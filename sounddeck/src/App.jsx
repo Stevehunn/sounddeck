@@ -1,122 +1,92 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect, useState, useRef } from 'react'
+import { useStore } from './store/useStore'
+import Sidebar from './components/Sidebar'
+import Home from './pages/Home'
+import Discover from './pages/Discover'
+import Options from './pages/Options'
+import Toast from './components/Toast'
+import { playSound } from './utils/audio'
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const store = useStore()
+  const [currentPage, setCurrentPage] = useState('home')
+  const [toasts, setToasts] = useState([])
+  const soundsRef = useRef([])
+
+  // Sync ref pour accès dans les callbacks IPC
+  useEffect(() => { soundsRef.current = store.sounds }, [store.sounds])
+
+  // Appliquer le thème
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', store.theme)
+  }, [store.theme])
+
+  // Écouter les raccourcis globaux depuis Electron
+  useEffect(() => {
+    if (!window.electronAPI) return
+
+    // Jouer un son via raccourci global
+    window.electronAPI.onPlaySound((soundId) => {
+      const sound = soundsRef.current.find(s => s.id === soundId)
+      if (sound) playSound(sound, store.audioDevice, store.volume)
+    })
+
+    // Changer de profil via raccourci global
+    window.electronAPI.onSwitchProfile(() => {
+      store.switchToNextProfile()
+    })
+
+    return () => {
+      window.electronAPI.removeAllListeners('play-sound')
+      window.electronAPI.removeAllListeners('switch-profile')
+    }
+  }, [])
+
+  // Système de notifications toast
+  const addToast = (message, type = 'info') => {
+    const id = Date.now()
+    setToasts(prev => [...prev, { id, message, type }])
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000)
+  }
+
+  if (store.loading) {
+    return (
+      <div style={{
+        height: '100vh', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', background: 'var(--bg-primary)',
+        color: 'var(--text-secondary)', flexDirection: 'column', gap: 12
+      }}>
+        <i className="ti ti-speakerphone" style={{ fontSize: 32, color: 'var(--accent)' }} />
+        <span>Chargement de SoundDeck...</span>
+      </div>
+    )
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg-primary)' }}>
+      <Sidebar
+        profiles={store.profiles}
+        currentProfileId={store.currentProfileId}
+        currentPage={currentPage}
+        onSwitchProfile={store.switchProfile}
+        onChangePage={setCurrentPage}
+        onCreateProfile={store.createProfile}
+        addToast={addToast}
+      />
 
-      <div className="ticks"></div>
+      <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {currentPage === 'home' && (
+          <Home store={store} addToast={addToast} />
+        )}
+        {currentPage === 'discover' && (
+          <Discover store={store} addToast={addToast} />
+        )}
+        {currentPage === 'options' && (
+          <Options store={store} addToast={addToast} />
+        )}
+      </main>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      <Toast toasts={toasts} />
+    </div>
   )
 }
-
-export default App

@@ -8,52 +8,36 @@ const isDev = process.env.NODE_ENV !== 'production'
 
 let mainWindow
 
-// Dossier où les sons sont stockés
 const soundsDir = path.join(app.getPath('userData'), 'sounds')
-if (!fs.existsSync(soundsDir)) {
-  fs.mkdirSync(soundsDir, { recursive: true })
-}
+if (!fs.existsSync(soundsDir)) fs.mkdirSync(soundsDir, { recursive: true })
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 700,
-    minWidth: 800,
-    minHeight: 500,
+    width: 1100, height: 700, minWidth: 800, minHeight: 500,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      webSecurity: false   // permet le chargement des fichiers locaux file://
     },
-    titleBarStyle: 'hiddenInset',
-    backgroundColor: '#0f0f0f',
-    show: false,
-    icon: path.join(__dirname, '../public/icon.png')
+    backgroundColor: '#111113',
+    show: false
   })
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
-    mainWindow.webContents.openDevTools()
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
 
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show()
-  })
-
-  mainWindow.on('closed', () => {
-    mainWindow = null
-  })
+  mainWindow.once('ready-to-show', () => mainWindow.show())
+  mainWindow.on('closed', () => { mainWindow = null })
 }
 
 app.whenReady().then(() => {
   createWindow()
   registerShortcuts()
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
+  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
 
 app.on('window-all-closed', () => {
@@ -62,9 +46,6 @@ app.on('window-all-closed', () => {
 })
 
 // ─── Raccourcis globaux ───────────────────────────────────────────────────────
-
-let registeredShortcuts = {}
-
 function registerShortcuts() {
   const shortcuts = store.get('shortcuts', {})
   Object.entries(shortcuts).forEach(([soundId, accelerator]) => {
@@ -73,19 +54,17 @@ function registerShortcuts() {
       globalShortcut.register(accelerator, () => {
         mainWindow?.webContents.send('play-sound', soundId)
       })
-      registeredShortcuts[soundId] = accelerator
-    } catch (e) {
-      console.error('Erreur raccourci:', accelerator, e)
-    }
+    } catch (e) { console.error('Erreur raccourci:', accelerator, e.message) }
   })
 
-  // Raccourci changement de profil
-  const profileShortcut = store.get('profileShortcut', 'CommandOrControl+Tab')
-  try {
-    globalShortcut.register(profileShortcut, () => {
-      mainWindow?.webContents.send('switch-profile')
-    })
-  } catch (e) {}
+  const profileShortcut = store.get('profileShortcut', '')
+  if (profileShortcut) {
+    try {
+      globalShortcut.register(profileShortcut, () => {
+        mainWindow?.webContents.send('switch-profile')
+      })
+    } catch (e) {}
+  }
 }
 
 ipcMain.handle('update-shortcuts', (event, shortcuts) => {
@@ -102,83 +81,146 @@ ipcMain.handle('update-profile-shortcut', (event, accelerator) => {
   return true
 })
 
-// ─── Gestion des sons ─────────────────────────────────────────────────────────
-
-// Ouvre la boîte de dialogue pour importer des fichiers audio
+// ─── Fichiers sons ────────────────────────────────────────────────────────────
 ipcMain.handle('open-file-dialog', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Importer des sons',
-    filters: [
-      { name: 'Fichiers audio', extensions: ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'] }
-    ],
+    filters: [{ name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'] }],
     properties: ['openFile', 'multiSelections']
   })
-  if (result.canceled) return []
-  return result.filePaths
+  return result.canceled ? [] : result.filePaths
 })
 
-// Copie un fichier son dans le dossier userData
+ipcMain.handle('open-image-dialog', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choisir une image',
+    filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }],
+    properties: ['openFile']
+  })
+  return result.canceled ? null : result.filePaths[0]
+})
+
 ipcMain.handle('import-sound-file', async (event, filePath) => {
   try {
     const fileName = path.basename(filePath)
     const destPath = path.join(soundsDir, fileName)
-
-    // Si le fichier existe déjà, on ajoute un timestamp
     const finalDest = fs.existsSync(destPath)
       ? path.join(soundsDir, `${Date.now()}_${fileName}`)
       : destPath
-
     fs.copyFileSync(filePath, finalDest)
     return { success: true, path: finalDest, name: path.basename(finalDest, path.extname(finalDest)) }
-  } catch (e) {
-    return { success: false, error: e.message }
-  }
+  } catch (e) { return { success: false, error: e.message } }
 })
 
-// Télécharge un son depuis une URL
+ipcMain.handle('import-image-file', async (event, filePath) => {
+  try {
+    const imagesDir = path.join(app.getPath('userData'), 'images')
+    if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true })
+    const fileName = path.basename(filePath)
+    const destPath = path.join(imagesDir, `${Date.now()}_${fileName}`)
+    fs.copyFileSync(filePath, destPath)
+    return { success: true, path: destPath }
+  } catch (e) { return { success: false, error: e.message } }
+})
+
 ipcMain.handle('download-sound-url', async (event, url, fileName) => {
   const https = require('https')
   const http = require('http')
   const protocol = url.startsWith('https') ? https : http
   const destPath = path.join(soundsDir, fileName)
-
   return new Promise((resolve) => {
     const file = fs.createWriteStream(destPath)
-    protocol.get(url, (response) => {
-      response.pipe(file)
-      file.on('finish', () => {
+    protocol.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (response) => {
+      if (response.statusCode === 301 || response.statusCode === 302) {
         file.close()
-        resolve({ success: true, path: destPath })
-      })
-    }).on('error', (e) => {
-      fs.unlink(destPath, () => {})
-      resolve({ success: false, error: e.message })
-    })
+        // Suivre la redirection
+        const redirectUrl = response.headers.location
+        const rProtocol = redirectUrl.startsWith('https') ? https : http
+        const file2 = fs.createWriteStream(destPath)
+        rProtocol.get(redirectUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (r2) => {
+          r2.pipe(file2)
+          file2.on('finish', () => { file2.close(); resolve({ success: true, path: destPath }) })
+        }).on('error', (e) => { fs.unlink(destPath, () => {}); resolve({ success: false, error: e.message }) })
+        return
+      }
+      response.pipe(file)
+      file.on('finish', () => { file.close(); resolve({ success: true, path: destPath }) })
+    }).on('error', (e) => { fs.unlink(destPath, () => {}); resolve({ success: false, error: e.message }) })
   })
 })
 
-// Supprime un son du dossier
 ipcMain.handle('delete-sound-file', async (event, filePath) => {
-  try {
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
-    return { success: true }
-  } catch (e) {
-    return { success: false, error: e.message }
-  }
+  try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); return { success: true } }
+  catch (e) { return { success: false, error: e.message } }
 })
 
-// Retourne le chemin du dossier sons (pour charger les fichiers via file://)
 ipcMain.handle('get-sounds-dir', () => soundsDir)
 
-// ─── Store (profils, favoris, options) ───────────────────────────────────────
+// ─── Scraper myinstants ───────────────────────────────────────────────────────
+ipcMain.handle('fetch-myinstants', async (event, query) => {
+  const https = require('https')
+  const url = `https://www.myinstants.com/fr/search/?name=${encodeURIComponent(query)}`
+  return new Promise((resolve) => {
+    https.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+        'Accept': 'text/html',
+        'Accept-Language': 'fr-FR,fr;q=0.9'
+      }
+    }, (res) => {
+      let data = ''
+      res.on('data', chunk => data += chunk)
+      res.on('end', () => {
+        try {
+          // Parser les boutons de sons dans le HTML
+          const sounds = []
+          // Pattern : onclick="play('media/sounds/xxx.mp3')" et le titre dans <b>
+          const btnRegex = /onclick="play\('(media\/sounds\/[^']+)'\)"/g
+          const titleRegex = /<b>([^<]+)<\/b>/g
 
+          const btnMatches = [...data.matchAll(btnRegex)]
+          const titleMatches = [...data.matchAll(titleRegex)]
+
+          btnMatches.forEach((match, i) => {
+            const soundPath = match[1]
+            const title = titleMatches[i] ? titleMatches[i][1].trim() : path.basename(soundPath, '.mp3')
+            sounds.push({
+              id: `mi_${i}_${Date.now()}`,
+              name: title,
+              url: `https://www.myinstants.com/${soundPath}`,
+              emoji: getEmojiForName(title)
+            })
+          })
+
+          resolve({ success: true, sounds: sounds.slice(0, 30) })
+        } catch (e) {
+          resolve({ success: false, error: e.message, sounds: [] })
+        }
+      })
+    }).on('error', (e) => resolve({ success: false, error: e.message, sounds: [] }))
+  })
+})
+
+function getEmojiForName(name) {
+  const n = name.toLowerCase()
+  if (n.includes('boom') || n.includes('explo')) return '💥'
+  if (n.includes('sad') || n.includes('trombone')) return '🎺'
+  if (n.includes('air') || n.includes('horn')) return '📣'
+  if (n.includes('laugh') || n.includes('lol') || n.includes('bruh')) return '😂'
+  if (n.includes('win') || n.includes('yes') || n.includes('epic')) return '🏆'
+  if (n.includes('oof') || n.includes('rip') || n.includes('fail')) return '😬'
+  if (n.includes('fart') || n.includes('poop')) return '💨'
+  if (n.includes('scream') || n.includes('aah') || n.includes('wtf')) return '😱'
+  if (n.includes('bell') || n.includes('ding') || n.includes('notif')) return '🔔'
+  if (n.includes('drum') || n.includes('ba dum')) return '🥁'
+  if (n.includes('cat') || n.includes('meow')) return '🐱'
+  if (n.includes('dog') || n.includes('woof')) return '🐶'
+  if (n.includes('noot') || n.includes('penguin')) return '🐧'
+  if (n.includes('vine')) return '🌿'
+  return '🔊'
+}
+
+// ─── Store ────────────────────────────────────────────────────────────────────
 ipcMain.handle('store-get', (event, key) => store.get(key))
 ipcMain.handle('store-set', (event, key, value) => { store.set(key, value); return true })
 ipcMain.handle('store-delete', (event, key) => { store.delete(key); return true })
-
-// ─── Sélection du périphérique audio ─────────────────────────────────────────
-
-ipcMain.handle('get-audio-devices', async () => {
-  // Retourné depuis le renderer via navigator.mediaDevices
-  return []
-})
