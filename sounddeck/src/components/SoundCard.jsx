@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import ShortcutRecorder from './ShortcutRecorder'
 import { playSound, stopSound, isPlaying } from '../utils/audio'
 
 export default function SoundCard({ sound, shortcut, audioDevice, volume, onToggleFavorite, onSetShortcut, onDelete, onRemoveFromProfile, onRename, onVolumeChange, currentProfileId }) {
@@ -139,7 +140,12 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, onTogg
       )}
 
       {/* Raccourci */}
-      <ShortcutInput soundId={sound.id} shortcut={shortcut} onSetShortcut={onSetShortcut} />
+      <ShortcutRecorder
+        value={shortcut || ''}
+        onSave={(acc) => onSetShortcut(sound.id, acc)}
+        onClear={() => onSetShortcut(sound.id, '')}
+        compact
+      />
     </div>
   )
 }
@@ -173,46 +179,6 @@ function VolumePanel({ volume, onChange, onCommit, onClose }) {
         style={{ width: '100%', marginTop: 8, padding: '4px 0', justifyContent: 'center', fontSize: 11 }}>
         Fermer
       </button>
-    </div>
-  )
-}
-
-// ─── Raccourci ────────────────────────────────────────────────────────────────
-function ShortcutInput({ soundId, shortcut, onSetShortcut }) {
-  const [recording, setRecording] = useState(false)
-
-  const handleKeyDown = (e) => {
-    e.preventDefault(); e.stopPropagation()
-    if (e.key === 'Escape') { setRecording(false); return }
-    if (e.key === 'Backspace' || e.key === 'Delete') { onSetShortcut(soundId, ''); setRecording(false); return }
-    const parts = []
-    if (e.ctrlKey || e.metaKey) parts.push('CommandOrControl')
-    if (e.altKey) parts.push('Alt')
-    if (e.shiftKey) parts.push('Shift')
-    const key = e.key.length === 1 ? e.key.toUpperCase() : e.key
-    if (!['Control', 'Meta', 'Alt', 'Shift'].includes(e.key)) {
-      parts.push(key)
-      onSetShortcut(soundId, parts.join('+'))
-      setRecording(false)
-    }
-  }
-
-  if (recording) {
-    return (
-      <div tabIndex={0} onKeyDown={handleKeyDown} onBlur={() => setRecording(false)}
-        ref={el => el && el.focus()}
-        style={{ fontSize: 10, textAlign: 'center', background: 'var(--accent-light)', border: '1px solid var(--accent)', borderRadius: 4, padding: '3px 6px', color: 'var(--accent)', outline: 'none' }}>
-        Appuyez...
-      </div>
-    )
-  }
-
-  return (
-    <div onClick={e => { e.stopPropagation(); setRecording(true) }}
-      className="shortcut-badge"
-      style={{ display: 'block', textAlign: 'center', cursor: 'pointer', fontSize: 10, padding: '3px 6px' }}
-      title="Cliquer pour définir un raccourci">
-      {shortcut || '+ Raccourci'}
     </div>
   )
 }

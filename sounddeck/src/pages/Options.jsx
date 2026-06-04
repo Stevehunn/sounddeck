@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
+import ShortcutRecorder from '../components/ShortcutRecorder'
 
 export default function Options({ store, addToast }) {
   const [audioDevices, setAudioDevices] = useState([])
-  const [recordingFor, setRecordingFor] = useState(null)
 
   // Charger les périphériques audio disponibles
   useEffect(() => {
@@ -11,32 +11,6 @@ export default function Options({ store, addToast }) {
       setAudioDevices(outputs)
     }).catch(() => {})
   }, [])
-
-  const handleShortcutRecord = (key) => {
-    setRecordingFor(key)
-  }
-
-  const handleKeyDown = (e, key) => {
-    e.preventDefault()
-    if (e.key === 'Escape') { setRecordingFor(null); return }
-    if (e.key === 'Backspace') {
-      if (key === 'profile') store.updateProfileShortcut('')
-      setRecordingFor(null)
-      return
-    }
-    const parts = []
-    if (e.ctrlKey || e.metaKey) parts.push('CommandOrControl')
-    if (e.altKey) parts.push('Alt')
-    if (e.shiftKey) parts.push('Shift')
-    const k = e.key.toUpperCase()
-    if (!['CONTROL', 'META', 'ALT', 'SHIFT'].includes(k)) {
-      parts.push(k)
-      const combo = parts.join('+')
-      if (key === 'profile') store.updateProfileShortcut(combo)
-      setRecordingFor(null)
-      addToast(`Raccourci défini : ${combo}`, 'success')
-    }
-  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -102,11 +76,9 @@ export default function Options({ store, addToast }) {
         {/* Raccourcis globaux */}
         <Section title="Raccourcis globaux" icon="ti-keyboard">
           <OptionRow label="Changer de profil" sub="Cycle entre vos profils">
-            <ShortcutKey
+            <ShortcutRecorder
               value={store.profileShortcut}
-              recording={recordingFor === 'profile'}
-              onRecord={() => handleShortcutRecord('profile')}
-              onKeyDown={e => handleKeyDown(e, 'profile')}
+              onSave={async (acc) => { await store.updateProfileShortcut(acc); addToast(`Raccourci défini : ${acc}`, 'success') }}
               onClear={() => store.updateProfileShortcut('')}
             />
           </OptionRow>
@@ -174,24 +146,6 @@ function Toggle({ value, onChange }) {
         position: 'absolute', width: 16, height: 16, borderRadius: 8, background: 'white',
         top: 2, left: value ? 18 : 2, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
       }} />
-    </div>
-  )
-}
-
-function ShortcutKey({ value, recording, onRecord, onKeyDown, onClear }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      {recording ? (
-        <div tabIndex={0} autoFocus onKeyDown={onKeyDown} onBlur={() => {}}
-          style={{ background: 'var(--accent-light)', border: '1px solid var(--accent)', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: 'var(--accent)', outline: 'none', minWidth: 120, textAlign: 'center' }}>
-          Appuyez sur une touche...
-        </div>
-      ) : (
-        <div onClick={onRecord} className="shortcut-badge" style={{ cursor: 'pointer', padding: '4px 10px', fontSize: 12, minWidth: 80, textAlign: 'center' }}>
-          {value || 'Non défini'}
-        </div>
-      )}
-      {value && <button className="btn-ghost" style={{ padding: '3px 6px' }} onClick={onClear}><i className="ti ti-x" /></button>}
     </div>
   )
 }

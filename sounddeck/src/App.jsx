@@ -11,29 +11,40 @@ export default function App() {
   const store = useStore()
   const [currentPage, setCurrentPage] = useState('home')
   const [toasts, setToasts] = useState([])
-  const soundsRef = useRef([])
 
-  // Sync ref pour accès dans les callbacks IPC
+  // Refs pour toujours avoir les valeurs à jour dans les callbacks IPC
+  const soundsRef = useRef([])
+  const addToastRef = useRef(null)
+  const switchToNextProfileRef = useRef(null)
+  const audioDeviceRef = useRef('default')
+  const volumeRef = useRef(80)
+
   useEffect(() => { soundsRef.current = store.sounds }, [store.sounds])
+  useEffect(() => { addToastRef.current = addToast }, )
+  useEffect(() => { switchToNextProfileRef.current = store.switchToNextProfile }, [store.switchToNextProfile])
+  useEffect(() => { audioDeviceRef.current = store.audioDevice }, [store.audioDevice])
+  useEffect(() => { volumeRef.current = store.volume }, [store.volume])
 
   // Appliquer le thème
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', store.theme)
   }, [store.theme])
 
-  // Écouter les raccourcis globaux depuis Electron
+  // Enregistrer les listeners IPC une seule fois — mais via les refs
   useEffect(() => {
     if (!window.electronAPI) return
 
-    // Jouer un son via raccourci global
     window.electronAPI.onPlaySound((soundId) => {
       const sound = soundsRef.current.find(s => s.id === soundId)
-      if (sound) playSound(sound, store.audioDevice, store.volume)
+      if (sound) playSound(sound, audioDeviceRef.current, volumeRef.current)
     })
 
-    // Changer de profil via raccourci global
-    window.electronAPI.onSwitchProfile(() => {
-      store.switchToNextProfile()
+    window.electronAPI.onSwitchProfile(async () => {
+      if (switchToNextProfileRef.current) {
+        await switchToNextProfileRef.current()
+        // Lire le nouveau profil courant depuis la ref après le changement
+        addToastRef.current?.('Profil changé', 'info')
+      }
     })
 
     return () => {
@@ -42,7 +53,6 @@ export default function App() {
     }
   }, [])
 
-  // Système de notifications toast
   const addToast = (message, type = 'info') => {
     const id = Date.now()
     setToasts(prev => [...prev, { id, message, type }])
@@ -75,15 +85,9 @@ export default function App() {
       />
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {currentPage === 'home' && (
-          <Home store={store} addToast={addToast} />
-        )}
-        {currentPage === 'discover' && (
-          <Discover store={store} addToast={addToast} />
-        )}
-        {currentPage === 'options' && (
-          <Options store={store} addToast={addToast} />
-        )}
+        {currentPage === 'home' && <Home store={store} addToast={addToast} />}
+        {currentPage === 'discover' && <Discover store={store} addToast={addToast} />}
+        {currentPage === 'options' && <Options store={store} addToast={addToast} />}
       </main>
 
       <Toast toasts={toasts} />
