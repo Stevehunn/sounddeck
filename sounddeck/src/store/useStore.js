@@ -140,6 +140,12 @@ export function useStore() {
     await save('sounds', updated)
   }, [sounds, save])
 
+  const updateSoundVolume = useCallback(async (soundId, volume) => {
+    const updated = sounds.map(s => s.id === soundId ? { ...s, volume } : s)
+    setSounds(updated)
+    await save('sounds', updated)
+  }, [sounds, save])
+
   const toggleFavorite = useCallback(async (soundId) => {
     const updated = sounds.map(s =>
       s.id === soundId ? { ...s, favorite: !s.favorite } : s
@@ -155,6 +161,15 @@ export function useStore() {
         ? s.profiles
         : [...s.profiles, profileId]
       return { ...s, profiles }
+    })
+    setSounds(updated)
+    await save('sounds', updated)
+  }, [sounds, save])
+
+  const removeSoundFromProfile = useCallback(async (soundId, profileId) => {
+    const updated = sounds.map(s => {
+      if (s.id !== soundId) return s
+      return { ...s, profiles: s.profiles.filter(pid => pid !== profileId) }
     })
     setSounds(updated)
     await save('sounds', updated)
@@ -217,7 +232,7 @@ export function useStore() {
     // Profils
     createProfile, deleteProfile, renameProfile, switchProfile, switchToNextProfile,
     // Sons
-    addSound, deleteSound, updateSound, toggleFavorite, addSoundToProfile,
+    addSound, deleteSound, updateSound, updateSoundVolume, toggleFavorite, addSoundToProfile, removeSoundFromProfile,
     // Raccourcis
     setShortcut, clearShortcut, updateProfileShortcut,
     // Options

@@ -185,9 +185,15 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, store, addToast }) 
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
       {sounds.map(s => (
         <SoundCard key={s.id} sound={s} shortcut={shortcuts[s.id]} audioDevice={audioDevice} volume={volume}
+          currentProfileId={store.currentProfileId}
           onToggleFavorite={store.toggleFavorite}
           onSetShortcut={store.setShortcut}
-          onDelete={async (id) => { await store.deleteSound(id); addToast('Son supprimé', 'info') }}
+          onVolumeChange={store.updateSoundVolume}
+          onRemoveFromProfile={async (id) => {
+            await store.removeSoundFromProfile(id, store.currentProfileId)
+            addToast('Son retiré du profil', 'info')
+          }}
+          onDelete={async (id) => { await store.deleteSound(id); addToast('Son supprimé définitivement', 'info') }}
           onRename={(id, name) => store.updateSound(id, { name })}
         />
       ))}

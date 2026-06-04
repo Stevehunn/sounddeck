@@ -1,5 +1,6 @@
 import { Howl, Howler } from 'howler'
 
+// Cache des instances Howl actives
 const soundCache = {}
 
 export function playSound(sound, audioDevice = 'default', globalVolume = 80) {
@@ -7,18 +8,21 @@ export function playSound(sound, audioDevice = 'default', globalVolume = 80) {
 
   const volumeRatio = ((sound.volume ?? 100) / 100) * (globalVolume / 100)
 
-  // Toujours construire une URL file:// correcte pour Windows
   let fileUrl = sound.path
   if (!fileUrl.startsWith('file://') && !fileUrl.startsWith('http')) {
-    // Windows : C:\... → file:///C:/...
     fileUrl = 'file:///' + fileUrl.replace(/\\/g, '/')
   }
 
-  console.log('Playing:', fileUrl)
-
-  // Arrêter et détruire le cache pour forcer le rechargement si besoin
-  if (soundCache[sound.id]) {
+  // Si déjà en cours de lecture → stop
+  if (soundCache[sound.id] && soundCache[sound.id].playing()) {
     soundCache[sound.id].stop()
+    soundCache[sound.id].unload()
+    delete soundCache[sound.id]
+    return // toggle : un 2e clic arrête le son
+  }
+
+  // Nettoyer l'ancienne instance si elle existe
+  if (soundCache[sound.id]) {
     soundCache[sound.id].unload()
     delete soundCache[sound.id]
   }
@@ -26,14 +30,13 @@ export function playSound(sound, audioDevice = 'default', globalVolume = 80) {
   const howl = new Howl({
     src: [fileUrl],
     volume: volumeRatio,
-    html5: false, // false = Web Audio API, plus fiable en Electron
-    format: [sound.path.split('.').pop() || 'mp3'],
+    html5: false,
+    format: [sound.path.split('.').pop()?.toLowerCase() || 'mp3'],
+    onend: () => { delete soundCache[sound.id] },
+    onstop: () => { delete soundCache[sound.id] },
     onloaderror: (id, err) => {
-      console.error('Erreur chargement son:', err, fileUrl)
+      console.error('Erreur chargement:', err, fileUrl)
       delete soundCache[sound.id]
-    },
-    onplayerror: (id, err) => {
-      console.error('Erreur lecture son:', err)
     }
   })
 
@@ -41,8 +44,21 @@ export function playSound(sound, audioDevice = 'default', globalVolume = 80) {
   howl.play()
 }
 
+export function stopSound(soundId) {
+  if (soundCache[soundId]) {
+    soundCache[soundId].stop()
+    soundCache[soundId].unload()
+    delete soundCache[soundId]
+  }
+}
+
+export function isPlaying(soundId) {
+  return !!(soundCache[soundId] && soundCache[soundId].playing())
+}
+
 export function stopAllSounds() {
   Howler.stop()
+  Object.keys(soundCache).forEach(k => delete soundCache[k])
 }
 
 export function clearSoundCache(soundId) {
@@ -57,16 +73,4 @@ export function formatDuration(seconds) {
   if (!seconds) return '—'
   if (seconds < 60) return `${Math.round(seconds)}s`
   return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`
-}
-
-export function getAudioDuration(filePath) {
-  return new Promise((resolve) => {
-    let url = filePath
-    if (!url.startsWith('file://') && !url.startsWith('http')) {
-      url = 'file:///' + filePath.replace(/\\/g, '/')
-    }
-    const audio = new Audio(url)
-    audio.addEventListener('loadedmetadata', () => resolve(audio.duration))
-    audio.addEventListener('error', () => resolve(null))
-  })
 }
