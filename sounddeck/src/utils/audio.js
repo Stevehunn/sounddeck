@@ -1,10 +1,9 @@
 import { Howl, Howler } from 'howler'
 
-// Cache des instances Howl actives
 const soundCache = {}
 
-export function playSound(sound, audioDevice = 'default', globalVolume = 80) {
-  if (!sound?.path) { console.warn('playSound: pas de path', sound); return }
+export function playSound(sound, audioDevice = 'default', globalVolume = 80, loop = false) {
+  if (!sound?.path) return
 
   const volumeRatio = ((sound.volume ?? 100) / 100) * (globalVolume / 100)
 
@@ -13,15 +12,14 @@ export function playSound(sound, audioDevice = 'default', globalVolume = 80) {
     fileUrl = 'file:///' + fileUrl.replace(/\\/g, '/')
   }
 
-  // Si déjà en cours de lecture → stop
+  // Toggle : si en cours → stop
   if (soundCache[sound.id] && soundCache[sound.id].playing()) {
     soundCache[sound.id].stop()
     soundCache[sound.id].unload()
     delete soundCache[sound.id]
-    return // toggle : un 2e clic arrête le son
+    return
   }
 
-  // Nettoyer l'ancienne instance si elle existe
   if (soundCache[sound.id]) {
     soundCache[sound.id].unload()
     delete soundCache[sound.id]
@@ -31,13 +29,11 @@ export function playSound(sound, audioDevice = 'default', globalVolume = 80) {
     src: [fileUrl],
     volume: volumeRatio,
     html5: false,
+    loop: loop,
     format: [sound.path.split('.').pop()?.toLowerCase() || 'mp3'],
-    onend: () => { delete soundCache[sound.id] },
+    onend: () => { if (!loop) delete soundCache[sound.id] },
     onstop: () => { delete soundCache[sound.id] },
-    onloaderror: (id, err) => {
-      console.error('Erreur chargement:', err, fileUrl)
-      delete soundCache[sound.id]
-    }
+    onloaderror: (id, err) => { console.error('Erreur chargement:', err); delete soundCache[sound.id] }
   })
 
   soundCache[sound.id] = howl
@@ -52,13 +48,13 @@ export function stopSound(soundId) {
   }
 }
 
-export function isPlaying(soundId) {
-  return !!(soundCache[soundId] && soundCache[soundId].playing())
-}
-
 export function stopAllSounds() {
   Howler.stop()
   Object.keys(soundCache).forEach(k => delete soundCache[k])
+}
+
+export function isPlaying(soundId) {
+  return !!(soundCache[soundId] && soundCache[soundId].playing())
 }
 
 export function clearSoundCache(soundId) {
@@ -67,10 +63,4 @@ export function clearSoundCache(soundId) {
   } else {
     Object.keys(soundCache).forEach(k => { soundCache[k].unload(); delete soundCache[k] })
   }
-}
-
-export function formatDuration(seconds) {
-  if (!seconds) return '—'
-  if (seconds < 60) return `${Math.round(seconds)}s`
-  return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`
 }

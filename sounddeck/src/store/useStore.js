@@ -12,6 +12,8 @@ export function useStore() {
   const [audioDevice, setAudioDevice] = useState('default')
   const [volume, setVolume] = useState(80)
   const [playLocally, setPlayLocally] = useState(true)
+  const [loopEnabled, setLoopEnabled] = useState(false)
+  const [loopShortcut, setLoopShortcut] = useState('')
   const [loading, setLoading] = useState(true)
 
   // ─── Chargement initial depuis electron-store ────────────────────────────────
@@ -26,6 +28,7 @@ export function useStore() {
         const savedAudioDevice = await window.electronAPI.storeGet('audioDevice') || 'default'
         const savedVolume = await window.electronAPI.storeGet('volume') ?? 80
         const savedPlayLocally = await window.electronAPI.storeGet('playLocally') ?? true
+        const savedLoopShortcut = await window.electronAPI.storeGet('loopShortcut') || ''
         const savedCurrentProfileId = await window.electronAPI.storeGet('currentProfileId')
 
         // Profil "Tous les sons" toujours présent
@@ -41,6 +44,7 @@ export function useStore() {
         setAudioDevice(savedAudioDevice)
         setVolume(savedVolume)
         setPlayLocally(savedPlayLocally)
+        setLoopShortcut(savedLoopShortcut)
         setCurrentProfileId(savedCurrentProfileId || 'all')
       } catch (e) {
         console.error('Erreur chargement store:', e)
@@ -101,11 +105,15 @@ export function useStore() {
   }, [profiles, currentProfileId, switchProfile])
 
   // ─── Sons ─────────────────────────────────────────────────────────────────────
+  // Normalise un chemin fichier en remplaçant les backslashes
+  const normalizePath = (p) => p ? p.replace(/\\/g, '/') : p
+
   const addSound = useCallback(async (soundData) => {
     const newSound = {
       id: uuidv4(),
       name: soundData.name,
-      path: soundData.path,
+      path: normalizePath(soundData.path),
+      image: normalizePath(soundData.image) || null,
       emoji: soundData.emoji || '🔊',
       favorite: false,
       profiles: soundData.profiles || ['all'],
@@ -197,6 +205,16 @@ export function useStore() {
     await window.electronAPI.updateProfileShortcut(accelerator)
   }, [save])
 
+  const toggleLoop = useCallback(() => {
+    setLoopEnabled(prev => !prev)
+  }, [])
+
+  const updateLoopShortcut = useCallback(async (accelerator) => {
+    setLoopShortcut(accelerator)
+    await save('loopShortcut', accelerator)
+    await window.electronAPI.updateLoopShortcut(accelerator)
+  }, [save])
+
   // ─── Options ──────────────────────────────────────────────────────────────────
   const updateTheme = useCallback(async (newTheme) => {
     setTheme(newTheme)
@@ -236,6 +254,7 @@ export function useStore() {
     // Raccourcis
     setShortcut, clearShortcut, updateProfileShortcut,
     // Options
+    loopEnabled, loopShortcut, toggleLoop, updateLoopShortcut,
     updateTheme, updateAudioDevice, updateVolume, updatePlayLocally
   }
 }

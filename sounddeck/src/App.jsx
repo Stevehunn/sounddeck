@@ -16,12 +16,14 @@ export default function App() {
   const soundsRef = useRef([])
   const addToastRef = useRef(null)
   const switchToNextProfileRef = useRef(null)
+  const toggleLoopRef = useRef(null)
   const audioDeviceRef = useRef('default')
   const volumeRef = useRef(80)
 
   useEffect(() => { soundsRef.current = store.sounds }, [store.sounds])
   useEffect(() => { addToastRef.current = addToast }, )
   useEffect(() => { switchToNextProfileRef.current = store.switchToNextProfile }, [store.switchToNextProfile])
+  useEffect(() => { toggleLoopRef.current = store.toggleLoop }, [store.toggleLoop])
   useEffect(() => { audioDeviceRef.current = store.audioDevice }, [store.audioDevice])
   useEffect(() => { volumeRef.current = store.volume }, [store.volume])
 
@@ -47,9 +49,15 @@ export default function App() {
       }
     })
 
+    window.electronAPI.onToggleLoop(() => {
+      if (toggleLoopRef.current) toggleLoopRef.current()
+      addToastRef.current?.('Loop ' + (store.loopEnabled ? 'désactivé' : 'activé'), 'info')
+    })
+
     return () => {
       window.electronAPI.removeAllListeners('play-sound')
       window.electronAPI.removeAllListeners('switch-profile')
+      window.electronAPI.removeAllListeners('toggle-loop')
     }
   }, [])
 
@@ -81,11 +89,13 @@ export default function App() {
         onSwitchProfile={store.switchProfile}
         onChangePage={setCurrentPage}
         onCreateProfile={store.createProfile}
+        onToggleLoop={store.toggleLoop}
+        loopEnabled={store.loopEnabled}
         addToast={addToast}
       />
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {currentPage === 'home' && <Home store={store} addToast={addToast} />}
+        {currentPage === 'home' && <Home store={store} addToast={addToast} loopEnabled={store.loopEnabled} />}
         {currentPage === 'discover' && <Discover store={store} addToast={addToast} />}
         {currentPage === 'options' && <Options store={store} addToast={addToast} />}
       </main>

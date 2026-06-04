@@ -82,6 +82,14 @@ export default function Options({ store, addToast }) {
               onClear={() => store.updateProfileShortcut('')}
             />
           </OptionRow>
+          <OptionRow label="Activer/désactiver le Loop" sub="Active le mode répétition pour tous les sons">
+            <ShortcutRecorder
+              value={store.loopShortcut}
+              onSave={async (acc) => { await store.updateLoopShortcut(acc); addToast(`Raccourci loop : ${acc}`, 'success') }}
+              onClear={() => store.updateLoopShortcut('')}
+              requireMod
+            />
+          </OptionRow>
           <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
             Les raccourcis par son se configurent directement sur chaque carte de son (page Mes sons).
           </div>

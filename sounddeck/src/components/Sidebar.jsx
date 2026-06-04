@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export default function Sidebar({ profiles, currentProfileId, currentPage, onSwitchProfile, onChangePage, onCreateProfile, addToast }) {
+export default function Sidebar({ profiles, currentProfileId, currentPage, onSwitchProfile, onChangePage, onCreateProfile, onToggleLoop, loopEnabled, addToast }) {
   const [newProfileName, setNewProfileName] = useState('')
   const [showNewProfile, setShowNewProfile] = useState(false)
 
@@ -81,6 +81,30 @@ export default function Sidebar({ profiles, currentProfileId, currentPage, onSwi
           active={currentPage === 'discover'}
           onClick={() => onChangePage('discover')}
         />
+
+        {/* Bouton Loop */}
+        <div style={{ margin: '6px 8px 0' }}>
+          <button
+            onClick={onToggleLoop}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+              padding: '7px 8px', borderRadius: 8,
+              background: loopEnabled ? 'rgba(29,158,117,0.15)' : 'var(--bg-tertiary)',
+              border: `1px solid ${loopEnabled ? 'var(--success)' : 'var(--border)'}`,
+              color: loopEnabled ? 'var(--success)' : 'var(--text-tertiary)',
+              fontSize: 12, fontWeight: loopEnabled ? 600 : 400, cursor: 'pointer'
+            }}>
+            <i className="ti ti-repeat" style={{ fontSize: 15 }} />
+            <span style={{ flex: 1, textAlign: 'left' }}>Loop</span>
+            <span style={{
+              fontSize: 10, padding: '1px 6px', borderRadius: 10,
+              background: loopEnabled ? 'var(--success)' : 'var(--border)',
+              color: loopEnabled ? 'white' : 'var(--text-tertiary)'
+            }}>
+              {loopEnabled ? 'ON' : 'OFF'}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Options en bas */}

@@ -1,19 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
-import ShortcutRecorder from './ShortcutRecorder'
 import { playSound, stopSound, isPlaying } from '../utils/audio'
+import ShortcutRecorder from './ShortcutRecorder'
 
-export default function SoundCard({ sound, shortcut, audioDevice, volume, onToggleFavorite, onSetShortcut, onDelete, onRemoveFromProfile, onRename, onVolumeChange, currentProfileId }) {
+export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEnabled, onToggleFavorite, onSetShortcut, onDelete, onRemoveFromProfile, onRename, onVolumeChange, currentProfileId }) {
   const [playing, setPlaying] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showVolume, setShowVolume] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(sound.name)
   const [localVolume, setLocalVolume] = useState(sound.volume ?? 100)
+  const [imgError, setImgError] = useState(false)
 
-  // Sync volume si le son change (ex: rechargement)
   useEffect(() => { setLocalVolume(sound.volume ?? 100) }, [sound.volume])
+  useEffect(() => { setImgError(false) }, [sound.image]) // reset si image change
 
-  // Polling pour détecter la fin du son et mettre à jour l'état playing
+  // Polling fin de son
   useEffect(() => {
     if (!playing) return
     const interval = setInterval(() => {
@@ -22,13 +23,21 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, onTogg
     return () => clearInterval(interval)
   }, [playing, sound.id])
 
+  // Si loop se désactive pendant que ce son joue en loop → le stopper
+  useEffect(() => {
+    if (!loopEnabled && playing) {
+      stopSound(sound.id)
+      setPlaying(false)
+    }
+  }, [loopEnabled])
+
   const handlePlay = (e) => {
     e?.stopPropagation()
     if (playing) {
       stopSound(sound.id)
       setPlaying(false)
     } else {
-      playSound(sound, audioDevice, volume)
+      playSound(sound, audioDevice, volume, loopEnabled)
       setPlaying(true)
     }
   }
@@ -38,24 +47,33 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, onTogg
     setEditingName(false)
   }
 
-  // Sauvegarde du volume après relâchement du slider
   const handleVolumeCommit = useCallback((val) => {
     onVolumeChange(sound.id, val)
   }, [sound.id, onVolumeChange])
 
-  const imageUrl = sound.image
-    ? (sound.image.startsWith('file://') ? sound.image : `file:///${sound.image.replace(/\\/g, '/')}`)
-    : null
+  // Construction URL image robuste — encode les espaces et caractères spéciaux
+  const buildImageUrl = (imgPath) => {
+    if (!imgPath) return null
+    if (imgPath.startsWith('file://')) return imgPath
+    // Windows : backslashes → forward slashes
+    const normalized = imgPath.replace(/\\/g, '/')
+    // Encoder les espaces et caractères spéciaux dans le chemin
+    const encoded = normalized.split('/').map(segment => encodeURIComponent(segment)).join('/')
+    return 'file:///' + encoded
+  }
+
+  const imageUrl = buildImageUrl(sound.image)
+  const showImage = !!(sound.image) && !imgError
 
   return (
     <div style={{
       background: 'var(--bg-secondary)',
-      border: `1px solid ${playing ? 'var(--accent)' : 'var(--border)'}`,
+      border: `1px solid ${playing ? (loopEnabled ? 'var(--success)' : 'var(--accent)') : 'var(--border)'}`,
       borderRadius: 'var(--radius-md)', padding: 8, position: 'relative',
       transition: 'border-color 0.15s'
     }} className={playing ? 'playing-pulse' : ''}>
 
-      {/* Barre du haut : favori + menu */}
+      {/* Barre du haut */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <button onClick={e => { e.stopPropagation(); onToggleFavorite(sound.id) }}
           style={{
@@ -66,20 +84,27 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, onTogg
           }}>
           <i className={`ti ${sound.favorite ? 'ti-star-filled' : 'ti-star'}`} />
         </button>
-        <button onClick={e => { e.stopPropagation(); setShowMenu(!showMenu); setShowVolume(false) }}
-          style={{
-            background: 'var(--bg-tertiary)', border: '1px solid var(--border)',
-            borderRadius: 6, color: 'var(--text-secondary)', padding: '3px 7px',
-            fontSize: 12, cursor: 'pointer', lineHeight: 1
-          }}>
-          <i className="ti ti-dots-vertical" />
-        </button>
+
+        <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+          {loopEnabled && (
+            <span title="Loop activé" style={{ fontSize: 11, color: 'var(--success)' }}>
+              <i className="ti ti-repeat" />
+            </span>
+          )}
+          <button onClick={e => { e.stopPropagation(); setShowMenu(!showMenu); setShowVolume(false) }}
+            style={{
+              background: 'var(--bg-tertiary)', border: '1px solid var(--border)',
+              borderRadius: 6, color: 'var(--text-secondary)', padding: '3px 7px',
+              fontSize: 12, cursor: 'pointer', lineHeight: 1
+            }}>
+            <i className="ti ti-dots-vertical" />
+          </button>
+        </div>
       </div>
 
       {showMenu && (
         <ContextMenu
-          sound={sound}
-          currentProfileId={currentProfileId}
+          sound={sound} currentProfileId={currentProfileId}
           onClose={() => setShowMenu(false)}
           onToggleFavorite={() => { onToggleFavorite(sound.id); setShowMenu(false) }}
           onRename={() => { setEditingName(true); setShowMenu(false) }}
@@ -89,14 +114,9 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, onTogg
         />
       )}
 
-      {/* Slider volume inline */}
       {showVolume && (
-        <VolumePanel
-          volume={localVolume}
-          onChange={val => setLocalVolume(val)}
-          onCommit={handleVolumeCommit}
-          onClose={() => setShowVolume(false)}
-        />
+        <VolumePanel volume={localVolume} onChange={val => setLocalVolume(val)}
+          onCommit={handleVolumeCommit} onClose={() => setShowVolume(false)} />
       )}
 
       {/* Image/emoji + overlay play/stop */}
@@ -106,23 +126,33 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, onTogg
           borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 26, marginBottom: 7, position: 'relative', overflow: 'hidden', cursor: 'pointer'
         }}
-        onMouseEnter={e => e.currentTarget.querySelector('.play-overlay').style.opacity = 1}
-        onMouseLeave={e => e.currentTarget.querySelector('.play-overlay').style.opacity = 0}
+        onMouseEnter={e => { const o = e.currentTarget.querySelector('.play-overlay'); if (o) o.style.opacity = 1 }}
+        onMouseLeave={e => { const o = e.currentTarget.querySelector('.play-overlay'); if (o && !playing) o.style.opacity = 0 }}
       >
-        {imageUrl
-          ? <img src={imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
-          : null}
-        <span style={{ display: imageUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
-          {sound.emoji || '🔊'}
-        </span>
+        {/* Image si disponible et pas d'erreur */}
+        {showImage && (
+          <img
+            src={imageUrl}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={() => setImgError(true)}
+          />
+        )}
+        {/* Emoji toujours présent en dessous de l'image */}
+        {!showImage && (
+          <span style={{ fontSize: 26 }}>{sound.emoji || '🔊'}</span>
+        )}
         <div className="play-overlay" style={{
           position: 'absolute', inset: 0,
-          background: playing ? 'rgba(224,82,82,0.85)' : 'rgba(124,111,247,0.85)',
+          background: playing
+            ? (loopEnabled ? 'rgba(29,158,117,0.85)' : 'rgba(224,82,82,0.85)')
+            : 'rgba(124,111,247,0.85)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           opacity: playing ? 1 : 0, transition: 'opacity 0.15s, background 0.15s', borderRadius: 8
         }}>
           <i className={`ti ${playing ? 'ti-player-stop-filled' : 'ti-player-play-filled'}`} style={{ fontSize: 26, color: 'white' }} />
+          {playing && loopEnabled && (
+            <i className="ti ti-repeat" style={{ position: 'absolute', bottom: 4, right: 4, fontSize: 12, color: 'white', opacity: 0.8 }} />
+          )}
         </div>
       </div>
 
@@ -139,7 +169,6 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, onTogg
         </div>
       )}
 
-      {/* Raccourci */}
       <ShortcutRecorder
         value={shortcut || ''}
         onSave={(acc) => onSetShortcut(sound.id, acc)}
@@ -150,7 +179,6 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, onTogg
   )
 }
 
-// ─── Panel volume inline ──────────────────────────────────────────────────────
 function VolumePanel({ volume, onChange, onCommit, onClose }) {
   return (
     <div style={{
@@ -165,8 +193,7 @@ function VolumePanel({ volume, onChange, onCommit, onClose }) {
         </span>
         <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>{volume}%</span>
       </div>
-      <input
-        type="range" min="0" max="100" value={volume}
+      <input type="range" min="0" max="100" value={volume}
         onChange={e => onChange(Number(e.target.value))}
         onMouseUp={e => onCommit(Number(e.target.value))}
         onTouchEnd={e => onCommit(Number(e.target.value))}
@@ -183,7 +210,6 @@ function VolumePanel({ volume, onChange, onCommit, onClose }) {
   )
 }
 
-// ─── Menu contextuel ──────────────────────────────────────────────────────────
 function ContextMenu({ sound, currentProfileId, onClose, onToggleFavorite, onRename, onVolumeOpen, onRemoveFromProfile, onDelete }) {
   const ref = (el) => {
     if (!el) return
@@ -191,7 +217,6 @@ function ContextMenu({ sound, currentProfileId, onClose, onToggleFavorite, onRen
     if (rect.right > window.innerWidth) { el.style.left = 'auto'; el.style.right = '0' }
     if (rect.left < 0) { el.style.left = '0'; el.style.right = 'auto' }
   }
-
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
@@ -203,14 +228,12 @@ function ContextMenu({ sound, currentProfileId, onClose, onToggleFavorite, onRen
         <MenuItem icon={sound.favorite ? 'ti-star' : 'ti-star-filled'} label={sound.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'} onClick={onToggleFavorite} />
         <MenuItem icon="ti-pencil" label="Renommer" onClick={onRename} />
         <MenuItem icon="ti-volume" label="Régler le volume" onClick={onVolumeOpen} />
-
         {onRemoveFromProfile && currentProfileId !== 'all' && (
           <>
             <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
             <MenuItem icon="ti-folder-minus" label="Retirer du profil" onClick={onRemoveFromProfile} warning />
           </>
         )}
-
         <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
         <MenuItem icon="ti-trash" label="Supprimer définitivement" onClick={onDelete} danger />
       </div>
