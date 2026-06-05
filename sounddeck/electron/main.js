@@ -17,7 +17,9 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false
+      webSecurity: false,
+      allowRunningInsecureContent: false,
+      experimentalFeatures: true    // nécessaire pour File.path sur certaines versions
     },
     backgroundColor: '#111113',
     show: false
@@ -29,6 +31,16 @@ function createWindow() {
   }
   mainWindow.once('ready-to-show', () => mainWindow.show())
   mainWindow.on('closed', () => { mainWindow = null })
+
+  // Empêcher Electron de naviguer vers un fichier droppé (comportement par défaut)
+  mainWindow.webContents.on('will-navigate', (e, url) => {
+    if (url !== mainWindow.webContents.getURL()) e.preventDefault()
+  })
+
+  // Autoriser le drag & drop de fichiers dans la fenêtre
+  mainWindow.webContents.session.on('will-download', (e) => {
+    e.preventDefault()
+  })
 }
 
 app.whenReady().then(() => {
@@ -149,23 +161,117 @@ ipcMain.handle('import-image-file', async (event, filePath) => {
   } catch (e) { return { success: false, error: e.message } }
 })
 
-ipcMain.handle('download-sound-url', async (event, url, fileName) => {
+ipcMain.handle('download-sound-url', async (event, rawUrl, fileName) => {
   const https = require('https')
   const http = require('http')
   const destPath = path.join(soundsDir, fileName)
-  const doRequest = (url, dest) => new Promise((resolve) => {
+
+  // ─── Conversion des liens de partage en liens directs ────────────────────
+  function resolveDirectUrl(url) {
+    // Google Drive : /file/d/ID/view → uc?export=download&id=ID
+    const gdrive = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/)
+    if (gdrive) {
+      return `https://drive.google.com/uc?export=download&id=${gdrive[1]}`
+    }
+    // Google Drive : open?id=ID
+    const gdriveOpen = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/)
+    if (gdriveOpen) {
+      return `https://drive.google.com/uc?export=download&id=${gdriveOpen[1]}`
+    }
+    // Dropbox : ?dl=0 → ?dl=1
+    if (url.includes('dropbox.com')) {
+      return url.replace('?dl=0', '?dl=1').replace('&dl=0', '&dl=1')
+    }
+    // OneDrive : liens de partage → download direct
+    if (url.includes('1drv.ms') || url.includes('onedrive.live.com')) {
+      // Encoder en base64 et construire le lien direct
+      const b64 = Buffer.from(url).toString('base64')
+        .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+      return `https://api.onedrive.com/v1.0/shares/u!${b64}/root/content`
+    }
+    return url
+  }
+
+  const url = resolveDirectUrl(rawUrl)
+  console.log('Download URL résolu:', rawUrl, '→', url)
+
+  const doRequest = (url, dest, redirectCount = 0) => new Promise((resolve) => {
+    if (redirectCount > 10) {
+      resolve({ success: false, error: 'Trop de redirections' })
+      return
+    }
     const protocol = url.startsWith('https') ? https : http
     const file = fs.createWriteStream(dest)
-    protocol.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
-      if ([301,302,303,307].includes(res.statusCode)) {
+
+    const req = protocol.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'audio/*, */*'
+      }
+    }, (res) => {
+      console.log('HTTP status:', res.statusCode, 'Content-Type:', res.headers['content-type'])
+
+      // Suivre les redirections
+      if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
         file.close()
-        doRequest(res.headers.location, dest).then(resolve)
+        fs.unlink(dest, () => {})
+        const redirectUrl = res.headers.location.startsWith('http')
+          ? res.headers.location
+          : new URL(res.headers.location, url).href
+        console.log('Redirection vers:', redirectUrl)
+        doRequest(redirectUrl, dest, redirectCount + 1).then(resolve)
         return
       }
+
+      // Vérifier que c'est bien un fichier audio (pas une page HTML)
+      const contentType = res.headers['content-type'] || ''
+      if (res.statusCode === 200 && contentType.includes('text/html')) {
+        file.close()
+        fs.unlink(dest, () => {})
+        resolve({
+          success: false,
+          error: 'Le lien pointe vers une page web et non un fichier audio direct.\n\nPour Google Drive : ouvrez le fichier → cliquez "Télécharger" → copiez le lien direct.\nPour Dropbox : remplacez ?dl=0 par ?dl=1 dans l\'URL.'
+        })
+        return
+      }
+
+      if (res.statusCode !== 200) {
+        file.close()
+        fs.unlink(dest, () => {})
+        resolve({ success: false, error: `Erreur HTTP ${res.statusCode}` })
+        return
+      }
+
       res.pipe(file)
-      file.on('finish', () => { file.close(); resolve({ success: true, path: dest }) })
-    }).on('error', (e) => { fs.unlink(dest, () => {}); resolve({ success: false, error: e.message }) })
+      file.on('finish', () => {
+        file.close()
+        // Vérifier la taille minimale (éviter les fichiers vides ou HTML)
+        const stats = fs.statSync(dest)
+        if (stats.size < 1000) {
+          fs.unlink(dest, () => {})
+          resolve({ success: false, error: 'Fichier téléchargé trop petit — lien invalide ou protégé.' })
+          return
+        }
+        resolve({ success: true, path: dest.replace(/\\/g, '/') })
+      })
+      file.on('error', (e) => {
+        fs.unlink(dest, () => {})
+        resolve({ success: false, error: e.message })
+      })
+    })
+
+    req.on('error', (e) => {
+      fs.unlink(dest, () => {})
+      resolve({ success: false, error: e.message })
+    })
+
+    req.setTimeout(15000, () => {
+      req.destroy()
+      fs.unlink(dest, () => {})
+      resolve({ success: false, error: 'Timeout — le serveur ne répond pas.' })
+    })
   })
+
   return doRequest(url, destPath)
 })
 
@@ -299,6 +405,29 @@ function getEmojiForName(name) {
   if (n.includes('noot') || n.includes('penguin')) return '🐧'
   return '🔊'
 }
+
+// ─── Écriture d'un fichier droppé depuis son contenu binaire ────────────────
+// Utilisé quand file.path n'est pas disponible dans le renderer
+ipcMain.handle('write-dropped-file', async (event, fileName, arrayBuffer) => {
+  try {
+    const safeName = fileName.replace(/[^a-zA-Z0-9._\- ]/g, '_')
+    const destPath = path.join(soundsDir, `${Date.now()}_${safeName}`)
+    const buffer = Buffer.from(arrayBuffer)
+    fs.writeFileSync(destPath, buffer)
+    const name = path.basename(destPath, path.extname(destPath))
+    console.log('write-dropped-file OK:', destPath, buffer.length, 'bytes')
+    return { success: true, path: destPath.replace(/\\/g, '/'), name }
+  } catch (e) {
+    console.error('write-dropped-file error:', e.message)
+    return { success: false, error: e.message }
+  }
+})
+
+// ─── Vérifier existence fichier ──────────────────────────────────────────────
+ipcMain.handle('file-exists', (event, filePath) => {
+  try { return fs.existsSync(filePath) }
+  catch (e) { return false }
+})
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 ipcMain.handle('store-get', (event, key) => store.get(key))

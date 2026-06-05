@@ -17,6 +17,7 @@ export default function App() {
   const addToastRef = useRef(null)
   const switchToNextProfileRef = useRef(null)
   const toggleLoopRef = useRef(null)
+  const playLocallyRef = useRef(true)
   const audioDeviceRef = useRef('default')
   const volumeRef = useRef(80)
 
@@ -24,6 +25,7 @@ export default function App() {
   useEffect(() => { addToastRef.current = addToast }, )
   useEffect(() => { switchToNextProfileRef.current = store.switchToNextProfile }, [store.switchToNextProfile])
   useEffect(() => { toggleLoopRef.current = store.toggleLoop }, [store.toggleLoop])
+  useEffect(() => { playLocallyRef.current = store.playLocally }, [store.playLocally])
   useEffect(() => { audioDeviceRef.current = store.audioDevice }, [store.audioDevice])
   useEffect(() => { volumeRef.current = store.volume }, [store.volume])
 
@@ -38,7 +40,7 @@ export default function App() {
 
     window.electronAPI.onPlaySound((soundId) => {
       const sound = soundsRef.current.find(s => s.id === soundId)
-      if (sound) playSound(sound, audioDeviceRef.current, volumeRef.current)
+      if (sound) playSound(sound, audioDeviceRef.current, volumeRef.current, false, playLocallyRef.current)
     })
 
     window.electronAPI.onSwitchProfile(async () => {

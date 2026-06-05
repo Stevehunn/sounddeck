@@ -19,5 +19,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onPlaySound: (cb) => ipcRenderer.on('play-sound', (e, id) => cb(id)),
   onSwitchProfile: (cb) => ipcRenderer.on('switch-profile', () => cb()),
   onToggleLoop: (cb) => ipcRenderer.on('toggle-loop', () => cb()),
-  removeAllListeners: (ch) => ipcRenderer.removeAllListeners(ch)
+  removeAllListeners: (ch) => ipcRenderer.removeAllListeners(ch),
+
+  // Expose process.versions pour détecter Electron dans le renderer
+  isElectron: true,
+
+  writeDroppedFile: (fileName, arrayBuffer) => ipcRenderer.invoke('write-dropped-file', fileName, arrayBuffer),
+  fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath)
+})
+
+// Exposer également via window pour accès direct dans les event handlers
+window.addEventListener('DOMContentLoaded', () => {
+  // Patch global pour s'assurer que file.path est accessible
+  // Electron injecte nativement cette propriété sur les objets File
+  // Ce patch n'est là qu'en sécurité
+  const originalFileDescriptor = Object.getOwnPropertyDescriptor(File.prototype, 'path')
+  if (!originalFileDescriptor) {
+    console.warn('File.path non disponible nativement — drop limité')
+  }
 })

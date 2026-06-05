@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { playSound, stopSound, isPlaying } from '../utils/audio'
 import ShortcutRecorder from './ShortcutRecorder'
 
-export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEnabled, onToggleFavorite, onSetShortcut, onDelete, onRemoveFromProfile, onRename, onVolumeChange, currentProfileId }) {
+export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEnabled, playLocally, onToggleFavorite, onSetShortcut, onDelete, onRemoveFromProfile, onRename, onVolumeChange, currentProfileId }) {
   const [playing, setPlaying] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showVolume, setShowVolume] = useState(false)
@@ -10,6 +10,7 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
   const [nameValue, setNameValue] = useState(sound.name)
   const [localVolume, setLocalVolume] = useState(sound.volume ?? 100)
   const [imgError, setImgError] = useState(false)
+  const [fileError, setFileError] = useState(false)
 
   useEffect(() => { setLocalVolume(sound.volume ?? 100) }, [sound.volume])
   useEffect(() => { setImgError(false) }, [sound.image]) // reset si image change
@@ -31,15 +32,26 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
     }
   }, [loopEnabled])
 
-  const handlePlay = (e) => {
+  const handlePlay = async (e) => {
     e?.stopPropagation()
     if (playing) {
       stopSound(sound.id)
       setPlaying(false)
-    } else {
-      playSound(sound, audioDevice, volume, loopEnabled)
-      setPlaying(true)
+      return
     }
+
+    // Vérifier que le fichier existe toujours sur le disque
+    if (sound.path && !sound.path.startsWith('http')) {
+      const exists = await window.electronAPI.fileExists(sound.path)
+      if (!exists) {
+        setFileError(true)
+        return
+      }
+    }
+
+    setFileError(false)
+    playSound(sound, audioDevice, volume, loopEnabled, playLocally)
+    setPlaying(true)
   }
 
   const handleRename = () => {
@@ -51,14 +63,16 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
     onVolumeChange(sound.id, val)
   }, [sound.id, onVolumeChange])
 
-  // Construction URL image robuste — encode les espaces et caractères spéciaux
+  // Construction URL image robuste
   const buildImageUrl = (imgPath) => {
     if (!imgPath) return null
-    if (imgPath.startsWith('file://')) return imgPath
-    // Windows : backslashes → forward slashes
+    if (imgPath.startsWith('file://') || imgPath.startsWith('http')) return imgPath
     const normalized = imgPath.replace(/\\/g, '/')
-    // Encoder les espaces et caractères spéciaux dans le chemin
-    const encoded = normalized.split('/').map(segment => encodeURIComponent(segment)).join('/')
+    const parts = normalized.split('/')
+    const encoded = parts.map((part) => {
+      if (part === '' || /^[A-Za-z]:$/.test(part)) return part
+      return encodeURIComponent(part)
+    }).join('/')
     return 'file:///' + encoded
   }
 
@@ -68,7 +82,7 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
   return (
     <div style={{
       background: 'var(--bg-secondary)',
-      border: `1px solid ${playing ? (loopEnabled ? 'var(--success)' : 'var(--accent)') : 'var(--border)'}`,
+      border: `1px solid ${fileError ? 'var(--danger)' : playing ? (loopEnabled ? 'var(--success)' : 'var(--accent)') : 'var(--border)'}`,
       borderRadius: 'var(--radius-md)', padding: 8, position: 'relative',
       transition: 'border-color 0.15s'
     }} className={playing ? 'playing-pulse' : ''}>

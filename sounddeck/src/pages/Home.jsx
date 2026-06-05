@@ -5,10 +5,13 @@ import AudioTrimmer from '../components/AudioTrimmer'
 const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
 
 export default function Home({ store, addToast, loopEnabled }) {
+  const playLocally = store.playLocally
   const [showAll, setShowAll] = useState(false)
   const [showAllOther, setShowAllOther] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importSuccess, setImportSuccess] = useState(0)
   const [search, setSearch] = useState('')
 
   const { currentSounds, favoriteSounds, shortcuts, audioDevice, volume, sounds, currentProfileId } = store
@@ -42,10 +45,88 @@ export default function Home({ store, addToast, loopEnabled }) {
   }
 
   const handleDrop = async (e) => {
-    e.preventDefault(); setDragOver(false)
-    const files = [...e.dataTransfer.files].filter(f => f.name.match(/\.(mp3|wav|ogg|flac|m4a|aac)$/i))
-    if (!files.length) { addToast('Aucun fichier audio détecté', 'error'); return }
-    await handleImportFiles(files.map(f => f.path))
+    e.preventDefault()
+    setDragOver(false)
+
+    // Collecter tous les fichiers
+    const dtFiles = [...(e.dataTransfer?.files || [])]
+    const dtItems = [...(e.dataTransfer?.items || [])]
+    const allFiles = dtFiles.length > 0
+      ? dtFiles
+      : dtItems.filter(i => i.kind === 'file').map(i => i.getAsFile()).filter(Boolean)
+
+    if (!allFiles.length) {
+      addToast('Aucun fichier détecté', 'error')
+      return
+    }
+
+    setImporting(true)
+    setImportSuccess(0)
+
+    // Filtrer les fichiers audio
+    const audioFiles = allFiles.filter(f => {
+      if (!f) return false
+      const nameMatch = f.name && f.name.match(/\.(mp3|wav|ogg|flac|m4a|aac|opus|weba)$/i)
+      const typeMatch = f.type && f.type.startsWith('audio/')
+      return nameMatch || typeMatch
+    })
+
+    if (!audioFiles.length) {
+      const names = allFiles.map(f => f.name).join(', ')
+      addToast(`Format non supporté : ${names}`, 'error')
+      return
+    }
+
+    let imported = 0
+    for (const file of audioFiles) {
+      try {
+        // Méthode 1 : file.path disponible (Electron standard)
+        if (file.path && file.path.length > 2) {
+          const result = await window.electronAPI.importSoundFile(file.path)
+          if (result.success) {
+            await store.addSound({
+              name: result.name,
+              path: result.path,
+              emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
+              profiles: [currentProfileId]
+            })
+            imported++
+            continue
+          }
+        }
+
+        // Méthode 2 : lire le contenu via FileReader et écrire côté main
+        const arrayBuffer = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = (e) => resolve(e.target.result)
+          reader.onerror = () => reject(new Error('Lecture impossible'))
+          reader.readAsArrayBuffer(file)
+        })
+
+        const result = await window.electronAPI.writeDroppedFile(file.name, arrayBuffer)
+        if (result.success) {
+          await store.addSound({
+            name: result.name,
+            path: result.path,
+            emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
+            profiles: [currentProfileId]
+          })
+          imported++
+        } else {
+          addToast(`Erreur pour ${file.name} : ${result.error}`, 'error')
+        }
+      } catch (err) {
+        console.error('Drop import error:', err)
+        addToast(`Impossible d'importer ${file.name}`, 'error')
+      }
+    }
+
+    setImporting(false)
+    if (imported > 0) {
+      setImportSuccess(imported)
+      addToast(`${imported} son(s) importé(s) avec succès`, 'success')
+      setTimeout(() => setImportSuccess(0), 3000)
+    }
   }
 
   const currentProfile = store.profiles.find(p => p.id === currentProfileId)
@@ -63,13 +144,72 @@ export default function Home({ store, addToast, loopEnabled }) {
         </button>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}
+      {/* Overlay global drag & drop sur toute la zone de contenu */}
+      <div style={{ flex: 1, overflowY: importing ? 'hidden' : 'auto', padding: '16px 20px', position: 'relative' }}
         onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-        onDragLeave={() => setDragOver(false)}
+        onDragLeave={e => {
+          // Ne désactiver que si on quitte vraiment la zone (pas un enfant)
+          if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false)
+        }}
         onDrop={handleDrop}>
 
-        {filtered.length === 0 && soundsOutsideProfile.length === 0 && (
-          <div className={`drop-zone ${dragOver ? 'drag-over' : ''}`} onClick={() => setShowImport(true)}>
+        {/* Overlay drag en cours */}
+        {dragOver && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 50,
+            background: 'rgba(124,111,247,0.15)',
+            border: '2px dashed var(--accent)',
+            borderRadius: 'var(--radius-lg)',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            gap: 12, pointerEvents: 'none'
+          }}>
+            <i className="ti ti-music-plus" style={{ fontSize: 48, color: 'var(--accent)' }} />
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--accent)' }}>Déposer pour importer</div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>MP3, WAV, OGG, FLAC, M4A</div>
+          </div>
+        )}
+
+        {/* Overlay import en cours */}
+        {importing && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 50,
+            background: 'rgba(0,0,0,0.5)',
+            borderRadius: 'var(--radius-lg)',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            gap: 14, backdropFilter: 'blur(4px)'
+          }}>
+            <i className="ti ti-loader" style={{ fontSize: 40, color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>Import en cours...</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>Copie des fichiers dans SoundDeck</div>
+          </div>
+        )}
+
+        {/* Overlay succès */}
+        {importSuccess > 0 && !importing && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 50,
+            background: 'rgba(29,158,117,0.15)',
+            border: '2px solid var(--success)',
+            borderRadius: 'var(--radius-lg)',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            gap: 12, pointerEvents: 'none',
+            animation: 'fadeIn 0.2s ease'
+          }}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <i className="ti ti-check" style={{ fontSize: 32, color: 'white' }} />
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--success)' }}>
+              {importSuccess} son{importSuccess > 1 ? 's' : ''} ajouté{importSuccess > 1 ? 's' : ''} !
+            </div>
+          </div>
+        )}
+
+        {filtered.length === 0 && soundsOutsideProfile.length === 0 && !importing && (
+          <div className={`drop-zone ${dragOver ? 'drag-over' : ''}`} onClick={() => setShowImport(true)}
+            style={{ cursor: 'pointer' }}>
             <i className="ti ti-music-plus" style={{ fontSize: 32, display: 'block', marginBottom: 8 }} />
             <div style={{ fontWeight: 500, marginBottom: 4 }}>Aucun son pour ce profil</div>
             <div style={{ fontSize: 12 }}>Glissez des fichiers audio ici ou cliquez pour ajouter</div>
@@ -78,13 +218,13 @@ export default function Home({ store, addToast, loopEnabled }) {
 
         {favoriteSounds.length > 0 && (
           <Section title="Favoris" icon="ti-star-filled" iconColor="var(--warning)" count={favoriteSounds.length}>
-            <SoundGrid sounds={favoriteSounds} shortcuts={shortcuts} audioDevice={audioDevice} volume={volume} loopEnabled={loopEnabled} store={store} addToast={addToast} />
+            <SoundGrid sounds={favoriteSounds} shortcuts={shortcuts} audioDevice={audioDevice} volume={volume} loopEnabled={loopEnabled} playLocally={playLocally} store={store} addToast={addToast} />
           </Section>
         )}
 
         {filtered.length > 0 && (
           <Section title="Sons du profil" icon="ti-music" count={filtered.length}>
-            <SoundGrid sounds={displayed} shortcuts={shortcuts} audioDevice={audioDevice} volume={volume} loopEnabled={loopEnabled} store={store} addToast={addToast} />
+            <SoundGrid sounds={displayed} shortcuts={shortcuts} audioDevice={audioDevice} volume={volume} loopEnabled={loopEnabled} playLocally={playLocally} store={store} addToast={addToast} />
             {filtered.length > 10 && (
               <button className="btn-secondary" onClick={() => setShowAll(!showAll)} style={{ width: '100%', marginTop: 10, justifyContent: 'center' }}>
                 <i className={`ti ${showAll ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
@@ -116,6 +256,8 @@ export default function Home({ store, addToast, loopEnabled }) {
           </Section>
         )}
       </div>
+
+      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
 
       {showImport && (
         <ImportModal
@@ -158,12 +300,13 @@ function Section({ title, icon, iconColor, count, muted, children }) {
   )
 }
 
-function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, store, addToast }) {
+function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLocally, store, addToast }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
       {sounds.map(s => (
         <SoundCard key={s.id} sound={s} shortcut={shortcuts[s.id]} audioDevice={audioDevice} volume={volume}
           loopEnabled={loopEnabled}
+          playLocally={playLocally}
           currentProfileId={store.currentProfileId}
           onToggleFavorite={store.toggleFavorite}
           onSetShortcut={store.setShortcut}
@@ -252,13 +395,27 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
 
         {tab === 'file' && (
           <>
-            <div className={`drop-zone ${dragOver ? 'drag-over' : ''}`}
+            <div
               onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={onDrop} onClick={onOpenDialog}>
-              <i className="ti ti-upload" style={{ fontSize: 28, display: 'block', marginBottom: 8 }} />
-              <div style={{ fontWeight: 500, marginBottom: 4 }}>Glissez vos fichiers ici</div>
-              <div style={{ fontSize: 12 }}>ou cliquez pour parcourir · MP3, WAV, OGG, FLAC</div>
+              onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false) }}
+              onDrop={onDrop}
+              onClick={onOpenDialog}
+              style={{
+                border: `2px dashed ${dragOver ? 'var(--accent)' : 'var(--border)'}`,
+                borderRadius: 'var(--radius-lg)',
+                padding: 32, textAlign: 'center',
+                cursor: 'pointer', transition: 'all 0.15s',
+                background: dragOver ? 'var(--accent-light)' : 'transparent',
+                color: dragOver ? 'var(--accent)' : 'var(--text-tertiary)'
+              }}>
+              <i className="ti ti-upload" style={{ fontSize: 36, display: 'block', marginBottom: 10 }} />
+              <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 14, color: dragOver ? 'var(--accent)' : 'var(--text-primary)' }}>
+                {dragOver ? 'Relâchez pour importer' : 'Glissez vos fichiers ici'}
+              </div>
+              <div style={{ fontSize: 12, marginBottom: 12 }}>MP3, WAV, OGG, FLAC, M4A</div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: 'var(--bg-tertiary)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                <i className="ti ti-folder-open" /> ou cliquez pour parcourir
+              </div>
             </div>
             <div className="modal-actions"><button className="btn-secondary" onClick={onClose}>Fermer</button></div>
           </>
@@ -340,8 +497,13 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
               <input value={urlName} onChange={e => setUrlName(e.target.value)} placeholder="Ex: Airhorn" />
             </div>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>URL directe (.mp3, .wav...)</label>
-              <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..." />
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>URL du fichier audio</label>
+              <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://... (.mp3, .wav, lien Google Drive...)" />
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', borderRadius: 6, padding: '8px 10px', lineHeight: 1.6 }}>
+              <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
+              <strong>Liens supportés :</strong> URL directe (.mp3/.wav), Google Drive (lien partagé), Dropbox (?dl=1)<br/>
+              <strong>⚠️ Google Drive :</strong> le fichier doit être en accès "Tout le monde avec le lien"
             </div>
             <div className="modal-actions">
               <button className="btn-secondary" onClick={onClose}>Annuler</button>
