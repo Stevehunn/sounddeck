@@ -1,29 +1,27 @@
 import { useState, useEffect, useRef } from 'react'
 import { Howl } from 'howler'
 
-// Catégories — les pages trending/best chargent via JS donc on utilise
-// des recherches équivalentes qui retournent du HTML statique parsable
 const CATEGORIES = [
-  // Sélections populaires (via recherche)
-  { id: 'trending',    label: '🔥 Tendances',        mode: 'search',    query: 'meme' },
-  { id: 'best',        label: '🏆 Classiques',        mode: 'search',    query: 'vine boom bruh airhorn oof' },
-  { id: 'french',      label: '🇫🇷 Sons français',    mode: 'search',    query: 'francais' },
-  { id: 'discord',     label: '💬 Discord',           mode: 'search',    query: 'discord' },
-  // Catégories officielles myinstants (HTML statique)
-  { id: 'anime',       label: '⛩️ Anime & Manga',     mode: 'category',  query: 'anime & manga' },
-  { id: 'games',       label: '🎮 Jeux vidéo',        mode: 'category',  query: 'games' },
-  { id: 'memes',       label: '😂 Memes',             mode: 'category',  query: 'memes' },
-  { id: 'movies',      label: '🎬 Films',             mode: 'category',  query: 'movies' },
-  { id: 'music',       label: '🎵 Musique',           mode: 'category',  query: 'music' },
-  { id: 'politics',    label: '🗳️ Politique',         mode: 'category',  query: 'politics' },
-  { id: 'pranks',      label: '🤣 Canulars',          mode: 'category',  query: 'pranks' },
-  { id: 'reactions',   label: '😱 Réactions',         mode: 'category',  query: 'reactions' },
-  { id: 'sfx',         label: '🔊 Effets sonores',    mode: 'category',  query: 'sound effects' },
-  { id: 'sports',      label: '⚽ Sports',            mode: 'category',  query: 'sports' },
-  { id: 'tv',          label: '📺 Télévision',        mode: 'category',  query: 'television' },
-  { id: 'tiktok',      label: '📱 TikTok Trends',     mode: 'category',  query: 'tiktok trends' },
-  { id: 'viral',       label: '📣 Viral',             mode: 'category',  query: 'viral' },
-  { id: 'whatsapp',    label: '💬 Whatsapp',          mode: 'category',  query: 'whatsapp audios' },
+  // Sélections populaires
+  { id: 'trending',  label: '🔥 Tendances',       mode: 'trending',  query: '' },
+  { id: 'best',      label: '🏆 Classiques',       mode: 'multi',     query: 'vine boom,bruh,airhorn,oof' },
+  { id: 'french',    label: '🇫🇷 Sons français',   mode: 'search',    query: 'francais' },
+  { id: 'discord',   label: '💬 Discord',          mode: 'multi',     query: 'discord,notification,ping' },
+  // Catégories officielles myinstants
+  { id: 'anime',     label: '⛩️ Anime & Manga',    mode: 'category',  query: 'anime & manga' },
+  { id: 'games',     label: '🎮 Jeux vidéo',       mode: 'category',  query: 'games' },
+  { id: 'memes',     label: '😂 Memes',            mode: 'category',  query: 'memes' },
+  { id: 'movies',    label: '🎬 Films',            mode: 'category',  query: 'movies' },
+  { id: 'music',     label: '🎵 Musique',          mode: 'category',  query: 'music' },
+  { id: 'politics',  label: '🗳️ Politique',        mode: 'category',  query: 'politics' },
+  { id: 'pranks',    label: '🤣 Canulars',         mode: 'category',  query: 'pranks' },
+  { id: 'reactions', label: '😱 Réactions',        mode: 'category',  query: 'reactions' },
+  { id: 'sfx',       label: '🔊 Effets sonores',   mode: 'category',  query: 'sound effects' },
+  { id: 'sports',    label: '⚽ Sports',           mode: 'category',  query: 'sports' },
+  { id: 'tv',        label: '📺 Télévision',       mode: 'category',  query: 'television' },
+  { id: 'tiktok',    label: '📱 TikTok Trends',    mode: 'category',  query: 'tiktok trends' },
+  { id: 'viral',     label: '📣 Viral',            mode: 'category',  query: 'viral' },
+  { id: 'whatsapp',  label: '💬 Whatsapp',         mode: 'category',  query: 'whatsapp audios' },
 ]
 
 export default function Discover({ store, addToast }) {

@@ -483,51 +483,68 @@ async function resolveInstantUrl(slug) {
 // Handler principal : liste + recherche + catégories
 ipcMain.handle('fetch-myinstants', async (event, query, mode = 'search') => {
   try {
-    let url
-    // Les pages trending/best chargent leurs sons via JS dynamique → pas parsables
-    // On les remplace par des recherches équivalentes qui retournent du HTML statique
-    if (mode === 'trending') {
-      // Tendances FR → recherche des sons populaires français
-      url = 'https://www.myinstants.com/fr/search/?name=meme'
-    } else if (mode === 'best') {
-      // Panthéon → meilleurs sons internationaux connus
-      url = 'https://www.myinstants.com/fr/search/?name=vine+boom+bruh+airhorn+oof'
-    } else if (mode === 'trending_fr') {
-      url = 'https://www.myinstants.com/fr/search/?name=francais'
-    } else if (mode === 'category') {
-      url = `https://www.myinstants.com/fr/categories/${encodeURIComponent(query)}/`
+    let sounds = []
+
+    // Mode 'multi' : plusieurs recherches combinées
+    if (mode === 'multi') {
+      const terms = query.split(',').map(t => t.trim()).filter(Boolean)
+      for (const term of terms.slice(0, 4)) {
+        const r = await fetchPage(`https://www.myinstants.com/fr/search/?name=${encodeURIComponent(term)}`)
+        if (r.ok) {
+          const found = parseSoundList(r.html)
+          sounds.push(...found)
+        }
+        await new Promise(r => setTimeout(r, 200))
+      }
+      // Dédupliquer par slug
+      const seen = new Set()
+      sounds = sounds.filter(s => {
+        if (seen.has(s.slug)) return false
+        seen.add(s.slug)
+        return true
+      })
     } else {
-      // Recherche standard — si vide on met un terme générique
-      const q = query && query.trim() ? query : 'meme'
-      url = `https://www.myinstants.com/fr/search/?name=${encodeURIComponent(q)}`
+      let url
+      if (mode === 'trending') {
+        url = 'https://www.myinstants.com/fr/search/?name=meme'
+      } else if (mode === 'category') {
+        url = `https://www.myinstants.com/fr/categories/${encodeURIComponent(query)}/`
+      } else {
+        const q = query && query.trim() ? query : 'meme'
+        url = `https://www.myinstants.com/fr/search/?name=${encodeURIComponent(q)}`
+      }
+
+      console.log('fetch-myinstants:', mode, url)
+      const result = await fetchPage(url)
+      if (!result.ok) return { success: false, error: result.error, sounds: [] }
+      sounds = parseSoundList(result.html)
     }
-
-    console.log('fetch-myinstants:', mode, url)
-    const result = await fetchPage(url)
-
-    if (!result.ok) {
-      return { success: false, error: result.error, sounds: [] }
-    }
-
-    let sounds = parseSoundList(result.html)
 
     if (!sounds.length) {
       return { success: false, error: 'Aucun son trouvé', sounds: [] }
     }
 
-    // Résoudre les URLs manquantes en parallèle (max 10 à la fois)
+    // Résoudre les URLs manquantes — séquentiellement avec délai pour éviter le rate limiting
     const needsResolve = sounds.filter(s => !s.url && s.slug)
+    console.log(`Résolution de ${needsResolve.length} URLs via pages détail...`)
+
     if (needsResolve.length > 0) {
-      const batches = []
-      for (let i = 0; i < Math.min(needsResolve.length, 20); i += 5) {
-        batches.push(needsResolve.slice(i, i + 5))
-      }
-      for (const batch of batches) {
+      // Résoudre par batch de 3 avec délai entre chaque batch
+      const toResolve = needsResolve.slice(0, 20)
+      for (let i = 0; i < toResolve.length; i += 3) {
+        const batch = toResolve.slice(i, i + 3)
         await Promise.all(batch.map(async (sound) => {
           const resolvedUrl = await resolveInstantUrl(sound.slug)
           if (resolvedUrl) sound.url = resolvedUrl
         }))
+        // Petit délai entre les batches pour éviter d'être bloqué
+        if (i + 3 < toResolve.length) {
+          await new Promise(r => setTimeout(r, 300))
+        }
       }
+
+      const resolved = sounds.filter(s => s.url).length
+      console.log(`URLs résolues : ${resolved}/${sounds.length}`)
     }
 
     // Filtrer les sons sans URL résolue
