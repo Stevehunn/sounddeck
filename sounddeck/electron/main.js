@@ -364,30 +364,182 @@ ipcMain.handle('delete-sound-file', async (event, filePath) => {
 ipcMain.handle('get-sounds-dir', () => soundsDir)
 
 // ─── Scraper myinstants ───────────────────────────────────────────────────────
-ipcMain.handle('fetch-myinstants', async (event, query) => {
-  const https = require('https')
-  const url = `https://www.myinstants.com/fr/search/?name=${encodeURIComponent(query)}`
+
+const https = require('https')
+
+function fetchPage(url) {
   return new Promise((resolve) => {
-    https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120', 'Accept': 'text/html', 'Accept-Language': 'fr-FR,fr;q=0.9' } }, (res) => {
+    https.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8'
+      }
+    }, (res) => {
+      // Suivre les redirections
+      if ([301,302,303,307].includes(res.statusCode) && res.headers.location) {
+        fetchPage(res.headers.location).then(resolve)
+        return
+      }
       let data = ''
       res.on('data', chunk => data += chunk)
-      res.on('end', () => {
-        try {
-          const sounds = []
-          const btnRegex = /onclick="play\('(media\/sounds\/[^']+)'\)"/g
-          const titleRegex = /<b>([^<]+)<\/b>/g
-          const btnMatches = [...data.matchAll(btnRegex)]
-          const titleMatches = [...data.matchAll(titleRegex)]
-          btnMatches.forEach((match, i) => {
-            const soundPath = match[1]
-            const title = titleMatches[i] ? titleMatches[i][1].trim() : path.basename(soundPath, '.mp3')
-            sounds.push({ id: `mi_${i}_${Date.now()}`, name: title, url: `https://www.myinstants.com/${soundPath}`, emoji: getEmojiForName(title) })
-          })
-          resolve({ success: true, sounds: sounds.slice(0, 30) })
-        } catch (e) { resolve({ success: false, error: e.message, sounds: [] }) }
-      })
-    }).on('error', (e) => resolve({ success: false, error: e.message, sounds: [] }))
+      res.on('end', () => resolve({ ok: true, html: data, status: res.statusCode }))
+    }).on('error', (e) => resolve({ ok: false, error: e.message }))
   })
+}
+
+// Extraire les sons d'une page de liste myinstants
+function parseSoundList(html) {
+  const sounds = []
+  const seen = new Set()
+
+  // Log pour debug — afficher un extrait du HTML reçu
+  console.log('parseSoundList HTML extrait:', html.substring(0, 500))
+  console.log('parseSoundList HTML longueur:', html.length)
+
+  // Myinstants peut utiliser plusieurs formats de liens :
+  // 1. <a href="https://www.myinstants.com/fr/instant/fart/">Fart</a>
+  // 2. <a href="/fr/instant/fart/">Fart</a>
+  // 3. <a href="/instant/fart/">Fart</a>
+  // On capture le slug ET le nom en une seule regex
+  const patterns = [
+    // Lien absolu avec domaine
+    /href="https?:\/\/(?:www\.)?myinstants\.com\/(?:fr\/)?instant\/([a-zA-Z0-9_-]+)\/?"\s*[^>]*>\s*([^<]{1,80})<\/a>/g,
+    // Lien relatif /fr/instant/
+    /href="\/fr\/instant\/([a-zA-Z0-9_-]+)\/?"\s*[^>]*>\s*([^<]{1,80})<\/a>/g,
+    // Lien relatif /instant/
+    /href="\/instant\/([a-zA-Z0-9_-]+)\/?"\s*[^>]*>\s*([^<]{1,80})<\/a>/g,
+  ]
+
+  const slugToName = {}
+  const allSlugs = []
+
+  for (const pattern of patterns) {
+    const matches = [...html.matchAll(pattern)]
+    for (const m of matches) {
+      const slug = m[1]
+      const name = m[2]?.trim()
+      if (slug && !seen.has(slug) && slug.length > 0 && slug.length < 80) {
+        // Ignorer les slugs qui sont des chemins de navigation
+        const ignore = ['favorites', 'recent', 'trending', 'search', 'categories',
+                        'new', 'profile', 'settings', 'uploaded', 'best_of_all_time',
+                        'report', 'add', 'embed']
+        if (ignore.some(i => slug.includes(i))) continue
+        seen.add(slug)
+        allSlugs.push(slug)
+        if (name && name.length > 0 && !name.startsWith('!') && !name.includes('svg')) {
+          slugToName[slug] = name
+        }
+      }
+    }
+  }
+
+  console.log(`parseSoundList: ${allSlugs.length} slugs uniques trouvés`)
+  console.log('Premiers slugs:', allSlugs.slice(0, 5))
+
+  // URLs directes mp3 depuis onclick="play('media/sounds/xxx.mp3')"
+  // Associées dans l'ordre aux slugs
+  const soundUrlRegex = /play\('(media\/sounds\/[^']+)'\)/g
+  const directUrls = [...html.matchAll(soundUrlRegex)].map(m =>
+    `https://www.myinstants.com/${m[1]}`
+  )
+  console.log(`parseSoundList: ${directUrls.length} URLs directes trouvées`)
+
+  for (let i = 0; i < Math.min(allSlugs.length, 40); i++) {
+    const slug = allSlugs[i]
+    const rawName = slugToName[slug] || slug.replace(/-\d+$/, '').replace(/-/g, ' ')
+    const name = rawName.charAt(0).toUpperCase() + rawName.slice(1)
+    const url = directUrls[i] || null
+
+    sounds.push({
+      id: `mi_${slug}_${Date.now()}`,
+      name,
+      slug,
+      url,
+      emoji: getEmojiForName(name)
+    })
+  }
+
+  return sounds
+}
+
+// Résoudre l'URL MP3 d'un son via sa page détail (og:audio)
+async function resolveInstantUrl(slug) {
+  const url = `https://www.myinstants.com/fr/instant/${slug}/`
+  const result = await fetchPage(url)
+  if (!result.ok) return null
+
+  // Extraire og:audio depuis les meta tags
+  const ogAudio = result.html.match(/meta-og:audio:\s*(https?:\/\/[^\s\n]+)/)
+  if (ogAudio) return ogAudio[1].trim()
+
+  // Fallback : chercher dans le HTML
+  const audioMatch = result.html.match(/href="(\/media\/sounds\/[^"]+\.mp3)"/)
+  if (audioMatch) return `https://www.myinstants.com${audioMatch[1]}`
+
+  return null
+}
+
+// Handler principal : liste + recherche + catégories
+ipcMain.handle('fetch-myinstants', async (event, query, mode = 'search') => {
+  try {
+    let url
+    // Les pages trending/best chargent leurs sons via JS dynamique → pas parsables
+    // On les remplace par des recherches équivalentes qui retournent du HTML statique
+    if (mode === 'trending') {
+      // Tendances FR → recherche des sons populaires français
+      url = 'https://www.myinstants.com/fr/search/?name=meme'
+    } else if (mode === 'best') {
+      // Panthéon → meilleurs sons internationaux connus
+      url = 'https://www.myinstants.com/fr/search/?name=vine+boom+bruh+airhorn+oof'
+    } else if (mode === 'trending_fr') {
+      url = 'https://www.myinstants.com/fr/search/?name=francais'
+    } else if (mode === 'category') {
+      url = `https://www.myinstants.com/fr/categories/${encodeURIComponent(query)}/`
+    } else {
+      // Recherche standard — si vide on met un terme générique
+      const q = query && query.trim() ? query : 'meme'
+      url = `https://www.myinstants.com/fr/search/?name=${encodeURIComponent(q)}`
+    }
+
+    console.log('fetch-myinstants:', mode, url)
+    const result = await fetchPage(url)
+
+    if (!result.ok) {
+      return { success: false, error: result.error, sounds: [] }
+    }
+
+    let sounds = parseSoundList(result.html)
+
+    if (!sounds.length) {
+      return { success: false, error: 'Aucun son trouvé', sounds: [] }
+    }
+
+    // Résoudre les URLs manquantes en parallèle (max 10 à la fois)
+    const needsResolve = sounds.filter(s => !s.url && s.slug)
+    if (needsResolve.length > 0) {
+      const batches = []
+      for (let i = 0; i < Math.min(needsResolve.length, 20); i += 5) {
+        batches.push(needsResolve.slice(i, i + 5))
+      }
+      for (const batch of batches) {
+        await Promise.all(batch.map(async (sound) => {
+          const resolvedUrl = await resolveInstantUrl(sound.slug)
+          if (resolvedUrl) sound.url = resolvedUrl
+        }))
+      }
+    }
+
+    // Filtrer les sons sans URL résolue
+    sounds = sounds.filter(s => s.url)
+
+    console.log(`fetch-myinstants: ${sounds.length} sons trouvés`)
+    return { success: true, sounds }
+
+  } catch (e) {
+    console.error('fetch-myinstants error:', e.message)
+    return { success: false, error: e.message, sounds: [] }
+  }
 })
 
 function getEmojiForName(name) {
