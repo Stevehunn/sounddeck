@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar'
 import Home from './pages/Home'
 import Discover from './pages/Discover'
 import Options from './pages/Options'
+import Editor from './pages/Editor'
 import Toast from './components/Toast'
 import { playSound } from './utils/audio'
 
@@ -100,6 +101,7 @@ export default function App() {
         {currentPage === 'home' && <Home store={store} addToast={addToast} loopEnabled={store.loopEnabled} />}
         {currentPage === 'discover' && <Discover store={store} addToast={addToast} />}
         {currentPage === 'options' && <Options store={store} addToast={addToast} />}
+        {currentPage === 'editor' && <Editor store={store} addToast={addToast} />}
       </main>
 
       <Toast toasts={toasts} />

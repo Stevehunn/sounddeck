@@ -81,6 +81,12 @@ export default function Sidebar({ profiles, currentProfileId, currentPage, onSwi
           active={currentPage === 'discover'}
           onClick={() => onChangePage('discover')}
         />
+        <SidebarItem
+          icon="ti-cut"
+          label="Éditeur"
+          active={currentPage === 'editor'}
+          onClick={() => onChangePage('editor')}
+        />
 
         {/* Bouton Loop */}
         <div style={{ margin: '6px 8px 0' }}>
