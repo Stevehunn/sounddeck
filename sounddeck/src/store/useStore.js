@@ -14,6 +14,7 @@ export function useStore() {
   const [playLocally, setPlayLocally] = useState(true)
   const [loopEnabled, setLoopEnabled] = useState(false)
   const [loopShortcut, setLoopShortcut] = useState('')
+  const [stopAllShortcut, setStopAllShortcut] = useState('')
   const [loading, setLoading] = useState(true)
 
   // ─── Chargement initial depuis electron-store ────────────────────────────────
@@ -29,6 +30,7 @@ export function useStore() {
         const savedVolume = await window.electronAPI.storeGet('volume') ?? 80
         const savedPlayLocally = await window.electronAPI.storeGet('playLocally') ?? true
         const savedLoopShortcut = await window.electronAPI.storeGet('loopShortcut') || ''
+        const savedStopAllShortcut = await window.electronAPI.storeGet('stopAllShortcut') || ''
         const savedCurrentProfileId = await window.electronAPI.storeGet('currentProfileId')
 
         // Profil "Tous les sons" toujours présent
@@ -45,6 +47,7 @@ export function useStore() {
         setVolume(savedVolume)
         setPlayLocally(savedPlayLocally)
         setLoopShortcut(savedLoopShortcut)
+        setStopAllShortcut(savedStopAllShortcut)
         setCurrentProfileId(savedCurrentProfileId || 'all')
       } catch (e) {
         console.error('Erreur chargement store:', e)
@@ -209,6 +212,12 @@ export function useStore() {
     setLoopEnabled(prev => !prev)
   }, [])
 
+  const updateStopAllShortcut = useCallback(async (accelerator) => {
+    setStopAllShortcut(accelerator)
+    await save('stopAllShortcut', accelerator)
+    await window.electronAPI.updateStopAllShortcut(accelerator)
+  }, [save])
+
   const updateLoopShortcut = useCallback(async (accelerator) => {
     setLoopShortcut(accelerator)
     await save('loopShortcut', accelerator)
@@ -255,6 +264,7 @@ export function useStore() {
     setShortcut, clearShortcut, updateProfileShortcut,
     // Options
     loopEnabled, loopShortcut, toggleLoop, updateLoopShortcut,
+    stopAllShortcut, updateStopAllShortcut,
     updateTheme, updateAudioDevice, updateVolume, updatePlayLocally
   }
 }

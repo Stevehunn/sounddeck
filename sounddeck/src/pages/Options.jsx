@@ -23,16 +23,26 @@ export default function Options({ store, addToast }) {
         {/* Apparence */}
         <Section title="Apparence" icon="ti-palette">
           <OptionRow label="Thème">
-            <div style={{ display: 'flex', gap: 6 }}>
-              {[['dark', 'Sombre', 'ti-moon'], ['light', 'Clair', 'ti-sun']].map(([val, label, icon]) => (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {[
+                { val: 'dark',         label: 'Sombre',    color: '#7C6FF7' },
+                { val: 'light',        label: 'Clair',     color: '#534AB7' },
+                { val: 'dark-blue',    label: 'Bleu',      color: '#2f81f7' },
+                { val: 'dark-green',   label: 'Vert',      color: '#23c55e' },
+                { val: 'dark-red',     label: 'Rouge',     color: '#ef4444' },
+                { val: 'dark-orange',  label: 'Orange',    color: '#f97316' },
+              ].map(({ val, label, color }) => (
                 <button key={val} onClick={() => store.updateTheme(val)}
                   style={{
-                    padding: '6px 14px', borderRadius: 8, border: `1px solid ${store.theme === val ? 'var(--accent)' : 'var(--border)'}`,
-                    background: store.theme === val ? 'var(--accent-light)' : 'transparent',
-                    color: store.theme === val ? 'var(--accent)' : 'var(--text-secondary)',
-                    fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4
+                    padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12,
+                    border: `2px solid ${store.theme === val ? color : 'var(--border)'}`,
+                    background: store.theme === val ? `${color}22` : 'var(--bg-tertiary)',
+                    color: store.theme === val ? color : 'var(--text-secondary)',
+                    display: 'flex', alignItems: 'center', gap: 6, fontWeight: store.theme === val ? 600 : 400
                   }}>
-                  <i className={`ti ${icon}`} />{label}
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                  {label}
+                  {store.theme === val && <i className="ti ti-check" style={{ fontSize: 11 }} />}
                 </button>
               ))}
             </div>
@@ -87,6 +97,14 @@ export default function Options({ store, addToast }) {
               value={store.loopShortcut}
               onSave={async (acc) => { await store.updateLoopShortcut(acc); addToast(`Raccourci loop : ${acc}`, 'success') }}
               onClear={() => store.updateLoopShortcut('')}
+              requireMod
+            />
+          </OptionRow>
+          <OptionRow label="Stop tous les sons" sub="Coupe immédiatement tous les sons en cours">
+            <ShortcutRecorder
+              value={store.stopAllShortcut}
+              onSave={async (acc) => { await store.updateStopAllShortcut(acc); addToast(`Raccourci stop : ${acc}`, 'success') }}
+              onClear={() => store.updateStopAllShortcut('')}
               requireMod
             />
           </OptionRow>

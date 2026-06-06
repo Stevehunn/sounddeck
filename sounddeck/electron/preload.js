@@ -16,9 +16,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateShortcuts: (shortcuts) => ipcRenderer.invoke('update-shortcuts', shortcuts),
   updateProfileShortcut: (acc) => ipcRenderer.invoke('update-profile-shortcut', acc),
   updateLoopShortcut: (acc) => ipcRenderer.invoke('update-loop-shortcut', acc),
+  updateStopAllShortcut: (acc) => ipcRenderer.invoke('update-stop-all-shortcut', acc),
   onPlaySound: (cb) => ipcRenderer.on('play-sound', (e, id) => cb(id)),
   onSwitchProfile: (cb) => ipcRenderer.on('switch-profile', () => cb()),
   onToggleLoop: (cb) => ipcRenderer.on('toggle-loop', () => cb()),
+  onStopAllSounds: (cb) => ipcRenderer.on('stop-all-sounds', () => cb()),
   removeAllListeners: (ch) => ipcRenderer.removeAllListeners(ch),
 
   // Expose process.versions pour détecter Electron dans le renderer

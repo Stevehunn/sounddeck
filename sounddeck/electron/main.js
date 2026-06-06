@@ -96,6 +96,13 @@ function registerShortcuts() {
       mainWindow?.webContents.send('toggle-loop')
     })
   }
+
+  const stopAllShortcut = store.get('stopAllShortcut', '')
+  if (stopAllShortcut) {
+    safeRegister(stopAllShortcut, () => {
+      mainWindow?.webContents.send('stop-all-sounds')
+    })
+  }
 }
 
 ipcMain.handle('update-shortcuts', (event, shortcuts) => {
@@ -107,6 +114,13 @@ ipcMain.handle('update-shortcuts', (event, shortcuts) => {
 
 ipcMain.handle('update-profile-shortcut', (event, accelerator) => {
   store.set('profileShortcut', accelerator)
+  globalShortcut.unregisterAll()
+  registerShortcuts()
+  return true
+})
+
+ipcMain.handle('update-stop-all-shortcut', (event, accelerator) => {
+  store.set('stopAllShortcut', accelerator)
   globalShortcut.unregisterAll()
   registerShortcuts()
   return true

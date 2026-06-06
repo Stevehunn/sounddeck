@@ -6,7 +6,7 @@ import Discover from './pages/Discover'
 import Options from './pages/Options'
 import Editor from './pages/Editor'
 import Toast from './components/Toast'
-import { playSound } from './utils/audio'
+import { playSound, stopAllSounds } from './utils/audio'
 
 export default function App() {
   const store = useStore()
@@ -61,6 +61,7 @@ export default function App() {
       window.electronAPI.removeAllListeners('play-sound')
       window.electronAPI.removeAllListeners('switch-profile')
       window.electronAPI.removeAllListeners('toggle-loop')
+      window.electronAPI.removeAllListeners('stop-all-sounds')
     }
   }, [])
 
@@ -94,6 +95,9 @@ export default function App() {
         onCreateProfile={store.createProfile}
         onToggleLoop={store.toggleLoop}
         loopEnabled={store.loopEnabled}
+        volume={store.volume}
+        onVolumeChange={store.updateVolume}
+        onStopAll={() => { stopAllSounds(); addToast('Tous les sons arrêtés', 'info') }}
         addToast={addToast}
       />
 
