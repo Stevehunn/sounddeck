@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { playSound, stopSound, isPlaying } from '../utils/audio'
 import ShortcutRecorder from './ShortcutRecorder'
 
-export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEnabled, playLocally, onToggleFavorite, onSetShortcut, onDelete, onRemoveFromProfile, onRename, onVolumeChange, currentProfileId }) {
+export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEnabled, playLocally, onToggleFavorite, onSetShortcut, onDelete, onRemoveFromProfile, onRename, onVolumeChange, onPlay, currentProfileId }) {
   const [playing, setPlaying] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showVolume, setShowVolume] = useState(false)
@@ -52,6 +52,7 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
     setFileError(false)
     playSound(sound, audioDevice, volume, loopEnabled, playLocally)
     setPlaying(true)
+    onPlay?.(sound.id)
   }
 
   const handleRename = () => {
@@ -189,6 +190,12 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
         onClear={() => onSetShortcut(sound.id, '')}
         compact
       />
+      {sound.playCount > 0 && (
+        <div style={{ fontSize: 9, color: 'var(--text-tertiary)', textAlign: 'center', marginTop: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+          <i className="ti ti-player-play" style={{ fontSize: 8 }} />
+          {sound.playCount} fois
+        </div>
+      )}
     </div>
   )
 }

@@ -27,7 +27,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
 
   writeDroppedFile: (fileName, arrayBuffer) => ipcRenderer.invoke('write-dropped-file', fileName, arrayBuffer),
-  fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath)
+  fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath),
+  exportConfig: () => ipcRenderer.invoke('export-config'),
+  importConfig: () => ipcRenderer.invoke('import-config')
 })
 
 // Exposer également via window pour accès direct dans les event handlers

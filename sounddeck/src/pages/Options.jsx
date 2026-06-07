@@ -124,6 +124,33 @@ export default function Options({ store, addToast }) {
           </div>
         </Section>
 
+        {/* Sauvegarde */}
+        <Section title="Sauvegarde & restauration" icon="ti-cloud">
+          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10, lineHeight: 1.6 }}>
+            Exporte ta configuration (profils, sons, raccourcis, thème) dans un fichier JSON.
+            Les fichiers audio ne sont pas inclus — seuls les chemins et métadonnées sont sauvegardés.
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-primary" style={{ flex: 1, justifyContent: 'center' }}
+              onClick={async () => {
+                const r = await window.electronAPI.exportConfig()
+                if (r.success) addToast(`Config exportée : ${r.path.split('\\').pop().split('/').pop()}`, 'success')
+                else if (r.error) addToast('Erreur : ' + r.error, 'error')
+              }}>
+              <i className="ti ti-download" /> Exporter
+            </button>
+            <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}
+              onClick={async () => {
+                const r = await window.electronAPI.importConfig()
+                if (r.success) {
+                  addToast(`Config importée (exportée le ${new Date(r.exportedAt).toLocaleDateString()}) — redémarre l'app`, 'success')
+                } else if (r.error) addToast('Erreur : ' + r.error, 'error')
+              }}>
+              <i className="ti ti-upload" /> Importer
+            </button>
+          </div>
+        </Section>
+
         {/* Profils */}
         <Section title="Gestion des profils" icon="ti-users">
           {store.profiles.map(p => (

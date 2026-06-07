@@ -5,12 +5,14 @@ import Home from './pages/Home'
 import Discover from './pages/Discover'
 import Options from './pages/Options'
 import Editor from './pages/Editor'
+import Presentation from './pages/Presentation'
 import Toast from './components/Toast'
 import { playSound, stopAllSounds } from './utils/audio'
 
 export default function App() {
   const store = useStore()
   const [currentPage, setCurrentPage] = useState('home')
+  const [presentationMode, setPresentationMode] = useState(false)
   const [toasts, setToasts] = useState([])
 
   // Refs pour toujours avoir les valeurs à jour dans les callbacks IPC
@@ -132,6 +134,7 @@ export default function App() {
         volume={store.volume}
         onVolumeChange={store.updateVolume}
         onStopAll={() => { stopAllSounds(); addToast('Tous les sons arrêtés', 'info') }}
+        onPresentation={() => setPresentationMode(true)}
         addToast={addToast}
       />
 
@@ -143,6 +146,12 @@ export default function App() {
       </main>
 
       <Toast toasts={toasts} />
+      {presentationMode && (
+        <Presentation
+          store={store}
+          onExit={() => setPresentationMode(false)}
+        />
+      )}
     </div>
   )
 }

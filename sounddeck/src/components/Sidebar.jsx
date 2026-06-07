@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 export default function Sidebar({ profiles, currentProfileId, currentPage, onSwitchProfile,
   onChangePage, onCreateProfile, onToggleLoop, loopEnabled, addToast,
-  volume, onVolumeChange, onStopAll }) {
+  volume, onVolumeChange, onStopAll, onPresentation }) {
 
   const [newProfileName, setNewProfileName] = useState('')
   const [showNewProfile, setShowNewProfile] = useState(false)
@@ -97,6 +97,23 @@ export default function Sidebar({ profiles, currentProfileId, currentPage, onSwi
         <SidebarItem icon="ti-home" label="Mes sons" active={currentPage === 'home'} onClick={() => onChangePage('home')} />
         <SidebarItem icon="ti-compass" label="Découverte" active={currentPage === 'discover'} onClick={() => onChangePage('discover')} />
         <SidebarItem icon="ti-cut" label="Éditeur" active={currentPage === 'editor'} onClick={() => onChangePage('editor')} />
+
+        {/* Mode présentation */}
+        <div style={{ margin: '6px 8px 0' }}>
+          <button onClick={onPresentation} style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+            padding: '7px 8px', borderRadius: 8,
+            background: 'var(--bg-tertiary)', border: '1px solid var(--border)',
+            color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer',
+            transition: 'all 0.15s'
+          }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
+            <i className="ti ti-layout-grid" style={{ fontSize: 15 }} />
+            <span style={{ flex: 1, textAlign: 'left' }}>Présentation</span>
+            <i className="ti ti-arrow-right" style={{ fontSize: 12 }} />
+          </button>
+        </div>
 
         {/* Bouton Loop */}
         <div style={{ margin: '6px 8px 0' }}>

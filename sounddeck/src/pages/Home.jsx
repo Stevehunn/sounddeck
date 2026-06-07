@@ -9,6 +9,7 @@ export default function Home({ store, addToast, loopEnabled }) {
   const [showAll, setShowAll] = useState(false)
   const [showAllOther, setShowAllOther] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [sortBy, setSortBy] = useState('default') // 'default' | 'popular' | 'recent' | 'alpha'
   const [dragOver, setDragOver] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importSuccess, setImportSuccess] = useState(0)
@@ -19,9 +20,16 @@ export default function Home({ store, addToast, loopEnabled }) {
     ? sounds.filter(s => !s.profiles.includes(currentProfileId))
     : []
 
-  const filtered = search
+  const baseFiltered = search
     ? currentSounds.filter(s => s.name.toLowerCase().includes(search.toLowerCase()))
     : currentSounds
+
+  const filtered = [...baseFiltered].sort((a, b) => {
+    if (sortBy === 'popular') return (b.playCount || 0) - (a.playCount || 0)
+    if (sortBy === 'recent') return (b.lastPlayed || 0) - (a.lastPlayed || 0)
+    if (sortBy === 'alpha') return a.name.localeCompare(b.name)
+    return (b.createdAt || 0) - (a.createdAt || 0)
+  })
 
   const displayed = showAll ? filtered : filtered.slice(0, 10)
   const displayedOther = showAllOther ? soundsOutsideProfile : soundsOutsideProfile.slice(0, 6)
@@ -138,7 +146,14 @@ export default function Home({ store, addToast, loopEnabled }) {
           <div style={{ fontWeight: 600, fontSize: 15 }}>{currentProfile?.name || 'Tous les sons'}</div>
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{currentSounds.length} son(s)</div>
         </div>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher..." style={{ width: 180 }} />
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+          style={{ fontSize: 12, padding: '5px 8px', width: 'auto' }}>
+          <option value="default">Plus récents</option>
+          <option value="popular">Plus joués</option>
+          <option value="recent">Joués récemment</option>
+          <option value="alpha">Alphabétique</option>
+        </select>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher..." style={{ width: 160 }} />
         <button className="btn-primary" onClick={() => setShowImport(true)}>
           <i className="ti ti-plus" /> Ajouter
         </button>
@@ -311,6 +326,7 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLo
           onToggleFavorite={store.toggleFavorite}
           onSetShortcut={store.setShortcut}
           onVolumeChange={store.updateSoundVolume}
+          onPlay={store.incrementPlayCount}
           onRemoveFromProfile={async (id) => { await store.removeSoundFromProfile(id, store.currentProfileId); addToast('Son retiré du profil', 'info') }}
           onDelete={async (id) => { await store.deleteSound(id); addToast('Son supprimé', 'info') }}
           onRename={(id, name) => store.updateSound(id, { name })}

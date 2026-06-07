@@ -606,6 +606,77 @@ ipcMain.handle('write-dropped-file', async (event, fileName, arrayBuffer) => {
   }
 })
 
+// ─── Export / Import config ──────────────────────────────────────────────────
+ipcMain.handle('export-config', async () => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Exporter la configuration',
+    defaultPath: `sounddeck-backup-${new Date().toISOString().slice(0,10)}.json`,
+    filters: [{ name: 'JSON', extensions: ['json'] }]
+  })
+  if (result.canceled) return { success: false }
+
+  try {
+    const config = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      profiles: store.get('profiles', []),
+      sounds: store.get('sounds', []),
+      shortcuts: store.get('shortcuts', {}),
+      profileShortcut: store.get('profileShortcut', ''),
+      loopShortcut: store.get('loopShortcut', ''),
+      stopAllShortcut: store.get('stopAllShortcut', ''),
+      theme: store.get('theme', 'dark'),
+      customTheme: store.get('customTheme', null),
+      volume: store.get('volume', 80),
+      playLocally: store.get('playLocally', true),
+      audioDevice: store.get('audioDevice', 'default'),
+    }
+    fs.writeFileSync(result.filePath, JSON.stringify(config, null, 2), 'utf-8')
+    return { success: true, path: result.filePath }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
+
+ipcMain.handle('import-config', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Importer une configuration',
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+    properties: ['openFile']
+  })
+  if (result.canceled) return { success: false }
+
+  try {
+    const raw = fs.readFileSync(result.filePaths[0], 'utf-8')
+    const config = JSON.parse(raw)
+    if (!config.version) return { success: false, error: 'Fichier invalide' }
+
+    // Restaurer uniquement les métadonnées, pas les fichiers audio
+    if (config.profiles) store.set('profiles', config.profiles)
+    if (config.sounds) {
+      // Marquer les sons dont le fichier n'existe plus
+      const sounds = config.sounds.map(s => ({
+        ...s,
+        missing: s.path && !fs.existsSync(s.path)
+      }))
+      store.set('sounds', sounds)
+    }
+    if (config.shortcuts) store.set('shortcuts', config.shortcuts)
+    if (config.profileShortcut) store.set('profileShortcut', config.profileShortcut)
+    if (config.loopShortcut) store.set('loopShortcut', config.loopShortcut)
+    if (config.stopAllShortcut) store.set('stopAllShortcut', config.stopAllShortcut)
+    if (config.theme) store.set('theme', config.theme)
+    if (config.customTheme) store.set('customTheme', config.customTheme)
+    if (config.volume != null) store.set('volume', config.volume)
+    if (config.playLocally != null) store.set('playLocally', config.playLocally)
+    if (config.audioDevice) store.set('audioDevice', config.audioDevice)
+
+    return { success: true, exportedAt: config.exportedAt }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
+
 // ─── Vérifier existence fichier ──────────────────────────────────────────────
 ipcMain.handle('file-exists', (event, filePath) => {
   try { return fs.existsSync(filePath) }

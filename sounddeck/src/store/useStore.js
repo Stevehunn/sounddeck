@@ -154,6 +154,14 @@ export function useStore() {
     await save('sounds', updated)
   }, [sounds, save])
 
+  const incrementPlayCount = useCallback(async (soundId) => {
+    const updated = sounds.map(s =>
+      s.id === soundId ? { ...s, playCount: (s.playCount || 0) + 1, lastPlayed: Date.now() } : s
+    )
+    setSounds(updated)
+    await save('sounds', updated)
+  }, [sounds, save])
+
   const updateSoundVolume = useCallback(async (soundId, volume) => {
     const updated = sounds.map(s => s.id === soundId ? { ...s, volume } : s)
     setSounds(updated)
@@ -269,7 +277,7 @@ export function useStore() {
     // Profils
     createProfile, deleteProfile, renameProfile, switchProfile, switchToNextProfile,
     // Sons
-    addSound, deleteSound, updateSound, updateSoundVolume, toggleFavorite, addSoundToProfile, removeSoundFromProfile,
+    addSound, deleteSound, updateSound, updateSoundVolume, incrementPlayCount, toggleFavorite, addSoundToProfile, removeSoundFromProfile,
     // Raccourcis
     setShortcut, clearShortcut, updateProfileShortcut,
     // Options
