@@ -30,6 +30,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   writeDroppedFile: (fileName, arrayBuffer) => ipcRenderer.invoke('write-dropped-file', fileName, arrayBuffer),
   fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath),
+  checkYtdlp: () => ipcRenderer.invoke('check-ytdlp'),
+  downloadYtdlp: () => ipcRenderer.invoke('download-ytdlp'),
+  youtubeInfo: (url) => ipcRenderer.invoke('youtube-info', url),
+  youtubeDownload: (url, start, end, title) => ipcRenderer.invoke('youtube-download', url, start, end, title),
   exportConfig: () => ipcRenderer.invoke('export-config'),
   exportFull: () => ipcRenderer.invoke('export-full'),
   exportSoundsOnly: () => ipcRenderer.invoke('export-sounds-only'),

@@ -7,6 +7,7 @@ import Options from './pages/Options'
 import Editor from './pages/Editor'
 import Presentation from './pages/Presentation'
 import Sequencer from './pages/Sequencer'
+import YouTube from './pages/YouTube'
 import Toast from './components/Toast'
 import { playSound, stopAllSounds } from './utils/audio'
 
@@ -148,6 +149,7 @@ export default function App() {
         {currentPage === 'options' && <Options store={store} addToast={addToast} />}
         {currentPage === 'editor' && <Editor store={store} addToast={addToast} />}
         {currentPage === 'sequencer' && <Sequencer store={store} addToast={addToast} />}
+        {currentPage === 'youtube' && <YouTube store={store} addToast={addToast} />}
       </main>
 
       <Toast toasts={toasts} />

@@ -905,6 +905,171 @@ ipcMain.handle('import-backup', async () => {
   return { success: false, error: 'Format non supporté' }
 })
 
+// ─── YouTube import via yt-dlp ───────────────────────────────────────────────
+
+const YTDLP_DIR = path.join(app.getPath('userData'), 'bin')
+const YTDLP_PATH = path.join(YTDLP_DIR, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp')
+
+// Vérifier si yt-dlp est disponible
+ipcMain.handle('check-ytdlp', async () => {
+  // 1. Vérifier dans userData/bin
+  if (fs.existsSync(YTDLP_PATH)) return { available: true, path: YTDLP_PATH, source: 'local' }
+
+  // 2. Vérifier dans le PATH système
+  const { execFile } = require('child_process')
+  const systemCmd = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
+  return new Promise((resolve) => {
+    execFile(systemCmd, ['--version'], { timeout: 5000 }, (err, stdout) => {
+      if (!err) resolve({ available: true, path: systemCmd, source: 'system', version: stdout.trim() })
+      else resolve({ available: false })
+    })
+  })
+})
+
+// Télécharger yt-dlp automatiquement
+ipcMain.handle('download-ytdlp', async () => {
+  try {
+    if (!fs.existsSync(YTDLP_DIR)) fs.mkdirSync(YTDLP_DIR, { recursive: true })
+
+    const https = require('https')
+    const url = process.platform === 'win32'
+      ? 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe'
+      : process.platform === 'darwin'
+        ? 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos'
+        : 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp'
+
+    const doDownload = (url, dest) => new Promise((resolve, reject) => {
+      const file = fs.createWriteStream(dest)
+      https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
+        if ([301, 302, 303, 307].includes(res.statusCode) && res.headers.location) {
+          file.close()
+          doDownload(res.headers.location, dest).then(resolve).catch(reject)
+          return
+        }
+        res.pipe(file)
+        file.on('finish', () => {
+          file.close()
+          // Rendre exécutable sur Unix
+          if (process.platform !== 'win32') {
+            fs.chmodSync(dest, '755')
+          }
+          resolve()
+        })
+      }).on('error', reject)
+    })
+
+    await doDownload(url, YTDLP_PATH)
+    return { success: true, path: YTDLP_PATH }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
+
+// Récupérer les infos d'une vidéo YouTube
+ipcMain.handle('youtube-info', async (event, url) => {
+  try {
+    const ytdlpPath = fs.existsSync(YTDLP_PATH) ? YTDLP_PATH : 'yt-dlp'
+    const { execFile } = require('child_process')
+
+    return new Promise((resolve) => {
+      execFile(ytdlpPath, [
+        '--dump-json',
+        '--no-playlist',
+        '--no-warnings',
+        url
+      ], { timeout: 30000 }, (err, stdout, stderr) => {
+        if (err) {
+          resolve({ success: false, error: stderr || err.message })
+          return
+        }
+        try {
+          const info = JSON.parse(stdout)
+          resolve({
+            success: true,
+            title: info.title,
+            duration: info.duration,
+            thumbnail: info.thumbnail,
+            uploader: info.uploader,
+            url: info.webpage_url
+          })
+        } catch (e) {
+          resolve({ success: false, error: 'Impossible de lire les infos' })
+        }
+      })
+    })
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
+
+// Télécharger l'audio d'une vidéo YouTube
+ipcMain.handle('youtube-download', async (event, url, startSec, endSec, title) => {
+  try {
+    const ytdlpPath = fs.existsSync(YTDLP_PATH) ? YTDLP_PATH : 'yt-dlp'
+    const { execFile } = require('child_process')
+
+    const safeName = (title || 'youtube').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40)
+    const outPath = path.join(soundsDir, `yt_${Date.now()}_${safeName}.mp3`)
+
+    // Arguments de base
+    const args = [
+      '--no-playlist',
+      '--no-warnings',
+      '-x',                          // extraire audio seulement
+      '--audio-format', 'mp3',
+      '--audio-quality', '5',        // qualité 0-9, 5 = bon compromis
+    ]
+
+    // Si on veut juste une portion, utiliser --download-sections
+    if (startSec > 0 || endSec > 0) {
+      const start = formatYtTime(startSec)
+      const end = formatYtTime(endSec)
+      args.push('--download-sections', `*${start}-${end}`)
+      args.push('--force-keyframes-at-cuts')
+    }
+
+    args.push('-o', outPath, url)
+
+    return new Promise((resolve) => {
+      execFile(ytdlpPath, args, { timeout: 120000 }, (err, stdout, stderr) => {
+        if (err) {
+          // Essayer de trouver le fichier quand même (yt-dlp peut réussir malgré un code d'erreur)
+          if (fs.existsSync(outPath) && fs.statSync(outPath).size > 1000) {
+            resolve({ success: true, path: outPath.replace(/\\/g, '/') })
+          } else {
+            resolve({ success: false, error: stderr || err.message })
+          }
+          return
+        }
+        if (fs.existsSync(outPath)) {
+          resolve({ success: true, path: outPath.replace(/\\/g, '/') })
+        } else {
+          // yt-dlp peut changer le nom du fichier légèrement
+          const files = fs.readdirSync(soundsDir)
+            .filter(f => f.startsWith(`yt_`) && f.endsWith('.mp3'))
+            .map(f => ({ f, t: fs.statSync(path.join(soundsDir, f)).mtimeMs }))
+            .sort((a, b) => b.t - a.t)
+          if (files.length > 0) {
+            const found = path.join(soundsDir, files[0].f)
+            resolve({ success: true, path: found.replace(/\\/g, '/') })
+          } else {
+            resolve({ success: false, error: 'Fichier de sortie introuvable' })
+          }
+        }
+      })
+    })
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
+
+function formatYtTime(seconds) {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = Math.floor(seconds % 60)
+  return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`
+}
+
 // ─── Vérifier existence fichier ──────────────────────────────────────────────
 ipcMain.handle('file-exists', (event, filePath) => {
   try { return fs.existsSync(filePath) }
