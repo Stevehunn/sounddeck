@@ -119,6 +119,14 @@ export default function Options({ store, addToast }) {
               requireMod
             />
           </OptionRow>
+          <OptionRow label="Mode présentation" sub="Ouvre/ferme le mode présentation plein écran">
+            <ShortcutRecorder
+              value={store.presentationShortcut}
+              onSave={async (acc) => { await store.updatePresentationShortcut(acc); addToast(`Raccourci présentation : ${acc}`, 'success') }}
+              onClear={() => store.updatePresentationShortcut('')}
+              requireMod
+            />
+          </OptionRow>
           <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
             Les raccourcis par son se configurent directement sur chaque carte de son (page Mes sons).
           </div>
@@ -126,28 +134,102 @@ export default function Options({ store, addToast }) {
 
         {/* Sauvegarde */}
         <Section title="Sauvegarde & restauration" icon="ti-cloud">
-          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10, lineHeight: 1.6 }}>
-            Exporte ta configuration (profils, sons, raccourcis, thème) dans un fichier JSON.
-            Les fichiers audio ne sont pas inclus — seuls les chemins et métadonnées sont sauvegardés.
+
+          {/* Export */}
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Exporter
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn-primary" style={{ flex: 1, justifyContent: 'center' }}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+
+            {/* Config seule */}
+            <div style={{ padding: '10px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ fontSize: 20 }}>📄</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>Config seule</div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Profils, raccourcis, thème · Fichier JSON léger</div>
+              </div>
+              <button className="btn-secondary" style={{ flexShrink: 0, fontSize: 12 }}
+                onClick={async () => {
+                  const r = await window.electronAPI.exportConfig()
+                  if (r.success) addToast('Configuration exportée ✓', 'success')
+                  else if (r.error) addToast('Erreur : ' + r.error, 'error')
+                }}>
+                <i className="ti ti-download" /> Exporter
+              </button>
+            </div>
+
+            {/* Archive complète */}
+            <div style={{ padding: '10px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ fontSize: 20 }}>📦</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>Archive complète</div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Config + tous les sons · Fichier ZIP (peut être lourd)</div>
+              </div>
+              <button className="btn-primary" style={{ flexShrink: 0, fontSize: 12 }}
+                onClick={async () => {
+                  addToast("Création de l'archive en cours...", 'info')
+                  const r = await window.electronAPI.exportFull()
+                  if (r.success) addToast(`Archive créée · ${r.sizeMb} Mo ✓`, 'success')
+                  else if (r.error) addToast('Erreur : ' + r.error, 'error')
+                }}>
+                <i className="ti ti-package" /> Exporter
+              </button>
+            </div>
+
+            {/* Sons uniquement */}
+            <div style={{ padding: '10px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ fontSize: 20 }}>🎵</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>Sons uniquement</div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Tous les fichiers audio · ZIP sans config</div>
+              </div>
+              <button className="btn-secondary" style={{ flexShrink: 0, fontSize: 12 }}
+                onClick={async () => {
+                  addToast('Compression des sons en cours...', 'info')
+                  const r = await window.electronAPI.exportSoundsOnly()
+                  if (r.success) addToast(`${r.sizeMb} Mo exportés ✓`, 'success')
+                  else if (r.error) addToast('Erreur : ' + r.error, 'error')
+                }}>
+                <i className="ti ti-music" /> Exporter
+              </button>
+            </div>
+          </div>
+
+          {/* Import */}
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Importer
+          </div>
+          <div style={{ padding: '10px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ fontSize: 20 }}>📥</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>Importer une sauvegarde</div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>JSON ou ZIP — détection automatique du format</div>
+            </div>
+            <button className="btn-primary" style={{ flexShrink: 0, fontSize: 12 }}
               onClick={async () => {
-                const r = await window.electronAPI.exportConfig()
-                if (r.success) addToast(`Config exportée : ${r.path.split('\\').pop().split('/').pop()}`, 'success')
-                else if (r.error) addToast('Erreur : ' + r.error, 'error')
-              }}>
-              <i className="ti ti-download" /> Exporter
-            </button>
-            <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}
-              onClick={async () => {
-                const r = await window.electronAPI.importConfig()
+                const r = await window.electronAPI.importBackup()
                 if (r.success) {
-                  addToast(`Config importée (exportée le ${new Date(r.exportedAt).toLocaleDateString()}) — redémarre l'app`, 'success')
-                } else if (r.error) addToast('Erreur : ' + r.error, 'error')
+                  if (r.type === 'json') {
+                    const msg = r.missing > 0
+                      ? `Config importée · ${r.missing} son(s) manquant(s) — redémarre l'app`
+                      : `Config importée ✓ — redémarre l'app`
+                    addToast(msg, r.missing > 0 ? 'info' : 'success')
+                  } else if (r.type === 'full') {
+                    addToast(`Archive importée · ${r.importedSounds} son(s) restauré(s) ✓ — redémarre l'app`, 'success')
+                  } else if (r.type === 'sounds-only') {
+                    addToast(`${r.importedSounds} son(s) importé(s) dans "Tous les sons" ✓`, 'success')
+                  }
+                } else if (r.error) {
+                  addToast('Erreur : ' + r.error, 'error')
+                }
               }}>
               <i className="ti ti-upload" /> Importer
             </button>
+          </div>
+
+          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 8, lineHeight: 1.6 }}>
+            <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
+            Un redémarrage de l'app est nécessaire après l'import d'une config ou d'une archive complète.
           </div>
         </Section>
 

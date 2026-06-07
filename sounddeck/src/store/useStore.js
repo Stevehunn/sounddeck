@@ -16,6 +16,7 @@ export function useStore() {
   const [loopEnabled, setLoopEnabled] = useState(false)
   const [loopShortcut, setLoopShortcut] = useState('')
   const [stopAllShortcut, setStopAllShortcut] = useState('')
+  const [presentationShortcut, setPresentationShortcut] = useState('')
   const [loading, setLoading] = useState(true)
 
   // ─── Chargement initial depuis electron-store ────────────────────────────────
@@ -33,6 +34,7 @@ export function useStore() {
         const savedPlayLocally = await window.electronAPI.storeGet('playLocally') ?? true
         const savedLoopShortcut = await window.electronAPI.storeGet('loopShortcut') || ''
         const savedStopAllShortcut = await window.electronAPI.storeGet('stopAllShortcut') || ''
+        const savedPresentationShortcut = await window.electronAPI.storeGet('presentationShortcut') || ''
         const savedCurrentProfileId = await window.electronAPI.storeGet('currentProfileId')
 
         // Profil "Tous les sons" toujours présent
@@ -51,6 +53,7 @@ export function useStore() {
         setPlayLocally(savedPlayLocally)
         setLoopShortcut(savedLoopShortcut)
         setStopAllShortcut(savedStopAllShortcut)
+        setPresentationShortcut(savedPresentationShortcut)
         setCurrentProfileId(savedCurrentProfileId || 'all')
       } catch (e) {
         console.error('Erreur chargement store:', e)
@@ -223,6 +226,12 @@ export function useStore() {
     setLoopEnabled(prev => !prev)
   }, [])
 
+  const updatePresentationShortcut = useCallback(async (accelerator) => {
+    setPresentationShortcut(accelerator)
+    await save('presentationShortcut', accelerator)
+    await window.electronAPI.updatePresentationShortcut(accelerator)
+  }, [save])
+
   const updateStopAllShortcut = useCallback(async (accelerator) => {
     setStopAllShortcut(accelerator)
     await save('stopAllShortcut', accelerator)
@@ -283,6 +292,7 @@ export function useStore() {
     // Options
     loopEnabled, loopShortcut, toggleLoop, updateLoopShortcut,
     stopAllShortcut, updateStopAllShortcut,
+    presentationShortcut, updatePresentationShortcut,
     customTheme, updateTheme, updateCustomTheme, updateAudioDevice, updateVolume, updatePlayLocally
   }
 }

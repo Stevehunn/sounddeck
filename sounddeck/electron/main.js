@@ -103,6 +103,13 @@ function registerShortcuts() {
       mainWindow?.webContents.send('stop-all-sounds')
     })
   }
+
+  const presentationShortcut = store.get('presentationShortcut', '')
+  if (presentationShortcut) {
+    safeRegister(presentationShortcut, () => {
+      mainWindow?.webContents.send('toggle-presentation')
+    })
+  }
 }
 
 ipcMain.handle('update-shortcuts', (event, shortcuts) => {
@@ -114,6 +121,13 @@ ipcMain.handle('update-shortcuts', (event, shortcuts) => {
 
 ipcMain.handle('update-profile-shortcut', (event, accelerator) => {
   store.set('profileShortcut', accelerator)
+  globalShortcut.unregisterAll()
+  registerShortcuts()
+  return true
+})
+
+ipcMain.handle('update-presentation-shortcut', (event, accelerator) => {
+  store.set('presentationShortcut', accelerator)
   globalShortcut.unregisterAll()
   registerShortcuts()
   return true
@@ -606,75 +620,289 @@ ipcMain.handle('write-dropped-file', async (event, fileName, arrayBuffer) => {
   }
 })
 
-// ─── Export / Import config ──────────────────────────────────────────────────
+// ─── Export / Import ─────────────────────────────────────────────────────────
+
+function buildConfig() {
+  return {
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    profiles: store.get('profiles', []),
+    sounds: store.get('sounds', []),
+    shortcuts: store.get('shortcuts', {}),
+    profileShortcut: store.get('profileShortcut', ''),
+    loopShortcut: store.get('loopShortcut', ''),
+    stopAllShortcut: store.get('stopAllShortcut', ''),
+    presentationShortcut: store.get('presentationShortcut', ''),
+    theme: store.get('theme', 'dark'),
+    customTheme: store.get('customTheme', null),
+    volume: store.get('volume', 80),
+    playLocally: store.get('playLocally', true),
+    audioDevice: store.get('audioDevice', 'default'),
+  }
+}
+
+function applyConfig(config) {
+  if (config.profiles) store.set('profiles', config.profiles)
+  if (config.shortcuts) store.set('shortcuts', config.shortcuts)
+  if (config.profileShortcut != null) store.set('profileShortcut', config.profileShortcut)
+  if (config.loopShortcut != null) store.set('loopShortcut', config.loopShortcut)
+  if (config.stopAllShortcut != null) store.set('stopAllShortcut', config.stopAllShortcut)
+  if (config.presentationShortcut != null) store.set('presentationShortcut', config.presentationShortcut)
+  if (config.theme) store.set('theme', config.theme)
+  if (config.customTheme) store.set('customTheme', config.customTheme)
+  if (config.volume != null) store.set('volume', config.volume)
+  if (config.playLocally != null) store.set('playLocally', config.playLocally)
+  if (config.audioDevice) store.set('audioDevice', config.audioDevice)
+}
+
+// ── Mode 1 : Config seule (JSON) ─────────────────────────────────────────────
 ipcMain.handle('export-config', async () => {
   const result = await dialog.showSaveDialog(mainWindow, {
     title: 'Exporter la configuration',
-    defaultPath: `sounddeck-backup-${new Date().toISOString().slice(0,10)}.json`,
+    defaultPath: `sounddeck-config-${new Date().toISOString().slice(0,10)}.json`,
     filters: [{ name: 'JSON', extensions: ['json'] }]
+  })
+  if (result.canceled) return { success: false }
+  try {
+    const config = buildConfig()
+    // Marquer les sons comme références (pas de fichiers inclus)
+    config.sounds = config.sounds.map(s => ({ ...s, included: false }))
+    fs.writeFileSync(result.filePath, JSON.stringify(config, null, 2), 'utf-8')
+    return { success: true, path: result.filePath }
+  } catch (e) { return { success: false, error: e.message } }
+})
+
+// ── Mode 2 : Archive complète (ZIP config + sons) ────────────────────────────
+ipcMain.handle('export-full', async (event) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Exporter archive complète',
+    defaultPath: `sounddeck-full-${new Date().toISOString().slice(0,10)}.zip`,
+    filters: [{ name: 'Archive ZIP', extensions: ['zip'] }]
   })
   if (result.canceled) return { success: false }
 
   try {
-    const config = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      profiles: store.get('profiles', []),
-      sounds: store.get('sounds', []),
-      shortcuts: store.get('shortcuts', {}),
-      profileShortcut: store.get('profileShortcut', ''),
-      loopShortcut: store.get('loopShortcut', ''),
-      stopAllShortcut: store.get('stopAllShortcut', ''),
-      theme: store.get('theme', 'dark'),
-      customTheme: store.get('customTheme', null),
-      volume: store.get('volume', 80),
-      playLocally: store.get('playLocally', true),
-      audioDevice: store.get('audioDevice', 'default'),
+    const archiver = require('archiver')
+    const config = buildConfig()
+    const sounds = store.get('sounds', [])
+
+    // Construire la config avec chemins relatifs dans le ZIP
+    const configForZip = {
+      ...config,
+      sounds: sounds.map(s => ({
+        ...s,
+        included: fs.existsSync(s.path || ''),
+        zipPath: fs.existsSync(s.path || '') ? `sounds/${path.basename(s.path)}` : null
+      }))
     }
-    fs.writeFileSync(result.filePath, JSON.stringify(config, null, 2), 'utf-8')
-    return { success: true, path: result.filePath }
+
+    const output = fs.createWriteStream(result.filePath)
+    const archive = archiver('zip', { zlib: { level: 6 } })
+
+    await new Promise((resolve, reject) => {
+      output.on('close', resolve)
+      archive.on('error', reject)
+      archive.pipe(output)
+
+      // Ajouter config.json
+      archive.append(JSON.stringify(configForZip, null, 2), { name: 'config.json' })
+
+      // Ajouter chaque fichier son existant
+      let added = 0
+      for (const sound of sounds) {
+        if (sound.path && fs.existsSync(sound.path)) {
+          archive.file(sound.path, { name: `sounds/${path.basename(sound.path)}` })
+          added++
+        }
+      }
+
+      // Ajouter les images
+      const imagesDir = path.join(app.getPath('userData'), 'images')
+      if (fs.existsSync(imagesDir)) {
+        archive.directory(imagesDir, 'images')
+      }
+
+      archive.finalize()
+      console.log(`Archive : ${added} sons inclus`)
+    })
+
+    const stats = fs.statSync(result.filePath)
+    const sizeMb = (stats.size / 1024 / 1024).toFixed(1)
+    return { success: true, path: result.filePath, sizeMb }
   } catch (e) {
+    console.error('export-full error:', e)
     return { success: false, error: e.message }
   }
 })
 
-ipcMain.handle('import-config', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Importer une configuration',
-    filters: [{ name: 'JSON', extensions: ['json'] }],
-    properties: ['openFile']
+// ── Mode 3 : Sons uniquement (ZIP) ───────────────────────────────────────────
+ipcMain.handle('export-sounds-only', async () => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Exporter les sons',
+    defaultPath: `sounddeck-sons-${new Date().toISOString().slice(0,10)}.zip`,
+    filters: [{ name: 'Archive ZIP', extensions: ['zip'] }]
   })
   if (result.canceled) return { success: false }
 
   try {
-    const raw = fs.readFileSync(result.filePaths[0], 'utf-8')
-    const config = JSON.parse(raw)
-    if (!config.version) return { success: false, error: 'Fichier invalide' }
+    const archiver = require('archiver')
+    const sounds = store.get('sounds', [])
+    const output = fs.createWriteStream(result.filePath)
+    const archive = archiver('zip', { zlib: { level: 6 } })
 
-    // Restaurer uniquement les métadonnées, pas les fichiers audio
-    if (config.profiles) store.set('profiles', config.profiles)
-    if (config.sounds) {
-      // Marquer les sons dont le fichier n'existe plus
-      const sounds = config.sounds.map(s => ({
-        ...s,
-        missing: s.path && !fs.existsSync(s.path)
-      }))
-      store.set('sounds', sounds)
-    }
-    if (config.shortcuts) store.set('shortcuts', config.shortcuts)
-    if (config.profileShortcut) store.set('profileShortcut', config.profileShortcut)
-    if (config.loopShortcut) store.set('loopShortcut', config.loopShortcut)
-    if (config.stopAllShortcut) store.set('stopAllShortcut', config.stopAllShortcut)
-    if (config.theme) store.set('theme', config.theme)
-    if (config.customTheme) store.set('customTheme', config.customTheme)
-    if (config.volume != null) store.set('volume', config.volume)
-    if (config.playLocally != null) store.set('playLocally', config.playLocally)
-    if (config.audioDevice) store.set('audioDevice', config.audioDevice)
+    await new Promise((resolve, reject) => {
+      output.on('close', resolve)
+      archive.on('error', reject)
+      archive.pipe(output)
 
-    return { success: true, exportedAt: config.exportedAt }
-  } catch (e) {
-    return { success: false, error: e.message }
+      let added = 0
+      for (const sound of sounds) {
+        if (sound.path && fs.existsSync(sound.path)) {
+          archive.file(sound.path, { name: path.basename(sound.path) })
+          added++
+        }
+      }
+      archive.finalize()
+      console.log(`Sons exportés : ${added}`)
+    })
+
+    const stats = fs.statSync(result.filePath)
+    const sizeMb = (stats.size / 1024 / 1024).toFixed(1)
+    return { success: true, path: result.filePath, sizeMb }
+  } catch (e) { return { success: false, error: e.message } }
+})
+
+// ── Import universel (JSON ou ZIP) ───────────────────────────────────────────
+ipcMain.handle('import-backup', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Importer une sauvegarde',
+    filters: [
+      { name: 'Sauvegardes SoundDeck', extensions: ['json', 'zip'] },
+      { name: 'JSON', extensions: ['json'] },
+      { name: 'Archive ZIP', extensions: ['zip'] }
+    ],
+    properties: ['openFile']
+  })
+  if (result.canceled) return { success: false }
+
+  const filePath = result.filePaths[0]
+  const ext = path.extname(filePath).toLowerCase()
+
+  // ── Import JSON ────────────────────────────────────────────────────────────
+  if (ext === '.json') {
+    try {
+      const raw = fs.readFileSync(filePath, 'utf-8')
+      const config = JSON.parse(raw)
+      if (!config.version) return { success: false, error: 'Fichier JSON invalide' }
+
+      applyConfig(config)
+
+      if (config.sounds) {
+        const sounds = config.sounds.map(s => ({
+          ...s,
+          missing: s.path && !fs.existsSync(s.path)
+        }))
+        store.set('sounds', sounds)
+        const missing = sounds.filter(s => s.missing).length
+        return { success: true, type: 'json', exportedAt: config.exportedAt, missing }
+      }
+      return { success: true, type: 'json', exportedAt: config.exportedAt, missing: 0 }
+    } catch (e) { return { success: false, error: e.message } }
   }
+
+  // ── Import ZIP ────────────────────────────────────────────────────────────
+  if (ext === '.zip') {
+    try {
+      const unzipper = require('unzipper')
+      const tmpDir = path.join(app.getPath('temp'), `sounddeck_import_${Date.now()}`)
+      fs.mkdirSync(tmpDir, { recursive: true })
+
+      // Extraire le ZIP dans un dossier temporaire
+      await new Promise((resolve, reject) => {
+        fs.createReadStream(filePath)
+          .pipe(unzipper.Extract({ path: tmpDir }))
+          .on('close', resolve)
+          .on('error', reject)
+      })
+
+      // Lire config.json si présent
+      const configPath = path.join(tmpDir, 'config.json')
+      let importedSounds = 0
+      let importedConfig = false
+
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+        applyConfig(config)
+        importedConfig = true
+
+        // Copier les sons extraits et mettre à jour les chemins
+        const soundsTmpDir = path.join(tmpDir, 'sounds')
+        if (fs.existsSync(soundsTmpDir)) {
+          const updatedSounds = (config.sounds || []).map(sound => {
+            if (!sound.zipPath) return { ...sound, missing: !fs.existsSync(sound.path || '') }
+            const srcFile = path.join(tmpDir, sound.zipPath)
+            if (!fs.existsSync(srcFile)) return { ...sound, missing: true }
+            const destFile = path.join(soundsDir, path.basename(srcFile))
+            fs.copyFileSync(srcFile, destFile)
+            importedSounds++
+            return { ...sound, path: destFile.replace(/\\/g, '/'), missing: false }
+          })
+          store.set('sounds', updatedSounds)
+        }
+
+        // Copier les images
+        const imagesTmpDir = path.join(tmpDir, 'images')
+        const imagesDir = path.join(app.getPath('userData'), 'images')
+        if (fs.existsSync(imagesTmpDir)) {
+          if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true })
+          fs.readdirSync(imagesTmpDir).forEach(f => {
+            fs.copyFileSync(path.join(imagesTmpDir, f), path.join(imagesDir, f))
+          })
+        }
+
+      } else {
+        // ZIP de sons uniquement — importer tous les fichiers audio
+        const files = fs.readdirSync(tmpDir).filter(f =>
+          f.match(/\.(mp3|wav|ogg|flac|m4a|aac)$/i)
+        )
+        const existingSounds = store.get('sounds', [])
+        const newSounds = []
+
+        for (const file of files) {
+          const src = path.join(tmpDir, file)
+          const dest = path.join(soundsDir, `imported_${Date.now()}_${file}`)
+          fs.copyFileSync(src, dest)
+          newSounds.push({
+            id: require('crypto').randomUUID(),
+            name: path.basename(file, path.extname(file)),
+            path: dest.replace(/\\/g, '/'),
+            emoji: '🔊',
+            favorite: false,
+            profiles: ['all'],
+            volume: 100,
+            createdAt: Date.now()
+          })
+          importedSounds++
+        }
+        store.set('sounds', [...existingSounds, ...newSounds])
+      }
+
+      // Nettoyer le dossier temporaire
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+
+      return {
+        success: true,
+        type: importedConfig ? 'full' : 'sounds-only',
+        importedSounds,
+        importedConfig
+      }
+    } catch (e) {
+      console.error('import-backup ZIP error:', e)
+      return { success: false, error: e.message }
+    }
+  }
+
+  return { success: false, error: 'Format non supporté' }
 })
 
 // ─── Vérifier existence fichier ──────────────────────────────────────────────

@@ -17,10 +17,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateProfileShortcut: (acc) => ipcRenderer.invoke('update-profile-shortcut', acc),
   updateLoopShortcut: (acc) => ipcRenderer.invoke('update-loop-shortcut', acc),
   updateStopAllShortcut: (acc) => ipcRenderer.invoke('update-stop-all-shortcut', acc),
+  updatePresentationShortcut: (acc) => ipcRenderer.invoke('update-presentation-shortcut', acc),
   onPlaySound: (cb) => ipcRenderer.on('play-sound', (e, id) => cb(id)),
   onSwitchProfile: (cb) => ipcRenderer.on('switch-profile', () => cb()),
   onToggleLoop: (cb) => ipcRenderer.on('toggle-loop', () => cb()),
   onStopAllSounds: (cb) => ipcRenderer.on('stop-all-sounds', () => cb()),
+  onTogglePresentation: (cb) => ipcRenderer.on('toggle-presentation', () => cb()),
   removeAllListeners: (ch) => ipcRenderer.removeAllListeners(ch),
 
   // Expose process.versions pour détecter Electron dans le renderer
@@ -29,7 +31,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   writeDroppedFile: (fileName, arrayBuffer) => ipcRenderer.invoke('write-dropped-file', fileName, arrayBuffer),
   fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath),
   exportConfig: () => ipcRenderer.invoke('export-config'),
-  importConfig: () => ipcRenderer.invoke('import-config')
+  exportFull: () => ipcRenderer.invoke('export-full'),
+  exportSoundsOnly: () => ipcRenderer.invoke('export-sounds-only'),
+  importBackup: () => ipcRenderer.invoke('import-backup')
 })
 
 // Exposer également via window pour accès direct dans les event handlers
