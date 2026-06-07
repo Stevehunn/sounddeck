@@ -97,6 +97,7 @@ export default function Sidebar({ profiles, currentProfileId, currentPage, onSwi
         <SidebarItem icon="ti-home" label="Mes sons" active={currentPage === 'home'} onClick={() => onChangePage('home')} />
         <SidebarItem icon="ti-compass" label="Découverte" active={currentPage === 'discover'} onClick={() => onChangePage('discover')} />
         <SidebarItem icon="ti-cut" label="Éditeur" active={currentPage === 'editor'} onClick={() => onChangePage('editor')} />
+        <SidebarItem icon="ti-playlist" label="Séquenceur" active={currentPage === 'sequencer'} onClick={() => onChangePage('sequencer')} />
 
         {/* Mode présentation */}
         <div style={{ margin: '6px 8px 0' }}>

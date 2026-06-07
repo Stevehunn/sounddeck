@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Howl } from 'howler'
+import Waveform, { formatTime } from '../components/Waveform'
 
 const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋','🤡','👾','🎤','🦄','💯']
 
@@ -119,8 +120,6 @@ function SoundEditor({ sound, store, addToast, onDone }) {
   const [playing, setPlaying] = useState(false)
   const [start, setStart] = useState(0)
   const [end, setEnd] = useState(0)
-  const [dragging, setDragging] = useState(null)
-
   // États du formulaire
   const [name, setName] = useState(sound.name + ' (copie)')
   const [emoji, setEmoji] = useState(sound.emoji || '🔊')
@@ -172,48 +171,9 @@ function SoundEditor({ sound, store, addToast, onDone }) {
     }
   }
 
-  const fmt = (s) => {
-    if (!s || isNaN(s)) return '0:00'
-    const m = Math.floor(s / 60)
-    const sec = Math.floor(s % 60)
-    return `${m}:${sec.toString().padStart(2, '0')}`
-  }
+  const fmt = formatTime
 
-  const getPosFromEvent = useCallback((e) => {
-    const tl = timelineRef.current
-    if (!tl || !duration) return 0
-    const rect = tl.getBoundingClientRect()
-    return Math.max(0, Math.min(duration, ((e.clientX - rect.left) / rect.width) * duration))
-  }, [duration])
 
-  const handleMouseMove = useCallback((e) => {
-    if (!dragging) return
-    const pos = getPosFromEvent(e)
-    if (dragging === 'start') setStart(Math.min(pos, end - 0.1))
-    else if (dragging === 'end') setEnd(Math.max(pos, start + 0.1))
-    else if (dragging === 'playhead') {
-      if (audioRef.current) audioRef.current.currentTime = pos
-      setCurrentTime(pos)
-    }
-  }, [dragging, getPosFromEvent, start, end])
-
-  const handleMouseUp = useCallback(() => setDragging(null), [])
-
-  useEffect(() => {
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [handleMouseMove, handleMouseUp])
-
-  const handleTimelineClick = (e) => {
-    if (dragging) return
-    const pos = getPosFromEvent(e)
-    if (audioRef.current) audioRef.current.currentTime = pos
-    setCurrentTime(pos)
-  }
 
   const handlePickImage = async () => {
     const imgPath = await window.electronAPI.openImageDialog()
@@ -270,9 +230,7 @@ function SoundEditor({ sound, store, addToast, onDone }) {
     onDone()
   }
 
-  const selLeft = `${(start / (duration || 1)) * 100}%`
-  const selWidth = `${((end - start) / (duration || 1)) * 100}%`
-  const playheadLeft = `${(currentTime / (duration || 1)) * 100}%`
+
 
   return (
     <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -316,79 +274,26 @@ function SoundEditor({ sound, store, addToast, onDone }) {
             </span>
           </div>
 
-          {/* Timeline */}
-          <div style={{ position: 'relative', height: 70, userSelect: 'none', marginBottom: 10 }}>
-            {/* Fond cliquable */}
-            <div ref={timelineRef} onClick={handleTimelineClick}
-              style={{
-                position: 'absolute', inset: 0, background: 'var(--bg-tertiary)',
-                borderRadius: 8, cursor: 'crosshair', overflow: 'hidden'
-              }}>
-              {/* Waveform */}
-              <WaveformBars duration={duration} />
-              {/* Zone sélectionnée */}
-              <div style={{
-                position: 'absolute', top: 0, bottom: 0,
-                left: selLeft, width: selWidth,
-                background: 'rgba(124,111,247,0.3)',
-                borderLeft: '2px solid var(--accent)',
-                borderRight: '2px solid var(--accent)',
-                pointerEvents: 'none'
-              }} />
-              {/* Playhead */}
-              <div
-                onMouseDown={e => { e.stopPropagation(); setDragging('playhead') }}
-                style={{
-                  position: 'absolute', top: 0, bottom: 0,
-                  left: playheadLeft, width: 2,
-                  background: 'white', cursor: 'col-resize',
-                  zIndex: 10, transform: 'translateX(-1px)'
-                }}>
-                <div style={{
-                  position: 'absolute', top: -5, left: -5,
-                  width: 12, height: 12, borderRadius: '50%',
-                  background: 'white', border: '2px solid var(--accent)'
-                }} />
-              </div>
-            </div>
-
-            {/* Poignée start */}
-            <div onMouseDown={e => { e.stopPropagation(); setDragging('start') }}
-              style={{
-                position: 'absolute', top: 0, bottom: 0,
-                left: selLeft, width: 14,
-                cursor: 'ew-resize', zIndex: 11,
-                transform: 'translateX(-7px)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-              <div style={{
-                width: 5, height: '70%', background: 'var(--accent)',
-                borderRadius: 3, boxShadow: '0 0 6px rgba(124,111,247,0.6)'
-              }} />
-            </div>
-
-            {/* Poignée end */}
-            <div onMouseDown={e => { e.stopPropagation(); setDragging('end') }}
-              style={{
-                position: 'absolute', top: 0, bottom: 0,
-                left: `calc(${selLeft} + ${selWidth})`,
-                width: 14, cursor: 'ew-resize', zIndex: 11,
-                transform: 'translateX(-7px)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-              <div style={{
-                width: 5, height: '70%', background: 'var(--accent)',
-                borderRadius: 3, boxShadow: '0 0 6px rgba(124,111,247,0.6)'
-              }} />
-            </div>
+          {/* Waveform réelle */}
+          <div style={{ marginBottom: 24 }}>
+            <Waveform
+              filePath={sound.path}
+              start={start}
+              end={end}
+              currentTime={currentTime}
+              duration={duration}
+              height={80}
+              showHandles
+              onSeek={(pos) => {
+                if (audioRef.current) audioRef.current.currentTime = pos
+                setCurrentTime(pos)
+              }}
+              onStartChange={(pos) => setStart(Math.max(0, pos))}
+              onEndChange={(pos) => setEnd(Math.min(duration, pos))}
+            />
           </div>
 
-          {/* Timestamps */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 12 }}>
-            <span>0:00</span>
-            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{fmt(currentTime)}</span>
-            <span>{fmt(duration)}</span>
-          </div>
+
 
           {/* Sliders précis */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
@@ -532,18 +437,6 @@ function SectionTitle({ icon, label }) {
   return (
     <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 5 }}>
       <i className={`ti ${icon}`} />{label}
-    </div>
-  )
-}
-
-function WaveformBars({ duration }) {
-  const bars = 60
-  return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', gap: 1, padding: '6px 2px', pointerEvents: 'none' }}>
-      {Array.from({ length: bars }).map((_, i) => {
-        const h = 15 + Math.abs(Math.sin(i * 2.1 + duration * 0.1) * Math.cos(i * 1.9) * 75)
-        return <div key={i} style={{ flex: 1, height: `${h}%`, background: 'rgba(124,111,247,0.4)', borderRadius: 1, minWidth: 1 }} />
-      })}
     </div>
   )
 }

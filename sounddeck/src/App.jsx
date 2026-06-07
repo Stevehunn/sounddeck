@@ -6,6 +6,7 @@ import Discover from './pages/Discover'
 import Options from './pages/Options'
 import Editor from './pages/Editor'
 import Presentation from './pages/Presentation'
+import Sequencer from './pages/Sequencer'
 import Toast from './components/Toast'
 import { playSound, stopAllSounds } from './utils/audio'
 
@@ -21,6 +22,7 @@ export default function App() {
   const switchToNextProfileRef = useRef(null)
   const toggleLoopRef = useRef(null)
   const playLocallyRef = useRef(true)
+  const setPresentationRef = useRef(null)
   const audioDeviceRef = useRef('default')
   const volumeRef = useRef(80)
 
@@ -29,6 +31,7 @@ export default function App() {
   useEffect(() => { switchToNextProfileRef.current = store.switchToNextProfile }, [store.switchToNextProfile])
   useEffect(() => { toggleLoopRef.current = store.toggleLoop }, [store.toggleLoop])
   useEffect(() => { playLocallyRef.current = store.playLocally }, [store.playLocally])
+  useEffect(() => { setPresentationRef.current = setPresentationMode }, [setPresentationMode])
   useEffect(() => { audioDeviceRef.current = store.audioDevice }, [store.audioDevice])
   useEffect(() => { volumeRef.current = store.volume }, [store.volume])
 
@@ -98,6 +101,7 @@ export default function App() {
       window.electronAPI.removeAllListeners('switch-profile')
       window.electronAPI.removeAllListeners('toggle-loop')
       window.electronAPI.removeAllListeners('stop-all-sounds')
+      window.electronAPI.removeAllListeners('toggle-presentation')
     }
   }, [])
 
@@ -143,6 +147,7 @@ export default function App() {
         {currentPage === 'discover' && <Discover store={store} addToast={addToast} />}
         {currentPage === 'options' && <Options store={store} addToast={addToast} />}
         {currentPage === 'editor' && <Editor store={store} addToast={addToast} />}
+        {currentPage === 'sequencer' && <Sequencer store={store} addToast={addToast} />}
       </main>
 
       <Toast toasts={toasts} />
