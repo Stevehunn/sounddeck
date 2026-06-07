@@ -33,7 +33,41 @@ export default function App() {
   // Appliquer le thème
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', store.theme)
-  }, [store.theme])
+
+    // Thème personnalisé : injecter les variables CSS directement
+    const existing = document.getElementById('custom-theme-style')
+    if (store.theme === 'custom' && store.customTheme) {
+      const c = store.customTheme
+      const css = `
+        [data-theme="custom"] {
+          --bg-primary: ${c.bgPrimary};
+          --bg-secondary: ${c.bgSecondary};
+          --bg-tertiary: ${c.bgTertiary};
+          --bg-hover: ${c.bgHover};
+          --border: ${c.border};
+          --text-primary: ${c.textPrimary};
+          --text-secondary: ${c.textSecondary};
+          --text-tertiary: ${c.textTertiary};
+          --accent: ${c.accent};
+          --accent-light: ${c.accentLight};
+          --accent-hover: ${c.accentHover};
+          --success: ${c.success};
+          --warning: ${c.warning};
+          --danger: ${c.danger};
+        }
+      `
+      if (existing) {
+        existing.textContent = css
+      } else {
+        const style = document.createElement('style')
+        style.id = 'custom-theme-style'
+        style.textContent = css
+        document.head.appendChild(style)
+      }
+    } else if (existing) {
+      existing.remove()
+    }
+  }, [store.theme, store.customTheme])
 
   // Enregistrer les listeners IPC une seule fois — mais via les refs
   useEffect(() => {

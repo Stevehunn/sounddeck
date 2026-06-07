@@ -9,6 +9,7 @@ export function useStore() {
   const [shortcuts, setShortcuts] = useState({})
   const [profileShortcut, setProfileShortcut] = useState('CommandOrControl+Tab')
   const [theme, setTheme] = useState('dark')
+  const [customTheme, setCustomTheme] = useState(null)
   const [audioDevice, setAudioDevice] = useState('default')
   const [volume, setVolume] = useState(80)
   const [playLocally, setPlayLocally] = useState(true)
@@ -26,6 +27,7 @@ export function useStore() {
         const savedShortcuts = await window.electronAPI.storeGet('shortcuts') || {}
         const savedProfileShortcut = await window.electronAPI.storeGet('profileShortcut') || 'CommandOrControl+Tab'
         const savedTheme = await window.electronAPI.storeGet('theme') || 'dark'
+        const savedCustomTheme = await window.electronAPI.storeGet('customTheme') || null
         const savedAudioDevice = await window.electronAPI.storeGet('audioDevice') || 'default'
         const savedVolume = await window.electronAPI.storeGet('volume') ?? 80
         const savedPlayLocally = await window.electronAPI.storeGet('playLocally') ?? true
@@ -43,6 +45,7 @@ export function useStore() {
         setShortcuts(savedShortcuts)
         setProfileShortcut(savedProfileShortcut)
         setTheme(savedTheme)
+        if (savedCustomTheme) setCustomTheme(savedCustomTheme)
         setAudioDevice(savedAudioDevice)
         setVolume(savedVolume)
         setPlayLocally(savedPlayLocally)
@@ -230,6 +233,13 @@ export function useStore() {
     await save('theme', newTheme)
   }, [save])
 
+  const updateCustomTheme = useCallback(async (colors) => {
+    setCustomTheme(colors)
+    setTheme('custom')
+    await save('customTheme', colors)
+    await save('theme', 'custom')
+  }, [save])
+
   const updateAudioDevice = useCallback(async (deviceId) => {
     setAudioDevice(deviceId)
     await save('audioDevice', deviceId)
@@ -265,6 +275,6 @@ export function useStore() {
     // Options
     loopEnabled, loopShortcut, toggleLoop, updateLoopShortcut,
     stopAllShortcut, updateStopAllShortcut,
-    updateTheme, updateAudioDevice, updateVolume, updatePlayLocally
+    customTheme, updateTheme, updateCustomTheme, updateAudioDevice, updateVolume, updatePlayLocally
   }
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import ShortcutRecorder from '../components/ShortcutRecorder'
+import CustomThemeEditor from '../components/CustomThemeEditor'
 
 export default function Options({ store, addToast }) {
   const [audioDevices, setAudioDevices] = useState([])
@@ -31,6 +32,7 @@ export default function Options({ store, addToast }) {
                 { val: 'dark-green',   label: 'Vert',      color: '#23c55e' },
                 { val: 'dark-red',     label: 'Rouge',     color: '#ef4444' },
                 { val: 'dark-orange',  label: 'Orange',    color: '#f97316' },
+                { val: 'custom', label: 'Personnalisé', color: '#a855f7' },
               ].map(({ val, label, color }) => (
                 <button key={val} onClick={() => store.updateTheme(val)}
                   style={{
@@ -47,6 +49,15 @@ export default function Options({ store, addToast }) {
               ))}
             </div>
           </OptionRow>
+          {store.theme === 'custom' && (
+            <CustomThemeEditor
+              current={store.customTheme}
+              onSave={async (colors) => {
+                await store.updateCustomTheme(colors)
+                addToast('Thème personnalisé appliqué !', 'success')
+              }}
+            />
+          )}
         </Section>
 
         {/* Audio */}
