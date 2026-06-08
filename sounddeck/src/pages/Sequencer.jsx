@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Howl } from 'howler'
+import { registerStopSequencerCallback, getSoundProgress } from '../utils/audio'
 
 export default function Sequencer({ store, addToast }) {
   const [playlists, setPlaylists] = useState([])
@@ -153,6 +154,36 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
   const [loopPlaylist, setLoopPlaylist] = useState(playlist.loop || false)
   const sequenceRef = useRef(null)
   const howlRef = useRef(null)
+  const playingRef = useRef(false)
+  const [currentProgress, setCurrentProgress] = useState(null)
+  const currentIdxRef = useRef(-1)
+  const itemsRef = useRef(items)
+
+  // Polling progression du son courant
+  useEffect(() => {
+    if (!playing || currentIdx < 0) { setCurrentProgress(null); return }
+    const item = items[currentIdx]
+    if (!item) return
+    const interval = setInterval(() => {
+      const p = getSoundProgress(item.soundId + '_seq') || getSoundProgress(item.soundId)
+      // On cherche le howl actif via ref
+      if (howlRef.current && howlRef.current.playing()) {
+        const seek = howlRef.current.seek()
+        const duration = howlRef.current.duration()
+        if (typeof seek === 'number' && typeof duration === 'number' && duration > 0) {
+          setCurrentProgress({ current: seek, duration, ratio: Math.min(1, seek / duration) })
+        }
+      } else {
+        setCurrentProgress(null)
+      }
+    }, 100)
+    return () => clearInterval(interval)
+  }, [playing, currentIdx, items])
+
+  // Sync refs
+  useEffect(() => { playingRef.current = playing }, [playing])
+  useEffect(() => { currentIdxRef.current = currentIdx }, [currentIdx])
+  useEffect(() => { itemsRef.current = items }, [items])
 
   const saveItems = async (updated, loop = loopPlaylist) => {
     setItems(updated)
@@ -201,14 +232,48 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
     playFrom(0)
   }
 
-  const stopSequence = () => {
+  const stopSequence = useCallback(() => {
     setPlaying(false)
     setCurrentIdx(-1)
+    playingRef.current = false
     if (sequenceRef.current) { clearTimeout(sequenceRef.current); sequenceRef.current = null }
     if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload(); howlRef.current = null }
-  }
+  }, [])
 
-  useEffect(() => () => stopSequence(), [])
+  // Enregistrer le callback pour stopAllSounds
+  useEffect(() => {
+    registerStopSequencerCallback(stopSequence)
+    return () => registerStopSequencerCallback(null)
+  }, [stopSequence])
+
+  // Raccourcis clavier next/prev (touches fléchées quand le séquenceur est actif)
+  useEffect(() => {
+    const handler = (e) => {
+      if (!playingRef.current) return
+      if (e.key === 'ArrowRight' || e.key === 'MediaTrackNext') {
+        e.preventDefault()
+        // Son suivant
+        if (sequenceRef.current) { clearTimeout(sequenceRef.current); sequenceRef.current = null }
+        if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload(); howlRef.current = null }
+        const next = currentIdxRef.current + 1
+        if (next < itemsRef.current.length) playFrom(next)
+        else if (loopPlaylist) playFrom(0)
+        else stopSequence()
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'MediaTrackPrevious') {
+        e.preventDefault()
+        // Son précédent
+        if (sequenceRef.current) { clearTimeout(sequenceRef.current); sequenceRef.current = null }
+        if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload(); howlRef.current = null }
+        const prev = Math.max(0, currentIdxRef.current - 1)
+        playFrom(prev)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [loopPlaylist, stopSequence])
+
+  useEffect(() => () => stopSequence(), [stopSequence])
 
   // ─── Drag & drop réordonnement ────────────────────────────────────────────
   const handleDragStart = (e, idx) => {
@@ -252,6 +317,13 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
     return acc + (item.delay || 0)
   }, 0)
 
+  const fmtSeqTime = (s) => {
+    if (!s || isNaN(s)) return '0:00'
+    const m = Math.floor(s / 60)
+    const sec = Math.floor(s % 60)
+    return `${m}:${sec.toString().padStart(2, '0')}`
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* Header */}
@@ -282,15 +354,85 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
 
         {/* Play / Stop */}
         {playing ? (
-          <button className="btn-danger" onClick={stopSequence} style={{ fontSize: 12, padding: '6px 14px', background: 'rgba(224,82,82,0.1)', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <i className="ti ti-player-stop-filled" /> Arrêter
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Raccourcis next/prev */}
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button onClick={() => {
+                if (sequenceRef.current) { clearTimeout(sequenceRef.current); sequenceRef.current = null }
+                if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload(); howlRef.current = null }
+                const prev = Math.max(0, currentIdx - 1)
+                playFrom(prev)
+              }} style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 }} title="Son précédent (←)">
+                <i className="ti ti-player-skip-back" />
+              </button>
+              <button onClick={() => {
+                if (sequenceRef.current) { clearTimeout(sequenceRef.current); sequenceRef.current = null }
+                if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload(); howlRef.current = null }
+                const next = currentIdx + 1
+                if (next < items.length) playFrom(next)
+                else if (loopPlaylist) playFrom(0)
+                else stopSequence()
+              }} style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 }} title="Son suivant (→)">
+                <i className="ti ti-player-skip-forward" />
+              </button>
+            </div>
+            <button onClick={stopSequence} style={{ fontSize: 12, padding: '6px 14px', background: 'rgba(224,82,82,0.1)', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <i className="ti ti-player-stop-filled" /> Arrêter
+            </button>
+          </div>
         ) : (
           <button className="btn-primary" onClick={startSequence} style={{ fontSize: 12 }}>
             <i className="ti ti-player-play-filled" /> Lancer
           </button>
         )}
       </div>
+
+      {/* Barre de progression globale */}
+      {playing && currentProgress && (
+        <div style={{ padding: '6px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg-secondary)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-secondary)', marginBottom: 4 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <i className="ti ti-music" style={{ color: 'var(--accent)' }} />
+              {currentIdx >= 0 && items[currentIdx] && (() => {
+                const s = sounds.find(s => s.id === items[currentIdx].soundId)
+                return s?.name || 'Son inconnu'
+              })()}
+            </span>
+            <span style={{ fontFamily: 'monospace' }}>
+              {fmtSeqTime(currentProgress.current)} / {fmtSeqTime(currentProgress.duration)}
+            </span>
+          </div>
+          <div style={{ height: 5, background: 'var(--bg-tertiary)', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', borderRadius: 3,
+              background: `linear-gradient(90deg, var(--accent), var(--accent-hover))`,
+              width: `${currentProgress.ratio * 100}%`,
+              transition: 'width 0.1s linear',
+              boxShadow: '0 0 8px var(--accent)'
+            }} />
+          </div>
+          {items.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-tertiary)', marginTop: 3 }}>
+              <span>Son {currentIdx + 1} / {items.length}</span>
+              <span>{items.filter((_, i) => i > currentIdx).length} son(s) restant(s)</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Indication raccourcis */}
+      {playing && (
+        <div style={{ padding: '6px 20px', background: 'var(--accent-light)', borderBottom: '1px solid var(--accent)', fontSize: 11, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          <i className="ti ti-keyboard" />
+          <span>Raccourcis actifs :</span>
+          <kbd style={{ background: 'var(--bg-secondary)', border: '1px solid var(--accent)', borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace' }}>←</kbd>
+          <span>Son précédent</span>
+          <kbd style={{ background: 'var(--bg-secondary)', border: '1px solid var(--accent)', borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace' }}>→</kbd>
+          <span>Son suivant</span>
+          <kbd style={{ background: 'var(--bg-secondary)', border: '1px solid var(--accent)', borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace' }}>Bouton Stop</kbd>
+          <span>Tout arrêter</span>
+        </div>
+      )}
 
       {/* Liste des items */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px' }}>
@@ -345,8 +487,20 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
                   {sound?.name || <span style={{ color: 'var(--danger)', fontSize: 12 }}>Son introuvable</span>}
                 </div>
                 {isActive && (
-                  <div style={{ fontSize: 10, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <i className="ti ti-volume" style={{ animation: 'pulse 1s ease infinite' }} /> En cours de lecture...
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                      <i className="ti ti-volume" style={{ animation: 'pulse 1s ease infinite' }} /> En cours de lecture...
+                    </div>
+                    {currentProgress && (
+                      <div style={{ height: 3, background: 'var(--bg-tertiary)', borderRadius: 2, overflow: 'hidden', width: '100%' }}>
+                        <div style={{
+                          height: '100%', borderRadius: 2,
+                          background: 'var(--accent)',
+                          width: `${currentProgress.ratio * 100}%`,
+                          transition: 'width 0.1s linear'
+                        }} />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

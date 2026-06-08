@@ -236,12 +236,26 @@ export default function Options({ store, addToast }) {
         {/* Profils */}
         <Section title="Gestion des profils" icon="ti-users">
           {store.profiles.map(p => (
-            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-secondary)', marginBottom: 6 }}>
               <i className={`ti ${p.isDefault ? 'ti-stack' : 'ti-user'}`} style={{ color: 'var(--text-secondary)' }} />
               <span style={{ flex: 1, fontSize: 13 }}>{p.name}</span>
               <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
                 {store.sounds.filter(s => s.profiles.includes(p.id)).length} son(s)
               </span>
+              {/* Export profil */}
+              <button
+                style={{ padding: '3px 8px', fontSize: 11, borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                title={`Exporter le profil "${p.name}"`}
+                onClick={async () => {
+                  addToast(`Création de l'archive du profil...`, 'info')
+                  const r = await window.electronAPI.exportProfile(p.id)
+                  if (r.success) addToast(`Profil "${p.name}" exporté · ${r.soundCount} sons · ${r.sizeMb} Mo`, 'success')
+                  else if (r.error) addToast('Erreur : ' + r.error, 'error')
+                }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                <i className="ti ti-package-export" /> Exporter
+              </button>
               {!p.isDefault && (
                 <button className="btn-danger" style={{ padding: '3px 8px', fontSize: 12 }}
                   onClick={async () => { await store.deleteProfile(p.id); addToast(`Profil supprimé`, 'info') }}>
@@ -250,6 +264,15 @@ export default function Options({ store, addToast }) {
               )}
             </div>
           ))}
+          {/* Import profil */}
+          <button className="btn-secondary" style={{ width: '100%', justifyContent: 'center', marginTop: 4, fontSize: 12 }}
+            onClick={async () => {
+              const r = await window.electronAPI.importProfile()
+              if (r.success) addToast(`Profil "${r.profileName}" importé · ${r.soundCount} sons ✓ — redémarre l'app`, 'success')
+              else if (r.error) addToast('Erreur : ' + r.error, 'error')
+            }}>
+            <i className="ti ti-package-import" /> Importer un profil partagé
+          </button>
         </Section>
 
       </div>

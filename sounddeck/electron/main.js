@@ -1097,6 +1097,184 @@ function formatYtTime(seconds) {
   return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`
 }
 
+// ─── Partage de profil ───────────────────────────────────────────────────────
+
+ipcMain.handle('export-profile', async (event, profileId) => {
+  const profiles = store.get('profiles', [])
+  const sounds = store.get('sounds', [])
+  const shortcuts = store.get('shortcuts', {})
+
+  const profile = profileId === 'all'
+    ? { id: 'all', name: 'Tous les sons', isDefault: true }
+    : profiles.find(p => p.id === profileId)
+
+  if (!profile) return { success: false, error: 'Profil introuvable' }
+
+  // Sons appartenant à ce profil
+  const profileSounds = profileId === 'all'
+    ? sounds
+    : sounds.filter(s => s.profiles?.includes(profileId))
+
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: `Exporter le profil "${profile.name}"`,
+    defaultPath: `sounddeck-profil-${profile.name.replace(/[^a-zA-Z0-9]/g, '_')}-${new Date().toISOString().slice(0,10)}.zip`,
+    filters: [{ name: 'Profil SoundDeck', extensions: ['zip'] }]
+  })
+  if (result.canceled) return { success: false }
+
+  try {
+    const archiver = require('archiver')
+    const output = fs.createWriteStream(result.filePath)
+    const archive = archiver('zip', { zlib: { level: 6 } })
+
+    const profileData = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      profile,
+      sounds: profileSounds.map(s => ({
+        ...s,
+        zipPath: fs.existsSync(s.path || '') ? `sounds/${path.basename(s.path)}` : null,
+        imageZipPath: s.image && fs.existsSync(s.image || '') ? `images/${path.basename(s.image)}` : null,
+        shortcut: shortcuts[s.id] || null
+      }))
+    }
+
+    await new Promise((resolve, reject) => {
+      output.on('close', resolve)
+      archive.on('error', reject)
+      archive.pipe(output)
+
+      archive.append(JSON.stringify(profileData, null, 2), { name: 'profile.json' })
+
+      let addedSounds = 0
+      for (const sound of profileSounds) {
+        if (sound.path && fs.existsSync(sound.path)) {
+          archive.file(sound.path, { name: `sounds/${path.basename(sound.path)}` })
+          addedSounds++
+        }
+        if (sound.image && fs.existsSync(sound.image)) {
+          archive.file(sound.image, { name: `images/${path.basename(sound.image)}` })
+        }
+      }
+
+      archive.finalize()
+      console.log(`Export profil "${profile.name}": ${addedSounds} sons`)
+    })
+
+    const sizeMb = (fs.statSync(result.filePath).size / 1024 / 1024).toFixed(1)
+    return { success: true, path: result.filePath, sizeMb, soundCount: profileSounds.length }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
+
+ipcMain.handle('import-profile', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Importer un profil',
+    filters: [{ name: 'Profil SoundDeck', extensions: ['zip'] }],
+    properties: ['openFile']
+  })
+  if (result.canceled) return { success: false }
+
+  try {
+    const unzipper = require('unzipper')
+    const tmpDir = path.join(app.getPath('temp'), `sounddeck_profile_${Date.now()}`)
+    fs.mkdirSync(tmpDir, { recursive: true })
+
+    await new Promise((resolve, reject) => {
+      fs.createReadStream(result.filePaths[0])
+        .pipe(unzipper.Extract({ path: tmpDir }))
+        .on('close', resolve)
+        .on('error', reject)
+    })
+
+    const profileJsonPath = path.join(tmpDir, 'profile.json')
+    if (!fs.existsSync(profileJsonPath)) {
+      return { success: false, error: 'Fichier de profil invalide' }
+    }
+
+    const profileData = JSON.parse(fs.readFileSync(profileJsonPath, 'utf-8'))
+    const { profile, sounds: importedSounds } = profileData
+
+    // Créer un nouveau profil avec un nouvel ID pour éviter les conflits
+    const { v4: uuidv4 } = require('uuid')
+    const newProfileId = uuidv4()
+    const newProfile = {
+      ...profile,
+      id: newProfileId,
+      name: profile.name + (profile.id === 'all' ? ' (importé)' : ''),
+      isDefault: false
+    }
+
+    // Copier les sons et images
+    const imagesDir = path.join(app.getPath('userData'), 'images')
+    if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true })
+
+    const existingSounds = store.get('sounds', [])
+    const newSounds = []
+    const newShortcuts = { ...store.get('shortcuts', {}) }
+
+    for (const sound of importedSounds) {
+      const newSoundId = uuidv4()
+      let newPath = sound.path
+      let newImage = sound.image || null
+
+      // Copier le fichier son
+      if (sound.zipPath) {
+        const srcSound = path.join(tmpDir, sound.zipPath)
+        if (fs.existsSync(srcSound)) {
+          const destSound = path.join(soundsDir, `imported_${Date.now()}_${path.basename(srcSound)}`)
+          fs.copyFileSync(srcSound, destSound)
+          newPath = destSound.replace(/\\/g, '/')
+        }
+      }
+
+      // Copier l'image
+      if (sound.imageZipPath) {
+        const srcImg = path.join(tmpDir, sound.imageZipPath)
+        if (fs.existsSync(srcImg)) {
+          const destImg = path.join(imagesDir, `imported_${Date.now()}_${path.basename(srcImg)}`)
+          fs.copyFileSync(srcImg, destImg)
+          newImage = destImg.replace(/\\/g, '/')
+        }
+      }
+
+      // Raccourci
+      if (sound.shortcut) newShortcuts[newSoundId] = sound.shortcut
+
+      newSounds.push({
+        id: newSoundId,
+        name: sound.name,
+        path: newPath,
+        image: newImage,
+        emoji: sound.emoji || '🔊',
+        favorite: sound.favorite || false,
+        profiles: [newProfileId],
+        volume: sound.volume || 100,
+        playCount: 0,
+        createdAt: Date.now()
+      })
+    }
+
+    // Sauvegarder
+    const existingProfiles = store.get('profiles', [])
+    store.set('profiles', [...existingProfiles, newProfile])
+    store.set('sounds', [...existingSounds, ...newSounds])
+    store.set('shortcuts', newShortcuts)
+
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+
+    return {
+      success: true,
+      profileName: newProfile.name,
+      soundCount: newSounds.length
+    }
+  } catch (e) {
+    console.error('import-profile error:', e)
+    return { success: false, error: e.message }
+  }
+})
+
 // ─── Vérifier existence fichier ──────────────────────────────────────────────
 ipcMain.handle('file-exists', (event, filePath) => {
   try { return fs.existsSync(filePath) }

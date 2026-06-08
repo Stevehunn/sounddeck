@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
-import { playSound, stopSound, isPlaying } from '../utils/audio'
+import { playSound, stopSound, isPlaying, getSoundProgress } from '../utils/audio'
 import ShortcutRecorder from './ShortcutRecorder'
+
+function fmtTime(s) {
+  if (!s || isNaN(s)) return '0:00'
+  const m = Math.floor(s / 60)
+  const sec = Math.floor(s % 60)
+  return `${m}:${sec.toString().padStart(2, '0')}`
+}
 
 export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEnabled, playLocally, onToggleFavorite, onSetShortcut, onDelete, onRemoveFromProfile, onRename, onVolumeChange, onPlay, currentProfileId }) {
   const [playing, setPlaying] = useState(false)
@@ -11,16 +18,25 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
   const [localVolume, setLocalVolume] = useState(sound.volume ?? 100)
   const [imgError, setImgError] = useState(false)
   const [fileError, setFileError] = useState(false)
+  const [progress, setProgress] = useState(null)
 
   useEffect(() => { setLocalVolume(sound.volume ?? 100) }, [sound.volume])
   useEffect(() => { setImgError(false) }, [sound.image]) // reset si image change
 
-  // Polling fin de son
+  // Polling fin de son + progression
   useEffect(() => {
-    if (!playing) return
+    if (!playing) { setProgress(null); return }
     const interval = setInterval(() => {
-      if (!isPlaying(sound.id)) setPlaying(false)
-    }, 200)
+      if (!isPlaying(sound.id)) {
+        setPlaying(false)
+        setProgress(null)
+      } else {
+        const p = getSoundProgress(sound.id)
+        // Afficher la barre seulement si durée > 3 secondes
+        if (p && p.duration > 3) setProgress(p)
+        else setProgress(null)
+      }
+    }, 100)
     return () => clearInterval(interval)
   }, [playing, sound.id])
 
@@ -190,6 +206,29 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
         onClear={() => onSetShortcut(sound.id, '')}
         compact
       />
+
+      {/* Barre de progression — sons > 3s */}
+      {progress && (
+        <div style={{ marginTop: 4 }}>
+          <div style={{
+            height: 4, background: 'var(--bg-tertiary)',
+            borderRadius: 2, overflow: 'hidden',
+            border: '1px solid var(--border)'
+          }}>
+            <div style={{
+              height: '100%', borderRadius: 2,
+              background: loopEnabled ? 'var(--success)' : 'var(--accent)',
+              width: `${progress.ratio * 100}%`,
+              transition: 'width 0.1s linear',
+              boxShadow: `0 0 4px ${loopEnabled ? 'var(--success)' : 'var(--accent)'}`
+            }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'var(--text-tertiary)', marginTop: 1 }}>
+            <span>{fmtTime(progress.current)}</span>
+            <span>{fmtTime(progress.duration)}</span>
+          </div>
+        </div>
+      )}
       {sound.playCount > 0 && (
         <div style={{ fontSize: 9, color: 'var(--text-tertiary)', textAlign: 'center', marginTop: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
           <i className="ti ti-player-play" style={{ fontSize: 8 }} />

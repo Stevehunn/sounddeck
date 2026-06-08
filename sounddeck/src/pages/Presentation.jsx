@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { playSound, stopSound, isPlaying } from '../utils/audio'
+import { playSound, stopSound, isPlaying, getSoundProgress } from '../utils/audio'
 
 export default function Presentation({ store, onExit }) {
   const [playingId, setPlayingId] = useState(null)
@@ -147,12 +147,53 @@ export default function Presentation({ store, onExit }) {
   )
 }
 
+function fmtTime(s) {
+  if (!s || isNaN(s)) return '0:00'
+  const m = Math.floor(s / 60)
+  const sec = Math.floor(s % 60)
+  return `${m}:${sec.toString().padStart(2, '0')}`
+}
+
+// Convertit "CommandOrControl+Shift+F1" en ["Ctrl", "Shift", "F1"]
+function formatShortcut(shortcut) {
+  if (!shortcut) return []
+  return shortcut
+    .split('+')
+    .map(k => {
+      if (k === 'CommandOrControl') return '⌘/Ctrl'
+      if (k === 'Command') return '⌘'
+      if (k === 'Control') return 'Ctrl'
+      if (k === 'Shift') return '⇧'
+      if (k === 'Alt') return 'Alt'
+      if (k === 'Return') return '↵'
+      if (k === 'Space') return '␣'
+      if (k === 'Up') return '↑'
+      if (k === 'Down') return '↓'
+      if (k === 'Left') return '←'
+      if (k === 'Right') return '→'
+      return k
+    })
+}
+
 function PresentationCard({ sound, shortcut, playing, onPlay, size }) {
   const [imgError, setImgError] = useState(false)
+  const [progress, setProgress] = useState(null)
+  // useState/useEffect déjà importés en haut du fichier
 
   const imageUrl = sound.image && !imgError
     ? (sound.image.startsWith('file://') ? sound.image : `file:///${sound.image.replace(/\\/g, '/')}`)
     : null
+
+  // Polling progression
+  useEffect(() => {
+    if (!playing) { setProgress(null); return }
+    const interval = setInterval(() => {
+      const p = getSoundProgress(sound.id)
+      if (p && p.duration > 3) setProgress(p)
+      else setProgress(null)
+    }, 100)
+    return () => clearInterval(interval)
+  }, [playing, sound.id])
 
   const isLarge = size === 'large'
   const cardSize = isLarge ? 140 : 120
@@ -215,12 +256,21 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size }) {
 
       {/* Raccourci */}
       {shortcut && (
-        <div style={{
-          display: 'inline-block', fontSize: 10, fontFamily: 'monospace',
-          background: 'var(--bg-tertiary)', border: '1px solid var(--border)',
-          borderRadius: 4, padding: '2px 6px', color: 'var(--text-secondary)'
-        }}>
-          {shortcut}
+        <div style={{ display: 'flex', gap: 3, justifyContent: 'center', flexWrap: 'wrap', marginTop: 2 }}>
+          {formatShortcut(shortcut).map((key, i) => (
+            <kbd key={i} style={{
+              fontSize: isLarge ? 11 : 10,
+              fontFamily: 'SFMono-Regular, Consolas, monospace',
+              background: playing ? 'rgba(124,111,247,0.3)' : 'var(--bg-tertiary)',
+              border: `1px solid ${playing ? 'var(--accent)' : 'var(--border)'}`,
+              borderBottom: `2px solid ${playing ? 'var(--accent)' : 'var(--text-tertiary)'}`,
+              borderRadius: 4, padding: '1px 5px',
+              color: playing ? 'var(--accent)' : 'var(--text-secondary)',
+              display: 'inline-block', lineHeight: 1.6
+            }}>
+              {key}
+            </kbd>
+          ))}
         </div>
       )}
 
@@ -228,6 +278,25 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size }) {
       {sound.playCount > 0 && (
         <div style={{ fontSize: 9, color: 'var(--text-tertiary)', marginTop: 3 }}>
           <i className="ti ti-player-play" style={{ fontSize: 8 }} /> {sound.playCount}
+        </div>
+      )}
+
+      {/* Barre de progression */}
+      {progress && (
+        <div style={{ marginTop: 6 }}>
+          <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', borderRadius: 2,
+              background: playing ? 'var(--accent)' : 'var(--border)',
+              width: `${progress.ratio * 100}%`,
+              transition: 'width 0.1s linear',
+              boxShadow: '0 0 6px var(--accent)'
+            }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-tertiary)', marginTop: 2 }}>
+            <span>{fmtTime(progress.current)}</span>
+            <span>{fmtTime(progress.duration)}</span>
+          </div>
         </div>
       )}
     </div>

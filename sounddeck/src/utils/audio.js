@@ -163,8 +163,17 @@ export function stopSound(soundId) {
   }
 }
 
+// Callback optionnel pour stopper le séquenceur quand stopAllSounds est appelé
+let stopSequencerCallback = null
+
+export function registerStopSequencerCallback(cb) {
+  stopSequencerCallback = cb
+}
+
 export function stopAllSounds() {
   Object.keys(soundCache).forEach(k => stopSound(k))
+  // Stopper aussi le séquenceur s'il est actif
+  if (stopSequencerCallback) stopSequencerCallback()
 }
 
 export function isPlaying(soundId) {
@@ -172,6 +181,30 @@ export function isPlaying(soundId) {
   if (!cached) return false
   if (Array.isArray(cached)) return cached.some(h => h.playing())
   return cached.playing()
+}
+
+export function getSoundProgress(soundId) {
+  const cached = soundCache[soundId]
+  if (!cached) return null
+  const howl = Array.isArray(cached) ? cached[0] : cached
+  if (!howl || !howl.playing()) return null
+
+  // howl.seek() sans argument retourne la position actuelle
+  // Avec Web Audio API (html5:false), ça peut retourner l'objet Howl — on vérifie
+  const seek = howl.seek()
+  const duration = howl.duration()
+
+  if (typeof seek !== 'number' || typeof duration !== 'number') return null
+  if (!duration || duration <= 0) return null
+
+  return { current: seek, duration, ratio: Math.min(1, seek / duration) }
+}
+
+export function getSoundDuration(soundId) {
+  const cached = soundCache[soundId]
+  if (!cached) return null
+  const howl = Array.isArray(cached) ? cached[0] : cached
+  return howl?.duration() || null
 }
 
 export function clearSoundCache(soundId) {
