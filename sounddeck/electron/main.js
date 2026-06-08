@@ -1008,6 +1008,20 @@ ipcMain.handle('youtube-download', async (event, url, startSec, endSec, title) =
     const ytdlpPath = fs.existsSync(YTDLP_PATH) ? YTDLP_PATH : 'yt-dlp'
     const { execFile } = require('child_process')
 
+    // Récupérer le chemin ffmpeg depuis @ffmpeg-installer
+    let ffmpegPath = null
+    try {
+      const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg')
+      ffmpegPath = ffmpegInstaller.path
+      if (ffmpegPath && ffmpegPath.includes('app.asar')) {
+        ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked')
+      }
+      // Extraire le dossier contenant ffmpeg (yt-dlp a besoin du dossier, pas du fichier)
+      ffmpegPath = path.dirname(ffmpegPath)
+    } catch (e) {
+      ffmpegPath = null
+    }
+
     const safeName = (title || 'youtube').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40)
     const outPath = path.join(soundsDir, `yt_${Date.now()}_${safeName}.mp3`)
 
@@ -1015,13 +1029,22 @@ ipcMain.handle('youtube-download', async (event, url, startSec, endSec, title) =
     const args = [
       '--no-playlist',
       '--no-warnings',
-      '-x',                          // extraire audio seulement
+      '-x',
       '--audio-format', 'mp3',
-      '--audio-quality', '5',        // qualité 0-9, 5 = bon compromis
+      '--audio-quality', '5',
     ]
 
-    // Si on veut juste une portion, utiliser --download-sections
-    if (startSec > 0 || endSec > 0) {
+    // Indiquer le dossier ffmpeg à yt-dlp
+    if (ffmpegPath) {
+      args.push('--ffmpeg-location', ffmpegPath)
+    }
+
+    // Portion spécifique
+    const fullDuration = endSec > 0
+    const hasStart = startSec > 0
+    const notFullVideo = hasStart || (endSec > 0 && endSec < 9999)
+
+    if (notFullVideo) {
       const start = formatYtTime(startSec)
       const end = formatYtTime(endSec)
       args.push('--download-sections', `*${start}-${end}`)
@@ -1030,10 +1053,14 @@ ipcMain.handle('youtube-download', async (event, url, startSec, endSec, title) =
 
     args.push('-o', outPath, url)
 
+    console.log('yt-dlp args:', args.join(' '))
+
     return new Promise((resolve) => {
-      execFile(ytdlpPath, args, { timeout: 120000 }, (err, stdout, stderr) => {
+      execFile(ytdlpPath, args, { timeout: 180000 }, (err, stdout, stderr) => {
+        console.log('yt-dlp stdout:', stdout?.slice(0, 200))
+        console.log('yt-dlp stderr:', stderr?.slice(0, 200))
+
         if (err) {
-          // Essayer de trouver le fichier quand même (yt-dlp peut réussir malgré un code d'erreur)
           if (fs.existsSync(outPath) && fs.statSync(outPath).size > 1000) {
             resolve({ success: true, path: outPath.replace(/\\/g, '/') })
           } else {
@@ -1044,9 +1071,9 @@ ipcMain.handle('youtube-download', async (event, url, startSec, endSec, title) =
         if (fs.existsSync(outPath)) {
           resolve({ success: true, path: outPath.replace(/\\/g, '/') })
         } else {
-          // yt-dlp peut changer le nom du fichier légèrement
+          // yt-dlp peut légèrement modifier le nom du fichier
           const files = fs.readdirSync(soundsDir)
-            .filter(f => f.startsWith(`yt_`) && f.endsWith('.mp3'))
+            .filter(f => f.startsWith('yt_') && f.endsWith('.mp3'))
             .map(f => ({ f, t: fs.statSync(path.join(soundsDir, f)).mtimeMs }))
             .sort((a, b) => b.t - a.t)
           if (files.length > 0) {
