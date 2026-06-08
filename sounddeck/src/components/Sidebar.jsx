@@ -142,6 +142,7 @@ export default function Sidebar({ profiles, currentProfileId, currentPage, onSwi
 
       {/* Options en bas */}
       <div style={{ borderTop: '1px solid var(--border)', padding: '4px 0' }}>
+        <SidebarItem icon="ti-book" label="Guide Discord" active={currentPage === 'guide'} onClick={() => onChangePage('guide')} />
         <SidebarItem icon="ti-settings" label="Options" active={currentPage === 'options'} onClick={() => onChangePage('options')} />
       </div>
     </aside>
