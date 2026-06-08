@@ -11,46 +11,77 @@
   "build": {
     "appId": "com.sounddeck.app",
     "productName": "SoundDeck",
+    "copyright": "SoundDeck",
     "directories": {
       "output": "dist-electron"
     },
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist",
+        "to": "dist",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "asarUnpack": [
+      "node_modules/@ffmpeg-installer/**",
+      "node_modules/ffmpeg-static/**",
+      "node_modules/archiver/**",
+      "node_modules/unzipper/**"
     ],
     "win": {
-      "target": "nsis",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "public/icon.ico",
+      "uninstallerIcon": "public/icon.ico",
+      "installerHeaderIcon": "public/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SoundDeck"
     },
     "mac": {
       "target": "dmg",
       "icon": "public/icon.icns"
     },
     "linux": {
-      "target": "AppImage"
+      "target": "AppImage",
+      "icon": "public/icon.png"
     }
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
-    "archiver": "^8.0.0",
-    "electron-store": "^8.2.0",
-    "ffmpeg-static": "^5.3.0",
-    "fluent-ffmpeg": "^2.1.3",
+    "archiver": "^6.0.0",
+    "electron-store": "^8.1.0",
     "howler": "^2.2.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "unzipper": "^0.12.3",
+    "unzipper": "^0.10.14",
     "uuid": "^14.0.0"
   },
   "devDependencies": {
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
-    "@vitejs/plugin-react": "^6.0.2",
-    "concurrently": "^8.2.2",
+    "@vitejs/plugin-react": "^4.0.0",
+    "concurrently": "^8.2.0",
     "cross-env": "^7.0.3",
-    "electron": "^42.3.2",
-    "electron-builder": "^26.8.1",
+    "electron": "^42.3.3",
+    "electron-builder": "^26.15.2",
     "vite": "^8.0.16",
-    "wait-on": "^7.2.0"
+    "wait-on": "^7.0.1"
   }
 }

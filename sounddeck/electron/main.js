@@ -1,16 +1,24 @@
-const { app, BrowserWindow, ipcMain, dialog, globalShortcut, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, globalShortcut, shell, Menu } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const Store = require('electron-store')
 
 const store = new Store()
-const isDev = process.env.NODE_ENV !== 'production'
+
+// Détection fiable dev vs production
+const isDev = !app.isPackaged
+
+// Supprimer la barre de menu native (File, Edit, View, Window)
+Menu.setApplicationMenu(null)
+
 let mainWindow
 
 const soundsDir = path.join(app.getPath('userData'), 'sounds')
 if (!fs.existsSync(soundsDir)) fs.mkdirSync(soundsDir, { recursive: true })
 
 function createWindow() {
+  const iconPath = path.join(__dirname, '../public/icon.ico')
+
   mainWindow = new BrowserWindow({
     width: 1100, height: 700, minWidth: 800, minHeight: 500,
     webPreferences: {
@@ -19,15 +27,21 @@ function createWindow() {
       nodeIntegration: false,
       webSecurity: false,
       allowRunningInsecureContent: false,
-      experimentalFeatures: true    // nécessaire pour File.path sur certaines versions
+      experimentalFeatures: true
     },
     backgroundColor: '#111113',
-    show: false
+    show: false,
+    autoHideMenuBar: true,  // cache la barre File/Edit/View
+    frame: true,
+    ...(fs.existsSync(iconPath) ? { icon: iconPath } : {})
   })
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
+    mainWindow.webContents.openDevTools()
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
+    // En production, le dossier dist est au même niveau que electron/
+    const indexPath = path.join(app.getAppPath(), 'dist', 'index.html')
+    mainWindow.loadFile(indexPath)
   }
   mainWindow.once('ready-to-show', () => mainWindow.show())
   mainWindow.on('closed', () => { mainWindow = null })
