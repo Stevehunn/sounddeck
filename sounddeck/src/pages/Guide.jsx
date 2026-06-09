@@ -42,8 +42,7 @@ const STEPS = [
           <ConfigStep
             number="1"
             title="Hardware Input 1 → Ton micro"
-            desc='Clique sur "HARDWARE INPUT 1" et sélectionne ton micro physique (ex: Microphone Realtek, Blue Yeti...)'
-            icon="🎙️"
+            desc='Clique sur "HARDWARE INPUT 1" et sélectionne ton micro physique (ex: Microphone Realtek, Blue Yeti...) Pour éviter de t&apos;entendre en écho, désactive le bouton A1'
           />
           <ConfigStep
             number="2"
@@ -59,7 +58,7 @@ const STEPS = [
           />
           <ConfigStep
             number="4"
-            title="A1 → Ton casque/haut-parleurs"
+            title="A1 → MME(Multimedia) → Ton casque/haut-parleurs"
             desc='En haut à droite, clique sur "A1" et sélectionne ton casque ou tes haut-parleurs'
             icon="🎧"
           />
