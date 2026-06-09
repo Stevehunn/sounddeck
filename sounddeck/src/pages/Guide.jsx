@@ -308,6 +308,14 @@ export default function Guide() {
 // ─── Composants réutilisables ─────────────────────────────────────────────────
 
 function DownloadCard({ icon, name, desc, url, instructions }) {
+  const handleOpen = () => {
+    if (window.electronAPI?.openExternal) {
+      window.electronAPI.openExternal(url)
+    } else {
+      window.open(url, '_blank')
+    }
+  }
+
   return (
     <div style={{
       padding: '12px 14px', background: 'var(--bg-secondary)',
@@ -321,17 +329,18 @@ function DownloadCard({ icon, name, desc, url, instructions }) {
         <div style={{ fontSize: 11, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', borderRadius: 6, padding: '4px 8px', marginBottom: 8 }}>
           <i className="ti ti-info-circle" style={{ marginRight: 4 }} />{instructions}
         </div>
-        <a href={url} target="_blank" rel="noreferrer"
+        <button
+          onClick={handleOpen}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 12, color: 'var(--accent)', textDecoration: 'none',
-            padding: '4px 10px', border: '1px solid var(--accent)',
-            borderRadius: 6, transition: 'all 0.1s'
+            fontSize: 12, color: 'var(--accent)', cursor: 'pointer',
+            padding: '6px 12px', border: '1px solid var(--accent)',
+            borderRadius: 6, background: 'transparent', transition: 'all 0.15s'
           }}
           onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-light)' }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
           <i className="ti ti-download" /> Télécharger gratuitement
-        </a>
+        </button>
       </div>
     </div>
   )

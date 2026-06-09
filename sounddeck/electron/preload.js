@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   downloadYtdlp: () => ipcRenderer.invoke('download-ytdlp'),
   youtubeInfo: (url) => ipcRenderer.invoke('youtube-info', url),
   youtubeDownload: (url, start, end, title) => ipcRenderer.invoke('youtube-download', url, start, end, title),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
   exportProfile: (profileId) => ipcRenderer.invoke('export-profile', profileId),
   importProfile: () => ipcRenderer.invoke('import-profile'),
   exportConfig: () => ipcRenderer.invoke('export-config'),

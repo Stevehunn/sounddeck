@@ -919,6 +919,11 @@ ipcMain.handle('import-backup', async () => {
   return { success: false, error: 'Format non supporté' }
 })
 
+// ─── Ouvrir un lien externe dans le navigateur par défaut ────────────────────
+ipcMain.handle('open-external', (event, url) => {
+  shell.openExternal(url)
+})
+
 // ─── YouTube import via yt-dlp ───────────────────────────────────────────────
 
 const YTDLP_DIR = path.join(app.getPath('userData'), 'bin')
