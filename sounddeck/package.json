@@ -1,7 +1,8 @@
 {
   "name": "sounddeck",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Soundboard local pour Discord et autres apps de discussion",
+  "license": "MIT",
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently \"cross-env BROWSER=none vite\" \"wait-on http://localhost:5173 && electron .\"",
