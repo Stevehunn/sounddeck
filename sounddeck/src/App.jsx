@@ -160,7 +160,7 @@ export default function App() {
         {currentPage === 'editor' && <Editor store={store} addToast={addToast} lang={store.lang} />}
         {currentPage === 'sequencer' && <Sequencer store={store} addToast={addToast} lang={store.lang} />}
         {currentPage === 'youtube' && <YouTube store={store} addToast={addToast} lang={store.lang} />}
-        {currentPage === 'guide' && <Guide />}
+        {currentPage === 'guide' && <Guide key={store.lang} lang={store.lang} />}
       </main>
 
       <Toast toasts={toasts} />
