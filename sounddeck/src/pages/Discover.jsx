@@ -7,10 +7,9 @@ function getCategories(lang) {
   const langData = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0]
   const country = langData.country || 'fr'
   
-  // Définir les requêtes de recherche pour chaque catégorie selon la langue
   const queries = {
     fr: {
-      local: 'fr',           // utilisé pour l'URL de tendances
+      local: 'fr',
       best: 'vine boom,bruh,airhorn,oof',
       french: 'francais',
       discord: 'discord,notification,ping',
@@ -30,9 +29,9 @@ function getCategories(lang) {
       whatsapp: 'whatsapp audios',
     },
     en: {
-      local: 'us',           // utilisé pour l'URL de tendances US
+      local: 'us',
       best: 'vine boom,bruh,airhorn,oof',
-      french: 'us',          // sons US
+      french: 'us',
       discord: 'discord,notification,ping',
       anime: 'anime & manga',
       games: 'games',
@@ -50,9 +49,9 @@ function getCategories(lang) {
       whatsapp: 'whatsapp audios',
     },
     es: {
-      local: 'es',           // utilisé pour l'URL de tendances ES
+      local: 'es',
       best: 'vine boom,bruh,airhorn,oof',
-      french: 'es',          // sons espagnols
+      french: 'es',
       discord: 'discord,notification,ping',
       anime: 'anime & manga',
       games: 'games',
@@ -71,10 +70,8 @@ function getCategories(lang) {
     }
   }
 
-  // Récupérer les requêtes pour la langue sélectionnée, ou fallback sur français
   const q = queries[lang] || queries.fr
 
-  // Traductions des labels
   const labels = {
     fr: {
       catLocalTrending: 'Tendances',
@@ -177,8 +174,19 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
   const [previewing, setPreviewing] = useState(null)
   const [showProfileModal, setShowProfileModal] = useState(null)
   const [error, setError] = useState('')
-  const [previewVolume, setPreviewVolume] = useState(70)
+  
+  // Utiliser le volume du store avec fallback
+  const [previewVolume, setPreviewVolume] = useState(store.previewVolume ?? 70)
   const previewHowlRef = useRef(null)
+
+  // Sauvegarder le volume quand il change
+  const handlePreviewVolumeChange = (value) => {
+    setPreviewVolume(value)
+    store.updatePreviewVolume?.(value)
+    if (previewHowlRef.current) {
+      previewHowlRef.current.volume(value / 100)
+    }
+  }
 
   const downloadedNames = store.sounds.map(s => s.name.toLowerCase().trim())
 
@@ -211,6 +219,13 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     fetchSounds(cats[0])
     return () => stopPreview()
   }, [lang])
+
+  // Synchroniser le volume avec le store quand il change
+  useEffect(() => {
+    if (store.previewVolume !== undefined && store.previewVolume !== previewVolume) {
+      setPreviewVolume(store.previewVolume)
+    }
+  }, [store.previewVolume])
 
   const handleCategoryClick = (cat) => {
     setActiveCategory(cat)
@@ -286,12 +301,12 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <i className="ti ti-volume" style={{ fontSize: 14, color: 'var(--text-tertiary)' }} />
-              <input type="range" min="0" max="100" value={previewVolume}
-                onChange={e => {
-                  const v = Number(e.target.value)
-                  setPreviewVolume(v)
-                  if (previewHowlRef.current) previewHowlRef.current.volume(v / 100)
-                }}
+              <input 
+                type="range" 
+                min="0" 
+                max="100" 
+                value={previewVolume}
+                onChange={e => handlePreviewVolumeChange(Number(e.target.value))}
                 style={{ width: 80, accentColor: 'var(--accent)', cursor: 'pointer' }}
                 title={`${tr('previewVolume')} : ${previewVolume}%`}
               />

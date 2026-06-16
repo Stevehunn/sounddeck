@@ -19,6 +19,7 @@ export function useStore() {
   const [stopAllShortcut, setStopAllShortcut] = useState('')
   const [presentationShortcut, setPresentationShortcut] = useState('')
   const [loading, setLoading] = useState(true)
+  const [previewVolume, setPreviewVolume] = useState(70) // AJOUTÉ
 
   // ─── Chargement initial depuis electron-store ────────────────────────────────
   useEffect(() => {
@@ -38,6 +39,7 @@ export function useStore() {
         const savedStopAllShortcut = await window.electronAPI.storeGet('stopAllShortcut') || ''
         const savedPresentationShortcut = await window.electronAPI.storeGet('presentationShortcut') || ''
         const savedCurrentProfileId = await window.electronAPI.storeGet('currentProfileId')
+        const savedPreviewVolume = await window.electronAPI.storeGet('previewVolume') ?? 70 // AJOUTÉ
 
         // Profil "Tous les sons" toujours présent
         const allProfile = { id: 'all', name: 'Tous les sons', isDefault: true }
@@ -58,6 +60,7 @@ export function useStore() {
         setStopAllShortcut(savedStopAllShortcut)
         setPresentationShortcut(savedPresentationShortcut)
         setCurrentProfileId(savedCurrentProfileId || 'all')
+        setPreviewVolume(savedPreviewVolume) // AJOUTÉ
       } catch (e) {
         console.error('Erreur chargement store:', e)
         setProfiles([{ id: 'all', name: 'Tous les sons', isDefault: true }])
@@ -280,6 +283,12 @@ export function useStore() {
     await save('playLocally', val)
   }, [save])
 
+  // ─── Volume de prévisualisation ─────────────────────────────────────────────
+  const updatePreviewVolume = useCallback(async (val) => {
+    setPreviewVolume(val)
+    await save('previewVolume', val)
+  }, [save])
+
   // ─── Sons filtrés selon profil actuel ────────────────────────────────────────
   const currentSounds = currentProfileId === 'all'
     ? sounds
@@ -291,6 +300,7 @@ export function useStore() {
     // État
     profiles, currentProfileId, sounds, currentSounds, favoriteSounds,
     shortcuts, profileShortcut, theme, audioDevice, volume, playLocally, loading,
+    previewVolume, // AJOUTÉ
     // Profils
     createProfile, deleteProfile, renameProfile, switchProfile, switchToNextProfile,
     // Sons
@@ -302,6 +312,7 @@ export function useStore() {
     stopAllShortcut, updateStopAllShortcut,
     presentationShortcut, updatePresentationShortcut,
     lang, updateLang,
-    customTheme, updateTheme, updateCustomTheme, updateAudioDevice, updateVolume, updatePlayLocally
+    customTheme, updateTheme, updateCustomTheme, updateAudioDevice, updateVolume, updatePlayLocally,
+    updatePreviewVolume, // AJOUTÉ
   }
 }
