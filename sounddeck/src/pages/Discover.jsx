@@ -2,37 +2,80 @@ import { useState, useEffect, useRef } from 'react'
 import { Howl } from 'howler'
 import { LANGUAGES, useTranslation } from '../i18n'
 
-// Les catégories sont générées dynamiquement selon la langue
-// Les catégories sont générées dynamiquement selon la langue
+// Helper pour récupérer les catégories avec leurs requêtes selon la langue
 function getCategories(lang) {
   const langData = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0]
-  // Utiliser les clés i18n directement - le fallback se fera automatiquement
-  return [
-    { id: 'local',      label: `📍 ${getLabel('catLocalTrending', lang)} ${langData.flag}`, mode: 'local', query: langData.myinstantsIndex },
-    { id: 'trending',   label: `🔥 ${getLabel('catTrending', lang)}`,       mode: 'trending',  query: '' },
-    { id: 'best',       label: `🏆 ${getLabel('catBest', lang)}`,           mode: 'multi',     query: 'vine boom,bruh,airhorn,oof' },
-    { id: 'french',     label: `🇫🇷 ${getLabel('catFrench', lang)}`,        mode: 'search',    query: 'francais' },
-    { id: 'discord',    label: `💬 ${getLabel('catDiscord', lang)}`,        mode: 'multi',     query: 'discord,notification,ping' },
-    { id: 'anime',      label: `⛩️ ${getLabel('catAnime', lang)}`,          mode: 'category',  query: 'anime & manga' },
-    { id: 'games',      label: `🎮 ${getLabel('catGames', lang)}`,          mode: 'category',  query: 'games' },
-    { id: 'memes',      label: `😂 ${getLabel('catMemes', lang)}`,          mode: 'category',  query: 'memes' },
-    { id: 'movies',     label: `🎬 ${getLabel('catMovies', lang)}`,         mode: 'category',  query: 'movies' },
-    { id: 'music',      label: `🎵 ${getLabel('catMusic', lang)}`,          mode: 'category',  query: 'music' },
-    { id: 'politics',   label: `🗳️ ${getLabel('catPolitics', lang)}`,      mode: 'category',  query: 'politics' },
-    { id: 'pranks',     label: `🤣 ${getLabel('catPranks', lang)}`,         mode: 'category',  query: 'pranks' },
-    { id: 'reactions',  label: `😱 ${getLabel('catReactions', lang)}`,      mode: 'category',  query: 'reactions' },
-    { id: 'sfx',        label: `🔊 ${getLabel('catSfx', lang)}`,            mode: 'category',  query: 'sound effects' },
-    { id: 'sports',     label: `⚽ ${getLabel('catSports', lang)}`,          mode: 'category',  query: 'sports' },
-    { id: 'tv',         label: `📺 ${getLabel('catTv', lang)}`,             mode: 'category',  query: 'television' },
-    { id: 'tiktok',     label: `📱 ${getLabel('catTiktok', lang)}`,         mode: 'category',  query: 'tiktok trends' },
-    { id: 'viral',      label: `📣 ${getLabel('catViral', lang)}`,          mode: 'category',  query: 'viral' },
-    { id: 'whatsapp',   label: `💬 ${getLabel('catWhatsapp', lang)}`,       mode: 'category',  query: 'whatsapp audios' },
-  ]
-}
+  const country = langData.country || 'fr'
+  
+  // Définir les requêtes de recherche pour chaque catégorie selon la langue
+  const queries = {
+    fr: {
+      local: 'fr',           // utilisé pour l'URL de tendances
+      best: 'vine boom,bruh,airhorn,oof',
+      french: 'francais',
+      discord: 'discord,notification,ping',
+      anime: 'anime & manga',
+      games: 'games',
+      memes: 'memes',
+      movies: 'movies',
+      music: 'music',
+      politics: 'politics',
+      pranks: 'pranks',
+      reactions: 'reactions',
+      sfx: 'sound effects',
+      sports: 'sports',
+      tv: 'television',
+      tiktok: 'tiktok trends',
+      viral: 'viral',
+      whatsapp: 'whatsapp audios',
+    },
+    en: {
+      local: 'us',           // utilisé pour l'URL de tendances US
+      best: 'vine boom,bruh,airhorn,oof',
+      french: 'us',          // sons US
+      discord: 'discord,notification,ping',
+      anime: 'anime & manga',
+      games: 'games',
+      memes: 'memes',
+      movies: 'movies',
+      music: 'music',
+      politics: 'politics',
+      pranks: 'pranks',
+      reactions: 'reactions',
+      sfx: 'sound effects',
+      sports: 'sports',
+      tv: 'television',
+      tiktok: 'tiktok trends',
+      viral: 'viral',
+      whatsapp: 'whatsapp audios',
+    },
+    es: {
+      local: 'es',           // utilisé pour l'URL de tendances ES
+      best: 'vine boom,bruh,airhorn,oof',
+      french: 'es',          // sons espagnols
+      discord: 'discord,notification,ping',
+      anime: 'anime & manga',
+      games: 'games',
+      memes: 'memes',
+      movies: 'movies',
+      music: 'music',
+      politics: 'politics',
+      pranks: 'pranks',
+      reactions: 'reactions',
+      sfx: 'sound effects',
+      sports: 'sports',
+      tv: 'television',
+      tiktok: 'tiktok trends',
+      viral: 'viral',
+      whatsapp: 'whatsapp audios',
+    }
+  }
 
-// Helper pour récupérer une traduction avec fallback
-function getLabel(key, lang) {
-  const translations = {
+  // Récupérer les requêtes pour la langue sélectionnée, ou fallback sur français
+  const q = queries[lang] || queries.fr
+
+  // Traductions des labels
+  const labels = {
     fr: {
       catLocalTrending: 'Tendances',
       catTrending: 'Tendances',
@@ -97,8 +140,30 @@ function getLabel(key, lang) {
       catWhatsapp: 'Whatsapp',
     }
   }
-  
-  return translations[lang]?.[key] || translations['fr'][key] || key
+
+  const label = labels[lang] || labels.fr
+
+  return [
+    { id: 'local',      label: `📍 ${label.catLocalTrending} ${langData.flag}`, mode: 'local', query: q.local },
+    { id: 'trending',   label: `🔥 ${label.catTrending}`,                       mode: 'trending',  query: '' },
+    { id: 'best',       label: `🏆 ${label.catBest}`,                           mode: 'multi',     query: q.best },
+    { id: 'french',     label: `🇫🇷 ${label.catFrench}`,                        mode: 'search',    query: q.french },
+    { id: 'discord',    label: `💬 ${label.catDiscord}`,                        mode: 'multi',     query: q.discord },
+    { id: 'anime',      label: `⛩️ ${label.catAnime}`,                          mode: 'category',  query: q.anime },
+    { id: 'games',      label: `🎮 ${label.catGames}`,                          mode: 'category',  query: q.games },
+    { id: 'memes',      label: `😂 ${label.catMemes}`,                          mode: 'category',  query: q.memes },
+    { id: 'movies',     label: `🎬 ${label.catMovies}`,                         mode: 'category',  query: q.movies },
+    { id: 'music',      label: `🎵 ${label.catMusic}`,                          mode: 'category',  query: q.music },
+    { id: 'politics',   label: `🗳️ ${label.catPolitics}`,                      mode: 'category',  query: q.politics },
+    { id: 'pranks',     label: `🤣 ${label.catPranks}`,                         mode: 'category',  query: q.pranks },
+    { id: 'reactions',  label: `😱 ${label.catReactions}`,                      mode: 'category',  query: q.reactions },
+    { id: 'sfx',        label: `🔊 ${label.catSfx}`,                            mode: 'category',  query: q.sfx },
+    { id: 'sports',     label: `⚽ ${label.catSports}`,                          mode: 'category',  query: q.sports },
+    { id: 'tv',         label: `📺 ${label.catTv}`,                             mode: 'category',  query: q.tv },
+    { id: 'tiktok',     label: `📱 ${label.catTiktok}`,                         mode: 'category',  query: q.tiktok },
+    { id: 'viral',      label: `📣 ${label.catViral}`,                          mode: 'category',  query: q.viral },
+    { id: 'whatsapp',   label: `💬 ${label.catWhatsapp}`,                       mode: 'category',  query: q.whatsapp },
+  ]
 }
 
 export default function Discover({ store, addToast, lang = 'fr' }) {
@@ -124,8 +189,11 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     try {
       let mode = search ? 'search' : category.mode
       let query = search || category.query
-      if (mode === 'local') { mode = 'local'; query = category.query }
-      const result = await window.electronAPI.fetchMyinstants(query, mode)
+      if (mode === 'local') {
+        mode = 'local'
+        query = category.query
+      }
+      const result = await window.electronAPI.fetchMyinstants(query, mode, lang)
       if (result.success && result.sounds.length > 0) {
         setSounds(result.sounds)
       } else {

@@ -2,8 +2,16 @@ const { app, BrowserWindow, ipcMain, dialog, globalShortcut, shell, Menu } = req
 const path = require('path')
 const fs = require('fs')
 const Store = require('electron-store')
+const { LANGUAGES } = require('../src/i18n')
 
 const store = new Store()
+
+// Définir les correspondances pays -> URLs de tendances
+const TRENDING_URLS = {
+  'fr': 'https://www.myinstants.com/fr/index/fr/',
+  'us': 'https://www.myinstants.com/fr/index/us/',
+  'es': 'https://www.myinstants.com/fr/index/es/',
+}
 
 // Détection fiable dev vs production
 const isDev = !app.isPackaged
@@ -31,7 +39,7 @@ function createWindow() {
     },
     backgroundColor: '#111113',
     show: false,
-    autoHideMenuBar: true,  // cache la barre File/Edit/View
+    autoHideMenuBar: true,
     frame: true,
     ...(fs.existsSync(iconPath) ? { icon: iconPath } : {})
   })
@@ -39,19 +47,16 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
   } else {
-    // En production, le dossier dist est au même niveau que electron/
     const indexPath = path.join(app.getAppPath(), 'dist', 'index.html')
     mainWindow.loadFile(indexPath)
   }
   mainWindow.once('ready-to-show', () => mainWindow.show())
   mainWindow.on('closed', () => { mainWindow = null })
 
-  // Empêcher Electron de naviguer vers un fichier droppé (comportement par défaut)
   mainWindow.webContents.on('will-navigate', (e, url) => {
     if (url !== mainWindow.webContents.getURL()) e.preventDefault()
   })
 
-  // Autoriser le drag & drop de fichiers dans la fenêtre
   mainWindow.webContents.session.on('will-download', (e) => {
     e.preventDefault()
   })
@@ -72,11 +77,9 @@ app.on('window-all-closed', () => {
 function safeRegister(accelerator, callback) {
   if (!accelerator) return false
   try {
-    // Electron n'accepte pas les touches seules sans modificateur sauf Fn
     const isFn = /^F\d+$/.test(accelerator)
     const hasMod = accelerator.includes('+')
     if (!isFn && !hasMod) {
-      // Touche seule : on passe quand même, Electron l'accepte pour certaines
       const ok = globalShortcut.register(accelerator, callback)
       return ok
     }
@@ -208,25 +211,19 @@ ipcMain.handle('download-sound-url', async (event, rawUrl, fileName) => {
   const http = require('http')
   const destPath = path.join(soundsDir, fileName)
 
-  // ─── Conversion des liens de partage en liens directs ────────────────────
   function resolveDirectUrl(url) {
-    // Google Drive : /file/d/ID/view → uc?export=download&id=ID
     const gdrive = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/)
     if (gdrive) {
       return `https://drive.google.com/uc?export=download&id=${gdrive[1]}`
     }
-    // Google Drive : open?id=ID
     const gdriveOpen = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/)
     if (gdriveOpen) {
       return `https://drive.google.com/uc?export=download&id=${gdriveOpen[1]}`
     }
-    // Dropbox : ?dl=0 → ?dl=1
     if (url.includes('dropbox.com')) {
       return url.replace('?dl=0', '?dl=1').replace('&dl=0', '&dl=1')
     }
-    // OneDrive : liens de partage → download direct
     if (url.includes('1drv.ms') || url.includes('onedrive.live.com')) {
-      // Encoder en base64 et construire le lien direct
       const b64 = Buffer.from(url).toString('base64')
         .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
       return `https://api.onedrive.com/v1.0/shares/u!${b64}/root/content`
@@ -253,7 +250,6 @@ ipcMain.handle('download-sound-url', async (event, rawUrl, fileName) => {
     }, (res) => {
       console.log('HTTP status:', res.statusCode, 'Content-Type:', res.headers['content-type'])
 
-      // Suivre les redirections
       if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
         file.close()
         fs.unlink(dest, () => {})
@@ -265,7 +261,6 @@ ipcMain.handle('download-sound-url', async (event, rawUrl, fileName) => {
         return
       }
 
-      // Vérifier que c'est bien un fichier audio (pas une page HTML)
       const contentType = res.headers['content-type'] || ''
       if (res.statusCode === 200 && contentType.includes('text/html')) {
         file.close()
@@ -287,7 +282,6 @@ ipcMain.handle('download-sound-url', async (event, rawUrl, fileName) => {
       res.pipe(file)
       file.on('finish', () => {
         file.close()
-        // Vérifier la taille minimale (éviter les fichiers vides ou HTML)
         const stats = fs.statSync(dest)
         if (stats.size < 1000) {
           fs.unlink(dest, () => {})
@@ -322,7 +316,6 @@ ipcMain.handle('trim-sound-file', async (event, filePath, startSec, endSec) => {
   try {
     let ffmpegPath = null
 
-    // 1. Essayer @ffmpeg-installer/ffmpeg (binaire précompilé cross-platform)
     try {
       const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg')
       ffmpegPath = ffmpegInstaller.path
@@ -331,7 +324,6 @@ ipcMain.handle('trim-sound-file', async (event, filePath, startSec, endSec) => {
       console.warn('@ffmpeg-installer/ffmpeg non disponible:', e.message)
     }
 
-    // 2. Fallback ffmpeg-static
     if (!ffmpegPath) {
       try {
         ffmpegPath = require('ffmpeg-static')
@@ -342,7 +334,6 @@ ipcMain.handle('trim-sound-file', async (event, filePath, startSec, endSec) => {
       } catch (e) { ffmpegPath = null }
     }
 
-    // 3. Fallback PATH système
     if (!ffmpegPath) ffmpegPath = 'ffmpeg'
 
     const ext = path.extname(filePath) || '.mp3'
@@ -372,7 +363,6 @@ ipcMain.handle('trim-sound-file', async (event, filePath, startSec, endSec) => {
       })
     })
 
-    // Vérifier que le fichier a bien été créé et n'est pas vide
     if (!fs.existsSync(outPath) || fs.statSync(outPath).size < 100) {
       throw new Error('Fichier de sortie invalide ou vide')
     }
@@ -381,7 +371,6 @@ ipcMain.handle('trim-sound-file', async (event, filePath, startSec, endSec) => {
 
   } catch (e) {
     console.error('trim-sound-file error:', e.message)
-    // Fallback : copie du fichier original
     try {
       const ext = path.extname(filePath) || '.mp3'
       const outPath = path.join(soundsDir, `copy_${Date.now()}${ext}`)
@@ -418,7 +407,6 @@ function fetchPage(url) {
         'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8'
       }
     }, (res) => {
-      // Suivre les redirections
       if ([301,302,303,307].includes(res.statusCode) && res.headers.location) {
         fetchPage(res.headers.location).then(resolve)
         return
@@ -430,26 +418,16 @@ function fetchPage(url) {
   })
 }
 
-// Extraire les sons d'une page de liste myinstants
 function parseSoundList(html) {
   const sounds = []
   const seen = new Set()
 
-  // Log pour debug — afficher un extrait du HTML reçu
   console.log('parseSoundList HTML extrait:', html.substring(0, 500))
   console.log('parseSoundList HTML longueur:', html.length)
 
-  // Myinstants peut utiliser plusieurs formats de liens :
-  // 1. <a href="https://www.myinstants.com/fr/instant/fart/">Fart</a>
-  // 2. <a href="/fr/instant/fart/">Fart</a>
-  // 3. <a href="/instant/fart/">Fart</a>
-  // On capture le slug ET le nom en une seule regex
   const patterns = [
-    // Lien absolu avec domaine
     /href="https?:\/\/(?:www\.)?myinstants\.com\/(?:fr\/)?instant\/([a-zA-Z0-9_-]+)\/?"\s*[^>]*>\s*([^<]{1,80})<\/a>/g,
-    // Lien relatif /fr/instant/
     /href="\/fr\/instant\/([a-zA-Z0-9_-]+)\/?"\s*[^>]*>\s*([^<]{1,80})<\/a>/g,
-    // Lien relatif /instant/
     /href="\/instant\/([a-zA-Z0-9_-]+)\/?"\s*[^>]*>\s*([^<]{1,80})<\/a>/g,
   ]
 
@@ -462,7 +440,6 @@ function parseSoundList(html) {
       const slug = m[1]
       const name = m[2]?.trim()
       if (slug && !seen.has(slug) && slug.length > 0 && slug.length < 80) {
-        // Ignorer les slugs qui sont des chemins de navigation
         const ignore = ['favorites', 'recent', 'trending', 'search', 'categories',
                         'new', 'profile', 'settings', 'uploaded', 'best_of_all_time',
                         'report', 'add', 'embed']
@@ -479,8 +456,6 @@ function parseSoundList(html) {
   console.log(`parseSoundList: ${allSlugs.length} slugs uniques trouvés`)
   console.log('Premiers slugs:', allSlugs.slice(0, 5))
 
-  // URLs directes mp3 depuis onclick="play('media/sounds/xxx.mp3')"
-  // Associées dans l'ordre aux slugs
   const soundUrlRegex = /play\('(media\/sounds\/[^']+)'\)/g
   const directUrls = [...html.matchAll(soundUrlRegex)].map(m =>
     `https://www.myinstants.com/${m[1]}`
@@ -505,17 +480,14 @@ function parseSoundList(html) {
   return sounds
 }
 
-// Résoudre l'URL MP3 d'un son via sa page détail (og:audio)
 async function resolveInstantUrl(slug) {
   const url = `https://www.myinstants.com/fr/instant/${slug}/`
   const result = await fetchPage(url)
   if (!result.ok) return null
 
-  // Extraire og:audio depuis les meta tags
   const ogAudio = result.html.match(/meta-og:audio:\s*(https?:\/\/[^\s\n]+)/)
   if (ogAudio) return ogAudio[1].trim()
 
-  // Fallback : chercher dans le HTML
   const audioMatch = result.html.match(/href="(\/media\/sounds\/[^"]+\.mp3)"/)
   if (audioMatch) return `https://www.myinstants.com${audioMatch[1]}`
 
@@ -523,11 +495,14 @@ async function resolveInstantUrl(slug) {
 }
 
 // Handler principal : liste + recherche + catégories
-ipcMain.handle('fetch-myinstants', async (event, query, mode = 'search') => {
+ipcMain.handle('fetch-myinstants', async (event, query, mode = 'search', lang = 'fr') => {
   try {
     let sounds = []
 
-    // Mode 'multi' : plusieurs recherches combinées
+    // Déterminer le code pays pour les tendances locales
+    const langData = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0]
+    const country = langData.country || 'fr'
+
     if (mode === 'multi') {
       const terms = query.split(',').map(t => t.trim()).filter(Boolean)
       for (const term of terms.slice(0, 4)) {
@@ -538,13 +513,19 @@ ipcMain.handle('fetch-myinstants', async (event, query, mode = 'search') => {
         }
         await new Promise(r => setTimeout(r, 200))
       }
-      // Dédupliquer par slug
       const seen = new Set()
       sounds = sounds.filter(s => {
         if (seen.has(s.slug)) return false
         seen.add(s.slug)
         return true
       })
+    } else if (mode === 'local') {
+      // Mode local : tendances du pays sélectionné
+      const url = TRENDING_URLS[country] || TRENDING_URLS['fr']
+      console.log('fetch-myinstants local:', url)
+      const result = await fetchPage(url)
+      if (!result.ok) return { success: false, error: result.error, sounds: [] }
+      sounds = parseSoundList(result.html)
     } else {
       let url
       if (mode === 'trending') {
@@ -566,12 +547,10 @@ ipcMain.handle('fetch-myinstants', async (event, query, mode = 'search') => {
       return { success: false, error: 'Aucun son trouvé', sounds: [] }
     }
 
-    // Résoudre les URLs manquantes — séquentiellement avec délai pour éviter le rate limiting
     const needsResolve = sounds.filter(s => !s.url && s.slug)
     console.log(`Résolution de ${needsResolve.length} URLs via pages détail...`)
 
     if (needsResolve.length > 0) {
-      // Résoudre par batch de 3 avec délai entre chaque batch
       const toResolve = needsResolve.slice(0, 20)
       for (let i = 0; i < toResolve.length; i += 3) {
         const batch = toResolve.slice(i, i + 3)
@@ -579,7 +558,6 @@ ipcMain.handle('fetch-myinstants', async (event, query, mode = 'search') => {
           const resolvedUrl = await resolveInstantUrl(sound.slug)
           if (resolvedUrl) sound.url = resolvedUrl
         }))
-        // Petit délai entre les batches pour éviter d'être bloqué
         if (i + 3 < toResolve.length) {
           await new Promise(r => setTimeout(r, 300))
         }
@@ -589,7 +567,6 @@ ipcMain.handle('fetch-myinstants', async (event, query, mode = 'search') => {
       console.log(`URLs résolues : ${resolved}/${sounds.length}`)
     }
 
-    // Filtrer les sons sans URL résolue
     sounds = sounds.filter(s => s.url)
 
     console.log(`fetch-myinstants: ${sounds.length} sons trouvés`)
@@ -618,7 +595,6 @@ function getEmojiForName(name) {
 }
 
 // ─── Écriture d'un fichier droppé depuis son contenu binaire ────────────────
-// Utilisé quand file.path n'est pas disponible dans le renderer
 ipcMain.handle('write-dropped-file', async (event, fileName, arrayBuffer) => {
   try {
     const safeName = fileName.replace(/[^a-zA-Z0-9._\- ]/g, '_')
@@ -679,7 +655,6 @@ ipcMain.handle('export-config', async () => {
   if (result.canceled) return { success: false }
   try {
     const config = buildConfig()
-    // Marquer les sons comme références (pas de fichiers inclus)
     config.sounds = config.sounds.map(s => ({ ...s, included: false }))
     fs.writeFileSync(result.filePath, JSON.stringify(config, null, 2), 'utf-8')
     return { success: true, path: result.filePath }
@@ -700,7 +675,6 @@ ipcMain.handle('export-full', async (event) => {
     const config = buildConfig()
     const sounds = store.get('sounds', [])
 
-    // Construire la config avec chemins relatifs dans le ZIP
     const configForZip = {
       ...config,
       sounds: sounds.map(s => ({
@@ -718,10 +692,8 @@ ipcMain.handle('export-full', async (event) => {
       archive.on('error', reject)
       archive.pipe(output)
 
-      // Ajouter config.json
       archive.append(JSON.stringify(configForZip, null, 2), { name: 'config.json' })
 
-      // Ajouter chaque fichier son existant
       let added = 0
       for (const sound of sounds) {
         if (sound.path && fs.existsSync(sound.path)) {
@@ -730,7 +702,6 @@ ipcMain.handle('export-full', async (event) => {
         }
       }
 
-      // Ajouter les images
       const imagesDir = path.join(app.getPath('userData'), 'images')
       if (fs.existsSync(imagesDir)) {
         archive.directory(imagesDir, 'images')
@@ -802,7 +773,6 @@ ipcMain.handle('import-backup', async () => {
   const filePath = result.filePaths[0]
   const ext = path.extname(filePath).toLowerCase()
 
-  // ── Import JSON ────────────────────────────────────────────────────────────
   if (ext === '.json') {
     try {
       const raw = fs.readFileSync(filePath, 'utf-8')
@@ -824,14 +794,12 @@ ipcMain.handle('import-backup', async () => {
     } catch (e) { return { success: false, error: e.message } }
   }
 
-  // ── Import ZIP ────────────────────────────────────────────────────────────
   if (ext === '.zip') {
     try {
       const unzipper = require('unzipper')
       const tmpDir = path.join(app.getPath('temp'), `sounddeck_import_${Date.now()}`)
       fs.mkdirSync(tmpDir, { recursive: true })
 
-      // Extraire le ZIP dans un dossier temporaire
       await new Promise((resolve, reject) => {
         fs.createReadStream(filePath)
           .pipe(unzipper.Extract({ path: tmpDir }))
@@ -839,7 +807,6 @@ ipcMain.handle('import-backup', async () => {
           .on('error', reject)
       })
 
-      // Lire config.json si présent
       const configPath = path.join(tmpDir, 'config.json')
       let importedSounds = 0
       let importedConfig = false
@@ -849,7 +816,6 @@ ipcMain.handle('import-backup', async () => {
         applyConfig(config)
         importedConfig = true
 
-        // Copier les sons extraits et mettre à jour les chemins
         const soundsTmpDir = path.join(tmpDir, 'sounds')
         if (fs.existsSync(soundsTmpDir)) {
           const updatedSounds = (config.sounds || []).map(sound => {
@@ -864,7 +830,6 @@ ipcMain.handle('import-backup', async () => {
           store.set('sounds', updatedSounds)
         }
 
-        // Copier les images
         const imagesTmpDir = path.join(tmpDir, 'images')
         const imagesDir = path.join(app.getPath('userData'), 'images')
         if (fs.existsSync(imagesTmpDir)) {
@@ -875,7 +840,6 @@ ipcMain.handle('import-backup', async () => {
         }
 
       } else {
-        // ZIP de sons uniquement — importer tous les fichiers audio
         const files = fs.readdirSync(tmpDir).filter(f =>
           f.match(/\.(mp3|wav|ogg|flac|m4a|aac)$/i)
         )
@@ -901,7 +865,6 @@ ipcMain.handle('import-backup', async () => {
         store.set('sounds', [...existingSounds, ...newSounds])
       }
 
-      // Nettoyer le dossier temporaire
       fs.rmSync(tmpDir, { recursive: true, force: true })
 
       return {
@@ -929,12 +892,9 @@ ipcMain.handle('open-external', (event, url) => {
 const YTDLP_DIR = path.join(app.getPath('userData'), 'bin')
 const YTDLP_PATH = path.join(YTDLP_DIR, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp')
 
-// Vérifier si yt-dlp est disponible
 ipcMain.handle('check-ytdlp', async () => {
-  // 1. Vérifier dans userData/bin
   if (fs.existsSync(YTDLP_PATH)) return { available: true, path: YTDLP_PATH, source: 'local' }
 
-  // 2. Vérifier dans le PATH système
   const { execFile } = require('child_process')
   const systemCmd = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
   return new Promise((resolve) => {
@@ -945,7 +905,6 @@ ipcMain.handle('check-ytdlp', async () => {
   })
 })
 
-// Télécharger yt-dlp automatiquement
 ipcMain.handle('download-ytdlp', async () => {
   try {
     if (!fs.existsSync(YTDLP_DIR)) fs.mkdirSync(YTDLP_DIR, { recursive: true })
@@ -968,7 +927,6 @@ ipcMain.handle('download-ytdlp', async () => {
         res.pipe(file)
         file.on('finish', () => {
           file.close()
-          // Rendre exécutable sur Unix
           if (process.platform !== 'win32') {
             fs.chmodSync(dest, '755')
           }
@@ -984,7 +942,6 @@ ipcMain.handle('download-ytdlp', async () => {
   }
 })
 
-// Récupérer les infos d'une vidéo YouTube
 ipcMain.handle('youtube-info', async (event, url) => {
   try {
     const ytdlpPath = fs.existsSync(YTDLP_PATH) ? YTDLP_PATH : 'yt-dlp'
@@ -1021,13 +978,11 @@ ipcMain.handle('youtube-info', async (event, url) => {
   }
 })
 
-// Télécharger l'audio d'une vidéo YouTube
 ipcMain.handle('youtube-download', async (event, url, startSec, endSec, title) => {
   try {
     const ytdlpPath = fs.existsSync(YTDLP_PATH) ? YTDLP_PATH : 'yt-dlp'
     const { execFile } = require('child_process')
 
-    // Récupérer le chemin ffmpeg depuis @ffmpeg-installer
     let ffmpegPath = null
     try {
       const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg')
@@ -1035,7 +990,6 @@ ipcMain.handle('youtube-download', async (event, url, startSec, endSec, title) =
       if (ffmpegPath && ffmpegPath.includes('app.asar')) {
         ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked')
       }
-      // Extraire le dossier contenant ffmpeg (yt-dlp a besoin du dossier, pas du fichier)
       ffmpegPath = path.dirname(ffmpegPath)
     } catch (e) {
       ffmpegPath = null
@@ -1044,7 +998,6 @@ ipcMain.handle('youtube-download', async (event, url, startSec, endSec, title) =
     const safeName = (title || 'youtube').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40)
     const outPath = path.join(soundsDir, `yt_${Date.now()}_${safeName}.mp3`)
 
-    // Arguments de base
     const args = [
       '--no-playlist',
       '--no-warnings',
@@ -1053,12 +1006,10 @@ ipcMain.handle('youtube-download', async (event, url, startSec, endSec, title) =
       '--audio-quality', '5',
     ]
 
-    // Indiquer le dossier ffmpeg à yt-dlp
     if (ffmpegPath) {
       args.push('--ffmpeg-location', ffmpegPath)
     }
 
-    // Portion spécifique
     const fullDuration = endSec > 0
     const hasStart = startSec > 0
     const notFullVideo = hasStart || (endSec > 0 && endSec < 9999)
@@ -1090,7 +1041,6 @@ ipcMain.handle('youtube-download', async (event, url, startSec, endSec, title) =
         if (fs.existsSync(outPath)) {
           resolve({ success: true, path: outPath.replace(/\\/g, '/') })
         } else {
-          // yt-dlp peut légèrement modifier le nom du fichier
           const files = fs.readdirSync(soundsDir)
             .filter(f => f.startsWith('yt_') && f.endsWith('.mp3'))
             .map(f => ({ f, t: fs.statSync(path.join(soundsDir, f)).mtimeMs }))
@@ -1129,7 +1079,6 @@ ipcMain.handle('export-profile', async (event, profileId) => {
 
   if (!profile) return { success: false, error: 'Profile not found' }
 
-  // Sons appartenant à ce profil
   const profileSounds = profileId === 'all'
     ? sounds
     : sounds.filter(s => s.profiles?.includes(profileId))
@@ -1215,7 +1164,6 @@ ipcMain.handle('import-profile', async () => {
     const profileData = JSON.parse(fs.readFileSync(profileJsonPath, 'utf-8'))
     const { profile, sounds: importedSounds } = profileData
 
-    // Créer un nouveau profil avec un nouvel ID pour éviter les conflits
     const { v4: uuidv4 } = require('uuid')
     const newProfileId = uuidv4()
     const newProfile = {
@@ -1225,7 +1173,6 @@ ipcMain.handle('import-profile', async () => {
       isDefault: false
     }
 
-    // Copier les sons et images
     const imagesDir = path.join(app.getPath('userData'), 'images')
     if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true })
 
@@ -1238,7 +1185,6 @@ ipcMain.handle('import-profile', async () => {
       let newPath = sound.path
       let newImage = sound.image || null
 
-      // Copier le fichier son
       if (sound.zipPath) {
         const srcSound = path.join(tmpDir, sound.zipPath)
         if (fs.existsSync(srcSound)) {
@@ -1248,7 +1194,6 @@ ipcMain.handle('import-profile', async () => {
         }
       }
 
-      // Copier l'image
       if (sound.imageZipPath) {
         const srcImg = path.join(tmpDir, sound.imageZipPath)
         if (fs.existsSync(srcImg)) {
@@ -1258,7 +1203,6 @@ ipcMain.handle('import-profile', async () => {
         }
       }
 
-      // Raccourci
       if (sound.shortcut) newShortcuts[newSoundId] = sound.shortcut
 
       newSounds.push({
@@ -1275,7 +1219,6 @@ ipcMain.handle('import-profile', async () => {
       })
     }
 
-    // Sauvegarder
     const existingProfiles = store.get('profiles', [])
     store.set('profiles', [...existingProfiles, newProfile])
     store.set('sounds', [...existingSounds, ...newSounds])
