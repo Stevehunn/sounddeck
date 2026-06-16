@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Howl } from 'howler'
 import { registerStopSequencerCallback, getSoundProgress } from '../utils/audio'
+import { useTranslation } from '../i18n'
 
-export default function Sequencer({ store, addToast }) {
+export default function Sequencer({ store, addToast, lang = 'fr' }) {
+  const tr = useTranslation(lang)
   const [playlists, setPlaylists] = useState([])
   const [activePlaylist, setActivePlaylist] = useState(null)
   const [showNewPlaylist, setShowNewPlaylist] = useState(false)
@@ -57,13 +59,13 @@ export default function Sequencer({ store, addToast }) {
       }}>
         <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <i className="ti ti-playlist" style={{ color: 'var(--accent)' }} /> Séquenceur
+            <i className="ti ti-playlist" style={{ color: 'var(--accent)' }} /> {tr('sequencerTitle')}
           </div>
           {showNewPlaylist ? (
             <div style={{ display: 'flex', gap: 4 }}>
               <input autoFocus value={newPlaylistName} onChange={e => setNewPlaylistName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') createPlaylist(); if (e.key === 'Escape') setShowNewPlaylist(false) }}
-                placeholder="Nom de la playlist" style={{ fontSize: 12, padding: '5px 8px', flex: 1 }} />
+                placeholder={tr('playlistName')} style={{ fontSize: 12, padding: '5px 8px', flex: 1 }} />
               <button className="btn-primary" style={{ padding: '5px 8px' }} onClick={createPlaylist}>
                 <i className="ti ti-check" />
               </button>
@@ -71,7 +73,7 @@ export default function Sequencer({ store, addToast }) {
           ) : (
             <button className="btn-primary" style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}
               onClick={() => setShowNewPlaylist(true)}>
-              <i className="ti ti-plus" /> Nouvelle playlist
+              <i className="ti ti-plus" /> {tr('newPlaylist')}
             </button>
           )}
         </div>
@@ -79,7 +81,7 @@ export default function Sequencer({ store, addToast }) {
         <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
           {playlists.length === 0 && (
             <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>
-              Aucune playlist
+              {tr('noPlaylist')}
             </div>
           )}
           {playlists.map(pl => (
@@ -99,7 +101,7 @@ export default function Sequencer({ store, addToast }) {
                   {pl.name}
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
-                  {pl.items.length} son{pl.items.length !== 1 ? 's' : ''}
+                  {pl.items.length} {tr('sounds')}
                 </div>
               </div>
               <button onClick={e => { e.stopPropagation(); deletePlaylist(pl.id) }}
@@ -124,28 +126,31 @@ export default function Sequencer({ store, addToast }) {
             volume={store.volume}
             onUpdate={updatePlaylist}
             addToast={addToast}
+            lang={lang}
           />
         ) : (
-          <EmptyState />
+          <EmptyState lang={lang} />
         )}
       </div>
     </div>
   )
 }
 
-function EmptyState() {
+function EmptyState({ lang = 'fr' }) {
+  const tr = useTranslation(lang)
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: 'var(--text-tertiary)' }}>
       <i className="ti ti-playlist" style={{ fontSize: 48, color: 'var(--border)' }} />
-      <div style={{ fontWeight: 500, fontSize: 14 }}>Sélectionnez ou créez une playlist</div>
+      <div style={{ fontWeight: 500, fontSize: 14 }}>{tr('selectPlaylist')}</div>
       <div style={{ fontSize: 12, textAlign: 'center', maxWidth: 280, lineHeight: 1.6 }}>
-        Arrangez vos sons dans l'ordre souhaité, définissez des délais entre chaque, et lancez la séquence d'un clic ou via raccourci.
+        {tr('selectPlaylistDesc')}
       </div>
     </div>
   )
 }
 
-function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addToast }) {
+function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addToast, lang = 'fr' }) {
+  const tr = useTranslation(lang)
   const [items, setItems] = useState(playlist.items || [])
   const [playing, setPlaying] = useState(false)
   const [currentIdx, setCurrentIdx] = useState(-1)
@@ -227,7 +232,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
   }, [items, sounds, volume, loopPlaylist])
 
   const startSequence = () => {
-    if (items.length === 0) { addToast('La playlist est vide', 'error'); return }
+    if (items.length === 0) { addToast(tr('emptyPlaylist'), 'error'); return }
     setPlaying(true)
     playFrom(0)
   }
@@ -331,7 +336,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600, fontSize: 14 }}>{playlist.name}</div>
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-            {items.length} son{items.length !== 1 ? 's' : ''} · {totalDuration.toFixed(1)}s de délais
+            {items.length} {tr('sounds')} · {totalDuration.toFixed(1)}s {tr('delayAfter').toLowerCase()}
           </div>
         </div>
 
@@ -344,12 +349,12 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
             color: loopPlaylist ? 'var(--success)' : 'var(--text-secondary)',
             display: 'flex', alignItems: 'center', gap: 4
           }}>
-          <i className="ti ti-repeat" /> Loop
+          <i className="ti ti-repeat" /> {tr('loop')}
         </button>
 
         {/* Ajouter sons */}
         <button className="btn-secondary" onClick={() => setShowAddSound(true)} style={{ fontSize: 12 }}>
-          <i className="ti ti-plus" /> Ajouter
+          <i className="ti ti-plus" /> {tr('addSounds')}
         </button>
 
         {/* Play / Stop */}
@@ -362,7 +367,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
                 if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload(); howlRef.current = null }
                 const prev = Math.max(0, currentIdx - 1)
                 playFrom(prev)
-              }} style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 }} title="Son précédent (←)">
+              }} style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 }} title={tr('previous')}>
                 <i className="ti ti-player-skip-back" />
               </button>
               <button onClick={() => {
@@ -372,17 +377,17 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
                 if (next < items.length) playFrom(next)
                 else if (loopPlaylist) playFrom(0)
                 else stopSequence()
-              }} style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 }} title="Son suivant (→)">
+              }} style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 }} title={tr('next')}>
                 <i className="ti ti-player-skip-forward" />
               </button>
             </div>
             <button onClick={stopSequence} style={{ fontSize: 12, padding: '6px 14px', background: 'rgba(224,82,82,0.1)', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <i className="ti ti-player-stop-filled" /> Arrêter
+              <i className="ti ti-player-stop-filled" /> {tr('stop_seq')}
             </button>
           </div>
         ) : (
           <button className="btn-primary" onClick={startSequence} style={{ fontSize: 12 }}>
-            <i className="ti ti-player-play-filled" /> Lancer
+            <i className="ti ti-player-play-filled" /> {tr('start_seq')}
           </button>
         )}
       </div>
@@ -413,8 +418,8 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
           </div>
           {items.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-tertiary)', marginTop: 3 }}>
-              <span>Son {currentIdx + 1} / {items.length}</span>
-              <span>{items.filter((_, i) => i > currentIdx).length} son(s) restant(s)</span>
+              <span>{tr('playing')} {currentIdx + 1} / {items.length}</span>
+              <span>{items.filter((_, i) => i > currentIdx).length} {tr('remaining')}</span>
             </div>
           )}
         </div>
@@ -424,13 +429,13 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
       {playing && (
         <div style={{ padding: '6px 20px', background: 'var(--accent-light)', borderBottom: '1px solid var(--accent)', fontSize: 11, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           <i className="ti ti-keyboard" />
-          <span>Raccourcis actifs :</span>
+          <span>{tr('activeShortcuts')} :</span>
           <kbd style={{ background: 'var(--bg-secondary)', border: '1px solid var(--accent)', borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace' }}>←</kbd>
-          <span>Son précédent</span>
+          <span>{tr('previous')}</span>
           <kbd style={{ background: 'var(--bg-secondary)', border: '1px solid var(--accent)', borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace' }}>→</kbd>
-          <span>Son suivant</span>
-          <kbd style={{ background: 'var(--bg-secondary)', border: '1px solid var(--accent)', borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace' }}>Bouton Stop</kbd>
-          <span>Tout arrêter</span>
+          <span>{tr('next')}</span>
+          <kbd style={{ background: 'var(--bg-secondary)', border: '1px solid var(--accent)', borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace' }}>{tr('stop_seq')}</kbd>
+          <span>{tr('stopAll')}</span>
         </div>
       )}
 
@@ -439,10 +444,10 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
         {items.length === 0 && (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)' }}>
             <i className="ti ti-music-plus" style={{ fontSize: 36, display: 'block', marginBottom: 10 }} />
-            <div style={{ fontWeight: 500, marginBottom: 6 }}>Playlist vide</div>
-            <div style={{ fontSize: 12, marginBottom: 16 }}>Ajoutez des sons pour créer votre séquence</div>
+            <div style={{ fontWeight: 500, marginBottom: 6 }}>{tr('emptyPlaylist')}</div>
+            <div style={{ fontSize: 12, marginBottom: 16 }}>{tr('addSounds')}</div>
             <button className="btn-primary" onClick={() => setShowAddSound(true)}>
-              <i className="ti ti-plus" /> Ajouter des sons
+              <i className="ti ti-plus" /> {tr('addSounds')}
             </button>
           </div>
         )}
@@ -484,12 +489,12 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
               {/* Nom du son */}
               <div style={{ flex: 1, overflow: 'hidden' }}>
                 <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isActive ? 'var(--accent)' : 'var(--text-primary)' }}>
-                  {sound?.name || <span style={{ color: 'var(--danger)', fontSize: 12 }}>Son introuvable</span>}
+                  {sound?.name || <span style={{ color: 'var(--danger)', fontSize: 12 }}>{tr('editorNoSound')}</span>}
                 </div>
                 {isActive && (
                   <div>
                     <div style={{ fontSize: 10, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                      <i className="ti ti-volume" style={{ animation: 'pulse 1s ease infinite' }} /> En cours de lecture...
+                      <i className="ti ti-volume" style={{ animation: 'pulse 1s ease infinite' }} /> {tr('playing')}
                     </div>
                     {currentProgress && (
                       <div style={{ height: 3, background: 'var(--bg-tertiary)', borderRadius: 2, overflow: 'hidden', width: '100%' }}>
@@ -509,7 +514,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                 <i className="ti ti-clock" style={{ fontSize: 13, color: 'var(--text-tertiary)' }} />
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <span style={{ fontSize: 9, color: 'var(--text-tertiary)', marginBottom: 1 }}>Délai après</span>
+                  <span style={{ fontSize: 9, color: 'var(--text-tertiary)', marginBottom: 1 }}>{tr('delayAfter')}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <input
                       type="number" min="0" max="60" step="0.5"
@@ -542,6 +547,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
           existingIds={items.map(i => i.soundId)}
           onAdd={addSounds}
           onClose={() => setShowAddSound(false)}
+          lang={lang}
         />
       )}
 
@@ -552,7 +558,8 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
   )
 }
 
-function AddSoundModal({ sounds, existingIds, onAdd, onClose }) {
+function AddSoundModal({ sounds, existingIds, onAdd, onClose, lang = 'fr' }) {
+  const tr = useTranslation(lang)
   const [selected, setSelected] = useState([])
   const [search, setSearch] = useState('')
 
@@ -569,11 +576,11 @@ function AddSoundModal({ sounds, existingIds, onAdd, onClose }) {
       <div className="modal fade-in" style={{ width: 480, maxHeight: '70vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
         <div className="modal-title">
           <i className="ti ti-music-plus" style={{ color: 'var(--accent)' }} />
-          Ajouter des sons à la playlist
+          {tr('addSounds')}
         </div>
 
         <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Rechercher..." style={{ marginBottom: 10 }} autoFocus />
+          placeholder={tr('search')} style={{ marginBottom: 10 }} autoFocus />
 
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
           {filtered.map(sound => {
@@ -596,7 +603,7 @@ function AddSoundModal({ sounds, existingIds, onAdd, onClose }) {
                 </div>
                 <span style={{ fontSize: 13, flex: 1 }}>{sound.name}</span>
                 {existingIds.includes(sound.id) && (
-                  <span style={{ fontSize: 10, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', padding: '1px 6px', borderRadius: 4 }}>Déjà ajouté</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', padding: '1px 6px', borderRadius: 4 }}>{tr('alreadyAdded')}</span>
                 )}
               </label>
             )
@@ -604,9 +611,9 @@ function AddSoundModal({ sounds, existingIds, onAdd, onClose }) {
         </div>
 
         <div className="modal-actions">
-          <button className="btn-secondary" onClick={onClose}>Annuler</button>
+          <button className="btn-secondary" onClick={onClose}>{tr('cancel')}</button>
           <button className="btn-primary" onClick={() => onAdd(selected)} disabled={selected.length === 0}>
-            <i className="ti ti-plus" /> Ajouter {selected.length > 0 ? `(${selected.length})` : ''}
+            <i className="ti ti-plus" /> {tr('add')} {selected.length > 0 ? `(${selected.length})` : ''}
           </button>
         </div>
       </div>

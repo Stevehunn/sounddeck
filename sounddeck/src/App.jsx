@@ -5,12 +5,13 @@ import Home from './pages/Home'
 import Discover from './pages/Discover'
 import Options from './pages/Options'
 import Editor from './pages/Editor'
-import Presentation from './pages/Presentation'
 import Sequencer from './pages/Sequencer'
 import YouTube from './pages/YouTube'
 import Guide from './pages/Guide'
+import Presentation from './pages/Presentation'
 import Toast from './components/Toast'
 import { playSound, stopAllSounds } from './utils/audio'
+import { LANGUAGES } from './i18n'
 
 export default function App() {
   const store = useStore()
@@ -18,30 +19,27 @@ export default function App() {
   const [presentationMode, setPresentationMode] = useState(false)
   const [toasts, setToasts] = useState([])
 
-  // Refs pour toujours avoir les valeurs à jour dans les callbacks IPC
   const soundsRef = useRef([])
   const addToastRef = useRef(null)
   const switchToNextProfileRef = useRef(null)
   const toggleLoopRef = useRef(null)
   const playLocallyRef = useRef(true)
-  const setPresentationRef = useRef(null)
   const audioDeviceRef = useRef('default')
   const volumeRef = useRef(80)
+  const setPresentationRef = useRef(null)
 
   useEffect(() => { soundsRef.current = store.sounds }, [store.sounds])
-  useEffect(() => { addToastRef.current = addToast }, )
   useEffect(() => { switchToNextProfileRef.current = store.switchToNextProfile }, [store.switchToNextProfile])
   useEffect(() => { toggleLoopRef.current = store.toggleLoop }, [store.toggleLoop])
   useEffect(() => { playLocallyRef.current = store.playLocally }, [store.playLocally])
-  useEffect(() => { setPresentationRef.current = setPresentationMode }, [setPresentationMode])
   useEffect(() => { audioDeviceRef.current = store.audioDevice }, [store.audioDevice])
   useEffect(() => { volumeRef.current = store.volume }, [store.volume])
+  useEffect(() => { setPresentationRef.current = setPresentationMode }, [setPresentationMode])
 
   // Appliquer le thème
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', store.theme)
 
-    // Thème personnalisé : injecter les variables CSS directement
     const existing = document.getElementById('custom-theme-style')
     if (store.theme === 'custom' && store.customTheme) {
       const c = store.customTheme
@@ -76,7 +74,7 @@ export default function App() {
     }
   }, [store.theme, store.customTheme])
 
-  // Enregistrer les listeners IPC une seule fois — mais via les refs
+  // Enregistrer les listeners IPC
   useEffect(() => {
     if (!window.electronAPI) return
 
@@ -88,14 +86,22 @@ export default function App() {
     window.electronAPI.onSwitchProfile(async () => {
       if (switchToNextProfileRef.current) {
         await switchToNextProfileRef.current()
-        // Lire le nouveau profil courant depuis la ref après le changement
         addToastRef.current?.('Profil changé', 'info')
       }
     })
 
-    window.electronAPI.onToggleLoop(() => {
+    window.electronAPI.onToggleLoop(async () => {
       if (toggleLoopRef.current) toggleLoopRef.current()
       addToastRef.current?.('Loop ' + (store.loopEnabled ? 'désactivé' : 'activé'), 'info')
+    })
+
+    window.electronAPI.onStopAllSounds(() => {
+      stopAllSounds()
+      addToastRef.current?.('Tous les sons arrêtés', 'info')
+    })
+
+    window.electronAPI.onTogglePresentation(() => {
+      setPresentationRef.current?.(prev => !prev)
     })
 
     return () => {
@@ -112,6 +118,8 @@ export default function App() {
     setToasts(prev => [...prev, { id, message, type }])
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000)
   }
+
+  useEffect(() => { addToastRef.current = addToast })
 
   if (store.loading) {
     return (
@@ -141,24 +149,27 @@ export default function App() {
         onVolumeChange={store.updateVolume}
         onStopAll={() => { stopAllSounds(); addToast('Tous les sons arrêtés', 'info') }}
         onPresentation={() => setPresentationMode(true)}
+        lang={store.lang}
         addToast={addToast}
       />
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {currentPage === 'home' && <Home store={store} addToast={addToast} loopEnabled={store.loopEnabled} />}
-        {currentPage === 'discover' && <Discover store={store} addToast={addToast} />}
-        {currentPage === 'options' && <Options store={store} addToast={addToast} />}
-        {currentPage === 'editor' && <Editor store={store} addToast={addToast} />}
-        {currentPage === 'sequencer' && <Sequencer store={store} addToast={addToast} />}
-        {currentPage === 'youtube' && <YouTube store={store} addToast={addToast} />}
+        {currentPage === 'home' && <Home store={store} addToast={addToast} loopEnabled={store.loopEnabled} lang={store.lang} />}
+        {currentPage === 'discover' && <Discover store={store} addToast={addToast} lang={store.lang} />}
+        {currentPage === 'options' && <Options store={store} addToast={addToast} lang={store.lang} />}
+        {currentPage === 'editor' && <Editor store={store} addToast={addToast} lang={store.lang} />}
+        {currentPage === 'sequencer' && <Sequencer store={store} addToast={addToast} lang={store.lang} />}
+        {currentPage === 'youtube' && <YouTube store={store} addToast={addToast} lang={store.lang} />}
         {currentPage === 'guide' && <Guide />}
       </main>
 
       <Toast toasts={toasts} />
+
       {presentationMode && (
         <Presentation
           store={store}
           onExit={() => setPresentationMode(false)}
+          lang={store.lang}
         />
       )}
     </div>

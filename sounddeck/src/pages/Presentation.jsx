@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { playSound, stopSound, isPlaying, getSoundProgress } from '../utils/audio'
+import { useTranslation } from '../i18n'
 
-export default function Presentation({ store, onExit }) {
+export default function Presentation({ store, onExit, lang = 'fr' }) {
+  const tr = useTranslation(lang)
   const [playingId, setPlayingId] = useState(null)
   const [search, setSearch] = useState('')
 
@@ -13,14 +15,12 @@ export default function Presentation({ store, onExit }) {
 
   const currentProfile = store.profiles.find(p => p.id === store.currentProfileId)
 
-  // Raccourci Échap pour quitter
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onExit() }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onExit])
 
-  // Polling état lecture
   useEffect(() => {
     if (!playingId) return
     const interval = setInterval(() => {
@@ -52,7 +52,6 @@ export default function Presentation({ store, onExit }) {
       display: 'flex', flexDirection: 'column',
       overflow: 'hidden'
     }}>
-      {/* Header */}
       <div style={{
         padding: '12px 24px', borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
@@ -61,46 +60,43 @@ export default function Presentation({ store, onExit }) {
         <i className="ti ti-speakerphone" style={{ fontSize: 22, color: 'var(--accent)' }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 700, fontSize: 16 }}>
-            Mode Présentation — {currentProfile?.name || 'Tous les sons'}
+            {tr('presentationTitle')} — {currentProfile?.id === 'all' ? tr('allSounds') : currentProfile?.name || tr('mySounds')}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-            {filtered.length} sons · Appuyez sur <kbd style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 3, padding: '1px 5px', fontSize: 10 }}>Échap</kbd> pour quitter
+            {filtered.length} {tr('sounds')} · {tr('exitTip')} <kbd style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 3, padding: '1px 5px', fontSize: 10 }}>Esc</kbd>
           </div>
         </div>
 
-        {/* Barre de recherche */}
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Rechercher..."
+          placeholder={tr('presentationSearch')}
           style={{ width: 200, fontSize: 13 }}
           autoFocus
         />
 
-        {/* Indicateurs */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {loopEnabled && (
             <div style={{ padding: '3px 8px', borderRadius: 20, background: 'rgba(29,158,117,0.15)', border: '1px solid var(--success)', color: 'var(--success)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <i className="ti ti-repeat" /> Loop ON
+              <i className="ti ti-repeat" /> {tr('presentationLoopOn')}
             </div>
           )}
           {playingId && (
             <div style={{ padding: '3px 8px', borderRadius: 20, background: 'var(--accent-light)', border: '1px solid var(--accent)', color: 'var(--accent)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <i className="ti ti-volume" style={{ animation: 'pulse 1s ease infinite' }} /> En cours
+              <i className="ti ti-volume" style={{ animation: 'pulse 1s ease infinite' }} /> {tr('presentationPlaying')}
             </div>
           )}
         </div>
 
         <button className="btn-secondary" onClick={onExit} style={{ flexShrink: 0 }}>
-          <i className="ti ti-x" /> Quitter
+          <i className="ti ti-x" /> {tr('presentationExit')}
         </button>
       </div>
 
-      {/* Favoris */}
       {favoriteSounds.length > 0 && !search && (
         <div style={{ padding: '14px 24px 0', flexShrink: 0 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--warning)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <i className="ti ti-star-filled" /> Favoris
+            <i className="ti ti-star-filled" /> {tr('favorites')}
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {favoriteSounds.map(s => (
@@ -111,6 +107,7 @@ export default function Presentation({ store, onExit }) {
                 playing={playingId === s.id}
                 onPlay={() => handlePlay(s)}
                 size="large"
+                lang={lang}
               />
             ))}
           </div>
@@ -118,11 +115,10 @@ export default function Presentation({ store, onExit }) {
         </div>
       )}
 
-      {/* Grille principale */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px 24px' }}>
         {filtered.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', marginTop: 60, fontSize: 14 }}>
-            Aucun son trouvé
+            {tr('noSounds')}
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
@@ -134,6 +130,7 @@ export default function Presentation({ store, onExit }) {
               playing={playingId === s.id}
               onPlay={() => handlePlay(s)}
               size="normal"
+              lang={lang}
             />
           ))}
         </div>
@@ -154,7 +151,6 @@ function fmtTime(s) {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
-// Convertit "CommandOrControl+Shift+F1" en ["Ctrl", "Shift", "F1"]
 function formatShortcut(shortcut) {
   if (!shortcut) return []
   return shortcut
@@ -175,16 +171,15 @@ function formatShortcut(shortcut) {
     })
 }
 
-function PresentationCard({ sound, shortcut, playing, onPlay, size }) {
+function PresentationCard({ sound, shortcut, playing, onPlay, size, lang }) {
+  const tr = useTranslation(lang || 'fr')
   const [imgError, setImgError] = useState(false)
   const [progress, setProgress] = useState(null)
-  // useState/useEffect déjà importés en haut du fichier
 
   const imageUrl = sound.image && !imgError
     ? (sound.image.startsWith('file://') ? sound.image : `file:///${sound.image.replace(/\\/g, '/')}`)
     : null
 
-  // Polling progression
   useEffect(() => {
     if (!playing) { setProgress(null); return }
     const interval = setInterval(() => {
@@ -214,7 +209,6 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size }) {
       onMouseEnter={e => { if (!playing) { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.transform = 'scale(1.03)' } }}
       onMouseLeave={e => { if (!playing) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'scale(1)' } }}
     >
-      {/* Image/Emoji */}
       <div style={{
         width: '100%', aspectRatio: '1', borderRadius: 10,
         background: 'var(--bg-tertiary)', display: 'flex',
@@ -230,7 +224,6 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size }) {
             position: 'absolute', inset: 0, background: 'rgba(124,111,247,0.7)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10
           }}>
-            {/* Equalizer animé */}
             <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 24 }}>
               {[1,2,3,4,3].map((h, i) => (
                 <div key={i} style={{
@@ -244,7 +237,6 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size }) {
         )}
       </div>
 
-      {/* Nom */}
       <div style={{
         fontSize: isLarge ? 13 : 12, fontWeight: 600,
         color: playing ? 'var(--accent)' : 'var(--text-primary)',
@@ -254,7 +246,6 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size }) {
         {sound.name}
       </div>
 
-      {/* Raccourci */}
       {shortcut && (
         <div style={{ display: 'flex', gap: 3, justifyContent: 'center', flexWrap: 'wrap', marginTop: 2 }}>
           {formatShortcut(shortcut).map((key, i) => (
@@ -274,14 +265,12 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size }) {
         </div>
       )}
 
-      {/* Compteur */}
       {sound.playCount > 0 && (
         <div style={{ fontSize: 9, color: 'var(--text-tertiary)', marginTop: 3 }}>
           <i className="ti ti-player-play" style={{ fontSize: 8 }} /> {sound.playCount}
         </div>
       )}
 
-      {/* Barre de progression */}
       {progress && (
         <div style={{ marginTop: 6 }}>
           <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' }}>

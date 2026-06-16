@@ -10,6 +10,7 @@ export function useStore() {
   const [profileShortcut, setProfileShortcut] = useState('CommandOrControl+Tab')
   const [theme, setTheme] = useState('dark')
   const [customTheme, setCustomTheme] = useState(null)
+  const [lang, setLang] = useState('fr')
   const [audioDevice, setAudioDevice] = useState('default')
   const [volume, setVolume] = useState(80)
   const [playLocally, setPlayLocally] = useState(true)
@@ -29,6 +30,7 @@ export function useStore() {
         const savedProfileShortcut = await window.electronAPI.storeGet('profileShortcut') || 'CommandOrControl+Tab'
         const savedTheme = await window.electronAPI.storeGet('theme') || 'dark'
         const savedCustomTheme = await window.electronAPI.storeGet('customTheme') || null
+        const savedLang = await window.electronAPI.storeGet('lang') || 'fr'
         const savedAudioDevice = await window.electronAPI.storeGet('audioDevice') || 'default'
         const savedVolume = await window.electronAPI.storeGet('volume') ?? 80
         const savedPlayLocally = await window.electronAPI.storeGet('playLocally') ?? true
@@ -48,6 +50,7 @@ export function useStore() {
         setProfileShortcut(savedProfileShortcut)
         setTheme(savedTheme)
         if (savedCustomTheme) setCustomTheme(savedCustomTheme)
+        setLang(savedLang)
         setAudioDevice(savedAudioDevice)
         setVolume(savedVolume)
         setPlayLocally(savedPlayLocally)
@@ -245,6 +248,11 @@ export function useStore() {
   }, [save])
 
   // ─── Options ──────────────────────────────────────────────────────────────────
+  const updateLang = useCallback(async (newLang) => {
+    setLang(newLang)
+    await save('lang', newLang)
+  }, [save])
+
   const updateTheme = useCallback(async (newTheme) => {
     setTheme(newTheme)
     await save('theme', newTheme)
@@ -293,6 +301,7 @@ export function useStore() {
     loopEnabled, loopShortcut, toggleLoop, updateLoopShortcut,
     stopAllShortcut, updateStopAllShortcut,
     presentationShortcut, updatePresentationShortcut,
+    lang, updateLang,
     customTheme, updateTheme, updateCustomTheme, updateAudioDevice, updateVolume, updatePlayLocally
   }
 }

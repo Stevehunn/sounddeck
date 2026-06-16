@@ -1,30 +1,109 @@
 import { useState, useEffect, useRef } from 'react'
 import { Howl } from 'howler'
+import { LANGUAGES, useTranslation } from '../i18n'
 
-const CATEGORIES = [
-  // Sélections populaires
-  { id: 'trending',  label: '🔥 Tendances',       mode: 'trending',  query: '' },
-  { id: 'best',      label: '🏆 Classiques',       mode: 'multi',     query: 'vine boom,bruh,airhorn,oof' },
-  { id: 'french',    label: '🇫🇷 Sons français',   mode: 'search',    query: 'francais' },
-  { id: 'discord',   label: '💬 Discord',          mode: 'multi',     query: 'discord,notification,ping' },
-  // Catégories officielles myinstants
-  { id: 'anime',     label: '⛩️ Anime & Manga',    mode: 'category',  query: 'anime & manga' },
-  { id: 'games',     label: '🎮 Jeux vidéo',       mode: 'category',  query: 'games' },
-  { id: 'memes',     label: '😂 Memes',            mode: 'category',  query: 'memes' },
-  { id: 'movies',    label: '🎬 Films',            mode: 'category',  query: 'movies' },
-  { id: 'music',     label: '🎵 Musique',          mode: 'category',  query: 'music' },
-  { id: 'politics',  label: '🗳️ Politique',        mode: 'category',  query: 'politics' },
-  { id: 'pranks',    label: '🤣 Canulars',         mode: 'category',  query: 'pranks' },
-  { id: 'reactions', label: '😱 Réactions',        mode: 'category',  query: 'reactions' },
-  { id: 'sfx',       label: '🔊 Effets sonores',   mode: 'category',  query: 'sound effects' },
-  { id: 'sports',    label: '⚽ Sports',           mode: 'category',  query: 'sports' },
-  { id: 'tv',        label: '📺 Télévision',       mode: 'category',  query: 'television' },
-  { id: 'tiktok',    label: '📱 TikTok Trends',    mode: 'category',  query: 'tiktok trends' },
-  { id: 'viral',     label: '📣 Viral',            mode: 'category',  query: 'viral' },
-  { id: 'whatsapp',  label: '💬 Whatsapp',         mode: 'category',  query: 'whatsapp audios' },
-]
+// Les catégories sont générées dynamiquement selon la langue
+// Les catégories sont générées dynamiquement selon la langue
+function getCategories(lang) {
+  const langData = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0]
+  // Utiliser les clés i18n directement - le fallback se fera automatiquement
+  return [
+    { id: 'local',      label: `📍 ${getLabel('catLocalTrending', lang)} ${langData.flag}`, mode: 'local', query: langData.myinstantsIndex },
+    { id: 'trending',   label: `🔥 ${getLabel('catTrending', lang)}`,       mode: 'trending',  query: '' },
+    { id: 'best',       label: `🏆 ${getLabel('catBest', lang)}`,           mode: 'multi',     query: 'vine boom,bruh,airhorn,oof' },
+    { id: 'french',     label: `🇫🇷 ${getLabel('catFrench', lang)}`,        mode: 'search',    query: 'francais' },
+    { id: 'discord',    label: `💬 ${getLabel('catDiscord', lang)}`,        mode: 'multi',     query: 'discord,notification,ping' },
+    { id: 'anime',      label: `⛩️ ${getLabel('catAnime', lang)}`,          mode: 'category',  query: 'anime & manga' },
+    { id: 'games',      label: `🎮 ${getLabel('catGames', lang)}`,          mode: 'category',  query: 'games' },
+    { id: 'memes',      label: `😂 ${getLabel('catMemes', lang)}`,          mode: 'category',  query: 'memes' },
+    { id: 'movies',     label: `🎬 ${getLabel('catMovies', lang)}`,         mode: 'category',  query: 'movies' },
+    { id: 'music',      label: `🎵 ${getLabel('catMusic', lang)}`,          mode: 'category',  query: 'music' },
+    { id: 'politics',   label: `🗳️ ${getLabel('catPolitics', lang)}`,      mode: 'category',  query: 'politics' },
+    { id: 'pranks',     label: `🤣 ${getLabel('catPranks', lang)}`,         mode: 'category',  query: 'pranks' },
+    { id: 'reactions',  label: `😱 ${getLabel('catReactions', lang)}`,      mode: 'category',  query: 'reactions' },
+    { id: 'sfx',        label: `🔊 ${getLabel('catSfx', lang)}`,            mode: 'category',  query: 'sound effects' },
+    { id: 'sports',     label: `⚽ ${getLabel('catSports', lang)}`,          mode: 'category',  query: 'sports' },
+    { id: 'tv',         label: `📺 ${getLabel('catTv', lang)}`,             mode: 'category',  query: 'television' },
+    { id: 'tiktok',     label: `📱 ${getLabel('catTiktok', lang)}`,         mode: 'category',  query: 'tiktok trends' },
+    { id: 'viral',      label: `📣 ${getLabel('catViral', lang)}`,          mode: 'category',  query: 'viral' },
+    { id: 'whatsapp',   label: `💬 ${getLabel('catWhatsapp', lang)}`,       mode: 'category',  query: 'whatsapp audios' },
+  ]
+}
 
-export default function Discover({ store, addToast }) {
+// Helper pour récupérer une traduction avec fallback
+function getLabel(key, lang) {
+  const translations = {
+    fr: {
+      catLocalTrending: 'Tendances',
+      catTrending: 'Tendances',
+      catBest: 'Classiques',
+      catFrench: 'Sons français',
+      catDiscord: 'Discord',
+      catAnime: 'Anime & Manga',
+      catGames: 'Jeux vidéo',
+      catMemes: 'Memes',
+      catMovies: 'Films',
+      catMusic: 'Musique',
+      catPolitics: 'Politique',
+      catPranks: 'Canulars',
+      catReactions: 'Réactions',
+      catSfx: 'Effets sonores',
+      catSports: 'Sports',
+      catTv: 'Télévision',
+      catTiktok: 'TikTok Trends',
+      catViral: 'Viral',
+      catWhatsapp: 'Whatsapp',
+    },
+    en: {
+      catLocalTrending: 'Trending',
+      catTrending: 'Trending',
+      catBest: 'Classics',
+      catFrench: 'US Sounds',
+      catDiscord: 'Discord',
+      catAnime: 'Anime & Manga',
+      catGames: 'Video games',
+      catMemes: 'Memes',
+      catMovies: 'Movies',
+      catMusic: 'Music',
+      catPolitics: 'Politics',
+      catPranks: 'Pranks',
+      catReactions: 'Reactions',
+      catSfx: 'Sound effects',
+      catSports: 'Sports',
+      catTv: 'Television',
+      catTiktok: 'TikTok Trends',
+      catViral: 'Viral',
+      catWhatsapp: 'Whatsapp',
+    },
+    es: {
+      catLocalTrending: 'Tendencias',
+      catTrending: 'Tendencias',
+      catBest: 'Clásicos',
+      catFrench: 'Sonidos ES',
+      catDiscord: 'Discord',
+      catAnime: 'Anime & Manga',
+      catGames: 'Videojuegos',
+      catMemes: 'Memes',
+      catMovies: 'Películas',
+      catMusic: 'Música',
+      catPolitics: 'Política',
+      catPranks: 'Bromas',
+      catReactions: 'Reacciones',
+      catSfx: 'Efectos de sonido',
+      catSports: 'Deportes',
+      catTv: 'Televisión',
+      catTiktok: 'TikTok Trends',
+      catViral: 'Viral',
+      catWhatsapp: 'Whatsapp',
+    }
+  }
+  
+  return translations[lang]?.[key] || translations['fr'][key] || key
+}
+
+export default function Discover({ store, addToast, lang = 'fr' }) {
+  const tr = useTranslation(lang)
+  const CATEGORIES = getCategories(lang)
   const [sounds, setSounds] = useState([])
   const [loading, setLoading] = useState(false)
   const [activeCategory, setActiveCategory] = useState(CATEGORIES[0])
@@ -43,24 +122,27 @@ export default function Discover({ store, addToast }) {
     setError('')
     setSounds([])
     try {
-      const mode = search ? 'search' : category.mode
-      const query = search || category.query
+      let mode = search ? 'search' : category.mode
+      let query = search || category.query
+      if (mode === 'local') { mode = 'local'; query = category.query }
       const result = await window.electronAPI.fetchMyinstants(query, mode)
       if (result.success && result.sounds.length > 0) {
         setSounds(result.sounds)
       } else {
-        setError(result.error || 'Aucun son trouvé pour cette recherche.')
+        setError(result.error || tr('noResult'))
       }
     } catch (e) {
-      setError('Erreur de connexion à MyInstants.')
+      setError(tr('connectionError'))
     }
     setLoading(false)
   }
 
   useEffect(() => {
-    fetchSounds(CATEGORIES[0])
+    const cats = getCategories(lang)
+    setActiveCategory(cats[0])
+    fetchSounds(cats[0])
     return () => stopPreview()
-  }, [])
+  }, [lang])
 
   const handleCategoryClick = (cat) => {
     setActiveCategory(cat)
@@ -74,7 +156,6 @@ export default function Discover({ store, addToast }) {
     fetchSounds(activeCategory, searchQuery.trim())
   }
 
-  // Aperçu du son avant téléchargement
   const stopPreview = () => {
     if (previewHowlRef.current) {
       previewHowlRef.current.stop()
@@ -98,7 +179,7 @@ export default function Discover({ store, addToast }) {
       onend: () => setPreviewing(null),
       onloaderror: () => {
         setPreviewing(null)
-        addToast('Impossible de prévisualiser ce son', 'error')
+        addToast(tr('previewError'), 'error')
       }
     })
     previewHowlRef.current = howl
@@ -117,26 +198,24 @@ export default function Discover({ store, addToast }) {
     const result = await window.electronAPI.downloadSoundUrl(sound.url, fileName)
     if (result.success) {
       await store.addSound({ name: sound.name, path: result.path, emoji: sound.emoji || '🔊', profiles: [profileId] })
-      addToast(`"${sound.name}" ajouté !`, 'success')
+      addToast(`"${sound.name}" ${tr('added')} !`, 'success')
     } else {
-      addToast(`Erreur : ${result.error}`, 'error')
+      addToast(`${tr('error')} : ${result.error}`, 'error')
     }
     setDownloading(d => ({ ...d, [sound.id]: false }))
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Header */}
       <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div>
-            <div style={{ fontWeight: 600, fontSize: 15 }}>Découverte</div>
+            <div style={{ fontWeight: 600, fontSize: 15 }}>{tr('discoverTitle')}</div>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-              Sons depuis <strong>MyInstants</strong> · {sounds.length} résultats
+              {tr('discoverSub')} <strong>MyInstants</strong> · {sounds.length} {tr('discoverResults')}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {/* Volume aperçu */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <i className="ti ti-volume" style={{ fontSize: 14, color: 'var(--text-tertiary)' }} />
               <input type="range" min="0" max="100" value={previewVolume}
@@ -146,7 +225,7 @@ export default function Discover({ store, addToast }) {
                   if (previewHowlRef.current) previewHowlRef.current.volume(v / 100)
                 }}
                 style={{ width: 80, accentColor: 'var(--accent)', cursor: 'pointer' }}
-                title={`Volume aperçu : ${previewVolume}%`}
+                title={`${tr('previewVolume')} : ${previewVolume}%`}
               />
               <span style={{ fontSize: 11, color: 'var(--text-tertiary)', minWidth: 28 }}>{previewVolume}%</span>
             </div>
@@ -157,16 +236,15 @@ export default function Discover({ store, addToast }) {
           </div>
         </div>
 
-        {/* Barre de recherche */}
         <form onSubmit={handleSearch} style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Rechercher un son... (ex: vine boom, discord, anime)"
+            placeholder={tr('searchSound')}
             style={{ flex: 1 }}
           />
           <button type="submit" className="btn-primary" style={{ flexShrink: 0 }}>
-            <i className="ti ti-search" /> Chercher
+            <i className="ti ti-search" /> {tr('searchBtn')}
           </button>
           {(searchQuery || loading) && (
             <button type="button" className="btn-secondary" onClick={() => { setSearchQuery(''); fetchSounds(activeCategory) }}>
@@ -175,7 +253,6 @@ export default function Discover({ store, addToast }) {
           )}
         </form>
 
-        {/* Catégories scrollables */}
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
           {CATEGORIES.map(cat => (
             <button key={cat.id} onClick={() => handleCategoryClick(cat)}
@@ -192,30 +269,26 @@ export default function Discover({ store, addToast }) {
         </div>
       </div>
 
-      {/* Contenu */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
 
-        {/* Chargement */}
         {loading && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 14, color: 'var(--text-secondary)' }}>
             <i className="ti ti-loader" style={{ fontSize: 36, color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
-            <div style={{ fontSize: 13 }}>Chargement depuis MyInstants...</div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Résolution des liens audio en cours</div>
+            <div style={{ fontSize: 13 }}>{tr('loading')}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{tr('resolvingLinks')}</div>
           </div>
         )}
 
-        {/* Erreur */}
         {!loading && error && (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)' }}>
             <i className="ti ti-wifi-off" style={{ fontSize: 36, display: 'block', marginBottom: 12 }} />
             <div style={{ fontWeight: 500, marginBottom: 6 }}>{error}</div>
             <button className="btn-secondary" onClick={() => fetchSounds(activeCategory, searchQuery)}>
-              <i className="ti ti-refresh" /> Réessayer
+              <i className="ti ti-refresh" /> {tr('retry')}
             </button>
           </div>
         )}
 
-        {/* Grille de sons */}
         {!loading && sounds.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
             {sounds.map(sound => {
@@ -231,6 +304,7 @@ export default function Discover({ store, addToast }) {
                   isPreviewing={isPreviewing}
                   onPreview={() => togglePreview(sound)}
                   onDownload={() => handleDownload(sound)}
+                  lang={lang}
                 />
               )
             })}
@@ -238,13 +312,13 @@ export default function Discover({ store, addToast }) {
         )}
       </div>
 
-      {/* Modal choix profil */}
       {showProfileModal && (
         <ProfilePickerModal
           sound={showProfileModal}
           profiles={store.profiles}
           onConfirm={(profileId) => confirmDownload(showProfileModal, profileId)}
           onClose={() => setShowProfileModal(null)}
+          lang={lang}
         />
       )}
 
@@ -256,7 +330,8 @@ export default function Discover({ store, addToast }) {
   )
 }
 
-function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPreview, onDownload }) {
+function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPreview, onDownload, lang }) {
+  const tr = useTranslation(lang || 'fr')
   return (
     <div style={{
       background: 'var(--bg-secondary)',
@@ -265,7 +340,6 @@ function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPrevie
       transition: 'border-color 0.15s',
       boxShadow: isPreviewing ? '0 0 0 3px rgba(124,111,247,0.2)' : 'none'
     }}>
-      {/* Zone emoji / aperçu */}
       <div
         onClick={onPreview}
         style={{
@@ -273,7 +347,7 @@ function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPrevie
           padding: '18px 0', display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 38, cursor: 'pointer', position: 'relative', transition: 'background 0.15s'
         }}
-        title="Cliquer pour écouter"
+        title={tr('clickToListen')}
       >
         {sound.emoji}
         <div style={{
@@ -295,14 +369,11 @@ function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPrevie
       </div>
 
       <div style={{ padding: '10px 12px' }}>
-        {/* Nom */}
         <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={sound.name}>
           {sound.name}
         </div>
 
-        {/* Boutons */}
         <div style={{ display: 'flex', gap: 6 }}>
-          {/* Bouton aperçu */}
           <button
             onClick={onPreview}
             style={{
@@ -312,11 +383,10 @@ function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPrevie
               color: isPreviewing ? 'var(--accent)' : 'var(--text-secondary)',
               fontSize: 12, cursor: 'pointer'
             }}
-            title={isPreviewing ? 'Arrêter' : 'Écouter'}>
+            title={isPreviewing ? tr('stopBtn') : tr('previewBtn')}>
             <i className={`ti ${isPreviewing ? 'ti-player-stop-filled' : 'ti-player-play'}`} />
           </button>
 
-          {/* Bouton télécharger */}
           <button
             onClick={() => !owned && !isDownloading && onDownload()}
             disabled={owned || isDownloading}
@@ -331,7 +401,7 @@ function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPrevie
             }}>
             <i className={`ti ${owned ? 'ti-check' : isDownloading ? 'ti-loader' : 'ti-download'}`}
               style={isDownloading ? { animation: 'spin 1s linear infinite' } : {}} />
-            {owned ? 'Ajouté' : isDownloading ? '...' : 'Ajouter'}
+            {owned ? tr('alreadyAdded') : isDownloading ? '...' : tr('downloadBtn')}
           </button>
         </div>
       </div>
@@ -346,14 +416,15 @@ function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPrevie
   )
 }
 
-function ProfilePickerModal({ sound, profiles, onConfirm, onClose }) {
+function ProfilePickerModal({ sound, profiles, onConfirm, onClose, lang }) {
+  const tr = useTranslation(lang || 'fr')
   const [selectedProfile, setSelectedProfile] = useState('all')
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal fade-in" onClick={e => e.stopPropagation()}>
         <div className="modal-title">
           <span style={{ fontSize: 22 }}>{sound.emoji}</span>
-          Ajouter "{sound.name}" à...
+          {tr('addTo').replace('{name}', sound.name)}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {profiles.map(p => (
@@ -372,9 +443,9 @@ function ProfilePickerModal({ sound, profiles, onConfirm, onClose }) {
           ))}
         </div>
         <div className="modal-actions">
-          <button className="btn-secondary" onClick={onClose}>Annuler</button>
+          <button className="btn-secondary" onClick={onClose}>{tr('cancel')}</button>
           <button className="btn-primary" onClick={() => onConfirm(selectedProfile)}>
-            <i className="ti ti-download" /> Télécharger
+            <i className="ti ti-download" /> {tr('downloadBtn')}
           </button>
         </div>
       </div>

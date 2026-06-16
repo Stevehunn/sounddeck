@@ -1124,10 +1124,10 @@ ipcMain.handle('export-profile', async (event, profileId) => {
   const shortcuts = store.get('shortcuts', {})
 
   const profile = profileId === 'all'
-    ? { id: 'all', name: 'Tous les sons', isDefault: true }
+    ? { id: 'all', name: 'All Sounds', isDefault: true }
     : profiles.find(p => p.id === profileId)
 
-  if (!profile) return { success: false, error: 'Profil introuvable' }
+  if (!profile) return { success: false, error: 'Profile not found' }
 
   // Sons appartenant à ce profil
   const profileSounds = profileId === 'all'
@@ -1135,9 +1135,9 @@ ipcMain.handle('export-profile', async (event, profileId) => {
     : sounds.filter(s => s.profiles?.includes(profileId))
 
   const result = await dialog.showSaveDialog(mainWindow, {
-    title: `Exporter le profil "${profile.name}"`,
-    defaultPath: `sounddeck-profil-${profile.name.replace(/[^a-zA-Z0-9]/g, '_')}-${new Date().toISOString().slice(0,10)}.zip`,
-    filters: [{ name: 'Profil SoundDeck', extensions: ['zip'] }]
+    title: `Export profile "${profile.name}"`,
+    defaultPath: `sounddeck-profile-${profile.name.replace(/[^a-zA-Z0-9]/g, '_')}-${new Date().toISOString().slice(0,10)}.zip`,
+    filters: [{ name: 'SoundDeck Profile', extensions: ['zip'] }]
   })
   if (result.canceled) return { success: false }
 
@@ -1189,8 +1189,8 @@ ipcMain.handle('export-profile', async (event, profileId) => {
 
 ipcMain.handle('import-profile', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Importer un profil',
-    filters: [{ name: 'Profil SoundDeck', extensions: ['zip'] }],
+    title: 'Import a profile',
+    filters: [{ name: 'SoundDeck Profile', extensions: ['zip'] }],
     properties: ['openFile']
   })
   if (result.canceled) return { success: false }
@@ -1209,7 +1209,7 @@ ipcMain.handle('import-profile', async () => {
 
     const profileJsonPath = path.join(tmpDir, 'profile.json')
     if (!fs.existsSync(profileJsonPath)) {
-      return { success: false, error: 'Fichier de profil invalide' }
+      return { success: false, error: 'Invalid profile file' }
     }
 
     const profileData = JSON.parse(fs.readFileSync(profileJsonPath, 'utf-8'))
@@ -1221,7 +1221,7 @@ ipcMain.handle('import-profile', async () => {
     const newProfile = {
       ...profile,
       id: newProfileId,
-      name: profile.name + (profile.id === 'all' ? ' (importé)' : ''),
+      name: profile.name + (profile.id === 'all' ? ' (imported)' : ''),
       isDefault: false
     }
 
