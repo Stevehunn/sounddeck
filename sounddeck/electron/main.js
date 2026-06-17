@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, globalShortcut, shell, Menu } = req
 const path = require('path')
 const fs = require('fs')
 const Store = require('electron-store')
-const { LANGUAGES } = require('../src/i18n')
+const { LANGUAGES } = require('./i18n')
 
 const store = new Store()
 
