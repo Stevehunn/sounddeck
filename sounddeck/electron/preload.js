@@ -23,6 +23,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onToggleLoop: (cb) => ipcRenderer.on('toggle-loop', () => cb()),
   onStopAllSounds: (cb) => ipcRenderer.on('stop-all-sounds', () => cb()),
   onTogglePresentation: (cb) => ipcRenderer.on('toggle-presentation', () => cb()),
+  toggleGlobalShortcuts: () => ipcRenderer.invoke('toggle-global-shortcuts'),
+  getGlobalShortcutsState: () => ipcRenderer.invoke('get-global-shortcuts-state'),
+  onShortcutsToggle: (cb) => ipcRenderer.on('shortcuts-toggle', (e, enabled) => cb(enabled)),
   removeAllListeners: (ch) => ipcRenderer.removeAllListeners(ch),
 
   // Expose process.versions pour détecter Electron dans le renderer
@@ -45,9 +48,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
 // Exposer également via window pour accès direct dans les event handlers
 window.addEventListener('DOMContentLoaded', () => {
-  // Patch global pour s'assurer que file.path est accessible
-  // Electron injecte nativement cette propriété sur les objets File
-  // Ce patch n'est là qu'en sécurité
   const originalFileDescriptor = Object.getOwnPropertyDescriptor(File.prototype, 'path')
   if (!originalFileDescriptor) {
     console.warn('File.path non disponible nativement — drop limité')

@@ -6,17 +6,13 @@ const { LANGUAGES } = require('./i18n')
 
 const store = new Store()
 
-// Définir les correspondances pays -> URLs de tendances
-const TRENDING_URLS = {
-  'fr': 'https://www.myinstants.com/fr/index/fr/',
-  'us': 'https://www.myinstants.com/fr/index/us/',
-  'es': 'https://www.myinstants.com/fr/index/es/',
-}
+// Ajouter un état pour les raccourcis globaux
+let globalShortcutsEnabled = store.get('globalShortcutsEnabled', true)
+let registeredShortcuts = []
 
-// Détection fiable dev vs production
 const isDev = !app.isPackaged
 
-// Supprimer la barre de menu native (File, Edit, View, Window)
+// Supprimer la barre de menu native
 Menu.setApplicationMenu(null)
 
 let mainWindow
@@ -65,11 +61,13 @@ function createWindow() {
 app.whenReady().then(() => {
   createWindow()
   registerShortcuts()
+  registerToggleShortcut()
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
 
 app.on('window-all-closed', () => {
   globalShortcut.unregisterAll()
+  registeredShortcuts = []
   if (process.platform !== 'darwin') app.quit()
 })
 
@@ -81,9 +79,11 @@ function safeRegister(accelerator, callback) {
     const hasMod = accelerator.includes('+')
     if (!isFn && !hasMod) {
       const ok = globalShortcut.register(accelerator, callback)
+      if (ok) registeredShortcuts.push(accelerator)
       return ok
     }
     const ok = globalShortcut.register(accelerator, callback)
+    if (ok) registeredShortcuts.push(accelerator)
     return ok
   } catch (e) {
     console.warn('Raccourci non supporté:', accelerator, e.message)
@@ -91,7 +91,99 @@ function safeRegister(accelerator, callback) {
   }
 }
 
+// Enregistrer le raccourci toggle séparément (toujours actif)
+function registerToggleShortcut() {
+  const toggleAccelerator = store.get('toggleShortcutsAccelerator', 'CommandOrControl+Shift+K')
+  if (!toggleAccelerator) return
+
+  try {
+    // Désenregistrer l'ancien toggle s'il existe
+    globalShortcut.unregister(toggleAccelerator)
+    
+    // Enregistrer le nouveau toggle - toujours actif, même quand les autres sont désactivés
+    const ok = globalShortcut.register(toggleAccelerator, () => {
+      // Basculer l'état
+      globalShortcutsEnabled = !globalShortcutsEnabled
+      store.set('globalShortcutsEnabled', globalShortcutsEnabled)
+      
+      // Réenregistrer ou désenregistrer les raccourcis selon l'état
+      if (globalShortcutsEnabled) {
+        registerShortcuts()
+      } else {
+        unregisterAllShortcuts()
+      }
+      
+      // Notifier le renderer
+      if (mainWindow) {
+        mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
+      }
+      
+      const state = globalShortcutsEnabled ? 'activés' : 'désactivés'
+      console.log(`🔇 Raccourcis ${state}`)
+    })
+    
+    if (ok) {
+      console.log('✅ Raccourci toggle enregistré:', toggleAccelerator)
+    } else {
+      console.warn('⚠️ Impossible d\'enregistrer le raccourci toggle:', toggleAccelerator)
+    }
+  } catch (e) {
+    console.warn('Erreur enregistrement toggle:', e.message)
+  }
+}
+
+// Désenregistrer tous les raccourcis (sauf le toggle)
+function unregisterAllShortcuts() {
+  registeredShortcuts.forEach(acc => {
+    try {
+      globalShortcut.unregister(acc)
+    } catch (e) {}
+  })
+  registeredShortcuts = []
+  console.log('🔇 Tous les raccourcis désenregistrés')
+}
+
+// Fonction pour réenregistrer tous les raccourcis (sauf le toggle)
+function reregisterShortcuts() {
+  // Désenregistrer les raccourcis existants
+  unregisterAllShortcuts()
+  
+  // Réenregistrer les autres raccourcis avec l'état actuel
+  if (globalShortcutsEnabled) {
+    registerShortcuts()
+  }
+  
+  // Notifier le renderer du changement
+  if (mainWindow) {
+    mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
+  }
+}
+
+// Fonction pour basculer l'état des raccourcis (appelée depuis le bouton)
+function toggleGlobalShortcuts() {
+  globalShortcutsEnabled = !globalShortcutsEnabled
+  store.set('globalShortcutsEnabled', globalShortcutsEnabled)
+  
+  if (globalShortcutsEnabled) {
+    registerShortcuts()
+  } else {
+    unregisterAllShortcuts()
+  }
+  
+  if (mainWindow) {
+    mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
+  }
+  
+  return globalShortcutsEnabled
+}
+
 function registerShortcuts() {
+  // Vérifier si les raccourcis sont activés
+  if (!globalShortcutsEnabled) {
+    console.log('🔇 Raccourcis globaux désactivés')
+    return
+  }
+
   const shortcuts = store.get('shortcuts', {})
   Object.entries(shortcuts).forEach(([soundId, accelerator]) => {
     if (!accelerator) return
@@ -127,40 +219,53 @@ function registerShortcuts() {
       mainWindow?.webContents.send('toggle-presentation')
     })
   }
+
+  console.log('✅ Raccourcis globaux activés')
 }
 
+// ─── IPC Handlers pour le toggle ────────────────────────────────────────────
+ipcMain.handle('toggle-global-shortcuts', () => {
+  return toggleGlobalShortcuts()
+})
+
+ipcMain.handle('get-global-shortcuts-state', () => {
+  return globalShortcutsEnabled
+})
+
+// ─── Mise à jour des raccourcis ─────────────────────────────────────────────
 ipcMain.handle('update-shortcuts', (event, shortcuts) => {
-  globalShortcut.unregisterAll()
   store.set('shortcuts', shortcuts)
-  registerShortcuts()
+  reregisterShortcuts()
   return true
 })
 
 ipcMain.handle('update-profile-shortcut', (event, accelerator) => {
   store.set('profileShortcut', accelerator)
-  globalShortcut.unregisterAll()
-  registerShortcuts()
+  reregisterShortcuts()
   return true
 })
 
 ipcMain.handle('update-presentation-shortcut', (event, accelerator) => {
   store.set('presentationShortcut', accelerator)
-  globalShortcut.unregisterAll()
-  registerShortcuts()
+  reregisterShortcuts()
   return true
 })
 
 ipcMain.handle('update-stop-all-shortcut', (event, accelerator) => {
   store.set('stopAllShortcut', accelerator)
-  globalShortcut.unregisterAll()
-  registerShortcuts()
+  reregisterShortcuts()
   return true
 })
 
 ipcMain.handle('update-loop-shortcut', (event, accelerator) => {
   store.set('loopShortcut', accelerator)
-  globalShortcut.unregisterAll()
-  registerShortcuts()
+  reregisterShortcuts()
+  return true
+})
+
+ipcMain.handle('update-toggle-shortcuts-accelerator', (event, accelerator) => {
+  store.set('toggleShortcutsAccelerator', accelerator)
+  reregisterShortcuts()
   return true
 })
 

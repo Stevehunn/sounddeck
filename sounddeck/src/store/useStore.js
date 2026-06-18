@@ -19,7 +19,9 @@ export function useStore() {
   const [stopAllShortcut, setStopAllShortcut] = useState('')
   const [presentationShortcut, setPresentationShortcut] = useState('')
   const [loading, setLoading] = useState(true)
-  const [previewVolume, setPreviewVolume] = useState(70) // AJOUTÉ
+  const [previewVolume, setPreviewVolume] = useState(70)
+  const [shortcutsEnabled, setShortcutsEnabled] = useState(true)
+  const [toggleShortcutsAccelerator, setToggleShortcutsAccelerator] = useState('CommandOrControl+Shift+K') // NOUVEAU
 
   // ─── Chargement initial depuis electron-store ────────────────────────────────
   useEffect(() => {
@@ -39,7 +41,9 @@ export function useStore() {
         const savedStopAllShortcut = await window.electronAPI.storeGet('stopAllShortcut') || ''
         const savedPresentationShortcut = await window.electronAPI.storeGet('presentationShortcut') || ''
         const savedCurrentProfileId = await window.electronAPI.storeGet('currentProfileId')
-        const savedPreviewVolume = await window.electronAPI.storeGet('previewVolume') ?? 70 // AJOUTÉ
+        const savedPreviewVolume = await window.electronAPI.storeGet('previewVolume') ?? 70
+        const savedShortcutsEnabled = await window.electronAPI.storeGet('shortcutsEnabled') ?? true
+        const savedToggleShortcutsAccelerator = await window.electronAPI.storeGet('toggleShortcutsAccelerator') || 'CommandOrControl+Shift+K' // NOUVEAU
 
         // Profil "Tous les sons" toujours présent
         const allProfile = { id: 'all', name: 'Tous les sons', isDefault: true }
@@ -60,7 +64,9 @@ export function useStore() {
         setStopAllShortcut(savedStopAllShortcut)
         setPresentationShortcut(savedPresentationShortcut)
         setCurrentProfileId(savedCurrentProfileId || 'all')
-        setPreviewVolume(savedPreviewVolume) // AJOUTÉ
+        setPreviewVolume(savedPreviewVolume)
+        setShortcutsEnabled(savedShortcutsEnabled)
+        setToggleShortcutsAccelerator(savedToggleShortcutsAccelerator) // NOUVEAU
       } catch (e) {
         console.error('Erreur chargement store:', e)
         setProfiles([{ id: 'all', name: 'Tous les sons', isDefault: true }])
@@ -250,6 +256,20 @@ export function useStore() {
     await window.electronAPI.updateLoopShortcut(accelerator)
   }, [save])
 
+  // ─── Raccourcis globaux (toggle) ──────────────────────────────────────────
+  const toggleGlobalShortcuts = useCallback(async () => {
+    const newState = await window.electronAPI.toggleGlobalShortcuts()
+    setShortcutsEnabled(newState)
+    return newState
+  }, [])
+
+  // ─── Raccourci pour activer/désactiver les raccourcis ──────────────────────
+  const updateToggleShortcutsAccelerator = useCallback(async (accelerator) => {
+    setToggleShortcutsAccelerator(accelerator)
+    await save('toggleShortcutsAccelerator', accelerator)
+    await window.electronAPI.updateToggleShortcutsAccelerator(accelerator)
+  }, [save])
+
   // ─── Options ──────────────────────────────────────────────────────────────────
   const updateLang = useCallback(async (newLang) => {
     setLang(newLang)
@@ -300,7 +320,7 @@ export function useStore() {
     // État
     profiles, currentProfileId, sounds, currentSounds, favoriteSounds,
     shortcuts, profileShortcut, theme, audioDevice, volume, playLocally, loading,
-    previewVolume, // AJOUTÉ
+    previewVolume, shortcutsEnabled, toggleShortcutsAccelerator, // NOUVEAU
     // Profils
     createProfile, deleteProfile, renameProfile, switchProfile, switchToNextProfile,
     // Sons
@@ -313,6 +333,9 @@ export function useStore() {
     presentationShortcut, updatePresentationShortcut,
     lang, updateLang,
     customTheme, updateTheme, updateCustomTheme, updateAudioDevice, updateVolume, updatePlayLocally,
-    updatePreviewVolume, // AJOUTÉ
+    updatePreviewVolume,
+    // Raccourcis globaux
+    toggleGlobalShortcuts,
+    updateToggleShortcutsAccelerator, // NOUVEAU
   }
 }

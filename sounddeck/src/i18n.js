@@ -354,6 +354,8 @@ export const TRANSLATIONS = {
     shortcutNeedMod: '⚠️ Ajoutez Ctrl/Alt/Shift',
     shortcutHintMod: 'Combinaison requise (ex: Ctrl+Shift+P)',
     shortcutHintAny: 'Une touche ou une combinaison (ex: F1, Ctrl+1)',
+    toggleShortcuts: 'Toggle raccourcis',
+    toggleShortcutsDesc: 'Activer/désactiver tous les raccourcis globaux',
 
     // ── Guide ─────────────────────────────────────────────────────────────────
     guideTitle: 'Guide Discord',
@@ -767,6 +769,8 @@ export const TRANSLATIONS = {
     shortcutNeedMod: '⚠️ Add Ctrl/Alt/Shift',
     shortcutHintMod: 'Combination required (e.g. Ctrl+Shift+P)',
     shortcutHintAny: 'A key or combination (e.g. F1, Ctrl+1)',
+    toggleShortcuts: 'Toggle shortcuts',
+    toggleShortcutsDesc: 'Enable/disable all global shortcuts',
 
     // ── Guide ─────────────────────────────────────────────────────────────────
     guideTitle: 'Discord Guide',
@@ -986,6 +990,8 @@ export const TRANSLATIONS = {
     shortcutPressCompact: 'Pulsa...', shortcutNeedMod: '⚠️ Añade Ctrl/Alt/Shift',
     shortcutHintMod: 'Combinación requerida (ej: Ctrl+Shift+P)',
     shortcutHintAny: 'Una tecla o combinación (ej: F1, Ctrl+1)',
+    toggleShortcuts: 'Alternar atajos',
+    toggleShortcutsDesc: 'Activar/desactivar todos los atajos globales',
     // ── Guide ─────────────────────────────────────────────────────────────────
     guideTitle: 'Guía Discord', guideSub: 'Voz + sonidos en Discord', quickRecap: 'Resumen rápido:',
     guideStep1Title: 'Paso 1 — Descargar las herramientas',

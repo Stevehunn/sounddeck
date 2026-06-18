@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from '../i18n'
 
 export default function Sidebar({ profiles, currentProfileId, currentPage, onSwitchProfile,
@@ -7,7 +7,24 @@ export default function Sidebar({ profiles, currentProfileId, currentPage, onSwi
 
   const [newProfileName, setNewProfileName] = useState('')
   const [showNewProfile, setShowNewProfile] = useState(false)
+  const [shortcutsEnabled, setShortcutsEnabled] = useState(true)
   const tr = useTranslation(lang)
+
+  // Récupérer l'état initial des raccourcis
+  useEffect(() => {
+    window.electronAPI.getGlobalShortcutsState().then(enabled => {
+      setShortcutsEnabled(enabled)
+    }).catch(() => {})
+    
+    // Écouter les changements venant du main process
+    window.electronAPI.onShortcutsToggle((enabled) => {
+      setShortcutsEnabled(enabled)
+    })
+    
+    return () => {
+      window.electronAPI.removeAllListeners('shortcuts-toggle')
+    }
+  }, [])
 
   const handleCreateProfile = async () => {
     if (!newProfileName.trim()) return
@@ -15,6 +32,16 @@ export default function Sidebar({ profiles, currentProfileId, currentPage, onSwi
     setNewProfileName('')
     setShowNewProfile(false)
     addToast(`Profil "${newProfileName.trim()}" créé`, 'success')
+  }
+
+  const handleToggleShortcuts = async () => {
+    try {
+      const newState = await window.electronAPI.toggleGlobalShortcuts()
+      setShortcutsEnabled(newState)
+      addToast(newState ? 'Raccourcis activés' : 'Raccourcis désactivés', 'info')
+    } catch (e) {
+      console.error('Erreur toggle shortcuts:', e)
+    }
   }
 
   return (
@@ -108,6 +135,31 @@ export default function Sidebar({ profiles, currentProfileId, currentPage, onSwi
             <span style={{ flex: 1, textAlign: 'left' }}>{tr('loop')}</span>
             <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: loopEnabled ? 'var(--success)' : 'var(--border)', color: loopEnabled ? 'white' : 'var(--text-tertiary)' }}>
               {loopEnabled ? 'ON' : 'OFF'}
+            </span>
+          </button>
+        </div>
+
+        {/* Toggle Raccourcis - NOUVEAU */}
+        <div style={{ margin: '6px 8px 0' }}>
+          <button onClick={handleToggleShortcuts} style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+            padding: '7px 8px', borderRadius: 8,
+            background: shortcutsEnabled ? 'rgba(124,111,247,0.15)' : 'rgba(224,82,82,0.15)',
+            border: `1px solid ${shortcutsEnabled ? 'var(--accent)' : 'var(--danger)'}`,
+            color: shortcutsEnabled ? 'var(--accent)' : 'var(--danger)',
+            fontSize: 12, fontWeight: shortcutsEnabled ? 600 : 400, cursor: 'pointer',
+            transition: 'all 0.15s'
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.transform = 'scale(1.02)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.transform = 'scale(1)'
+          }}>
+            <i className={`ti ${shortcutsEnabled ? 'ti-keyboard' : 'ti-keyboard-off'}`} style={{ fontSize: 15 }} />
+            <span style={{ flex: 1, textAlign: 'left' }}>Raccourcis</span>
+            <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: shortcutsEnabled ? 'var(--accent)' : 'var(--danger)', color: 'white' }}>
+              {shortcutsEnabled ? 'ON' : 'OFF'}
             </span>
           </button>
         </div>

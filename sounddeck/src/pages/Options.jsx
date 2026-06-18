@@ -154,6 +154,23 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               requireMod
             />
           </OptionRow>
+          
+          {/* NOUVEAU : Raccourci pour activer/désactiver les raccourcis globaux */}
+          <OptionRow label="Toggle raccourcis" sub="Activer/désactiver tous les raccourcis globaux">
+            <ShortcutRecorder
+              value={store.toggleShortcutsAccelerator || 'CommandOrControl+Shift+K'}
+              onSave={async (acc) => { 
+                await store.updateToggleShortcutsAccelerator(acc)
+                addToast(`Raccourci toggle défini : ${acc}`, 'success')
+              }}
+              onClear={() => {
+                store.updateToggleShortcutsAccelerator('')
+                addToast('Raccourci toggle supprimé', 'info')
+              }}
+              requireMod
+            />
+          </OptionRow>
+
           <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
             {tr('shortcutsPerSoundNote')}
           </div>
