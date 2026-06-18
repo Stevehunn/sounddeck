@@ -1,7 +1,9 @@
+// sounddeck/src/components/SoundCard.jsx
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { playSound, stopSound, isPlaying, getSoundProgress } from '../utils/audio'
 import ShortcutRecorder from './ShortcutRecorder'
+import { useTranslation } from '../i18n'
 
 function fmtTime(s) {
   if (!s || isNaN(s)) return '0:00'
@@ -10,7 +12,8 @@ function fmtTime(s) {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
-export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEnabled, playLocally, onToggleFavorite, onSetShortcut, onDelete, onRemoveFromProfile, onRename, onVolumeChange, onPlay, currentProfileId }) {
+export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEnabled, playLocally, onToggleFavorite, onSetShortcut, onDelete, onRemoveFromProfile, onRename, onVolumeChange, onPlay, currentProfileId, lang = 'fr' }) {
+  const tr = useTranslation(lang)
   const [playing, setPlaying] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showVolume, setShowVolume] = useState(false)
@@ -96,7 +99,6 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
   const imageUrl = buildImageUrl(sound.image)
   const showImage = !!(sound.image) && !imgError
 
-  // Ouvrir le menu contextuel
   const handleMenuToggle = (e) => {
     e.stopPropagation()
     if (showMenu) {
@@ -104,13 +106,11 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
       return
     }
     
-    // Calculer la position du menu par rapport au bouton
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect()
       let top = rect.bottom + 4
       let left = rect.left - 10
       
-      // S'assurer que le menu ne sort pas de l'écran
       const menuWidth = 220
       const menuHeight = 280
       
@@ -133,7 +133,6 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
     setShowVolume(false)
   }
 
-  // Fermer le menu quand on clique ailleurs
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (showMenu && cardRef.current && !cardRef.current.contains(e.target)) {
@@ -153,7 +152,6 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
         transition: 'border-color 0.15s'
       }} className={playing ? 'playing-pulse' : ''}>
 
-        {/* Barre du haut */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
           <button onClick={e => { e.stopPropagation(); onToggleFavorite(sound.id) }}
             style={{
@@ -184,10 +182,9 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
 
         {showVolume && (
           <VolumePanel volume={localVolume} onChange={val => setLocalVolume(val)}
-            onCommit={handleVolumeCommit} onClose={() => setShowVolume(false)} />
+            onCommit={handleVolumeCommit} onClose={() => setShowVolume(false)} lang={lang} />
         )}
 
-        {/* Image/emoji + overlay play/stop */}
         <div onClick={handlePlay}
           style={{
             width: '100%', aspectRatio: '1', background: 'var(--bg-tertiary)',
@@ -222,7 +219,6 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
           </div>
         </div>
 
-        {/* Nom */}
         {editingName ? (
           <input autoFocus value={nameValue} onChange={e => setNameValue(e.target.value)}
             onBlur={handleRename}
@@ -240,6 +236,7 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
           onSave={(acc) => onSetShortcut(sound.id, acc)}
           onClear={() => onSetShortcut(sound.id, '')}
           compact
+          lang={lang}
         />
 
         {progress && (
@@ -266,12 +263,11 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
         {sound.playCount > 0 && (
           <div style={{ fontSize: 9, color: 'var(--text-tertiary)', textAlign: 'center', marginTop: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
             <i className="ti ti-player-play" style={{ fontSize: 8 }} />
-            {sound.playCount} fois
+            {sound.playCount} {tr('playCount')}
           </div>
         )}
       </div>
 
-      {/* Menu contextuel en portail - sort du DOM de la carte */}
       {showMenu && createPortal(
         <ContextMenuPortal
           sound={sound}
@@ -283,6 +279,7 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
           onRemoveFromProfile={onRemoveFromProfile ? () => { onRemoveFromProfile(sound.id); setShowMenu(false) } : null}
           onDelete={() => { onDelete(sound.id); setShowMenu(false) }}
           position={menuPosition}
+          lang={lang}
         />,
         document.body
       )}
@@ -290,7 +287,8 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
   )
 }
 
-function VolumePanel({ volume, onChange, onCommit, onClose }) {
+function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr' }) {
+  const tr = useTranslation(lang)
   return (
     <div style={{
       position: 'absolute', top: 36, left: 0, right: 0, zIndex: 100,
@@ -300,7 +298,7 @@ function VolumePanel({ volume, onChange, onCommit, onClose }) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-          <i className="ti ti-volume" /> Volume
+          <i className="ti ti-volume" /> {tr('menuVolume')}
         </span>
         <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>{volume}%</span>
       </div>
@@ -315,17 +313,16 @@ function VolumePanel({ volume, onChange, onCommit, onClose }) {
       </div>
       <button onClick={onClose} className="btn-secondary"
         style={{ width: '100%', marginTop: 8, padding: '4px 0', justifyContent: 'center', fontSize: 11 }}>
-        Fermer
+        {tr('volumePanelClose')}
       </button>
     </div>
   )
 }
 
-// Menu contextuel en portail
-function ContextMenuPortal({ sound, currentProfileId, onClose, onToggleFavorite, onRename, onVolumeOpen, onRemoveFromProfile, onDelete, position }) {
+function ContextMenuPortal({ sound, currentProfileId, onClose, onToggleFavorite, onRename, onVolumeOpen, onRemoveFromProfile, onDelete, position, lang = 'fr' }) {
+  const tr = useTranslation(lang)
   const menuRef = useRef(null)
 
-  // Réajuster la position si le menu sort de l'écran
   useEffect(() => {
     if (!menuRef.current) return
     const rect = menuRef.current.getBoundingClientRect()
@@ -362,22 +359,27 @@ function ContextMenuPortal({ sound, currentProfileId, onClose, onToggleFavorite,
       boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
       backdropFilter: 'blur(4px)'
     }}>
-      <MenuItem icon={sound.favorite ? 'ti-star' : 'ti-star-filled'} label={sound.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'} onClick={onToggleFavorite} />
-      <MenuItem icon="ti-pencil" label="Renommer" onClick={onRename} />
-      <MenuItem icon="ti-volume" label="Régler le volume" onClick={onVolumeOpen} />
+      <MenuItem 
+        icon={sound.favorite ? 'ti-star' : 'ti-star-filled'} 
+        label={sound.favorite ? tr('menuFavoriteRemove') : tr('menuFavoriteAdd')} 
+        onClick={onToggleFavorite} 
+        lang={lang}
+      />
+      <MenuItem icon="ti-pencil" label={tr('menuRename')} onClick={onRename} lang={lang} />
+      <MenuItem icon="ti-volume" label={tr('menuVolume')} onClick={onVolumeOpen} lang={lang} />
       {onRemoveFromProfile && currentProfileId !== 'all' && (
         <>
           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-          <MenuItem icon="ti-folder-minus" label="Retirer du profil" onClick={onRemoveFromProfile} warning />
+          <MenuItem icon="ti-folder-minus" label={tr('menuRemoveFromProfile')} onClick={onRemoveFromProfile} warning lang={lang} />
         </>
       )}
       <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-      <MenuItem icon="ti-trash" label="Supprimer définitivement" onClick={onDelete} danger />
+      <MenuItem icon="ti-trash" label={tr('menuDelete')} onClick={onDelete} danger lang={lang} />
     </div>
   )
 }
 
-function MenuItem({ icon, label, onClick, danger, warning }) {
+function MenuItem({ icon, label, onClick, danger, warning, lang = 'fr' }) {
   return (
     <button onClick={onClick}
       style={{

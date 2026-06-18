@@ -580,6 +580,7 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLo
               onDelete={async (id) => { await store.deleteSound(id); addToast(tr('deleted'), 'info') }}
               onRename={(id, name) => store.updateSound(id, { name })}
               draggable={draggable}
+              lang={lang}
             />
           </div>
         )

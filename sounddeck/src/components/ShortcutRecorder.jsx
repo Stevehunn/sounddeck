@@ -1,4 +1,6 @@
+// sounddeck/src/components/ShortcutRecorder.jsx
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from '../i18n'
 
 function eventToAccelerator(e, requireMod = false) {
   const ignored = ['Control', 'Meta', 'Alt', 'Shift', 'Tab', 'CapsLock', 'Escape']
@@ -24,15 +26,14 @@ function eventToAccelerator(e, requireMod = false) {
   const hasMod = e.ctrlKey || e.metaKey || e.altKey || e.shiftKey
   const isFn = /^F\d+$/.test(key)
 
-  // requireMod = true → combinaison obligatoire (ex: raccourci profil)
-  // requireMod = false → touche seule acceptée (ex: raccourci son)
   if (requireMod && !hasMod) return null
   if (!requireMod && !hasMod && !isFn && key.length > 1 && !Object.values(specialKeys).includes(key)) return null
 
   return parts.join('+')
 }
 
-export default function ShortcutRecorder({ value, onSave, onClear, placeholder = '+ Raccourci', compact = false, requireMod = false }) {
+export default function ShortcutRecorder({ value, onSave, onClear, placeholder = '+ Raccourci', compact = false, requireMod = false, lang = 'fr' }) {
+  const tr = useTranslation(lang)
   const [recording, setRecording] = useState(false)
   const [preview, setPreview] = useState('')
   const inputRef = useRef(null)
@@ -54,19 +55,17 @@ export default function ShortcutRecorder({ value, onSave, onClear, placeholder =
       setRecording(false)
       setPreview('')
     } else {
-      // Aperçu modificateurs en attente
       const parts = []
       if (e.ctrlKey || e.metaKey) parts.push('Ctrl')
       if (e.altKey) parts.push('Alt')
       if (e.shiftKey) parts.push('Shift')
       if (parts.length) setPreview(parts.join('+') + '+...')
-      else if (requireMod) setPreview('⚠️ Ajoutez Ctrl/Alt/Shift')
+      else if (requireMod) setPreview(tr('shortcutNeedMod'))
     }
   }
 
-  const hint = requireMod
-    ? 'Combinaison requise (ex: Ctrl+Shift+P)'
-    : 'Une touche ou une combinaison (ex: F1, Ctrl+1)'
+  const hint = requireMod ? tr('shortcutHintMod') : tr('shortcutHintAny')
+  const displayPlaceholder = placeholder === '+ Raccourci' ? tr('shortcutPlaceholder') : placeholder
 
   if (recording) {
     return (
@@ -79,7 +78,7 @@ export default function ShortcutRecorder({ value, onSave, onClear, placeholder =
           borderRadius: 4, padding: compact ? '3px 6px' : '5px 10px',
           color: 'var(--accent)', cursor: 'pointer', minWidth: compact ? 0 : 160, whiteSpace: 'nowrap'
         }} onClick={() => { setRecording(false); setPreview('') }}>
-          {preview || (compact ? 'Appuyez...' : '⌨️ Appuyez sur une touche...')}
+          {preview || (compact ? tr('shortcutPressCompact') : tr('shortcutPressKey'))}
         </div>
       </div>
     )
@@ -95,7 +94,7 @@ export default function ShortcutRecorder({ value, onSave, onClear, placeholder =
         color: value ? 'var(--text-primary)' : 'var(--text-tertiary)',
         cursor: 'pointer', minWidth: compact ? 0 : 80, textAlign: 'center', whiteSpace: 'nowrap'
       }}>
-        {value || placeholder}
+        {value || displayPlaceholder}
       </div>
       {value && (
         <button onClick={e => { e.stopPropagation(); onClear?.() }}
