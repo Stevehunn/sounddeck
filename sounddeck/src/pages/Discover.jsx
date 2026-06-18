@@ -1,3 +1,4 @@
+// sounddeck/src/pages/Discover.jsx
 import { useState, useEffect, useRef } from 'react'
 import { Howl } from 'howler'
 import { LANGUAGES, useTranslation } from '../i18n'
@@ -175,16 +176,21 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
   const [showProfileModal, setShowProfileModal] = useState(null)
   const [error, setError] = useState('')
   
-  // Utiliser le volume du store avec fallback
-  const [previewVolume, setPreviewVolume] = useState(store.previewVolume ?? 70)
+  // Volume de preview : 0-100% du volume global (50% = volume global)
+  const [previewLevel, setPreviewLevel] = useState(store.previewVolume ?? 50)
   const previewHowlRef = useRef(null)
 
-  // Sauvegarder le volume quand il change
-  const handlePreviewVolumeChange = (value) => {
-    setPreviewVolume(value)
-    store.updatePreviewVolume?.(value)
-    if (previewHowlRef.current) {
-      previewHowlRef.current.volume(value / 100)
+  // Calculer le volume effectif en pourcentage
+  const getEffectiveVolume = () => {
+    return Math.round((store.volume * previewLevel) / 100)
+  }
+
+  // Mettre à jour le volume du howl en cours si actif
+  const updateHowlVolume = (level) => {
+    if (previewHowlRef.current && previewing) {
+      const effectiveVolume = Math.round((store.volume * level) / 100)
+      const volumeRatio = Math.max(0.01, effectiveVolume / 100)
+      previewHowlRef.current.volume(volumeRatio)
     }
   }
 
@@ -220,13 +226,6 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     return () => stopPreview()
   }, [lang])
 
-  // Synchroniser le volume avec le store quand il change
-  useEffect(() => {
-    if (store.previewVolume !== undefined && store.previewVolume !== previewVolume) {
-      setPreviewVolume(store.previewVolume)
-    }
-  }, [store.previewVolume])
-
   const handleCategoryClick = (cat) => {
     setActiveCategory(cat)
     setSearchQuery('')
@@ -255,10 +254,14 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     }
     stopPreview()
     setPreviewing(sound.id)
+    
+    const effectiveVolume = getEffectiveVolume()
+    const volumeRatio = Math.max(0.01, effectiveVolume / 100)
+    
     const howl = new Howl({
       src: [sound.url],
       html5: true,
-      volume: previewVolume / 100,
+      volume: volumeRatio,
       onend: () => setPreviewing(null),
       onloaderror: () => {
         setPreviewing(null)
@@ -267,6 +270,26 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     })
     previewHowlRef.current = howl
     howl.play()
+  }
+
+  const handlePreviewLevelChange = (value) => {
+    const newLevel = Math.max(0, Math.min(100, Number(value)))
+    setPreviewLevel(newLevel)
+    store.updatePreviewVolume?.(newLevel)
+    updateHowlVolume(newLevel)
+  }
+
+  const decreaseVolume = () => {
+    handlePreviewLevelChange(previewLevel - 5)
+  }
+
+  const increaseVolume = () => {
+    handlePreviewLevelChange(previewLevel + 5)
+  }
+
+  // Réinitialiser au volume global (50%)
+  const resetPreviewVolume = () => {
+    handlePreviewLevelChange(50)
   }
 
   const handleDownload = (sound) => {
@@ -288,6 +311,9 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     setDownloading(d => ({ ...d, [sound.id]: false }))
   }
 
+  const isMuted = previewLevel === 0
+  const isAtGlobal = previewLevel === 50
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
@@ -298,20 +324,241 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
               {tr('discoverSub')} <strong>MyInstants</strong> · {sounds.length} {tr('discoverResults')}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <i className="ti ti-volume" style={{ fontSize: 14, color: 'var(--text-tertiary)' }} />
-              <input 
-                type="range" 
-                min="0" 
-                max="100" 
-                value={previewVolume}
-                onChange={e => handlePreviewVolumeChange(Number(e.target.value))}
-                style={{ width: 80, accentColor: 'var(--accent)', cursor: 'pointer' }}
-                title={`${tr('previewVolume')} : ${previewVolume}%`}
-              />
-              <span style={{ fontSize: 11, color: 'var(--text-tertiary)', minWidth: 28 }}>{previewVolume}%</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Contrôle du volume avec barre de progression */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 6,
+              background: 'var(--bg-tertiary)',
+              padding: '4px 10px 4px 6px',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border)',
+              minWidth: 160
+            }}>
+              {/* Bouton Diminuer */}
+              <button
+                onClick={decreaseVolume}
+                disabled={previewLevel <= 0}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: 4,
+                  color: previewLevel <= 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)',
+                  cursor: previewLevel <= 0 ? 'default' : 'pointer',
+                  padding: '4px 6px',
+                  fontSize: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  transition: 'all 0.15s',
+                  opacity: previewLevel <= 0 ? 0.4 : 1
+                }}
+                onMouseEnter={e => {
+                  if (previewLevel > 0) {
+                    e.currentTarget.style.color = 'var(--danger)'
+                    e.currentTarget.style.background = 'rgba(224,82,82,0.1)'
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (previewLevel > 0) {
+                    e.currentTarget.style.color = 'var(--text-secondary)'
+                    e.currentTarget.style.background = 'transparent'
+                  }
+                }}
+                title="Diminuer le volume (-5%)"
+              >
+                <i className="ti ti-minus" />
+              </button>
+
+              {/* Barre de progression du volume */}
+              <div 
+                style={{ 
+                  flex: 1,
+                  height: 6,
+                  background: 'var(--bg-secondary)',
+                  borderRadius: 3,
+                  position: 'relative',
+                  cursor: 'pointer',
+                  minWidth: 60,
+                  border: '1px solid var(--border)',
+                  overflow: 'visible'
+                }}
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  const x = (e.clientX - rect.left) / rect.width
+                  const newLevel = Math.max(0, Math.min(100, Math.round(x * 100)))
+                  handlePreviewLevelChange(newLevel)
+                }}
+                title="Cliquez pour régler le volume"
+              >
+                {/* Fond de la barre */}
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  height: '100%',
+                  width: '100%',
+                  background: 'var(--bg-hover)',
+                  borderRadius: 3,
+                  opacity: 0.3
+                }} />
+                
+                {/* Barre de progression */}
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  height: '100%',
+                  width: `${previewLevel}%`,
+                  background: isMuted 
+                    ? 'var(--danger)' 
+                    : previewLevel < 30 
+                      ? 'var(--warning)' 
+                      : 'var(--accent)',
+                  borderRadius: 3,
+                  transition: 'width 0.15s ease, background 0.3s ease',
+                  boxShadow: isMuted ? 'none' : '0 0 8px rgba(124,111,247,0.2)'
+                }} />
+
+                {/* Indicateur du milieu (50% = volume global) */}
+                <div style={{
+                  position: 'absolute',
+                  top: -4,
+                  left: '50%',
+                  width: 2,
+                  height: 14,
+                  background: 'rgba(255,255,255,0.4)',
+                  borderRadius: 1,
+                  transform: 'translateX(-50%)',
+                  pointerEvents: 'none',
+                  zIndex: 2
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  top: 11,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  fontSize: 7,
+                  color: 'rgba(255,255,255,0.3)',
+                  pointerEvents: 'none',
+                  zIndex: 2,
+                  whiteSpace: 'nowrap',
+                  fontWeight: 500
+                }}>
+                  GLOBAL
+                </div>
+
+                {/* Repère du volume actuel - petit point lumineux */}
+                {previewLevel > 0 && previewLevel < 100 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: -3,
+                    left: `${previewLevel}%`,
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: isMuted ? 'var(--danger)' : 'var(--accent)',
+                    transform: 'translateX(-50%)',
+                    pointerEvents: 'none',
+                    zIndex: 3,
+                    boxShadow: '0 0 10px rgba(124,111,247,0.4)',
+                    border: '2px solid var(--bg-tertiary)'
+                  }} />
+                )}
+              </div>
+
+              {/* Bouton Augmenter */}
+              <button
+                onClick={increaseVolume}
+                disabled={previewLevel >= 100}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: 4,
+                  color: previewLevel >= 100 ? 'var(--text-tertiary)' : 'var(--text-secondary)',
+                  cursor: previewLevel >= 100 ? 'default' : 'pointer',
+                  padding: '4px 6px',
+                  fontSize: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  transition: 'all 0.15s',
+                  opacity: previewLevel >= 100 ? 0.4 : 1
+                }}
+                onMouseEnter={e => {
+                  if (previewLevel < 100) {
+                    e.currentTarget.style.color = 'var(--success)'
+                    e.currentTarget.style.background = 'rgba(29,158,117,0.1)'
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (previewLevel < 100) {
+                    e.currentTarget.style.color = 'var(--text-secondary)'
+                    e.currentTarget.style.background = 'transparent'
+                  }
+                }}
+                title="Augmenter le volume (+5%)"
+              >
+                <i className="ti ti-plus" />
+              </button>
+
+              {/* Boutons Mute et Reset */}
+              <div style={{ display: 'flex', gap: 2, marginLeft: 2 }}>
+                <button
+                  onClick={() => handlePreviewLevelChange(isMuted ? 50 : 0)}
+                  style={{
+                    background: isMuted ? 'rgba(224,82,82,0.15)' : 'transparent',
+                    border: 'none',
+                    borderRadius: 4,
+                    color: isMuted ? 'var(--danger)' : 'var(--text-tertiary)',
+                    cursor: 'pointer',
+                    padding: '4px 4px',
+                    fontSize: 14,
+                    display: 'flex',
+                    alignItems: 'center',
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'var(--bg-hover)'
+                  }}
+                  onMouseLeave={e => {
+                    if (!isMuted) e.currentTarget.style.background = 'transparent'
+                  }}
+                  title={isMuted ? 'Activer le son' : 'Couper le son'}
+                >
+                  <i className={`ti ${isMuted ? 'ti-volume-off' : previewLevel < 30 ? 'ti-volume-2' : 'ti-volume'}`} />
+                </button>
+
+                {!isAtGlobal && !isMuted && (
+                  <button
+                    onClick={resetPreviewVolume}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      borderRadius: 4,
+                      color: 'var(--text-tertiary)',
+                      cursor: 'pointer',
+                      padding: '4px 4px',
+                      fontSize: 13,
+                      display: 'flex',
+                      alignItems: 'center',
+                      transition: 'all 0.15s'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.color = 'var(--accent)'
+                      e.currentTarget.style.background = 'var(--bg-hover)'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.color = 'var(--text-tertiary)'
+                      e.currentTarget.style.background = 'transparent'
+                    }}
+                    title="Réinitialiser au volume global"
+                  >
+                    <i className="ti ti-refresh" />
+                  </button>
+                )}
+              </div>
             </div>
+
             <a href="https://www.myinstants.com" target="_blank" rel="noreferrer"
               style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
               <i className="ti ti-external-link" /> myinstants.com

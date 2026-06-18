@@ -1,3 +1,4 @@
+// sounddeck/src/store/useStore.js
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -24,13 +25,23 @@ export function useStore() {
   const [toggleShortcutsAccelerator, setToggleShortcutsAccelerator] = useState('CommandOrControl+Shift+K')
   const [soundOrder, setSoundOrder] = useState({})
   const [orderVersion, setOrderVersion] = useState(0)
+  // Nouvelle option : normalisation activée/désactivée
+  const [normalizationEnabled, setNormalizationEnabled] = useState(true)
+  // Seuil de normalisation cible en RMS (0-1)
+  const [normalizationTarget, setNormalizationTarget] = useState(0.1) // ~ -20 dB
 
   // ─── Chargement initial depuis electron-store ────────────────────────────────
   useEffect(() => {
     async function loadData() {
       try {
         const savedProfiles = await window.electronAPI.storeGet('profiles') || []
-        const savedSounds = await window.electronAPI.storeGet('sounds') || []
+        const savedSounds = (await window.electronAPI.storeGet('sounds') || []).map(s => {
+          if (s.volumeDb !== undefined) return s
+          // Convertir de 0-100 à -12 à +12
+          const oldVolume = s.volume ?? 100
+          const newDb = Math.round(((oldVolume - 50) / 50) * 12 * 10) / 10
+          return { ...s, volume: newDb, volumeDb: newDb }
+        })
         const savedShortcuts = await window.electronAPI.storeGet('shortcuts') || {}
         const savedProfileShortcut = await window.electronAPI.storeGet('profileShortcut') || 'CommandOrControl+Tab'
         const savedTheme = await window.electronAPI.storeGet('theme') || 'dark'
@@ -47,6 +58,8 @@ export function useStore() {
         const savedShortcutsEnabled = await window.electronAPI.storeGet('shortcutsEnabled') ?? true
         const savedToggleShortcutsAccelerator = await window.electronAPI.storeGet('toggleShortcutsAccelerator') || 'CommandOrControl+Shift+K'
         const savedSoundOrder = await window.electronAPI.storeGet('soundOrder') || {}
+        const savedNormalizationEnabled = await window.electronAPI.storeGet('normalizationEnabled') ?? true
+        const savedNormalizationTarget = await window.electronAPI.storeGet('normalizationTarget') ?? 0.1
 
         const allProfile = { id: 'all', name: 'Tous les sons', isDefault: true }
         const userProfiles = savedProfiles.filter(p => p.id !== 'all')
@@ -70,6 +83,8 @@ export function useStore() {
         setShortcutsEnabled(savedShortcutsEnabled)
         setToggleShortcutsAccelerator(savedToggleShortcutsAccelerator)
         setSoundOrder(savedSoundOrder)
+        setNormalizationEnabled(savedNormalizationEnabled)
+        setNormalizationTarget(savedNormalizationTarget)
       } catch (e) {
         console.error('Erreur chargement store:', e)
         setProfiles([{ id: 'all', name: 'Tous les sons', isDefault: true }])
@@ -143,13 +158,13 @@ export function useStore() {
       emoji: soundData.emoji || '🔊',
       favorite: false,
       profiles: soundData.profiles || ['all'],
-      volume: 100,
+      volume: 0, // 0 dB par défaut (volume relatif)
+      volumeDb: 0, // En dB pour plus de précision
       createdAt: Date.now()
     }
     const updated = [...sounds, newSound]
     setSounds(updated)
     await save('sounds', updated)
-    // Ajouter le nouveau son à la fin de l'ordre pour tous les profils concernés
     const updatedOrder = { ...soundOrder }
     const targetProfiles = newSound.profiles || ['all']
     targetProfiles.forEach(pid => {
@@ -204,8 +219,12 @@ export function useStore() {
     await save('sounds', updated)
   }, [sounds, save])
 
-  const updateSoundVolume = useCallback(async (soundId, volume) => {
-    const updated = sounds.map(s => s.id === soundId ? { ...s, volume } : s)
+  // Volume en dB (-24 à +24)
+  const updateSoundVolume = useCallback(async (soundId, volumeDb) => {
+    const clampedDb = Math.max(-24, Math.min(24, volumeDb))
+    const updated = sounds.map(s => 
+      s.id === soundId ? { ...s, volume: clampedDb, volumeDb: clampedDb } : s
+    )
     setSounds(updated)
     await save('sounds', updated)
   }, [sounds, save])
@@ -258,39 +277,30 @@ export function useStore() {
 
   // ─── Réorganisation des sons ──────────────────────────────────────────────
   const reorderSounds = useCallback(async (startIndex, endIndex) => {
-    // Utiliser 'all' comme clé pour l'ordre global, ou le profileId pour les profils
     const profileId = currentProfileId || 'all'
     const currentOrder = soundOrder[profileId] || []
     
-    // Récupérer les sons du profil actuel dans l'ordre actuel
     const profileSounds = profileId === 'all'
       ? sounds
       : sounds.filter(s => s.profiles.includes(profileId))
     
-    // Si l'ordre personnalisé n'existe pas ou est incomplet, le créer
     let orderedIds = currentOrder.length === profileSounds.length 
       ? currentOrder 
       : profileSounds.map(s => s.id)
     
-    // Vérifier que les indices sont valides
     if (startIndex < 0 || startIndex >= orderedIds.length || 
         endIndex < 0 || endIndex >= orderedIds.length) {
       console.warn('Indices invalides pour reorderSounds:', startIndex, endIndex)
       return false
     }
     
-    // Réorganiser les IDs
     const [removed] = orderedIds.splice(startIndex, 1)
     orderedIds.splice(endIndex, 0, removed)
     
-    // Sauvegarder le nouvel ordre
     const updatedOrder = { ...soundOrder, [profileId]: orderedIds }
     setSoundOrder(updatedOrder)
     await save('soundOrder', updatedOrder)
-    
-    // Forcer un re-rendu des sons ordonnés
     setOrderVersion(prev => prev + 1)
-    
     return true
   }, [sounds, currentProfileId, soundOrder, save])
 
@@ -389,6 +399,17 @@ export function useStore() {
     await save('previewVolume', val)
   }, [save])
 
+  // ─── Normalisation ──────────────────────────────────────────────────────────
+  const updateNormalizationEnabled = useCallback(async (enabled) => {
+    setNormalizationEnabled(enabled)
+    await save('normalizationEnabled', enabled)
+  }, [save])
+
+  const updateNormalizationTarget = useCallback(async (target) => {
+    setNormalizationTarget(target)
+    await save('normalizationTarget', target)
+  }, [save])
+
   // ─── Sons ordonnés selon le profil ──────────────────────────────────────────
   const orderedSounds = useMemo(() => {
     const profileId = currentProfileId || 'all'
@@ -409,7 +430,6 @@ export function useStore() {
       .filter(id => soundMap[id])
       .map(id => soundMap[id])
     
-    // Ajouter les sons qui ne sont pas dans l'ordre (devrait normalement ne pas arriver)
     const missing = profileSounds.filter(s => !order.includes(s.id))
     return [...ordered, ...missing]
   }, [sounds, soundOrder, currentProfileId, orderVersion])
@@ -422,6 +442,8 @@ export function useStore() {
     shortcuts, profileShortcut, theme, audioDevice, volume, playLocally, loading,
     previewVolume, shortcutsEnabled, toggleShortcutsAccelerator,
     soundOrder,
+    // Normalisation
+    normalizationEnabled, normalizationTarget,
     // Profils
     createProfile, deleteProfile, renameProfile, switchProfile, switchToNextProfile,
     // Sons
@@ -439,5 +461,8 @@ export function useStore() {
     // Raccourcis globaux
     toggleGlobalShortcuts,
     updateToggleShortcutsAccelerator,
+    // Normalisation
+    updateNormalizationEnabled,
+    updateNormalizationTarget,
   }
 }

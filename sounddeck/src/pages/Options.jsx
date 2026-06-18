@@ -97,6 +97,29 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             <Toggle value={store.playLocally} onChange={store.updatePlayLocally} />
           </OptionRow>
 
+          <OptionRow label="Normalisation du volume" sub="Égalise le volume des sons automatiquement">
+            <Toggle value={store.normalizationEnabled} onChange={store.updateNormalizationEnabled} />
+          </OptionRow>
+
+          {store.normalizationEnabled && (
+            <OptionRow label="Seuil de normalisation" sub="Plus le chiffre est bas, plus les sons forts sont réduits">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input 
+                  type="range" 
+                  min="0.01" 
+                  max="0.5" 
+                  step="0.005" 
+                  value={store.normalizationTarget}
+                  onChange={e => store.updateNormalizationTarget(Number(e.target.value))}
+                  style={{ width: 120, accentColor: 'var(--accent)' }}
+                />
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)', minWidth: 40 }}>
+                  {Math.round(-20 * Math.log10(store.normalizationTarget))} dB
+                </span>
+              </div>
+            </OptionRow>
+          )}
+
           <OptionRow label={tr('outputDevice')} sub={tr('outputDeviceDesc')}>
             <select value={store.audioDevice} onChange={e => store.updateAudioDevice(e.target.value)}
               style={{ width: 220 }}>

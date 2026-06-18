@@ -581,6 +581,8 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLo
               onRename={(id, name) => store.updateSound(id, { name })}
               draggable={draggable}
               lang={lang}
+              onDragStart={(e) => draggable && onDragStart(e, s.id, index, dropTarget)}
+              onDragEnd={(e) => draggable && onDragEnd(e)}
             />
           </div>
         )

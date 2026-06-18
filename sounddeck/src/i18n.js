@@ -203,6 +203,7 @@ export const TRANSLATIONS = {
     stopBtn: 'Arrêter',
     clickToListen: 'Cliquer pour écouter',
     addTo: 'Ajouter "{name}" à...',
+    ofGlobal: 'du volume global',
 
     // ── Editor ────────────────────────────────────────────────────────────────
     editorTitle: 'Éditeur de sons',
@@ -317,6 +318,9 @@ export const TRANSLATIONS = {
     menuDelete: 'Supprimer définitivement',
     volumePanelClose: 'Fermer',
     playCount: 'fois',
+    volumeReset: 'Réinitialiser le volume',
+    reset: '0 dB',
+    volumeDefault: '(par défaut)',
 
     // ── CustomThemeEditor ─────────────────────────────────────────────────────
     themeEditorTitle: 'Éditeur de thème personnalisé',
@@ -619,6 +623,7 @@ export const TRANSLATIONS = {
     stopBtn: 'Stop',
     clickToListen: 'Click to listen',
     addTo: 'Add "{name}" to...',
+    ofGlobal: 'of global volume',
 
     // ── Editor ────────────────────────────────────────────────────────────────
     editorTitle: 'Sound editor',
@@ -733,6 +738,9 @@ export const TRANSLATIONS = {
     menuDelete: 'Delete permanently',
     volumePanelClose: 'Close',
     playCount: 'times',
+    volumeReset: 'Reset volume',
+    reset: '0 dB',
+    volumeDefault: '(default)',
 
     // ── CustomThemeEditor ─────────────────────────────────────────────────────
     themeEditorTitle: 'Custom theme editor',
@@ -1035,6 +1043,7 @@ export const TRANSLATIONS = {
     stopBtn: 'Parar',
     clickToListen: 'Clic para escuchar',
     addTo: 'Añadir "{name}" a...',
+    ofGlobal: 'del volumen global',
 
     // ── Editor ────────────────────────────────────────────────────────────────
     editorTitle: 'Editor de sonidos',
@@ -1149,6 +1158,9 @@ export const TRANSLATIONS = {
     menuDelete: 'Eliminar permanentemente',
     volumePanelClose: 'Cerrar',
     playCount: 'veces',
+    volumeReset: 'Restablecer volumen',
+    reset: '0 dB',
+    volumeDefault: '(por defecto)',
 
     // ── CustomThemeEditor ─────────────────────────────────────────────────────
     themeEditorTitle: 'Editor de tema personalizado',
