@@ -10,13 +10,11 @@ export default function Sidebar({ profiles, currentProfileId, currentPage, onSwi
   const [shortcutsEnabled, setShortcutsEnabled] = useState(true)
   const tr = useTranslation(lang)
 
-  // Récupérer l'état initial des raccourcis
   useEffect(() => {
     window.electronAPI.getGlobalShortcutsState().then(enabled => {
       setShortcutsEnabled(enabled)
     }).catch(() => {})
     
-    // Écouter les changements venant du main process
     window.electronAPI.onShortcutsToggle((enabled) => {
       setShortcutsEnabled(enabled)
     })
@@ -121,7 +119,7 @@ export default function Sidebar({ profiles, currentProfileId, currentPage, onSwi
         <SidebarItem icon="ti-playlist" label={tr('sequencer')} active={currentPage === 'sequencer'} onClick={() => onChangePage('sequencer')} />
         <SidebarItem icon="ti-brand-youtube" label={tr('youtube')} active={currentPage === 'youtube'} onClick={() => onChangePage('youtube')} />
 
-        {/* Loop */}
+        {/* Loop - TRADUIT */}
         <div style={{ margin: '6px 8px 0' }}>
           <button onClick={onToggleLoop} style={{
             width: '100%', display: 'flex', alignItems: 'center', gap: 8,
@@ -139,7 +137,7 @@ export default function Sidebar({ profiles, currentProfileId, currentPage, onSwi
           </button>
         </div>
 
-        {/* Toggle Raccourcis - NOUVEAU */}
+        {/* Toggle Raccourcis - TRADUIT */}
         <div style={{ margin: '6px 8px 0' }}>
           <button onClick={handleToggleShortcuts} style={{
             width: '100%', display: 'flex', alignItems: 'center', gap: 8,
@@ -157,7 +155,7 @@ export default function Sidebar({ profiles, currentProfileId, currentPage, onSwi
             e.currentTarget.style.transform = 'scale(1)'
           }}>
             <i className={`ti ${shortcutsEnabled ? 'ti-keyboard' : 'ti-keyboard-off'}`} style={{ fontSize: 15 }} />
-            <span style={{ flex: 1, textAlign: 'left' }}>Raccourcis</span>
+            <span style={{ flex: 1, textAlign: 'left' }}>{tr('shortcuts')}</span>
             <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: shortcutsEnabled ? 'var(--accent)' : 'var(--danger)', color: 'white' }}>
               {shortcutsEnabled ? 'ON' : 'OFF'}
             </span>

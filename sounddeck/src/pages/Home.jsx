@@ -123,7 +123,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     setDraggedSoundId(null)
     setDragOverIndex(null)
     setIsDragging(false)
-    addToast('Son déplacé', 'success')
+    addToast(tr('soundMoved'), 'success') // ✅ Utilisation de la traduction
   }
 
   const handleImportFiles = async (filePaths) => {
