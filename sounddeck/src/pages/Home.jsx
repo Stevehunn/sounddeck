@@ -11,24 +11,26 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
   const [showAll, setShowAll] = useState(false)
   const [showAllOther, setShowAllOther] = useState(false)
   const [showImport, setShowImport] = useState(false)
-  const [sortBy, setSortBy] = useState('custom') // Changé : 'custom' par défaut
+  const [sortBy, setSortBy] = useState('custom')
   const [dragOver, setDragOver] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importSuccess, setImportSuccess] = useState(0)
   const [search, setSearch] = useState('')
   const [columns, setColumns] = useState(6)
   const gridRef = useRef(null)
+  const favoritesGridRef = useRef(null)
 
-  // État pour le drag and drop des sons
   const [draggedSoundId, setDraggedSoundId] = useState(null)
   const [dragOverIndex, setDragOverIndex] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [dragSource, setDragSource] = useState(null) // 'favorites' | 'profile'
 
   const { currentSounds, favoriteSounds, shortcuts, audioDevice, volume, sounds, currentProfileId } = store
   const soundsOutsideProfile = currentProfileId !== 'all'
     ? sounds.filter(s => !s.profiles.includes(currentProfileId))
     : []
 
+  // Calculer le nombre de colonnes pour la grille principale
   useEffect(() => {
     const calculateColumns = () => {
       if (!gridRef.current) return
@@ -48,11 +50,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     : currentSounds
 
   const filtered = [...baseFiltered].sort((a, b) => {
-    if (sortBy === 'custom') {
-      // L'ordre personnalisé est déjà appliqué via store.currentSounds
-      // On garde l'ordre tel quel
-      return 0
-    }
+    if (sortBy === 'custom') return 0
     if (sortBy === 'popular') return (b.playCount || 0) - (a.playCount || 0)
     if (sortBy === 'recent') return (b.lastPlayed || 0) - (a.lastPlayed || 0)
     if (sortBy === 'alpha') return a.name.localeCompare(b.name)
@@ -64,8 +62,17 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
   const displayedOther = showAllOther ? soundsOutsideProfile : soundsOutsideProfile.slice(0, itemsPerPage)
 
   // ─── Gestion du drag and drop ──────────────────────────────────────────────
-  const handleDragStart = (e, soundId, index) => {
-    // Le drag and drop n'est disponible qu'en mode "Personnalisé"
+  // Trouver l'index réel d'un son dans la liste complète (pour la réorganisation globale)
+  const findGlobalIndex = (soundId) => {
+    return currentSounds.findIndex(s => s.id === soundId)
+  }
+
+  // Récupérer les sons favoris dans l'ordre actuel de la liste globale
+  const getOrderedFavorites = () => {
+    return currentSounds.filter(s => s.favorite)
+  }
+
+  const handleDragStart = (e, soundId, index, source) => {
     if (sortBy !== 'custom') {
       addToast('Le drag and drop est disponible uniquement en tri "Personnalisé"', 'info')
       e.preventDefault()
@@ -74,8 +81,9 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     setDraggedSoundId(soundId)
     setDragOverIndex(index)
     setIsDragging(true)
+    setDragSource(source)
     e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', `${soundId}|${index}`)
+    e.dataTransfer.setData('text/plain', `${soundId}|${index}|${source}`)
     setTimeout(() => {
       if (e.target) {
         e.target.style.opacity = '0.4'
@@ -90,6 +98,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     setDraggedSoundId(null)
     setDragOverIndex(null)
     setIsDragging(false)
+    setDragSource(null)
   }
 
   const handleDragOver = (e, index) => {
@@ -98,32 +107,111 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     setDragOverIndex(index)
   }
 
-  const handleDrop = async (e, dropIndex) => {
+  const handleDrop = async (e, dropIndex, targetSource) => {
     e.preventDefault()
     if (!draggedSoundId) return
 
     const data = e.dataTransfer.getData('text/plain')
     if (!data) return
-    const [sourceId, sourceIndex] = data.split('|')
+    const [sourceId, sourceIndex, sourceType] = data.split('|')
     
     if (sourceId !== draggedSoundId) return
     
     const startIndex = parseInt(sourceIndex)
     const endIndex = dropIndex
 
-    if (startIndex === endIndex) {
+    if (startIndex === endIndex && sourceType === targetSource) {
       setDraggedSoundId(null)
       setDragOverIndex(null)
       setIsDragging(false)
+      setDragSource(null)
       return
     }
 
+    // Calculer les indices globaux
+    const allSounds = currentSounds
+    
+    // Si on vient des favoris, trouver l'index global du son
+    let globalStartIndex = findGlobalIndex(sourceId)
+    if (globalStartIndex === -1) {
+      setDraggedSoundId(null)
+      setDragOverIndex(null)
+      setIsDragging(false)
+      setDragSource(null)
+      return
+    }
+
+    // Si on drop dans les favoris, on doit calculer l'index global correspondant
+    let globalEndIndex
+    if (targetSource === 'favorites') {
+      // Récupérer les favoris dans l'ordre global actuel
+      const orderedFavorites = getOrderedFavorites()
+      // Trouver l'ID du son à la position endIndex dans les favoris
+      if (endIndex < orderedFavorites.length) {
+        const targetSoundId = orderedFavorites[endIndex]?.id
+        if (targetSoundId) {
+          globalEndIndex = findGlobalIndex(targetSoundId)
+        } else {
+          // Si c'est la fin de la liste des favoris, placer après le dernier favori
+          const lastFavorite = orderedFavorites[orderedFavorites.length - 1]
+          globalEndIndex = lastFavorite ? findGlobalIndex(lastFavorite.id) + 1 : 0
+        }
+      } else {
+        // Si on drop à la fin des favoris, placer après le dernier favori
+        const lastFavorite = orderedFavorites[orderedFavorites.length - 1]
+        globalEndIndex = lastFavorite ? findGlobalIndex(lastFavorite.id) + 1 : 0
+      }
+    } else {
+      // Drop dans la liste principale - on utilise l'index global
+      // Mais il faut tenir compte des favoris qui sont en haut
+      // Pour simplifier, on réorganise globalement
+      globalEndIndex = endIndex
+    }
+
+    // Si l'index est invalide, on ajuste
+    if (globalEndIndex < 0) globalEndIndex = 0
+    if (globalEndIndex > allSounds.length) globalEndIndex = allSounds.length
+
+    // Réorganiser globalement
+    await store.reorderSounds(globalStartIndex, globalEndIndex)
+    
+    setDraggedSoundId(null)
+    setDragOverIndex(null)
+    setIsDragging(false)
+    setDragSource(null)
+    addToast(tr('soundMoved'), 'success')
+  }
+
+  // Version simplifiée pour le drop dans la liste principale
+  const handleMainDrop = async (e, dropIndex) => {
+    e.preventDefault()
+    if (!draggedSoundId) return
+
+    const data = e.dataTransfer.getData('text/plain')
+    if (!data) return
+    const [sourceId, sourceIndex, sourceType] = data.split('|')
+    
+    if (sourceId !== draggedSoundId) return
+    
+    const startIndex = parseInt(sourceIndex)
+    const endIndex = dropIndex
+
+    if (startIndex === endIndex && sourceType === 'profile') {
+      setDraggedSoundId(null)
+      setDragOverIndex(null)
+      setIsDragging(false)
+      setDragSource(null)
+      return
+    }
+
+    // Réorganiser globalement
     await store.reorderSounds(startIndex, endIndex)
     
     setDraggedSoundId(null)
     setDragOverIndex(null)
     setIsDragging(false)
-    addToast(tr('soundMoved'), 'success') // ✅ Utilisation de la traduction
+    setDragSource(null)
+    addToast(tr('soundMoved'), 'success')
   }
 
   const handleImportFiles = async (filePaths) => {
@@ -315,6 +403,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
           </div>
         )}
 
+        {/* Section Favoris - DRAGGABLE */}
         {favoriteSounds.length > 0 && (
           <Section title={tr('favorites')} icon="ti-star-filled" iconColor="var(--warning)" count={favoriteSounds.length}>
             <SoundGrid 
@@ -327,7 +416,15 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
               store={store} 
               addToast={addToast} 
               lang={lang}
-              draggable={false}
+              gridRef={favoritesGridRef}
+              draggable={sortBy === 'custom'}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              draggedSoundId={draggedSoundId}
+              dragOverIndex={dragOverIndex}
+              dropTarget="favorites"
             />
           </Section>
         )}
@@ -349,9 +446,10 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
               onDragOver={handleDragOver}
-              onDrop={handleDrop}
+              onDrop={handleMainDrop}
               draggedSoundId={draggedSoundId}
               dragOverIndex={dragOverIndex}
+              dropTarget="profile"
             />
             {filtered.length > itemsPerPage && (
               <button className="btn-secondary" onClick={() => setShowAll(!showAll)} style={{ width: '100%', marginTop: 10, justifyContent: 'center' }}>
@@ -429,7 +527,7 @@ function Section({ title, icon, iconColor, count, muted, children }) {
   )
 }
 
-function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLocally, store, addToast, lang, gridRef, draggable, onDragStart, onDragEnd, onDragOver, onDrop, draggedSoundId, dragOverIndex }) {
+function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLocally, store, addToast, lang, gridRef, draggable, onDragStart, onDragEnd, onDragOver, onDrop, draggedSoundId, dragOverIndex, dropTarget }) {
   const tr = useTranslation(lang || 'fr')
   
   return (
@@ -442,10 +540,10 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLo
           <div
             key={s.id}
             draggable={draggable}
-            onDragStart={(e) => draggable && onDragStart(e, s.id, index)}
+            onDragStart={(e) => draggable && onDragStart(e, s.id, index, dropTarget)}
             onDragEnd={(e) => draggable && onDragEnd(e)}
             onDragOver={(e) => draggable && onDragOver(e, index)}
-            onDrop={(e) => draggable && onDrop(e, index)}
+            onDrop={(e) => draggable && onDrop(e, index, dropTarget)}
             style={{
               opacity: isDragging ? 0.3 : 1,
               transform: isDragOver ? 'scale(1.02)' : 'scale(1)',
