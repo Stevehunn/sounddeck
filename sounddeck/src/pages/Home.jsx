@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import SoundCard from '../components/SoundCard'
 import AudioTrimmer from '../components/AudioTrimmer'
 import { useTranslation } from '../i18n'
@@ -11,30 +11,120 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
   const [showAll, setShowAll] = useState(false)
   const [showAllOther, setShowAllOther] = useState(false)
   const [showImport, setShowImport] = useState(false)
-  const [sortBy, setSortBy] = useState('default')
+  const [sortBy, setSortBy] = useState('custom') // Changé : 'custom' par défaut
   const [dragOver, setDragOver] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importSuccess, setImportSuccess] = useState(0)
   const [search, setSearch] = useState('')
+  const [columns, setColumns] = useState(6)
+  const gridRef = useRef(null)
+
+  // État pour le drag and drop des sons
+  const [draggedSoundId, setDraggedSoundId] = useState(null)
+  const [dragOverIndex, setDragOverIndex] = useState(null)
+  const [isDragging, setIsDragging] = useState(false)
 
   const { currentSounds, favoriteSounds, shortcuts, audioDevice, volume, sounds, currentProfileId } = store
   const soundsOutsideProfile = currentProfileId !== 'all'
     ? sounds.filter(s => !s.profiles.includes(currentProfileId))
     : []
 
+  useEffect(() => {
+    const calculateColumns = () => {
+      if (!gridRef.current) return
+      const containerWidth = gridRef.current.offsetWidth
+      const cardWidth = 110 + 10
+      const nbColumns = Math.max(2, Math.floor(containerWidth / cardWidth))
+      setColumns(nbColumns)
+    }
+
+    calculateColumns()
+    window.addEventListener('resize', calculateColumns)
+    return () => window.removeEventListener('resize', calculateColumns)
+  }, [])
+
   const baseFiltered = search
     ? currentSounds.filter(s => s.name.toLowerCase().includes(search.toLowerCase()))
     : currentSounds
 
   const filtered = [...baseFiltered].sort((a, b) => {
+    if (sortBy === 'custom') {
+      // L'ordre personnalisé est déjà appliqué via store.currentSounds
+      // On garde l'ordre tel quel
+      return 0
+    }
     if (sortBy === 'popular') return (b.playCount || 0) - (a.playCount || 0)
     if (sortBy === 'recent') return (b.lastPlayed || 0) - (a.lastPlayed || 0)
     if (sortBy === 'alpha') return a.name.localeCompare(b.name)
     return (b.createdAt || 0) - (a.createdAt || 0)
   })
 
-  const displayed = showAll ? filtered : filtered.slice(0, 10)
-  const displayedOther = showAllOther ? soundsOutsideProfile : soundsOutsideProfile.slice(0, 6)
+  const itemsPerPage = columns * 2
+  const displayed = showAll ? filtered : filtered.slice(0, itemsPerPage)
+  const displayedOther = showAllOther ? soundsOutsideProfile : soundsOutsideProfile.slice(0, itemsPerPage)
+
+  // ─── Gestion du drag and drop ──────────────────────────────────────────────
+  const handleDragStart = (e, soundId, index) => {
+    // Le drag and drop n'est disponible qu'en mode "Personnalisé"
+    if (sortBy !== 'custom') {
+      addToast('Le drag and drop est disponible uniquement en tri "Personnalisé"', 'info')
+      e.preventDefault()
+      return
+    }
+    setDraggedSoundId(soundId)
+    setDragOverIndex(index)
+    setIsDragging(true)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', `${soundId}|${index}`)
+    setTimeout(() => {
+      if (e.target) {
+        e.target.style.opacity = '0.4'
+      }
+    }, 0)
+  }
+
+  const handleDragEnd = (e) => {
+    if (e.target) {
+      e.target.style.opacity = '1'
+    }
+    setDraggedSoundId(null)
+    setDragOverIndex(null)
+    setIsDragging(false)
+  }
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault()
+    if (!isDragging) return
+    setDragOverIndex(index)
+  }
+
+  const handleDrop = async (e, dropIndex) => {
+    e.preventDefault()
+    if (!draggedSoundId) return
+
+    const data = e.dataTransfer.getData('text/plain')
+    if (!data) return
+    const [sourceId, sourceIndex] = data.split('|')
+    
+    if (sourceId !== draggedSoundId) return
+    
+    const startIndex = parseInt(sourceIndex)
+    const endIndex = dropIndex
+
+    if (startIndex === endIndex) {
+      setDraggedSoundId(null)
+      setDragOverIndex(null)
+      setIsDragging(false)
+      return
+    }
+
+    await store.reorderSounds(startIndex, endIndex)
+    
+    setDraggedSoundId(null)
+    setDragOverIndex(null)
+    setIsDragging(false)
+    addToast('Son déplacé', 'success')
+  }
 
   const handleImportFiles = async (filePaths) => {
     let count = 0
@@ -54,7 +144,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     if (paths.length) await handleImportFiles(paths)
   }
 
-  const handleDrop = async (e) => {
+  const handleDropFiles = async (e) => {
     e.preventDefault()
     setDragOver(false)
 
@@ -146,6 +236,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
         </div>
         <select value={sortBy} onChange={e => setSortBy(e.target.value)}
           style={{ fontSize: 12, padding: '5px 8px', width: 'auto' }}>
+          <option value="custom">{tr('sortCustom')}</option>
           <option value="default">{tr('sortDefault')}</option>
           <option value="popular">{tr('sortPopular')}</option>
           <option value="recent">{tr('sortRecent')}</option>
@@ -162,7 +253,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
         onDragLeave={e => {
           if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false)
         }}
-        onDrop={handleDrop}>
+        onDrop={handleDropFiles}>
 
         {dragOver && (
           <div style={{
@@ -226,17 +317,46 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
 
         {favoriteSounds.length > 0 && (
           <Section title={tr('favorites')} icon="ti-star-filled" iconColor="var(--warning)" count={favoriteSounds.length}>
-            <SoundGrid sounds={favoriteSounds} shortcuts={shortcuts} audioDevice={audioDevice} volume={volume} loopEnabled={loopEnabled} playLocally={playLocally} store={store} addToast={addToast} lang={lang} />
+            <SoundGrid 
+              sounds={favoriteSounds} 
+              shortcuts={shortcuts} 
+              audioDevice={audioDevice} 
+              volume={volume} 
+              loopEnabled={loopEnabled} 
+              playLocally={playLocally} 
+              store={store} 
+              addToast={addToast} 
+              lang={lang}
+              draggable={false}
+            />
           </Section>
         )}
 
         {filtered.length > 0 && (
           <Section title={tr('profileSounds')} icon="ti-music" count={filtered.length}>
-            <SoundGrid sounds={displayed} shortcuts={shortcuts} audioDevice={audioDevice} volume={volume} loopEnabled={loopEnabled} playLocally={playLocally} store={store} addToast={addToast} lang={lang} />
-            {filtered.length > 10 && (
+            <SoundGrid 
+              sounds={displayed} 
+              shortcuts={shortcuts} 
+              audioDevice={audioDevice} 
+              volume={volume} 
+              loopEnabled={loopEnabled} 
+              playLocally={playLocally} 
+              store={store} 
+              addToast={addToast} 
+              lang={lang}
+              gridRef={gridRef}
+              draggable={sortBy === 'custom'}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              draggedSoundId={draggedSoundId}
+              dragOverIndex={dragOverIndex}
+            />
+            {filtered.length > itemsPerPage && (
               <button className="btn-secondary" onClick={() => setShowAll(!showAll)} style={{ width: '100%', marginTop: 10, justifyContent: 'center' }}>
                 <i className={`ti ${showAll ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
-                {showAll ? tr('showLess') : `${tr('showMore')} ${filtered.length - 10}`}
+                {showAll ? tr('showLess') : `${tr('showMore')} ${filtered.length - itemsPerPage}`}
               </button>
             )}
           </Section>
@@ -255,10 +375,10 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
                 }} lang={lang} />
               ))}
             </div>
-            {soundsOutsideProfile.length > 6 && (
+            {soundsOutsideProfile.length > itemsPerPage && (
               <button className="btn-secondary" onClick={() => setShowAllOther(!showAllOther)} style={{ width: '100%', marginTop: 10, justifyContent: 'center' }}>
                 <i className={`ti ${showAllOther ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
-                {showAllOther ? tr('showLess') : `${tr('showMore')} ${soundsOutsideProfile.length - 6}`}
+                {showAllOther ? tr('showLess') : `${tr('showMore')} ${soundsOutsideProfile.length - itemsPerPage}`}
               </button>
             )}
           </Section>
@@ -271,7 +391,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
         <ImportModal
           onClose={() => setShowImport(false)}
           onOpenDialog={handleOpenDialog}
-          onDrop={handleDrop}
+          onDrop={handleDropFiles}
           dragOver={dragOver}
           setDragOver={setDragOver}
           currentProfileId={currentProfileId}
@@ -309,24 +429,63 @@ function Section({ title, icon, iconColor, count, muted, children }) {
   )
 }
 
-function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLocally, store, addToast, lang }) {
+function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLocally, store, addToast, lang, gridRef, draggable, onDragStart, onDragEnd, onDragOver, onDrop, draggedSoundId, dragOverIndex }) {
   const tr = useTranslation(lang || 'fr')
+  
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
-      {sounds.map(s => (
-        <SoundCard key={s.id} sound={s} shortcut={shortcuts[s.id]} audioDevice={audioDevice} volume={volume}
-          loopEnabled={loopEnabled}
-          playLocally={playLocally}
-          currentProfileId={store.currentProfileId}
-          onToggleFavorite={store.toggleFavorite}
-          onSetShortcut={store.setShortcut}
-          onVolumeChange={store.updateSoundVolume}
-          onPlay={store.incrementPlayCount}
-          onRemoveFromProfile={async (id) => { await store.removeSoundFromProfile(id, store.currentProfileId); addToast(tr('removedFromProfile'), 'info') }}
-          onDelete={async (id) => { await store.deleteSound(id); addToast(tr('deleted'), 'info') }}
-          onRename={(id, name) => store.updateSound(id, { name })}
-        />
-      ))}
+    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10, position: 'relative', zIndex: 1 }}>
+      {sounds.map((s, index) => {
+        const isDragging = draggedSoundId === s.id
+        const isDragOver = dragOverIndex === index && !isDragging
+        
+        return (
+          <div
+            key={s.id}
+            draggable={draggable}
+            onDragStart={(e) => draggable && onDragStart(e, s.id, index)}
+            onDragEnd={(e) => draggable && onDragEnd(e)}
+            onDragOver={(e) => draggable && onDragOver(e, index)}
+            onDrop={(e) => draggable && onDrop(e, index)}
+            style={{
+              opacity: isDragging ? 0.3 : 1,
+              transform: isDragOver ? 'scale(1.02)' : 'scale(1)',
+              transition: 'transform 0.15s, opacity 0.15s',
+              cursor: draggable ? 'grab' : 'default',
+              position: 'relative',
+              zIndex: isDragging ? 10 : 1
+            }}
+          >
+            {isDragOver && (
+              <div style={{
+                position: 'absolute',
+                top: -4, left: -4, right: -4, bottom: -4,
+                border: '2px solid var(--accent)',
+                borderRadius: 'var(--radius-md)',
+                pointerEvents: 'none',
+                zIndex: 5,
+                animation: 'fadeIn 0.15s ease'
+              }} />
+            )}
+            <SoundCard 
+              sound={s} 
+              shortcut={shortcuts[s.id]} 
+              audioDevice={audioDevice} 
+              volume={volume}
+              loopEnabled={loopEnabled}
+              playLocally={playLocally}
+              currentProfileId={store.currentProfileId}
+              onToggleFavorite={store.toggleFavorite}
+              onSetShortcut={store.setShortcut}
+              onVolumeChange={store.updateSoundVolume}
+              onPlay={store.incrementPlayCount}
+              onRemoveFromProfile={async (id) => { await store.removeSoundFromProfile(id, store.currentProfileId); addToast(tr('removedFromProfile'), 'info') }}
+              onDelete={async (id) => { await store.deleteSound(id); addToast(tr('deleted'), 'info') }}
+              onRename={(id, name) => store.updateSound(id, { name })}
+              draggable={draggable}
+            />
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -349,6 +508,7 @@ function OutsideCard({ sound, onAdd, lang }) {
   )
 }
 
+// ImportModal inchangé...
 function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onUrlImport, onManualAdd, lang }) {
   const tr = useTranslation(lang || 'fr')
   const [tab, setTab] = useState('file')

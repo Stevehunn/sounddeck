@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 
 // Hook principal qui gère tout l'état de l'application
@@ -21,7 +21,9 @@ export function useStore() {
   const [loading, setLoading] = useState(true)
   const [previewVolume, setPreviewVolume] = useState(70)
   const [shortcutsEnabled, setShortcutsEnabled] = useState(true)
-  const [toggleShortcutsAccelerator, setToggleShortcutsAccelerator] = useState('CommandOrControl+Shift+K') // NOUVEAU
+  const [toggleShortcutsAccelerator, setToggleShortcutsAccelerator] = useState('CommandOrControl+Shift+K')
+  const [soundOrder, setSoundOrder] = useState({})
+  const [orderVersion, setOrderVersion] = useState(0)
 
   // ─── Chargement initial depuis electron-store ────────────────────────────────
   useEffect(() => {
@@ -43,9 +45,9 @@ export function useStore() {
         const savedCurrentProfileId = await window.electronAPI.storeGet('currentProfileId')
         const savedPreviewVolume = await window.electronAPI.storeGet('previewVolume') ?? 70
         const savedShortcutsEnabled = await window.electronAPI.storeGet('shortcutsEnabled') ?? true
-        const savedToggleShortcutsAccelerator = await window.electronAPI.storeGet('toggleShortcutsAccelerator') || 'CommandOrControl+Shift+K' // NOUVEAU
+        const savedToggleShortcutsAccelerator = await window.electronAPI.storeGet('toggleShortcutsAccelerator') || 'CommandOrControl+Shift+K'
+        const savedSoundOrder = await window.electronAPI.storeGet('soundOrder') || {}
 
-        // Profil "Tous les sons" toujours présent
         const allProfile = { id: 'all', name: 'Tous les sons', isDefault: true }
         const userProfiles = savedProfiles.filter(p => p.id !== 'all')
         const allProfiles = [allProfile, ...userProfiles]
@@ -66,7 +68,8 @@ export function useStore() {
         setCurrentProfileId(savedCurrentProfileId || 'all')
         setPreviewVolume(savedPreviewVolume)
         setShortcutsEnabled(savedShortcutsEnabled)
-        setToggleShortcutsAccelerator(savedToggleShortcutsAccelerator) // NOUVEAU
+        setToggleShortcutsAccelerator(savedToggleShortcutsAccelerator)
+        setSoundOrder(savedSoundOrder)
       } catch (e) {
         console.error('Erreur chargement store:', e)
         setProfiles([{ id: 'all', name: 'Tous les sons', isDefault: true }])
@@ -97,16 +100,19 @@ export function useStore() {
     if (profileId === 'all') return
     const updated = profiles.filter(p => p.id !== profileId)
     setProfiles(updated)
-    // Retirer les sons de ce profil (mais garder les sons eux-mêmes)
     const updatedSounds = sounds.map(s => ({
       ...s,
       profiles: s.profiles.filter(pid => pid !== profileId)
     }))
     setSounds(updatedSounds)
+    const updatedOrder = { ...soundOrder }
+    delete updatedOrder[profileId]
+    setSoundOrder(updatedOrder)
     await save('profiles', updated.filter(p => p.id !== 'all'))
     await save('sounds', updatedSounds)
+    await save('soundOrder', updatedOrder)
     if (currentProfileId === profileId) setCurrentProfileId('all')
-  }, [profiles, sounds, currentProfileId, save])
+  }, [profiles, sounds, currentProfileId, save, soundOrder])
 
   const renameProfile = useCallback(async (profileId, newName) => {
     const updated = profiles.map(p => p.id === profileId ? { ...p, name: newName } : p)
@@ -126,7 +132,6 @@ export function useStore() {
   }, [profiles, currentProfileId, switchProfile])
 
   // ─── Sons ─────────────────────────────────────────────────────────────────────
-  // Normalise un chemin fichier en remplaçant les backslashes
   const normalizePath = (p) => p ? p.replace(/\\/g, '/') : p
 
   const addSound = useCallback(async (soundData) => {
@@ -144,8 +149,22 @@ export function useStore() {
     const updated = [...sounds, newSound]
     setSounds(updated)
     await save('sounds', updated)
+    // Ajouter le nouveau son à la fin de l'ordre pour tous les profils concernés
+    const updatedOrder = { ...soundOrder }
+    const targetProfiles = newSound.profiles || ['all']
+    targetProfiles.forEach(pid => {
+      if (!updatedOrder[pid]) {
+        updatedOrder[pid] = []
+      }
+      if (!updatedOrder[pid].includes(newSound.id)) {
+        updatedOrder[pid].push(newSound.id)
+      }
+    })
+    setSoundOrder(updatedOrder)
+    await save('soundOrder', updatedOrder)
+    setOrderVersion(prev => prev + 1)
     return newSound
-  }, [sounds, save])
+  }, [sounds, save, soundOrder])
 
   const deleteSound = useCallback(async (soundId) => {
     const sound = sounds.find(s => s.id === soundId)
@@ -154,14 +173,22 @@ export function useStore() {
     }
     const updated = sounds.filter(s => s.id !== soundId)
     setSounds(updated)
-    // Nettoyer les raccourcis
+    const updatedOrder = { ...soundOrder }
+    Object.keys(updatedOrder).forEach(profileId => {
+      if (updatedOrder[profileId]) {
+        updatedOrder[profileId] = updatedOrder[profileId].filter(id => id !== soundId)
+      }
+    })
+    setSoundOrder(updatedOrder)
+    await save('sounds', updated)
+    await save('soundOrder', updatedOrder)
     const updatedShortcuts = { ...shortcuts }
     delete updatedShortcuts[soundId]
     setShortcuts(updatedShortcuts)
-    await save('sounds', updated)
     await save('shortcuts', updatedShortcuts)
     await window.electronAPI.updateShortcuts(updatedShortcuts)
-  }, [sounds, shortcuts, save])
+    setOrderVersion(prev => prev + 1)
+  }, [sounds, shortcuts, save, soundOrder])
 
   const updateSound = useCallback(async (soundId, changes) => {
     const updated = sounds.map(s => s.id === soundId ? { ...s, ...changes } : s)
@@ -200,8 +227,18 @@ export function useStore() {
       return { ...s, profiles }
     })
     setSounds(updated)
+    const updatedOrder = { ...soundOrder }
+    if (!updatedOrder[profileId]) {
+      updatedOrder[profileId] = []
+    }
+    if (!updatedOrder[profileId].includes(soundId)) {
+      updatedOrder[profileId].push(soundId)
+    }
+    setSoundOrder(updatedOrder)
     await save('sounds', updated)
-  }, [sounds, save])
+    await save('soundOrder', updatedOrder)
+    setOrderVersion(prev => prev + 1)
+  }, [sounds, save, soundOrder])
 
   const removeSoundFromProfile = useCallback(async (soundId, profileId) => {
     const updated = sounds.map(s => {
@@ -209,8 +246,53 @@ export function useStore() {
       return { ...s, profiles: s.profiles.filter(pid => pid !== profileId) }
     })
     setSounds(updated)
+    const updatedOrder = { ...soundOrder }
+    if (updatedOrder[profileId]) {
+      updatedOrder[profileId] = updatedOrder[profileId].filter(id => id !== soundId)
+    }
+    setSoundOrder(updatedOrder)
     await save('sounds', updated)
-  }, [sounds, save])
+    await save('soundOrder', updatedOrder)
+    setOrderVersion(prev => prev + 1)
+  }, [sounds, save, soundOrder])
+
+  // ─── Réorganisation des sons ──────────────────────────────────────────────
+  const reorderSounds = useCallback(async (startIndex, endIndex) => {
+    // Utiliser 'all' comme clé pour l'ordre global, ou le profileId pour les profils
+    const profileId = currentProfileId || 'all'
+    const currentOrder = soundOrder[profileId] || []
+    
+    // Récupérer les sons du profil actuel dans l'ordre actuel
+    const profileSounds = profileId === 'all'
+      ? sounds
+      : sounds.filter(s => s.profiles.includes(profileId))
+    
+    // Si l'ordre personnalisé n'existe pas ou est incomplet, le créer
+    let orderedIds = currentOrder.length === profileSounds.length 
+      ? currentOrder 
+      : profileSounds.map(s => s.id)
+    
+    // Vérifier que les indices sont valides
+    if (startIndex < 0 || startIndex >= orderedIds.length || 
+        endIndex < 0 || endIndex >= orderedIds.length) {
+      console.warn('Indices invalides pour reorderSounds:', startIndex, endIndex)
+      return false
+    }
+    
+    // Réorganiser les IDs
+    const [removed] = orderedIds.splice(startIndex, 1)
+    orderedIds.splice(endIndex, 0, removed)
+    
+    // Sauvegarder le nouvel ordre
+    const updatedOrder = { ...soundOrder, [profileId]: orderedIds }
+    setSoundOrder(updatedOrder)
+    await save('soundOrder', updatedOrder)
+    
+    // Forcer un re-rendu des sons ordonnés
+    setOrderVersion(prev => prev + 1)
+    
+    return true
+  }, [sounds, currentProfileId, soundOrder, save])
 
   // ─── Raccourcis ───────────────────────────────────────────────────────────────
   const setShortcut = useCallback(async (soundId, accelerator) => {
@@ -263,7 +345,6 @@ export function useStore() {
     return newState
   }, [])
 
-  // ─── Raccourci pour activer/désactiver les raccourcis ──────────────────────
   const updateToggleShortcutsAccelerator = useCallback(async (accelerator) => {
     setToggleShortcutsAccelerator(accelerator)
     await save('toggleShortcutsAccelerator', accelerator)
@@ -303,28 +384,49 @@ export function useStore() {
     await save('playLocally', val)
   }, [save])
 
-  // ─── Volume de prévisualisation ─────────────────────────────────────────────
   const updatePreviewVolume = useCallback(async (val) => {
     setPreviewVolume(val)
     await save('previewVolume', val)
   }, [save])
 
-  // ─── Sons filtrés selon profil actuel ────────────────────────────────────────
-  const currentSounds = currentProfileId === 'all'
-    ? sounds
-    : sounds.filter(s => s.profiles.includes(currentProfileId))
+  // ─── Sons ordonnés selon le profil ──────────────────────────────────────────
+  const orderedSounds = useMemo(() => {
+    const profileId = currentProfileId || 'all'
+    const profileSounds = profileId === 'all'
+      ? sounds
+      : sounds.filter(s => s.profiles.includes(profileId))
+    
+    const order = soundOrder[profileId] || []
+    
+    if (order.length === 0 || order.length !== profileSounds.length) {
+      return profileSounds
+    }
+    
+    const soundMap = {}
+    profileSounds.forEach(s => { soundMap[s.id] = s })
+    
+    const ordered = order
+      .filter(id => soundMap[id])
+      .map(id => soundMap[id])
+    
+    // Ajouter les sons qui ne sont pas dans l'ordre (devrait normalement ne pas arriver)
+    const missing = profileSounds.filter(s => !order.includes(s.id))
+    return [...ordered, ...missing]
+  }, [sounds, soundOrder, currentProfileId, orderVersion])
 
-  const favoriteSounds = currentSounds.filter(s => s.favorite)
+  const favoriteSounds = orderedSounds.filter(s => s.favorite)
 
   return {
     // État
-    profiles, currentProfileId, sounds, currentSounds, favoriteSounds,
+    profiles, currentProfileId, sounds, currentSounds: orderedSounds, favoriteSounds,
     shortcuts, profileShortcut, theme, audioDevice, volume, playLocally, loading,
-    previewVolume, shortcutsEnabled, toggleShortcutsAccelerator, // NOUVEAU
+    previewVolume, shortcutsEnabled, toggleShortcutsAccelerator,
+    soundOrder,
     // Profils
     createProfile, deleteProfile, renameProfile, switchProfile, switchToNextProfile,
     // Sons
-    addSound, deleteSound, updateSound, updateSoundVolume, incrementPlayCount, toggleFavorite, addSoundToProfile, removeSoundFromProfile,
+    addSound, deleteSound, updateSound, updateSoundVolume, incrementPlayCount, toggleFavorite, 
+    addSoundToProfile, removeSoundFromProfile, reorderSounds,
     // Raccourcis
     setShortcut, clearShortcut, updateProfileShortcut,
     // Options
@@ -336,6 +438,6 @@ export function useStore() {
     updatePreviewVolume,
     // Raccourcis globaux
     toggleGlobalShortcuts,
-    updateToggleShortcutsAccelerator, // NOUVEAU
+    updateToggleShortcutsAccelerator,
   }
 }
