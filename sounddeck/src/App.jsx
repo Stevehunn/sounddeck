@@ -1,3 +1,4 @@
+// sounddeck/src/App.jsx
 import { useEffect, useState, useRef } from 'react'
 import { useStore } from './store/useStore'
 import Sidebar from './components/Sidebar'
@@ -74,6 +75,13 @@ export default function App() {
     }
   }, [store.theme, store.customTheme])
 
+  // Mettre à jour le menu du tray quand la langue change
+  useEffect(() => {
+    if (window.electronAPI?.updateTrayLanguage) {
+      window.electronAPI.updateTrayLanguage(store.lang)
+    }
+  }, [store.lang])
+
   // Enregistrer les listeners IPC
   useEffect(() => {
     if (!window.electronAPI) return
@@ -111,7 +119,7 @@ export default function App() {
       window.electronAPI.removeAllListeners('stop-all-sounds')
       window.electronAPI.removeAllListeners('toggle-presentation')
     }
-  }, [])
+  }, [store.loopEnabled]) // Ajout de store.loopEnabled pour que le toast soit à jour
 
   const addToast = (message, type = 'info') => {
     const id = Date.now()
@@ -119,7 +127,7 @@ export default function App() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000)
   }
 
-  useEffect(() => { addToastRef.current = addToast })
+  useEffect(() => { addToastRef.current = addToast }, [])
 
   if (store.loading) {
     return (

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, globalShortcut, shell, Menu } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, globalShortcut, shell, Menu, Tray, nativeImage } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const Store = require('electron-store')
@@ -9,16 +9,184 @@ const store = new Store()
 // Ajouter un état pour les raccourcis globaux
 let globalShortcutsEnabled = store.get('globalShortcutsEnabled', true)
 let registeredShortcuts = []
+let mainWindow = null
+let tray = null
+let isQuitting = false
 
 const isDev = !app.isPackaged
 
 // Supprimer la barre de menu native
 Menu.setApplicationMenu(null)
 
-let mainWindow
-
 const soundsDir = path.join(app.getPath('userData'), 'sounds')
 if (!fs.existsSync(soundsDir)) fs.mkdirSync(soundsDir, { recursive: true })
+
+// Vérifier si l'app doit démarrer en arrière-plan
+const shouldStartMinimized = store.get('startMinimized', false)
+
+// ============================================================
+// 🔄 MODIFICATION - TRAY_LABELS avec les 3 langues
+// ============================================================
+const TRAY_LABELS = {
+  fr: {
+    open: 'Ouvrir SoundDeck',
+    shortcuts: 'Raccourcis',
+    shortcutsOn: 'Désactiver les raccourcis',
+    shortcutsOff: 'Activer les raccourcis',
+    launchAtStartup: 'Lancer au démarrage',
+    startMinimized: 'Démarrer en arrière-plan',
+    quit: 'Quitter SoundDeck'
+  },
+  en: {
+    open: 'Open SoundDeck',
+    shortcuts: 'Shortcuts',
+    shortcutsOn: 'Disable shortcuts',
+    shortcutsOff: 'Enable shortcuts',
+    launchAtStartup: 'Launch at startup',
+    startMinimized: 'Start minimized',
+    quit: 'Quit SoundDeck'
+  },
+  es: {
+    open: 'Abrir SoundDeck',
+    shortcuts: 'Atajos',
+    shortcutsOn: 'Desactivar atajos',
+    shortcutsOff: 'Activar atajos',
+    launchAtStartup: 'Iniciar al arrancar',
+    startMinimized: 'Iniciar minimizado',
+    quit: 'Salir de SoundDeck'
+  }
+}
+
+// ============================================================
+// 🔄 MODIFICATION - Fonctions utilitaires pour le tray
+// ============================================================
+
+// Récupérer la langue actuelle du store
+function getCurrentTrayLanguage() {
+  return store.get('lang', 'fr')
+}
+
+// Fonction utilitaire pour créer le menu du tray avec une langue donnée
+function buildTrayMenu(lang) {
+  const labels = TRAY_LABELS[lang] || TRAY_LABELS.fr
+  
+  return Menu.buildFromTemplate([
+    {
+      label: labels.open,
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show()
+          mainWindow.focus()
+        } else {
+          createWindow()
+        }
+      }
+    },
+    {
+      label: labels.shortcuts,
+      submenu: [
+        {
+          label: globalShortcutsEnabled ? labels.shortcutsOn : labels.shortcutsOff,
+          click: () => {
+            toggleGlobalShortcuts()
+          }
+        }
+      ]
+    },
+    { type: 'separator' },
+    {
+      label: labels.launchAtStartup,
+      type: 'checkbox',
+      checked: store.get('launchAtStartup', false),
+      click: (menuItem) => {
+        setLaunchAtStartup(menuItem.checked)
+      }
+    },
+    {
+      label: labels.startMinimized,
+      type: 'checkbox',
+      checked: store.get('startMinimized', false),
+      click: (menuItem) => {
+        store.set('startMinimized', menuItem.checked)
+      }
+    },
+    { type: 'separator' },
+    {
+      label: labels.quit,
+      click: () => {
+        isQuitting = true
+        app.quit()
+      }
+    }
+  ])
+}
+
+// ============================================================
+// 🔄 MODIFICATION - createTray utilise buildTrayMenu
+// ============================================================
+function createTray(lang = 'fr') {
+  if (tray) return
+
+  let iconPath
+  if (isDev) {
+    iconPath = path.join(__dirname, '../public/logo sd cadre.ico')
+  } else {
+    iconPath = path.join(app.getAppPath(), 'dist', 'logo sd cadre.ico')
+    if (!fs.existsSync(iconPath)) {
+      iconPath = path.join(process.resourcesPath, 'logo sd cadre.ico')
+    }
+  }
+
+  let icon
+  if (fs.existsSync(iconPath)) {
+    icon = nativeImage.createFromPath(iconPath)
+  } else {
+    icon = nativeImage.createEmpty()
+  }
+  
+  const trayIcon = icon.resize({ width: 16, height: 16 })
+  tray = new Tray(trayIcon)
+  tray.setToolTip('SoundDeck - Soundboard')
+
+  const contextMenu = buildTrayMenu(lang)
+  tray.setContextMenu(contextMenu)
+
+  tray.on('double-click', () => {
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide()
+      } else {
+        mainWindow.show()
+        mainWindow.focus()
+      }
+    } else {
+      createWindow()
+    }
+  })
+}
+
+// ============================================================
+// 🔄 MODIFICATION - update-tray-language utilise buildTrayMenu
+// ============================================================
+ipcMain.handle('update-tray-language', (event, lang) => {
+  if (tray) {
+    const contextMenu = buildTrayMenu(lang)
+    tray.setContextMenu(contextMenu)
+  }
+  return true
+})
+
+// ============================================================
+// 🔄 MODIFICATION - store-set-lang pour sauvegarder la langue
+// ============================================================
+ipcMain.handle('store-set-lang', (event, lang) => {
+  store.set('lang', lang)
+  return true
+})
+
+// ============================================================
+// FIN DES MODIFICATIONS - Le reste est inchangé
+// ============================================================
 
 function createWindow() {
   const iconPath = path.join(__dirname, '../public/icon.ico')
@@ -34,11 +202,12 @@ function createWindow() {
       experimentalFeatures: true
     },
     backgroundColor: '#111113',
-    show: false,
+    show: !shouldStartMinimized,
     autoHideMenuBar: true,
     frame: true,
     ...(fs.existsSync(iconPath) ? { icon: iconPath } : {})
   })
+
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
@@ -46,7 +215,14 @@ function createWindow() {
     const indexPath = path.join(app.getAppPath(), 'dist', 'index.html')
     mainWindow.loadFile(indexPath)
   }
-  mainWindow.once('ready-to-show', () => mainWindow.show())
+
+  mainWindow.once('ready-to-show', () => {
+    createTray('fr')
+    if (!shouldStartMinimized) {
+      mainWindow.show()
+    }
+  })
+
   mainWindow.on('closed', () => { mainWindow = null })
 
   mainWindow.webContents.on('will-navigate', (e, url) => {
@@ -56,19 +232,75 @@ function createWindow() {
   mainWindow.webContents.session.on('will-download', (e) => {
     e.preventDefault()
   })
+
+  mainWindow.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault()
+      mainWindow.hide()
+    }
+  })
+}
+
+// ─── Gestion du démarrage automatique ────────────────────────────────────────
+function setLaunchAtStartup(enabled) {
+  store.set('launchAtStartup', enabled)
+  
+  if (process.platform === 'win32') {
+    const { exec } = require('child_process')
+    const appPath = app.getPath('exe')
+    const shortcutPath = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', 'SoundDeck.lnk')
+    
+    if (enabled) {
+      const script = `
+        $WshShell = New-Object -ComObject WScript.Shell
+        $Shortcut = $WshShell.CreateShortcut("${shortcutPath}")
+        $Shortcut.TargetPath = "${appPath}"
+        $Shortcut.WorkingDirectory = "${path.dirname(appPath)}"
+        $Shortcut.Save()
+      `
+      exec(`powershell -Command "${script}"`, (error) => {
+        if (error) console.error('Erreur création raccourci démarrage:', error)
+      })
+    } else {
+      if (fs.existsSync(shortcutPath)) {
+        fs.unlinkSync(shortcutPath)
+      }
+    }
+  } else if (process.platform === 'darwin') {
+    // macOS - utiliser les services de login
+    // À implémenter si besoin
+  } else if (process.platform === 'linux') {
+    // Linux - utiliser .desktop file
+    // À implémenter si besoin
+  }
 }
 
 app.whenReady().then(() => {
+  createTray('fr')
   createWindow()
   registerShortcuts()
   registerToggleShortcut()
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
+  
+  app.on('activate', () => { 
+    if (BrowserWindow.getAllWindows().length === 0) createWindow() 
+  })
 })
 
 app.on('window-all-closed', () => {
-  globalShortcut.unregisterAll()
-  registeredShortcuts = []
-  if (process.platform !== 'darwin') app.quit()
+  if (!isQuitting) {
+    if (process.platform !== 'darwin') {
+      return
+    }
+  }
+  if (isQuitting) {
+    globalShortcut.unregisterAll()
+    registeredShortcuts = []
+    app.quit()
+  }
+})
+
+app.on('before-quit', () => {
+  isQuitting = true
 })
 
 // ─── Raccourcis ───────────────────────────────────────────────────────────────
@@ -91,31 +323,35 @@ function safeRegister(accelerator, callback) {
   }
 }
 
-// Enregistrer le raccourci toggle séparément (toujours actif)
+// ============================================================
+// 🔄 MODIFICATION - registerToggleShortcut utilise buildTrayMenu
+// ============================================================
 function registerToggleShortcut() {
   const toggleAccelerator = store.get('toggleShortcutsAccelerator', 'CommandOrControl+Shift+K')
   if (!toggleAccelerator) return
 
   try {
-    // Désenregistrer l'ancien toggle s'il existe
     globalShortcut.unregister(toggleAccelerator)
     
-    // Enregistrer le nouveau toggle - toujours actif, même quand les autres sont désactivés
     const ok = globalShortcut.register(toggleAccelerator, () => {
-      // Basculer l'état
       globalShortcutsEnabled = !globalShortcutsEnabled
       store.set('globalShortcutsEnabled', globalShortcutsEnabled)
       
-      // Réenregistrer ou désenregistrer les raccourcis selon l'état
       if (globalShortcutsEnabled) {
         registerShortcuts()
       } else {
         unregisterAllShortcuts()
       }
       
-      // Notifier le renderer
       if (mainWindow) {
         mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
+      }
+      
+      // 🔄 MODIFICATION - Mettre à jour le menu du tray avec la langue actuelle
+      if (tray) {
+        const currentLang = getCurrentTrayLanguage()
+        const contextMenu = buildTrayMenu(currentLang)
+        tray.setContextMenu(contextMenu)
       }
       
       const state = globalShortcutsEnabled ? 'activés' : 'désactivés'
@@ -132,7 +368,6 @@ function registerToggleShortcut() {
   }
 }
 
-// Désenregistrer tous les raccourcis (sauf le toggle)
 function unregisterAllShortcuts() {
   registeredShortcuts.forEach(acc => {
     try {
@@ -143,23 +378,21 @@ function unregisterAllShortcuts() {
   console.log('🔇 Tous les raccourcis désenregistrés')
 }
 
-// Fonction pour réenregistrer tous les raccourcis (sauf le toggle)
 function reregisterShortcuts() {
-  // Désenregistrer les raccourcis existants
   unregisterAllShortcuts()
   
-  // Réenregistrer les autres raccourcis avec l'état actuel
   if (globalShortcutsEnabled) {
     registerShortcuts()
   }
   
-  // Notifier le renderer du changement
   if (mainWindow) {
     mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
   }
 }
 
-// Fonction pour basculer l'état des raccourcis (appelée depuis le bouton)
+// ============================================================
+// 🔄 MODIFICATION - toggleGlobalShortcuts utilise buildTrayMenu
+// ============================================================
 function toggleGlobalShortcuts() {
   globalShortcutsEnabled = !globalShortcutsEnabled
   store.set('globalShortcutsEnabled', globalShortcutsEnabled)
@@ -170,6 +403,13 @@ function toggleGlobalShortcuts() {
     unregisterAllShortcuts()
   }
   
+  // 🔄 MODIFICATION - Mettre à jour le menu du tray avec la langue actuelle
+  if (tray) {
+    const currentLang = getCurrentTrayLanguage()
+    const contextMenu = buildTrayMenu(currentLang)
+    tray.setContextMenu(contextMenu)
+  }
+  
   if (mainWindow) {
     mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
   }
@@ -178,7 +418,6 @@ function toggleGlobalShortcuts() {
 }
 
 function registerShortcuts() {
-  // Vérifier si les raccourcis sont activés
   if (!globalShortcutsEnabled) {
     console.log('🔇 Raccourcis globaux désactivés')
     return
@@ -230,6 +469,48 @@ ipcMain.handle('toggle-global-shortcuts', () => {
 
 ipcMain.handle('get-global-shortcuts-state', () => {
   return globalShortcutsEnabled
+})
+
+// ─── IPC Handlers pour le tray ─────────────────────────────────────────────
+ipcMain.handle('get-start-minimized', () => {
+  return store.get('startMinimized', false)
+})
+
+ipcMain.handle('set-start-minimized', (event, value) => {
+  store.set('startMinimized', value)
+  return true
+})
+
+ipcMain.handle('get-launch-at-startup', () => {
+  return store.get('launchAtStartup', false)
+})
+
+ipcMain.handle('set-launch-at-startup', (event, value) => {
+  setLaunchAtStartup(value)
+  return true
+})
+
+ipcMain.handle('quit-app', () => {
+  isQuitting = true
+  app.quit()
+  return true
+})
+
+ipcMain.handle('hide-window', () => {
+  if (mainWindow) {
+    mainWindow.hide()
+  }
+  return true
+})
+
+ipcMain.handle('show-window', () => {
+  if (mainWindow) {
+    mainWindow.show()
+    mainWindow.focus()
+  } else {
+    createWindow()
+  }
+  return true
 })
 
 // ─── Mise à jour des raccourcis ─────────────────────────────────────────────

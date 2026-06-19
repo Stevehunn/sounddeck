@@ -1,3 +1,4 @@
+// sounddeck/electron/preload.js
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -27,6 +28,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getGlobalShortcutsState: () => ipcRenderer.invoke('get-global-shortcuts-state'),
   onShortcutsToggle: (cb) => ipcRenderer.on('shortcuts-toggle', (e, enabled) => cb(enabled)),
   removeAllListeners: (ch) => ipcRenderer.removeAllListeners(ch),
+  updateTrayLanguage: (lang) => ipcRenderer.invoke('update-tray-language', lang),
+
+  // Nouvelles API pour le tray
+  getStartMinimized: () => ipcRenderer.invoke('get-start-minimized'),
+  setStartMinimized: (value) => ipcRenderer.invoke('set-start-minimized', value),
+  getLaunchAtStartup: () => ipcRenderer.invoke('get-launch-at-startup'),
+  setLaunchAtStartup: (value) => ipcRenderer.invoke('set-launch-at-startup', value),
+  quitApp: () => ipcRenderer.invoke('quit-app'),
+  hideWindow: () => ipcRenderer.invoke('hide-window'),
+  showWindow: () => ipcRenderer.invoke('show-window'),
+  storeSetLang: (lang) => ipcRenderer.invoke('store-set-lang', lang),
 
   // Expose process.versions pour détecter Electron dans le renderer
   isElectron: true,

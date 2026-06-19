@@ -22,8 +22,39 @@ export default function Options({ store, addToast, lang = 'fr' }) {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
 
-        {/* Apparence */}
-        <Section title={tr('appearance')} icon="ti-palette">
+        {/* Application */}
+        <Section title={tr('application')} icon="ti-apps">
+          <OptionRow label={tr('startMinimized')} sub={tr('startMinimizedDesc')}>
+            <Toggle 
+              value={store.startMinimized ?? false} 
+              onChange={async (val) => {
+                await window.electronAPI.setStartMinimized(val)
+                store.setStartMinimized?.(val)
+              }} 
+            />
+          </OptionRow>
+          
+          <OptionRow label={tr('launchAtStartup')} sub={tr('launchAtStartupDesc')}>
+            <Toggle 
+              value={store.launchAtStartup ?? false} 
+              onChange={async (val) => {
+                await window.electronAPI.setLaunchAtStartup(val)
+                store.setLaunchAtStartup?.(val)
+              }} 
+            />
+          </OptionRow>
+
+          <OptionRow label={tr('hideToTray')} sub={tr('hideToTrayDesc')}>
+            <button 
+              className="btn-secondary" 
+              onClick={async () => {
+                await window.electronAPI.hideWindow()
+              }}
+              style={{ fontSize: 12 }}
+            >
+              <i className="ti ti-eye-off" /> {tr('hideToTrayBtn')}
+            </button>
+          </OptionRow>
 
           <OptionRow label={tr('language')}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -44,7 +75,10 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               ))}
             </div>
           </OptionRow>
+        </Section>
 
+        {/* Apparence */}
+        <Section title={tr('appearance')} icon="ti-palette">
           <OptionRow label={tr('theme')}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {[

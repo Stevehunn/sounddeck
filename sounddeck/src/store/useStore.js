@@ -30,6 +30,9 @@ export function useStore() {
   // Seuil de normalisation cible en RMS (0-1)
   const [normalizationTarget, setNormalizationTarget] = useState(0.1) // ~ -20 dB
 
+  const [startMinimized, setStartMinimized] = useState(false)
+  const [launchAtStartup, setLaunchAtStartup] = useState(false)
+
   // ─── Chargement initial depuis electron-store ────────────────────────────────
   useEffect(() => {
     async function loadData() {
@@ -39,7 +42,7 @@ export function useStore() {
           if (s.volumeDb !== undefined) return s
           // Convertir de 0-100 à -12 à +12
           const oldVolume = s.volume ?? 100
-          const newDb = Math.round(((oldVolume - 50) / 50) * 12 * 10) / 10
+          const newDb = Math.round(((oldVolume - 50) / 50) * 24 * 10) / 10
           return { ...s, volume: newDb, volumeDb: newDb }
         })
         const savedShortcuts = await window.electronAPI.storeGet('shortcuts') || {}
@@ -64,6 +67,11 @@ export function useStore() {
         const allProfile = { id: 'all', name: 'Tous les sons', isDefault: true }
         const userProfiles = savedProfiles.filter(p => p.id !== 'all')
         const allProfiles = [allProfile, ...userProfiles]
+
+        const savedStartMinimized = await window.electronAPI.getStartMinimized?.() ?? false
+        const savedLaunchAtStartup = await window.electronAPI.getLaunchAtStartup?.() ?? false
+        setStartMinimized(savedStartMinimized)
+        setLaunchAtStartup(savedLaunchAtStartup)
 
         setProfiles(allProfiles)
         setSounds(savedSounds)
@@ -363,9 +371,11 @@ export function useStore() {
 
   // ─── Options ──────────────────────────────────────────────────────────────────
   const updateLang = useCallback(async (newLang) => {
-    setLang(newLang)
-    await save('lang', newLang)
-  }, [save])
+  setLang(newLang)
+  await save('lang', newLang)
+  // Sauvegarder la langue dans le store principal pour le tray
+  await window.electronAPI.storeSetLang?.(newLang)
+}, [save])
 
   const updateTheme = useCallback(async (newTheme) => {
     setTheme(newTheme)
@@ -464,5 +474,10 @@ export function useStore() {
     // Normalisation
     updateNormalizationEnabled,
     updateNormalizationTarget,
+    // Démarrage
+    startMinimized,
+    launchAtStartup,
+    setStartMinimized: (val) => { setStartMinimized(val); save('startMinimized', val) },
+    setLaunchAtStartup: (val) => { setLaunchAtStartup(val); save('launchAtStartup', val) },
   }
 }
