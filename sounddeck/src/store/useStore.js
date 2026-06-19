@@ -33,6 +33,9 @@ export function useStore() {
   const [startMinimized, setStartMinimized] = useState(false)
   const [launchAtStartup, setLaunchAtStartup] = useState(false)
 
+  const [audioMode, setAudioMode] = useState('simple')
+  const [virtualDriverInstalled, setVirtualDriverInstalled] = useState(false) // ✅ Déclaration unique
+
   // ─── Chargement initial depuis electron-store ────────────────────────────────
   useEffect(() => {
     async function loadData() {
@@ -72,6 +75,11 @@ export function useStore() {
         const savedLaunchAtStartup = await window.electronAPI.getLaunchAtStartup?.() ?? false
         setStartMinimized(savedStartMinimized)
         setLaunchAtStartup(savedLaunchAtStartup)
+
+        const savedAudioMode = await window.electronAPI.storeGet('audioMode') || 'simple'
+        const savedVirtualDriverInstalled = await window.electronAPI.storeGet('virtualDriverInstalled') || false
+        setAudioMode(savedAudioMode)
+        setVirtualDriverInstalled(savedVirtualDriverInstalled)
 
         setProfiles(allProfiles)
         setSounds(savedSounds)
@@ -371,11 +379,11 @@ export function useStore() {
 
   // ─── Options ──────────────────────────────────────────────────────────────────
   const updateLang = useCallback(async (newLang) => {
-  setLang(newLang)
-  await save('lang', newLang)
-  // Sauvegarder la langue dans le store principal pour le tray
-  await window.electronAPI.storeSetLang?.(newLang)
-}, [save])
+    setLang(newLang)
+    await save('lang', newLang)
+    // Sauvegarder la langue dans le store principal pour le tray
+    await window.electronAPI.storeSetLang?.(newLang)
+  }, [save])
 
   const updateTheme = useCallback(async (newTheme) => {
     setTheme(newTheme)
@@ -407,6 +415,18 @@ export function useStore() {
   const updatePreviewVolume = useCallback(async (val) => {
     setPreviewVolume(val)
     await save('previewVolume', val)
+  }, [save])
+
+  // ─── Audio Mode ──────────────────────────────────────────────────────────────
+  const updateAudioMode = useCallback(async (mode) => {
+    setAudioMode(mode)
+    await save('audioMode', mode)
+  }, [save])
+
+  // ✅ Utilisation de setVirtualDriverInstalled (déjà déclaré dans le useState)
+  const updateVirtualDriverInstalled = useCallback(async (installed) => {
+    setVirtualDriverInstalled(installed)
+    await save('virtualDriverInstalled', installed)
   }, [save])
 
   // ─── Normalisation ──────────────────────────────────────────────────────────
@@ -468,6 +488,11 @@ export function useStore() {
     lang, updateLang,
     customTheme, updateTheme, updateCustomTheme, updateAudioDevice, updateVolume, updatePlayLocally,
     updatePreviewVolume,
+    // Audio Mode
+    audioMode,
+    virtualDriverInstalled,
+    updateAudioMode,
+    updateVirtualDriverInstalled, // ✅ Renommé pour éviter le conflit
     // Raccourcis globaux
     toggleGlobalShortcuts,
     updateToggleShortcutsAccelerator,

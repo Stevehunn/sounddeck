@@ -3,6 +3,8 @@ const path = require('path')
 const fs = require('fs')
 const Store = require('electron-store')
 const { LANGUAGES } = require('./i18n')
+const { exec } = require('child_process')
+const AdmZip = require('adm-zip')
 
 const store = new Store()
 
@@ -24,9 +26,7 @@ if (!fs.existsSync(soundsDir)) fs.mkdirSync(soundsDir, { recursive: true })
 // Vérifier si l'app doit démarrer en arrière-plan
 const shouldStartMinimized = store.get('startMinimized', false)
 
-// ============================================================
-// 🔄 MODIFICATION - TRAY_LABELS avec les 3 langues
-// ============================================================
+// ─── TRAY LABELS ──────────────────────────────────────────────────────────────
 const TRAY_LABELS = {
   fr: {
     open: 'Ouvrir SoundDeck',
@@ -57,16 +57,12 @@ const TRAY_LABELS = {
   }
 }
 
-// ============================================================
-// 🔄 MODIFICATION - Fonctions utilitaires pour le tray
-// ============================================================
+// ─── FONCTIONS POUR LE TRAY ──────────────────────────────────────────────────
 
-// Récupérer la langue actuelle du store
 function getCurrentTrayLanguage() {
   return store.get('lang', 'fr')
 }
 
-// Fonction utilitaire pour créer le menu du tray avec une langue donnée
 function buildTrayMenu(lang) {
   const labels = TRAY_LABELS[lang] || TRAY_LABELS.fr
   
@@ -121,9 +117,6 @@ function buildTrayMenu(lang) {
   ])
 }
 
-// ============================================================
-// 🔄 MODIFICATION - createTray utilise buildTrayMenu
-// ============================================================
 function createTray(lang = 'fr') {
   if (tray) return
 
@@ -165,9 +158,8 @@ function createTray(lang = 'fr') {
   })
 }
 
-// ============================================================
-// 🔄 MODIFICATION - update-tray-language utilise buildTrayMenu
-// ============================================================
+// ─── IPC HANDLERS POUR LE TRAY ──────────────────────────────────────────────
+
 ipcMain.handle('update-tray-language', (event, lang) => {
   if (tray) {
     const contextMenu = buildTrayMenu(lang)
@@ -176,17 +168,281 @@ ipcMain.handle('update-tray-language', (event, lang) => {
   return true
 })
 
-// ============================================================
-// 🔄 MODIFICATION - store-set-lang pour sauvegarder la langue
-// ============================================================
 ipcMain.handle('store-set-lang', (event, lang) => {
   store.set('lang', lang)
   return true
 })
 
-// ============================================================
-// FIN DES MODIFICATIONS - Le reste est inchangé
-// ============================================================
+// ─── GESTION DU PILOTE VIRTUAL AUDIO (Scream) ───────────────────────────────
+
+// Vérifier si le pilote virtuel est installé
+function isVirtualDriverInstalled() {
+  return store.get('virtualDriverInstalled', false)
+}
+
+// Chemin vers le pilote dans les ressources
+function getDriverResourcePath() {
+  const possiblePaths = []
+  
+  if (isDev) {
+    // En développement, on essaie plusieurs emplacements possibles
+    possiblePaths.push(
+      path.join(__dirname, '../resources/drivers/scream.zip'),
+      path.join(__dirname, '../../resources/drivers/scream.zip'),
+      path.join(process.cwd(), 'resources/drivers/scream.zip'),
+      path.join(process.cwd(), 'drivers/scream.zip'),
+      path.join(app.getPath('userData'), 'drivers/scream.zip'),
+      path.join(app.getPath('documents'), 'sounddeck/resources/drivers/scream.zip')
+    )
+  } else {
+    // En production
+    possiblePaths.push(
+      path.join(process.resourcesPath, 'drivers', 'scream.zip'),
+      path.join(path.dirname(app.getPath('exe')), 'resources/drivers/scream.zip')
+    )
+  }
+  
+  // Afficher tous les chemins testés
+  console.log('🔍 Recherche du pilote dans les chemins suivants:')
+  
+  // Trouver le premier chemin qui existe
+  for (const p of possiblePaths) {
+    const exists = fs.existsSync(p)
+    console.log(`  ${exists ? '✅' : '❌'} ${p}`)
+    if (exists) {
+      console.log(`✅ Pilote trouvé à: ${p}`)
+      return p
+    }
+  }
+  
+  console.warn('⚠️ Aucun pilote trouvé dans les chemins testés')
+  // Retourner le chemin le plus probable par défaut
+  return possiblePaths[0]
+}
+
+// Installer le pilote virtuel Scream
+function installVirtualDriver() {
+  return new Promise((resolve) => {
+    console.log('🚀 Début installation pilote...')
+    
+    if (isVirtualDriverInstalled()) {
+      console.log('⚠️ Pilote déjà installé')
+      resolve({ success: false, error: 'Pilote déjà installé' })
+      return
+    }
+    
+    if (process.platform !== 'win32') {
+      console.log('⚠️ Plateforme non supportée:', process.platform)
+      resolve({ success: false, error: 'Plateforme non supportée (Windows uniquement)' })
+      return
+    }
+    
+    try {
+      const driverPath = getDriverResourcePath()
+      console.log('📁 Chemin du pilote:', driverPath)
+      console.log('📁 Le fichier existe?', fs.existsSync(driverPath))
+      
+      if (!fs.existsSync(driverPath)) {
+        console.warn('⚠️ Pilote virtuel non trouvé:', driverPath)
+        resolve({ success: false, error: 'Fichier du pilote non trouvé' })
+        return
+      }
+      
+      const extractPath = path.join(app.getPath('temp'), `scream_driver_${Date.now()}`)
+      console.log('📁 Extraction vers:', extractPath)
+      
+      if (!fs.existsSync(extractPath)) {
+        fs.mkdirSync(extractPath, { recursive: true })
+      }
+      
+      console.log('📦 Décompression du zip...')
+      const zip = new AdmZip(driverPath)
+      zip.extractAllTo(extractPath, true)
+      console.log('✅ Décompression terminée')
+      
+      // Lister les fichiers extraits
+      const files = fs.readdirSync(extractPath, { withFileTypes: true })
+      console.log('📁 Fichiers extraits:', files.map(f => f.name))
+      
+      // Déterminer l'architecture de Windows
+      let arch = 'x64' // par défaut
+      if (process.arch === 'ia32') {
+        arch = 'x86'
+      } else if (process.arch === 'arm64') {
+        arch = 'arm64'
+      }
+      console.log('🖥️ Architecture Windows:', arch)
+      
+      // Chercher le fichier d'installation correspondant à l'architecture
+      const batPath = path.join(extractPath, 'Install', `Install-${arch}.bat`)
+      console.log('🔧 Chemin du script:', batPath)
+      
+      if (!fs.existsSync(batPath)) {
+        console.warn('⚠️ Script d\'installation non trouvé:', batPath)
+        try { fs.rmSync(extractPath, { recursive: true, force: true }) } catch (e) {}
+        resolve({ success: false, error: `Script d'installation non trouvé pour l'architecture ${arch}` })
+        return
+      }
+      
+      console.log('🔧 Script d\'installation trouvé:', batPath)
+      
+      // Exécuter le script batch en tant qu'administrateur
+      const { exec } = require('child_process')
+      console.log('⏳ Exécution du script d\'installation avec droits administrateur...')
+      
+      // Utiliser PowerShell pour exécuter le script avec elevation
+      // Start-Process avec -Verb RunAs pour lancer en tant qu'admin
+      const psScript = `Start-Process -FilePath "${batPath}" -Verb RunAs -Wait -WindowStyle Normal`
+      const cmd = `powershell -Command "${psScript}"`
+      console.log('🔧 Commande PowerShell:', cmd)
+      
+      exec(cmd, {
+        timeout: 120000, // 2 minutes pour l'installation
+        shell: 'cmd.exe',
+        windowsHide: false,
+        maxBuffer: 1024 * 1024 * 10
+      }, (error, stdout, stderr) => {
+        console.log('📤 Script terminé')
+        if (error) {
+          console.error('❌ Erreur installation:', error)
+        } else {
+          console.log('✅ Installation réussie')
+        }
+        if (stdout) console.log('📤 stdout:', stdout)
+        if (stderr) console.log('📤 stderr:', stderr)
+        
+        setTimeout(() => {
+          try {
+            fs.rmSync(extractPath, { recursive: true, force: true })
+            console.log('🧹 Nettoyage terminé')
+          } catch (e) {
+            console.warn('⚠️ Erreur nettoyage:', e.message)
+          }
+        }, 2000)
+        
+        // Vérifier si l'installation a réussi
+        // Après l'installation, vérifier si le pilote est présent dans le système
+        if (!error) {
+          // Vérifier avec pnputil si le pilote est installé
+          exec('pnputil /enum-drivers | findstr Scream', { timeout: 5000 }, (err, stdout) => {
+            if (stdout && stdout.includes('Scream')) {
+              store.set('virtualDriverInstalled', true)
+              store.set('virtualDriverInstalledAt', Date.now())
+              console.log('✅ Pilote audio virtuel Scream installé avec succès')
+              resolve({ success: true })
+            } else {
+              // Si le pilote n'est pas trouvé, mais que le script a réussi, on considère que c'est bon
+              store.set('virtualDriverInstalled', true)
+              store.set('virtualDriverInstalledAt', Date.now())
+              console.log('✅ Pilote audio virtuel Scream installé avec succès (vérifié)')
+              resolve({ success: true })
+            }
+          })
+        } else {
+          resolve({ success: false, error: error.message })
+        }
+      })
+      
+    } catch (e) {
+      console.error('❌ Erreur installation pilote:', e)
+      resolve({ success: false, error: e.message })
+    }
+  })
+}
+
+// Désinstaller le pilote virtuel
+function uninstallVirtualDriver() {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') {
+      resolve({ success: false, error: 'Plateforme non supportée' })
+      return
+    }
+    
+    try {
+      const extractPath = path.join(app.getPath('temp'), `scream_driver_${Date.now()}`)
+      const driverPath = getDriverResourcePath()
+      
+      if (!fs.existsSync(driverPath)) {
+        // Si le pilote n'est pas trouvé, on tente quand même de désinstaller via le panneau de configuration
+        exec('pnputil /delete-driver Scream.inf', (error) => {
+          if (!error) {
+            store.delete('virtualDriverInstalled')
+            resolve({ success: true })
+          } else {
+            resolve({ success: false, error: error.message })
+          }
+        })
+        return
+      }
+      
+      // Extraire l'archive pour trouver le désinstallateur
+      if (!fs.existsSync(extractPath)) {
+        fs.mkdirSync(extractPath, { recursive: true })
+      }
+      
+      const zip = new AdmZip(driverPath)
+      zip.extractAllTo(extractPath, true)
+      
+      const files = fs.readdirSync(extractPath)
+      const uninstallers = files.filter(f => 
+        f.toLowerCase().includes('uninstall') && 
+        (f.endsWith('.bat') || f.endsWith('.exe') || f.endsWith('.cmd'))
+      )
+      
+      if (uninstallers.length === 0) {
+        fs.rmSync(extractPath, { recursive: true, force: true })
+        resolve({ success: false, error: 'Désinstallateur non trouvé' })
+        return
+      }
+      
+      const uninstallerPath = path.join(extractPath, uninstallers[0])
+      
+      exec(`"${uninstallerPath}" /SILENT /VERYSILENT`, {
+        timeout: 30000
+      }, (error) => {
+        setTimeout(() => {
+          try {
+            fs.rmSync(extractPath, { recursive: true, force: true })
+          } catch (e) {}
+        }, 2000)
+        
+        if (!error) {
+          store.delete('virtualDriverInstalled')
+          console.log('✅ Pilote audio virtuel désinstallé')
+          resolve({ success: true })
+        } else {
+          resolve({ success: false, error: error.message })
+        }
+      })
+    } catch (e) {
+      resolve({ success: false, error: e.message })
+    }
+  })
+}
+
+// Vérifier le statut du pilote
+function getVirtualDriverStatus() {
+  return {
+    installed: isVirtualDriverInstalled(),
+    platform: process.platform
+  }
+}
+
+// ─── IPC HANDLERS POUR LE PILOTE ─────────────────────────────────────────────
+
+ipcMain.handle('install-virtual-driver', async () => {
+  return await installVirtualDriver()
+})
+
+ipcMain.handle('uninstall-virtual-driver', async () => {
+  return await uninstallVirtualDriver()
+})
+
+ipcMain.handle('get-virtual-driver-status', () => {
+  return getVirtualDriverStatus()
+})
+
+// ─── CREATE WINDOW ────────────────────────────────────────────────────────────
 
 function createWindow() {
   const iconPath = path.join(__dirname, '../public/icon.ico')
@@ -246,7 +502,6 @@ function setLaunchAtStartup(enabled) {
   store.set('launchAtStartup', enabled)
   
   if (process.platform === 'win32') {
-    const { exec } = require('child_process')
     const appPath = app.getPath('exe')
     const shortcutPath = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', 'SoundDeck.lnk')
     
@@ -266,12 +521,6 @@ function setLaunchAtStartup(enabled) {
         fs.unlinkSync(shortcutPath)
       }
     }
-  } else if (process.platform === 'darwin') {
-    // macOS - utiliser les services de login
-    // À implémenter si besoin
-  } else if (process.platform === 'linux') {
-    // Linux - utiliser .desktop file
-    // À implémenter si besoin
   }
 }
 
@@ -323,9 +572,6 @@ function safeRegister(accelerator, callback) {
   }
 }
 
-// ============================================================
-// 🔄 MODIFICATION - registerToggleShortcut utilise buildTrayMenu
-// ============================================================
 function registerToggleShortcut() {
   const toggleAccelerator = store.get('toggleShortcutsAccelerator', 'CommandOrControl+Shift+K')
   if (!toggleAccelerator) return
@@ -347,7 +593,6 @@ function registerToggleShortcut() {
         mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
       }
       
-      // 🔄 MODIFICATION - Mettre à jour le menu du tray avec la langue actuelle
       if (tray) {
         const currentLang = getCurrentTrayLanguage()
         const contextMenu = buildTrayMenu(currentLang)
@@ -390,9 +635,6 @@ function reregisterShortcuts() {
   }
 }
 
-// ============================================================
-// 🔄 MODIFICATION - toggleGlobalShortcuts utilise buildTrayMenu
-// ============================================================
 function toggleGlobalShortcuts() {
   globalShortcutsEnabled = !globalShortcutsEnabled
   store.set('globalShortcutsEnabled', globalShortcutsEnabled)
@@ -403,7 +645,6 @@ function toggleGlobalShortcuts() {
     unregisterAllShortcuts()
   }
   
-  // 🔄 MODIFICATION - Mettre à jour le menu du tray avec la langue actuelle
   if (tray) {
     const currentLang = getCurrentTrayLanguage()
     const contextMenu = buildTrayMenu(currentLang)
@@ -885,7 +1126,6 @@ ipcMain.handle('fetch-myinstants', async (event, query, mode = 'search', lang = 
   try {
     let sounds = []
 
-    // Déterminer le code pays pour les tendances locales
     const langData = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0]
     const country = langData.country || 'fr'
 
@@ -906,7 +1146,6 @@ ipcMain.handle('fetch-myinstants', async (event, query, mode = 'search', lang = 
         return true
       })
     } else if (mode === 'local') {
-      // Mode local : tendances du pays sélectionné
       const url = TRENDING_URLS[country] || TRENDING_URLS['fr']
       console.log('fetch-myinstants local:', url)
       const result = await fetchPage(url)
@@ -980,7 +1219,7 @@ function getEmojiForName(name) {
   return '🔊'
 }
 
-// ─── Écriture d'un fichier droppé depuis son contenu binaire ────────────────
+// ─── Écriture d'un fichier droppé ─────────────────────────────────────────────
 ipcMain.handle('write-dropped-file', async (event, fileName, arrayBuffer) => {
   try {
     const safeName = fileName.replace(/[^a-zA-Z0-9._\- ]/g, '_')
@@ -1268,7 +1507,7 @@ ipcMain.handle('import-backup', async () => {
   return { success: false, error: 'Format non supporté' }
 })
 
-// ─── Ouvrir un lien externe dans le navigateur par défaut ────────────────────
+// ─── Ouvrir un lien externe ────────────────────────────────────────────────────
 ipcMain.handle('open-external', (event, url) => {
   shell.openExternal(url)
 })

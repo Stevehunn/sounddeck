@@ -68,6 +68,7 @@
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "adm-zip": "^0.5.17",
     "archiver": "^6.0.0",
     "electron-store": "^8.1.0",
     "howler": "^2.2.4",

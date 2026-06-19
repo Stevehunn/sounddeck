@@ -177,6 +177,103 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           </div>
         </Section>
 
+        {/* Mode audio */}
+        <Section title="Mode audio" icon="ti-soundwave">
+          <OptionRow label="Mode d'audio" sub="Choisissez comment SoundDeck envoie l'audio">
+            <select 
+              value={store.audioMode || 'simple'} 
+              onChange={e => store.updateAudioMode(e.target.value)}
+              style={{ width: 200, fontSize: 12 }}
+            >
+              <option value="simple">Mode simple (intégré)</option>
+              <option value="advanced">Mode avancé (VB-Cable/VoiceMeeter)</option>
+            </select>
+          </OptionRow>
+
+          {store.audioMode === 'simple' && (
+            <>
+              <OptionRow label="Périphérique audio virtuel" sub="Installe un périphérique audio pour Discord">
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button 
+                    className={store.virtualDriverInstalled ? "btn-primary" : "btn-secondary"}
+                    onClick={async () => {
+                      if (store.virtualDriverInstalled) {
+                        const result = await window.electronAPI.uninstallVirtualDriver()
+                        if (result.success) {
+                          store.setVirtualDriverInstalled(false)
+                          addToast('Périphérique virtuel désinstallé', 'info')
+                        } else {
+                          addToast('Erreur désinstallation: ' + result.error, 'error')
+                        }
+                      } else {
+                        addToast('Installation du périphérique virtuel en cours...', 'info')
+                        const result = await window.electronAPI.installVirtualDriver()
+                        if (result.success) {
+                          store.setVirtualDriverInstalled(true)
+                          addToast('✅ Périphérique virtuel installé ! Redémarre Discord pour le voir apparaître.', 'success')
+                        } else {
+                          addToast('❌ Erreur installation: ' + result.error, 'error')
+                        }
+                      }
+                    }}
+                    style={{ fontSize: 12 }}
+                  >
+                    <i className={`ti ${store.virtualDriverInstalled ? 'ti-circle-check' : 'ti-download'}`} />
+                    {store.virtualDriverInstalled ? '✅ Installé' : 'Installer le pilote'}
+                  </button>
+                  {store.virtualDriverInstalled && (
+                    <span style={{ fontSize: 11, color: 'var(--success)' }}>
+                      <i className="ti ti-check" /> Scream Virtual Device
+                    </span>
+                  )}
+                </div>
+              </OptionRow>
+              
+              <OptionRow label="Périphérique de sortie" sub="Sélectionne le périphérique virtuel pour Discord">
+                <select 
+                  value={store.audioDevice} 
+                  onChange={e => store.updateAudioDevice(e.target.value)}
+                  style={{ width: 220, fontSize: 12 }}
+                >
+                  <option value="default">Par défaut</option>
+                  {audioDevices.map(d => (
+                    <option key={d.deviceId} value={d.deviceId}>
+                      {d.label || `Périphérique ${d.deviceId.slice(0, 8)}`}
+                    </option>
+                  ))}
+                </select>
+              </OptionRow>
+
+              <div style={{ padding: '10px 12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                <i className="ti ti-info-circle" style={{ marginRight: 6, color: 'var(--accent)' }} />
+                <strong>Mode simple</strong> : SoundDeck installe un périphérique audio virtuel (Scream). 
+                Sélectionnez-le dans Discord comme périphérique d'entrée.
+                <br />
+                <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                  ⚠️ Nécessite un redémarrage de Discord après l'installation.
+                </span>
+              </div>
+            </>
+          )}
+
+          {store.audioMode === 'advanced' && (
+            <div style={{ padding: '10px 12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              <i className="ti ti-info-circle" style={{ marginRight: 6, color: 'var(--accent)' }} />
+              <strong>Mode avancé</strong> : Utilise VB-Cable + VoiceMeeter Banana pour un mixage professionnel.
+              <br />
+              <button onClick={() => window.electronAPI?.openExternal('https://vb-audio.com/Cable/')}
+                style={{ color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer', marginTop: 4, display: 'inline-block', fontSize: 12, padding: 0 }}>
+                <i className="ti ti-download" /> Télécharger VB-Cable
+              </button>
+              <br />
+              <button onClick={() => window.electronAPI?.openExternal('https://vb-audio.com/Voicemeeter/banana.htm')}
+                style={{ color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer', marginTop: 2, display: 'inline-block', fontSize: 12, padding: 0 }}>
+                <i className="ti ti-download" /> Télécharger VoiceMeeter Banana
+              </button>
+            </div>
+          )}
+        </Section>
+
         {/* Raccourcis globaux */}
         <Section title={tr('shortcuts')} icon="ti-keyboard">
           <OptionRow label={tr('switchProfile')} sub={tr('switchProfileDesc')}>
@@ -212,7 +309,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             />
           </OptionRow>
           
-          {/* NOUVEAU : Raccourci pour activer/désactiver les raccourcis globaux */}
+          {/* Raccourci pour activer/désactiver les raccourcis globaux */}
           <OptionRow label="Toggle raccourcis" sub="Activer/désactiver tous les raccourcis globaux">
             <ShortcutRecorder
               value={store.toggleShortcutsAccelerator || 'CommandOrControl+Shift+K'}

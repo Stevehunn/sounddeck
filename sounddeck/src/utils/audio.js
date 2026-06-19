@@ -1,10 +1,15 @@
-// sounddeck/src/utils/audio.js
 import { Howl, Howler } from 'howler'
 
 const soundCache = {}
 
 // Cache pour les gains normalisés
 const gainCache = {}
+
+let audioMode = 'simple'
+
+export function setAudioMode(mode) {
+  audioMode = mode
+}
 
 // Construit une URL file:// correcte pour Windows et les chemins avec espaces
 function buildFileUrl(filePath) {

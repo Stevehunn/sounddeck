@@ -1,4 +1,3 @@
-// sounddeck/electron/preload.js
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -38,7 +37,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   quitApp: () => ipcRenderer.invoke('quit-app'),
   hideWindow: () => ipcRenderer.invoke('hide-window'),
   showWindow: () => ipcRenderer.invoke('show-window'),
-  storeSetLang: (lang) => ipcRenderer.invoke('store-set-lang', lang),
+
+  // Nouvelles API pour le pilote virtuel
+  installVirtualDriver: () => ipcRenderer.invoke('install-virtual-driver'),
+  uninstallVirtualDriver: () => ipcRenderer.invoke('uninstall-virtual-driver'),
+  getVirtualDriverStatus: () => ipcRenderer.invoke('get-virtual-driver-status'),
 
   // Expose process.versions pour détecter Electron dans le renderer
   isElectron: true,
