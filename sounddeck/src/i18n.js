@@ -169,6 +169,13 @@ export const TRANSLATIONS = {
     toastShortcutPresentation: 'Raccourci présentation :',
     toastCustomThemeApplied: 'Thème personnalisé appliqué !',
     toastProfileExporting: 'Création de l\'archive du profil...',
+    virtualDriverDetected: 'Périphérique virtuel détecté',
+    virtualDriverNotDetected: 'Aucun périphérique virtuel détecté',
+    downloadVirtualDriver: 'Télécharger le pilote virtuel',
+    virtualDriverInfo: 'Téléchargez et installez le pilote, puis redémarrez Discord.',
+    virtualDriverSuccess: '✅ Périphérique virtuel détecté ! Sélectionnez-le dans Discord.',
+    virtualDriverSelect: 'Sélectionne le périphérique virtuel pour Discord',
+    virtualDriverDefault: 'Par défaut',
 
     // ── Presentation ──────────────────────────────────────────────────────────
     presentationTitle: 'Mode Présentation',
@@ -603,6 +610,13 @@ export const TRANSLATIONS = {
     toastShortcutPresentation: 'Presentation shortcut:',
     toastCustomThemeApplied: 'Custom theme applied!',
     toastProfileExporting: 'Creating profile archive...',
+    virtualDriverDetected: 'Périphérique virtuel détecté',
+    virtualDriverNotDetected: 'Aucun périphérique virtuel détecté',
+    downloadVirtualDriver: 'Télécharger le pilote virtuel',
+    virtualDriverInfo: 'Téléchargez et installez le pilote, puis redémarrez Discord.',
+    virtualDriverSuccess: '✅ Périphérique virtuel détecté ! Sélectionnez-le dans Discord.',
+    virtualDriverSelect: 'Sélectionne le périphérique virtuel pour Discord',
+    virtualDriverDefault: 'Par défaut',
 
     // ── Presentation ──────────────────────────────────────────────────────────
     presentationTitle: 'Presentation Mode',
@@ -1037,6 +1051,13 @@ export const TRANSLATIONS = {
     toastShortcutPresentation: 'Atajo presentación:',
     toastCustomThemeApplied: '¡Tema personalizado aplicado!',
     toastProfileExporting: 'Creando archivo del perfil...',
+    virtualDriverDetected: 'Périphérique virtuel détecté',
+    virtualDriverNotDetected: 'Aucun périphérique virtuel détecté',
+    downloadVirtualDriver: 'Télécharger le pilote virtuel',
+    virtualDriverInfo: 'Téléchargez et installez le pilote, puis redémarrez Discord.',
+    virtualDriverSuccess: '✅ Périphérique virtuel détecté ! Sélectionnez-le dans Discord.',
+    virtualDriverSelect: 'Sélectionne le périphérique virtuel pour Discord',
+    virtualDriverDefault: 'Par défaut',
 
     // ── Presentation ──────────────────────────────────────────────────────────
     presentationTitle: 'Modo Presentación',

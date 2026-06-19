@@ -36,6 +36,11 @@ export function useStore() {
   const [audioMode, setAudioMode] = useState('simple')
   const [virtualDriverInstalled, setVirtualDriverInstalled] = useState(false) // ✅ Déclaration unique
 
+  const [mixerEnabled, setMixerEnabled] = useState(false)
+  const [microphoneDevice, setMicrophoneDevice] = useState('default')
+  const [microphoneVolume, setMicrophoneVolume] = useState(80)
+  const [mixerSoundVolume, setMixerSoundVolume] = useState(100)
+
   // ─── Chargement initial depuis electron-store ────────────────────────────────
   useEffect(() => {
     async function loadData() {
@@ -80,6 +85,15 @@ export function useStore() {
         const savedVirtualDriverInstalled = await window.electronAPI.storeGet('virtualDriverInstalled') || false
         setAudioMode(savedAudioMode)
         setVirtualDriverInstalled(savedVirtualDriverInstalled)
+
+        const savedMixerEnabled = await window.electronAPI.storeGet('mixerEnabled') ?? false
+        const savedMicrophoneDevice = await window.electronAPI.storeGet('microphoneDevice') || 'default'
+        const savedMicrophoneVolume = await window.electronAPI.storeGet('microphoneVolume') ?? 80
+        const savedMixerSoundVolume = await window.electronAPI.storeGet('mixerSoundVolume') ?? 100
+        setMixerEnabled(savedMixerEnabled)
+        setMicrophoneDevice(savedMicrophoneDevice)
+        setMicrophoneVolume(savedMicrophoneVolume)
+        setMixerSoundVolume(savedMixerSoundVolume)
 
         setProfiles(allProfiles)
         setSounds(savedSounds)
@@ -440,6 +454,29 @@ export function useStore() {
     await save('normalizationTarget', target)
   }, [save])
 
+  // ─── Mixer ──────────────────────────────────────────────────────────────────
+  const updateMixerEnabled = useCallback(async (enabled) => {
+    console.log('💾 Sauvegarde mixerEnabled:', enabled)
+    setMixerEnabled(enabled)
+    await save('mixerEnabled', enabled)
+  }, [save])
+
+  const updateMicrophoneDevice = useCallback(async (deviceId) => {
+    setMicrophoneDevice(deviceId)
+    await save('microphoneDevice', deviceId)
+  }, [save])
+
+  const updateMicrophoneVolume = useCallback(async (volume) => {
+    setMicrophoneVolume(volume)
+    await save('microphoneVolume', volume)
+  }, [save])
+
+  const updateMixerSoundVolume = useCallback(async (volume) => {
+    setMixerSoundVolume(volume)
+    await save('mixerSoundVolume', volume)
+  }, [save])
+
+
   // ─── Sons ordonnés selon le profil ──────────────────────────────────────────
   const orderedSounds = useMemo(() => {
     const profileId = currentProfileId || 'all'
@@ -499,6 +536,15 @@ export function useStore() {
     // Normalisation
     updateNormalizationEnabled,
     updateNormalizationTarget,
+    // Mixer
+    mixerEnabled,
+    microphoneDevice,
+    microphoneVolume,
+    mixerSoundVolume,
+    updateMixerEnabled,
+    updateMicrophoneDevice,
+    updateMicrophoneVolume,
+    updateMixerSoundVolume,
     // Démarrage
     startMinimized,
     launchAtStartup,

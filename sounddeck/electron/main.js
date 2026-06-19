@@ -602,6 +602,9 @@ function registerToggleShortcut() {
       const state = globalShortcutsEnabled ? 'activés' : 'désactivés'
       console.log(`🔇 Raccourcis ${state}`)
     })
+
+    console.log('✅ Raccourci toggle enregistré:', toggleAccelerator)
+    console.log('📊 État des raccourcis globaux:', globalShortcutsEnabled)
     
     if (ok) {
       console.log('✅ Raccourci toggle enregistré:', toggleAccelerator)

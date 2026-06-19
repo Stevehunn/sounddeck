@@ -1,4 +1,6 @@
+// sounddeck/src/utils/audio.js
 import { Howl, Howler } from 'howler'
+import { playSoundInMixer, loadAudioBuffer, isMixerActive, mixerState, stopMixer, initAudioMixer } from './audioMixer'
 
 const soundCache = {}
 
@@ -6,6 +8,13 @@ const soundCache = {}
 const gainCache = {}
 
 let audioMode = 'simple'
+
+// Référence au store pour accéder à l'état du mixeur
+let storeRef = null
+
+export function setStoreRef(store) {
+  storeRef = store
+}
 
 export function setAudioMode(mode) {
   audioMode = mode
@@ -48,10 +57,9 @@ export async function analyzeGain(filePath, sampleCount = 100) {
     }
     
     const rms = Math.sqrt(sumSquares / (channelData.length / step))
-    // Gain en dB pour atteindre -18 LUFS (valeur standard)
     const targetRMS = 0.1 // environ -20 dB
     const gain = rms > 0.001 ? targetRMS / rms : 1
-    const gainDb = 20 * Math.log10(Math.min(gain, 10)) // Limiter à +20dB max
+    const gainDb = 20 * Math.log10(Math.min(gain, 10))
     
     gainCache[filePath] = gainDb
     return gainDb
@@ -66,40 +74,80 @@ function calculateFinalVolume(globalVolume, soundVolumeDb, gainDb = 0) {
   const normalizedGlobal = globalVolume / 100
   const globalRatio = Math.pow(normalizedGlobal, 1.8)
   
-  // Ajustement individuel en dB (-24 à +24)
   const individualGain = (soundVolumeDb || 0)
-  
-  // Gain de normalisation
   const normalizationGain = gainDb || 0
-  
-  // Gain total en dB
   const totalGainDb = individualGain + normalizationGain
-  
-  // Convertir en ratio linéaire (plus grande plage)
   const linearGain = Math.pow(10, totalGainDb / 20)
-  
-  // Volume final = global * gain
   const finalVolume = Math.min(1, globalRatio * linearGain)
   
-  return Math.max(0.0001, finalVolume) // Plus petit minimum pour -24dB
+  return Math.max(0.0001, finalVolume)
 }
 
-// Version asynchrone de playSound avec normalisation
-export async function playSoundAsync(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
-  if (!sound?.path) return
+// Jouer un son avec le mixeur (micro + sons)
 
-  // Analyser le gain si pas encore fait
-  let gainDb = 0
-  if (sound.path && !gainCache[sound.path]) {
-    try {
-      gainDb = await analyzeGain(sound.path)
-    } catch (e) {
-      console.warn('Gain analysis failed, using default:', e)
-    }
-  } else if (sound.path) {
-    gainDb = gainCache[sound.path] || 0
+async function playSoundWithMixer(sound, globalVolume, loop) {
+  // Le volume du son est en dB (-24 à +24), il faut le convertir en ratio
+  // 0 dB = 100%, -24 dB = ~0%, +24 dB = ~400% (limité à 1)
+  const soundVolumeDb = sound.volumeDb ?? sound.volume ?? 0
+  
+  // Convertir dB en ratio linéaire (0-1)
+  // 0 dB -> 1.0, -24 dB -> ~0.063, +24 dB -> ~15.8 (limité à 1)
+  let soundRatio = Math.pow(10, soundVolumeDb / 20)
+  soundRatio = Math.min(1, soundRatio) // Limiter à 1 (100%)
+  
+  const globalVol = globalVolume / 100
+  const mixerVol = (storeRef?.mixerSoundVolume ?? 100) / 100
+  
+  // Volume final = soundRatio * globalVol * mixerVol
+  const volumeRatio = soundRatio * globalVol * mixerVol
+  
+  console.log('🔊 Volume calculé:', {
+    soundVolumeDb,
+    soundRatio,
+    globalVol,
+    mixerVol,
+    volumeRatio
+  })
+  
+  const fileUrl = buildFileUrl(sound.path)
+  
+  // Vérifier si le son est déjà en cours de lecture
+  if (soundCache[sound.id]) {
+    stopSound(sound.id)
+    return
   }
+  
+  // Charger le son dans un buffer
+  const audioBuffer = await loadAudioBuffer(fileUrl)
+  if (!audioBuffer) {
+    console.warn('⚠️ Impossible de charger le son:', fileUrl)
+    return
+  }
+  
+  // Jouer dans le mixeur avec le volume calculé
+  const source = playSoundInMixer(audioBuffer, volumeRatio)
+  
+  if (source) {
+    soundCache[sound.id] = source
+    if (loop) {
+      source.onended = () => {
+        if (storeRef?.loopEnabled) {
+          playSoundWithMixer(sound, globalVolume, loop)
+        } else {
+          delete soundCache[sound.id]
+        }
+      }
+    } else {
+      source.onended = () => {
+        delete soundCache[sound.id]
+      }
+    }
+  }
+}
 
+// Jouer un son normalement (sans mixeur)
+function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
+  const gainDb = gainCache[sound.path] || 0
   const volumeRatio = calculateFinalVolume(globalVolume, sound.volume ?? 0, gainDb)
   let fileUrl = buildFileUrl(sound.path)
 
@@ -107,19 +155,17 @@ export async function playSoundAsync(sound, audioDevice = 'default', globalVolum
   const validFormats = ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'opus', 'webm']
   const format = validFormats.includes(rawExt) ? rawExt : 'mp3'
 
-  // Toggle : si en cours → stop
   if (soundCache[sound.id]) {
     const cached = soundCache[sound.id]
     if (Array.isArray(cached)) {
       cached.forEach(h => { try { h.stop(); h.unload() } catch(e){} })
     } else {
-      try { cached.stop(); cached.unload() } catch(e){}
+      try { cached.stop(); cached.unload() } catch(e){} 
     }
     delete soundCache[sound.id]
     return
   }
 
-  // Cas 1 : périphérique par défaut
   if (!audioDevice || audioDevice === 'default') {
     const howl = new Howl({
       src: [fileUrl],
@@ -136,7 +182,6 @@ export async function playSoundAsync(sound, audioDevice = 'default', globalVolum
     return
   }
 
-  // Cas 2 : périphérique virtuel
   try {
     const howls = []
 
@@ -194,11 +239,38 @@ export async function playSoundAsync(sound, audioDevice = 'default', globalVolum
   }
 }
 
-// Version synchrone pour compatibilité (utilise le cache existant)
+// Version principale de playSound - vérifie si le mixeur est activé
 export function playSound(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
   if (!sound?.path) return
   
-  const gainDb = gainCache[sound.path] || 0
+  // Vérifier si le mixeur est activé et actif
+  const mixerEnabled = storeRef?.mixerEnabled || false
+  
+  if (mixerEnabled && isMixerActive()) {
+    // Utiliser le mixeur
+    playSoundWithMixer(sound, globalVolume, loop)
+    return
+  }
+  
+  // Sinon, utiliser le mode normal
+  playSoundNormal(sound, audioDevice, globalVolume, loop, playLocally)
+}
+
+// Version asynchrone de playSound avec normalisation
+export async function playSoundAsync(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
+  if (!sound?.path) return
+
+  let gainDb = 0
+  if (sound.path && !gainCache[sound.path]) {
+    try {
+      gainDb = await analyzeGain(sound.path)
+    } catch (e) {
+      console.warn('Gain analysis failed, using default:', e)
+    }
+  } else if (sound.path) {
+    gainDb = gainCache[sound.path] || 0
+  }
+
   const volumeRatio = calculateFinalVolume(globalVolume, sound.volume ?? 0, gainDb)
   let fileUrl = buildFileUrl(sound.path)
 
@@ -211,7 +283,7 @@ export function playSound(sound, audioDevice = 'default', globalVolume = 80, loo
     if (Array.isArray(cached)) {
       cached.forEach(h => { try { h.stop(); h.unload() } catch(e){} })
     } else {
-      try { cached.stop(); cached.unload() } catch(e){}
+      try { cached.stop(); cached.unload() } catch(e){} 
     }
     delete soundCache[sound.id]
     return
@@ -311,8 +383,6 @@ export async function analyzeAllGains(sounds, onProgress) {
   return gainCache
 }
 
-// ... (le reste des fonctions inchangées)
-
 export function stopSound(soundId) {
   const cached = soundCache[soundId]
   if (cached) {
@@ -339,23 +409,58 @@ export function stopAllSounds() {
 export function isPlaying(soundId) {
   const cached = soundCache[soundId]
   if (!cached) return false
-  if (Array.isArray(cached)) return cached.some(h => h.playing())
-  return cached.playing()
+  
+  // Si c'est un tableau (mode normal avec Howl)
+  if (Array.isArray(cached)) {
+    return cached.some(h => h.playing && h.playing())
+  }
+  
+  // Si c'est un Howl (mode normal)
+  if (cached.playing && typeof cached.playing === 'function') {
+    return cached.playing()
+  }
+  
+  // Si c'est un AudioBufferSourceNode (mode mixeur)
+  // On vérifie s'il est toujours actif
+  try {
+    // Un AudioBufferSourceNode n'a pas de méthode playing()
+    // On vérifie si le son est en cours via le gain du noeud
+    // On retourne true si le noeud existe (il sera nettoyé à la fin)
+    return !!cached
+  } catch (e) {
+    return false
+  }
 }
 
 export function getSoundProgress(soundId) {
   const cached = soundCache[soundId]
   if (!cached) return null
-  const howl = Array.isArray(cached) ? cached[0] : cached
-  if (!howl || !howl.playing()) return null
-
-  const seek = howl.seek()
-  const duration = howl.duration()
-
-  if (typeof seek !== 'number' || typeof duration !== 'number') return null
-  if (!duration || duration <= 0) return null
-
-  return { current: seek, duration, ratio: Math.min(1, seek / duration) }
+  
+  // Si c'est un tableau (mode normal avec Howl)
+  if (Array.isArray(cached)) {
+    const howl = cached[0]
+    if (!howl || !howl.playing || !howl.playing()) return null
+    const seek = howl.seek()
+    const duration = howl.duration()
+    if (typeof seek !== 'number' || typeof duration !== 'number') return null
+    if (!duration || duration <= 0) return null
+    return { current: seek, duration, ratio: Math.min(1, seek / duration) }
+  }
+  
+  // Si c'est un Howl (mode normal)
+  if (cached.playing && typeof cached.playing === 'function') {
+    if (!cached.playing()) return null
+    const seek = cached.seek()
+    const duration = cached.duration()
+    if (typeof seek !== 'number' || typeof duration !== 'number') return null
+    if (!duration || duration <= 0) return null
+    return { current: seek, duration, ratio: Math.min(1, seek / duration) }
+  }
+  
+  // Si c'est un AudioBufferSourceNode (mode mixeur)
+  // On ne peut pas obtenir la progression facilement
+  // On retourne null pour ne pas afficher la barre de progression
+  return null
 }
 
 export function getSoundDuration(soundId) {
@@ -370,5 +475,5 @@ export function clearSoundCache(soundId) {
   else stopAllSounds()
 }
 
-// Exporter la fonction de calcul pour usage externe
+// Exporter les fonctions pour usage externe
 export { calculateFinalVolume, gainCache }

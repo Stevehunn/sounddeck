@@ -1,3 +1,8 @@
+import { useState, useEffect } from 'react'
+
+// Compteur global pour générer des IDs uniques
+let toastCounter = 0
+
 export default function Toast({ toasts }) {
   if (!toasts.length) return null
 

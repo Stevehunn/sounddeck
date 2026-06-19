@@ -11,7 +11,7 @@ import YouTube from './pages/YouTube'
 import Guide from './pages/Guide'
 import Presentation from './pages/Presentation'
 import Toast from './components/Toast'
-import { playSound, stopAllSounds } from './utils/audio'
+import { playSound, stopAllSounds, setStoreRef } from './utils/audio'
 import { LANGUAGES } from './i18n'
 
 export default function App() {
@@ -28,6 +28,11 @@ export default function App() {
   const audioDeviceRef = useRef('default')
   const volumeRef = useRef(80)
   const setPresentationRef = useRef(null)
+
+  // ✅ Passer la référence du store à audio.js pour le mixeur
+  useEffect(() => {
+    setStoreRef(store)
+  }, [store])
 
   useEffect(() => { soundsRef.current = store.sounds }, [store.sounds])
   useEffect(() => { switchToNextProfileRef.current = store.switchToNextProfile }, [store.switchToNextProfile])
@@ -88,7 +93,10 @@ export default function App() {
 
     window.electronAPI.onPlaySound((soundId) => {
       const sound = soundsRef.current.find(s => s.id === soundId)
-      if (sound) playSound(sound, audioDeviceRef.current, volumeRef.current, false, playLocallyRef.current)
+      if (sound) {
+        // Utiliser store.mixerEnabled pour décider du mode de lecture
+        playSound(sound, audioDeviceRef.current, volumeRef.current, false, playLocallyRef.current)
+      }
     })
 
     window.electronAPI.onSwitchProfile(async () => {
@@ -119,10 +127,11 @@ export default function App() {
       window.electronAPI.removeAllListeners('stop-all-sounds')
       window.electronAPI.removeAllListeners('toggle-presentation')
     }
-  }, [store.loopEnabled]) // Ajout de store.loopEnabled pour que le toast soit à jour
+  }, [store.loopEnabled, store.mixerEnabled]) // ✅ Ajout de store.mixerEnabled pour que le mixeur soit pris en compte
 
   const addToast = (message, type = 'info') => {
-    const id = Date.now()
+    // Utiliser crypto.randomUUID() pour garantir des IDs uniques
+    const id = crypto.randomUUID ? crypto.randomUUID() : Date.now() + '_' + Math.random()
     setToasts(prev => [...prev, { id, message, type }])
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000)
   }

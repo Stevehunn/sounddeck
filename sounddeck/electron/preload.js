@@ -1,3 +1,4 @@
+// sounddeck/electron/preload.js
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -18,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateLoopShortcut: (acc) => ipcRenderer.invoke('update-loop-shortcut', acc),
   updateStopAllShortcut: (acc) => ipcRenderer.invoke('update-stop-all-shortcut', acc),
   updatePresentationShortcut: (acc) => ipcRenderer.invoke('update-presentation-shortcut', acc),
+  updateToggleShortcutsAccelerator: (accelerator) => ipcRenderer.invoke('update-toggle-shortcuts-accelerator', accelerator),
   onPlaySound: (cb) => ipcRenderer.on('play-sound', (e, id) => cb(id)),
   onSwitchProfile: (cb) => ipcRenderer.on('switch-profile', () => cb()),
   onToggleLoop: (cb) => ipcRenderer.on('toggle-loop', () => cb()),
