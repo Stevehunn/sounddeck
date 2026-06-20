@@ -257,13 +257,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
 
         {/* AUDIO */}
         <Section title={tr('audio')} icon="ti-volume">
-          
-          {/* Volume global */}
-          <OptionRow label={tr('globalVolume')} sub={`${store.volume}%`}>
-            <input type="range" min="0" max="100" value={store.volume}
-              onChange={e => store.updateVolume(Number(e.target.value))}
-              style={{ width: 140, accentColor: 'var(--accent)' }} />
-          </OptionRow>
 
           {/* Mode d'audio */}
           <OptionRow label={tr('audioMode')} sub={tr('audioModeDesc')}>
@@ -316,9 +309,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                       <i className="ti ti-check" style={{ marginRight: 4 }} />
                       {tr('virtualDriverSuccess')}
                       <br />
-                      <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
-                        💡 {tr('uninstallGuide')}
-                      </span>
                     </div>
                   )}
 
@@ -413,6 +403,25 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                       style={{ width: 140, accentColor: 'var(--accent)' }} />
                   </OptionRow>
 
+                  <OptionRow label={tr('noiseSuppressionMode')} sub={tr('noiseSuppressionModeDesc')}>
+                    <select 
+                      value={store.noiseSuppressionMode || 'auto'} 
+                      onChange={async (e) => {
+                        const mode = e.target.value
+                        await store.updateNoiseSuppressionMode(mode)
+                        const { setNoiseSuppressionMode } = await import('../utils/audioMixer')
+                        setNoiseSuppressionMode(mode)
+                        addToast(tr('noiseSuppressionModeChanged').replace('{mode}', mode), 'info')
+                      }}
+                      style={{ width: 140, fontSize: 12 }}
+                    >
+                      <option value="auto">{tr('noiseSuppressionModeAuto')}</option>
+                      <option value="worklet">{tr('noiseSuppressionModeWorklet')}</option>
+                      <option value="filter">{tr('noiseSuppressionModeFilter')}</option>
+                      <option value="off">{tr('noiseSuppressionModeOff')}</option>
+                    </select>
+                  </OptionRow>
+
                   <OptionRow label={tr('mixerSoundVolume')} sub={`${store.mixerSoundVolume}%`}>
                     <input type="range" min="0" max="100" value={store.mixerSoundVolume}
                       onChange={async (e) => {
@@ -422,6 +431,62 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                         setSoundVolume(val / 100)
                       }}
                       style={{ width: 140, accentColor: 'var(--accent)' }} />
+                  </OptionRow>
+
+                  <OptionRow label={tr('mixerStatus')} sub={tr('mixerStatusSub')}>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ 
+                        fontSize: 11, 
+                        color: (() => {
+                          try {
+                            const { isMixerOperational } = require('../utils/audioMixer')
+                            return isMixerOperational() ? 'var(--success)' : 'var(--danger)'
+                          } catch { return 'var(--text-tertiary)' }
+                        })()
+                      }}>
+                        <i className={`ti ${(() => {
+                          try {
+                            const { isMixerOperational } = require('../utils/audioMixer')
+                            return isMixerOperational() ? 'ti-check' : 'ti-x'
+                          } catch { return 'ti-minus' }
+                        })()}`} />
+                        <span style={{ marginLeft: 4, fontSize: 11 }}>
+                          {(() => {
+                            try {
+                              const { isMixerOperational } = require('../utils/audioMixer')
+                              return isMixerOperational() ? tr('mixerOperational') : tr('mixerNotOperational')
+                            } catch { return '' }
+                          })()}
+                        </span>
+                      </span>
+                      <button className="btn-secondary" onClick={async () => {
+                        try {
+                          const { repairMixer, isMixerOperational } = await import('../utils/audioMixer')
+                          if (!isMixerOperational()) {
+                            const success = repairMixer()
+                            if (success) {
+                              addToast(tr('mixerRepaired'), 'success')
+                            } else {
+                              addToast(tr('mixerReset'), 'info')
+                              const { stopMixer, initAudioMixer, connectMixerToOutput, resumeAudioContext } = await import('../utils/audioMixer')
+                              await stopMixer()
+                              const stream = await initAudioMixer(store.microphoneDevice || 'default')
+                              if (stream) {
+                                resumeAudioContext()
+                                connectMixerToOutput(store.audioDevice || 'default')
+                                addToast(tr('mixerResetSuccess'), 'success')
+                              }
+                            }
+                          } else {
+                            addToast(tr('mixerOperational'), 'success')
+                          }
+                        } catch (e) {
+                          addToast(tr('mixerRepairError').replace('{error}', e.message), 'error')
+                        }
+                      }} style={{ fontSize: 12 }}>
+                        <i className="ti ti-wrench" /> {tr('mixerRepair')}
+                      </button>
+                    </div>
                   </OptionRow>
 
                   <OptionRow label={tr('testMicrophone')} sub="">
@@ -436,7 +501,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                       }}
                     >
                       <i className={`ti ${isMicrophoneTesting ? 'ti-microphone-2' : 'ti-mic'}`} 
-                         style={isMicrophoneTesting ? { animation: 'pulse 0.6s ease infinite' } : {}} />
+                        style={isMicrophoneTesting ? { animation: 'pulse 0.6s ease infinite' } : {}} />
                       {isMicrophoneTesting ? 'Test en cours...' : tr('test')}
                     </button>
                   </OptionRow>

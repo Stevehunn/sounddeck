@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onShortcutsToggle: (cb) => ipcRenderer.on('shortcuts-toggle', (e, enabled) => cb(enabled)),
   removeAllListeners: (ch) => ipcRenderer.removeAllListeners(ch),
   updateTrayLanguage: (lang) => ipcRenderer.invoke('update-tray-language', lang),
+  setNoiseSuppression: (enabled) => ipcRenderer.invoke('set-noise-suppression', enabled),
 
   // Nouvelles API pour le tray
   getStartMinimized: () => ipcRenderer.invoke('get-start-minimized'),

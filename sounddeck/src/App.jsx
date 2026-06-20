@@ -12,13 +12,13 @@ import Guide from './pages/Guide'
 import Presentation from './pages/Presentation'
 import Toast from './components/Toast'
 import { playSound, stopAllSounds, setStoreRef } from './utils/audio'
-import { LANGUAGES } from './i18n'
 
 export default function App() {
   const store = useStore()
   const [currentPage, setCurrentPage] = useState('home')
   const [presentationMode, setPresentationMode] = useState(false)
   const [toasts, setToasts] = useState([])
+  const [mixerInitialized, setMixerInitialized] = useState(false)
 
   const soundsRef = useRef([])
   const addToastRef = useRef(null)
@@ -87,6 +87,49 @@ export default function App() {
     }
   }, [store.lang])
 
+  // ✅ Initialiser le mixeur au démarrage si activé
+  useEffect(() => {
+    if (store.loading) return
+    if (mixerInitialized) return
+    
+    const initMixer = async () => {
+      if (store.mixerEnabled && store.initMixerOnStartup) {
+        console.log('🎛️ Initialisation du mixeur au démarrage de l\'app...')
+        // Attendre un peu que tout soit bien chargé
+        await new Promise(resolve => setTimeout(resolve, 500))
+        const success = await store.initMixerOnStartup()
+        setMixerInitialized(true)
+        if (success) {
+          console.log('✅ Mixeur initialisé avec succès au démarrage')
+        } else {
+          console.warn('⚠️ Échec de l\'initialisation du mixeur au démarrage')
+        }
+      } else {
+        setMixerInitialized(true)
+      }
+    }
+    
+    initMixer()
+  }, [store.loading, store.mixerEnabled, store.initMixerOnStartup, mixerInitialized])
+
+  // ✅ Vérifier l'état du mixeur quand la langue change
+  useEffect(() => {
+    if (!store.loading && store.mixerEnabled && mixerInitialized) {
+      const checkMixer = async () => {
+        try {
+          const { isMixerOperational, repairMixer } = await import('./utils/audioMixer')
+          if (!isMixerOperational()) {
+            console.log('🔧 Mixeur non opérationnel après changement de langue, tentative de réparation...')
+            repairMixer()
+          }
+        } catch (e) {
+          console.warn('Erreur vérification mixeur:', e)
+        }
+      }
+      checkMixer()
+    }
+  }, [store.lang, store.loading, store.mixerEnabled, mixerInitialized])
+
   // Enregistrer les listeners IPC
   useEffect(() => {
     if (!window.electronAPI) return
@@ -94,7 +137,6 @@ export default function App() {
     window.electronAPI.onPlaySound((soundId) => {
       const sound = soundsRef.current.find(s => s.id === soundId)
       if (sound) {
-        // Utiliser store.mixerEnabled pour décider du mode de lecture
         playSound(sound, audioDeviceRef.current, volumeRef.current, false, playLocallyRef.current)
       }
     })
@@ -127,10 +169,9 @@ export default function App() {
       window.electronAPI.removeAllListeners('stop-all-sounds')
       window.electronAPI.removeAllListeners('toggle-presentation')
     }
-  }, [store.loopEnabled, store.mixerEnabled]) // ✅ Ajout de store.mixerEnabled pour que le mixeur soit pris en compte
+  }, [store.loopEnabled, store.mixerEnabled])
 
   const addToast = (message, type = 'info') => {
-    // Utiliser crypto.randomUUID() pour garantir des IDs uniques
     const id = crypto.randomUUID ? crypto.randomUUID() : Date.now() + '_' + Math.random()
     setToasts(prev => [...prev, { id, message, type }])
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000)

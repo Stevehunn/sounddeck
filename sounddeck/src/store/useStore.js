@@ -31,11 +31,8 @@ export function useStore() {
   const [toggleShortcutsAccelerator, setToggleShortcutsAccelerator] = useState('CommandOrControl+Shift+K')
   const [soundOrder, setSoundOrder] = useState({})
   const [orderVersion, setOrderVersion] = useState(0)
-  // Nouvelle option : normalisation activée/désactivée
   const [normalizationEnabled, setNormalizationEnabled] = useState(true)
-  // Seuil de normalisation cible en RMS (0-1)
-  const [normalizationTarget, setNormalizationTarget] = useState(0.1) // ~ -20 dB
-
+  const [normalizationTarget, setNormalizationTarget] = useState(0.1)
   const [startMinimized, setStartMinimized] = useState(false)
   const [launchAtStartup, setLaunchAtStartup] = useState(false)
 
@@ -49,6 +46,10 @@ export function useStore() {
   const [microphoneDevice, setMicrophoneDevice] = useState('default')
   const [microphoneVolume, setMicrophoneVolume] = useState(80)
   const [mixerSoundVolume, setMixerSoundVolume] = useState(100)
+
+  // Noise suppression
+  const [noiseSuppression, setNoiseSuppression] = useState(false)
+  const [noiseSuppressionMode, setNoiseSuppressionMode] = useState('auto')
 
   // ─── Chargement initial depuis electron-store ────────────────────────────────
   useEffect(() => {
@@ -79,6 +80,8 @@ export function useStore() {
         const savedSoundOrder = await window.electronAPI.storeGet('soundOrder') || {}
         const savedNormalizationEnabled = await window.electronAPI.storeGet('normalizationEnabled') ?? true
         const savedNormalizationTarget = await window.electronAPI.storeGet('normalizationTarget') ?? 0.1
+        const savedNoiseSuppression = await window.electronAPI.storeGet('noiseSuppression') ?? false
+        const savedNoiseSuppressionMode = await window.electronAPI.storeGet('noiseSuppressionMode') || 'auto'
 
         const allProfile = { id: 'all', name: 'Tous les sons', isDefault: true }
         const userProfiles = savedProfiles.filter(p => p.id !== 'all')
@@ -104,6 +107,9 @@ export function useStore() {
         setMicrophoneDevice(savedMicrophoneDevice)
         setMicrophoneVolume(savedMicrophoneVolume)
         setMixerSoundVolume(savedMixerSoundVolume)
+
+        setNoiseSuppression(savedNoiseSuppression)
+        setNoiseSuppressionMode(savedNoiseSuppressionMode)
 
         setProfiles(allProfiles)
         setSounds(savedSounds)
@@ -488,6 +494,90 @@ export function useStore() {
     await save('mixerSoundVolume', volume)
   }, [save])
 
+  // ─── Noise Suppression ──────────────────────────────────────────────────────
+  const updateNoiseSuppression = useCallback(async (enabled) => {
+    setNoiseSuppression(enabled)
+    await save('noiseSuppression', enabled)
+  }, [save])
+
+  const updateNoiseSuppressionMode = useCallback(async (mode) => {
+    setNoiseSuppressionMode(mode)
+    await save('noiseSuppressionMode', mode)
+  }, [save])
+
+  // ─── Initialisation du mixeur au démarrage ──────────────────────────────────
+  const initMixerOnStartup = useCallback(async () => {
+    if (!mixerEnabled) {
+      console.log('ℹ️ Mixeur désactivé, pas d\'initialisation automatique')
+      return true
+    }
+    
+    try {
+      console.log('🎛️ Initialisation automatique du mixeur au démarrage...')
+      console.log('📊 État du mixeur au démarrage:', {
+        mixerEnabled,
+        microphoneDevice,
+        audioDevice,
+        noiseSuppressionMode
+      })
+      
+      const { 
+        initAudioMixer, 
+        resumeAudioContext, 
+        connectMixerToOutput, 
+        setNoiseSuppressionMode,
+        isMixerOperational,
+        repairMixer
+      } = await import('../utils/audioMixer')
+      
+      // Vérifier si déjà opérationnel
+      if (isMixerOperational()) {
+        console.log('✅ Mixeur déjà opérationnel')
+        return true
+      }
+      
+      // Essayer de réparer d'abord
+      const repaired = repairMixer()
+      if (repaired && isMixerOperational()) {
+        console.log('✅ Mixeur réparé avec succès')
+        return true
+      }
+      
+      // Sinon, initialiser complètement
+      const mixedStream = await initAudioMixer(microphoneDevice || 'default')
+      
+      if (mixedStream) {
+        resumeAudioContext()
+        connectMixerToOutput(audioDevice || 'default')
+        
+        // Appliquer le mode de réduction de bruit sauvegardé
+        if (noiseSuppressionMode && noiseSuppressionMode !== 'off') {
+          try {
+            setNoiseSuppressionMode(noiseSuppressionMode)
+            console.log(`🔇 Mode réduction de bruit appliqué: ${noiseSuppressionMode}`)
+          } catch (e) {
+            console.warn('⚠️ Erreur lors de l\'application du mode de réduction de bruit:', e)
+          }
+        }
+        
+        console.log('✅ Mixeur initialisé automatiquement avec succès')
+        return true
+      } else {
+        console.warn('⚠️ Échec de l\'initialisation automatique du mixeur')
+        // Désactiver le mixeur pour éviter les erreurs
+        setMixerEnabled(false)
+        await save('mixerEnabled', false)
+        return false
+      }
+    } catch (e) {
+      console.error('❌ Erreur lors de l\'initialisation automatique du mixeur:', e)
+      // Désactiver le mixeur pour éviter les erreurs
+      setMixerEnabled(false)
+      await save('mixerEnabled', false)
+      return false
+    }
+  }, [mixerEnabled, microphoneDevice, audioDevice, noiseSuppressionMode, save])
+
   // ─── Sons ordonnés selon le profil ──────────────────────────────────────────
   const orderedSounds = useMemo(() => {
     const profileId = currentProfileId || 'all'
@@ -558,6 +648,13 @@ export function useStore() {
     updateMicrophoneDevice,
     updateMicrophoneVolume,
     updateMixerSoundVolume,
+    // Noise Suppression
+    noiseSuppression,
+    noiseSuppressionMode,
+    updateNoiseSuppression,
+    updateNoiseSuppressionMode,
+    // Initialisation
+    initMixerOnStartup,
     // Démarrage
     startMinimized,
     launchAtStartup,
