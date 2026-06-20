@@ -36,18 +36,16 @@ async function loadNoiseSuppressionWorklet() {
   if (workletLoaded) return true
   
   try {
-    // Vérifier si AudioWorklet est supporté
     if (!audioContext.audioWorklet) {
       console.warn('⚠️ AudioWorklet non supporté par ce navigateur')
       return false
     }
     
-    // Dans Electron, on peut charger depuis un chemin local
-    // ou depuis le serveur de développement
+    // ✅ En production, le fichier est à la racine
     const baseUrl = window.location.origin
     const workletUrl = `${baseUrl}/noise-suppression.js`
     
-    console.log('📥 Chargement de l\'AudioWorklet...')
+    console.log('📥 Chargement de l\'AudioWorklet depuis:', workletUrl)
     await audioContext.audioWorklet.addModule(workletUrl)
     workletLoaded = true
     console.log('✅ AudioWorklet chargé avec succès')

@@ -540,6 +540,25 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               <OptionRow label={tr('playLocally')} sub={tr('playLocallyDesc')}>
                 <Toggle value={store.playLocally} onChange={store.updatePlayLocally} />
               </OptionRow>
+
+              <OptionRow label={tr('localOutputDevice')} sub={tr('localOutputDeviceDesc')}>
+                <select 
+                  value={store.localAudioDevice || 'default'} 
+                  onChange={async (e) => {
+                    const deviceId = e.target.value
+                    await store.updateLocalAudioDevice(deviceId)
+                    addToast(tr('localOutputDeviceChanged').replace('{device}', deviceId === 'default' ? tr('localOutputDeviceDefault') : deviceId), 'info')
+                  }}
+                  style={{ width: 220, fontSize: 12 }}
+                >
+                  <option value="default">{tr('localOutputDeviceDefault')}</option>
+                  {audioDevices.map(d => (
+                    <option key={d.deviceId} value={d.deviceId}>
+                      {d.label || `${tr('outputDeviceLabel')} ${d.deviceId.slice(0, 8)}`}
+                    </option>
+                  ))}
+                </select>
+              </OptionRow>
             </>
           )}
 

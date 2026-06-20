@@ -275,6 +275,11 @@ export const TRANSLATIONS = {
     mixerResetSuccess: '✅ Mixeur réinitialisé avec succès',
     mixerRepairError: '❌ Erreur: {error}',
 
+    // Périphérique local
+    localOutputDevice: 'Périphérique de sortie local',
+    localOutputDeviceDesc: 'Périphérique utilisé pour l\'écoute locale (casque)',
+    localOutputDeviceDefault: 'Par défaut',
+
     // ── Presentation ──────────────────────────────────────────────────────────
     presentationTitle: 'Mode Présentation',
     exitTip: 'Appuyez sur Échap pour quitter',
@@ -811,6 +816,10 @@ export const TRANSLATIONS = {
     mixerResetSuccess: '✅ Mixer reset successfully',
     mixerRepairError: '❌ Error: {error}',
 
+    localOutputDevice: 'Local output device',
+    localOutputDeviceDesc: 'Device used for local playback (headphones)',
+    localOutputDeviceDefault: 'Default',
+
     // ── Presentation ──────────────────────────────────────────────────────────
     presentationTitle: 'Presentation Mode',
     exitTip: 'Press Escape to exit',
@@ -1346,6 +1355,10 @@ export const TRANSLATIONS = {
     mixerReset: '🔄 Reiniciando mezclador...',
     mixerResetSuccess: '✅ Mezclador reiniciado con éxito',
     mixerRepairError: '❌ Error: {error}',
+
+    localOutputDevice: 'Dispositivo de salida local',
+    localOutputDeviceDesc: 'Dispositivo utilizado para la reproducción local (auriculares)',
+    localOutputDeviceDefault: 'Por defecto',
 
     // ── Presentation ──────────────────────────────────────────────────────────
     presentationTitle: 'Modo Presentación',

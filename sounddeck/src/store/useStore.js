@@ -46,6 +46,7 @@ export function useStore() {
   const [microphoneDevice, setMicrophoneDevice] = useState('default')
   const [microphoneVolume, setMicrophoneVolume] = useState(80)
   const [mixerSoundVolume, setMixerSoundVolume] = useState(100)
+  const [localAudioDevice, setLocalAudioDevice] = useState('default')
 
   // Noise suppression
   const [noiseSuppression, setNoiseSuppression] = useState(false)
@@ -131,6 +132,9 @@ export function useStore() {
         setSoundOrder(savedSoundOrder)
         setNormalizationEnabled(savedNormalizationEnabled)
         setNormalizationTarget(savedNormalizationTarget)
+
+        const savedLocalAudioDevice = await window.electronAPI.storeGet('localAudioDevice') || 'default'
+        setLocalAudioDevice(savedLocalAudioDevice)
       } catch (e) {
         console.error('Erreur chargement store:', e)
         setProfiles([{ id: 'all', name: 'Tous les sons', isDefault: true }])
@@ -146,6 +150,12 @@ export function useStore() {
   const save = useCallback(async (key, value) => {
     await window.electronAPI.storeSet(key, value)
   }, [])
+
+  // ─── Sauvegarde périphérique audio local ──────────────────────────────────────────────────────────────────
+  const updateLocalAudioDevice = useCallback(async (deviceId) => {
+    setLocalAudioDevice(deviceId)
+    await save('localAudioDevice', deviceId)
+  }, [save])
 
   // ─── Profils ──────────────────────────────────────────────────────────────────
   const createProfile = useCallback(async (name) => {
@@ -660,5 +670,8 @@ export function useStore() {
     launchAtStartup,
     setStartMinimized: (val) => { setStartMinimized(val); save('startMinimized', val) },
     setLaunchAtStartup: (val) => { setLaunchAtStartup(val); save('launchAtStartup', val) },
+    // Périphérique audio local
+    localAudioDevice,
+    updateLocalAudioDevice,
   }
 }

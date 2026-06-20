@@ -921,6 +921,8 @@ ipcMain.handle('get-virtual-driver-status', () => {
 
 function createWindow() {
   const iconPath = path.join(__dirname, '../public/icon.ico')
+  // ou en production:
+  // const iconPath = path.join(process.resourcesPath, 'icon.ico')
 
   mainWindow = new BrowserWindow({
     width: 1100, height: 700, minWidth: 800, minHeight: 500,

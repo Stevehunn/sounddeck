@@ -82,50 +82,6 @@ function calculateFinalVolume(globalVolume, soundVolumeDb, gainDb = 0) {
   return Math.max(0.0001, finalVolume)
 }
 
-// ─── Mode Mixeur (VB-Cable) ────────────────────────────────────────────────
-
-async function playSoundWithMixer(sound, globalVolume, loop) {
-  const soundVolumeDb = sound.volumeDb ?? sound.volume ?? 0
-  let soundRatio = Math.pow(10, soundVolumeDb / 20)
-  soundRatio = Math.min(1, soundRatio)
-  
-  const globalVol = globalVolume / 100
-  const mixerVol = (storeRef?.mixerSoundVolume ?? 100) / 100
-  const volumeRatio = soundRatio * globalVol * mixerVol
-  
-  const fileUrl = buildFileUrl(sound.path)
-  
-  if (soundCache[sound.id]) {
-    stopSound(sound.id)
-    return
-  }
-  
-  const audioBuffer = await loadAudioBuffer(fileUrl)
-  if (!audioBuffer) {
-    console.warn('⚠️ Impossible de charger le son:', fileUrl)
-    return
-  }
-  
-  const source = playSoundInMixer(audioBuffer, volumeRatio)
-  
-  if (source) {
-    soundCache[sound.id] = source
-    if (loop) {
-      source.onended = () => {
-        if (storeRef?.loopEnabled) {
-          playSoundWithMixer(sound, globalVolume, loop)
-        } else {
-          delete soundCache[sound.id]
-        }
-      }
-    } else {
-      source.onended = () => {
-        delete soundCache[sound.id]
-      }
-    }
-  }
-}
-
 // ─── Mode Normal (sans mixeur) ─────────────────────────────────────────────
 
 function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
@@ -221,6 +177,90 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
   }
 }
 
+// ─── Mode Mixeur (VB-Cable) ────────────────────────────────────────────────
+
+async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true) {
+  const soundVolumeDb = sound.volumeDb ?? sound.volume ?? 0
+  let soundRatio = Math.pow(10, soundVolumeDb / 20)
+  soundRatio = Math.min(1, soundRatio)
+  
+  const globalVol = globalVolume / 100
+  const mixerVol = (storeRef?.mixerSoundVolume ?? 100) / 100
+  const volumeRatio = soundRatio * globalVol * mixerVol
+  
+  const fileUrl = buildFileUrl(sound.path)
+  
+  if (soundCache[sound.id]) {
+    stopSound(sound.id)
+    return
+  }
+  
+  const audioBuffer = await loadAudioBuffer(fileUrl)
+  if (!audioBuffer) {
+    console.warn('⚠️ Impossible de charger le son:', fileUrl)
+    return
+  }
+  
+  // Jouer le son dans le mixeur (pour Discord)
+  const source = playSoundInMixer(audioBuffer, volumeRatio)
+  
+  if (source) {
+    soundCache[sound.id] = source
+    if (loop) {
+      source.onended = () => {
+        if (storeRef?.loopEnabled) {
+          playSoundWithMixer(sound, globalVolume, loop, playLocally)
+        } else {
+          delete soundCache[sound.id]
+        }
+      }
+    } else {
+      source.onended = () => {
+        delete soundCache[sound.id]
+      }
+    }
+  }
+  
+  // Jouer aussi en local si playLocally est activé
+  if (playLocally) {
+    try {
+      const localHowl = new Howl({
+        src: [fileUrl],
+        volume: volumeRatio * 0.8,
+        html5: true,
+        format: ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'],
+        onend: () => {},
+        onloaderror: (id, err) => {
+          console.warn('⚠️ Erreur lecture locale:', err)
+        }
+      })
+      
+      localHowl.once('play', () => {
+        try {
+          const audioNode = localHowl._sounds?.[0]?._node
+          if (audioNode && audioNode.setSinkId) {
+            const localDevice = storeRef?.localAudioDevice || 'default'
+            audioNode.setSinkId(localDevice).catch(() => {})
+          }
+        } catch (e) {}
+      })
+      
+      localHowl.play()
+      
+      // Stocker le howl local dans le cache
+      if (!Array.isArray(soundCache[sound.id])) {
+        soundCache[sound.id] = [soundCache[sound.id]]
+      }
+      if (Array.isArray(soundCache[sound.id])) {
+        soundCache[sound.id].push(localHowl)
+      }
+      
+    } catch (e) {
+      console.warn('⚠️ Erreur lecture locale:', e)
+    }
+  }
+}
+
 // ─── Version principale de playSound ──────────────────────────────────────
 
 export function playSound(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
@@ -232,7 +272,7 @@ export function playSound(sound, audioDevice = 'default', globalVolume = 80, loo
   if (mode === 'simple') {
     const mixerEnabled = storeRef?.mixerEnabled || false
     if (mixerEnabled && isMixerActive()) {
-      playSoundWithMixer(sound, globalVolume, loop)
+      playSoundWithMixer(sound, globalVolume, loop, playLocally)
       return
     }
     playSoundNormal(sound, audioDevice, globalVolume, loop, playLocally)
