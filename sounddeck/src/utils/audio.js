@@ -1,4 +1,3 @@
-// sounddeck/src/utils/audio.js
 import { Howl, Howler } from 'howler'
 import { playSoundInMixer, loadAudioBuffer, isMixerActive, mixerState, stopMixer, initAudioMixer } from './audioMixer'
 
@@ -57,7 +56,7 @@ export async function analyzeGain(filePath, sampleCount = 100) {
     }
     
     const rms = Math.sqrt(sumSquares / (channelData.length / step))
-    const targetRMS = 0.1 // environ -20 dB
+    const targetRMS = 0.1
     const gain = rms > 0.001 ? targetRMS / rms : 1
     const gainDb = 20 * Math.log10(Math.min(gain, 10))
     
@@ -83,48 +82,30 @@ function calculateFinalVolume(globalVolume, soundVolumeDb, gainDb = 0) {
   return Math.max(0.0001, finalVolume)
 }
 
-// Jouer un son avec le mixeur (micro + sons)
+// ─── Mode Mixeur (VB-Cable) ────────────────────────────────────────────────
 
 async function playSoundWithMixer(sound, globalVolume, loop) {
-  // Le volume du son est en dB (-24 à +24), il faut le convertir en ratio
-  // 0 dB = 100%, -24 dB = ~0%, +24 dB = ~400% (limité à 1)
   const soundVolumeDb = sound.volumeDb ?? sound.volume ?? 0
-  
-  // Convertir dB en ratio linéaire (0-1)
-  // 0 dB -> 1.0, -24 dB -> ~0.063, +24 dB -> ~15.8 (limité à 1)
   let soundRatio = Math.pow(10, soundVolumeDb / 20)
-  soundRatio = Math.min(1, soundRatio) // Limiter à 1 (100%)
+  soundRatio = Math.min(1, soundRatio)
   
   const globalVol = globalVolume / 100
   const mixerVol = (storeRef?.mixerSoundVolume ?? 100) / 100
-  
-  // Volume final = soundRatio * globalVol * mixerVol
   const volumeRatio = soundRatio * globalVol * mixerVol
-  
-  console.log('🔊 Volume calculé:', {
-    soundVolumeDb,
-    soundRatio,
-    globalVol,
-    mixerVol,
-    volumeRatio
-  })
   
   const fileUrl = buildFileUrl(sound.path)
   
-  // Vérifier si le son est déjà en cours de lecture
   if (soundCache[sound.id]) {
     stopSound(sound.id)
     return
   }
   
-  // Charger le son dans un buffer
   const audioBuffer = await loadAudioBuffer(fileUrl)
   if (!audioBuffer) {
     console.warn('⚠️ Impossible de charger le son:', fileUrl)
     return
   }
   
-  // Jouer dans le mixeur avec le volume calculé
   const source = playSoundInMixer(audioBuffer, volumeRatio)
   
   if (source) {
@@ -145,7 +126,8 @@ async function playSoundWithMixer(sound, globalVolume, loop) {
   }
 }
 
-// Jouer un son normalement (sans mixeur)
+// ─── Mode Normal (sans mixeur) ─────────────────────────────────────────────
+
 function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
   const gainDb = gainCache[sound.path] || 0
   const volumeRatio = calculateFinalVolume(globalVolume, sound.volume ?? 0, gainDb)
@@ -239,20 +221,25 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
   }
 }
 
-// Version principale de playSound - vérifie si le mixeur est activé
+// ─── Version principale de playSound ──────────────────────────────────────
+
 export function playSound(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
   if (!sound?.path) return
   
-  // Vérifier si le mixeur est activé et actif
-  const mixerEnabled = storeRef?.mixerEnabled || false
+  const mode = storeRef?.audioMode || 'simple'
   
-  if (mixerEnabled && isMixerActive()) {
-    // Utiliser le mixeur
-    playSoundWithMixer(sound, globalVolume, loop)
+  // Mode simple - avec VB-Cable
+  if (mode === 'simple') {
+    const mixerEnabled = storeRef?.mixerEnabled || false
+    if (mixerEnabled && isMixerActive()) {
+      playSoundWithMixer(sound, globalVolume, loop)
+      return
+    }
+    playSoundNormal(sound, audioDevice, globalVolume, loop, playLocally)
     return
   }
   
-  // Sinon, utiliser le mode normal
+  // Mode avancé - VoiceMeeter
   playSoundNormal(sound, audioDevice, globalVolume, loop, playLocally)
 }
 
@@ -410,22 +397,15 @@ export function isPlaying(soundId) {
   const cached = soundCache[soundId]
   if (!cached) return false
   
-  // Si c'est un tableau (mode normal avec Howl)
   if (Array.isArray(cached)) {
     return cached.some(h => h.playing && h.playing())
   }
   
-  // Si c'est un Howl (mode normal)
   if (cached.playing && typeof cached.playing === 'function') {
     return cached.playing()
   }
   
-  // Si c'est un AudioBufferSourceNode (mode mixeur)
-  // On vérifie s'il est toujours actif
   try {
-    // Un AudioBufferSourceNode n'a pas de méthode playing()
-    // On vérifie si le son est en cours via le gain du noeud
-    // On retourne true si le noeud existe (il sera nettoyé à la fin)
     return !!cached
   } catch (e) {
     return false
@@ -436,7 +416,6 @@ export function getSoundProgress(soundId) {
   const cached = soundCache[soundId]
   if (!cached) return null
   
-  // Si c'est un tableau (mode normal avec Howl)
   if (Array.isArray(cached)) {
     const howl = cached[0]
     if (!howl || !howl.playing || !howl.playing()) return null
@@ -447,7 +426,6 @@ export function getSoundProgress(soundId) {
     return { current: seek, duration, ratio: Math.min(1, seek / duration) }
   }
   
-  // Si c'est un Howl (mode normal)
   if (cached.playing && typeof cached.playing === 'function') {
     if (!cached.playing()) return null
     const seek = cached.seek()
@@ -457,9 +435,6 @@ export function getSoundProgress(soundId) {
     return { current: seek, duration, ratio: Math.min(1, seek / duration) }
   }
   
-  // Si c'est un AudioBufferSourceNode (mode mixeur)
-  // On ne peut pas obtenir la progression facilement
-  // On retourne null pour ne pas afficher la barre de progression
   return null
 }
 

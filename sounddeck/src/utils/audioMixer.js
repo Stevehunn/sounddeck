@@ -420,6 +420,84 @@ export async function getAudioInputDevices() {
   }
 }
 
+// Test ponctuel du micro
+export async function testMicrophoneOnce(deviceId = 'default') {
+  let tempContext = null
+  let tempStream = null
+  
+  try {
+    console.log('🎤 Test ponctuel du micro...')
+    
+    // Créer un contexte temporaire
+    tempContext = new (window.AudioContext || window.webkitAudioContext)()
+    if (tempContext.state === 'suspended') {
+      await tempContext.resume()
+    }
+    
+    // Récupérer le flux du micro
+    const constraints = {
+      audio: {
+        deviceId: deviceId && deviceId !== 'default' ? { exact: deviceId } : undefined,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    }
+    
+    tempStream = await navigator.mediaDevices.getUserMedia(constraints)
+    
+    if (!tempStream.getAudioTracks().length) {
+      throw new Error('Aucune piste audio disponible')
+    }
+    
+    // Créer une source et la connecter à la destination pour entendre le micro
+    const source = tempContext.createMediaStreamSource(tempStream)
+    const gain = tempContext.createGain()
+    gain.gain.value = 0.3
+    source.connect(gain)
+    gain.connect(tempContext.destination)
+    
+    const deviceName = tempStream.getAudioTracks()[0]?.label || 'Microphone'
+    
+    console.log('✅ Test micro démarré pour 3 secondes')
+    
+    return {
+      success: true,
+      deviceName,
+      stream: tempStream,
+      context: tempContext,
+      stop: () => {
+        try {
+          if (tempStream) {
+            tempStream.getTracks().forEach(track => track.stop())
+            tempStream = null
+          }
+          if (tempContext && tempContext.state !== 'closed') {
+            tempContext.close()
+            tempContext = null
+          }
+          console.log('🔇 Test micro arrêté')
+        } catch (e) {
+          console.warn('Erreur lors de l\'arrêt du test:', e)
+        }
+      }
+    }
+    
+  } catch (e) {
+    console.error('❌ Erreur test micro:', e)
+    if (tempStream) {
+      tempStream.getTracks().forEach(track => track.stop())
+    }
+    if (tempContext && tempContext.state !== 'closed') {
+      try { await tempContext.close() } catch (err) {}
+    }
+    return {
+      success: false,
+      error: e.message
+    }
+  }
+}
+
 // Exporter les fonctions pour usage externe
 export default {
   initAudioMixer,

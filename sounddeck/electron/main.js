@@ -173,184 +173,407 @@ ipcMain.handle('store-set-lang', (event, lang) => {
   return true
 })
 
-// ─── GESTION DU PILOTE VIRTUAL AUDIO (Scream) ───────────────────────────────
+// ─── GESTION DU PILOTE VIRTUAL AUDIO (VB-Cable) ────────────────────────────
 
-// Vérifier si le pilote virtuel est installé
+// Vérifier si le pilote VB-Cable est installé
 function isVirtualDriverInstalled() {
   return store.get('virtualDriverInstalled', false)
 }
 
-// Chemin vers le pilote dans les ressources
+// Chemin vers l'installateur VB-Cable dans les ressources
 function getDriverResourcePath() {
   const possiblePaths = []
   
   if (isDev) {
-    // En développement, on essaie plusieurs emplacements possibles
     possiblePaths.push(
-      path.join(__dirname, '../resources/drivers/scream.zip'),
-      path.join(__dirname, '../../resources/drivers/scream.zip'),
-      path.join(process.cwd(), 'resources/drivers/scream.zip'),
-      path.join(process.cwd(), 'drivers/scream.zip'),
-      path.join(app.getPath('userData'), 'drivers/scream.zip'),
-      path.join(app.getPath('documents'), 'sounddeck/resources/drivers/scream.zip')
+      // Chercher d'abord l'EXE
+      path.join(__dirname, '../resources/drivers/VBCABLE_Setup_x64.exe'),
+      path.join(__dirname, '../resources/drivers/VBCABLE_Setup.exe'),
+      // Puis les ZIP
+      path.join(__dirname, '../resources/drivers/VBCABLE_Driver_Pack.zip'),
+      path.join(__dirname, '../resources/drivers/VBCABLE_Driver_Pack45.zip'),
+      // Autres chemins
+      path.join(__dirname, '../../resources/drivers/VBCABLE_Setup_x64.exe'),
+      path.join(process.cwd(), 'resources/drivers/VBCABLE_Setup_x64.exe'),
+      path.join(process.cwd(), 'drivers/VBCABLE_Setup_x64.exe'),
+      path.join(app.getPath('userData'), 'drivers/VBCABLE_Setup_x64.exe')
     )
   } else {
-    // En production
     possiblePaths.push(
-      path.join(process.resourcesPath, 'drivers', 'scream.zip'),
-      path.join(path.dirname(app.getPath('exe')), 'resources/drivers/scream.zip')
+      path.join(process.resourcesPath, 'drivers', 'VBCABLE_Setup_x64.exe'),
+      path.join(process.resourcesPath, 'drivers', 'VBCABLE_Driver_Pack.zip'),
+      path.join(process.resourcesPath, 'drivers', 'VBCABLE_Driver_Pack45.zip'),
+      path.join(path.dirname(app.getPath('exe')), 'resources/drivers/VBCABLE_Setup_x64.exe')
     )
   }
   
-  // Afficher tous les chemins testés
-  console.log('🔍 Recherche du pilote dans les chemins suivants:')
-  
-  // Trouver le premier chemin qui existe
+  console.log('🔍 Recherche de l\'installateur VB-Cable:')
   for (const p of possiblePaths) {
     const exists = fs.existsSync(p)
     console.log(`  ${exists ? '✅' : '❌'} ${p}`)
     if (exists) {
-      console.log(`✅ Pilote trouvé à: ${p}`)
+      console.log(`✅ Installateur trouvé à: ${p}`)
       return p
     }
   }
   
-  console.warn('⚠️ Aucun pilote trouvé dans les chemins testés')
-  // Retourner le chemin le plus probable par défaut
+  console.warn('⚠️ Aucun installateur VB-Cable trouvé')
   return possiblePaths[0]
 }
 
-// Installer le pilote virtuel Scream
-function installVirtualDriver() {
-  return new Promise((resolve) => {
-    console.log('🚀 Début installation pilote...')
+// Télécharger VB-Cable depuis le site officiel
+async function downloadVBCable() {
+  return new Promise((resolve, reject) => {
+    const https = require('https')
+    const url = 'https://vb-audio.com/Cable/VBCABLE_Setup_x64.exe'
+    const destPath = path.join(app.getPath('temp'), 'VBCABLE_Setup_x64.exe')
     
-    if (isVirtualDriverInstalled()) {
-      console.log('⚠️ Pilote déjà installé')
-      resolve({ success: false, error: 'Pilote déjà installé' })
-      return
-    }
+    console.log('📥 Téléchargement de VB-Cable depuis:', url)
     
-    if (process.platform !== 'win32') {
-      console.log('⚠️ Plateforme non supportée:', process.platform)
-      resolve({ success: false, error: 'Plateforme non supportée (Windows uniquement)' })
-      return
-    }
-    
-    try {
-      const driverPath = getDriverResourcePath()
-      console.log('📁 Chemin du pilote:', driverPath)
-      console.log('📁 Le fichier existe?', fs.existsSync(driverPath))
-      
-      if (!fs.existsSync(driverPath)) {
-        console.warn('⚠️ Pilote virtuel non trouvé:', driverPath)
-        resolve({ success: false, error: 'Fichier du pilote non trouvé' })
+    const file = fs.createWriteStream(destPath)
+    https.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    }, (res) => {
+      if ([301, 302, 303, 307].includes(res.statusCode) && res.headers.location) {
+        // Redirection - on suit
+        const redirectUrl = res.headers.location.startsWith('http')
+          ? res.headers.location
+          : `https://vb-audio.com${res.headers.location}`
+        console.log('🔄 Redirection vers:', redirectUrl)
+        downloadVBCableFromUrl(redirectUrl, destPath).then(resolve).catch(reject)
         return
       }
       
-      const extractPath = path.join(app.getPath('temp'), `scream_driver_${Date.now()}`)
-      console.log('📁 Extraction vers:', extractPath)
-      
-      if (!fs.existsSync(extractPath)) {
-        fs.mkdirSync(extractPath, { recursive: true })
-      }
-      
-      console.log('📦 Décompression du zip...')
-      const zip = new AdmZip(driverPath)
-      zip.extractAllTo(extractPath, true)
-      console.log('✅ Décompression terminée')
-      
-      // Lister les fichiers extraits
-      const files = fs.readdirSync(extractPath, { withFileTypes: true })
-      console.log('📁 Fichiers extraits:', files.map(f => f.name))
-      
-      // Déterminer l'architecture de Windows
-      let arch = 'x64' // par défaut
-      if (process.arch === 'ia32') {
-        arch = 'x86'
-      } else if (process.arch === 'arm64') {
-        arch = 'arm64'
-      }
-      console.log('🖥️ Architecture Windows:', arch)
-      
-      // Chercher le fichier d'installation correspondant à l'architecture
-      const batPath = path.join(extractPath, 'Install', `Install-${arch}.bat`)
-      console.log('🔧 Chemin du script:', batPath)
-      
-      if (!fs.existsSync(batPath)) {
-        console.warn('⚠️ Script d\'installation non trouvé:', batPath)
-        try { fs.rmSync(extractPath, { recursive: true, force: true }) } catch (e) {}
-        resolve({ success: false, error: `Script d'installation non trouvé pour l'architecture ${arch}` })
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP ${res.statusCode}`))
         return
       }
       
-      console.log('🔧 Script d\'installation trouvé:', batPath)
-      
-      // Exécuter le script batch en tant qu'administrateur
-      const { exec } = require('child_process')
-      console.log('⏳ Exécution du script d\'installation avec droits administrateur...')
-      
-      // Utiliser PowerShell pour exécuter le script avec elevation
-      // Start-Process avec -Verb RunAs pour lancer en tant qu'admin
-      const psScript = `Start-Process -FilePath "${batPath}" -Verb RunAs -Wait -WindowStyle Normal`
-      const cmd = `powershell -Command "${psScript}"`
-      console.log('🔧 Commande PowerShell:', cmd)
-      
-      exec(cmd, {
-        timeout: 120000, // 2 minutes pour l'installation
-        shell: 'cmd.exe',
-        windowsHide: false,
-        maxBuffer: 1024 * 1024 * 10
-      }, (error, stdout, stderr) => {
-        console.log('📤 Script terminé')
-        if (error) {
-          console.error('❌ Erreur installation:', error)
-        } else {
-          console.log('✅ Installation réussie')
-        }
-        if (stdout) console.log('📤 stdout:', stdout)
-        if (stderr) console.log('📤 stderr:', stderr)
-        
-        setTimeout(() => {
-          try {
-            fs.rmSync(extractPath, { recursive: true, force: true })
-            console.log('🧹 Nettoyage terminé')
-          } catch (e) {
-            console.warn('⚠️ Erreur nettoyage:', e.message)
-          }
-        }, 2000)
-        
-        // Vérifier si l'installation a réussi
-        // Après l'installation, vérifier si le pilote est présent dans le système
-        if (!error) {
-          // Vérifier avec pnputil si le pilote est installé
-          exec('pnputil /enum-drivers | findstr Scream', { timeout: 5000 }, (err, stdout) => {
-            if (stdout && stdout.includes('Scream')) {
-              store.set('virtualDriverInstalled', true)
-              store.set('virtualDriverInstalledAt', Date.now())
-              console.log('✅ Pilote audio virtuel Scream installé avec succès')
-              resolve({ success: true })
-            } else {
-              // Si le pilote n'est pas trouvé, mais que le script a réussi, on considère que c'est bon
-              store.set('virtualDriverInstalled', true)
-              store.set('virtualDriverInstalledAt', Date.now())
-              console.log('✅ Pilote audio virtuel Scream installé avec succès (vérifié)')
-              resolve({ success: true })
-            }
-          })
-        } else {
-          resolve({ success: false, error: error.message })
-        }
+      res.pipe(file)
+      file.on('finish', () => {
+        file.close()
+        console.log('✅ Téléchargement terminé:', destPath)
+        resolve(destPath)
       })
-      
-    } catch (e) {
-      console.error('❌ Erreur installation pilote:', e)
-      resolve({ success: false, error: e.message })
-    }
+      file.on('error', reject)
+    }).on('error', reject)
   })
 }
 
-// Désinstaller le pilote virtuel
+function downloadVBCableFromUrl(url, destPath) {
+  return new Promise((resolve, reject) => {
+    const https = require('https')
+    const file = fs.createWriteStream(destPath)
+    
+    https.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    }, (res) => {
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP ${res.statusCode}`))
+        return
+      }
+      res.pipe(file)
+      file.on('finish', () => {
+        file.close()
+        resolve(destPath)
+      })
+      file.on('error', reject)
+    }).on('error', reject)
+  })
+}
+
+function checkVBCableInstalled() {
+  return new Promise((resolve) => {
+    exec('pnputil /enum-drivers | findstr /i "vb-audio"', { timeout: 5000 }, (err, stdout) => {
+      if (stdout && stdout.toLowerCase().includes('vb-audio')) {
+        resolve(true)
+        return
+      }
+      exec('powershell -Command "Get-PnpDevice -FriendlyName *CABLE* | Select-Object FriendlyName"', 
+        { timeout: 5000 }, (err2, stdout2) => {
+          if (stdout2 && stdout2.toLowerCase().includes('cable')) {
+            resolve(true)
+            return
+          }
+          exec('reg query "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall" /s /f "VB-CABLE"', 
+            { timeout: 5000 }, (err3, stdout3) => {
+              resolve(stdout3 && stdout3.toLowerCase().includes('vb-cable'))
+            })
+        })
+    })
+  })
+}
+
+// Installer VB-Cable
+async function installVirtualDriver() {
+  console.log('🚀 Début installation VB-Cable...')
+  
+  if (isVirtualDriverInstalled()) {
+    console.log('⚠️ Pilote déjà installé')
+    return { success: false, error: 'Pilote déjà installé' }
+  }
+  
+  if (process.platform !== 'win32') {
+    console.log('⚠️ Plateforme non supportée:', process.platform)
+    return { success: false, error: 'Plateforme non supportée (Windows uniquement)' }
+  }
+  
+  try {
+    // 1. Chercher l'installateur localement (ZIP ou EXE)
+    let installerPath = getDriverResourcePath()
+    let downloaded = false
+    let isZip = false
+    
+    // Vérifier si c'est un ZIP ou un EXE
+    if (fs.existsSync(installerPath) && installerPath.endsWith('.zip')) {
+      isZip = true
+      console.log('📦 Fichier ZIP détecté, extraction en cours...')
+      
+      // Extraire le ZIP dans un dossier temporaire
+      const extractPath = path.join(app.getPath('temp'), `vbcable_${Date.now()}`)
+      fs.mkdirSync(extractPath, { recursive: true })
+      
+      const AdmZip = require('adm-zip')
+      const zip = new AdmZip(installerPath)
+      zip.extractAllTo(extractPath, true)
+      console.log('✅ Extraction terminée dans:', extractPath)
+      
+      // Chercher l'exe dans le dossier extrait
+      const files = fs.readdirSync(extractPath)
+      console.log('📁 Fichiers extraits:', files)
+      
+      // Chercher VBCABLE_Setup_x64.exe ou VBCABLE_Setup.exe
+      let exeFile = files.find(f => f.match(/VBCABLE_Setup.*\.exe/i))
+      if (!exeFile) {
+        // Chercher dans les sous-dossiers
+        for (const file of files) {
+          const fullPath = path.join(extractPath, file)
+          if (fs.statSync(fullPath).isDirectory()) {
+            const subFiles = fs.readdirSync(fullPath)
+            const found = subFiles.find(f => f.match(/VBCABLE_Setup.*\.exe/i))
+            if (found) {
+              exeFile = path.join(file, found)
+              break
+            }
+          }
+        }
+      }
+      
+      if (!exeFile) {
+        fs.rmSync(extractPath, { recursive: true, force: true })
+        return { success: false, error: 'VBCABLE_Setup.exe non trouvé dans le ZIP' }
+      }
+      
+      installerPath = path.join(extractPath, exeFile)
+      console.log('✅ Installateur trouvé:', installerPath)
+      
+      // Nettoyer le dossier après installation
+      setTimeout(() => {
+        try {
+          fs.rmSync(extractPath, { recursive: true, force: true })
+          console.log('🧹 Dossier temporaire nettoyé')
+        } catch (e) {
+          console.warn('⚠️ Erreur nettoyage:', e.message)
+        }
+      }, 10000)
+      
+    } else if (!fs.existsSync(installerPath)) {
+      // 2. Si pas trouvé, télécharger le ZIP
+      console.log('📥 Installateur non trouvé localement, téléchargement...')
+      try {
+        installerPath = await downloadVBCableZip()
+        downloaded = true
+        isZip = true
+        console.log('✅ Téléchargement réussi:', installerPath)
+        
+        // Extraire le ZIP téléchargé
+        const extractPath = path.join(app.getPath('temp'), `vbcable_${Date.now()}`)
+        fs.mkdirSync(extractPath, { recursive: true })
+        
+        const AdmZip = require('adm-zip')
+        const zip = new AdmZip(installerPath)
+        zip.extractAllTo(extractPath, true)
+        console.log('✅ Extraction terminée dans:', extractPath)
+        
+        // Chercher l'exe
+        const files = fs.readdirSync(extractPath)
+        let exeFile = files.find(f => f.match(/VBCABLE_Setup.*\.exe/i))
+        if (!exeFile) {
+          for (const file of files) {
+            const fullPath = path.join(extractPath, file)
+            if (fs.statSync(fullPath).isDirectory()) {
+              const subFiles = fs.readdirSync(fullPath)
+              const found = subFiles.find(f => f.match(/VBCABLE_Setup.*\.exe/i))
+              if (found) {
+                exeFile = path.join(file, found)
+                break
+              }
+            }
+          }
+        }
+        
+        if (!exeFile) {
+          fs.rmSync(extractPath, { recursive: true, force: true })
+          return { success: false, error: 'VBCABLE_Setup.exe non trouvé dans le ZIP' }
+        }
+        
+        installerPath = path.join(extractPath, exeFile)
+        console.log('✅ Installateur trouvé:', installerPath)
+        
+        // Nettoyer plus tard
+        setTimeout(() => {
+          try {
+            fs.rmSync(extractPath, { recursive: true, force: true })
+          } catch (e) {}
+        }, 10000)
+        
+      } catch (e) {
+        console.error('❌ Erreur téléchargement:', e)
+        return { success: false, error: 'Impossible de télécharger VB-Cable: ' + e.message }
+      }
+    }
+    
+    // 3. Installer avec élévation de privilèges (RunAs)
+    console.log('🔧 Installation de VB-Cable avec droits administrateur...')
+    console.log('📁 Installateur:', installerPath)
+    
+    // Utiliser PowerShell avec Start-Process -Verb RunAs pour lancer en tant qu'admin
+    // Les options /VERYSILENT /SUPPRESSMSGBOXES /NORESTART fonctionnent avec l'admin
+    const psScript = `Start-Process -FilePath "${installerPath}" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Verb RunAs -Wait`
+    const cmd = `powershell -Command "${psScript}"`
+    console.log('🔧 Commande PowerShell:', cmd)
+    
+    return new Promise((resolve) => {
+      exec(cmd, {
+        timeout: 120000,
+        shell: 'cmd.exe',
+        windowsHide: false
+      }, (error, stdout, stderr) => {
+        if (stdout) console.log('📤 stdout:', stdout)
+        if (stderr) console.error('📤 stderr:', stderr)
+        
+        if (error) {
+          console.error('❌ Erreur installation:', error)
+          // Code 5 = Access denied / besoin de redémarrage
+          // Code 4294967295 = erreur générique souvent due à l'UAC
+          if (error.code === 5 || error.code === 4294967295) {
+            // On vérifie si le pilote est quand même installé
+            setTimeout(() => {
+              checkVBCableInstalled().then((installed) => {
+                if (installed) {
+                  store.set('virtualDriverInstalled', true)
+                  store.set('virtualDriverInstalledAt', Date.now())
+                  console.log('✅ VB-Cable installé avec succès (vérifié)')
+                  resolve({ success: true })
+                } else {
+                  console.log('⚠️ Installation peut nécessiter un redémarrage')
+                  store.set('virtualDriverInstalled', true)
+                  store.set('virtualDriverInstalledAt', Date.now())
+                  resolve({ success: true, warning: 'Installation réussie. Un redémarrage peut être nécessaire pour que le périphérique soit détecté.' })
+                }
+              })
+            }, 3000)
+            return
+          }
+          resolve({ success: false, error: error.message })
+          return
+        }
+        
+        // Vérifier si l'installation a réussi
+        setTimeout(() => {
+          checkVBCableInstalled().then((installed) => {
+            if (installed) {
+              store.set('virtualDriverInstalled', true)
+              store.set('virtualDriverInstalledAt', Date.now())
+              console.log('✅ VB-Cable installé avec succès')
+              resolve({ success: true })
+            } else {
+              console.warn('⚠️ VB-Cable non détecté après installation')
+              store.set('virtualDriverInstalled', true)
+              store.set('virtualDriverInstalledAt', Date.now())
+              resolve({ success: true, warning: 'Installation réussie mais redémarrage peut être nécessaire' })
+            }
+          })
+        }, 3000)
+      })
+    })
+    
+  } catch (e) {
+    console.error('❌ Erreur installation VB-Cable:', e)
+    return { success: false, error: e.message }
+  }
+}
+
+// Télécharger le ZIP de VB-Cable
+async function downloadVBCableZip() {
+  return new Promise((resolve, reject) => {
+    const https = require('https')
+    // ✅ URL CORRECTE du ZIP officiel
+    const url = 'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip'
+    const destPath = path.join(app.getPath('temp'), 'VBCABLE_Driver_Pack45.zip')
+    
+    console.log('📥 Téléchargement de VB-Cable depuis:', url)
+    
+    const file = fs.createWriteStream(destPath)
+    https.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    }, (res) => {
+      if ([301, 302, 303, 307].includes(res.statusCode) && res.headers.location) {
+        const redirectUrl = res.headers.location.startsWith('http')
+          ? res.headers.location
+          : `https://vb-audio.com${res.headers.location}`
+        console.log('🔄 Redirection vers:', redirectUrl)
+        downloadVBCableFromUrl(redirectUrl, destPath).then(resolve).catch(reject)
+        return
+      }
+      
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP ${res.statusCode}`))
+        return
+      }
+      
+      res.pipe(file)
+      file.on('finish', () => {
+        file.close()
+        console.log('✅ Téléchargement terminé:', destPath)
+        resolve(destPath)
+      })
+      file.on('error', reject)
+    }).on('error', reject)
+  })
+}
+
+function downloadVBCableFromUrl(url, destPath) {
+  return new Promise((resolve, reject) => {
+    const https = require('https')
+    const file = fs.createWriteStream(destPath)
+    
+    https.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    }, (res) => {
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP ${res.statusCode}`))
+        return
+      }
+      res.pipe(file)
+      file.on('finish', () => {
+        file.close()
+        resolve(destPath)
+      })
+      file.on('error', reject)
+    }).on('error', reject)
+  })
+}
+
+// Désinstaller VB-Cable - Version avec recherche PowerShell
 function uninstallVirtualDriver() {
   return new Promise((resolve) => {
     if (process.platform !== 'win32') {
@@ -358,65 +581,317 @@ function uninstallVirtualDriver() {
       return
     }
     
-    try {
-      const extractPath = path.join(app.getPath('temp'), `scream_driver_${Date.now()}`)
-      const driverPath = getDriverResourcePath()
-      
-      if (!fs.existsSync(driverPath)) {
-        // Si le pilote n'est pas trouvé, on tente quand même de désinstaller via le panneau de configuration
-        exec('pnputil /delete-driver Scream.inf', (error) => {
-          if (!error) {
-            store.delete('virtualDriverInstalled')
-            resolve({ success: true })
-          } else {
-            resolve({ success: false, error: error.message })
-          }
-        })
-        return
+    console.log('🗑️ Début désinstallation VB-Cable...')
+    
+    // Méthode 1: Essayer via le désinstallateur officiel
+    const uninstallerPaths = [
+      'C:\\Program Files\\VB-CABLE\\uninstall.exe',
+      'C:\\Program Files\\VB-CABLE\\unins000.exe',
+      'C:\\Program Files (x86)\\VB-CABLE\\uninstall.exe',
+      'C:\\Program Files (x86)\\VB-CABLE\\unins000.exe'
+    ]
+    
+    let foundUninstaller = null
+    for (const p of uninstallerPaths) {
+      if (fs.existsSync(p)) {
+        foundUninstaller = p
+        break
       }
-      
-      // Extraire l'archive pour trouver le désinstallateur
-      if (!fs.existsSync(extractPath)) {
-        fs.mkdirSync(extractPath, { recursive: true })
-      }
-      
-      const zip = new AdmZip(driverPath)
-      zip.extractAllTo(extractPath, true)
-      
-      const files = fs.readdirSync(extractPath)
-      const uninstallers = files.filter(f => 
-        f.toLowerCase().includes('uninstall') && 
-        (f.endsWith('.bat') || f.endsWith('.exe') || f.endsWith('.cmd'))
-      )
-      
-      if (uninstallers.length === 0) {
-        fs.rmSync(extractPath, { recursive: true, force: true })
-        resolve({ success: false, error: 'Désinstallateur non trouvé' })
-        return
-      }
-      
-      const uninstallerPath = path.join(extractPath, uninstallers[0])
-      
-      exec(`"${uninstallerPath}" /SILENT /VERYSILENT`, {
-        timeout: 30000
-      }, (error) => {
-        setTimeout(() => {
-          try {
-            fs.rmSync(extractPath, { recursive: true, force: true })
-          } catch (e) {}
-        }, 2000)
-        
+    }
+    
+    if (foundUninstaller) {
+      console.log('🔧 Désinstallation via:', foundUninstaller)
+      const cmd = `"${foundUninstaller}" /VERYSILENT /SUPPRESSMSGBOXES`
+      exec(cmd, { timeout: 60000 }, (error) => {
         if (!error) {
           store.delete('virtualDriverInstalled')
-          console.log('✅ Pilote audio virtuel désinstallé')
+          console.log('✅ VB-Cable désinstallé avec succès')
           resolve({ success: true })
         } else {
-          resolve({ success: false, error: error.message })
+          console.log('⚠️ Échec désinstallateur, recherche PowerShell...')
+          uninstallViaPowerShell(resolve)
         }
       })
-    } catch (e) {
-      resolve({ success: false, error: e.message })
+      return
     }
+    
+    // Méthode 2: Recherche via PowerShell
+    uninstallViaPowerShell(resolve)
+  })
+}
+
+// Fonction auxiliaire pour désinstaller via PowerShell
+function uninstallViaPowerShell(resolve) {
+  console.log('🔧 Recherche du driver VB-Cable via PowerShell...')
+  
+  // Script PowerShell qui liste TOUS les drivers installés et cherche VB-Cable
+  const psScript = `
+    $ErrorActionPreference = "SilentlyContinue"
+    
+    # Récupérer tous les drivers
+    $drivers = pnputil /enum-drivers
+    
+    # Chercher les drivers qui contiennent "cable" ou "vb" ou "vbaudio"
+    $found = $drivers | Select-String -Pattern "(?i)(cable|vb[-_]?audio|vbaudio)"
+    
+    if ($found) {
+      # Extraire le nom du fichier .inf (oem*.inf)
+      $infFile = ($found.Line -match 'oem\\d+\\.inf').Matches.Value
+      if ($infFile) {
+        Write-Host "FOUND:$infFile"
+      } else {
+        # Chercher autrement
+        foreach ($line in $found.Line) {
+          $match = [regex]::Match($line, 'oem\\d+\\.inf', 'IgnoreCase')
+          if ($match.Success) {
+            Write-Host "FOUND:$($match.Value)"
+            break
+          }
+        }
+      }
+    } else {
+      # Chercher dans les périphériques audio
+      $devices = Get-PnpDevice -Class AudioEndpoint -ErrorAction SilentlyContinue
+      foreach ($device in $devices) {
+        if ($device.FriendlyName -match "cable|vb") {
+          Write-Host "DEVICE:$($device.FriendlyName)"
+          # Récupérer l'instance ID pour trouver le driver
+          $instanceId = $device.InstanceId
+          Write-Host "INSTANCE:$instanceId"
+        }
+      }
+    }
+  `
+  
+  exec(`powershell -Command "${psScript}"`, { timeout: 15000 }, (err, stdout, stderr) => {
+    if (stdout) console.log('📤 PowerShell stdout:', stdout)
+    if (stderr) console.error('📤 PowerShell stderr:', stderr)
+    
+    if (err) {
+      console.error('❌ Erreur PowerShell:', err)
+      // Dernière tentative: chercher manuellement dans tous les drivers
+      uninstallViaManualSearch(resolve)
+      return
+    }
+    
+    // Analyser la sortie pour trouver le nom du driver
+    const lines = stdout.split('\n')
+    let infFile = null
+    
+    for (const line of lines) {
+      if (line.startsWith('FOUND:')) {
+        infFile = line.replace('FOUND:', '').trim()
+        break
+      }
+    }
+    
+    if (infFile) {
+      console.log(`✅ Driver trouvé via PowerShell: ${infFile}`)
+      exec(`pnputil /delete-driver ${infFile} /force`, { timeout: 10000 }, (delErr) => {
+        if (delErr) {
+          console.warn('⚠️ Erreur suppression:', delErr.message)
+          uninstallViaManualSearch(resolve)
+        } else {
+          store.delete('virtualDriverInstalled')
+          console.log('✅ VB-Cable désinstallé avec succès')
+          resolve({ success: true })
+        }
+      })
+    } else {
+      // Si on a trouvé un périphérique mais pas le driver
+      if (stdout.includes('DEVICE:')) {
+        console.log('🔧 Périphérique VB-Cable trouvé, tentative de suppression...')
+        const removeDeviceScript = `
+          Get-PnpDevice -FriendlyName "*CABLE*" | Remove-PnpDevice -Confirm:$false
+          Get-PnpDevice -FriendlyName "*VB-Audio*" | Remove-PnpDevice -Confirm:$false
+        `
+        exec(`powershell -Command "${removeDeviceScript}"`, { timeout: 10000 }, (rmErr) => {
+          if (!rmErr) {
+            store.delete('virtualDriverInstalled')
+            console.log('✅ VB-Cable supprimé via PowerShell')
+            resolve({ success: true })
+          } else {
+            uninstallViaManualSearch(resolve)
+          }
+        })
+      } else {
+        uninstallViaManualSearch(resolve)
+      }
+    }
+  })
+}
+
+// Fonction auxiliaire pour recherche manuelle
+function uninstallViaManualSearch(resolve) {
+  console.log('🔧 Recherche manuelle dans tous les drivers...')
+  
+  // Lister TOUS les drivers
+  exec('pnputil /enum-drivers', { timeout: 15000 }, (enumErr, enumStdout) => {
+    if (enumErr) {
+      console.error('❌ Erreur énumération:', enumErr)
+      resolve({ success: false, error: 'Impossible d\'énumérer les drivers' })
+      return
+    }
+    
+    const lines = enumStdout.split('\n')
+    let foundInf = null
+    
+    // Parcourir chaque ligne et chercher des indices
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].toLowerCase()
+      
+      // Chercher des mots-clés dans la ligne
+      if (line.includes('cable') || 
+          line.includes('vb-audio') || 
+          line.includes('vbaudio') || 
+          (line.includes('vb') && line.includes('audio'))) {
+        
+        // Chercher le nom du fichier .inf dans cette ligne ou les lignes suivantes
+        for (let j = Math.max(0, i - 2); j < Math.min(lines.length, i + 3); j++) {
+          const match = lines[j].match(/(oem\d+\.inf)/i)
+          if (match) {
+            foundInf = match[1]
+            console.log(`✅ Driver trouvé: ${foundInf} (ligne: ${lines[j].trim()})`)
+            break
+          }
+        }
+        
+        if (foundInf) break
+      }
+    }
+    
+    if (foundInf) {
+      console.log(`🔧 Suppression du driver: ${foundInf}`)
+      exec(`pnputil /delete-driver ${foundInf} /force`, { timeout: 10000 }, (delErr) => {
+        if (delErr) {
+          console.warn('⚠️ Erreur suppression:', delErr.message)
+          // Dernière chance: essayer avec PowerShell élevé
+          console.log('🔧 Dernière tentative avec élévation de privilèges...')
+          uninstallViaPowerShellElevated(resolve)
+        } else {
+          store.delete('virtualDriverInstalled')
+          console.log('✅ VB-Cable désinstallé avec succès')
+          resolve({ success: true })
+        }
+      })
+    } else {
+      console.log('❌ Aucun driver VB-Cable trouvé')
+      resolve({ success: false, error: 'Driver VB-Cable non trouvé' })
+    }
+  })
+}
+
+// Fonction auxiliaire pour désinstaller via PowerShell avec élévation - Version avec désactivation
+function uninstallViaPowerShellElevated(resolve) {
+  console.log('🔧 Tentative de désinstallation avec élévation de privilèges...')
+  
+  const tempDir = app.getPath('temp')
+  const scriptPath = path.join(tempDir, `uninstall_vbcable_${Date.now()}.ps1`)
+  
+  const psScriptContent = `
+$ErrorActionPreference = "Continue"
+
+Write-Host "=========================================="
+Write-Host "Desinstallation de VB-Cable"
+Write-Host "=========================================="
+
+# 1. Desactiver les peripheriques
+Write-Host ""
+Write-Host "[1] Desactivation des peripheriques..."
+
+# Desactiver CABLE Input/Output
+Get-PnpDevice -FriendlyName "*CABLE*" -ErrorAction SilentlyContinue | ForEach-Object {
+  Write-Host "  Desactivation de: $($_.FriendlyName)"
+  $_.FriendlyName | Disable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+}
+
+# Desactiver VB-Audio Virtual Cable
+Get-PnpDevice -FriendlyName "*VB-Audio*" -ErrorAction SilentlyContinue | ForEach-Object {
+  Write-Host "  Desactivation de: $($_.FriendlyName)"
+  $_.FriendlyName | Disable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+}
+
+Start-Sleep -Seconds 2
+
+# 2. Trouver et supprimer le driver
+Write-Host ""
+Write-Host "[2] Recherche et suppression du driver..."
+
+# Rechercher le driver specifique
+$foundInf = $null
+$drivers = pnputil /enum-drivers
+
+foreach ($line in $drivers) {
+    $lowerLine = $line.ToLower()
+    if ($lowerLine -match "vbmmecable64_win10" -or 
+        $lowerLine -match "vbmmecable" -or
+        $lowerLine -match "vbaudio" -or 
+        ($lowerLine -match "vb" -and $lowerLine -match "cable")) {
+        
+        $match = [regex]::Match($line, 'oem\\d+\\.inf', 'IgnoreCase')
+        if ($match.Success) {
+            $foundInf = $match.Value
+            Write-Host "  Driver trouve: $foundInf"
+            Write-Host "  Ligne: $line"
+            break
+        }
+    }
+}
+
+if ($foundInf) {
+    Write-Host ""
+    Write-Host "[3] Suppression du driver: $foundInf"
+    
+    # Essayer la suppression
+    $result = pnputil /delete-driver $foundInf /force 2>&1
+    Write-Host "  Resultat: $result"
+    
+    # Verifier si le driver a ete supprime
+    Write-Host ""
+    Write-Host "[4] Verification..."
+    $check = pnputil /enum-drivers | Select-String -Pattern "vbmmecable"
+    if ($check) {
+        Write-Host "  Driver VB-Cable encore present"
+    } else {
+        Write-Host "  Driver VB-Cable supprime !"
+    }
+} else {
+    Write-Host "  Driver VB-Cable non trouve"
+}
+
+Write-Host ""
+Write-Host "=========================================="
+Write-Host "Termine. Vous pouvez fermer cette fenetre."
+Write-Host "=========================================="
+Read-Host "Appuyez sur Entree pour fermer"
+`
+  
+  fs.writeFileSync(scriptPath, psScriptContent, 'utf8')
+  console.log('📁 Script PowerShell créé:', scriptPath)
+  
+  const cmd = `powershell -Command "Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -File ""${scriptPath}""' -Verb RunAs -Wait"`
+  console.log('🔧 Lancement du script PowerShell avec élévation...')
+  
+  exec(cmd, { timeout: 120000 }, (error, stdout, stderr) => {
+    if (stdout) console.log('📤 PowerShell stdout:', stdout)
+    if (stderr) console.error('📤 PowerShell stderr:', stderr)
+    
+    try {
+      if (fs.existsSync(scriptPath)) fs.unlinkSync(scriptPath)
+      console.log('🧹 Fichier script supprimé')
+    } catch (e) {}
+    
+    setTimeout(() => {
+      checkVBCableInstalled().then((installed) => {
+        if (!installed) {
+          store.delete('virtualDriverInstalled')
+          console.log('✅ VB-Cable désinstallé avec succès')
+          resolve({ success: true })
+        } else {
+          resolve({ success: false, error: 'Driver toujours présent' })
+        }
+      })
+    }, 3000)
   })
 }
 

@@ -1,6 +1,12 @@
-// sounddeck/src/store/useStore.js
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { v4 as uuidv4 } from 'uuid'
+
+// Constantes des modes audio
+export const AUDIO_MODES = {
+  INTEGRATED: 'integrated',
+  SIMPLE: 'simple',
+  ADVANCED: 'advanced'
+}
 
 // Hook principal qui gère tout l'état de l'application
 export function useStore() {
@@ -33,9 +39,12 @@ export function useStore() {
   const [startMinimized, setStartMinimized] = useState(false)
   const [launchAtStartup, setLaunchAtStartup] = useState(false)
 
-  const [audioMode, setAudioMode] = useState('simple')
-  const [virtualDriverInstalled, setVirtualDriverInstalled] = useState(false) // ✅ Déclaration unique
+  // Audio modes
+  const [audioMode, setAudioMode] = useState(AUDIO_MODES.INTEGRATED)
+  const [virtualDriverInstalled, setVirtualDriverInstalled] = useState(false)
+  const [virtualDeviceActive, setVirtualDeviceActive] = useState(false)
 
+  // Mixer
   const [mixerEnabled, setMixerEnabled] = useState(false)
   const [microphoneDevice, setMicrophoneDevice] = useState('default')
   const [microphoneVolume, setMicrophoneVolume] = useState(80)
@@ -48,7 +57,6 @@ export function useStore() {
         const savedProfiles = await window.electronAPI.storeGet('profiles') || []
         const savedSounds = (await window.electronAPI.storeGet('sounds') || []).map(s => {
           if (s.volumeDb !== undefined) return s
-          // Convertir de 0-100 à -12 à +12
           const oldVolume = s.volume ?? 100
           const newDb = Math.round(((oldVolume - 50) / 50) * 24 * 10) / 10
           return { ...s, volume: newDb, volumeDb: newDb }
@@ -81,10 +89,12 @@ export function useStore() {
         setStartMinimized(savedStartMinimized)
         setLaunchAtStartup(savedLaunchAtStartup)
 
-        const savedAudioMode = await window.electronAPI.storeGet('audioMode') || 'simple'
+        const savedAudioMode = await window.electronAPI.storeGet('audioMode') || AUDIO_MODES.INTEGRATED
         const savedVirtualDriverInstalled = await window.electronAPI.storeGet('virtualDriverInstalled') || false
+        const savedVirtualDeviceActive = await window.electronAPI.storeGet('virtualDeviceActive') ?? false
         setAudioMode(savedAudioMode)
         setVirtualDriverInstalled(savedVirtualDriverInstalled)
+        setVirtualDeviceActive(savedVirtualDeviceActive)
 
         const savedMixerEnabled = await window.electronAPI.storeGet('mixerEnabled') ?? false
         const savedMicrophoneDevice = await window.electronAPI.storeGet('microphoneDevice') || 'default'
@@ -188,8 +198,8 @@ export function useStore() {
       emoji: soundData.emoji || '🔊',
       favorite: false,
       profiles: soundData.profiles || ['all'],
-      volume: 0, // 0 dB par défaut (volume relatif)
-      volumeDb: 0, // En dB pour plus de précision
+      volume: 0,
+      volumeDb: 0,
       createdAt: Date.now()
     }
     const updated = [...sounds, newSound]
@@ -249,7 +259,6 @@ export function useStore() {
     await save('sounds', updated)
   }, [sounds, save])
 
-  // Volume en dB (-24 à +24)
   const updateSoundVolume = useCallback(async (soundId, volumeDb) => {
     const clampedDb = Math.max(-24, Math.min(24, volumeDb))
     const updated = sounds.map(s => 
@@ -395,7 +404,6 @@ export function useStore() {
   const updateLang = useCallback(async (newLang) => {
     setLang(newLang)
     await save('lang', newLang)
-    // Sauvegarder la langue dans le store principal pour le tray
     await window.electronAPI.storeSetLang?.(newLang)
   }, [save])
 
@@ -437,10 +445,14 @@ export function useStore() {
     await save('audioMode', mode)
   }, [save])
 
-  // ✅ Utilisation de setVirtualDriverInstalled (déjà déclaré dans le useState)
   const updateVirtualDriverInstalled = useCallback(async (installed) => {
     setVirtualDriverInstalled(installed)
     await save('virtualDriverInstalled', installed)
+  }, [save])
+
+  const updateVirtualDeviceActive = useCallback(async (active) => {
+    setVirtualDeviceActive(active)
+    await save('virtualDeviceActive', active)
   }, [save])
 
   // ─── Normalisation ──────────────────────────────────────────────────────────
@@ -475,7 +487,6 @@ export function useStore() {
     setMixerSoundVolume(volume)
     await save('mixerSoundVolume', volume)
   }, [save])
-
 
   // ─── Sons ordonnés selon le profil ──────────────────────────────────────────
   const orderedSounds = useMemo(() => {
@@ -528,8 +539,10 @@ export function useStore() {
     // Audio Mode
     audioMode,
     virtualDriverInstalled,
+    virtualDeviceActive,
     updateAudioMode,
-    updateVirtualDriverInstalled, // ✅ Renommé pour éviter le conflit
+    updateVirtualDriverInstalled,
+    updateVirtualDeviceActive,
     // Raccourcis globaux
     toggleGlobalShortcuts,
     updateToggleShortcutsAccelerator,
