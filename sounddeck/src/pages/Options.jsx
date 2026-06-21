@@ -3,6 +3,7 @@ import ShortcutRecorder from '../components/ShortcutRecorder'
 import CustomThemeEditor from '../components/CustomThemeEditor'
 import { LANGUAGES, useTranslation } from '../i18n'
 import { getMicrophoneStatus, getMixerStats, testMicrophoneOnce, connectMixerToOutput } from '../utils/audioMixer'
+import KeyboardVisualizer from '../components/KeyboardVisualizer'
 
 export default function Options({ store, addToast, lang = 'fr' }) {
   const tr = useTranslation(lang)
@@ -605,12 +606,35 @@ export default function Options({ store, addToast, lang = 'fr' }) {
 
         {/* Raccourcis globaux */}
         <Section title={tr('shortcuts')} icon="ti-keyboard">
+          <OptionRow label="Disposition du clavier" sub="Sélectionnez votre type de clavier">
+            <select 
+              value={store.keyboardLayout || 'qwerty'} 
+              onChange={async (e) => {
+                const layout = e.target.value
+                await store.updateKeyboardLayout(layout)
+                addToast(`Disposition: ${layout === 'azerty' ? 'AZERTY' : 'QWERTY'}`, 'info')
+              }}
+              style={{ width: 140, fontSize: 12 }}
+            >
+              <option value="qwerty">QWERTY</option>
+              <option value="azerty">AZERTY</option>
+            </select>
+          </OptionRow>
+
+          {/* ⬇️ AJOUTE LE VISUALISEUR ICI ⬇️ */}
+          <KeyboardVisualizer 
+            shortcuts={store.shortcuts} 
+            layout={store.keyboardLayout || 'qwerty'} 
+            lang={store.lang}
+          />
+
           <OptionRow label={tr('switchProfile')} sub={tr('switchProfileDesc')}>
             <ShortcutRecorder
               value={store.profileShortcut}
               onSave={async (acc) => { await store.updateProfileShortcut(acc); addToast(`${tr('toastShortcutSet')} ${acc}`, 'success') }}
               onClear={() => store.updateProfileShortcut('')}
               requireMod
+              layout={store.keyboardLayout || 'qwerty'}
             />
           </OptionRow>
           <OptionRow label={tr('toggleLoop')} sub={tr('toggleLoopDesc')}>
@@ -619,6 +643,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               onSave={async (acc) => { await store.updateLoopShortcut(acc); addToast(`${tr('toastShortcutLoop')} ${acc}`, 'success') }}
               onClear={() => store.updateLoopShortcut('')}
               requireMod
+              layout={store.keyboardLayout || 'qwerty'}
             />
           </OptionRow>
           <OptionRow label={tr('stopAllShortcut')} sub={tr('stopAllDesc')}>
@@ -627,6 +652,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               onSave={async (acc) => { await store.updateStopAllShortcut(acc); addToast(`${tr('toastShortcutStop')} ${acc}`, 'success') }}
               onClear={() => store.updateStopAllShortcut('')}
               requireMod
+              layout={store.keyboardLayout || 'qwerty'}
             />
           </OptionRow>
           <OptionRow label={tr('presentationShortcut')} sub={tr('presentationDesc')}>
@@ -635,6 +661,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               onSave={async (acc) => { await store.updatePresentationShortcut(acc); addToast(`${tr('toastShortcutPresentation')} ${acc}`, 'success') }}
               onClear={() => store.updatePresentationShortcut('')}
               requireMod
+              layout={store.keyboardLayout || 'qwerty'}
             />
           </OptionRow>
           
@@ -650,6 +677,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 addToast(tr('toggleShortcutRemoved'), 'info')
               }}
               requireMod
+              layout={store.keyboardLayout || 'qwerty'}
             />
           </OptionRow>
 

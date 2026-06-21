@@ -583,6 +583,7 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLo
               lang={lang}
               onDragStart={(e) => draggable && onDragStart(e, s.id, index, dropTarget)}
               onDragEnd={(e) => draggable && onDragEnd(e)}
+              layout={store.keyboardLayout || 'qwerty'}
             />
           </div>
         )

@@ -61,7 +61,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportConfig: () => ipcRenderer.invoke('export-config'),
   exportFull: () => ipcRenderer.invoke('export-full'),
   exportSoundsOnly: () => ipcRenderer.invoke('export-sounds-only'),
-  importBackup: () => ipcRenderer.invoke('import-backup')
+  importBackup: () => ipcRenderer.invoke('import-backup'),
+  confirmQuit: (action, remember) => ipcRenderer.invoke('confirm-quit', action, remember),
+  onShowQuitConfirm: (cb) => ipcRenderer.on('show-quit-confirm', () => cb()),
 })
 
 // Exposer également via window pour accès direct dans les event handlers

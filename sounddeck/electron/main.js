@@ -13,7 +13,10 @@ let globalShortcutsEnabled = store.get('globalShortcutsEnabled', true)
 let registeredShortcuts = []
 let mainWindow = null
 let tray = null
+let trayInstance = null
 let isQuitting = false
+let closeToTray = store.get('closeToTray', true)
+let pendingQuit = false
 
 const isDev = !app.isPackaged
 
@@ -25,6 +28,12 @@ if (!fs.existsSync(soundsDir)) fs.mkdirSync(soundsDir, { recursive: true })
 
 // Vérifier si l'app doit démarrer en arrière-plan
 const shouldStartMinimized = store.get('startMinimized', false)
+
+const TRENDING_URLS = {
+  fr: 'https://www.myinstants.com/fr/trending/',
+  en: 'https://www.myinstants.com/en/trending/',
+  es: 'https://www.myinstants.com/es/trending/'
+}
 
 // ─── TRAY LABELS ──────────────────────────────────────────────────────────────
 const TRAY_LABELS = {
@@ -65,7 +74,7 @@ function getCurrentTrayLanguage() {
 
 function buildTrayMenu(lang) {
   const labels = TRAY_LABELS[lang] || TRAY_LABELS.fr
-  
+
   return Menu.buildFromTemplate([
     {
       label: labels.open,
@@ -118,7 +127,11 @@ function buildTrayMenu(lang) {
 }
 
 function createTray(lang = 'fr') {
-  if (tray) return
+  // ✅ Empêcher la création de plusieurs icônes
+  if (trayInstance) {
+    console.log('ℹ️ Une icône du tray existe déjà')
+    return
+  }
 
   let iconPath
   if (isDev) {
@@ -136,9 +149,10 @@ function createTray(lang = 'fr') {
   } else {
     icon = nativeImage.createEmpty()
   }
-  
+
   const trayIcon = icon.resize({ width: 16, height: 16 })
   tray = new Tray(trayIcon)
+  trayInstance = tray // ← STOCKER L'INSTANCE
   tray.setToolTip('SoundDeck - Soundboard')
 
   const contextMenu = buildTrayMenu(lang)
@@ -183,7 +197,7 @@ function isVirtualDriverInstalled() {
 // Chemin vers l'installateur VB-Cable dans les ressources
 function getDriverResourcePath() {
   const possiblePaths = []
-  
+
   if (isDev) {
     possiblePaths.push(
       // Chercher d'abord l'EXE
@@ -206,7 +220,7 @@ function getDriverResourcePath() {
       path.join(path.dirname(app.getPath('exe')), 'resources/drivers/VBCABLE_Setup_x64.exe')
     )
   }
-  
+
   console.log('🔍 Recherche de l\'installateur VB-Cable:')
   for (const p of possiblePaths) {
     const exists = fs.existsSync(p)
@@ -216,7 +230,7 @@ function getDriverResourcePath() {
       return p
     }
   }
-  
+
   console.warn('⚠️ Aucun installateur VB-Cable trouvé')
   return possiblePaths[0]
 }
@@ -227,9 +241,9 @@ async function downloadVBCable() {
     const https = require('https')
     const url = 'https://vb-audio.com/Cable/VBCABLE_Setup_x64.exe'
     const destPath = path.join(app.getPath('temp'), 'VBCABLE_Setup_x64.exe')
-    
+
     console.log('📥 Téléchargement de VB-Cable depuis:', url)
-    
+
     const file = fs.createWriteStream(destPath)
     https.get(url, {
       headers: {
@@ -245,12 +259,12 @@ async function downloadVBCable() {
         downloadVBCableFromUrl(redirectUrl, destPath).then(resolve).catch(reject)
         return
       }
-      
+
       if (res.statusCode !== 200) {
         reject(new Error(`HTTP ${res.statusCode}`))
         return
       }
-      
+
       res.pipe(file)
       file.on('finish', () => {
         file.close()
@@ -266,7 +280,7 @@ function downloadVBCableFromUrl(url, destPath) {
   return new Promise((resolve, reject) => {
     const https = require('https')
     const file = fs.createWriteStream(destPath)
-    
+
     https.get(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -293,13 +307,13 @@ function checkVBCableInstalled() {
         resolve(true)
         return
       }
-      exec('powershell -Command "Get-PnpDevice -FriendlyName *CABLE* | Select-Object FriendlyName"', 
+      exec('powershell -Command "Get-PnpDevice -FriendlyName *CABLE* | Select-Object FriendlyName"',
         { timeout: 5000 }, (err2, stdout2) => {
           if (stdout2 && stdout2.toLowerCase().includes('cable')) {
             resolve(true)
             return
           }
-          exec('reg query "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall" /s /f "VB-CABLE"', 
+          exec('reg query "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall" /s /f "VB-CABLE"',
             { timeout: 5000 }, (err3, stdout3) => {
               resolve(stdout3 && stdout3.toLowerCase().includes('vb-cable'))
             })
@@ -311,41 +325,41 @@ function checkVBCableInstalled() {
 // Installer VB-Cable
 async function installVirtualDriver() {
   console.log('🚀 Début installation VB-Cable...')
-  
+
   if (isVirtualDriverInstalled()) {
     console.log('⚠️ Pilote déjà installé')
     return { success: false, error: 'Pilote déjà installé' }
   }
-  
+
   if (process.platform !== 'win32') {
     console.log('⚠️ Plateforme non supportée:', process.platform)
     return { success: false, error: 'Plateforme non supportée (Windows uniquement)' }
   }
-  
+
   try {
     // 1. Chercher l'installateur localement (ZIP ou EXE)
     let installerPath = getDriverResourcePath()
     let downloaded = false
     let isZip = false
-    
+
     // Vérifier si c'est un ZIP ou un EXE
     if (fs.existsSync(installerPath) && installerPath.endsWith('.zip')) {
       isZip = true
       console.log('📦 Fichier ZIP détecté, extraction en cours...')
-      
+
       // Extraire le ZIP dans un dossier temporaire
       const extractPath = path.join(app.getPath('temp'), `vbcable_${Date.now()}`)
       fs.mkdirSync(extractPath, { recursive: true })
-      
+
       const AdmZip = require('adm-zip')
       const zip = new AdmZip(installerPath)
       zip.extractAllTo(extractPath, true)
       console.log('✅ Extraction terminée dans:', extractPath)
-      
+
       // Chercher l'exe dans le dossier extrait
       const files = fs.readdirSync(extractPath)
       console.log('📁 Fichiers extraits:', files)
-      
+
       // Chercher VBCABLE_Setup_x64.exe ou VBCABLE_Setup.exe
       let exeFile = files.find(f => f.match(/VBCABLE_Setup.*\.exe/i))
       if (!exeFile) {
@@ -362,15 +376,15 @@ async function installVirtualDriver() {
           }
         }
       }
-      
+
       if (!exeFile) {
         fs.rmSync(extractPath, { recursive: true, force: true })
         return { success: false, error: 'VBCABLE_Setup.exe non trouvé dans le ZIP' }
       }
-      
+
       installerPath = path.join(extractPath, exeFile)
       console.log('✅ Installateur trouvé:', installerPath)
-      
+
       // Nettoyer le dossier après installation
       setTimeout(() => {
         try {
@@ -380,7 +394,7 @@ async function installVirtualDriver() {
           console.warn('⚠️ Erreur nettoyage:', e.message)
         }
       }, 10000)
-      
+
     } else if (!fs.existsSync(installerPath)) {
       // 2. Si pas trouvé, télécharger le ZIP
       console.log('📥 Installateur non trouvé localement, téléchargement...')
@@ -389,16 +403,16 @@ async function installVirtualDriver() {
         downloaded = true
         isZip = true
         console.log('✅ Téléchargement réussi:', installerPath)
-        
+
         // Extraire le ZIP téléchargé
         const extractPath = path.join(app.getPath('temp'), `vbcable_${Date.now()}`)
         fs.mkdirSync(extractPath, { recursive: true })
-        
+
         const AdmZip = require('adm-zip')
         const zip = new AdmZip(installerPath)
         zip.extractAllTo(extractPath, true)
         console.log('✅ Extraction terminée dans:', extractPath)
-        
+
         // Chercher l'exe
         const files = fs.readdirSync(extractPath)
         let exeFile = files.find(f => f.match(/VBCABLE_Setup.*\.exe/i))
@@ -415,38 +429,38 @@ async function installVirtualDriver() {
             }
           }
         }
-        
+
         if (!exeFile) {
           fs.rmSync(extractPath, { recursive: true, force: true })
           return { success: false, error: 'VBCABLE_Setup.exe non trouvé dans le ZIP' }
         }
-        
+
         installerPath = path.join(extractPath, exeFile)
         console.log('✅ Installateur trouvé:', installerPath)
-        
+
         // Nettoyer plus tard
         setTimeout(() => {
           try {
             fs.rmSync(extractPath, { recursive: true, force: true })
           } catch (e) {}
         }, 10000)
-        
+
       } catch (e) {
         console.error('❌ Erreur téléchargement:', e)
         return { success: false, error: 'Impossible de télécharger VB-Cable: ' + e.message }
       }
     }
-    
+
     // 3. Installer avec élévation de privilèges (RunAs)
     console.log('🔧 Installation de VB-Cable avec droits administrateur...')
     console.log('📁 Installateur:', installerPath)
-    
+
     // Utiliser PowerShell avec Start-Process -Verb RunAs pour lancer en tant qu'admin
     // Les options /VERYSILENT /SUPPRESSMSGBOXES /NORESTART fonctionnent avec l'admin
     const psScript = `Start-Process -FilePath "${installerPath}" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Verb RunAs -Wait`
     const cmd = `powershell -Command "${psScript}"`
     console.log('🔧 Commande PowerShell:', cmd)
-    
+
     return new Promise((resolve) => {
       exec(cmd, {
         timeout: 120000,
@@ -455,7 +469,7 @@ async function installVirtualDriver() {
       }, (error, stdout, stderr) => {
         if (stdout) console.log('📤 stdout:', stdout)
         if (stderr) console.error('📤 stderr:', stderr)
-        
+
         if (error) {
           console.error('❌ Erreur installation:', error)
           // Code 5 = Access denied / besoin de redémarrage
@@ -482,7 +496,7 @@ async function installVirtualDriver() {
           resolve({ success: false, error: error.message })
           return
         }
-        
+
         // Vérifier si l'installation a réussi
         setTimeout(() => {
           checkVBCableInstalled().then((installed) => {
@@ -501,7 +515,7 @@ async function installVirtualDriver() {
         }, 3000)
       })
     })
-    
+
   } catch (e) {
     console.error('❌ Erreur installation VB-Cable:', e)
     return { success: false, error: e.message }
@@ -515,9 +529,9 @@ async function downloadVBCableZip() {
     // ✅ URL CORRECTE du ZIP officiel
     const url = 'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip'
     const destPath = path.join(app.getPath('temp'), 'VBCABLE_Driver_Pack45.zip')
-    
+
     console.log('📥 Téléchargement de VB-Cable depuis:', url)
-    
+
     const file = fs.createWriteStream(destPath)
     https.get(url, {
       headers: {
@@ -532,40 +546,16 @@ async function downloadVBCableZip() {
         downloadVBCableFromUrl(redirectUrl, destPath).then(resolve).catch(reject)
         return
       }
-      
+
       if (res.statusCode !== 200) {
         reject(new Error(`HTTP ${res.statusCode}`))
         return
       }
-      
+
       res.pipe(file)
       file.on('finish', () => {
         file.close()
         console.log('✅ Téléchargement terminé:', destPath)
-        resolve(destPath)
-      })
-      file.on('error', reject)
-    }).on('error', reject)
-  })
-}
-
-function downloadVBCableFromUrl(url, destPath) {
-  return new Promise((resolve, reject) => {
-    const https = require('https')
-    const file = fs.createWriteStream(destPath)
-    
-    https.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
-    }, (res) => {
-      if (res.statusCode !== 200) {
-        reject(new Error(`HTTP ${res.statusCode}`))
-        return
-      }
-      res.pipe(file)
-      file.on('finish', () => {
-        file.close()
         resolve(destPath)
       })
       file.on('error', reject)
@@ -580,9 +570,9 @@ function uninstallVirtualDriver() {
       resolve({ success: false, error: 'Plateforme non supportée' })
       return
     }
-    
+
     console.log('🗑️ Début désinstallation VB-Cable...')
-    
+
     // Méthode 1: Essayer via le désinstallateur officiel
     const uninstallerPaths = [
       'C:\\Program Files\\VB-CABLE\\uninstall.exe',
@@ -590,7 +580,7 @@ function uninstallVirtualDriver() {
       'C:\\Program Files (x86)\\VB-CABLE\\uninstall.exe',
       'C:\\Program Files (x86)\\VB-CABLE\\unins000.exe'
     ]
-    
+
     let foundUninstaller = null
     for (const p of uninstallerPaths) {
       if (fs.existsSync(p)) {
@@ -598,7 +588,7 @@ function uninstallVirtualDriver() {
         break
       }
     }
-    
+
     if (foundUninstaller) {
       console.log('🔧 Désinstallation via:', foundUninstaller)
       const cmd = `"${foundUninstaller}" /VERYSILENT /SUPPRESSMSGBOXES`
@@ -614,7 +604,7 @@ function uninstallVirtualDriver() {
       })
       return
     }
-    
+
     // Méthode 2: Recherche via PowerShell
     uninstallViaPowerShell(resolve)
   })
@@ -623,17 +613,17 @@ function uninstallVirtualDriver() {
 // Fonction auxiliaire pour désinstaller via PowerShell
 function uninstallViaPowerShell(resolve) {
   console.log('🔧 Recherche du driver VB-Cable via PowerShell...')
-  
+
   // Script PowerShell qui liste TOUS les drivers installés et cherche VB-Cable
   const psScript = `
     $ErrorActionPreference = "SilentlyContinue"
-    
+
     # Récupérer tous les drivers
     $drivers = pnputil /enum-drivers
-    
+
     # Chercher les drivers qui contiennent "cable" ou "vb" ou "vbaudio"
     $found = $drivers | Select-String -Pattern "(?i)(cable|vb[-_]?audio|vbaudio)"
-    
+
     if ($found) {
       # Extraire le nom du fichier .inf (oem*.inf)
       $infFile = ($found.Line -match 'oem\\d+\\.inf').Matches.Value
@@ -662,29 +652,29 @@ function uninstallViaPowerShell(resolve) {
       }
     }
   `
-  
+
   exec(`powershell -Command "${psScript}"`, { timeout: 15000 }, (err, stdout, stderr) => {
     if (stdout) console.log('📤 PowerShell stdout:', stdout)
     if (stderr) console.error('📤 PowerShell stderr:', stderr)
-    
+
     if (err) {
       console.error('❌ Erreur PowerShell:', err)
       // Dernière tentative: chercher manuellement dans tous les drivers
       uninstallViaManualSearch(resolve)
       return
     }
-    
+
     // Analyser la sortie pour trouver le nom du driver
     const lines = stdout.split('\n')
     let infFile = null
-    
+
     for (const line of lines) {
       if (line.startsWith('FOUND:')) {
         infFile = line.replace('FOUND:', '').trim()
         break
       }
     }
-    
+
     if (infFile) {
       console.log(`✅ Driver trouvé via PowerShell: ${infFile}`)
       exec(`pnputil /delete-driver ${infFile} /force`, { timeout: 10000 }, (delErr) => {
@@ -724,7 +714,7 @@ function uninstallViaPowerShell(resolve) {
 // Fonction auxiliaire pour recherche manuelle
 function uninstallViaManualSearch(resolve) {
   console.log('🔧 Recherche manuelle dans tous les drivers...')
-  
+
   // Lister TOUS les drivers
   exec('pnputil /enum-drivers', { timeout: 15000 }, (enumErr, enumStdout) => {
     if (enumErr) {
@@ -732,20 +722,20 @@ function uninstallViaManualSearch(resolve) {
       resolve({ success: false, error: 'Impossible d\'énumérer les drivers' })
       return
     }
-    
+
     const lines = enumStdout.split('\n')
     let foundInf = null
-    
+
     // Parcourir chaque ligne et chercher des indices
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].toLowerCase()
-      
+
       // Chercher des mots-clés dans la ligne
-      if (line.includes('cable') || 
-          line.includes('vb-audio') || 
-          line.includes('vbaudio') || 
+      if (line.includes('cable') ||
+          line.includes('vb-audio') ||
+          line.includes('vbaudio') ||
           (line.includes('vb') && line.includes('audio'))) {
-        
+
         // Chercher le nom du fichier .inf dans cette ligne ou les lignes suivantes
         for (let j = Math.max(0, i - 2); j < Math.min(lines.length, i + 3); j++) {
           const match = lines[j].match(/(oem\d+\.inf)/i)
@@ -755,11 +745,11 @@ function uninstallViaManualSearch(resolve) {
             break
           }
         }
-        
+
         if (foundInf) break
       }
     }
-    
+
     if (foundInf) {
       console.log(`🔧 Suppression du driver: ${foundInf}`)
       exec(`pnputil /delete-driver ${foundInf} /force`, { timeout: 10000 }, (delErr) => {
@@ -784,10 +774,10 @@ function uninstallViaManualSearch(resolve) {
 // Fonction auxiliaire pour désinstaller via PowerShell avec élévation - Version avec désactivation
 function uninstallViaPowerShellElevated(resolve) {
   console.log('🔧 Tentative de désinstallation avec élévation de privilèges...')
-  
+
   const tempDir = app.getPath('temp')
   const scriptPath = path.join(tempDir, `uninstall_vbcable_${Date.now()}.ps1`)
-  
+
   const psScriptContent = `
 $ErrorActionPreference = "Continue"
 
@@ -823,11 +813,11 @@ $drivers = pnputil /enum-drivers
 
 foreach ($line in $drivers) {
     $lowerLine = $line.ToLower()
-    if ($lowerLine -match "vbmmecable64_win10" -or 
+    if ($lowerLine -match "vbmmecable64_win10" -or
         $lowerLine -match "vbmmecable" -or
-        $lowerLine -match "vbaudio" -or 
+        $lowerLine -match "vbaudio" -or
         ($lowerLine -match "vb" -and $lowerLine -match "cable")) {
-        
+
         $match = [regex]::Match($line, 'oem\\d+\\.inf', 'IgnoreCase')
         if ($match.Success) {
             $foundInf = $match.Value
@@ -841,11 +831,11 @@ foreach ($line in $drivers) {
 if ($foundInf) {
     Write-Host ""
     Write-Host "[3] Suppression du driver: $foundInf"
-    
+
     # Essayer la suppression
     $result = pnputil /delete-driver $foundInf /force 2>&1
     Write-Host "  Resultat: $result"
-    
+
     # Verifier si le driver a ete supprime
     Write-Host ""
     Write-Host "[4] Verification..."
@@ -865,22 +855,22 @@ Write-Host "Termine. Vous pouvez fermer cette fenetre."
 Write-Host "=========================================="
 Read-Host "Appuyez sur Entree pour fermer"
 `
-  
+
   fs.writeFileSync(scriptPath, psScriptContent, 'utf8')
   console.log('📁 Script PowerShell créé:', scriptPath)
-  
+
   const cmd = `powershell -Command "Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -File ""${scriptPath}""' -Verb RunAs -Wait"`
   console.log('🔧 Lancement du script PowerShell avec élévation...')
-  
+
   exec(cmd, { timeout: 120000 }, (error, stdout, stderr) => {
     if (stdout) console.log('📤 PowerShell stdout:', stdout)
     if (stderr) console.error('📤 PowerShell stderr:', stderr)
-    
+
     try {
       if (fs.existsSync(scriptPath)) fs.unlinkSync(scriptPath)
       console.log('🧹 Fichier script supprimé')
     } catch (e) {}
-    
+
     setTimeout(() => {
       checkVBCableInstalled().then((installed) => {
         if (!installed) {
@@ -921,8 +911,6 @@ ipcMain.handle('get-virtual-driver-status', () => {
 
 function createWindow() {
   const iconPath = path.join(__dirname, '../public/icon.ico')
-  // ou en production:
-  // const iconPath = path.join(process.resourcesPath, 'icon.ico')
 
   mainWindow = new BrowserWindow({
     width: 1100, height: 700, minWidth: 800, minHeight: 500,
@@ -967,21 +955,35 @@ function createWindow() {
   })
 
   mainWindow.on('close', (e) => {
-    if (!isQuitting) {
-      e.preventDefault()
-      mainWindow.hide()
-    }
-  })
+  // Si l'utilisateur a explicitement demandé de quitter
+  if (isQuitting || pendingQuit) {
+    return
+  }
+
+  // Si la préférence est de fermer complètement (ne plus demander)
+  if (closeToTray === false) {
+    isQuitting = true
+    app.quit()
+    return
+  }
+
+  // ✅ NOUVEAU : On empêche la fermeture et on affiche la popup SANS cacher la fenêtre
+  e.preventDefault()
+
+  // Demander au renderer d'afficher la popup de confirmation
+  // La fenêtre reste visible pendant que l'utilisateur choisit
+  mainWindow.webContents.send('show-quit-confirm')
+})
 }
 
 // ─── Gestion du démarrage automatique ────────────────────────────────────────
 function setLaunchAtStartup(enabled) {
   store.set('launchAtStartup', enabled)
-  
+
   if (process.platform === 'win32') {
     const appPath = app.getPath('exe')
     const shortcutPath = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', 'SoundDeck.lnk')
-    
+
     if (enabled) {
       const script = `
         $WshShell = New-Object -ComObject WScript.Shell
@@ -1002,13 +1004,14 @@ function setLaunchAtStartup(enabled) {
 }
 
 app.whenReady().then(() => {
+  cleanupOrphanShortcuts()
   createTray('fr')
   createWindow()
   registerShortcuts()
   registerToggleShortcut()
-  
-  app.on('activate', () => { 
-    if (BrowserWindow.getAllWindows().length === 0) createWindow() 
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
@@ -1027,6 +1030,18 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   isQuitting = true
+
+  // ✅ Nettoyer l'icône du tray
+  if (trayInstance) {
+    try {
+      trayInstance.destroy()
+      trayInstance = null
+      tray = null
+      console.log('🧹 Icône du tray nettoyée')
+    } catch (e) {
+      console.warn('⚠️ Erreur lors du nettoyage du tray:', e)
+    }
+  }
 })
 
 // ─── Raccourcis ───────────────────────────────────────────────────────────────
@@ -1055,34 +1070,34 @@ function registerToggleShortcut() {
 
   try {
     globalShortcut.unregister(toggleAccelerator)
-    
+
     const ok = globalShortcut.register(toggleAccelerator, () => {
       globalShortcutsEnabled = !globalShortcutsEnabled
       store.set('globalShortcutsEnabled', globalShortcutsEnabled)
-      
+
       if (globalShortcutsEnabled) {
         registerShortcuts()
       } else {
         unregisterAllShortcuts()
       }
-      
+
       if (mainWindow) {
         mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
       }
-      
+
       if (tray) {
         const currentLang = getCurrentTrayLanguage()
         const contextMenu = buildTrayMenu(currentLang)
         tray.setContextMenu(contextMenu)
       }
-      
+
       const state = globalShortcutsEnabled ? 'activés' : 'désactivés'
       console.log(`🔇 Raccourcis ${state}`)
     })
 
     console.log('✅ Raccourci toggle enregistré:', toggleAccelerator)
     console.log('📊 État des raccourcis globaux:', globalShortcutsEnabled)
-    
+
     if (ok) {
       console.log('✅ Raccourci toggle enregistré:', toggleAccelerator)
     } else {
@@ -1105,11 +1120,11 @@ function unregisterAllShortcuts() {
 
 function reregisterShortcuts() {
   unregisterAllShortcuts()
-  
+
   if (globalShortcutsEnabled) {
     registerShortcuts()
   }
-  
+
   if (mainWindow) {
     mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
   }
@@ -1118,23 +1133,23 @@ function reregisterShortcuts() {
 function toggleGlobalShortcuts() {
   globalShortcutsEnabled = !globalShortcutsEnabled
   store.set('globalShortcutsEnabled', globalShortcutsEnabled)
-  
+
   if (globalShortcutsEnabled) {
     registerShortcuts()
   } else {
     unregisterAllShortcuts()
   }
-  
+
   if (tray) {
     const currentLang = getCurrentTrayLanguage()
     const contextMenu = buildTrayMenu(currentLang)
     tray.setContextMenu(contextMenu)
   }
-  
+
   if (mainWindow) {
     mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
   }
-  
+
   return globalShortcutsEnabled
 }
 
@@ -1183,6 +1198,32 @@ function registerShortcuts() {
   console.log('✅ Raccourcis globaux activés')
 }
 
+// ─── Nettoyage des raccourcis orphelins ──────────────────────────────────────
+function cleanupOrphanShortcuts() {
+  console.log('🧹 Nettoyage des raccourcis orphelins...')
+  const shortcuts = store.get('shortcuts', {})
+  const sounds = store.get('sounds', [])
+  const soundIds = new Set(sounds.map(s => s.id))
+  let hasChanges = false
+
+  Object.keys(shortcuts).forEach(id => {
+    if (!soundIds.has(id)) {
+      console.log(`🗑️ Suppression du raccourci orphelin pour l'ID: ${id}`)
+      delete shortcuts[id]
+      hasChanges = true
+    }
+  })
+
+  if (hasChanges) {
+    store.set('shortcuts', shortcuts)
+    console.log('✅ Raccourcis orphelins nettoyés')
+    // Mettre à jour les raccourcis enregistrés
+    reregisterShortcuts()
+  } else {
+    console.log('✅ Aucun raccourci orphelin trouvé')
+  }
+}
+
 // ─── IPC Handlers pour le toggle ────────────────────────────────────────────
 ipcMain.handle('toggle-global-shortcuts', () => {
   return toggleGlobalShortcuts()
@@ -1215,6 +1256,38 @@ ipcMain.handle('quit-app', () => {
   isQuitting = true
   app.quit()
   return true
+})
+
+ipcMain.handle('confirm-quit', (event, action, remember) => {
+  console.log('🔍 confirm-quit appelé avec:', { action, remember })
+
+  if (action === 'quit') {
+    // L'utilisateur veut quitter
+    if (remember) {
+      closeToTray = false
+      store.set('closeToTray', false)
+      console.log('💾 closeToTray sauvegardé:', false)
+    }
+    pendingQuit = true
+    isQuitting = true
+    app.quit()
+    return 'quit'
+  } else if (action === 'minimize') {
+    // ✅ L'utilisateur veut réduire - on cache la fenêtre maintenant
+    if (remember) {
+      closeToTray = true
+      store.set('closeToTray', true)
+      console.log('💾 closeToTray sauvegardé:', true)
+    }
+    // On cache la fenêtre
+    if (mainWindow) {
+      mainWindow.hide()
+    }
+    return 'minimize'
+  } else {
+    // Annuler - on ne fait rien, la fenêtre reste visible
+    return 'cancel'
+  }
 })
 
 ipcMain.handle('hide-window', () => {
@@ -1429,16 +1502,16 @@ ipcMain.handle('trim-sound-file', async (event, filePath, startSec, endSec) => {
       console.log('ffmpeg via installer:', ffmpegPath)
     } catch (e) {
       console.warn('@ffmpeg-installer/ffmpeg non disponible:', e.message)
-    }
-
-    if (!ffmpegPath) {
       try {
         ffmpegPath = require('ffmpeg-static')
         if (ffmpegPath && ffmpegPath.includes('app.asar')) {
           ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked')
         }
         console.log('ffmpeg via static:', ffmpegPath)
-      } catch (e) { ffmpegPath = null }
+      } catch (e2) {
+        console.warn('ffmpeg-static non disponible:', e2.message)
+        ffmpegPath = 'ffmpeg' // fallback
+      }
     }
 
     if (!ffmpegPath) ffmpegPath = 'ffmpeg'
@@ -1500,6 +1573,11 @@ ipcMain.handle('delete-sound-file', async (event, filePath) => {
 })
 
 ipcMain.handle('get-sounds-dir', () => soundsDir)
+
+ipcMain.handle('cleanup-orphan-shortcuts', () => {
+  cleanupOrphanShortcuts()
+  return true
+})
 
 // ─── Scraper myinstants ───────────────────────────────────────────────────────
 

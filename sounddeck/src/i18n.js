@@ -28,6 +28,12 @@ export const TRANSLATIONS = {
     toastAllStopped: 'Tous les sons arrêtés',
     toastLoopOn: 'Loop activé',
     toastLoopOff: 'Loop désactivé',
+    quitConfirmTitle: 'Quitter SoundDeck ?',
+    quitConfirmMessage: 'Que voulez-vous faire ?',
+    quitConfirmQuit: 'Quitter complètement',
+    quitConfirmMinimize: 'Réduire dans la barre d\'état',
+    quitConfirmCancel: 'Annuler',
+    quitConfirmRemember: 'Ne plus me demander',
 
     // ── Home ──────────────────────────────────────────────────────────────────
     allSounds: 'Tous les sons',
@@ -572,6 +578,12 @@ export const TRANSLATIONS = {
     toastAllStopped: 'All sounds stopped',
     toastLoopOn: 'Loop enabled',
     toastLoopOff: 'Loop disabled',
+    quitConfirmTitle: 'Quit SoundDeck?',
+    quitConfirmMessage: 'What do you want to do?',
+    quitConfirmQuit: 'Quit completely',
+    quitConfirmMinimize: 'Minimize to tray',
+    quitConfirmCancel: 'Cancel',
+    quitConfirmRemember: 'Don\'t ask again',
 
     // ── Home ──────────────────────────────────────────────────────────────────
     allSounds: 'All Sounds',
@@ -1112,6 +1124,12 @@ export const TRANSLATIONS = {
     toastAllStopped: 'Todos los sonidos detenidos',
     toastLoopOn: 'Loop activado',
     toastLoopOff: 'Loop desactivado',
+    quitConfirmTitle: '¿Salir de SoundDeck?',
+    quitConfirmMessage: '¿Qué quieres hacer?',
+    quitConfirmQuit: 'Salir completamente',
+    quitConfirmMinimize: 'Minimizar a la bandeja',
+    quitConfirmCancel: 'Cancelar',
+    quitConfirmRemember: 'No volver a preguntar',
 
     // ── Home ──────────────────────────────────────────────────────────────────
     allSounds: 'Todos los sonidos',

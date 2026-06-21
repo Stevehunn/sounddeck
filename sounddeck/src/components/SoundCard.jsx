@@ -19,7 +19,7 @@ function convertOldVolumeToDb(oldVolume) {
   return Math.round(((oldVolume - 50) / 50) * 24 * 10) / 10
 }
 
-export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEnabled, playLocally, onToggleFavorite, onSetShortcut, onDelete, onRemoveFromProfile, onRename, onVolumeChange, onPlay, currentProfileId, lang = 'fr', onDragStart, onDragEnd, draggable = true }) {
+export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEnabled, playLocally, onToggleFavorite, onSetShortcut, onDelete, onRemoveFromProfile, onRename, onVolumeChange, onPlay, currentProfileId, lang = 'fr', onDragStart, onDragEnd, draggable = true, layout = 'qwerty'}) {
   const tr = useTranslation(lang)
   const [playing, setPlaying] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
@@ -304,6 +304,7 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
           onClear={() => onSetShortcut(sound.id, '')}
           compact
           lang={lang}
+          layout={layout}
         />
 
         {progress && (

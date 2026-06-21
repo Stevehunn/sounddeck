@@ -1,4 +1,3 @@
-// sounddeck/src/App.jsx
 import { useEffect, useState, useRef } from 'react'
 import { useStore } from './store/useStore'
 import Sidebar from './components/Sidebar'
@@ -11,6 +10,7 @@ import YouTube from './pages/YouTube'
 import Guide from './pages/Guide'
 import Presentation from './pages/Presentation'
 import Toast from './components/Toast'
+import QuitConfirm from './components/QuitConfirm'
 import { playSound, stopAllSounds, setStoreRef } from './utils/audio'
 
 export default function App() {
@@ -28,6 +28,8 @@ export default function App() {
   const audioDeviceRef = useRef('default')
   const volumeRef = useRef(80)
   const setPresentationRef = useRef(null)
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false)
+  const isQuittingRef = useRef(false)
 
   // ✅ Passer la référence du store à audio.js pour le mixeur
   useEffect(() => {
@@ -95,7 +97,6 @@ export default function App() {
     const initMixer = async () => {
       if (store.mixerEnabled && store.initMixerOnStartup) {
         console.log('🎛️ Initialisation du mixeur au démarrage de l\'app...')
-        // Attendre un peu que tout soit bien chargé
         await new Promise(resolve => setTimeout(resolve, 500))
         const success = await store.initMixerOnStartup()
         setMixerInitialized(true)
@@ -130,7 +131,31 @@ export default function App() {
     }
   }, [store.lang, store.loading, store.mixerEnabled, mixerInitialized])
 
-  // Enregistrer les listeners IPC
+  // ✅ Vérifier le périphérique micro au démarrage
+  useEffect(() => {
+    if (store.loading) return
+    
+    const checkMicrophoneDevice = async () => {
+      if (store.microphoneDevice && store.microphoneDevice !== 'default') {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices()
+          const audioInputs = devices.filter(d => d.kind === 'audioinput')
+          const deviceExists = audioInputs.some(d => d.deviceId === store.microphoneDevice)
+          
+          if (!deviceExists) {
+            console.log('🔧 Périphérique micro introuvable, réinitialisation au périphérique par défaut')
+            await store.updateMicrophoneDeviceId('default')
+          }
+        } catch (e) {
+          console.warn('⚠️ Erreur lors de la vérification du périphérique micro:', e)
+        }
+      }
+    }
+    
+    checkMicrophoneDevice()
+  }, [store.loading, store.microphoneDevice])
+
+  // ✅ Enregistrer les listeners IPC
   useEffect(() => {
     if (!window.electronAPI) return
 
@@ -162,12 +187,21 @@ export default function App() {
       setPresentationRef.current?.(prev => !prev)
     })
 
+    // ✅ Écouter l'événement pour afficher la popup de confirmation
+    window.electronAPI.onShowQuitConfirm(() => {
+      // Ne pas afficher la popup si l'app est en train de quitter
+      if (!isQuittingRef.current) {
+        setShowQuitConfirm(true)
+      }
+    })
+
     return () => {
       window.electronAPI.removeAllListeners('play-sound')
       window.electronAPI.removeAllListeners('switch-profile')
       window.electronAPI.removeAllListeners('toggle-loop')
       window.electronAPI.removeAllListeners('stop-all-sounds')
       window.electronAPI.removeAllListeners('toggle-presentation')
+      window.electronAPI.removeAllListeners('show-quit-confirm')
     }
   }, [store.loopEnabled, store.mixerEnabled])
 
@@ -228,6 +262,14 @@ export default function App() {
           store={store}
           onExit={() => setPresentationMode(false)}
           lang={store.lang}
+        />
+      )}
+
+      {/* ✅ Popup de confirmation de fermeture */}
+      {showQuitConfirm && (
+        <QuitConfirm 
+          onClose={() => setShowQuitConfirm(false)} 
+          lang={store.lang} 
         />
       )}
     </div>

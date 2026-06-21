@@ -324,11 +324,31 @@ async function initMicrophone(deviceId) {
     }
     noiseSuppressionNode = null
     
+    // ✅ Récupérer la liste des périphériques pour vérifier si le deviceId existe
+    let actualDeviceId = deviceId
+    if (deviceId && deviceId !== 'default') {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const audioInputs = devices.filter(d => d.kind === 'audioinput')
+        const deviceExists = audioInputs.some(d => d.deviceId === deviceId)
+        
+        if (!deviceExists) {
+          console.warn(`⚠️ Périphérique ${deviceId} non trouvé, utilisation du périphérique par défaut`)
+          actualDeviceId = 'default'
+        } else {
+          console.log(`✅ Périphérique trouvé: ${deviceId}`)
+        }
+      } catch (e) {
+        console.warn('⚠️ Erreur lors de l\'énumération des périphériques:', e)
+        actualDeviceId = 'default'
+      }
+    }
+    
     const constraints = {
       audio: {
-        deviceId: deviceId && deviceId !== 'default' ? { exact: deviceId } : undefined,
+        deviceId: actualDeviceId && actualDeviceId !== 'default' ? { exact: actualDeviceId } : undefined,
         echoCancellation: true,
-        noiseSuppression: true, // Suppression de bruit native du navigateur
+        noiseSuppression: true,
         autoGainControl: true,
         sampleRate: 48000,
         channelCount: 2
@@ -363,27 +383,24 @@ async function initMicrophone(deviceId) {
         } catch (e) {
           console.warn('⚠️ Erreur création AudioWorklet:', e.message)
           noiseWorkletNode = null
-          // Fallback vers le filtre basique
           applyBasicNoiseFilter()
         }
       } else {
-        // Utiliser le filtre basique
         applyBasicNoiseFilter()
       }
       
     } else {
-      // ❌ Sans réduction de bruit, connexion directe
       microphoneSource.connect(microphoneGain)
       console.log('🔊 Réduction de bruit désactivée')
     }
     
-    currentDeviceId = deviceId
-    mixerState.microphoneDeviceId = deviceId
+    currentDeviceId = actualDeviceId
+    mixerState.microphoneDeviceId = actualDeviceId
     mixerState.isMicrophoneConnected = true
     
     console.log('✅ Micro connecté avec succès')
     console.log('📊 État du micro:', {
-      deviceId,
+      deviceId: actualDeviceId,
       audioContextState: audioContext.state,
       gainValue: microphoneGain.gain.value,
       noiseSuppression: noiseSuppressionEnabled,
