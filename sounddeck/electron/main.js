@@ -981,23 +981,41 @@ function setLaunchAtStartup(enabled) {
   store.set('launchAtStartup', enabled)
 
   if (process.platform === 'win32') {
-    const appPath = app.getPath('exe')
-    const shortcutPath = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', 'SoundDeck.lnk')
+    const appPath = process.execPath
+    const startupFolder = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
+    const shortcutPath = path.join(startupFolder, 'SoundDeck.lnk')
 
     if (enabled) {
-      const script = `
-        $WshShell = New-Object -ComObject WScript.Shell
-        $Shortcut = $WshShell.CreateShortcut("${shortcutPath}")
-        $Shortcut.TargetPath = "${appPath}"
-        $Shortcut.WorkingDirectory = "${path.dirname(appPath)}"
-        $Shortcut.Save()
-      `
-      exec(`powershell -Command "${script}"`, (error) => {
-        if (error) console.error('Erreur création raccourci démarrage:', error)
+      // Créer le raccourci de manière fiable avec une commande PowerShell simplifiée
+      const cmd = `powershell -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('${shortcutPath.replace(/\\/g, '\\\\')}');$s.TargetPath='${appPath.replace(/\\/g, '\\\\')}';$s.Save()"`
+      
+      console.log('🔧 Création du raccourci démarrage...')
+      console.log('📁 Chemin:', shortcutPath)
+      console.log('🎯 Cible:', appPath)
+      
+      exec(cmd, (error, stdout, stderr) => {
+        if (error) {
+          console.error('❌ Erreur création raccourci démarrage:', error)
+        } else {
+          console.log('✅ Raccourci démarrage créé:', shortcutPath)
+          // Vérifier que le fichier existe
+          if (fs.existsSync(shortcutPath)) {
+            console.log('✅ Fichier vérifié présent !')
+          } else {
+            console.log('⚠️ Fichier non trouvé malgré la création')
+          }
+        }
       })
     } else {
       if (fs.existsSync(shortcutPath)) {
-        fs.unlinkSync(shortcutPath)
+        try {
+          fs.unlinkSync(shortcutPath)
+          console.log('🗑️ Raccourci démarrage supprimé')
+        } catch (e) {
+          console.error('❌ Erreur suppression raccourci:', e)
+        }
+      } else {
+        console.log('ℹ️ Aucun raccourci à supprimer')
       }
     }
   }
