@@ -928,6 +928,11 @@ ipcMain.handle('get-virtual-driver-status', () => {
 function createWindow() {
   const iconPath = path.join(__dirname, '../public/icon.ico')
 
+  console.log('🔍 DIAGNOSTIC createWindow:')
+  console.log('📌 __dirname:', __dirname)
+  console.log('📌 app.isPackaged:', app.isPackaged)
+  console.log('📌 app.getAppPath():', app.getAppPath())
+
   mainWindow = new BrowserWindow({
     width: 1100, height: 700, minWidth: 800, minHeight: 500,
     webPreferences: {
@@ -949,7 +954,43 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
   } else {
-    const indexPath = path.join(app.getAppPath(), 'dist', 'index.html')
+    // ✅ CORRECTION : Chemin correct pour l'app packagée
+    // Dans une app packagée, les fichiers sont dans app.asar
+    // mais le dossier dist est extrait à la racine
+    
+    // ✅ Essayer plusieurs chemins
+    let indexPath = path.join(app.getAppPath(), 'dist', 'index.html')
+    
+    // ✅ Si le fichier n'existe pas dans app.asar, essayer à la racine
+    if (!fs.existsSync(indexPath)) {
+      // Pour une app installée, les fichiers sont parfois extraits
+      const resourcePath = path.join(process.resourcesPath, 'app', 'dist', 'index.html')
+      if (fs.existsSync(resourcePath)) {
+        indexPath = resourcePath
+      } else {
+        // Dernière chance : dans le dossier de l'exe
+        const exePath = path.join(path.dirname(app.getPath('exe')), 'resources', 'app', 'dist', 'index.html')
+        if (fs.existsSync(exePath)) {
+          indexPath = exePath
+        }
+      }
+    }
+    
+    console.log('📄 Chargement de:', indexPath)
+    console.log('📄 Fichier existe:', fs.existsSync(indexPath))
+    
+    // ✅ Si le fichier n'existe pas, afficher une erreur et quitter
+    if (!fs.existsSync(indexPath)) {
+      console.error('❌ ERREUR: index.html introuvable !')
+      dialog.showErrorBox('Erreur de chargement', 
+        'Impossible de trouver index.html.\n\n' +
+        'Chemin recherché: ' + indexPath + '\n\n' +
+        'Vérifiez que le build est correct.'
+      )
+      app.quit()
+      return
+    }
+    
     mainWindow.loadFile(indexPath)
   }
 
@@ -971,71 +1012,162 @@ function createWindow() {
   })
 
   mainWindow.on('close', (e) => {
-  // Si l'utilisateur a explicitement demandé de quitter
-  if (isQuitting || pendingQuit) {
-    return
-  }
+    if (isQuitting || pendingQuit) {
+      return
+    }
 
-  // Si la préférence est de fermer complètement (ne plus demander)
-  if (closeToTray === false) {
-    isQuitting = true
-    app.quit()
-    return
-  }
+    if (closeToTray === false) {
+      isQuitting = true
+      app.quit()
+      return
+    }
 
-  // ✅ NOUVEAU : On empêche la fermeture et on affiche la popup SANS cacher la fenêtre
-  e.preventDefault()
-
-  // Demander au renderer d'afficher la popup de confirmation
-  // La fenêtre reste visible pendant que l'utilisateur choisit
-  mainWindow.webContents.send('show-quit-confirm')
-})
+    e.preventDefault()
+    mainWindow.webContents.send('show-quit-confirm')
+  })
 }
 
 // ─── Gestion du démarrage automatique ────────────────────────────────────────
 function setLaunchAtStartup(enabled) {
   store.set('launchAtStartup', enabled)
 
-  if (process.platform === 'win32') {
-    const appPath = process.execPath
-    const startupFolder = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
-    const shortcutPath = path.join(startupFolder, 'SoundDeck.lnk')
+  if (process.platform !== 'win32') return
 
-    if (enabled) {
-      // Créer le raccourci de manière fiable avec une commande PowerShell simplifiée
-      const cmd = `powershell -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('${shortcutPath.replace(/\\/g, '\\\\')}');$s.TargetPath='${appPath.replace(/\\/g, '\\\\')}';$s.Save()"`
-      
-      console.log('🔧 Création du raccourci démarrage...')
-      console.log('📁 Chemin:', shortcutPath)
-      console.log('🎯 Cible:', appPath)
-      
-      exec(cmd, (error, stdout, stderr) => {
-        if (error) {
-          console.error('❌ Erreur création raccourci démarrage:', error)
-        } else {
-          console.log('✅ Raccourci démarrage créé:', shortcutPath)
-          // Vérifier que le fichier existe
-          if (fs.existsSync(shortcutPath)) {
-            console.log('✅ Fichier vérifié présent !')
-          } else {
-            console.log('⚠️ Fichier non trouvé malgré la création')
-          }
+  // ✅ Si on est en développement, NE PAS créer de raccourci de démarrage
+  // pour éviter le problème de la double fenêtre Electron
+  if (!app.isPackaged) {
+    console.log('🛠️ Mode développement : création du raccourci désactivée')
+    return
+  }
+
+  const targetPath = process.execPath
+  const workingDir = path.dirname(targetPath)
+  const startupFolder = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
+  const startupShortcutPath = path.join(startupFolder, 'SoundDeck.lnk')
+
+  console.log('🎯 setLaunchAtStartup - enabled:', enabled)
+  console.log('🎯 targetPath:', targetPath)
+
+  // ✅ SUPPRIMER TOUS LES RACCOURCIS SOUNDDECK AVANT DE CRÉER LE BON
+  if (enabled) {
+    // Rechercher et supprimer tous les raccourcis SoundDeck
+    const searchPaths = [
+      path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+      'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs',
+      path.join(app.getPath('desktop')),
+      'C:\\Users\\Public\\Desktop',
+    ]
+    
+    for (const folder of searchPaths) {
+      if (!fs.existsSync(folder)) continue
+      const files = fs.readdirSync(folder)
+      for (const file of files) {
+        if (file.toLowerCase().includes('sounddeck') && file.endsWith('.lnk')) {
+          const fullPath = path.join(folder, file)
+          try {
+            fs.unlinkSync(fullPath)
+            console.log(`🗑️ Supprimé: ${fullPath}`)
+          } catch (e) {}
         }
-      })
-    } else {
-      if (fs.existsSync(shortcutPath)) {
-        try {
-          fs.unlinkSync(shortcutPath)
-          console.log('🗑️ Raccourci démarrage supprimé')
-        } catch (e) {
-          console.error('❌ Erreur suppression raccourci:', e)
-        }
-      } else {
-        console.log('ℹ️ Aucun raccourci à supprimer')
       }
     }
   }
+
+  if (!fs.existsSync(startupFolder)) {
+    try {
+      fs.mkdirSync(startupFolder, { recursive: true })
+    } catch (e) {
+      console.error('❌ Erreur création dossier Startup:', e)
+      return
+    }
+  }
+
+  if (enabled) {
+    // Créer le bon raccourci dans Startup
+    const tempDir = app.getPath('temp')
+    const ps1Path = path.join(tempDir, `create_shortcut_${Date.now()}.ps1`)
+    
+    const ps1Content = `
+$WshShell = New-Object -ComObject WScript.Shell
+$Shortcut = $WshShell.CreateShortcut("${startupShortcutPath.replace(/\\/g, '\\\\')}")
+$Shortcut.TargetPath = "${targetPath.replace(/\\/g, '\\\\')}"
+$Shortcut.WorkingDirectory = "${workingDir.replace(/\\/g, '\\\\')}"
+$Shortcut.Save()
+`
+    
+    fs.writeFileSync(ps1Path, ps1Content, 'utf8')
+    
+    const cmd = `powershell -ExecutionPolicy Bypass -File "${ps1Path}"`
+    
+    exec(cmd, { maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+      try {
+        if (fs.existsSync(ps1Path)) fs.unlinkSync(ps1Path)
+      } catch (e) {}
+      
+      if (error) {
+        console.error('❌ Erreur création raccourci:', error.message)
+        return
+      }
+      
+      if (fs.existsSync(startupShortcutPath)) {
+        console.log('✅ Raccourci démarrage créé')
+      }
+    })
+  }
 }
+
+// ─── DIAGNOSTIC COMPLET DES RACCOURCIS ──────────────────────────────────────
+function findAllSoundDeckShortcuts() {
+  console.log('═══════════════════════════════════════════════')
+  console.log('🔍 RECHERCHE DE TOUS LES RACCOURCIS SOUNDDECK')
+  console.log('═══════════════════════════════════════════════')
+  
+  const searchPaths = [
+    // Startup utilisateur
+    path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup'),
+    // Startup tous les utilisateurs
+    'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup',
+    // Menu Démarrer utilisateur
+    path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+    // Menu Démarrer tous les utilisateurs
+    'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs',
+    // Bureau utilisateur
+    path.join(app.getPath('desktop')),
+    // Bureau public
+    'C:\\Users\\Public\\Desktop',
+    // Dossier d'installation
+    path.dirname(process.execPath),
+  ]
+  
+  for (const folder of searchPaths) {
+    if (!fs.existsSync(folder)) continue
+    
+    const files = fs.readdirSync(folder)
+    const shortcuts = files.filter(f => f.toLowerCase().includes('sounddeck') && f.endsWith('.lnk'))
+    
+    if (shortcuts.length > 0) {
+      console.log(`📁 ${folder}:`)
+      for (const file of shortcuts) {
+        const fullPath = path.join(folder, file)
+        console.log(`   📄 ${file}`)
+        
+        // Lire la cible du raccourci
+        try {
+          const checkCmd = `powershell -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('${fullPath.replace(/\\/g, '\\\\')}');Write-Host 'Cible:' $s.TargetPath; Write-Host 'Args:' $s.Arguments"`
+          exec(checkCmd, (err, stdout) => {
+            if (!err) console.log(`      ${stdout.trim()}`)
+          })
+        } catch (e) {}
+      }
+    }
+  }
+  console.log('═══════════════════════════════════════════════')
+}
+
+// Appeler cette fonction au démarrage
+app.whenReady().then
+
+// ─── App ──────────────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
   cleanupOrphanShortcuts()
@@ -1043,10 +1175,56 @@ app.whenReady().then(() => {
   createWindow()
   registerShortcuts()
   registerToggleShortcut()
+  findAllSoundDeckShortcuts()
+  
+  console.log('🔍 DIAGNOSTIC DES CHEMINS:')
+  console.log('process.execPath:', process.execPath)
+  console.log('app.getPath("exe"):', app.getPath('exe'))
+  console.log('app.isPackaged:', app.isPackaged)
+  console.log('__dirname:', __dirname)
+  console.log('app.getAppPath():', app.getAppPath())
+  
+  // ✅ CRÉER LE VRAI RACCOURCI SI L'OPTION EST ACTIVÉE
+  const isLaunchAtStartup = store.get('launchAtStartup', false)
+  console.log('📌 launchAtStartup dans le store:', isLaunchAtStartup)
+  
+  if (isLaunchAtStartup) {
+    console.log('🔧 Création du raccourci de démarrage...')
+    setLaunchAtStartup(true)
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+app.on('window-all-closed', () => {
+  if (!isQuitting) {
+    if (process.platform !== 'darwin') {
+      return
+    }
+  }
+  if (isQuitting) {
+    globalShortcut.unregisterAll()
+    registeredShortcuts = []
+    app.quit()
+  }
+})
+
+app.on('before-quit', () => {
+  isQuitting = true
+  
+  // ✅ Nettoyer l'icône du tray
+  if (trayInstance) {
+    try {
+      trayInstance.destroy()
+      trayInstance = null
+      tray = null
+      console.log('🧹 Icône du tray nettoyée')
+    } catch (e) {
+      console.warn('⚠️ Erreur lors du nettoyage du tray:', e)
+    }
+  }
 })
 
 app.on('window-all-closed', () => {

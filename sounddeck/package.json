@@ -23,11 +23,6 @@
     ],
     "extraResources": [
       {
-        "from": "dist",
-        "to": "dist",
-        "filter": ["**/*"]
-      },
-      {
         "from": "resources",
         "to": "resources",
         "filter": ["**/*"]
