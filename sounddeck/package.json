@@ -1,6 +1,6 @@
 {
   "name": "sounddeck",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Soundboard local pour Discord et autres apps de discussion",
   "license": "MIT",
   "main": "electron/main.js",
