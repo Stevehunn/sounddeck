@@ -8,6 +8,22 @@ const AdmZip = require('adm-zip')
 
 const store = new Store()
 
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+  console.log('ℹ️ Une instance de SoundDeck est déjà en cours. Fermeture...')
+  app.quit()
+  process.exit(0)
+}
+
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+  }
+})
+
 // Ajouter un état pour les raccourcis globaux
 let globalShortcutsEnabled = store.get('globalShortcutsEnabled', true)
 let registeredShortcuts = []
