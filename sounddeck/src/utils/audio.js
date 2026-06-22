@@ -36,7 +36,7 @@ function buildFileUrl(filePath) {
 }
 
 // Analyse le gain normalisé d'un fichier audio
-export async function analyzeGain(filePath, sampleCount = 100) {
+export async function analyzeGain(filePath, sampleCount = 200) {
   if (gainCache[filePath]) return gainCache[filePath]
   
   try {
@@ -56,9 +56,15 @@ export async function analyzeGain(filePath, sampleCount = 100) {
     }
     
     const rms = Math.sqrt(sumSquares / (channelData.length / step))
-    const targetRMS = 0.1
+    
+    // ✅ Plage de cible élargie : 0.05 (-26dB) à 0.8 (-2dB)
+    // La valeur par défaut est 0.2 (-14dB) - plus raisonnable
+    const defaultTarget = 0.2
+    const targetRMS = gainCache.targetRMS || defaultTarget
+    
+    // Limiter le gain pour éviter les distorsions
     const gain = rms > 0.001 ? targetRMS / rms : 1
-    const gainDb = 20 * Math.log10(Math.min(gain, 10))
+    const gainDb = 20 * Math.log10(Math.min(gain, 20)) // ✅ Limite augmentée à 20 (26dB)
     
     gainCache[filePath] = gainDb
     return gainDb
@@ -66,6 +72,11 @@ export async function analyzeGain(filePath, sampleCount = 100) {
     console.warn('Gain analysis failed:', e)
     return 0
   }
+}
+
+// ✅ Fonction pour définir la cible de normalisation
+export function setNormalizationTarget(targetRMS) {
+  gainCache.targetRMS = targetRMS
 }
 
 // Calcule le volume final avec normalisation + ajustement individuel

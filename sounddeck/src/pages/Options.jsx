@@ -585,28 +585,158 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             </div>
           )}
 
-          {/* Normalisation */}
           <OptionRow label={tr('normalization')} sub={tr('normalizationDesc')}>
             <Toggle value={store.normalizationEnabled} onChange={store.updateNormalizationEnabled} />
           </OptionRow>
 
+          <OptionRow label={tr('reanalyzeGains')} sub={tr('reanalyzeGainsDesc')}>
+            <button className="btn-secondary" onClick={async () => {
+              await store.resetGainCache?.()
+              addToast(tr('gainCacheCleared'), 'info')
+            }} style={{ fontSize: 12 }}>
+              <i className="ti ti-refresh" /> {tr('reanalyzeGains')}
+            </button>
+          </OptionRow>
+
           {store.normalizationEnabled && (
-            <OptionRow label={tr('normalizationThreshold')} sub={tr('normalizationThresholdDesc')}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="range" min="0.01" max="0.5" step="0.005" value={store.normalizationTarget}
-                  onChange={e => store.updateNormalizationTarget(Number(e.target.value))}
-                  style={{ width: 120, accentColor: 'var(--accent)' }} />
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)', minWidth: 40 }}>
-                  {Math.round(-20 * Math.log10(store.normalizationTarget))} dB
-                </span>
+            <>
+              <OptionRow label={tr('normalizationTarget')} sub={tr('normalizationTargetDesc')}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                  <input 
+                    type="range" 
+                    min="0.02"     // ✅ -34dB
+                    max="1.0"      // ✅ 0dB (pleine échelle)
+                    step="0.005" 
+                    value={store.normalizationTarget}
+                    onChange={e => store.updateNormalizationTarget(Number(e.target.value))}
+                    style={{ flex: 1, accentColor: 'var(--accent)' }} 
+                  />
+                  <span style={{ 
+                    fontSize: 12, 
+                    color: 'var(--text-secondary)', 
+                    minWidth: 70,
+                    fontFamily: 'monospace',
+                    fontWeight: 600,
+                    background: 'var(--bg-tertiary)',
+                    padding: '2px 10px',
+                    borderRadius: 4
+                  }}>
+                    {Math.round(-20 * Math.log10(store.normalizationTarget))} dB
+                  </span>
+                </div>
+              </OptionRow>
+              
+              {/* ✅ Indicateur visuel du niveau */}
+              <div style={{ 
+                padding: '8px 12px', 
+                background: 'var(--bg-tertiary)', 
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border)',
+                marginTop: 4
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  fontSize: 10, 
+                  color: 'var(--text-tertiary)',
+                  marginBottom: 4
+                }}>
+                  <span>{tr('normalizationLabelLow')}</span>
+                  <span>{tr('normalizationLabelMedium')}</span>
+                  <span>{tr('normalizationLabelHigh')}</span>
+                </div>
+                <div style={{ 
+                  display: 'flex', 
+                  gap: 2, 
+                  height: 6, 
+                  background: 'var(--bg-secondary)', 
+                  borderRadius: 3,
+                  overflow: 'hidden',
+                  position: 'relative'
+                }}>
+                  {/* Barre de progression */}
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    height: '100%',
+                    width: `${(store.normalizationTarget / 1.0) * 100}%`,
+                    background: `linear-gradient(90deg, 
+                      ${store.normalizationTarget < 0.2 ? 'var(--danger)' : 
+                        store.normalizationTarget < 0.4 ? 'var(--warning)' : 
+                        'var(--success)'}
+                    )`,
+                    borderRadius: 3,
+                    transition: 'width 0.2s ease, background 0.3s ease'
+                  }} />
+                  
+                  {/* Repère du milieu (0.2 = -14dB) */}
+                  <div style={{
+                    position: 'absolute',
+                    top: -2,
+                    left: '20%',
+                    width: 2,
+                    height: 10,
+                    background: 'rgba(255,255,255,0.3)',
+                    borderRadius: 1,
+                    zIndex: 2
+                  }} />
+                  <div style={{
+                    position: 'absolute',
+                    top: 10,
+                    left: '20%',
+                    transform: 'translateX(-50%)',
+                    fontSize: 7,
+                    color: 'rgba(255,255,255,0.2)',
+                    zIndex: 2,
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {tr('normalizationDefaultLabel')}
+                  </div>
+                </div>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  fontSize: 9, 
+                  color: 'var(--text-tertiary)',
+                  marginTop: 6
+                }}>
+                  <span style={{ color: store.normalizationTarget < 0.2 ? 'var(--danger)' : 'var(--text-tertiary)' }}>
+                    -34 dB
+                  </span>
+                  <span style={{ color: Math.abs(store.normalizationTarget - 0.2) < 0.01 ? 'var(--accent)' : 'var(--text-tertiary)' }}>
+                    -14 dB
+                  </span>
+                  <span style={{ color: store.normalizationTarget > 0.7 ? 'var(--success)' : 'var(--text-tertiary)' }}>
+                    0 dB
+                  </span>
+                </div>
               </div>
-            </OptionRow>
+              
+              <div style={{ 
+                fontSize: 11, 
+                color: 'var(--text-tertiary)', 
+                marginTop: 8,
+                padding: '8px 12px',
+                background: 'var(--bg-secondary)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)',
+                lineHeight: 1.6
+              }}>
+                <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
+                <strong>{tr('normalizationAdvice')}</strong> 
+                {store.normalizationTarget < 0.15 && ` ${tr('normalizationAdviceLow')}`}
+                {store.normalizationTarget >= 0.15 && store.normalizationTarget < 0.3 && ` ${tr('normalizationAdviceMedium')}`}
+                {store.normalizationTarget >= 0.3 && store.normalizationTarget < 0.6 && ` ${tr('normalizationAdviceModerate')}`}
+                {store.normalizationTarget >= 0.6 && ` ${tr('normalizationAdviceHigh')}`}
+              </div>
+            </>
           )}
         </Section>
 
         {/* Raccourcis globaux */}
         <Section title={tr('shortcuts')} icon="ti-keyboard">
-          <OptionRow label="Disposition du clavier" sub="Sélectionnez votre type de clavier">
+          <OptionRow label={tr('keyboardLayout')} sub={tr('keyboardLayoutDesc')}>
             <select 
               value={store.keyboardLayout || 'qwerty'} 
               onChange={async (e) => {

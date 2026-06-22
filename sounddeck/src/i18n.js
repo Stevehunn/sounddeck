@@ -203,6 +203,8 @@ export const TRANSLATIONS = {
     normalizationDesc: 'Égalise le volume des sons automatiquement',
     normalizationThreshold: 'Seuil de normalisation',
     normalizationThresholdDesc: 'Plus bas = sons plus réduits',
+    normalizationTarget: 'Seuil de normalisation',
+    normalizationTargetDesc: 'Plus la valeur est élevée, plus les sons sont amplifiés',
     error: 'Erreur',
     audioMode: 'Mode audio',
     audioModeDesc: "Comment SoundDeck envoie l'audio",
@@ -285,6 +287,36 @@ export const TRANSLATIONS = {
     localOutputDevice: 'Périphérique de sortie local',
     localOutputDeviceDesc: 'Périphérique utilisé pour l\'écoute locale (casque)',
     localOutputDeviceDefault: 'Par défaut',
+    localOutputDeviceChanged: 'Périphérique local changé : {device}',
+
+    // Pour la disposition du clavier
+    keyboardLayout: 'Disposition du clavier',
+    keyboardLayoutDesc: 'Sélectionnez votre type de clavier',
+
+    // Pour la visualisation du clavier
+    keyboardVisualizerTitle: 'Visualisation du clavier',
+    keyboardVisualizerUsed: 'raccourci utilisé',
+    keyboardVisualizerUsedPlural: 'raccourcis utilisés',
+    keyboardVisualizerKeyUsed: 'Touche utilisée',
+    keyboardVisualizerKeyAvailable: 'Touche disponible',
+
+    // Normalisation
+    normalizationTargetDesc: 'Plus la valeur est élevée, plus les sons sont amplifiés',
+    normalizationAdvice: 'Conseil :',
+    normalizationAdviceLow: '🔈 Sons très réduits (pour éviter l\'écrêtage)',
+    normalizationAdviceMedium: '⚖️ Équilibre par défaut',
+    normalizationAdviceModerate: '🔊 Sons modérément amplifiés',
+    normalizationAdviceHigh: '🔊🔊 Sons fortement amplifiés (risque d\'écrêtage)',
+    reanalyzeGains: 'Réanalyser les gains',
+    reanalyzeGainsDesc: 'Force la réanalyse des niveaux sonores',
+    gainCacheCleared: 'Cache des gains vidé, rejouez vos sons pour réanalyser',
+    normalizationLabelLow: 'Plus fort 🔈',
+    normalizationLabelMedium: 'Équilibre ⚖️',
+    normalizationLabelHigh: 'Plus faible 🔉',
+    normalizationDefaultLabel: 'Par défaut',
+    reanalyzeGains: 'Réanalyser les gains',
+    reanalyzeGainsDesc: 'Force la réanalyse des niveaux sonores',
+    gainCacheCleared: 'Cache des gains vidé, rejouez vos sons pour réanalyser',
 
     // ── Presentation ──────────────────────────────────────────────────────────
     presentationTitle: 'Mode Présentation',
@@ -753,6 +785,8 @@ export const TRANSLATIONS = {
     normalizationDesc: 'Automatically equalizes sound volume',
     normalizationThreshold: 'Normalization threshold',
     normalizationThresholdDesc: 'Lower = softer sounds',
+    normalizationTarget: 'Normalization threshold',
+    normalizationTargetDesc: 'Higher value = louder sounds',
     error: 'Error',
     audioMode: 'Audio mode',
     audioModeDesc: "How SoundDeck sends audio",
@@ -831,6 +865,31 @@ export const TRANSLATIONS = {
     localOutputDevice: 'Local output device',
     localOutputDeviceDesc: 'Device used for local playback (headphones)',
     localOutputDeviceDefault: 'Default',
+    localOutputDeviceChanged: 'Local device changed: {device}',
+    keyboardLayout: 'Keyboard layout',
+    keyboardLayoutDesc: 'Select your keyboard type',
+    keyboardVisualizerTitle: 'Keyboard visualization',
+    keyboardVisualizerUsed: 'shortcut used',
+    keyboardVisualizerUsedPlural: 'shortcuts used',
+    keyboardVisualizerKeyUsed: 'Key used',
+    keyboardVisualizerKeyAvailable: 'Key available',
+
+    normalizationTargetDesc: 'Higher value = louder sounds',
+    normalizationAdvice: 'Advice:',
+    normalizationAdviceLow: '🔈 Very quiet sounds (to avoid clipping)',
+    normalizationAdviceMedium: '⚖️ Default balance',
+    normalizationAdviceModerate: '🔊 Moderately amplified sounds',
+    normalizationAdviceHigh: '🔊🔊 Highly amplified sounds (risk of clipping)',
+    reanalyzeGains: 'Re-analyze gains',
+    reanalyzeGainsDesc: 'Force re-analysis of sound levels',
+    gainCacheCleared: 'Gain cache cleared, replay your sounds to re-analyze',
+    reanalyzeGains: 'Re-analyze gains',
+    reanalyzeGainsDesc: 'Force re-analysis of sound levels',
+    gainCacheCleared: 'Gain cache cleared, replay your sounds to re-analyze',
+    normalizationLabelLow: 'Louder 🔈',
+    normalizationLabelMedium: 'Balance ⚖️',
+    normalizationLabelHigh: 'Quieter 🔉',
+    normalizationDefaultLabel: 'Default',
 
     // ── Presentation ──────────────────────────────────────────────────────────
     presentationTitle: 'Presentation Mode',
@@ -1299,6 +1358,8 @@ export const TRANSLATIONS = {
     normalizationDesc: 'Iguala el volumen de los sonidos automáticamente',
     normalizationThreshold: 'Umbral de normalización',
     normalizationThresholdDesc: 'Más bajo = sonidos más reducidos',
+    normalizationTarget: 'Umbral de normalización',
+    normalizationTargetDesc: 'Valor más alto = sonidos más fuertes',
     error: 'Error',
     audioMode: 'Modo audio',
     audioModeDesc: "Cómo SoundDeck envía el audio",
@@ -1377,6 +1438,37 @@ export const TRANSLATIONS = {
     localOutputDevice: 'Dispositivo de salida local',
     localOutputDeviceDesc: 'Dispositivo utilizado para la reproducción local (auriculares)',
     localOutputDeviceDefault: 'Por defecto',
+
+    normalizationTargetDesc: 'Valor más alto = sonidos más fuertes',
+    normalizationAdvice: 'Consejo:',
+    normalizationAdviceLow: '🔈 Sonidos muy reducidos (para evitar recortes)',
+    normalizationAdviceMedium: '⚖️ Equilibrio por defecto',
+    normalizationAdviceModerate: '🔊 Sonidos moderadamente amplificados',
+    normalizationAdviceHigh: '🔊🔊 Sonidos muy amplificados (riesgo de recorte)',
+    reanalyzeGains: 'Reanalizar ganancias',
+    reanalyzeGainsDesc: 'Forzar el reanálisis de los niveles de sonido',
+    gainCacheCleared: 'Caché de ganancias vaciado, reproduce tus sonidos para reanalizar',
+
+    keyboardLayout: 'Disposición del teclado',
+    keyboardLayoutDesc: 'Selecciona tu tipo de teclado',
+
+    keyboardVisualizerTitle: 'Visualización del teclado',
+    keyboardVisualizerUsed: 'atajo utilizado',
+    keyboardVisualizerUsedPlural: 'atajos utilizados',
+    keyboardVisualizerKeyUsed: 'Tecla utilizada',
+    keyboardVisualizerKeyAvailable: 'Tecla disponible',
+
+    
+    normalizationLabelLow: 'Más fuerte 🔈',
+    normalizationLabelMedium: 'Equilibrio ⚖️',
+    normalizationLabelHigh: 'Más bajo 🔉',
+    normalizationDefaultLabel: 'Por defecto',
+
+    reanalyzeGains: 'Reanalizar ganancias',
+    reanalyzeGainsDesc: 'Forzar el reanálisis de los niveles de sonido',
+    gainCacheCleared: 'Caché de ganancias vaciado, reproduce tus sonidos para reanalizar',
+
+    localOutputDeviceChanged: 'Dispositivo local cambiado: {device}',
 
     // ── Presentation ──────────────────────────────────────────────────────────
     presentationTitle: 'Modo Presentación',

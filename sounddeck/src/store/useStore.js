@@ -84,7 +84,7 @@ useEffect(() => {
       const savedToggleShortcutsAccelerator = await window.electronAPI.storeGet('toggleShortcutsAccelerator') || 'CommandOrControl+Shift+K'
       const savedSoundOrder = await window.electronAPI.storeGet('soundOrder') || {}
       const savedNormalizationEnabled = await window.electronAPI.storeGet('normalizationEnabled') ?? true
-      const savedNormalizationTarget = await window.electronAPI.storeGet('normalizationTarget') ?? 0.1
+      const savedNormalizationTarget = await window.electronAPI.storeGet('normalizationTarget') ?? 0.2
       const savedNoiseSuppression = await window.electronAPI.storeGet('noiseSuppression') ?? false
       const savedNoiseSuppressionMode = await window.electronAPI.storeGet('noiseSuppressionMode') || 'auto'
 
@@ -534,6 +534,13 @@ useEffect(() => {
     setNormalizationTarget(target)
     await save('normalizationTarget', target)
   }, [save])
+
+  // Forcer la réanalyse des gains
+  const resetGainCache = useCallback(async () => {
+    const { gainCache } = await import('../utils/audio')
+    Object.keys(gainCache).forEach(key => delete gainCache[key])
+    console.log('🧹 Cache des gains vidé')
+  }, [])
 
   // ─── Mixer ──────────────────────────────────────────────────────────────────
   const updateMixerEnabled = useCallback(async (enabled) => {

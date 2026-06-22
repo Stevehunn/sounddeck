@@ -112,9 +112,9 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
         gap: 8
       }}>
         <i className="ti ti-keyboard" /> 
-        Visualisation du clavier
+        {tr('keyboardVisualizerTitle')}
         <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 400 }}>
-          ({usedShortcutsCount} raccourci{usedShortcutsCount !== 1 ? 's' : ''} utilisé{usedShortcutsCount !== 1 ? 's' : ''})
+          ({usedShortcutsCount} {usedShortcutsCount !== 1 ? tr('keyboardVisualizerUsedPlural') : tr('keyboardVisualizerUsed')})
         </span>
         <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 500 }}>
           {layout === 'azerty' ? 'AZERTY' : 'QWERTY'}
@@ -252,11 +252,11 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
       }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <div style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--accent-light)', border: '1px solid var(--accent)' }} />
-          Touche utilisée
+          {tr('keyboardVisualizerKeyUsed')}
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <div style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }} />
-          Touche disponible
+          {tr('keyboardVisualizerKeyAvailable')}
         </span>
       </div>
     </div>
