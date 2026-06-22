@@ -375,7 +375,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                   <OptionRow label={tr('microphone')} sub={tr('microphoneSelect')}>
                     <select value={store.microphoneDevice} onChange={async (e) => {
                       const deviceId = e.target.value
-                      await store.updateMicrophoneDevice(deviceId)
+                      await store.updateMicrophoneDeviceId(deviceId)  // ✅ CORRIGÉ
                       try {
                         const { changeMicrophone } = await import('../utils/audioMixer')
                         await changeMicrophone(deviceId)
