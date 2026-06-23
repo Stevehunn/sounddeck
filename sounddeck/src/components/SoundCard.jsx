@@ -19,13 +19,40 @@ function convertOldVolumeToDb(oldVolume) {
   return Math.round(((oldVolume - 50) / 50) * 24 * 10) / 10
 }
 
-export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEnabled, playLocally, onToggleFavorite, onSetShortcut, onDelete, onRemoveFromProfile, onRename, onVolumeChange, onPlay, currentProfileId, lang = 'fr', onDragStart, onDragEnd, draggable = true, layout = 'qwerty'}) {
+// Liste d'emojis prédéfinis
+const EMOJI_LIST = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋','🎤','🦄','💯','🤡','👾','🪇','🪘','🎸','🎹','🎷','🎺','🎻','🥁','🪗','🎼','🎧','📢','📣','🔇','🔈','🔉','🔊','💬','🗣️','👥','👤','🎭','🎪','🎨','🎬','🎤','🎧','🎼','🎹','🥁','🎷','🎺','🎸','🎻','🪕','🎮','🕹️','🎲','🧩','🎯','🎱','🎳','🎰','🧨','💣','🔫','🗡️','⚔️','🛡️','🏹','🪃','🪄','🔮','🧿','🪬','💎','🪙','💰','💵','💶','💷','💴','🪪','📱','📲','💻','🖥️','🖨️','⌨️','🖱️','🖲️','💽','💾','💿','📀','🧮','📟','☎️','📞','📠','📺','📻','🎙️','🎚️','🎛️','🧭','⏰','⏳','⌛️']
+
+export default function SoundCard({ 
+  sound, 
+  shortcut, 
+  audioDevice, 
+  volume, 
+  loopEnabled, 
+  playLocally, 
+  onToggleFavorite, 
+  onSetShortcut, 
+  onDelete, 
+  onRemoveFromProfile, 
+  onRename, 
+  onVolumeChange, 
+  onPlay, 
+  currentProfileId, 
+  lang = 'fr', 
+  onDragStart, 
+  onDragEnd, 
+  draggable = true, 
+  layout = 'qwerty',
+  onChangeImage,
+  onChangeEmoji
+}) {
   const tr = useTranslation(lang)
   const [playing, setPlaying] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showVolume, setShowVolume] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(sound.name)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [emojiPickerPosition, setEmojiPickerPosition] = useState({ top: 0, left: 0 })
   
   const initialVolume = sound.volumeDb !== undefined ? sound.volumeDb : convertOldVolumeToDb(sound.volume)
   const [localVolume, setLocalVolume] = useState(initialVolume)
@@ -143,7 +170,7 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
       let left = rect.left - 10
       
       const menuWidth = 220
-      const menuHeight = 280
+      const menuHeight = 320
       
       if (left + menuWidth > window.innerWidth) {
         left = window.innerWidth - menuWidth - 10
@@ -172,6 +199,28 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
       setVolumePosition({ top, left })
     }
     setShowVolume(true)
+    setShowMenu(false)
+  }
+
+  const handleChangeImage = async () => {
+    const imgPath = await window.electronAPI.openImageDialog()
+    if (imgPath && onChangeImage) {
+      const result = await window.electronAPI.importImageFile(imgPath)
+      if (result.success) {
+        onChangeImage(sound.id, result.path)
+      }
+    }
+  }
+
+  const handleChangeEmoji = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      setEmojiPickerPosition({
+        top: rect.bottom + 4,
+        left: rect.left - 100
+      })
+    }
+    setShowEmojiPicker(true)
     setShowMenu(false)
   }
 
@@ -206,6 +255,8 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
     }
   }
 
+  const isFavorite = sound.favorites?.includes(currentProfileId) || false;
+
   return (
     <>
       <div 
@@ -227,12 +278,12 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
           <button onClick={e => { e.stopPropagation(); onToggleFavorite(sound.id) }}
             style={{
-              background: sound.favorite ? 'rgba(239,159,39,0.15)' : 'var(--bg-tertiary)',
-              border: `1px solid ${sound.favorite ? 'var(--warning)' : 'var(--border)'}`,
-              borderRadius: 6, fontSize: 12, color: sound.favorite ? 'var(--warning)' : 'var(--text-tertiary)',
+              background: isFavorite ? 'rgba(239,159,39,0.15)' : 'var(--bg-tertiary)',
+              border: `1px solid ${isFavorite ? 'var(--warning)' : 'var(--border)'}`,
+              borderRadius: 6, fontSize: 12, color: isFavorite ? 'var(--warning)' : 'var(--text-tertiary)',
               padding: '3px 7px', cursor: 'pointer', lineHeight: 1
             }}>
-            <i className={`ti ${sound.favorite ? 'ti-star-filled' : 'ti-star'}`} />
+            <i className={`ti ${isFavorite ? 'ti-star-filled' : 'ti-star'}`} />
           </button>
 
           <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
@@ -347,6 +398,8 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
             onVolumeOpen={handleVolumeOpen}
             onRemoveFromProfile={onRemoveFromProfile ? () => { onRemoveFromProfile(sound.id); setShowMenu(false) } : null}
             onDelete={() => { onDelete(sound.id); setShowMenu(false) }}
+            onChangeImage={handleChangeImage}
+            onChangeEmoji={handleChangeEmoji}
             position={menuPosition}
             lang={lang}
           />
@@ -371,11 +424,90 @@ export default function SoundCard({ sound, shortcut, audioDevice, volume, loopEn
         />,
         document.body
       )}
+
+      {showEmojiPicker && createPortal(
+        <div 
+          style={{
+            position: 'fixed',
+            top: emojiPickerPosition.top,
+            left: emojiPickerPosition.left,
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)',
+            padding: 12,
+            zIndex: 99999,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            maxWidth: 320,
+            maxHeight: 300,
+            overflowY: 'auto'
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            marginBottom: 8
+          }}>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+              Choisir un emoji
+            </span>
+            <button 
+              onClick={() => setShowEmojiPicker(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-tertiary)',
+                cursor: 'pointer',
+                padding: '2px 4px'
+              }}
+            >
+              <i className="ti ti-x" />
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {EMOJI_LIST.map(e => (
+              <button
+                key={e}
+                onClick={() => {
+                  if (onChangeEmoji) {
+                    onChangeEmoji(sound.id, e)
+                  }
+                  setShowEmojiPicker(false)
+                }}
+                style={{
+                  width: 36,
+                  height: 36,
+                  fontSize: 18,
+                  borderRadius: 6,
+                  border: `1px solid ${sound.emoji === e ? 'var(--accent)' : 'var(--border)'}`,
+                  background: sound.emoji === e ? 'var(--accent-light)' : 'var(--bg-tertiary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = 'var(--accent)'
+                  e.currentTarget.style.transform = 'scale(1.1)'
+                }}
+                onMouseLeave={e => {
+                  if (sound.emoji !== e) {
+                    e.currentTarget.style.borderColor = 'var(--border)'
+                  }
+                  e.currentTarget.style.transform = 'scale(1)'
+                }}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
     </>
   )
 }
 
-// VolumePanel simplifié - sans barre de progression supplémentaire
+// VolumePanel
 function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragStart, onDragEnd, soundName, position }) {
   const tr = useTranslation(lang)
   const [localVolume, setLocalVolume] = useState(volume)
@@ -407,7 +539,6 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
     onCommit(0)
   }
 
-  // Fermer le panneau quand on clique en dehors
   useEffect(() => {
     const handleClickOutside = (e) => {
       const panel = document.getElementById('volume-panel')
@@ -441,7 +572,6 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
         animation: 'fadeIn 0.15s ease'
       }}
     >
-      {/* En-tête avec le nom du son */}
       <div style={{ 
         display: 'flex', 
         alignItems: 'center', 
@@ -491,7 +621,6 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
         </button>
       </div>
 
-      {/* Valeur du volume en grand */}
       <div style={{ 
         textAlign: 'center',
         marginBottom: 16,
@@ -510,7 +639,6 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
         <span style={{ fontSize: 16, color: 'var(--text-tertiary)', marginLeft: 4 }}>dB</span>
       </div>
 
-      {/* Slider uniquement - sans barre de progression supplémentaire */}
       <div style={{ padding: '4px 0' }}>
         <input 
           type="range" 
@@ -535,7 +663,6 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
         />
       </div>
 
-      {/* Labels du slider */}
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 16 }}>
         <span>-24 dB</span>
         <span style={{ 
@@ -551,7 +678,6 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
         <span>+24 dB</span>
       </div>
 
-      {/* Boutons d'action */}
       <div style={{ display: 'flex', gap: 8 }}>
         <button
           onClick={(e) => { e.stopPropagation(); resetToZero(); }}
@@ -609,7 +735,21 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
   )
 }
 
-function ContextMenuPortal({ sound, currentProfileId, onClose, onToggleFavorite, onRename, onVolumeOpen, onRemoveFromProfile, onDelete, position, lang = 'fr' }) {
+// ContextMenuPortal
+function ContextMenuPortal({ 
+  sound, 
+  currentProfileId, 
+  onClose, 
+  onToggleFavorite, 
+  onRename, 
+  onVolumeOpen, 
+  onRemoveFromProfile, 
+  onDelete,
+  onChangeImage,
+  onChangeEmoji,
+  position, 
+  lang = 'fr' 
+}) {
   const tr = useTranslation(lang)
   const menuRef = useRef(null)
 
@@ -643,7 +783,7 @@ function ContextMenuPortal({ sound, currentProfileId, onClose, onToggleFavorite,
     action()
     onClose()
   }
-
+  
   return (
     <div 
       ref={menuRef} 
@@ -663,8 +803,8 @@ function ContextMenuPortal({ sound, currentProfileId, onClose, onToggleFavorite,
       }}
     >
       <MenuItem 
-        icon={sound.favorite ? 'ti-star' : 'ti-star-filled'} 
-        label={sound.favorite ? tr('menuFavoriteRemove') : tr('menuFavoriteAdd')} 
+        icon={isFavorite ? 'ti-star' : 'ti-star-filled'} 
+        label={isFavorite ? tr('menuFavoriteRemove') : tr('menuFavoriteAdd')} 
         onClick={() => handleAction(onToggleFavorite)}
         lang={lang}
       />
@@ -672,6 +812,18 @@ function ContextMenuPortal({ sound, currentProfileId, onClose, onToggleFavorite,
         icon="ti-pencil" 
         label={tr('menuRename')} 
         onClick={() => handleAction(onRename)}
+        lang={lang}
+      />
+      <MenuItem 
+        icon="ti-photo" 
+        label={tr('menuChangeImage')} 
+        onClick={() => handleAction(onChangeImage)}
+        lang={lang}
+      />
+      <MenuItem 
+        icon="ti-mood-smile" 
+        label={tr('menuChangeEmoji')} 
+        onClick={() => handleAction(onChangeEmoji)}
         lang={lang}
       />
       <MenuItem 

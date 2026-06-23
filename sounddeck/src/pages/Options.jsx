@@ -811,6 +811,22 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             />
           </OptionRow>
 
+          <OptionRow label={tr('toggleWindowShortcut')} sub={tr('toggleWindowShortcutDesc')}>
+            <ShortcutRecorder
+              value={store.toggleWindowShortcut || 'CommandOrControl+Shift+S'}
+              onSave={async (acc) => { 
+                await store.updateToggleWindowShortcut(acc)
+                addToast(`${tr('toggleWindowShortcutSet')} ${acc}`, 'success')
+              }}
+              onClear={() => {
+                store.updateToggleWindowShortcut('')
+                addToast(tr('toggleWindowShortcutRemoved'), 'info')
+              }}
+              requireMod
+              layout={store.keyboardLayout || 'qwerty'}
+            />
+          </OptionRow>
+
           <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
             {tr('shortcutsPerSoundNote')}
           </div>

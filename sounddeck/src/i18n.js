@@ -99,6 +99,8 @@ export const TRANSLATIONS = {
     imageSelected: 'Image sélectionnée',
     noSoundsForProfile: 'Aucun son pour ce profil',
     soundMoved: 'Son déplacé',
+    menuChangeImage: 'Changer l\'image',
+    menuChangeEmoji: 'Changer l\'émoticône',
 
     // ── Options ───────────────────────────────────────────────────────────────
     optionsTitle: 'Options',
@@ -243,6 +245,10 @@ export const TRANSLATIONS = {
     profileImported: 'Profil importé',
     toggleShortcutSet: 'Raccourci toggle défini :',
     toggleShortcutRemoved: 'Raccourci toggle supprimé',
+    toggleWindowShortcut: 'Afficher/cacher la fenêtre',
+    toggleWindowShortcutDesc: 'Raccourci pour montrer ou cacher la fenêtre de SoundDeck',
+    toggleWindowShortcutSet: 'Raccourci fenêtre défini :',
+    toggleWindowShortcutRemoved: 'Raccourci fenêtre supprimé',
     uninstallGuide: 'Pour désinstaller VB-Cable, va dans Panneau de configuration → Programmes → Désinstaller un programme → cherche "VB-CABLE".',
     uninstallGuideTitle: '📌 Si tu as besoin de désinstaller VB-Cable, voilà comment faire:',
     uninstallGuideStep1: 'Va dans Panneau de configuration → Programmes → Désinstaller un programme',
@@ -681,6 +687,8 @@ export const TRANSLATIONS = {
     imageSelected: 'Image selected',
     noSoundsForProfile: 'No sounds for this profile',
     soundMoved: 'Sound moved',
+    menuChangeImage: 'Change image',
+    menuChangeEmoji: 'Change emoji',
 
     // ── Options ───────────────────────────────────────────────────────────────
     optionsTitle: 'Options',
@@ -825,6 +833,10 @@ export const TRANSLATIONS = {
     profileImported: 'Profile imported',
     toggleShortcutSet: 'Toggle shortcut set:',
     toggleShortcutRemoved: 'Toggle shortcut removed',
+    toggleWindowShortcut: 'Show/hide window',
+    toggleWindowShortcutDesc: 'Shortcut to show or hide the SoundDeck window',
+    toggleWindowShortcutSet: 'Window shortcut set:',
+    toggleWindowShortcutRemoved: 'Window shortcut removed',
     uninstallGuide: 'To uninstall VB-Cable, go to Control Panel → Programs → Uninstall a program → search for "VB-CABLE".',
     uninstallGuideTitle: '📌 If you need to uninstall VB-Cable, here\'s how to do it:',
     uninstallGuideStep1: 'Go to Control Panel → Programs → Uninstall a program',
@@ -1254,6 +1266,8 @@ export const TRANSLATIONS = {
     imageSelected: 'Imagen seleccionada',
     noSoundsForProfile: 'No hay sonidos para este perfil',
     soundMoved: 'Sonido movido',
+    menuChangeImage: 'Cambiar imagen',
+    menuChangeEmoji: 'Cambiar emoji',
 
     // ── Options ───────────────────────────────────────────────────────────────
     optionsTitle: 'Opciones',
@@ -1398,6 +1412,10 @@ export const TRANSLATIONS = {
     profileImported: 'Perfil importado',
     toggleShortcutSet: 'Atajo de alternancia definido:',
     toggleShortcutRemoved: 'Atajo de alternancia eliminado',
+    toggleWindowShortcut: 'Mostrar/ocultar ventana',
+    toggleWindowShortcutDesc: 'Atajo para mostrar u ocultar la ventana de SoundDeck',
+    toggleWindowShortcutSet: 'Atajo de ventana definido:',
+    toggleWindowShortcutRemoved: 'Atajo de ventana eliminado',
     uninstallGuide: 'Para desinstalar VB-Cable, ve a Panel de control → Programas → Desinstalar un programa → busca "VB-CABLE".',
     uninstallGuideTitle: '📌 Si necesitas desinstalar VB-Cable, aquí te explicamos cómo hacerlo:',
     uninstallGuideStep1: 'Ve a Panel de control → Programas → Desinstalar un programa',

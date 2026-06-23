@@ -30,6 +30,9 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     ? sounds.filter(s => !s.profiles.includes(currentProfileId))
     : []
 
+  // ✅ MODIFICATION 1 : Recalculer les favoris pour le profil courant
+  const favoriteSoundsForProfile = currentSounds.filter(s => s.favorites?.includes(currentProfileId) || false);
+
   // Calculer le nombre de colonnes pour la grille principale
   useEffect(() => {
     const calculateColumns = () => {
@@ -69,7 +72,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
 
   // Récupérer les sons favoris dans l'ordre actuel de la liste globale
   const getOrderedFavorites = () => {
-    return currentSounds.filter(s => s.favorite)
+    return currentSounds.filter(s => s.favorites?.includes(currentProfileId) || false)
   }
 
   const handleDragStart = (e, soundId, index, source) => {
@@ -403,11 +406,11 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
           </div>
         )}
 
-        {/* Section Favoris - DRAGGABLE */}
-        {favoriteSounds.length > 0 && (
-          <Section title={tr('favorites')} icon="ti-star-filled" iconColor="var(--warning)" count={favoriteSounds.length}>
+        {/* ✅ MODIFICATION 2 : Utiliser favoriteSoundsForProfile */}
+        {favoriteSoundsForProfile.length > 0 && (
+          <Section title={tr('favorites')} icon="ti-star-filled" iconColor="var(--warning)" count={favoriteSoundsForProfile.length}>
             <SoundGrid 
-              sounds={favoriteSounds} 
+              sounds={favoriteSoundsForProfile} 
               shortcuts={shortcuts} 
               audioDevice={audioDevice} 
               volume={volume} 
@@ -579,6 +582,9 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLo
               onRemoveFromProfile={async (id) => { await store.removeSoundFromProfile(id, store.currentProfileId); addToast(tr('removedFromProfile'), 'info') }}
               onDelete={async (id) => { await store.deleteSound(id); addToast(tr('deleted'), 'info') }}
               onRename={(id, name) => store.updateSound(id, { name })}
+              // ✅ NOUVELLES PROPS
+              onChangeImage={store.updateSoundImage}
+              onChangeEmoji={store.updateSoundEmoji}
               draggable={draggable}
               lang={lang}
               onDragStart={(e) => draggable && onDragStart(e, s.id, index, dropTarget)}

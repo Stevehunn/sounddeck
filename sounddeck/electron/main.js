@@ -1169,12 +1169,28 @@ app.whenReady().then
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   cleanupOrphanShortcuts()
   createTray('fr')
   createWindow()
   registerShortcuts()
   registerToggleShortcut()
+  
+  // Charger le raccourci depuis le store
+  try {
+    const store = new Store()
+    const savedShortcut = store.get('toggleWindowShortcut')
+    if (savedShortcut) {
+      currentToggleWindowShortcut = savedShortcut
+      registerToggleWindowShortcut(savedShortcut)
+    } else {
+      registerToggleWindowShortcut('CommandOrControl+Shift+S')
+    }
+  } catch (e) {
+    console.warn('Erreur chargement raccourci toggle fenêtre:', e)
+    registerToggleWindowShortcut('CommandOrControl+Shift+S')
+  }
+  
   findAllSoundDeckShortcuts()
   
   console.log('🔍 DIAGNOSTIC DES CHEMINS:')
@@ -1553,6 +1569,11 @@ ipcMain.handle('update-loop-shortcut', (event, accelerator) => {
 ipcMain.handle('update-toggle-shortcuts-accelerator', (event, accelerator) => {
   store.set('toggleShortcutsAccelerator', accelerator)
   reregisterShortcuts()
+  return true
+})
+
+ipcMain.handle('update-toggle-window-shortcut', (event, accelerator) => {
+  registerToggleWindowShortcut(accelerator)
   return true
 })
 
@@ -2459,6 +2480,50 @@ function formatYtTime(seconds) {
   const m = Math.floor((seconds % 3600) / 60)
   const s = Math.floor(seconds % 60)
   return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`
+}
+
+// ─── Raccourci pour montrer/cacher la fenêtre ─────────────────────────────────
+let currentToggleWindowShortcut = 'CommandOrControl+Shift+S'
+
+function registerToggleWindowShortcut(shortcut) {
+  // Si shortcut n'est pas fourni, utiliser celui du store ou la valeur par défaut
+  if (!shortcut) {
+    shortcut = currentToggleWindowShortcut
+  }
+  
+  // Désenregistrer l'ancien
+  try {
+    globalShortcut.unregister(currentToggleWindowShortcut)
+  } catch (e) {}
+  
+  if (!shortcut) {
+    console.log('ℹ️ Raccourci toggle fenêtre désactivé')
+    return
+  }
+  
+  try {
+    const ok = globalShortcut.register(shortcut, () => {
+      if (mainWindow) {
+        if (mainWindow.isVisible()) {
+          mainWindow.hide()
+        } else {
+          mainWindow.show()
+          mainWindow.focus()
+        }
+      } else {
+        createWindow()
+      }
+    })
+    
+    if (ok) {
+      currentToggleWindowShortcut = shortcut
+      console.log(`✅ Raccourci pour toggle la fenêtre enregistré: ${shortcut}`)
+    } else {
+      console.warn(`⚠️ Impossible d'enregistrer le raccourci: ${shortcut}`)
+    }
+  } catch (e) {
+    console.warn('Erreur enregistrement toggle fenêtre:', e.message)
+  }
 }
 
 // ─── Partage de profil ───────────────────────────────────────────────────────

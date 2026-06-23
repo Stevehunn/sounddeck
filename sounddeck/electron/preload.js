@@ -64,6 +64,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   importBackup: () => ipcRenderer.invoke('import-backup'),
   confirmQuit: (action, remember) => ipcRenderer.invoke('confirm-quit', action, remember),
   onShowQuitConfirm: (cb) => ipcRenderer.on('show-quit-confirm', () => cb()),
+  updateToggleWindowShortcut: (accelerator) => ipcRenderer.invoke('update-toggle-window-shortcut', accelerator),
 })
 
 // Exposer également via window pour accès direct dans les event handlers

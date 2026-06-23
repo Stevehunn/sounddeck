@@ -29,6 +29,7 @@ export function useStore() {
   const [previewVolume, setPreviewVolume] = useState(70)
   const [shortcutsEnabled, setShortcutsEnabled] = useState(true)
   const [toggleShortcutsAccelerator, setToggleShortcutsAccelerator] = useState('CommandOrControl+Shift+K')
+  const [toggleWindowShortcut, setToggleWindowShortcut] = useState('CommandOrControl+Shift+S')
   const [soundOrder, setSoundOrder] = useState({})
   const [orderVersion, setOrderVersion] = useState(0)
   const [normalizationEnabled, setNormalizationEnabled] = useState(true)
@@ -57,119 +58,122 @@ export function useStore() {
 
 
   // ─── Chargement initial depuis electron-store ────────────────────────────────
-useEffect(() => {
-  async function loadData() {
-    try {
-      const savedProfiles = await window.electronAPI.storeGet('profiles') || []
-      const savedSounds = (await window.electronAPI.storeGet('sounds') || []).map(s => {
-        if (s.volumeDb !== undefined) return s
-        const oldVolume = s.volume ?? 100
-        const newDb = Math.round(((oldVolume - 50) / 50) * 24 * 10) / 10
-        return { ...s, volume: newDb, volumeDb: newDb }
-      })
-      const savedShortcuts = await window.electronAPI.storeGet('shortcuts') || {}
-      const savedProfileShortcut = await window.electronAPI.storeGet('profileShortcut') || 'CommandOrControl+Tab'
-      const savedTheme = await window.electronAPI.storeGet('theme') || 'dark'
-      const savedCustomTheme = await window.electronAPI.storeGet('customTheme') || null
-      const savedLang = await window.electronAPI.storeGet('lang') || 'fr'
-      const savedAudioDevice = await window.electronAPI.storeGet('audioDevice') || 'default'
-      const savedVolume = await window.electronAPI.storeGet('volume') ?? 80
-      const savedPlayLocally = await window.electronAPI.storeGet('playLocally') ?? true
-      const savedLoopShortcut = await window.electronAPI.storeGet('loopShortcut') || ''
-      const savedStopAllShortcut = await window.electronAPI.storeGet('stopAllShortcut') || ''
-      const savedPresentationShortcut = await window.electronAPI.storeGet('presentationShortcut') || ''
-      const savedCurrentProfileId = await window.electronAPI.storeGet('currentProfileId')
-      const savedPreviewVolume = await window.electronAPI.storeGet('previewVolume') ?? 70
-      const savedShortcutsEnabled = await window.electronAPI.storeGet('shortcutsEnabled') ?? true
-      const savedToggleShortcutsAccelerator = await window.electronAPI.storeGet('toggleShortcutsAccelerator') || 'CommandOrControl+Shift+K'
-      const savedSoundOrder = await window.electronAPI.storeGet('soundOrder') || {}
-      const savedNormalizationEnabled = await window.electronAPI.storeGet('normalizationEnabled') ?? true
-      const savedNormalizationTarget = await window.electronAPI.storeGet('normalizationTarget') ?? 0.2
-      const savedNoiseSuppression = await window.electronAPI.storeGet('noiseSuppression') ?? false
-      const savedNoiseSuppressionMode = await window.electronAPI.storeGet('noiseSuppressionMode') || 'auto'
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const savedProfiles = await window.electronAPI.storeGet('profiles') || []
+        const savedSounds = (await window.electronAPI.storeGet('sounds') || []).map(s => {
+          if (s.volumeDb !== undefined) return s
+          const oldVolume = s.volume ?? 100
+          const newDb = Math.round(((oldVolume - 50) / 50) * 24 * 10) / 10
+          return { ...s, volume: newDb, volumeDb: newDb }
+        })
+        const savedShortcuts = await window.electronAPI.storeGet('shortcuts') || {}
+        const savedProfileShortcut = await window.electronAPI.storeGet('profileShortcut') || 'CommandOrControl+Tab'
+        const savedTheme = await window.electronAPI.storeGet('theme') || 'dark'
+        const savedCustomTheme = await window.electronAPI.storeGet('customTheme') || null
+        const savedLang = await window.electronAPI.storeGet('lang') || 'fr'
+        const savedAudioDevice = await window.electronAPI.storeGet('audioDevice') || 'default'
+        const savedVolume = await window.electronAPI.storeGet('volume') ?? 80
+        const savedPlayLocally = await window.electronAPI.storeGet('playLocally') ?? true
+        const savedLoopShortcut = await window.electronAPI.storeGet('loopShortcut') || ''
+        const savedStopAllShortcut = await window.electronAPI.storeGet('stopAllShortcut') || ''
+        const savedPresentationShortcut = await window.electronAPI.storeGet('presentationShortcut') || ''
+        const savedCurrentProfileId = await window.electronAPI.storeGet('currentProfileId')
+        const savedPreviewVolume = await window.electronAPI.storeGet('previewVolume') ?? 70
+        const savedShortcutsEnabled = await window.electronAPI.storeGet('shortcutsEnabled') ?? true
+        const savedToggleShortcutsAccelerator = await window.electronAPI.storeGet('toggleShortcutsAccelerator') || 'CommandOrControl+Shift+K'
+        const savedSoundOrder = await window.electronAPI.storeGet('soundOrder') || {}
+        const savedNormalizationEnabled = await window.electronAPI.storeGet('normalizationEnabled') ?? true
+        const savedNormalizationTarget = await window.electronAPI.storeGet('normalizationTarget') ?? 0.2
+        const savedNoiseSuppression = await window.electronAPI.storeGet('noiseSuppression') ?? false
+        const savedNoiseSuppressionMode = await window.electronAPI.storeGet('noiseSuppressionMode') || 'auto'
 
-      const allProfile = { id: 'all', name: 'Tous les sons', isDefault: true }
-      const userProfiles = savedProfiles.filter(p => p.id !== 'all')
-      const allProfiles = [allProfile, ...userProfiles]
+        const allProfile = { id: 'all', name: 'Tous les sons', isDefault: true }
+        const userProfiles = savedProfiles.filter(p => p.id !== 'all')
+        const allProfiles = [allProfile, ...userProfiles]
 
-      const savedStartMinimized = await window.electronAPI.getStartMinimized?.() ?? false
-      const savedLaunchAtStartup = await window.electronAPI.getLaunchAtStartup?.() ?? false
-      setStartMinimized(savedStartMinimized)
-      setLaunchAtStartup(savedLaunchAtStartup)
+        const savedStartMinimized = await window.electronAPI.getStartMinimized?.() ?? false
+        const savedLaunchAtStartup = await window.electronAPI.getLaunchAtStartup?.() ?? false
+        setStartMinimized(savedStartMinimized)
+        setLaunchAtStartup(savedLaunchAtStartup)
 
-      const savedAudioMode = await window.electronAPI.storeGet('audioMode') || AUDIO_MODES.INTEGRATED
-      const savedVirtualDriverInstalled = await window.electronAPI.storeGet('virtualDriverInstalled') || false
-      const savedVirtualDeviceActive = await window.electronAPI.storeGet('virtualDeviceActive') ?? false
-      setAudioMode(savedAudioMode)
-      setVirtualDriverInstalled(savedVirtualDriverInstalled)
-      setVirtualDeviceActive(savedVirtualDeviceActive)
+        const savedAudioMode = await window.electronAPI.storeGet('audioMode') || AUDIO_MODES.INTEGRATED
+        const savedVirtualDriverInstalled = await window.electronAPI.storeGet('virtualDriverInstalled') || false
+        const savedVirtualDeviceActive = await window.electronAPI.storeGet('virtualDeviceActive') ?? false
+        setAudioMode(savedAudioMode)
+        setVirtualDriverInstalled(savedVirtualDriverInstalled)
+        setVirtualDeviceActive(savedVirtualDeviceActive)
 
-      const savedMixerEnabled = await window.electronAPI.storeGet('mixerEnabled') ?? false
-      const savedMicrophoneDevice = await window.electronAPI.storeGet('microphoneDevice') || 'default'
-      const savedMicrophoneVolume = await window.electronAPI.storeGet('microphoneVolume') ?? 80
-      const savedMixerSoundVolume = await window.electronAPI.storeGet('mixerSoundVolume') ?? 100
-      setMixerEnabled(savedMixerEnabled)
-      setMicrophoneDevice(savedMicrophoneDevice)
-      setMicrophoneVolume(savedMicrophoneVolume)
-      setMixerSoundVolume(savedMixerSoundVolume)
+        const savedMixerEnabled = await window.electronAPI.storeGet('mixerEnabled') ?? false
+        const savedMicrophoneDevice = await window.electronAPI.storeGet('microphoneDevice') || 'default'
+        const savedMicrophoneVolume = await window.electronAPI.storeGet('microphoneVolume') ?? 80
+        const savedMixerSoundVolume = await window.electronAPI.storeGet('mixerSoundVolume') ?? 100
+        setMixerEnabled(savedMixerEnabled)
+        setMicrophoneDevice(savedMicrophoneDevice)
+        setMicrophoneVolume(savedMicrophoneVolume)
+        setMixerSoundVolume(savedMixerSoundVolume)
 
-      setNoiseSuppression(savedNoiseSuppression)
-      setNoiseSuppressionMode(savedNoiseSuppressionMode)
+        setNoiseSuppression(savedNoiseSuppression)
+        setNoiseSuppressionMode(savedNoiseSuppressionMode)
 
-      const savedKeyboardLayout = await window.electronAPI.storeGet('keyboardLayout') || 'qwerty'
-      setKeyboardLayout(savedKeyboardLayout)
+        const savedKeyboardLayout = await window.electronAPI.storeGet('keyboardLayout') || 'qwerty'
+        setKeyboardLayout(savedKeyboardLayout)
 
-      setProfiles(allProfiles)
-      setSounds(savedSounds)
-      setShortcuts(savedShortcuts)
-      // ═════════Nettoyage des raccourcis orphelins════════════════════════════
-      const soundIds = new Set(savedSounds.map(s => s.id))
-      const cleanedShortcuts = { ...savedShortcuts }
-      let hasChanges = false
-      Object.keys(cleanedShortcuts).forEach(id => {
-        if (!soundIds.has(id)) {
-          delete cleanedShortcuts[id]
-          hasChanges = true
+        const savedToggleWindowShortcut = await window.electronAPI.storeGet('toggleWindowShortcut') || 'CommandOrControl+Shift+S'
+        setToggleWindowShortcut(savedToggleWindowShortcut)
+
+        setProfiles(allProfiles)
+        setSounds(savedSounds)
+        setShortcuts(savedShortcuts)
+        // ═════════Nettoyage des raccourcis orphelins════════════════════════════
+        const soundIds = new Set(savedSounds.map(s => s.id))
+        const cleanedShortcuts = { ...savedShortcuts }
+        let hasChanges = false
+        Object.keys(cleanedShortcuts).forEach(id => {
+          if (!soundIds.has(id)) {
+            delete cleanedShortcuts[id]
+            hasChanges = true
+          }
+        })
+        if (hasChanges) {
+          setShortcuts(cleanedShortcuts)
+          await window.electronAPI.storeSet('shortcuts', cleanedShortcuts)
+          await window.electronAPI.updateShortcuts(cleanedShortcuts)
+          console.log('✅ Raccourcis orphelins nettoyés au chargement')
         }
-      })
-      if (hasChanges) {
-        setShortcuts(cleanedShortcuts)
-        await window.electronAPI.storeSet('shortcuts', cleanedShortcuts)
-        await window.electronAPI.updateShortcuts(cleanedShortcuts)
-        console.log('✅ Raccourcis orphelins nettoyés au chargement')
-      }
-      // ═══════════════════════════════════════════════════════════════════════
-      
-      setProfileShortcut(savedProfileShortcut)
-      setTheme(savedTheme)
-      if (savedCustomTheme) setCustomTheme(savedCustomTheme)
-      setLang(savedLang)
-      setAudioDevice(savedAudioDevice)
-      setVolume(savedVolume)
-      setPlayLocally(savedPlayLocally)
-      setLoopShortcut(savedLoopShortcut)
-      setStopAllShortcut(savedStopAllShortcut)
-      setPresentationShortcut(savedPresentationShortcut)
-      setCurrentProfileId(savedCurrentProfileId || 'all')
-      setPreviewVolume(savedPreviewVolume)
-      setShortcutsEnabled(savedShortcutsEnabled)
-      setToggleShortcutsAccelerator(savedToggleShortcutsAccelerator)
-      setSoundOrder(savedSoundOrder)
-      setNormalizationEnabled(savedNormalizationEnabled)
-      setNormalizationTarget(savedNormalizationTarget)
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        setProfileShortcut(savedProfileShortcut)
+        setTheme(savedTheme)
+        if (savedCustomTheme) setCustomTheme(savedCustomTheme)
+        setLang(savedLang)
+        setAudioDevice(savedAudioDevice)
+        setVolume(savedVolume)
+        setPlayLocally(savedPlayLocally)
+        setLoopShortcut(savedLoopShortcut)
+        setStopAllShortcut(savedStopAllShortcut)
+        setPresentationShortcut(savedPresentationShortcut)
+        setCurrentProfileId(savedCurrentProfileId || 'all')
+        setPreviewVolume(savedPreviewVolume)
+        setShortcutsEnabled(savedShortcutsEnabled)
+        setToggleShortcutsAccelerator(savedToggleShortcutsAccelerator)
+        setSoundOrder(savedSoundOrder)
+        setNormalizationEnabled(savedNormalizationEnabled)
+        setNormalizationTarget(savedNormalizationTarget)
 
-      const savedLocalAudioDevice = await window.electronAPI.storeGet('localAudioDevice') || 'default'
-      setLocalAudioDevice(savedLocalAudioDevice)
-    } catch (e) {
-      console.error('Erreur chargement store:', e)
-      setProfiles([{ id: 'all', name: 'Tous les sons', isDefault: true }])
-      setCurrentProfileId('all')
-    } finally {
-      setLoading(false)
+        const savedLocalAudioDevice = await window.electronAPI.storeGet('localAudioDevice') || 'default'
+        setLocalAudioDevice(savedLocalAudioDevice)
+      } catch (e) {
+        console.error('Erreur chargement store:', e)
+        setProfiles([{ id: 'all', name: 'Tous les sons', isDefault: true }])
+        setCurrentProfileId('all')
+      } finally {
+        setLoading(false)
+      }
     }
-  }
-  loadData()
-}, [])
+    loadData()
+  }, [])
 
   // ─── Sauvegarde automatique ───────────────────────────────────────────────────
   const save = useCallback(async (key, value) => {
@@ -230,6 +234,7 @@ useEffect(() => {
   // ─── Sons ─────────────────────────────────────────────────────────────────────
   const normalizePath = (p) => p ? p.replace(/\\/g, '/') : p
 
+  // ✅ MODIFICATION 1 : favorites est maintenant un tableau
   const addSound = useCallback(async (soundData) => {
     const newSound = {
       id: uuidv4(),
@@ -237,7 +242,7 @@ useEffect(() => {
       path: normalizePath(soundData.path),
       image: normalizePath(soundData.image) || null,
       emoji: soundData.emoji || '🔊',
-      favorite: false,
+      favorites: [], // ✅ CHANGEMENT : favorite: false → favorites: []
       profiles: soundData.profiles || ['all'],
       volume: 0,
       volumeDb: 0,
@@ -309,13 +314,27 @@ useEffect(() => {
     await save('sounds', updated)
   }, [sounds, save])
 
-  const toggleFavorite = useCallback(async (soundId) => {
-    const updated = sounds.map(s =>
-      s.id === soundId ? { ...s, favorite: !s.favorite } : s
-    )
-    setSounds(updated)
-    await save('sounds', updated)
-  }, [sounds, save])
+  // ✅ MODIFICATION 2 : toggleFavorite avec gestion des profils
+const toggleFavorite = useCallback(async (soundId) => {
+  const profileId = currentProfileId || 'all';
+  
+  // ✅ AUTORISER le toggle pour le profil "all" également
+  // On utilise "all" comme ID de profil pour les favoris globaux
+
+  const updated = sounds.map(s => {
+    if (s.id !== soundId) return s;
+    const isFav = s.favorites?.includes(profileId) || false;
+    return {
+      ...s,
+      favorites: isFav
+        ? s.favorites.filter(id => id !== profileId)
+        : [...(s.favorites || []), profileId]
+    };
+  });
+  
+  setSounds(updated);
+  await save('sounds', updated);
+}, [sounds, currentProfileId, save]);
 
   const addSoundToProfile = useCallback(async (soundId, profileId) => {
     const updated = sounds.map(s => {
@@ -439,6 +458,12 @@ useEffect(() => {
     setToggleShortcutsAccelerator(accelerator)
     await save('toggleShortcutsAccelerator', accelerator)
     await window.electronAPI.updateToggleShortcutsAccelerator(accelerator)
+  }, [save])
+
+  const updateToggleWindowShortcut = useCallback(async (accelerator) => {
+    setToggleWindowShortcut(accelerator)
+    await save('toggleWindowShortcut', accelerator)
+    await window.electronAPI.updateToggleWindowShortcut?.(accelerator)
   }, [save])
 
   // ─── Nettoyage des raccourcis orphelins ──────────────────────────────────────
@@ -670,6 +695,24 @@ useEffect(() => {
     await save('microphoneDevice', deviceId)
   }, [save])
 
+  // ─── ✅ NOUVELLE FONCTION : Changer l'image d'un son ──────────────────────
+  const updateSoundImage = useCallback(async (soundId, imagePath) => {
+    const updated = sounds.map(s => 
+      s.id === soundId ? { ...s, image: normalizePath(imagePath) } : s
+    )
+    setSounds(updated)
+    await save('sounds', updated)
+  }, [sounds, save])
+
+  // ─── ✅ NOUVELLE FONCTION : Changer l'émoticône d'un son ──────────────────
+  const updateSoundEmoji = useCallback(async (soundId, emoji) => {
+    const updated = sounds.map(s => 
+      s.id === soundId ? { ...s, emoji } : s
+    )
+    setSounds(updated)
+    await save('sounds', updated)
+  }, [sounds, save])
+
   // ─── Sons ordonnés selon le profil ──────────────────────────────────────────
   const orderedSounds = useMemo(() => {
     const profileId = currentProfileId || 'all'
@@ -694,7 +737,12 @@ useEffect(() => {
     return [...ordered, ...missing]
   }, [sounds, soundOrder, currentProfileId, orderVersion])
 
-  const favoriteSounds = orderedSounds.filter(s => s.favorite)
+  // favoriteSounds dynamique par profil
+  const favoriteSounds = useMemo(() => {
+  // ✅ Pour le profil "all", on montre les favoris marqués avec "all"
+  // Pour les autres profils, on montre les favoris de ce profil
+  return orderedSounds.filter(s => s.favorites?.includes(currentProfileId) || false);
+}, [orderedSounds, currentProfileId]);
 
   return {
     // État
@@ -709,6 +757,9 @@ useEffect(() => {
     // Sons
     addSound, deleteSound, updateSound, updateSoundVolume, incrementPlayCount, toggleFavorite, 
     addSoundToProfile, removeSoundFromProfile, reorderSounds,
+    // ✅ NOUVEAUX
+    updateSoundImage,
+    updateSoundEmoji,
     // Raccourcis
     setShortcut, clearShortcut, updateProfileShortcut,
     // Options
@@ -728,6 +779,8 @@ useEffect(() => {
     // Raccourcis globaux
     toggleGlobalShortcuts,
     updateToggleShortcutsAccelerator,
+    toggleWindowShortcut,
+    updateToggleWindowShortcut,
     // Normalisation
     updateNormalizationEnabled,
     updateNormalizationTarget,
