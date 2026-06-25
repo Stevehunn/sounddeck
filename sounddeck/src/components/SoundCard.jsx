@@ -736,20 +736,7 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
 }
 
 // ContextMenuPortal
-function ContextMenuPortal({ 
-  sound, 
-  currentProfileId, 
-  onClose, 
-  onToggleFavorite, 
-  onRename, 
-  onVolumeOpen, 
-  onRemoveFromProfile, 
-  onDelete,
-  onChangeImage,
-  onChangeEmoji,
-  position, 
-  lang = 'fr' 
-}) {
+function ContextMenuPortal({ sound, currentProfileId, onClose, onToggleFavorite, onRename, onVolumeOpen, onRemoveFromProfile, onDelete, position, lang = 'fr' }) {
   const tr = useTranslation(lang)
   const menuRef = useRef(null)
 
@@ -783,7 +770,7 @@ function ContextMenuPortal({
     action()
     onClose()
   }
-  
+
   return (
     <div 
       ref={menuRef} 
@@ -803,8 +790,8 @@ function ContextMenuPortal({
       }}
     >
       <MenuItem 
-        icon={isFavorite ? 'ti-star' : 'ti-star-filled'} 
-        label={isFavorite ? tr('menuFavoriteRemove') : tr('menuFavoriteAdd')} 
+        icon={sound.favorite ? 'ti-star' : 'ti-star-filled'} 
+        label={sound.favorite ? tr('menuFavoriteRemove') : tr('menuFavoriteAdd')} 
         onClick={() => handleAction(onToggleFavorite)}
         lang={lang}
       />
@@ -812,18 +799,6 @@ function ContextMenuPortal({
         icon="ti-pencil" 
         label={tr('menuRename')} 
         onClick={() => handleAction(onRename)}
-        lang={lang}
-      />
-      <MenuItem 
-        icon="ti-photo" 
-        label={tr('menuChangeImage')} 
-        onClick={() => handleAction(onChangeImage)}
-        lang={lang}
-      />
-      <MenuItem 
-        icon="ti-mood-smile" 
-        label={tr('menuChangeEmoji')} 
-        onClick={() => handleAction(onChangeEmoji)}
         lang={lang}
       />
       <MenuItem 
