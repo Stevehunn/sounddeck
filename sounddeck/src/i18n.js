@@ -324,6 +324,18 @@ export const TRANSLATIONS = {
     reanalyzeGainsDesc: 'Force la réanalyse des niveaux sonores',
     gainCacheCleared: 'Cache des gains vidé, rejouez vos sons pour réanalyser',
 
+    // ── Profile Manager ───────────────────────────────────────────────────────
+    profileManagerTitle: 'Gérer le profil',
+    profileManagerSelectAll: 'Tout sélectionner',
+    profileManagerDeselectAll: 'Tout désélectionner',
+    profileManagerRemoveSelected: 'Retirer sélection',
+    profileManagerDeleteProfile: 'Supprimer le profil',
+    profileManagerConfirmRemove: 'Confirmer la suppression',
+    profileManagerConfirmMessage: 'Vous êtes sur le point de retirer {count} son(s) du profil "{name}".',
+    profileManagerConfirmSub: 'Ces sons resteront dans votre bibliothèque et pourront être réajoutés plus tard.',
+    profileManagerNoSounds: 'Ce profil ne contient aucun son.',
+    profileManagerFavorite: 'Favori',
+
     // ── Presentation ──────────────────────────────────────────────────────────
     presentationTitle: 'Mode Présentation',
     exitTip: 'Appuyez sur Échap pour quitter',
@@ -902,6 +914,18 @@ export const TRANSLATIONS = {
     normalizationLabelMedium: 'Balance ⚖️',
     normalizationLabelHigh: 'Quieter 🔉',
     normalizationDefaultLabel: 'Default',
+
+    // ── Profile Manager ───────────────────────────────────────────────────────
+    profileManagerTitle: 'Manage profile',
+    profileManagerSelectAll: 'Select all',
+    profileManagerDeselectAll: 'Deselect all',
+    profileManagerRemoveSelected: 'Remove selected',
+    profileManagerDeleteProfile: 'Delete profile',
+    profileManagerConfirmRemove: 'Confirm removal',
+    profileManagerConfirmMessage: 'You are about to remove {count} sound(s) from profile "{name}".',
+    profileManagerConfirmSub: 'These sounds will remain in your library and can be re-added later.',
+    profileManagerNoSounds: 'This profile has no sounds.',
+    profileManagerFavorite: 'Favorite',
 
     // ── Presentation ──────────────────────────────────────────────────────────
     presentationTitle: 'Presentation Mode',
@@ -1487,6 +1511,19 @@ export const TRANSLATIONS = {
     gainCacheCleared: 'Caché de ganancias vaciado, reproduce tus sonidos para reanalizar',
 
     localOutputDeviceChanged: 'Dispositivo local cambiado: {device}',
+
+
+    // ── Profile Manager ───────────────────────────────────────────────────────
+    profileManagerTitle: 'Gestionar perfil',
+    profileManagerSelectAll: 'Seleccionar todo',
+    profileManagerDeselectAll: 'Deseleccionar todo',
+    profileManagerRemoveSelected: 'Eliminar seleccionados',
+    profileManagerDeleteProfile: 'Eliminar perfil',
+    profileManagerConfirmRemove: 'Confirmar eliminación',
+    profileManagerConfirmMessage: 'Estás a punto de eliminar {count} sonido(s) del perfil "{name}".',
+    profileManagerConfirmSub: 'Estos sonidos permanecerán en tu biblioteca y podrán ser reañadidos más tarde.',
+    profileManagerNoSounds: 'Este perfil no tiene sonidos.',
+    profileManagerFavorite: 'Favorito',
 
     // ── Presentation ──────────────────────────────────────────────────────────
     presentationTitle: 'Modo Presentación',

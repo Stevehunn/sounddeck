@@ -1,18 +1,59 @@
-import { useState, useEffect, useRef } from 'react'
+// sounddeck/src/pages/Options.jsx
+import { useState, useEffect, useRef, forwardRef, useCallback } from 'react'
 import ShortcutRecorder from '../components/ShortcutRecorder'
 import CustomThemeEditor from '../components/CustomThemeEditor'
 import { LANGUAGES, useTranslation } from '../i18n'
 import { getMicrophoneStatus, getMixerStats, testMicrophoneOnce, connectMixerToOutput } from '../utils/audioMixer'
 import KeyboardVisualizer from '../components/KeyboardVisualizer'
 
+// Définition des sections
+const SECTIONS = [
+  { id: 'appearance', icon: 'ti-palette', label: 'Apparence' },
+  { id: 'audio', icon: 'ti-volume', label: 'Audio' },
+  { id: 'shortcuts', icon: 'ti-keyboard', label: 'Raccourcis' },
+  { id: 'backup', icon: 'ti-cloud', label: 'Sauvegarde' },
+  { id: 'profiles', icon: 'ti-users', label: 'Profils' },
+]
+
+// Composant Section avec forwardRef
+const Section = forwardRef(({ title, icon, children, id }, ref) => {
+  return (
+    <div ref={ref} data-section={id} style={{ marginBottom: 32, scrollMarginTop: 80 }}>
+      <div style={{ 
+        fontSize: 13, 
+        fontWeight: 600, 
+        color: 'var(--accent)', 
+        marginBottom: 12, 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: 8,
+        paddingBottom: 8,
+        borderBottom: '1px solid var(--border)'
+      }}>
+        <i className={`ti ${icon}`} />
+        {title}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {children}
+      </div>
+    </div>
+  )
+})
+
+Section.displayName = 'Section'
+
 export default function Options({ store, addToast, lang = 'fr' }) {
   const tr = useTranslation(lang)
+  const [activeSection, setActiveSection] = useState('appearance')
   const [audioDevices, setAudioDevices] = useState([])
   const [isDetecting, setIsDetecting] = useState(false)
   const [microphones, setMicrophones] = useState([])
   const [isInstallingDriver, setIsInstallingDriver] = useState(false)
   const [isMicrophoneTesting, setIsMicrophoneTesting] = useState(false)
   const micTestRef = useRef(null)
+  const sectionRefs = useRef({})
+  const observerRef = useRef(null)
+  const isScrollingRef = useRef(false)
 
   // Nettoyer le test à la fermeture de la page Options
   useEffect(() => {
@@ -57,7 +98,87 @@ export default function Options({ store, addToast, lang = 'fr' }) {
     detectDevices()
   }, [])
 
-  // Installation automatique de VB-Cable
+  // ✅ NOUVEAU : Observer les sections pour mettre à jour la navigation
+  useEffect(() => {
+    // Attendre que les refs soient disponibles
+    const setupObserver = () => {
+      const sections = SECTIONS.map(s => sectionRefs.current[s.id]).filter(Boolean)
+      
+      if (sections.length === 0) {
+        setTimeout(setupObserver, 100)
+        return
+      }
+
+      // Nettoyer l'ancien observer
+      if (observerRef.current) {
+        observerRef.current.disconnect()
+      }
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          // Si l'utilisateur est en train de scroller, on ne met pas à jour
+          if (isScrollingRef.current) return
+
+          // Trouver la section la plus visible
+          let maxRatio = 0
+          let maxId = null
+
+          entries.forEach(entry => {
+            const ratio = entry.intersectionRatio
+            if (ratio > maxRatio) {
+              maxRatio = ratio
+              maxId = entry.target.dataset.section
+            }
+          })
+
+          // Si on a trouvé une section visible avec un ratio > 0.3
+          if (maxId && maxRatio > 0.2) {
+            setActiveSection(maxId)
+          }
+        },
+        {
+          threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5],
+          rootMargin: '-60px 0px -40% 0px'
+        }
+      )
+
+      sections.forEach(section => {
+        if (section) observer.observe(section)
+      })
+
+      observerRef.current = observer
+
+      return () => {
+        observer.disconnect()
+      }
+    }
+
+    // Initialiser l'observer après un court délai
+    const timer = setTimeout(setupObserver, 200)
+    return () => {
+      clearTimeout(timer)
+      if (observerRef.current) {
+        observerRef.current.disconnect()
+      }
+    }
+  }, []) // Se déclenche une fois au montage
+
+  const scrollToSection = (sectionId) => {
+    const ref = sectionRefs.current[sectionId]
+    if (ref) {
+      // Marquer que l'utilisateur est en train de scroller
+      isScrollingRef.current = true
+      setActiveSection(sectionId)
+      
+      ref.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      
+      // Réactiver l'observation après le défilement
+      setTimeout(() => {
+        isScrollingRef.current = false
+      }, 800)
+    }
+  }
+
   const handleInstallDriver = async () => {
     setIsInstallingDriver(true)
     try {
@@ -120,7 +241,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
   }
 
   const testMicrophone = async () => {
-    // Si un test est déjà en cours, l'arrêter
     if (micTestRef.current) {
       micTestRef.current.stop()
       micTestRef.current = null
@@ -145,7 +265,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         
         addToast(`✅ Micro "${result.deviceName}" fonctionne !`, 'success')
         
-        // Arrêter automatiquement après 3 secondes
         setTimeout(() => {
           if (micTestRef.current) {
             micTestRef.current.stop()
@@ -167,36 +286,66 @@ export default function Options({ store, addToast, lang = 'fr' }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 15 }}>{tr('optionsTitle')}</div>
+      <div style={{ 
+        padding: '12px 20px', 
+        borderBottom: '1px solid var(--border)', 
+        flexShrink: 0,
+        background: 'var(--bg-secondary)',
+        zIndex: 10
+      }}>
+        <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 8 }}>
+          <i className="ti ti-settings" style={{ color: 'var(--accent)', marginRight: 6 }} />
+          {tr('optionsTitle')}
+        </div>
+        
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {SECTIONS.map(section => (
+            <button
+              key={section.id}
+              onClick={() => scrollToSection(section.id)}
+              style={{
+                padding: '5px 12px',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: 12,
+                cursor: 'pointer',
+                border: `1px solid ${activeSection === section.id ? 'var(--accent)' : 'var(--border)'}`,
+                background: activeSection === section.id ? 'var(--accent-light)' : 'transparent',
+                color: activeSection === section.id ? 'var(--accent)' : 'var(--text-secondary)',
+                fontWeight: activeSection === section.id ? 500 : 400,
+                transition: 'all 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4
+              }}
+              onMouseEnter={e => {
+                if (activeSection !== section.id) {
+                  e.currentTarget.style.borderColor = 'var(--accent)'
+                  e.currentTarget.style.color = 'var(--text-primary)'
+                }
+              }}
+              onMouseLeave={e => {
+                if (activeSection !== section.id) {
+                  e.currentTarget.style.borderColor = 'var(--border)'
+                  e.currentTarget.style.color = 'var(--text-secondary)'
+                }
+              }}
+            >
+              <i className={`ti ${section.icon}`} style={{ fontSize: 13 }} />
+              {section.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
 
-        {/* Application */}
-        <Section title={tr('application')} icon="ti-apps">
-          <OptionRow label={tr('startMinimized')} sub={tr('startMinimizedDesc')}>
-            <Toggle value={store.startMinimized ?? false} onChange={async (val) => {
-              await window.electronAPI.setStartMinimized(val)
-              store.setStartMinimized?.(val)
-            }} />
-          </OptionRow>
-          
-          <OptionRow label={tr('launchAtStartup')} sub={tr('launchAtStartupDesc')}>
-            <Toggle value={store.launchAtStartup ?? false} onChange={async (val) => {
-              await window.electronAPI.setLaunchAtStartup(val)
-              store.setLaunchAtStartup?.(val)
-            }} />
-          </OptionRow>
-
-          <OptionRow label={tr('hideToTray')} sub={tr('hideToTrayDesc')}>
-            <button className="btn-secondary" onClick={async () => {
-              await window.electronAPI.hideWindow()
-            }} style={{ fontSize: 12 }}>
-              <i className="ti ti-eye-off" /> {tr('hideToTrayBtn')}
-            </button>
-          </OptionRow>
-
+        {/* Section Apparence */}
+        <Section 
+          ref={el => sectionRefs.current['appearance'] = el}
+          id="appearance"
+          title="Apparence" 
+          icon="ti-palette"
+        >
           <OptionRow label={tr('language')}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {LANGUAGES.map(l => (
@@ -216,10 +365,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               ))}
             </div>
           </OptionRow>
-        </Section>
 
-        {/* Apparence */}
-        <Section title={tr('appearance')} icon="ti-palette">
           <OptionRow label={tr('theme')}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {[
@@ -256,10 +402,13 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           )}
         </Section>
 
-        {/* AUDIO */}
-        <Section title={tr('audio')} icon="ti-volume">
-
-          {/* Mode d'audio */}
+        {/* Section Audio */}
+        <Section 
+          ref={el => sectionRefs.current['audio'] = el}
+          id="audio"
+          title="Audio" 
+          icon="ti-volume"
+        >
           <OptionRow label={tr('audioMode')} sub={tr('audioModeDesc')}>
             <select value={store.audioMode || 'simple'} onChange={e => store.updateAudioMode(e.target.value)}
               style={{ width: 180, fontSize: 12 }}>
@@ -268,10 +417,8 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             </select>
           </OptionRow>
 
-          {/* MODE SIMPLE - VB-Cable (RECOMMANDÉ) */}
           {store.audioMode === 'simple' && (
             <>
-              {/* Installation VB-Cable */}
               <OptionRow label={tr('virtualDriver')} sub={tr('virtualDriverSub')}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -313,7 +460,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                     </div>
                   )}
 
-                  {/* ✅ GUIDE DE DÉSINSTALLATION TOUJOURS VISIBLE */}
                   <div style={{ fontSize: 11, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', padding: '8px 12px', borderRadius: 6, lineHeight: 1.6, border: '1px solid var(--border)' }}>
                     <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
                     <strong>{tr('uninstallGuideTitle')}</strong>
@@ -327,7 +473,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 </div>
               </OptionRow>
 
-              {/* Périphérique de sortie */}
               <OptionRow label={tr('outputDevice')} sub={tr('outputDeviceDesc')}>
                 <select value={store.audioDevice} onChange={e => store.updateAudioDevice(e.target.value)}
                   style={{ width: 220, fontSize: 12 }}>
@@ -340,7 +485,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 </select>
               </OptionRow>
 
-              {/* Activer le mixeur */}
               <OptionRow label={tr('mixerEnable')} sub={tr('mixerEnableDesc')}>
                 <Toggle value={store.mixerEnabled} onChange={async (val) => {
                   await store.updateMixerEnabled(val)
@@ -375,7 +519,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                   <OptionRow label={tr('microphone')} sub={tr('microphoneSelect')}>
                     <select value={store.microphoneDevice} onChange={async (e) => {
                       const deviceId = e.target.value
-                      await store.updateMicrophoneDeviceId(deviceId)  // ✅ CORRIGÉ
+                      await store.updateMicrophoneDeviceId(deviceId)
                       try {
                         const { changeMicrophone } = await import('../utils/audioMixer')
                         await changeMicrophone(deviceId)
@@ -537,7 +681,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 </>
               )}
 
-              {/* Play locally */}
               <OptionRow label={tr('playLocally')} sub={tr('playLocallyDesc')}>
                 <Toggle value={store.playLocally} onChange={store.updatePlayLocally} />
               </OptionRow>
@@ -563,7 +706,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             </>
           )}
 
-          {/* MODE AVANCÉ - VoiceMeeter */}
           {store.audioMode === 'advanced' && (
             <div style={{ padding: '10px 12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
               <i className="ti ti-info-circle" style={{ marginRight: 6, color: 'var(--accent)' }} />
@@ -604,8 +746,8 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
                   <input 
                     type="range" 
-                    min="0.02"     // ✅ -34dB
-                    max="1.0"      // ✅ 0dB (pleine échelle)
+                    min="0.02"
+                    max="1.0"
                     step="0.005" 
                     value={store.normalizationTarget}
                     onChange={e => store.updateNormalizationTarget(Number(e.target.value))}
@@ -626,7 +768,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 </div>
               </OptionRow>
               
-              {/* ✅ Indicateur visuel du niveau */}
               <div style={{ 
                 padding: '8px 12px', 
                 background: 'var(--bg-tertiary)', 
@@ -654,7 +795,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                   overflow: 'hidden',
                   position: 'relative'
                 }}>
-                  {/* Barre de progression */}
                   <div style={{
                     position: 'absolute',
                     top: 0,
@@ -670,7 +810,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                     transition: 'width 0.2s ease, background 0.3s ease'
                   }} />
                   
-                  {/* Repère du milieu (0.2 = -14dB) */}
                   <div style={{
                     position: 'absolute',
                     top: -2,
@@ -734,8 +873,13 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           )}
         </Section>
 
-        {/* Raccourcis globaux */}
-        <Section title={tr('shortcuts')} icon="ti-keyboard">
+        {/* Section Raccourcis */}
+        <Section 
+          ref={el => sectionRefs.current['shortcuts'] = el}
+          id="shortcuts"
+          title="Raccourcis" 
+          icon="ti-keyboard"
+        >
           <OptionRow label={tr('keyboardLayout')} sub={tr('keyboardLayoutDesc')}>
             <select 
               value={store.keyboardLayout || 'qwerty'} 
@@ -751,7 +895,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             </select>
           </OptionRow>
 
-          {/* ⬇️ AJOUTE LE VISUALISEUR ICI ⬇️ */}
           <KeyboardVisualizer 
             shortcuts={store.shortcuts} 
             layout={store.keyboardLayout || 'qwerty'} 
@@ -832,8 +975,13 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           </div>
         </Section>
 
-        {/* Sauvegarde */}
-        <Section title={tr('backup')} icon="ti-cloud">
+        {/* Section Sauvegarde */}
+        <Section 
+          ref={el => sectionRefs.current['backup'] = el}
+          id="backup"
+          title="Sauvegarde" 
+          icon="ti-cloud"
+        >
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             {tr('exportSectionLabel')}
           </div>
@@ -917,8 +1065,13 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           </div>
         </Section>
 
-        {/* Profils */}
-        <Section title={tr('profileManagement')} icon="ti-users">
+        {/* Section Profils */}
+        <Section 
+          ref={el => sectionRefs.current['profiles'] = el}
+          id="profiles"
+          title="Profils" 
+          icon="ti-users"
+        >
           {store.profiles.map(p => (
             <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-secondary)', marginBottom: 6 }}>
               <i className={`ti ${p.isDefault ? 'ti-stack' : 'ti-user'}`} style={{ color: 'var(--text-secondary)' }} />
@@ -968,19 +1121,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           50% { transform: scale(1.1); opacity: 0.6; }
         }
       `}</style>
-    </div>
-  )
-}
-
-function Section({ title, icon, children }) {
-  return (
-    <div style={{ marginBottom: 28 }}>
-      <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-        <i className={`ti ${icon}`} />{title}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {children}
-      </div>
     </div>
   )
 }

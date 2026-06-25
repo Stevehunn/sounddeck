@@ -1,36 +1,41 @@
 import { useState, useEffect, useRef } from 'react'
 import SoundCard from '../components/SoundCard'
 import AudioTrimmer from '../components/AudioTrimmer'
+import ProfileManagerModal from '../components/ProfileManagerModal'
 import { useTranslation } from '../i18n'
 
 const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
 
-export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
+export default function Home({ store, addToast, loopEnabled, lang = 'fr', globalSearch = '' }) {
   const tr = useTranslation(lang)
   const playLocally = store.playLocally
   const [showAll, setShowAll] = useState(false)
   const [showAllOther, setShowAllOther] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [showProfileManager, setShowProfileManager] = useState(false)
   const [sortBy, setSortBy] = useState('custom')
   const [dragOver, setDragOver] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState(0)
+  const [totalFiles, setTotalFiles] = useState(0)
   const [importSuccess, setImportSuccess] = useState(0)
-  const [search, setSearch] = useState('')
+  const [localSearch, setLocalSearch] = useState('')
   const [columns, setColumns] = useState(6)
   const gridRef = useRef(null)
   const favoritesGridRef = useRef(null)
 
+  const searchTerm = globalSearch || localSearch
+
   const [draggedSoundId, setDraggedSoundId] = useState(null)
   const [dragOverIndex, setDragOverIndex] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [dragSource, setDragSource] = useState(null) // 'favorites' | 'profile'
+  const [dragSource, setDragSource] = useState(null)
 
   const { currentSounds, favoriteSounds, shortcuts, audioDevice, volume, sounds, currentProfileId } = store
   const soundsOutsideProfile = currentProfileId !== 'all'
     ? sounds.filter(s => !s.profiles.includes(currentProfileId))
     : []
 
-  // ✅ MODIFICATION 1 : Recalculer les favoris pour le profil courant
   const favoriteSoundsForProfile = currentSounds.filter(s => s.favorites?.includes(currentProfileId) || false);
 
   // Calculer le nombre de colonnes pour la grille principale
@@ -48,8 +53,8 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     return () => window.removeEventListener('resize', calculateColumns)
   }, [])
 
-  const baseFiltered = search
-    ? currentSounds.filter(s => s.name.toLowerCase().includes(search.toLowerCase()))
+  const baseFiltered = searchTerm
+    ? currentSounds.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
     : currentSounds
 
   const filtered = [...baseFiltered].sort((a, b) => {
@@ -65,12 +70,10 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
   const displayedOther = showAllOther ? soundsOutsideProfile : soundsOutsideProfile.slice(0, itemsPerPage)
 
   // ─── Gestion du drag and drop ──────────────────────────────────────────────
-  // Trouver l'index réel d'un son dans la liste complète (pour la réorganisation globale)
   const findGlobalIndex = (soundId) => {
     return currentSounds.findIndex(s => s.id === soundId)
   }
 
-  // Récupérer les sons favoris dans l'ordre actuel de la liste globale
   const getOrderedFavorites = () => {
     return currentSounds.filter(s => s.favorites?.includes(currentProfileId) || false)
   }
@@ -131,10 +134,8 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
       return
     }
 
-    // Calculer les indices globaux
     const allSounds = currentSounds
     
-    // Si on vient des favoris, trouver l'index global du son
     let globalStartIndex = findGlobalIndex(sourceId)
     if (globalStartIndex === -1) {
       setDraggedSoundId(null)
@@ -144,38 +145,28 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
       return
     }
 
-    // Si on drop dans les favoris, on doit calculer l'index global correspondant
     let globalEndIndex
     if (targetSource === 'favorites') {
-      // Récupérer les favoris dans l'ordre global actuel
       const orderedFavorites = getOrderedFavorites()
-      // Trouver l'ID du son à la position endIndex dans les favoris
       if (endIndex < orderedFavorites.length) {
         const targetSoundId = orderedFavorites[endIndex]?.id
         if (targetSoundId) {
           globalEndIndex = findGlobalIndex(targetSoundId)
         } else {
-          // Si c'est la fin de la liste des favoris, placer après le dernier favori
           const lastFavorite = orderedFavorites[orderedFavorites.length - 1]
           globalEndIndex = lastFavorite ? findGlobalIndex(lastFavorite.id) + 1 : 0
         }
       } else {
-        // Si on drop à la fin des favoris, placer après le dernier favori
         const lastFavorite = orderedFavorites[orderedFavorites.length - 1]
         globalEndIndex = lastFavorite ? findGlobalIndex(lastFavorite.id) + 1 : 0
       }
     } else {
-      // Drop dans la liste principale - on utilise l'index global
-      // Mais il faut tenir compte des favoris qui sont en haut
-      // Pour simplifier, on réorganise globalement
       globalEndIndex = endIndex
     }
 
-    // Si l'index est invalide, on ajuste
     if (globalEndIndex < 0) globalEndIndex = 0
     if (globalEndIndex > allSounds.length) globalEndIndex = allSounds.length
 
-    // Réorganiser globalement
     await store.reorderSounds(globalStartIndex, globalEndIndex)
     
     setDraggedSoundId(null)
@@ -185,7 +176,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     addToast(tr('soundMoved'), 'success')
   }
 
-  // Version simplifiée pour le drop dans la liste principale
   const handleMainDrop = async (e, dropIndex) => {
     e.preventDefault()
     if (!draggedSoundId) return
@@ -207,7 +197,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
       return
     }
 
-    // Réorganiser globalement
     await store.reorderSounds(startIndex, endIndex)
     
     setDraggedSoundId(null)
@@ -218,16 +207,29 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
   }
 
   const handleImportFiles = async (filePaths) => {
+    setTotalFiles(filePaths.length)
+    setImportProgress(0)
     let count = 0
-    for (const fp of filePaths) {
+    
+    for (let i = 0; i < filePaths.length; i++) {
+      const fp = filePaths[i]
       const result = await window.electronAPI.importSoundFile(fp)
       if (result.success) {
-        await store.addSound({ name: result.name, path: result.path, emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)], profiles: [currentProfileId] })
+        await store.addSound({ 
+          name: result.name, 
+          path: result.path, 
+          emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)], 
+          profiles: [currentProfileId] 
+        })
         count++
       }
+      setImportProgress(i + 1)
     }
+    
     if (count > 0) addToast(`${count} ${tr('sounds')} ${tr('imported')}`, 'success')
     setShowImport(false)
+    setImportProgress(0)
+    setTotalFiles(0)
   }
 
   const handleOpenDialog = async () => {
@@ -324,6 +326,11 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600, fontSize: 15 }}>{currentProfile?.id === 'all' ? tr('allSounds') : currentProfile?.name}</div>
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{currentSounds.length} {tr('sounds')}</div>
+          {searchTerm && (
+            <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>
+              <i className="ti ti-search" style={{ fontSize: 10 }} /> Résultats pour "{searchTerm}" ({filtered.length})
+            </div>
+          )}
         </div>
         <select value={sortBy} onChange={e => setSortBy(e.target.value)}
           style={{ fontSize: 12, padding: '5px 8px', width: 'auto' }}>
@@ -333,10 +340,20 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
           <option value="recent">{tr('sortRecent')}</option>
           <option value="alpha">{tr('sortAlpha')}</option>
         </select>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('search')} style={{ width: 160 }} />
+        <input 
+          value={localSearch} 
+          onChange={e => setLocalSearch(e.target.value)} 
+          placeholder={tr('search')} 
+          style={{ width: 160 }} 
+        />
         <button className="btn-primary" onClick={() => setShowImport(true)}>
           <i className="ti ti-plus" /> {tr('addSound')}
         </button>
+        {currentProfileId !== 'all' && (
+          <button className="btn-secondary" onClick={() => setShowProfileManager(true)} style={{ fontSize: 12 }}>
+            <i className="ti ti-settings" /> Gérer le profil
+          </button>
+        )}
       </div>
 
       <div style={{ flex: 1, overflowY: importing ? 'hidden' : 'auto', padding: '16px 20px', position: 'relative' }}
@@ -365,7 +382,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
         {importing && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 50,
-            background: 'rgba(0,0,0,0.5)',
+            background: 'rgba(0,0,0,0.6)',
             borderRadius: 'var(--radius-lg)',
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
@@ -373,7 +390,26 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
           }}>
             <i className="ti ti-loader" style={{ fontSize: 40, color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
             <div style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>{tr('importing')}</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>{tr('importingFiles')}</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
+              {totalFiles > 0 ? `${importProgress} / ${totalFiles} fichiers` : tr('importingFiles')}
+            </div>
+            {totalFiles > 0 && (
+              <div style={{
+                width: 200,
+                height: 4,
+                background: 'rgba(255,255,255,0.2)',
+                borderRadius: 2,
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  width: `${(importProgress / totalFiles) * 100}%`,
+                  height: '100%',
+                  background: 'var(--accent)',
+                  borderRadius: 2,
+                  transition: 'width 0.3s ease'
+                }} />
+              </div>
+            )}
           </div>
         )}
 
@@ -406,7 +442,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
           </div>
         )}
 
-        {/* ✅ MODIFICATION 2 : Utiliser favoriteSoundsForProfile */}
         {favoriteSoundsForProfile.length > 0 && (
           <Section title={tr('favorites')} icon="ti-star-filled" iconColor="var(--warning)" count={favoriteSoundsForProfile.length}>
             <SoundGrid 
@@ -513,6 +548,18 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
           lang={lang}
         />
       )}
+
+      {showProfileManager && (
+        <ProfileManagerModal
+          profileId={currentProfileId}
+          profileName={currentProfile?.name || 'Profil'}
+          sounds={currentSounds}
+          store={store}
+          onClose={() => setShowProfileManager(false)}
+          addToast={addToast}
+          lang={lang}
+        />
+      )}
     </div>
   )
 }
@@ -582,7 +629,6 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLo
               onRemoveFromProfile={async (id) => { await store.removeSoundFromProfile(id, store.currentProfileId); addToast(tr('removedFromProfile'), 'info') }}
               onDelete={async (id) => { await store.deleteSound(id); addToast(tr('deleted'), 'info') }}
               onRename={(id, name) => store.updateSound(id, { name })}
-              // ✅ NOUVELLES PROPS
               onChangeImage={store.updateSoundImage}
               onChangeEmoji={store.updateSoundEmoji}
               draggable={draggable}
