@@ -11,7 +11,6 @@ export default function Guide({ lang = 'fr' }) {
     setActiveStep('install')
   }, [lang])
 
-  // Les étapes ne contiennent plus que des identifiants, pas du texte traduit
   const steps = [
     { id: 'install', icon: '📦', titleKey: 'guideStep1Title', color: '#7C6FF7', contentKey: 'step1' },
     { id: 'voicemeeter', icon: '🎚️', titleKey: 'guideStep2Title', color: '#2f81f7', contentKey: 'step2' },
@@ -22,7 +21,6 @@ export default function Guide({ lang = 'fr' }) {
 
   const active = steps.find(s => s.id === activeStep)
 
-  // Rendu du contenu selon l'étape active
   const renderContent = () => {
     switch (activeStep) {
       case 'install':
@@ -84,9 +82,9 @@ export default function Guide({ lang = 'fr' }) {
                 lang={lang}
               />
             </div>
-            <div style={{ background: 'var(--bg-tertiary)', borderRadius: 10, padding: 16, fontFamily: 'monospace', fontSize: 12, lineHeight: 2 }}>
+            <div className="guide-flow">
               <div style={{ color: 'var(--text-tertiary)', marginBottom: 6, fontSize: 11, fontFamily: 'inherit' }}>{tr('guideAudioFlow')}</div>
-              <div style={{ color: 'var(--text-primary)' }}>
+              <div style={{ color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: 12, lineHeight: 2 }}>
                 <span style={{ color: '#2f81f7' }}>{tr('guideYourMic')}</span> ──────────────────────────┐<br/>
                 {'                                    '}<span style={{ color: 'var(--accent)' }}>▼</span><br/>
                 {'                            '}<span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>VoiceMeeter Banana</span><br/>
@@ -185,13 +183,13 @@ export default function Guide({ lang = 'fr' }) {
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
           {steps.map((step) => (
             <button key={step.id} onClick={() => setActiveStep(step.id)}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: activeStep === step.id ? 'var(--accent-light)' : 'transparent', border: 'none', borderLeft: `3px solid ${activeStep === step.id ? step.color : 'transparent'}`, cursor: 'pointer', textAlign: 'left', transition: 'all 0.1s' }}
-              onMouseEnter={e => { if (activeStep !== step.id) e.currentTarget.style.background = 'var(--bg-hover)' }}
-              onMouseLeave={e => { if (activeStep !== step.id) e.currentTarget.style.background = 'transparent' }}>
+              className={`sidebar-item ${activeStep === step.id ? 'active' : ''}`}
+              style={{ borderLeft: `3px solid ${activeStep === step.id ? step.color : 'transparent'}` }}
+            >
               <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, background: activeStep === step.id ? step.color : 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, transition: 'all 0.1s' }}>
                 {activeStep === step.id ? <i className="ti ti-check" style={{ color: 'white', fontSize: 13 }} /> : step.icon}
               </div>
-              <div style={{ overflow: 'hidden' }}>
+              <div className="label">
                 <div style={{ fontSize: 11, fontWeight: 600, color: activeStep === step.id ? step.color : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {tr(step.titleKey)}
                 </div>
@@ -224,12 +222,12 @@ export default function Guide({ lang = 'fr' }) {
             </div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-            <button className="btn-secondary" style={{ fontSize: 12 }}
+            <button className="btn-secondary btn-sm"
               disabled={activeStep === steps[0].id}
               onClick={() => { const idx = steps.findIndex(s => s.id === activeStep); if (idx > 0) setActiveStep(steps[idx - 1].id) }}>
               <i className="ti ti-arrow-left" /> {tr('guidePrev')}
             </button>
-            <button className="btn-primary" style={{ fontSize: 12 }}
+            <button className="btn-primary btn-sm"
               disabled={activeStep === steps[steps.length - 1].id}
               onClick={() => { const idx = steps.findIndex(s => s.id === activeStep); if (idx < steps.length - 1) setActiveStep(steps[idx + 1].id) }}>
               {tr('guideNext')} <i className="ti ti-arrow-right" />
@@ -253,18 +251,15 @@ function DownloadCard({ icon, name, desc, url, instructions, lang }) {
     else window.open(url, '_blank')
   }
   return (
-    <div style={{ padding: '12px 14px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 10, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+    <div className="option-row" style={{ padding: '12px 14px', alignItems: 'flex-start' }}>
       <div style={{ fontSize: 28, flexShrink: 0, marginTop: 2 }}>{icon}</div>
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, padding: '0 10px' }}>
         <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{name}</div>
         <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>{desc}</div>
         <div style={{ fontSize: 11, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', borderRadius: 6, padding: '4px 8px', marginBottom: 8 }}>
           <i className="ti ti-info-circle" style={{ marginRight: 4 }} />{instructions}
         </div>
-        <button onClick={handleOpen}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--accent)', cursor: 'pointer', padding: '6px 12px', border: '1px solid var(--accent)', borderRadius: 6, background: 'transparent', transition: 'all 0.15s' }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-light)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+        <button onClick={handleOpen} className="btn-secondary btn-sm">
           <i className="ti ti-download" /> {tr('download')}
         </button>
       </div>
@@ -275,13 +270,47 @@ function DownloadCard({ icon, name, desc, url, instructions, lang }) {
 function ConfigStep({ number, title, desc, icon, highlight, lang }) {
   const tr = useTranslation(lang || 'fr')
   return (
-    <div style={{ padding: '10px 14px', borderRadius: 10, background: highlight ? 'var(--accent-light)' : 'var(--bg-secondary)', border: `1px solid ${highlight ? 'var(--accent)' : 'var(--border)'}`, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-      <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, background: highlight ? 'var(--accent)' : 'var(--bg-tertiary)', border: `1px solid ${highlight ? 'var(--accent)' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: highlight ? 'white' : 'var(--text-secondary)' }}>
+    <div 
+      className={`option-row ${highlight ? 'config-step-highlight' : ''}`} 
+      style={{ 
+        alignItems: 'flex-start', 
+        padding: '10px 14px',
+        flexWrap: 'wrap',
+        gap: 8
+      }}
+    >
+      <div style={{ 
+        width: 24, 
+        height: 24, 
+        borderRadius: '50%', 
+        flexShrink: 0, 
+        background: highlight ? 'var(--accent)' : 'var(--bg-tertiary)', 
+        border: `1px solid ${highlight ? 'var(--accent)' : 'var(--border)'}`, 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        fontSize: 11, 
+        fontWeight: 700, 
+        color: highlight ? 'white' : 'var(--text-secondary)',
+        flexShrink: 0
+      }}>
         {number}
       </div>
-      <div style={{ fontSize: 16, flexShrink: 0 }}>{icon}</div>
-      <div>
-        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, color: highlight ? 'var(--accent)' : 'var(--text-primary)' }}>{title}</div>
+      <div style={{ 
+        fontSize: 16, 
+        flexShrink: 0,
+        width: 28,
+        textAlign: 'center'
+      }}>{icon}</div>
+      <div style={{ flex: 1, minWidth: 180 }}>
+        <div style={{ 
+          fontWeight: 600, 
+          fontSize: 13, 
+          marginBottom: 2, 
+          color: highlight ? 'var(--accent)' : 'var(--text-primary)' 
+        }}>
+          {title}
+        </div>
         <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{desc}</div>
       </div>
     </div>
@@ -291,9 +320,9 @@ function ConfigStep({ number, title, desc, icon, highlight, lang }) {
 function TipCard({ icon, title, desc, lang }) {
   const tr = useTranslation(lang || 'fr')
   return (
-    <div style={{ padding: '10px 14px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 10, display: 'flex', gap: 10 }}>
+    <div className="option-row" style={{ padding: '10px 14px' }}>
       <div style={{ fontSize: 20, flexShrink: 0 }}>{icon}</div>
-      <div>
+      <div style={{ flex: 1, padding: '0 10px' }}>
         <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{title}</div>
         <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{desc}</div>
       </div>

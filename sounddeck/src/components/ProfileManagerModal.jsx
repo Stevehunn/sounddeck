@@ -92,21 +92,22 @@ export default function ProfileManagerModal({
           border: '1px solid var(--border)'
         }}>
           <button 
-            className="btn-secondary" 
+            className="btn-secondary btn-sm" 
             onClick={toggleAll}
-            style={{ fontSize: 12, padding: '4px 12px' }}
+            style={{ fontSize: 12, padding: '4px 12px', borderRadius: 'var(--radius-sm)' }}
           >
             <i className={`ti ${selectedSounds.size === sounds.length ? 'ti-checkbox' : 'ti-checkbox'}`} />
             {selectedSounds.size === sounds.length ? 'Tout désélectionner' : 'Tout sélectionner'}
           </button>
           
           <button 
-            className="btn-primary" 
+            className="btn-primary btn-sm" 
             onClick={handleRemoveSelected}
             disabled={selectedSounds.size === 0 || isDeleting}
             style={{ 
               fontSize: 12, 
-              padding: '4px 12px',
+              padding: '4px 12px', 
+              borderRadius: 'var(--radius-sm)',
               opacity: selectedSounds.size === 0 ? 0.5 : 1
             }}
           >
@@ -117,9 +118,9 @@ export default function ProfileManagerModal({
           <div style={{ flex: 1 }} />
 
           <button 
-            className="btn-danger" 
+            className="btn-danger btn-sm" 
             onClick={handleDeleteProfile}
-            style={{ fontSize: 12, padding: '4px 12px' }}
+            style={{ fontSize: 12, padding: '4px 12px', borderRadius: 'var(--radius-sm)' }}
           >
             <i className="ti ti-trash" />
             Supprimer le profil
@@ -228,9 +229,10 @@ export default function ProfileManagerModal({
           )}
         </div>
 
+        {/* ✅ Bouton Fermer agrandi */}
         <div className="modal-actions" style={{ marginTop: 0 }}>
-          <button className="btn-secondary" onClick={onClose}>
-            <i className="ti ti-x" /> Fermer
+          <button className="btn-secondary btn-lg" onClick={onClose} style={{ borderRadius: 'var(--radius-md)', minHeight: 40, padding: '8px 20px' }}>
+            <i className="ti ti-x" /> {tr('close')}
           </button>
         </div>
 
@@ -251,10 +253,10 @@ export default function ProfileManagerModal({
               </div>
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button className="btn-secondary" onClick={() => setShowConfirmDelete(false)} disabled={isDeleting}>
+                <button className="btn-secondary btn-lg" onClick={() => setShowConfirmDelete(false)} disabled={isDeleting} style={{ borderRadius: 'var(--radius-md)', minHeight: 40 }}>
                   Annuler
                 </button>
-                <button className="btn-danger" onClick={confirmRemove} disabled={isDeleting}>
+                <button className="btn-danger btn-lg" onClick={confirmRemove} disabled={isDeleting} style={{ borderRadius: 'var(--radius-md)', minHeight: 40 }}>
                   {isDeleting ? (
                     <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> Suppression...</>
                   ) : (

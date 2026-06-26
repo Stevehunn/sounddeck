@@ -46,24 +46,15 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
   }
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 999,
-      background: 'var(--bg-primary)',
-      display: 'flex', flexDirection: 'column',
-      overflow: 'hidden'
-    }}>
-      <div style={{
-        padding: '12px 24px', borderBottom: '1px solid var(--border)',
-        display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
-        background: 'var(--bg-secondary)'
-      }}>
+    <div className="presentation-overlay">
+      <div className="presentation-header">
         <i className="ti ti-speakerphone" style={{ fontSize: 22, color: 'var(--accent)' }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 700, fontSize: 16 }}>
             {tr('presentationTitle')} — {currentProfile?.id === 'all' ? tr('allSounds') : currentProfile?.name || tr('mySounds')}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-            {filtered.length} {tr('sounds')} · {tr('exitTip')} <kbd style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 3, padding: '1px 5px', fontSize: 10 }}>Esc</kbd>
+            {filtered.length} {tr('sounds')} · {tr('exitTip')} <kbd>Esc</kbd>
           </div>
         </div>
 
@@ -77,24 +68,24 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {loopEnabled && (
-            <div style={{ padding: '3px 8px', borderRadius: 20, background: 'rgba(29,158,117,0.15)', border: '1px solid var(--success)', color: 'var(--success)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div className="presentation-badge success">
               <i className="ti ti-repeat" /> {tr('presentationLoopOn')}
             </div>
           )}
           {playingId && (
-            <div style={{ padding: '3px 8px', borderRadius: 20, background: 'var(--accent-light)', border: '1px solid var(--accent)', color: 'var(--accent)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div className="presentation-badge accent">
               <i className="ti ti-volume" style={{ animation: 'pulse 1s ease infinite' }} /> {tr('presentationPlaying')}
             </div>
           )}
         </div>
 
-        <button className="btn-secondary" onClick={onExit} style={{ flexShrink: 0 }}>
+        <button className="btn-secondary btn-lg" onClick={onExit} style={{ minWidth: 120 }}>
           <i className="ti ti-x" /> {tr('presentationExit')}
         </button>
       </div>
 
       {favoriteSounds.length > 0 && !search && (
-        <div style={{ padding: '14px 24px 0', flexShrink: 0 }}>
+        <div className="presentation-favorites">
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--warning)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
             <i className="ti ti-star-filled" /> {tr('favorites')}
           </div>
@@ -196,34 +187,17 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size, lang }) {
 
   return (
     <div
+      className={`presentation-card ${playing ? 'playing' : ''}`}
       onClick={onPlay}
-      style={{
-        width: cardSize, cursor: 'pointer',
-        background: playing ? 'var(--accent-light)' : 'var(--bg-secondary)',
-        border: `2px solid ${playing ? 'var(--accent)' : 'var(--border)'}`,
-        borderRadius: 'var(--radius-lg)', padding: 10,
-        transition: 'all 0.15s', textAlign: 'center',
-        boxShadow: playing ? '0 0 20px rgba(124,111,247,0.3)' : 'none',
-        transform: playing ? 'scale(1.02)' : 'scale(1)'
-      }}
-      onMouseEnter={e => { if (!playing) { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.transform = 'scale(1.03)' } }}
-      onMouseLeave={e => { if (!playing) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'scale(1)' } }}
+      style={{ width: cardSize }}
     >
-      <div style={{
-        width: '100%', aspectRatio: '1', borderRadius: 10,
-        background: 'var(--bg-tertiary)', display: 'flex',
-        alignItems: 'center', justifyContent: 'center',
-        fontSize: emojiSize, marginBottom: 8, overflow: 'hidden', position: 'relative'
-      }}>
+      <div className="preview" style={{ fontSize: emojiSize }}>
         {imageUrl
           ? <img src={imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={() => setImgError(true)} />
           : <span>{sound.emoji || '🔊'}</span>
         }
         {playing && (
-          <div style={{
-            position: 'absolute', inset: 0, background: 'rgba(124,111,247,0.7)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10
-          }}>
+          <div className="waves">
             <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 24 }}>
               {[1,2,3,4,3].map((h, i) => (
                 <div key={i} style={{
@@ -237,12 +211,7 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size, lang }) {
         )}
       </div>
 
-      <div style={{
-        fontSize: isLarge ? 13 : 12, fontWeight: 600,
-        color: playing ? 'var(--accent)' : 'var(--text-primary)',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        marginBottom: 4
-      }}>
+      <div className="name" style={{ fontSize: isLarge ? 13 : 12 }}>
         {sound.name}
       </div>
 
@@ -251,13 +220,10 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size, lang }) {
           {formatShortcut(shortcut).map((key, i) => (
             <kbd key={i} style={{
               fontSize: isLarge ? 11 : 10,
-              fontFamily: 'SFMono-Regular, Consolas, monospace',
-              background: playing ? 'rgba(124,111,247,0.3)' : 'var(--bg-tertiary)',
               border: `1px solid ${playing ? 'var(--accent)' : 'var(--border)'}`,
               borderBottom: `2px solid ${playing ? 'var(--accent)' : 'var(--text-tertiary)'}`,
-              borderRadius: 4, padding: '1px 5px',
               color: playing ? 'var(--accent)' : 'var(--text-secondary)',
-              display: 'inline-block', lineHeight: 1.6
+              background: playing ? 'rgba(124,111,247,0.3)' : 'var(--bg-tertiary)'
             }}>
               {key}
             </kbd>
@@ -272,17 +238,11 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size, lang }) {
       )}
 
       {progress && (
-        <div style={{ marginTop: 6 }}>
-          <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' }}>
-            <div style={{
-              height: '100%', borderRadius: 2,
-              background: playing ? 'var(--accent)' : 'var(--border)',
-              width: `${progress.ratio * 100}%`,
-              transition: 'width 0.1s linear',
-              boxShadow: '0 0 6px var(--accent)'
-            }} />
+        <div className="progress-bar" style={{ marginTop: 6 }}>
+          <div className="track">
+            <div className={`fill ${playing ? 'accent' : ''}`} style={{ width: `${progress.ratio * 100}%` }} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-tertiary)', marginTop: 2 }}>
+          <div className="time">
             <span>{fmtTime(progress.current)}</span>
             <span>{fmtTime(progress.duration)}</span>
           </div>

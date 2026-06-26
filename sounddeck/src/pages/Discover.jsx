@@ -1,12 +1,9 @@
-// sounddeck/src/pages/Discover.jsx
 import { useState, useEffect, useRef } from 'react'
 import { Howl } from 'howler'
 import { LANGUAGES, useTranslation } from '../i18n'
 
 // ─── CONFIGURATION DES CATÉGORIES ────────────────────────────────────────────
-// Structure unique pour toutes les langues
 const CATEGORY_CONFIG = {
-  // Chaque catégorie a un id, une icône, une clé de traduction et une requête
   trending: { icon: '🔥', key: 'catTrending', mode: 'local', query: '' },
   best: { icon: '🏆', key: 'catBest', mode: 'multi', query: 'vine boom,bruh,airhorn,oof' },
   discord: { icon: '💬', key: 'catDiscord', mode: 'multi', query: 'discord,notification,ping' },
@@ -38,7 +35,6 @@ const BASE_URLS = {
 export default function Discover({ store, addToast, lang = 'fr' }) {
   const tr = useTranslation(lang)
   
-  // États
   const [sounds, setSounds] = useState([])
   const [loading, setLoading] = useState(false)
   const [activeCategory, setActiveCategory] = useState('trending')
@@ -52,8 +48,6 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
   const previewHowlRef = useRef(null)
   const searchTimeoutRef = useRef(null)
 
-  // ─── UTILITAIRES ────────────────────────────────────────────────────────────
-
   const getEffectiveVolume = () => Math.round((store.volume * previewLevel) / 100)
 
   const updateHowlVolume = (level) => {
@@ -63,8 +57,6 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
       previewHowlRef.current.volume(volumeRatio)
     }
   }
-
-  // ─── RÉCUPÉRATION DES SONS ──────────────────────────────────────────────────
 
   const fetchSounds = async (categoryId, query = '') => {
     const category = CATEGORY_CONFIG[categoryId]
@@ -78,17 +70,12 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
       let mode = category.mode
       let search = query || category.query
 
-      // Gestion spéciale pour 'local' (tendances par pays)
       if (mode === 'local') {
         const langData = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0]
         const country = langData.country || 'fr'
-        // Utiliser l'URL directe pour les tendances
-        const url = BASE_URLS[country] || BASE_URLS.fr
-        // On passe l'URL complète comme query
-        search = url
+        search = BASE_URLS[country] || BASE_URLS.fr
       }
 
-      // Mode 'multi' : on cherche plusieurs termes
       if (mode === 'multi') {
         const terms = search.split(',').map(t => t.trim()).filter(Boolean)
         const results = []
@@ -101,7 +88,6 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
           await new Promise(r => setTimeout(r, 200))
         }
         
-        // Déduplication
         const seen = new Set()
         const unique = results.filter(s => {
           if (seen.has(s.slug)) return false
@@ -115,7 +101,6 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
         return
       }
 
-      // Mode normal (search, category, local)
       const result = await window.electronAPI.fetchMyinstants(search, mode, lang)
       
       if (result.success && result.sounds.length > 0) {
@@ -131,15 +116,10 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     setLoading(false)
   }
 
-  // ─── EFFETS ──────────────────────────────────────────────────────────────────
-
-  // Chargement initial
   useEffect(() => {
     fetchSounds('trending')
     return () => stopPreview()
   }, [lang])
-
-  // ─── GESTIONNAIRES D'ÉVÉNEMENTS ────────────────────────────────────────────
 
   const handleCategoryClick = (categoryId) => {
     setActiveCategory(categoryId)
@@ -157,7 +137,6 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     fetchSounds(activeCategory, query)
   }
 
-  // Recherche avec debounce
   const handleSearchChange = (value) => {
     setSearchQuery(value)
     
@@ -171,8 +150,6 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
       }, 500)
     }
   }
-
-  // ─── PREVIEW AUDIO ──────────────────────────────────────────────────────────
 
   const stopPreview = () => {
     if (previewHowlRef.current) {
@@ -209,16 +186,12 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     howl.play()
   }
 
-  // ─── VOLUME DE PREVIEW ──────────────────────────────────────────────────────
-
   const handlePreviewLevelChange = (value) => {
     const newLevel = Math.max(0, Math.min(100, Number(value)))
     setPreviewLevel(newLevel)
     store.updatePreviewVolume?.(newLevel)
     updateHowlVolume(newLevel)
   }
-
-  // ─── TÉLÉCHARGEMENT ─────────────────────────────────────────────────────────
 
   const handleDownload = (sound) => {
     stopPreview()
@@ -250,8 +223,6 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     setDownloading(prev => ({ ...prev, [sound.id]: false }))
   }
 
-  // ─── RENDU ──────────────────────────────────────────────────────────────────
-
   const categories = Object.entries(CATEGORY_CONFIG).map(([id, config]) => ({
     id,
     ...config,
@@ -273,7 +244,6 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
             </div>
           </div>
           
-          {/* Contrôle du volume */}
           <VolumeControl
             previewLevel={previewLevel}
             isMuted={isMuted}
@@ -290,39 +260,34 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
             value={searchQuery}
             onChange={e => handleSearchChange(e.target.value)}
             placeholder={tr('searchSound')}
-            style={{ flex: 1 }}
+            className="input-lg"
+            style={{ flex: 1, borderRadius: 'var(--radius-md)' }}
           />
-          <button type="submit" className="btn-primary" style={{ flexShrink: 0 }}>
+          <button type="submit" className="btn-primary btn-lg" style={{ borderRadius: 'var(--radius-md)' }}>
             <i className="ti ti-search" /> {tr('searchBtn')}
           </button>
           {(searchQuery || loading) && (
-            <button type="button" className="btn-secondary" onClick={() => {
-              setSearchQuery('')
-              fetchSounds(activeCategory)
-            }}>
-              <i className="ti ti-x" />
+            <button 
+              type="button" 
+              className="btn-clear-search"
+              onClick={() => {
+                setSearchQuery('')
+                fetchSounds(activeCategory)
+              }}
+              title="Effacer la recherche"
+            >
+              <i className="ti ti-trash" />
             </button>
           )}
         </form>
 
         {/* Catégories */}
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'thin' }}>
+        <div className="categories-scroll">
           {categories.map(cat => (
             <button
               key={cat.id}
+              className={`category-btn ${activeCategory === cat.id ? 'active' : ''}`}
               onClick={() => handleCategoryClick(cat.id)}
-              style={{
-                padding: '5px 12px',
-                borderRadius: 20,
-                fontSize: 12,
-                cursor: 'pointer',
-                flexShrink: 0,
-                border: `1px solid ${activeCategory === cat.id ? 'var(--accent)' : 'var(--border)'}`,
-                background: activeCategory === cat.id ? 'var(--accent-light)' : 'transparent',
-                color: activeCategory === cat.id ? 'var(--accent)' : 'var(--text-secondary)',
-                fontWeight: activeCategory === cat.id ? 500 : 400,
-                whiteSpace: 'nowrap'
-              }}
             >
               {cat.label}
             </button>
@@ -354,7 +319,6 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
         )}
       </div>
 
-      {/* Modal de sélection de profil */}
       {showProfileModal && (
         <ProfilePickerModal
           sound={showProfileModal}
@@ -373,11 +337,10 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
 
 function LoadingState({ tr }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 14, color: 'var(--text-secondary)' }}>
+    <div className="flex-center" style={{ flexDirection: 'column', height: 200, gap: 14, color: 'var(--text-secondary)' }}>
       <i className="ti ti-loader" style={{ fontSize: 36, color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
       <div style={{ fontSize: 13 }}>{tr('loading')}</div>
       <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{tr('resolvingLinks')}</div>
-      <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
     </div>
   )
 }
@@ -579,47 +542,17 @@ function SoundGrid({ sounds, downloadedNames, downloading, previewing, onPreview
 
 function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPreview, onDownload, lang, tr }) {
   return (
-    <div style={{
-      background: 'var(--bg-secondary)',
-      border: `1px solid ${isPreviewing ? 'var(--accent)' : owned ? 'var(--success)' : 'var(--border)'}`,
-      borderRadius: 'var(--radius-lg)',
-      overflow: 'hidden',
-      transition: 'border-color 0.15s',
-      boxShadow: isPreviewing ? '0 0 0 3px rgba(124,111,247,0.2)' : 'none'
-    }}>
-      <div
-        onClick={onPreview}
-        style={{
-          background: isPreviewing ? 'var(--accent-light)' : 'var(--bg-tertiary)',
-          padding: '18px 0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 38,
-          cursor: 'pointer',
-          position: 'relative',
-          transition: 'background 0.15s'
-        }}
-        title={tr('clickToListen')}
-      >
+    <div className={`discover-card ${isPreviewing ? 'previewing' : ''} ${owned ? 'owned' : ''}`}>
+      <div className="preview" onClick={onPreview} title={tr('clickToListen')}>
         {sound.emoji}
         {isPreviewing && (
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'rgba(124,111,247,0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
+          <div className="waves">
             <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 20 }}>
               {[1, 2, 3, 4].map(i => (
                 <div
                   key={i}
+                  className="bar"
                   style={{
-                    width: 4,
-                    borderRadius: 2,
-                    background: 'var(--accent)',
                     animation: `wave ${0.6 + i * 0.1}s ease-in-out infinite alternate`,
                     height: `${40 + i * 15}%`
                   }}
@@ -630,19 +563,12 @@ function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPrevie
         )}
       </div>
 
-      <div style={{ padding: '10px 12px' }}>
-        <div style={{
-          fontWeight: 500,
-          fontSize: 13,
-          marginBottom: 8,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap'
-        }} title={sound.name}>
+      <div className="info">
+        <div className="name" title={sound.name}>
           {sound.name}
         </div>
 
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div className="actions">
           <button
             onClick={onPreview}
             style={{
@@ -685,17 +611,6 @@ function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPrevie
           </button>
         </div>
       </div>
-
-      <style>{`
-        @keyframes wave {
-          from { transform: scaleY(0.4); }
-          to { transform: scaleY(1); }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   )
 }
@@ -705,7 +620,7 @@ function ProfilePickerModal({ sound, profiles, onConfirm, onClose, lang, tr }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal fade-in" onClick={e => e.stopPropagation()}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-title">
           <span style={{ fontSize: 22 }}>{sound.emoji}</span>
           {tr('addTo').replace('{name}', sound.name)}
@@ -731,7 +646,6 @@ function ProfilePickerModal({ sound, profiles, onConfirm, onClose, lang, tr }) {
                 value={p.id}
                 checked={selectedProfile === p.id}
                 onChange={() => setSelectedProfile(p.id)}
-                style={{ accentColor: 'var(--accent)', width: 'auto' }}
               />
               <i className={`ti ${p.isDefault ? 'ti-stack' : 'ti-user'}`} style={{ color: 'var(--text-secondary)' }} />
               <span style={{ fontSize: 13 }}>{p.id === 'all' ? tr('allSounds') : p.name}</span>

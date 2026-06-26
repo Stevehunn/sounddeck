@@ -3,7 +3,16 @@ import { Howl } from 'howler'
 import Waveform, { formatTime } from '../components/Waveform'
 import { useTranslation } from '../i18n'
 
-const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋','🤡','👾','🎤','🦄','💯']
+// ✅ Emojis uniques - supprimer les doublons
+const EMOJIS = [
+  '🔊','🎵','🎶','🎼','🎧','🎤','🎸','🎹','🎺','🎻','🥁','🪗','🪘','🎷','🪕',
+  '😂','🤣','😱','😬','🤡','👾','🦄','💥','🔥','⭐','🌟','✨','💫','🌈','⚡',
+  '🔔','📢','📣','💬','🗣️','👏','🙌','🤘','👍','👎','💀','👻','🎃','🤖','👽',
+  '🐸','🐧','🐱','🐶','🦊','🐻','🐼','🐨','🦁','🐮','🐷','🐒','🐲','🐉','🦕',
+  '🎮','🕹️','🎯','🎱','🎳','🎰','🧩','🃏','🎴','♠️','♥️','♦️','♣️','🀄','🎲',
+  '🍕','🍔','🌮','🌯','🍣','🍜','🍩','🍪','🎂','🧁','🍫','🍭','🍬','🍺','🍻',
+  '🚀','🛸','💎','💰','💵','💶','💷','💴','🪙','🧿','🔮','🪄','⚔️','🛡️','🏹'
+]
 
 export default function Editor({ store, addToast, lang = 'fr' }) {
   const tr = useTranslation(lang)
@@ -16,21 +25,21 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-      {/* Panneau gauche — liste des sons */}
       <div style={{
         width: 220, flexShrink: 0, borderRight: '1px solid var(--border)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden'
       }}>
         <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
-            <i className="ti ti-cut" style={{ color: 'var(--accent)', marginRight: 6 }} />
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-cut" style={{ color: 'var(--accent)' }} />
             {tr('editorTitle')}
           </div>
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={tr('editorSearch')}
-            style={{ fontSize: 12, padding: '5px 8px' }}
+            className="input-sm"
+            style={{ borderRadius: 'var(--radius-md)' }}
           />
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
@@ -50,7 +59,6 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         </div>
       </div>
 
-      {/* Panneau droit — éditeur */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {selectedSound ? (
           <SoundEditor
@@ -75,15 +83,11 @@ function SoundListItem({ sound, active, onClick }) {
     : null
 
   return (
-    <button onClick={onClick} style={{
-      width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-      padding: '7px 12px', background: active ? 'var(--accent-light)' : 'transparent',
-      border: 'none', borderLeft: `2px solid ${active ? 'var(--accent)' : 'transparent'}`,
-      color: active ? 'var(--accent)' : 'var(--text-primary)',
-      fontSize: 13, cursor: 'pointer', textAlign: 'left'
-    }}
-      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-hover)' }}
-      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}>
+    <button 
+      onClick={onClick} 
+      className={`sidebar-item ${active ? 'active' : ''}`}
+      style={{ borderLeft: `2px solid ${active ? 'var(--accent)' : 'transparent'}` }}
+    >
       <div style={{
         width: 28, height: 28, borderRadius: 6, background: 'var(--bg-tertiary)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -93,7 +97,7 @@ function SoundListItem({ sound, active, onClick }) {
           ? <img src={imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : sound.emoji || '🔊'}
       </div>
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>
+      <span className="label" style={{ fontSize: 12 }}>
         {sound.name}
       </span>
     </button>
@@ -103,11 +107,7 @@ function SoundListItem({ sound, active, onClick }) {
 function EmptyState({ lang = 'fr' }) {
   const tr = useTranslation(lang)
   return (
-    <div style={{
-      flex: 1, display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      gap: 12, color: 'var(--text-tertiary)'
-    }}>
+    <div className="flex-center" style={{ flexDirection: 'column', height: '100%', gap: 12, color: 'var(--text-tertiary)' }}>
       <i className="ti ti-cut" style={{ fontSize: 48, color: 'var(--border)' }} />
       <div style={{ fontWeight: 500, fontSize: 14 }}>{tr('selectSound')}</div>
       <div style={{ fontSize: 12, textAlign: 'center', maxWidth: 260, lineHeight: 1.6 }}>
@@ -229,24 +229,24 @@ function SoundEditor({ sound, store, addToast, onDone, lang = 'fr' }) {
 
   return (
     <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 150 }}>
           <div style={{ fontWeight: 600, fontSize: 14 }}>{tr('editingOf')} <span style={{ color: 'var(--accent)' }}>{sound.name}</span></div>
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{tr('originalKept')}</div>
         </div>
-        <button className="btn-secondary" onClick={onDone}>
+        <button className="btn-secondary btn-lg" onClick={onDone} style={{ borderRadius: 'var(--radius-md)' }}>
           <i className="ti ti-x" /> {tr('cancel')}
         </button>
-        <button className="btn-primary" onClick={handleSave} disabled={saving}>
+        <button className="btn-primary btn-lg" onClick={handleSave} disabled={saving} style={{ borderRadius: 'var(--radius-md)' }}>
           {saving
             ? <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('creating')}</>
             : <><i className="ti ti-check" /> {tr('createSound')}</>}
         </button>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', gap: 20 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 300 }}>
           <SectionTitle icon="ti-cut" label={tr('trimSound')} />
 
           <div style={{
@@ -303,23 +303,23 @@ function SoundEditor({ sound, store, addToast, onDone, lang = 'fr' }) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button onClick={togglePlay} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button onClick={togglePlay} className="btn-secondary btn-lg" style={{ flex: 1, justifyContent: 'center', borderRadius: 'var(--radius-md)', minWidth: 120 }}>
               <i className={`ti ${playing ? 'ti-player-pause' : 'ti-player-play'}`} />
               {playing ? tr('trimmerPause') : tr('listenSelection')}
             </button>
-            <button onClick={() => { setStart(0); setEnd(duration) }} className="btn-ghost" title={tr('selectAll')}>
+            <button onClick={() => { setStart(0); setEnd(duration) }} className="btn-ghost btn-lg" title={tr('selectAll')} style={{ borderRadius: 'var(--radius-md)' }}>
               <i className="ti ti-refresh" /> {tr('selectAll')}
             </button>
           </div>
 
-          <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text-tertiary)', padding: '8px 10px', background: 'var(--bg-tertiary)', borderRadius: 6 }}>
+          <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text-tertiary)', padding: '8px 10px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
             <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
             {tr('editorTrimNote')}
           </div>
         </div>
 
-        <div style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
           <div>
             <SectionTitle icon="ti-eye" label={tr('editorPreview')} />
@@ -328,7 +328,7 @@ function SoundEditor({ sound, store, addToast, onDone, lang = 'fr' }) {
               padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8
             }}>
               <div style={{
-                width: 64, height: 64, borderRadius: 10, background: 'var(--bg-secondary)',
+                width: 64, height: 64, borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 32, overflow: 'hidden', border: '1px solid var(--border)'
               }}>
@@ -348,18 +348,19 @@ function SoundEditor({ sound, store, addToast, onDone, lang = 'fr' }) {
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder={tr('editorNamePlaceholder')}
-              style={{ fontSize: 13 }}
+              className="input-lg"
+              style={{ fontSize: 13, borderRadius: 'var(--radius-md)' }}
             />
           </div>
 
           <div>
             <SectionTitle icon="ti-photo" label={tr('editorImageLabel')} />
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <button className="btn-secondary" onClick={handlePickImage} style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
+              <button className="btn-secondary" onClick={handlePickImage} style={{ flex: 1, justifyContent: 'center', fontSize: 12, borderRadius: 'var(--radius-md)', minHeight: 34 }}>
                 <i className="ti ti-upload" /> {imagePreview ? tr('editorImageChange') : tr('editorImageChoose')}
               </button>
               {imagePreview && (
-                <button className="btn-ghost" onClick={() => { setImage(null); setImagePreview(null) }} title={tr('menuDelete')}>
+                <button className="btn-ghost" onClick={() => { setImage(null); setImagePreview(null) }} title={tr('menuDelete')} style={{ borderRadius: 'var(--radius-sm)', minHeight: 34 }}>
                   <i className="ti ti-x" />
                 </button>
               )}
@@ -369,14 +370,24 @@ function SoundEditor({ sound, store, addToast, onDone, lang = 'fr' }) {
           {!imagePreview && (
             <div>
               <SectionTitle icon="ti-mood-smile" label={tr('editorEmojiLabel')} />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, maxHeight: 200, overflowY: 'auto' }}>
                 {EMOJIS.map(e => (
-                  <button key={e} onClick={() => setEmoji(e)}
+                  <button 
+                    key={e} 
+                    onClick={() => setEmoji(e)}
                     style={{
-                      width: 32, height: 32, fontSize: 16, borderRadius: 6, cursor: 'pointer',
+                      width: 34, height: 34, fontSize: 16, borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                       border: `1px solid ${emoji === e ? 'var(--accent)' : 'var(--border)'}`,
-                      background: emoji === e ? 'var(--accent-light)' : 'var(--bg-tertiary)'
-                    }}>
+                      background: emoji === e ? 'var(--accent-light)' : 'var(--bg-tertiary)',
+                      transition: 'all var(--transition-base) ease'
+                    }}
+                    onMouseEnter={e => {
+                      if (emoji !== e) e.currentTarget.style.borderColor = 'var(--accent)'
+                    }}
+                    onMouseLeave={e => {
+                      if (emoji !== e) e.currentTarget.style.borderColor = 'var(--border)'
+                    }}
+                  >
                     {e}
                   </button>
                 ))}
@@ -407,8 +418,6 @@ function SoundEditor({ sound, store, addToast, onDone, lang = 'fr' }) {
 
         </div>
       </div>
-
-      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }

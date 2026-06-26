@@ -5,7 +5,6 @@ import { LANGUAGES, useTranslation } from '../i18n'
 import { getMicrophoneStatus, getMixerStats, testMicrophoneOnce, connectMixerToOutput } from '../utils/audioMixer'
 import KeyboardVisualizer from '../components/KeyboardVisualizer'
 
-// Définition des sections
 const SECTIONS = [
   { id: 'appearance', icon: 'ti-palette', labelKey: 'optionsAppearance' },
   { id: 'audio', icon: 'ti-volume', labelKey: 'optionsAudio' },
@@ -14,7 +13,6 @@ const SECTIONS = [
   { id: 'profiles', icon: 'ti-users', labelKey: 'optionsProfiles' },
 ]
 
-// Composant Section avec forwardRef
 const Section = forwardRef(({ title, icon, children, id }, ref) => {
   return (
     <div ref={ref} data-section={id} style={{ marginBottom: 32, scrollMarginTop: 80 }}>
@@ -54,7 +52,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
   const observerRef = useRef(null)
   const isScrollingRef = useRef(false)
 
-  // Nettoyer le test à la fermeture de la page Options
   useEffect(() => {
     return () => {
       if (micTestRef.current) {
@@ -64,7 +61,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
     }
   }, [])
 
-  // Détecter les périphériques audio
   useEffect(() => {
     const detectDevices = async () => {
       try {
@@ -97,7 +93,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
     detectDevices()
   }, [])
 
-  // Observer les sections pour mettre à jour la navigation
   useEffect(() => {
     const setupObserver = () => {
       const sections = SECTIONS.map(s => sectionRefs.current[s.id]).filter(Boolean)
@@ -329,7 +324,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-
         {/* Section Apparence */}
         <Section 
           ref={el => sectionRefs.current['appearance'] = el}
@@ -342,13 +336,19 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               {LANGUAGES.map(l => (
                 <button key={l.code} onClick={() => store.updateLang(l.code)}
                   style={{
-                    padding: '5px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12,
+                    padding: '5px 10px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontSize: 12,
                     border: `2px solid ${store.lang === l.code ? 'var(--accent)' : 'var(--border)'}`,
                     background: store.lang === l.code ? 'var(--accent-light)' : 'var(--bg-tertiary)',
                     color: store.lang === l.code ? 'var(--accent)' : 'var(--text-secondary)',
-                    display: 'flex', alignItems: 'center', gap: 5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
                     fontWeight: store.lang === l.code ? 600 : 400
-                  }}>
+                  }}
+                >
                   <span style={{ fontSize: 16 }}>{l.flag}</span>
                   {l.label}
                   {store.lang === l.code && <i className="ti ti-check" style={{ fontSize: 11 }} />}
@@ -367,13 +367,19 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               ].map(({ val, label, color }) => (
                 <button key={val} onClick={() => store.updateTheme(val)}
                   style={{
-                    padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12,
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontSize: 12,
                     border: `2px solid ${store.theme === val ? color : 'var(--border)'}`,
                     background: store.theme === val ? `${color}22` : 'var(--bg-tertiary)',
                     color: store.theme === val ? color : 'var(--text-secondary)',
-                    display: 'flex', alignItems: 'center', gap: 6,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
                     fontWeight: store.theme === val ? 600 : 400
-                  }}>
+                  }}
+                >
                   <div style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
                   {label}
                   {store.theme === val && <i className="ti ti-check" style={{ fontSize: 11 }} />}
@@ -976,53 +982,66 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             {tr('exportSectionLabel')}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
-            <div style={{ padding: '10px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ fontSize: 20 }}>📄</div>
-              <div style={{ flex: 1 }}>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+            {/* Config seule */}
+            <div className="option-row" style={{ padding: '12px 14px', flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ fontSize: 20, flexShrink: 0 }}>📄</div>
+              <div style={{ flex: 1, padding: '0 14px', minWidth: 150 }}>
                 <div style={{ fontSize: 13, fontWeight: 500 }}>{tr('configOnly')}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{tr('configOnlyDesc')}</div>
               </div>
-              <button className="btn-secondary" style={{ flexShrink: 0, fontSize: 12 }}
+              <button 
+                className="btn-secondary" 
+                style={{ flexShrink: 0, fontSize: 12, padding: '6px 16px', minHeight: 34, borderRadius: 'var(--radius-md)' }}
                 onClick={async () => {
                   const r = await window.electronAPI.exportConfig()
                   if (r.success) addToast(tr('toastConfigExported'), 'success')
                   else if (r.error) addToast(`${tr('error')} ${r.error}`, 'error')
-                }}>
+                }}
+              >
                 <i className="ti ti-download" /> {tr('exportLabel')}
               </button>
             </div>
 
-            <div style={{ padding: '10px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ fontSize: 20 }}>📦</div>
-              <div style={{ flex: 1 }}>
+            {/* Archive complète */}
+            <div className="option-row" style={{ padding: '12px 14px', flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ fontSize: 20, flexShrink: 0 }}>📦</div>
+              <div style={{ flex: 1, padding: '0 14px', minWidth: 150 }}>
                 <div style={{ fontSize: 13, fontWeight: 500 }}>{tr('fullArchive')}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{tr('fullArchiveDesc')}</div>
               </div>
-              <button className="btn-primary" style={{ flexShrink: 0, fontSize: 12 }}
+              <button 
+                className="btn-primary" 
+                style={{ flexShrink: 0, fontSize: 12, padding: '6px 16px', minHeight: 34, borderRadius: 'var(--radius-md)' }}
                 onClick={async () => {
                   addToast(tr('toastArchiveCreating'), 'info')
                   const r = await window.electronAPI.exportFull()
                   if (r.success) addToast(`${tr('archiveCreated')} · ${r.sizeMb} Mo ✓`, 'success')
                   else if (r.error) addToast(`${tr('error')} ${r.error}`, 'error')
-                }}>
+                }}
+              >
                 <i className="ti ti-package" /> {tr('exportLabel')}
               </button>
             </div>
 
-            <div style={{ padding: '10px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ fontSize: 20 }}>🎵</div>
-              <div style={{ flex: 1 }}>
+            {/* Sons uniquement */}
+            <div className="option-row" style={{ padding: '12px 14px', flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ fontSize: 20, flexShrink: 0 }}>🎵</div>
+              <div style={{ flex: 1, padding: '0 14px', minWidth: 150 }}>
                 <div style={{ fontSize: 13, fontWeight: 500 }}>{tr('soundsOnly')}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{tr('soundsOnlyDesc')}</div>
               </div>
-              <button className="btn-secondary" style={{ flexShrink: 0, fontSize: 12 }}
+              <button 
+                className="btn-secondary" 
+                style={{ flexShrink: 0, fontSize: 12, padding: '6px 16px', minHeight: 34, borderRadius: 'var(--radius-md)' }}
                 onClick={async () => {
                   addToast(tr('toastSoundsCompressing'), 'info')
                   const r = await window.electronAPI.exportSoundsOnly()
                   if (r.success) addToast(`${r.sizeMb} Mo ${tr('exported')} ✓`, 'success')
                   else if (r.error) addToast(`${tr('error')} ${r.error}`, 'error')
-                }}>
+                }}
+              >
                 <i className="ti ti-music" /> {tr('exportLabel')}
               </button>
             </div>
@@ -1031,13 +1050,16 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             {tr('importSectionLabel')}
           </div>
-          <div style={{ padding: '10px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontSize: 20 }}>📥</div>
-            <div style={{ flex: 1 }}>
+          
+          <div className="option-row" style={{ padding: '12px 14px', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ fontSize: 20, flexShrink: 0 }}>📥</div>
+            <div style={{ flex: 1, padding: '0 14px', minWidth: 150 }}>
               <div style={{ fontSize: 13, fontWeight: 500 }}>{tr('importBackup')}</div>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{tr('importBackupDesc')}</div>
             </div>
-            <button className="btn-primary" style={{ flexShrink: 0, fontSize: 12 }}
+            <button 
+              className="btn-primary" 
+              style={{ flexShrink: 0, fontSize: 12, padding: '6px 16px', minHeight: 34, borderRadius: 'var(--radius-md)' }}
               onClick={async () => {
                 const r = await window.electronAPI.importBackup()
                 if (r.success) {
@@ -1045,7 +1067,8 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                   else if (r.type === 'full') addToast(`${tr('archiveImported')} · ${r.importedSounds} ${tr('sounds')} ✓ — ${tr('restartRequired')}`, 'success')
                   else if (r.type === 'sounds-only') addToast(`${r.importedSounds} ${tr('sounds')} ${tr('imported')} ✓`, 'success')
                 } else if (r.error) addToast(`${tr('error')} ${r.error}`, 'error')
-              }}>
+              }}
+            >
               <i className="ti ti-upload" /> {tr('importLabel')}
             </button>
           </div>
@@ -1064,64 +1087,59 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           icon="ti-users"
         >
           {store.profiles.map(p => (
-            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-secondary)', marginBottom: 6 }}>
+            <div key={p.id} className="option-row" style={{ padding: '10px 14px' }}>
               <i className={`ti ${p.isDefault ? 'ti-stack' : 'ti-user'}`} style={{ color: 'var(--text-secondary)' }} />
-              <span style={{ flex: 1, fontSize: 13 }}>{p.id === 'all' ? tr('allSounds') : p.name}</span>
-              <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+              <span style={{ flex: 1, fontSize: 13, padding: '0 10px' }}>{p.id === 'all' ? tr('allSounds') : p.name}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginRight: 8 }}>
                 {store.sounds.filter(s => s.profiles?.includes(p.id)).length} {tr('sounds')}
               </span>
               <button
-                style={{ padding: '3px 8px', fontSize: 11, borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                className="btn-secondary btn-sm"
+                style={{ padding: '4px 12px', minHeight: 28 }}
                 onClick={async () => {
                   addToast(tr('toastProfileExporting'), 'info')
                   const r = await window.electronAPI.exportProfile(p.id)
                   if (r.success) addToast(`${tr('profileExported')} "${p.name}" · ${r.soundCount} ${tr('sounds')} · ${r.sizeMb} Mo`, 'success')
                   else if (r.error) addToast(`${tr('error')} ${r.error}`, 'error')
                 }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
-                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+              >
                 <i className="ti ti-package-export" /> {tr('exportProfile')}
               </button>
               {!p.isDefault && (
-                <button className="btn-danger" style={{ padding: '3px 8px', fontSize: 12 }}
-                  onClick={async () => { await store.deleteProfile(p.id); addToast(tr('profileDeleted'), 'info') }}>
+                <button 
+                  className="btn-danger btn-sm" 
+                  style={{ padding: '4px 8px', minHeight: 28 }}
+                  onClick={async () => { await store.deleteProfile(p.id); addToast(tr('profileDeleted'), 'info') }}
+                >
                   <i className="ti ti-trash" />
                 </button>
               )}
             </div>
           ))}
-          <button className="btn-secondary" style={{ width: '100%', justifyContent: 'center', marginTop: 4, fontSize: 12 }}
+          <button 
+            className="btn-secondary" 
+            style={{ width: '100%', justifyContent: 'center', marginTop: 4, fontSize: 12, padding: '6px 12px', minHeight: 34 }}
             onClick={async () => {
               const r = await window.electronAPI.importProfile()
               if (r.success) addToast(`${tr('profileImported')} "${r.profileName}" · ${r.soundCount} ${tr('sounds')} ✓ — ${tr('restartRequired')}`, 'success')
               else if (r.error) addToast(`${tr('error')} ${r.error}`, 'error')
-            }}>
+            }}
+          >
             <i className="ti ti-package-import" /> {tr('importProfile')}
           </button>
         </Section>
 
       </div>
-
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.1); opacity: 0.6; }
-        }
-      `}</style>
     </div>
   )
 }
 
 function OptionRow({ label, sub, children }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+    <div className="option-row">
       <div>
-        <div style={{ fontSize: 13 }}>{label}</div>
-        {sub && <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 1 }}>{sub}</div>}
+        <div className="label">{label}</div>
+        {sub && <div className="sub">{sub}</div>}
       </div>
       {children}
     </div>
@@ -1130,17 +1148,8 @@ function OptionRow({ label, sub, children }) {
 
 function Toggle({ value, onChange }) {
   return (
-    <div onClick={() => onChange(!value)} style={{
-      width: 38, height: 22, borderRadius: 11,
-      background: value ? 'var(--accent)' : 'var(--bg-tertiary)',
-      border: '1px solid var(--border)', position: 'relative',
-      cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0
-    }}>
-      <div style={{
-        position: 'absolute', width: 16, height: 16, borderRadius: 8,
-        background: 'white', top: 2, left: value ? 18 : 2,
-        transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
-      }} />
+    <div className={`toggle ${value ? 'active' : ''}`} onClick={() => onChange(!value)}>
+      <div className="knob" />
     </div>
   )
 }

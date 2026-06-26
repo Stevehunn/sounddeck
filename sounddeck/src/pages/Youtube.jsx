@@ -102,7 +102,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <PageHeader title={tr('youtubeTitle')} sub={tr('youtubeSub')} />
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+        <div className="flex-center" style={{ flex: 1, padding: 40 }}>
           <div style={{ maxWidth: 480, textAlign: 'center' }}>
             <div style={{ fontSize: 56, marginBottom: 16 }}>📦</div>
             <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>{tr('ytdlpRequired')}</div>
@@ -110,14 +110,18 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
               {tr('ytdlpDesc')}
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 20 }}>
-              <button className="btn-primary" onClick={handleInstallYtdlp} disabled={downloading}
-                style={{ fontSize: 14, padding: '10px 24px' }}>
+              <button 
+                className="btn-primary btn-lg" 
+                onClick={handleInstallYtdlp} 
+                disabled={downloading}
+                style={{ borderRadius: 'var(--radius-md)', padding: '10px 24px' }}
+              >
                 {downloading
                   ? <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('installing')}</>
                   : <><i className="ti ti-download" /> {tr('installYtdlp')}</>}
               </button>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', padding: '10px 14px', background: 'var(--bg-tertiary)', borderRadius: 8, lineHeight: 1.6, textAlign: 'left' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', padding: '10px 14px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', lineHeight: 1.6, textAlign: 'left' }}>
               <i className="ti ti-info-circle" style={{ marginRight: 6, color: 'var(--accent)' }} />
               {tr('ytdlpManual')}
             </div>
@@ -132,7 +136,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <PageHeader title={tr('youtubeTitle')} sub={tr('pasteUrl')} />
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+        <div className="flex-center" style={{ flex: 1, padding: 40 }}>
           <div style={{ width: '100%', maxWidth: 560 }}>
             <div style={{ fontSize: 56, textAlign: 'center', marginBottom: 20 }}>▶️</div>
             <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 16, textAlign: 'center' }}>
@@ -144,17 +148,22 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
                 onChange={e => setUrl(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleFetchInfo()}
                 placeholder={tr('ytUrlPlaceholder')}
-                style={{ flex: 1, fontSize: 13 }}
+                className="input-lg"
+                style={{ flex: 1, fontSize: 13, borderRadius: 'var(--radius-md)' }}
                 autoFocus
               />
-              <button className="btn-primary" onClick={handleFetchInfo} disabled={!url.trim() || loadingInfo}
-                style={{ flexShrink: 0 }}>
+              <button 
+                className="btn-primary btn-lg" 
+                onClick={handleFetchInfo} 
+                disabled={!url.trim() || loadingInfo}
+                style={{ flexShrink: 0, borderRadius: 'var(--radius-md)', minWidth: 120 }}
+              >
                 {loadingInfo
                   ? <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('loading2')}</>
                   : <><i className="ti ti-search" /> {tr('load')}</>}
               </button>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.6, padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 8 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.6, padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
               <i className="ti ti-shield-check" style={{ marginRight: 4, color: 'var(--success)' }} />
               {tr('ytUrlNote')}
             </div>
@@ -176,9 +185,9 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
 
           {videoInfo?.thumbnail && (
-            <div style={{ display: 'flex', gap: 16, marginBottom: 24, padding: 16, background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-              <img src={videoInfo.thumbnail} alt="" style={{ width: 140, height: 80, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />
-              <div>
+            <div className="option-row" style={{ marginBottom: 24, padding: 16, borderRadius: 'var(--radius-md)' }}>
+              <img src={videoInfo.thumbnail} alt="" style={{ width: 140, height: 80, objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0 }} />
+              <div style={{ flex: 1, padding: '0 12px' }}>
                 <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{videoInfo.title}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 6 }}>{videoInfo.uploader}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -192,10 +201,10 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               {tr('ytTrimTitle')}
             </div>
-            <div style={{ padding: '12px 16px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', marginBottom: 12 }}>
+            <div style={{ padding: '12px 16px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{tr('ytTrimDuration')} <strong style={{ color: 'var(--accent)' }}>{fmt(end - start)}</strong></span>
-                <button className="btn-ghost" style={{ fontSize: 11 }} onClick={() => { setStart(0); setEnd(videoInfo?.duration || 0) }}>
+                <button className="btn-ghost btn-sm" onClick={() => { setStart(0); setEnd(videoInfo?.duration || 0) }} style={{ borderRadius: 'var(--radius-sm)' }}>
                   <i className="ti ti-refresh" /> {tr('ytTrimSelectAll')}
                 </button>
               </div>
@@ -223,25 +232,47 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{tr('ytPreciseStart')}</label>
-                <input type="number" min="0" max={videoInfo?.duration} step="0.5" value={start}
+                <input 
+                  type="number" 
+                  min="0" 
+                  max={videoInfo?.duration} 
+                  step="0.5" 
+                  value={start}
                   onChange={e => setStart(Math.max(0, Math.min(Number(e.target.value), end - 1)))}
-                  style={{ fontSize: 12 }} />
+                  className="input-sm"
+                  style={{ borderRadius: 'var(--radius-sm)' }}
+                />
               </div>
               <div>
                 <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{tr('ytPreciseEnd')}</label>
-                <input type="number" min="0" max={videoInfo?.duration} step="0.5" value={end}
+                <input 
+                  type="number" 
+                  min="0" 
+                  max={videoInfo?.duration} 
+                  step="0.5" 
+                  value={end}
                   onChange={e => setEnd(Math.max(Number(e.target.value), start + 1))}
-                  style={{ fontSize: 12 }} />
+                  className="input-sm"
+                  style={{ borderRadius: 'var(--radius-sm)' }}
+                />
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <button className="btn-secondary" onClick={() => setStep('url')}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+            <button 
+              className="btn-secondary btn-lg" 
+              onClick={() => setStep('url')} 
+              style={{ borderRadius: 'var(--radius-md)', minWidth: 120 }}
+            >
               <i className="ti ti-arrow-left" /> {tr('ytBack')}
             </button>
-            <button className="btn-primary" onClick={handleDownloadAudio} disabled={importing}
-              style={{ fontSize: 13, padding: '8px 20px' }}>
+            <button 
+              className="btn-primary btn-lg" 
+              onClick={handleDownloadAudio} 
+              disabled={importing} 
+              style={{ borderRadius: 'var(--radius-md)', minWidth: 180 }}
+            >
               {importing
                 ? <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('ytDownloading')}</>
                 : <><i className="ti ti-download" /> {tr('downloadAudio')}</>}
@@ -260,9 +291,9 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
           <div style={{ maxWidth: 560, margin: '0 auto' }}>
 
-            <div style={{ padding: '12px 16px', background: 'rgba(29,158,117,0.1)', border: '1px solid var(--success)', borderRadius: 'var(--radius-md)', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="option-row" style={{ borderColor: 'var(--success)', marginBottom: 20, padding: '12px 16px', background: 'rgba(29,158,117,0.1)', borderRadius: 'var(--radius-md)' }}>
               <i className="ti ti-check" style={{ color: 'var(--success)', fontSize: 20 }} />
-              <div>
+              <div style={{ flex: 1, padding: '0 8px' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--success)' }}>{tr('ytSuccessTitle')}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{tr('ytSuccessSource')} {videoInfo?.title?.slice(0, 50)}</div>
               </div>
@@ -281,8 +312,14 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
               <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 {tr('soundName')}
               </label>
-              <input value={soundName} onChange={e => setSoundName(e.target.value)}
-                placeholder={tr('ytSoundNamePlaceholder')} style={{ fontSize: 13 }} autoFocus />
+              <input 
+                value={soundName} 
+                onChange={e => setSoundName(e.target.value)}
+                placeholder={tr('ytSoundNamePlaceholder')} 
+                className="input-lg"
+                style={{ fontSize: 13, borderRadius: 'var(--radius-md)' }}
+                autoFocus 
+              />
             </div>
 
             <div style={{ marginBottom: 14 }}>
@@ -293,7 +330,8 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
                 {EMOJIS.map(e => (
                   <button key={e} onClick={() => setEmoji(e)}
                     style={{
-                      width: 36, height: 36, fontSize: 18, borderRadius: 8, cursor: 'pointer',
+                      width: 36, height: 36, fontSize: 18, borderRadius: 'var(--radius-sm)',
+                      cursor: 'pointer',
                       border: `1px solid ${emoji === e ? 'var(--accent)' : 'var(--border)'}`,
                       background: emoji === e ? 'var(--accent-light)' : 'var(--bg-tertiary)'
                     }}>
@@ -327,12 +365,20 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn-secondary" onClick={() => setStep('trim')}>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button 
+                className="btn-secondary btn-lg" 
+                onClick={() => setStep('trim')} 
+                style={{ borderRadius: 'var(--radius-md)', minWidth: 120 }}
+              >
                 <i className="ti ti-arrow-left" /> {tr('ytBack')}
               </button>
-              <button className="btn-primary" onClick={handleSave} disabled={!soundName.trim()}
-                style={{ fontSize: 13, padding: '8px 24px' }}>
+              <button 
+                className="btn-primary btn-lg" 
+                onClick={handleSave} 
+                disabled={!soundName.trim()} 
+                style={{ borderRadius: 'var(--radius-md)', minWidth: 200 }}
+              >
                 <i className="ti ti-check" /> {tr('addToLibrary')}
               </button>
             </div>
@@ -349,7 +395,7 @@ function PageHeader({ title, sub, onBack }) {
   return (
     <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
       {onBack && (
-        <button className="btn-ghost" onClick={onBack} style={{ padding: '4px 8px' }}>
+        <button className="btn-ghost" onClick={onBack} style={{ padding: '4px 8px', borderRadius: 'var(--radius-sm)' }}>
           <i className="ti ti-arrow-left" />
         </button>
       )}
@@ -363,7 +409,7 @@ function PageHeader({ title, sub, onBack }) {
 
 function LoadingScreen({ message }) {
   return (
-    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, color: 'var(--text-tertiary)' }}>
+    <div className="flex-center" style={{ flex: 1, gap: 10, color: 'var(--text-tertiary)' }}>
       <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
       {message}
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>

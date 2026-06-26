@@ -36,9 +36,8 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
     ? sounds.filter(s => !s.profiles.includes(currentProfileId))
     : []
 
-  const favoriteSoundsForProfile = currentSounds.filter(s => s.favorites?.includes(currentProfileId) || false);
+  const favoriteSoundsForProfile = currentSounds.filter(s => s.favorites?.includes(currentProfileId) || false)
 
-  // Calculer le nombre de colonnes pour la grille principale
   useEffect(() => {
     const calculateColumns = () => {
       if (!gridRef.current) return
@@ -69,7 +68,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
   const displayed = showAll ? filtered : filtered.slice(0, itemsPerPage)
   const displayedOther = showAllOther ? soundsOutsideProfile : soundsOutsideProfile.slice(0, itemsPerPage)
 
-  // ─── Gestion du drag and drop ──────────────────────────────────────────────
   const findGlobalIndex = (soundId) => {
     return currentSounds.findIndex(s => s.id === soundId)
   }
@@ -322,8 +320,8 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 150 }}>
           <div style={{ fontWeight: 600, fontSize: 15 }}>{currentProfile?.id === 'all' ? tr('allSounds') : currentProfile?.name}</div>
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{currentSounds.length} {tr('sounds')}</div>
           {searchTerm && (
@@ -332,8 +330,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
             </div>
           )}
         </div>
-        <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-          style={{ fontSize: 12, padding: '5px 8px', width: 'auto' }}>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="input-sm" style={{ width: 'auto', minWidth: 120 }}>
           <option value="custom">{tr('sortCustom')}</option>
           <option value="default">{tr('sortDefault')}</option>
           <option value="popular">{tr('sortPopular')}</option>
@@ -344,14 +341,15 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
           value={localSearch} 
           onChange={e => setLocalSearch(e.target.value)} 
           placeholder={tr('search')} 
-          style={{ width: 160 }} 
+          className="input-sm"
+          style={{ width: 160, minWidth: 120 }} 
         />
-        <button className="btn-primary" onClick={() => setShowImport(true)}>
+        <button className="btn-primary btn-sm" onClick={() => setShowImport(true)}>
           <i className="ti ti-plus" /> {tr('addSound')}
         </button>
         {currentProfileId !== 'all' && (
-          <button className="btn-secondary" onClick={() => setShowProfileManager(true)} style={{ fontSize: 12 }}>
-            <i className="ti ti-settings" /> Gérer le profil
+          <button className="btn-secondary btn-sm" onClick={() => setShowProfileManager(true)}>
+            <i className="ti ti-settings" /> {tr('manageProfile')}
           </button>
         )}
       </div>
@@ -364,15 +362,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
         onDrop={handleDropFiles}>
 
         {dragOver && (
-          <div style={{
-            position: 'absolute', inset: 0, zIndex: 50,
-            background: 'rgba(124,111,247,0.15)',
-            border: '2px dashed var(--accent)',
-            borderRadius: 'var(--radius-lg)',
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            gap: 12, pointerEvents: 'none'
-          }}>
+          <div className="drop-overlay">
             <i className="ti ti-music-plus" style={{ fontSize: 48, color: 'var(--accent)' }} />
             <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--accent)' }}>{tr('dropToImport')}</div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>MP3, WAV, OGG, FLAC, M4A</div>
@@ -380,27 +370,14 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
         )}
 
         {importing && (
-          <div style={{
-            position: 'absolute', inset: 0, zIndex: 50,
-            background: 'rgba(0,0,0,0.6)',
-            borderRadius: 'var(--radius-lg)',
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            gap: 14, backdropFilter: 'blur(4px)'
-          }}>
+          <div className="import-overlay">
             <i className="ti ti-loader" style={{ fontSize: 40, color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
             <div style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>{tr('importing')}</div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
               {totalFiles > 0 ? `${importProgress} / ${totalFiles} fichiers` : tr('importingFiles')}
             </div>
             {totalFiles > 0 && (
-              <div style={{
-                width: 200,
-                height: 4,
-                background: 'rgba(255,255,255,0.2)',
-                borderRadius: 2,
-                overflow: 'hidden'
-              }}>
+              <div style={{ width: 200, height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 2, overflow: 'hidden' }}>
                 <div style={{
                   width: `${(importProgress / totalFiles) * 100}%`,
                   height: '100%',
@@ -414,16 +391,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
         )}
 
         {importSuccess > 0 && !importing && (
-          <div style={{
-            position: 'absolute', inset: 0, zIndex: 50,
-            background: 'rgba(29,158,117,0.15)',
-            border: '2px solid var(--success)',
-            borderRadius: 'var(--radius-lg)',
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            gap: 12, pointerEvents: 'none',
-            animation: 'fadeIn 0.2s ease'
-          }}>
+          <div className="success-overlay">
             <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <i className="ti ti-check" style={{ fontSize: 32, color: 'white' }} />
             </div>
@@ -434,8 +402,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
         )}
 
         {filtered.length === 0 && soundsOutsideProfile.length === 0 && !importing && (
-          <div className={`drop-zone ${dragOver ? 'drag-over' : ''}`} onClick={() => setShowImport(true)}
-            style={{ cursor: 'pointer' }}>
+          <div className="drop-zone" onClick={() => setShowImport(true)} style={{ cursor: 'pointer' }}>
             <i className="ti ti-music-plus" style={{ fontSize: 32, display: 'block', marginBottom: 8 }} />
             <div style={{ fontWeight: 500, marginBottom: 4 }}>{tr('noSoundsForProfile')}</div>
             <div style={{ fontSize: 12 }}>{tr('dropHere')}</div>
@@ -490,7 +457,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
               dropTarget="profile"
             />
             {filtered.length > itemsPerPage && (
-              <button className="btn-secondary" onClick={() => setShowAll(!showAll)} style={{ width: '100%', marginTop: 10, justifyContent: 'center' }}>
+              <button className="btn-secondary btn-sm" onClick={() => setShowAll(!showAll)} style={{ width: '100%', marginTop: 10, justifyContent: 'center' }}>
                 <i className={`ti ${showAll ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
                 {showAll ? tr('showLess') : `${tr('showMore')} ${filtered.length - itemsPerPage}`}
               </button>
@@ -512,7 +479,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
               ))}
             </div>
             {soundsOutsideProfile.length > itemsPerPage && (
-              <button className="btn-secondary" onClick={() => setShowAllOther(!showAllOther)} style={{ width: '100%', marginTop: 10, justifyContent: 'center' }}>
+              <button className="btn-secondary btn-sm" onClick={() => setShowAllOther(!showAllOther)} style={{ width: '100%', marginTop: 10, justifyContent: 'center' }}>
                 <i className={`ti ${showAllOther ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
                 {showAllOther ? tr('showLess') : `${tr('showMore')} ${soundsOutsideProfile.length - itemsPerPage}`}
               </button>
@@ -520,8 +487,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
           </Section>
         )}
       </div>
-
-      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
 
       {showImport && (
         <ImportModal
@@ -560,6 +525,8 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
           lang={lang}
         />
       )}
+
+      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }
@@ -567,7 +534,15 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
 function Section({ title, icon, iconColor, count, muted, children }) {
   return (
     <section style={{ marginBottom: 24 }}>
-      <div style={{ fontSize: 12, fontWeight: 500, color: muted ? 'var(--text-tertiary)' : 'var(--text-secondary)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ 
+        fontSize: 12, 
+        fontWeight: 500, 
+        color: muted ? 'var(--text-tertiary)' : 'var(--text-secondary)', 
+        marginBottom: 10, 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: 6 
+      }}>
         <i className={`ti ${icon}`} style={{ color: iconColor || 'inherit' }} />
         {title}
         {count != null && <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>({count})</span>}
@@ -655,14 +630,13 @@ function OutsideCard({ sound, onAdd, lang }) {
         {imageUrl ? <img src={imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : sound.emoji}
       </div>
       <div style={{ fontSize: 11, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 6 }}>{sound.name}</div>
-      <button onClick={onAdd} className="btn-primary" style={{ width: '100%', padding: '4px 0', justifyContent: 'center', fontSize: 11 }}>
+      <button onClick={onAdd} className="btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center' }}>
         <i className="ti ti-circle-plus" /> {tr('addToProfile')}
       </button>
     </div>
   )
 }
 
-// ImportModal inchangé...
 function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onUrlImport, onManualAdd, lang }) {
   const tr = useTranslation(lang || 'fr')
   const [tab, setTab] = useState('file')
@@ -704,7 +678,7 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal fade-in" style={{ width: 480 }} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ width: 480 }} onClick={e => e.stopPropagation()}>
         <div className="modal-title"><i className="ti ti-music-plus" style={{ color: 'var(--accent)' }} /> {tr('addSoundTitle')}</div>
 
         <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: 'var(--bg-tertiary)', borderRadius: 8, padding: 4 }}>
@@ -723,18 +697,13 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
         {tab === 'file' && (
           <>
             <div
+              className={`drop-zone ${dragOver ? 'drag-over' : ''}`}
               onDragOver={e => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false) }}
               onDrop={onDrop}
               onClick={onOpenDialog}
-              style={{
-                border: `2px dashed ${dragOver ? 'var(--accent)' : 'var(--border)'}`,
-                borderRadius: 'var(--radius-lg)',
-                padding: 32, textAlign: 'center',
-                cursor: 'pointer', transition: 'all 0.15s',
-                background: dragOver ? 'var(--accent-light)' : 'transparent',
-                color: dragOver ? 'var(--accent)' : 'var(--text-tertiary)'
-              }}>
+              style={{ cursor: 'pointer', padding: '32px' }}
+            >
               <i className="ti ti-upload" style={{ fontSize: 36, display: 'block', marginBottom: 10 }} />
               <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 14, color: dragOver ? 'var(--accent)' : 'var(--text-primary)' }}>
                 {dragOver ? tr('releaseToImport') : tr('dropFiles')}
@@ -744,8 +713,9 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
                 <i className="ti ti-folder-open" /> {tr('orBrowse')}
               </div>
             </div>
-            <div className="modal-actions"><button className="btn-secondary" onClick={onClose}>{tr('close')}</button></div>
-          </>
+            <div className="modal-actions">
+              <button className="btn-secondary btn-lg" onClick={onClose}>{tr('close')}</button>
+            </div>          </>
         )}
 
         {tab === 'manual' && !showTrimmer && (
@@ -758,12 +728,12 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{tr('audioFile')}</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input readOnly value={manualFile ? manualFile.name : ''} placeholder={tr('noFile')} style={{ flex: 1 }} />
-                <button className="btn-secondary" onClick={handlePickFile}><i className="ti ti-folder-open" /> {tr('browse')}</button>
+                <button className="btn-secondary btn-sm" onClick={handlePickFile}><i className="ti ti-folder-open" /> {tr('browse')}</button>
               </div>
             </div>
 
             {manualFile && (
-              <button className="btn-secondary" onClick={() => setShowTrimmer(true)} style={{ justifyContent: 'center' }}>
+              <button className="btn-secondary btn-sm" onClick={() => setShowTrimmer(true)} style={{ justifyContent: 'center' }}>
                 <i className="ti ti-cut" /> {tr('trimAudio')}
               </button>
             )}
@@ -776,8 +746,8 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
                     style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
                 )}
                 <input readOnly value={manualImage ? tr('imageSelected') : ''} placeholder={tr('noImage')} style={{ flex: 1 }} />
-                <button className="btn-secondary" onClick={handlePickImage}><i className="ti ti-photo" /> {tr('image')}</button>
-                {manualImage && <button className="btn-ghost" onClick={() => setManualImage(null)}><i className="ti ti-x" /></button>}
+                <button className="btn-secondary btn-sm" onClick={handlePickImage}><i className="ti ti-photo" /> {tr('image')}</button>
+                {manualImage && <button className="btn-ghost btn-sm" onClick={() => setManualImage(null)}><i className="ti ti-x" /></button>}
               </div>
             </div>
 
@@ -795,8 +765,8 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
               </div>
             )}
             <div className="modal-actions">
-              <button className="btn-secondary" onClick={onClose}>{tr('cancel')}</button>
-              <button className="btn-primary" onClick={() => handleManualAdd(null)} disabled={!manualFile || !manualName}>
+              <button className="btn-secondary btn-lg" onClick={onClose}>{tr('cancel')}</button>
+              <button className="btn-primary btn-lg" onClick={() => handleManualAdd(null)} disabled={!manualFile || !manualName}>
                 <i className="ti ti-check" /> {tr('add')}
               </button>
             </div>
@@ -832,8 +802,8 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
               <strong>⚠️ Google Drive :</strong> {tr('urlWarning')}
             </div>
             <div className="modal-actions">
-              <button className="btn-secondary" onClick={onClose}>{tr('cancel')}</button>
-              <button className="btn-primary" onClick={() => url && urlName && onUrlImport(url, urlName)} disabled={!url || !urlName}>
+              <button className="btn-secondary btn-lg" onClick={onClose}>{tr('cancel')}</button>
+              <button className="btn-primary btn-lg" onClick={() => url && urlName && onUrlImport(url, urlName)} disabled={!url || !urlName}>
                 <i className="ti ti-download" /> {tr('download')}
               </button>
             </div>

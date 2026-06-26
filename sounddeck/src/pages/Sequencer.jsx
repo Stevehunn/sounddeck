@@ -10,7 +10,6 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
   const [showNewPlaylist, setShowNewPlaylist] = useState(false)
   const [newPlaylistName, setNewPlaylistName] = useState('')
 
-  // Charger les playlists depuis le store
   useEffect(() => {
     window.electronAPI.storeGet('playlists').then(saved => {
       if (saved) setPlaylists(saved)
@@ -51,8 +50,6 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-
-      {/* Panneau gauche — liste des playlists */}
       <div style={{
         width: 220, flexShrink: 0, borderRight: '1px solid var(--border)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden'
@@ -65,13 +62,13 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
             <div style={{ display: 'flex', gap: 4 }}>
               <input autoFocus value={newPlaylistName} onChange={e => setNewPlaylistName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') createPlaylist(); if (e.key === 'Escape') setShowNewPlaylist(false) }}
-                placeholder={tr('playlistName')} style={{ fontSize: 12, padding: '5px 8px', flex: 1 }} />
-              <button className="btn-primary" style={{ padding: '5px 8px' }} onClick={createPlaylist}>
+                placeholder={tr('playlistName')} className="input-sm" style={{ flex: 1 }} />
+              <button className="btn-primary btn-sm" onClick={createPlaylist} style={{ borderRadius: 'var(--radius-sm)' }}>
                 <i className="ti ti-check" />
               </button>
             </div>
           ) : (
-            <button className="btn-primary" style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}
+            <button className="btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center', borderRadius: 'var(--radius-sm)' }}
               onClick={() => setShowNewPlaylist(true)}>
               <i className="ti ti-plus" /> {tr('newPlaylist')}
             </button>
@@ -87,16 +84,11 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
           {playlists.map(pl => (
             <div key={pl.id}
               onClick={() => setActivePlaylist(pl)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
-                background: activePlaylist?.id === pl.id ? 'var(--accent-light)' : 'transparent',
-                borderLeft: `2px solid ${activePlaylist?.id === pl.id ? 'var(--accent)' : 'transparent'}`,
-                cursor: 'pointer', transition: 'all 0.1s'
-              }}
-              onMouseEnter={e => { if (activePlaylist?.id !== pl.id) e.currentTarget.style.background = 'var(--bg-hover)' }}
-              onMouseLeave={e => { if (activePlaylist?.id !== pl.id) e.currentTarget.style.background = 'transparent' }}>
+              className={`sidebar-item ${activePlaylist?.id === pl.id ? 'active' : ''}`}
+              style={{ borderLeft: `2px solid ${activePlaylist?.id === pl.id ? 'var(--accent)' : 'transparent'}` }}
+            >
               <i className="ti ti-playlist" style={{ color: activePlaylist?.id === pl.id ? 'var(--accent)' : 'var(--text-tertiary)', fontSize: 15 }} />
-              <div style={{ flex: 1, overflow: 'hidden' }}>
+              <div className="label">
                 <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: activePlaylist?.id === pl.id ? 'var(--accent)' : 'var(--text-primary)' }}>
                   {pl.name}
                 </div>
@@ -105,7 +97,8 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
                 </div>
               </div>
               <button onClick={e => { e.stopPropagation(); deletePlaylist(pl.id) }}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: '2px 4px', fontSize: 12, borderRadius: 4 }}
+                className="btn-ghost btn-sm"
+                style={{ color: 'var(--text-tertiary)', padding: '2px 4px', borderRadius: 'var(--radius-sm)' }}
                 onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)' }}
                 onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-tertiary)' }}>
                 <i className="ti ti-trash" />
@@ -115,7 +108,6 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
         </div>
       </div>
 
-      {/* Panneau droit — éditeur de playlist */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {activePlaylist ? (
           <PlaylistEditor
@@ -139,7 +131,7 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
 function EmptyState({ lang = 'fr' }) {
   const tr = useTranslation(lang)
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: 'var(--text-tertiary)' }}>
+    <div className="flex-center" style={{ flexDirection: 'column', height: '100%', gap: 12, color: 'var(--text-tertiary)' }}>
       <i className="ti ti-playlist" style={{ fontSize: 48, color: 'var(--border)' }} />
       <div style={{ fontWeight: 500, fontSize: 14 }}>{tr('selectPlaylist')}</div>
       <div style={{ fontSize: 12, textAlign: 'center', maxWidth: 280, lineHeight: 1.6 }}>
@@ -164,14 +156,12 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
   const currentIdxRef = useRef(-1)
   const itemsRef = useRef(items)
 
-  // Polling progression du son courant
   useEffect(() => {
     if (!playing || currentIdx < 0) { setCurrentProgress(null); return }
     const item = items[currentIdx]
     if (!item) return
     const interval = setInterval(() => {
       const p = getSoundProgress(item.soundId + '_seq') || getSoundProgress(item.soundId)
-      // On cherche le howl actif via ref
       if (howlRef.current && howlRef.current.playing()) {
         const seek = howlRef.current.seek()
         const duration = howlRef.current.duration()
@@ -185,7 +175,6 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
     return () => clearInterval(interval)
   }, [playing, currentIdx, items])
 
-  // Sync refs
   useEffect(() => { playingRef.current = playing }, [playing])
   useEffect(() => { currentIdxRef.current = currentIdx }, [currentIdx])
   useEffect(() => { itemsRef.current = items }, [items])
@@ -195,7 +184,6 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
     await onUpdate({ ...playlist, items: updated, loop })
   }
 
-  // ─── Lecture séquencielle ─────────────────────────────────────────────────
   const playFrom = useCallback(async (idx) => {
     if (idx >= items.length) {
       if (loopPlaylist) { playFrom(0); return }
@@ -221,7 +209,6 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
       volume: volumeRatio,
       html5: false,
       onend: () => {
-        // Délai avant le son suivant
         const delay = item.delay || 0
         sequenceRef.current = setTimeout(() => {
           if (sequenceRef.current !== null) playFrom(idx + 1)
@@ -245,19 +232,16 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
     if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload(); howlRef.current = null }
   }, [])
 
-  // Enregistrer le callback pour stopAllSounds
   useEffect(() => {
     registerStopSequencerCallback(stopSequence)
     return () => registerStopSequencerCallback(null)
   }, [stopSequence])
 
-  // Raccourcis clavier next/prev (touches fléchées quand le séquenceur est actif)
   useEffect(() => {
     const handler = (e) => {
       if (!playingRef.current) return
       if (e.key === 'ArrowRight' || e.key === 'MediaTrackNext') {
         e.preventDefault()
-        // Son suivant
         if (sequenceRef.current) { clearTimeout(sequenceRef.current); sequenceRef.current = null }
         if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload(); howlRef.current = null }
         const next = currentIdxRef.current + 1
@@ -267,7 +251,6 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
       }
       if (e.key === 'ArrowLeft' || e.key === 'MediaTrackPrevious') {
         e.preventDefault()
-        // Son précédent
         if (sequenceRef.current) { clearTimeout(sequenceRef.current); sequenceRef.current = null }
         if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload(); howlRef.current = null }
         const prev = Math.max(0, currentIdxRef.current - 1)
@@ -280,7 +263,6 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
 
   useEffect(() => () => stopSequence(), [stopSequence])
 
-  // ─── Drag & drop réordonnement ────────────────────────────────────────────
   const handleDragStart = (e, idx) => {
     e.dataTransfer.setData('text/plain', String(idx))
   }
@@ -296,7 +278,6 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
     saveItems(updated)
   }
 
-  // ─── Modifier un item ─────────────────────────────────────────────────────
   const updateItem = (idx, changes) => {
     const updated = items.map((item, i) => i === idx ? { ...item, ...changes } : item)
     saveItems(updated)
@@ -331,70 +312,94 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 150 }}>
           <div style={{ fontWeight: 600, fontSize: 14 }}>{playlist.name}</div>
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
             {items.length} {tr('sounds')} · {totalDuration.toFixed(1)}s {tr('delayAfter').toLowerCase()}
           </div>
         </div>
 
-        {/* Loop toggle */}
-        <button onClick={() => { setLoopPlaylist(!loopPlaylist); saveItems(items, !loopPlaylist) }}
-          style={{
-            padding: '5px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
-            border: `1px solid ${loopPlaylist ? 'var(--success)' : 'var(--border)'}`,
-            background: loopPlaylist ? 'rgba(29,158,117,0.1)' : 'transparent',
-            color: loopPlaylist ? 'var(--success)' : 'var(--text-secondary)',
-            display: 'flex', alignItems: 'center', gap: 4
-          }}>
-          <i className="ti ti-repeat" /> {tr('loop')}
+        <button 
+          onClick={() => { setLoopPlaylist(!loopPlaylist); saveItems(items, !loopPlaylist) }}
+          className={`btn-sm ${loopPlaylist ? 'btn-success' : 'btn-secondary'}`}
+          style={{ 
+            border: `1px solid ${loopPlaylist ? 'var(--success)' : 'var(--border)'}`, 
+            minHeight: 28, 
+            borderRadius: 'var(--radius-sm)',
+            fontSize: 12,
+            padding: '4px 10px'
+          }}
+        >
+          <i className="ti ti-repeat" style={{ fontSize: 14 }} /> {tr('loop')}
         </button>
 
-        {/* Ajouter sons */}
-        <button className="btn-secondary" onClick={() => setShowAddSound(true)} style={{ fontSize: 12 }}>
-          <i className="ti ti-plus" /> {tr('addSounds')}
+        <button 
+          className="btn-secondary btn-sm" 
+          style={{ 
+            minHeight: 28, 
+            padding: '4px 12px', 
+            borderRadius: 'var(--radius-sm)',
+            fontSize: 12
+          }} 
+          onClick={() => setShowAddSound(true)}
+        >
+          <i className="ti ti-plus" style={{ fontSize: 14 }} /> {tr('addSounds')}
         </button>
 
-        {/* Play / Stop */}
         {playing ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {/* Raccourcis next/prev */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={() => {
-                if (sequenceRef.current) { clearTimeout(sequenceRef.current); sequenceRef.current = null }
-                if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload(); howlRef.current = null }
-                const prev = Math.max(0, currentIdx - 1)
-                playFrom(prev)
-              }} style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 }} title={tr('previous')}>
-                <i className="ti ti-player-skip-back" />
+              <button 
+                onClick={() => {
+                  if (sequenceRef.current) { clearTimeout(sequenceRef.current); sequenceRef.current = null }
+                  if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload(); howlRef.current = null }
+                  const prev = Math.max(0, currentIdx - 1)
+                  playFrom(prev)
+                }} 
+                className="btn-secondary btn-sm" 
+                title={tr('previous')}
+                style={{ borderRadius: 'var(--radius-sm)', minHeight: 28, padding: '4px 8px' }}
+              >
+                <i className="ti ti-player-skip-back" style={{ fontSize: 14 }} />
               </button>
-              <button onClick={() => {
-                if (sequenceRef.current) { clearTimeout(sequenceRef.current); sequenceRef.current = null }
-                if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload(); howlRef.current = null }
-                const next = currentIdx + 1
-                if (next < items.length) playFrom(next)
-                else if (loopPlaylist) playFrom(0)
-                else stopSequence()
-              }} style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 }} title={tr('next')}>
-                <i className="ti ti-player-skip-forward" />
+              <button 
+                onClick={() => {
+                  if (sequenceRef.current) { clearTimeout(sequenceRef.current); sequenceRef.current = null }
+                  if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload(); howlRef.current = null }
+                  const next = currentIdx + 1
+                  if (next < items.length) playFrom(next)
+                  else if (loopPlaylist) playFrom(0)
+                  else stopSequence()
+                }} 
+                className="btn-secondary btn-sm" 
+                title={tr('next')}
+                style={{ borderRadius: 'var(--radius-sm)', minHeight: 28, padding: '4px 8px' }}
+              >
+                <i className="ti ti-player-skip-forward" style={{ fontSize: 14 }} />
               </button>
             </div>
-            <button onClick={stopSequence} style={{ fontSize: 12, padding: '6px 14px', background: 'rgba(224,82,82,0.1)', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <i className="ti ti-player-stop-filled" /> {tr('stop_seq')}
+            <button 
+              onClick={stopSequence} 
+              className="btn-danger btn-sm"
+              style={{ borderRadius: 'var(--radius-sm)', minHeight: 28, padding: '4px 10px', fontSize: 12 }}
+            >
+              <i className="ti ti-player-stop-filled" style={{ fontSize: 14 }} /> {tr('stop_seq')}
             </button>
           </div>
         ) : (
-          <button className="btn-primary" onClick={startSequence} style={{ fontSize: 12 }}>
-            <i className="ti ti-player-play-filled" /> {tr('start_seq')}
+          <button 
+            className="btn-primary btn-sm" 
+            onClick={startSequence} 
+            style={{ borderRadius: 'var(--radius-sm)', minHeight: 28, padding: '4px 12px', fontSize: 12 }}
+          >
+            <i className="ti ti-player-play-filled" style={{ fontSize: 14 }} /> {tr('start_seq')}
           </button>
         )}
       </div>
 
-      {/* Barre de progression globale */}
       {playing && currentProgress && (
-        <div style={{ padding: '6px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg-secondary)' }}>
+        <div className="sequencer-progress">
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-secondary)', marginBottom: 4 }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <i className="ti ti-music" style={{ color: 'var(--accent)' }} />
@@ -407,14 +412,10 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
               {fmtSeqTime(currentProgress.current)} / {fmtSeqTime(currentProgress.duration)}
             </span>
           </div>
-          <div style={{ height: 5, background: 'var(--bg-tertiary)', borderRadius: 3, overflow: 'hidden' }}>
-            <div style={{
-              height: '100%', borderRadius: 3,
-              background: `linear-gradient(90deg, var(--accent), var(--accent-hover))`,
-              width: `${currentProgress.ratio * 100}%`,
-              transition: 'width 0.1s linear',
-              boxShadow: '0 0 8px var(--accent)'
-            }} />
+          <div className="progress-bar">
+            <div className="track">
+              <div className="fill accent" style={{ width: `${currentProgress.ratio * 100}%` }} />
+            </div>
           </div>
           {items.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-tertiary)', marginTop: 3 }}>
@@ -425,28 +426,30 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
         </div>
       )}
 
-      {/* Indication raccourcis */}
       {playing && (
-        <div style={{ padding: '6px 20px', background: 'var(--accent-light)', borderBottom: '1px solid var(--accent)', fontSize: 11, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        <div className="sequencer-shortcuts">
           <i className="ti ti-keyboard" />
           <span>{tr('activeShortcuts')} :</span>
-          <kbd style={{ background: 'var(--bg-secondary)', border: '1px solid var(--accent)', borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace' }}>←</kbd>
+          <kbd>←</kbd>
           <span>{tr('previous')}</span>
-          <kbd style={{ background: 'var(--bg-secondary)', border: '1px solid var(--accent)', borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace' }}>→</kbd>
+          <kbd>→</kbd>
           <span>{tr('next')}</span>
-          <kbd style={{ background: 'var(--bg-secondary)', border: '1px solid var(--accent)', borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace' }}>{tr('stop_seq')}</kbd>
+          <kbd>{tr('stop_seq')}</kbd>
           <span>{tr('stopAll')}</span>
         </div>
       )}
 
-      {/* Liste des items */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px' }}>
         {items.length === 0 && (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)' }}>
             <i className="ti ti-music-plus" style={{ fontSize: 36, display: 'block', marginBottom: 10 }} />
             <div style={{ fontWeight: 500, marginBottom: 6 }}>{tr('emptyPlaylist')}</div>
             <div style={{ fontSize: 12, marginBottom: 16 }}>{tr('addSounds')}</div>
-            <button className="btn-primary" onClick={() => setShowAddSound(true)}>
+            <button 
+              className="btn-primary btn-lg" 
+              onClick={() => setShowAddSound(true)} 
+              style={{ borderRadius: 'var(--radius-md)', minHeight: 40, padding: '8px 24px' }}
+            >
               <i className="ti ti-plus" /> {tr('addSounds')}
             </button>
           </div>
@@ -462,16 +465,9 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
               onDragOver={e => { e.preventDefault(); setDragOverIdx(idx) }}
               onDragLeave={() => setDragOverIdx(null)}
               onDrop={e => handleDrop(e, idx)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 12px', marginBottom: 6,
-                background: isActive ? 'var(--accent-light)' : dragOverIdx === idx ? 'var(--bg-hover)' : 'var(--bg-secondary)',
-                border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
-                borderRadius: 'var(--radius-md)', cursor: 'grab',
-                transition: 'all 0.1s', boxShadow: isActive ? '0 0 12px rgba(124,111,247,0.2)' : 'none'
-              }}>
-
-              {/* Numéro + drag handle */}
+              className={`sequencer-item ${isActive ? 'active' : ''} ${dragOverIdx === idx ? 'drag-over' : ''}`}
+              style={{ borderRadius: 'var(--radius-md)' }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-tertiary)', fontSize: 12, flexShrink: 0 }}>
                 <i className="ti ti-grip-vertical" />
                 <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 600, color: isActive ? 'var(--accent)' : 'var(--text-tertiary)' }}>
@@ -479,14 +475,12 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
                 </span>
               </div>
 
-              {/* Emoji / Image */}
               <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0, overflow: 'hidden' }}>
                 {sound?.image
                   ? <img src={sound.image.startsWith('file://') ? sound.image : `file:///${sound.image.replace(/\\/g, '/')}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   : (sound?.emoji || '🔊')}
               </div>
 
-              {/* Nom du son */}
               <div style={{ flex: 1, overflow: 'hidden' }}>
                 <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isActive ? 'var(--accent)' : 'var(--text-primary)' }}>
                   {sound?.name || <span style={{ color: 'var(--danger)', fontSize: 12 }}>{tr('editorNoSound')}</span>}
@@ -497,20 +491,16 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
                       <i className="ti ti-volume" style={{ animation: 'pulse 1s ease infinite' }} /> {tr('playing')}
                     </div>
                     {currentProgress && (
-                      <div style={{ height: 3, background: 'var(--bg-tertiary)', borderRadius: 2, overflow: 'hidden', width: '100%' }}>
-                        <div style={{
-                          height: '100%', borderRadius: 2,
-                          background: 'var(--accent)',
-                          width: `${currentProgress.ratio * 100}%`,
-                          transition: 'width 0.1s linear'
-                        }} />
+                      <div className="progress-bar" style={{ height: 3 }}>
+                        <div className="track">
+                          <div className="fill accent" style={{ width: `${currentProgress.ratio * 100}%` }} />
+                        </div>
                       </div>
                     )}
                   </div>
                 )}
               </div>
 
-              {/* Délai après */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                 <i className="ti ti-clock" style={{ fontSize: 13, color: 'var(--text-tertiary)' }} />
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -520,7 +510,8 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
                       type="number" min="0" max="60" step="0.5"
                       value={item.delay || 0}
                       onChange={e => updateItem(idx, { delay: Math.max(0, Number(e.target.value)) })}
-                      style={{ width: 55, fontSize: 12, padding: '3px 6px', textAlign: 'center' }}
+                      className="input-sm"
+                      style={{ width: 55, textAlign: 'center', borderRadius: 'var(--radius-sm)' }}
                       onClick={e => e.stopPropagation()}
                     />
                     <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>s</span>
@@ -528,19 +519,34 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
                 </div>
               </div>
 
-              {/* Supprimer */}
-              <button onClick={() => removeItem(idx)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: '4px', borderRadius: 4, fontSize: 14 }}
-                onMouseEnter={e => e.currentTarget.style.color = 'var(--danger)'}
-                onMouseLeave={e => e.currentTarget.style.color = 'var(--text-tertiary)'}>
-                <i className="ti ti-x" />
+              {/* ✅ Bouton poubelle rouge au survol */}
+              <button 
+                onClick={() => removeItem(idx)}
+                className="btn-ghost btn-sm"
+                style={{ 
+                  color: 'var(--text-tertiary)', 
+                  padding: '4px', 
+                  borderRadius: 'var(--radius-sm)',
+                  minHeight: 28,
+                  minWidth: 28,
+                  transition: 'all var(--transition-base) ease'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.color = 'var(--danger)'
+                  e.currentTarget.style.background = 'rgba(224, 82, 82, 0.1)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.color = 'var(--text-tertiary)'
+                  e.currentTarget.style.background = 'transparent'
+                }}
+              >
+                <i className="ti ti-trash" />
               </button>
             </div>
           )
         })}
       </div>
 
-      {/* Modal ajout de sons */}
       {showAddSound && (
         <AddSoundModal
           sounds={sounds}
@@ -573,14 +579,20 @@ function AddSoundModal({ sounds, existingIds, onAdd, onClose, lang = 'fr' }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal fade-in" style={{ width: 480, maxHeight: '70vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ width: 480, maxHeight: '70vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
         <div className="modal-title">
           <i className="ti ti-music-plus" style={{ color: 'var(--accent)' }} />
           {tr('addSounds')}
         </div>
 
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder={tr('search')} style={{ marginBottom: 10 }} autoFocus />
+        <input 
+          value={search} 
+          onChange={e => setSearch(e.target.value)}
+          placeholder={tr('search')} 
+          className="input-lg" 
+          style={{ marginBottom: 10, borderRadius: 'var(--radius-md)' }} 
+          autoFocus 
+        />
 
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
           {filtered.map(sound => {
@@ -603,7 +615,7 @@ function AddSoundModal({ sounds, existingIds, onAdd, onClose, lang = 'fr' }) {
                 </div>
                 <span style={{ fontSize: 13, flex: 1 }}>{sound.name}</span>
                 {existingIds.includes(sound.id) && (
-                  <span style={{ fontSize: 10, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', padding: '1px 6px', borderRadius: 4 }}>{tr('alreadyAdded')}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', padding: '1px 6px', borderRadius: 'var(--radius-sm)' }}>{tr('alreadyAdded')}</span>
                 )}
               </label>
             )
@@ -611,8 +623,15 @@ function AddSoundModal({ sounds, existingIds, onAdd, onClose, lang = 'fr' }) {
         </div>
 
         <div className="modal-actions">
-          <button className="btn-secondary" onClick={onClose}>{tr('cancel')}</button>
-          <button className="btn-primary" onClick={() => onAdd(selected)} disabled={selected.length === 0}>
+          <button className="btn-secondary btn-lg" onClick={onClose} style={{ borderRadius: 'var(--radius-md)' }}>
+            {tr('cancel')}
+          </button>
+          <button 
+            className="btn-primary btn-lg" 
+            onClick={() => onAdd(selected)} 
+            disabled={selected.length === 0}
+            style={{ borderRadius: 'var(--radius-md)' }}
+          >
             <i className="ti ti-plus" /> {tr('add')} {selected.length > 0 ? `(${selected.length})` : ''}
           </button>
         </div>
