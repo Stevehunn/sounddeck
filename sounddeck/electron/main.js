@@ -46,9 +46,9 @@ if (!fs.existsSync(soundsDir)) fs.mkdirSync(soundsDir, { recursive: true })
 const shouldStartMinimized = store.get('startMinimized', false)
 
 const TRENDING_URLS = {
-  fr: 'https://www.myinstants.com/fr/trending/',
-  en: 'https://www.myinstants.com/en/trending/',
-  es: 'https://www.myinstants.com/es/trending/'
+  fr: 'https://www.myinstants.com/fr/index/fr/',
+  en: 'https://www.myinstants.com/fr/index/us/',
+  es: 'https://www.myinstants.com/fr/index/es/'
 }
 
 // ─── TRAY LABELS ──────────────────────────────────────────────────────────────
@@ -1937,7 +1937,11 @@ ipcMain.handle('fetch-myinstants', async (event, query, mode = 'search', lang = 
         return true
       })
     } else if (mode === 'local') {
-      const url = TRENDING_URLS[country] || TRENDING_URLS['fr']
+      // ✅ Si query est une URL complète (pour le mode local), l'utiliser directement
+      let url = query
+      if (!url.startsWith('http')) {
+        url = TRENDING_URLS[country] || TRENDING_URLS['fr']
+      }
       console.log('fetch-myinstants local:', url)
       const result = await fetchPage(url)
       if (!result.ok) return { success: false, error: result.error, sounds: [] }
@@ -1945,7 +1949,8 @@ ipcMain.handle('fetch-myinstants', async (event, query, mode = 'search', lang = 
     } else {
       let url
       if (mode === 'trending') {
-        url = 'https://www.myinstants.com/fr/search/?name=meme'
+        // ✅ 'trending' utilise aussi les URLs index/{country}/
+        url = TRENDING_URLS[country] || TRENDING_URLS['fr']
       } else if (mode === 'category') {
         url = `https://www.myinstants.com/fr/categories/${encodeURIComponent(query)}/`
       } else {

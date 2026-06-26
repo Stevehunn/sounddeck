@@ -3,189 +3,59 @@ import { useState, useEffect, useRef } from 'react'
 import { Howl } from 'howler'
 import { LANGUAGES, useTranslation } from '../i18n'
 
-// Helper pour récupérer les catégories avec leurs requêtes selon la langue
-function getCategories(lang) {
-  const langData = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0]
-  const country = langData.country || 'fr'
-  
-  const queries = {
-    fr: {
-      local: 'fr',
-      best: 'vine boom,bruh,airhorn,oof',
-      french: 'francais',
-      discord: 'discord,notification,ping',
-      anime: 'anime & manga',
-      games: 'games',
-      memes: 'memes',
-      movies: 'movies',
-      music: 'music',
-      politics: 'politics',
-      pranks: 'pranks',
-      reactions: 'reactions',
-      sfx: 'sound effects',
-      sports: 'sports',
-      tv: 'television',
-      tiktok: 'tiktok trends',
-      viral: 'viral',
-      whatsapp: 'whatsapp audios',
-    },
-    en: {
-      local: 'us',
-      best: 'vine boom,bruh,airhorn,oof',
-      french: 'us',
-      discord: 'discord,notification,ping',
-      anime: 'anime & manga',
-      games: 'games',
-      memes: 'memes',
-      movies: 'movies',
-      music: 'music',
-      politics: 'politics',
-      pranks: 'pranks',
-      reactions: 'reactions',
-      sfx: 'sound effects',
-      sports: 'sports',
-      tv: 'television',
-      tiktok: 'tiktok trends',
-      viral: 'viral',
-      whatsapp: 'whatsapp audios',
-    },
-    es: {
-      local: 'es',
-      best: 'vine boom,bruh,airhorn,oof',
-      french: 'es',
-      discord: 'discord,notification,ping',
-      anime: 'anime & manga',
-      games: 'games',
-      memes: 'memes',
-      movies: 'movies',
-      music: 'music',
-      politics: 'politics',
-      pranks: 'pranks',
-      reactions: 'reactions',
-      sfx: 'sound effects',
-      sports: 'sports',
-      tv: 'television',
-      tiktok: 'tiktok trends',
-      viral: 'viral',
-      whatsapp: 'whatsapp audios',
-    }
-  }
-
-  const q = queries[lang] || queries.fr
-
-  const labels = {
-    fr: {
-      catLocalTrending: 'Tendances',
-      catTrending: 'Tendances',
-      catBest: 'Classiques',
-      catFrench: 'Sons français',
-      catDiscord: 'Discord',
-      catAnime: 'Anime & Manga',
-      catGames: 'Jeux vidéo',
-      catMemes: 'Memes',
-      catMovies: 'Films',
-      catMusic: 'Musique',
-      catPolitics: 'Politique',
-      catPranks: 'Canulars',
-      catReactions: 'Réactions',
-      catSfx: 'Effets sonores',
-      catSports: 'Sports',
-      catTv: 'Télévision',
-      catTiktok: 'TikTok Trends',
-      catViral: 'Viral',
-      catWhatsapp: 'Whatsapp',
-    },
-    en: {
-      catLocalTrending: 'Trending',
-      catTrending: 'Trending',
-      catBest: 'Classics',
-      catFrench: 'US Sounds',
-      catDiscord: 'Discord',
-      catAnime: 'Anime & Manga',
-      catGames: 'Video games',
-      catMemes: 'Memes',
-      catMovies: 'Movies',
-      catMusic: 'Music',
-      catPolitics: 'Politics',
-      catPranks: 'Pranks',
-      catReactions: 'Reactions',
-      catSfx: 'Sound effects',
-      catSports: 'Sports',
-      catTv: 'Television',
-      catTiktok: 'TikTok Trends',
-      catViral: 'Viral',
-      catWhatsapp: 'Whatsapp',
-    },
-    es: {
-      catLocalTrending: 'Tendencias',
-      catTrending: 'Tendencias',
-      catBest: 'Clásicos',
-      catFrench: 'Sonidos ES',
-      catDiscord: 'Discord',
-      catAnime: 'Anime & Manga',
-      catGames: 'Videojuegos',
-      catMemes: 'Memes',
-      catMovies: 'Películas',
-      catMusic: 'Música',
-      catPolitics: 'Política',
-      catPranks: 'Bromas',
-      catReactions: 'Reacciones',
-      catSfx: 'Efectos de sonido',
-      catSports: 'Deportes',
-      catTv: 'Televisión',
-      catTiktok: 'TikTok Trends',
-      catViral: 'Viral',
-      catWhatsapp: 'Whatsapp',
-    }
-  }
-
-  const label = labels[lang] || labels.fr
-
-  return [
-    { id: 'local',      label: `📍 ${label.catLocalTrending} ${langData.flag}`, mode: 'local', query: q.local },
-    { id: 'trending',   label: `🔥 ${label.catTrending}`,                       mode: 'trending',  query: '' },
-    { id: 'best',       label: `🏆 ${label.catBest}`,                           mode: 'multi',     query: q.best },
-    { id: 'french',     label: `🇫🇷 ${label.catFrench}`,                        mode: 'search',    query: q.french },
-    { id: 'discord',    label: `💬 ${label.catDiscord}`,                        mode: 'multi',     query: q.discord },
-    { id: 'anime',      label: `⛩️ ${label.catAnime}`,                          mode: 'category',  query: q.anime },
-    { id: 'games',      label: `🎮 ${label.catGames}`,                          mode: 'category',  query: q.games },
-    { id: 'memes',      label: `😂 ${label.catMemes}`,                          mode: 'category',  query: q.memes },
-    { id: 'movies',     label: `🎬 ${label.catMovies}`,                         mode: 'category',  query: q.movies },
-    { id: 'music',      label: `🎵 ${label.catMusic}`,                          mode: 'category',  query: q.music },
-    { id: 'politics',   label: `🗳️ ${label.catPolitics}`,                      mode: 'category',  query: q.politics },
-    { id: 'pranks',     label: `🤣 ${label.catPranks}`,                         mode: 'category',  query: q.pranks },
-    { id: 'reactions',  label: `😱 ${label.catReactions}`,                      mode: 'category',  query: q.reactions },
-    { id: 'sfx',        label: `🔊 ${label.catSfx}`,                            mode: 'category',  query: q.sfx },
-    { id: 'sports',     label: `⚽ ${label.catSports}`,                          mode: 'category',  query: q.sports },
-    { id: 'tv',         label: `📺 ${label.catTv}`,                             mode: 'category',  query: q.tv },
-    { id: 'tiktok',     label: `📱 ${label.catTiktok}`,                         mode: 'category',  query: q.tiktok },
-    { id: 'viral',      label: `📣 ${label.catViral}`,                          mode: 'category',  query: q.viral },
-    { id: 'whatsapp',   label: `💬 ${label.catWhatsapp}`,                       mode: 'category',  query: q.whatsapp },
-  ]
+// ─── CONFIGURATION DES CATÉGORIES ────────────────────────────────────────────
+// Structure unique pour toutes les langues
+const CATEGORY_CONFIG = {
+  // Chaque catégorie a un id, une icône, une clé de traduction et une requête
+  trending: { icon: '🔥', key: 'catTrending', mode: 'local', query: '' },
+  best: { icon: '🏆', key: 'catBest', mode: 'multi', query: 'vine boom,bruh,airhorn,oof' },
+  discord: { icon: '💬', key: 'catDiscord', mode: 'multi', query: 'discord,notification,ping' },
+  anime: { icon: '⛩️', key: 'catAnime', mode: 'category', query: 'anime & manga' },
+  games: { icon: '🎮', key: 'catGames', mode: 'category', query: 'games' },
+  memes: { icon: '😂', key: 'catMemes', mode: 'category', query: 'memes' },
+  movies: { icon: '🎬', key: 'catMovies', mode: 'category', query: 'movies' },
+  music: { icon: '🎵', key: 'catMusic', mode: 'category', query: 'music' },
+  politics: { icon: '🗳️', key: 'catPolitics', mode: 'category', query: 'politics' },
+  pranks: { icon: '🤣', key: 'catPranks', mode: 'category', query: 'pranks' },
+  reactions: { icon: '😱', key: 'catReactions', mode: 'category', query: 'reactions' },
+  sfx: { icon: '🔊', key: 'catSfx', mode: 'category', query: 'sound effects' },
+  sports: { icon: '⚽', key: 'catSports', mode: 'category', query: 'sports' },
+  tv: { icon: '📺', key: 'catTv', mode: 'category', query: 'television' },
+  tiktok: { icon: '📱', key: 'catTiktok', mode: 'category', query: 'tiktok trends' },
+  viral: { icon: '📣', key: 'catViral', mode: 'category', query: 'viral' },
+  whatsapp: { icon: '💬', key: 'catWhatsapp', mode: 'category', query: 'whatsapp audios' },
 }
+
+// URLs par pays
+const BASE_URLS = {
+  fr: 'https://www.myinstants.com/fr/index/fr/',
+  en: 'https://www.myinstants.com/fr/index/us/',
+  es: 'https://www.myinstants.com/fr/index/es/',
+}
+
+// ─── COMPOSANT PRINCIPAL ──────────────────────────────────────────────────────
 
 export default function Discover({ store, addToast, lang = 'fr' }) {
   const tr = useTranslation(lang)
-  const CATEGORIES = getCategories(lang)
+  
+  // États
   const [sounds, setSounds] = useState([])
   const [loading, setLoading] = useState(false)
-  const [activeCategory, setActiveCategory] = useState(CATEGORIES[0])
+  const [activeCategory, setActiveCategory] = useState('trending')
   const [searchQuery, setSearchQuery] = useState('')
   const [downloading, setDownloading] = useState({})
   const [previewing, setPreviewing] = useState(null)
   const [showProfileModal, setShowProfileModal] = useState(null)
   const [error, setError] = useState('')
-  
-  // Volume de preview : 0-100% du volume global (50% = volume global)
   const [previewLevel, setPreviewLevel] = useState(store.previewVolume ?? 50)
+  
   const previewHowlRef = useRef(null)
+  const searchTimeoutRef = useRef(null)
 
-  // Calculer le volume effectif en pourcentage
-  const getEffectiveVolume = () => {
-    return Math.round((store.volume * previewLevel) / 100)
-  }
+  // ─── UTILITAIRES ────────────────────────────────────────────────────────────
 
-  // Mettre à jour le volume du howl en cours si actif
+  const getEffectiveVolume = () => Math.round((store.volume * previewLevel) / 100)
+
   const updateHowlVolume = (level) => {
     if (previewHowlRef.current && previewing) {
       const effectiveVolume = Math.round((store.volume * level) / 100)
@@ -194,49 +64,115 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     }
   }
 
-  const downloadedNames = store.sounds.map(s => s.name.toLowerCase().trim())
+  // ─── RÉCUPÉRATION DES SONS ──────────────────────────────────────────────────
 
-  const fetchSounds = async (category, search = '') => {
+  const fetchSounds = async (categoryId, query = '') => {
+    const category = CATEGORY_CONFIG[categoryId]
+    if (!category) return
+
     setLoading(true)
     setError('')
     setSounds([])
+
     try {
-      let mode = search ? 'search' : category.mode
-      let query = search || category.query
+      let mode = category.mode
+      let search = query || category.query
+
+      // Gestion spéciale pour 'local' (tendances par pays)
       if (mode === 'local') {
-        mode = 'local'
-        query = category.query
+        const langData = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0]
+        const country = langData.country || 'fr'
+        // Utiliser l'URL directe pour les tendances
+        const url = BASE_URLS[country] || BASE_URLS.fr
+        // On passe l'URL complète comme query
+        search = url
       }
-      const result = await window.electronAPI.fetchMyinstants(query, mode, lang)
+
+      // Mode 'multi' : on cherche plusieurs termes
+      if (mode === 'multi') {
+        const terms = search.split(',').map(t => t.trim()).filter(Boolean)
+        const results = []
+        
+        for (const term of terms.slice(0, 4)) {
+          const result = await window.electronAPI.fetchMyinstants(term, 'search', lang)
+          if (result.success) {
+            results.push(...result.sounds)
+          }
+          await new Promise(r => setTimeout(r, 200))
+        }
+        
+        // Déduplication
+        const seen = new Set()
+        const unique = results.filter(s => {
+          if (seen.has(s.slug)) return false
+          seen.add(s.slug)
+          return true
+        })
+        
+        setSounds(unique)
+        if (unique.length === 0) setError(tr('noResult'))
+        setLoading(false)
+        return
+      }
+
+      // Mode normal (search, category, local)
+      const result = await window.electronAPI.fetchMyinstants(search, mode, lang)
+      
       if (result.success && result.sounds.length > 0) {
         setSounds(result.sounds)
       } else {
         setError(result.error || tr('noResult'))
       }
     } catch (e) {
+      console.error('Error fetching sounds:', e)
       setError(tr('connectionError'))
     }
+    
     setLoading(false)
   }
 
+  // ─── EFFETS ──────────────────────────────────────────────────────────────────
+
+  // Chargement initial
   useEffect(() => {
-    const cats = getCategories(lang)
-    setActiveCategory(cats[0])
-    fetchSounds(cats[0])
+    fetchSounds('trending')
     return () => stopPreview()
   }, [lang])
 
-  const handleCategoryClick = (cat) => {
-    setActiveCategory(cat)
+  // ─── GESTIONNAIRES D'ÉVÉNEMENTS ────────────────────────────────────────────
+
+  const handleCategoryClick = (categoryId) => {
+    setActiveCategory(categoryId)
     setSearchQuery('')
-    fetchSounds(cat)
+    fetchSounds(categoryId)
   }
 
   const handleSearch = (e) => {
     e.preventDefault()
-    if (!searchQuery.trim()) return
-    fetchSounds(activeCategory, searchQuery.trim())
+    const query = searchQuery.trim()
+    if (!query) {
+      fetchSounds(activeCategory)
+      return
+    }
+    fetchSounds(activeCategory, query)
   }
+
+  // Recherche avec debounce
+  const handleSearchChange = (value) => {
+    setSearchQuery(value)
+    
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+    
+    if (value.trim().length >= 2) {
+      searchTimeoutRef.current = setTimeout(() => {
+        fetchSounds(activeCategory, value.trim())
+      }, 500)
+    }
+  }
+
+  // ─── PREVIEW AUDIO ──────────────────────────────────────────────────────────
 
   const stopPreview = () => {
     if (previewHowlRef.current) {
@@ -252,11 +188,11 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
       stopPreview()
       return
     }
+    
     stopPreview()
     setPreviewing(sound.id)
     
-    const effectiveVolume = getEffectiveVolume()
-    const volumeRatio = Math.max(0.01, effectiveVolume / 100)
+    const volumeRatio = Math.max(0.01, getEffectiveVolume() / 100)
     
     const howl = new Howl({
       src: [sound.url],
@@ -268,9 +204,12 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
         addToast(tr('previewError'), 'error')
       }
     })
+    
     previewHowlRef.current = howl
     howl.play()
   }
+
+  // ─── VOLUME DE PREVIEW ──────────────────────────────────────────────────────
 
   const handlePreviewLevelChange = (value) => {
     const newLevel = Math.max(0, Math.min(100, Number(value)))
@@ -279,18 +218,7 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     updateHowlVolume(newLevel)
   }
 
-  const decreaseVolume = () => {
-    handlePreviewLevelChange(previewLevel - 5)
-  }
-
-  const increaseVolume = () => {
-    handlePreviewLevelChange(previewLevel + 5)
-  }
-
-  // Réinitialiser au volume global (50%)
-  const resetPreviewVolume = () => {
-    handlePreviewLevelChange(50)
-  }
+  // ─── TÉLÉCHARGEMENT ─────────────────────────────────────────────────────────
 
   const handleDownload = (sound) => {
     stopPreview()
@@ -299,277 +227,68 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
 
   const confirmDownload = async (sound, profileId) => {
     setShowProfileModal(null)
-    setDownloading(d => ({ ...d, [sound.id]: true }))
-    const fileName = sound.name.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40) + '_' + Date.now() + '.mp3'
+    setDownloading(prev => ({ ...prev, [sound.id]: true }))
+    
+    const fileName = sound.name
+      .replace(/[^a-zA-Z0-9]/g, '_')
+      .slice(0, 40) + '_' + Date.now() + '.mp3'
+    
     const result = await window.electronAPI.downloadSoundUrl(sound.url, fileName)
+    
     if (result.success) {
-      await store.addSound({ name: sound.name, path: result.path, emoji: sound.emoji || '🔊', profiles: [profileId] })
+      await store.addSound({
+        name: sound.name,
+        path: result.path,
+        emoji: sound.emoji || '🔊',
+        profiles: [profileId]
+      })
       addToast(`"${sound.name}" ${tr('added')} !`, 'success')
     } else {
       addToast(`${tr('error')} : ${result.error}`, 'error')
     }
-    setDownloading(d => ({ ...d, [sound.id]: false }))
+    
+    setDownloading(prev => ({ ...prev, [sound.id]: false }))
   }
+
+  // ─── RENDU ──────────────────────────────────────────────────────────────────
+
+  const categories = Object.entries(CATEGORY_CONFIG).map(([id, config]) => ({
+    id,
+    ...config,
+    label: `${config.icon} ${tr(config.key)}`
+  }))
 
   const isMuted = previewLevel === 0
   const isAtGlobal = previewLevel === 50
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {/* Header */}
       <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
           <div>
             <div style={{ fontWeight: 600, fontSize: 15 }}>{tr('discoverTitle')}</div>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
               {tr('discoverSub')} <strong>MyInstants</strong> · {sounds.length} {tr('discoverResults')}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {/* Contrôle du volume avec barre de progression */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 6,
-              background: 'var(--bg-tertiary)',
-              padding: '4px 10px 4px 6px',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)',
-              minWidth: 160
-            }}>
-              {/* Bouton Diminuer */}
-              <button
-                onClick={decreaseVolume}
-                disabled={previewLevel <= 0}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  borderRadius: 4,
-                  color: previewLevel <= 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)',
-                  cursor: previewLevel <= 0 ? 'default' : 'pointer',
-                  padding: '4px 6px',
-                  fontSize: 16,
-                  display: 'flex',
-                  alignItems: 'center',
-                  transition: 'all 0.15s',
-                  opacity: previewLevel <= 0 ? 0.4 : 1
-                }}
-                onMouseEnter={e => {
-                  if (previewLevel > 0) {
-                    e.currentTarget.style.color = 'var(--danger)'
-                    e.currentTarget.style.background = 'rgba(224,82,82,0.1)'
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (previewLevel > 0) {
-                    e.currentTarget.style.color = 'var(--text-secondary)'
-                    e.currentTarget.style.background = 'transparent'
-                  }
-                }}
-                title="Diminuer le volume (-5%)"
-              >
-                <i className="ti ti-minus" />
-              </button>
-
-              {/* Barre de progression du volume */}
-              <div 
-                style={{ 
-                  flex: 1,
-                  height: 6,
-                  background: 'var(--bg-secondary)',
-                  borderRadius: 3,
-                  position: 'relative',
-                  cursor: 'pointer',
-                  minWidth: 60,
-                  border: '1px solid var(--border)',
-                  overflow: 'visible'
-                }}
-                onClick={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect()
-                  const x = (e.clientX - rect.left) / rect.width
-                  const newLevel = Math.max(0, Math.min(100, Math.round(x * 100)))
-                  handlePreviewLevelChange(newLevel)
-                }}
-                title="Cliquez pour régler le volume"
-              >
-                {/* Fond de la barre */}
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  height: '100%',
-                  width: '100%',
-                  background: 'var(--bg-hover)',
-                  borderRadius: 3,
-                  opacity: 0.3
-                }} />
-                
-                {/* Barre de progression */}
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  height: '100%',
-                  width: `${previewLevel}%`,
-                  background: isMuted 
-                    ? 'var(--danger)' 
-                    : previewLevel < 30 
-                      ? 'var(--warning)' 
-                      : 'var(--accent)',
-                  borderRadius: 3,
-                  transition: 'width 0.15s ease, background 0.3s ease',
-                  boxShadow: isMuted ? 'none' : '0 0 8px rgba(124,111,247,0.2)'
-                }} />
-
-                {/* Indicateur du milieu (50% = volume global) */}
-                <div style={{
-                  position: 'absolute',
-                  top: -4,
-                  left: '50%',
-                  width: 2,
-                  height: 14,
-                  background: 'rgba(255,255,255,0.4)',
-                  borderRadius: 1,
-                  transform: 'translateX(-50%)',
-                  pointerEvents: 'none',
-                  zIndex: 2
-                }} />
-                <div style={{
-                  position: 'absolute',
-                  top: 11,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  fontSize: 7,
-                  color: 'rgba(255,255,255,0.3)',
-                  pointerEvents: 'none',
-                  zIndex: 2,
-                  whiteSpace: 'nowrap',
-                  fontWeight: 500
-                }}>
-                  GLOBAL
-                </div>
-
-                {/* Repère du volume actuel - petit point lumineux */}
-                {previewLevel > 0 && previewLevel < 100 && (
-                  <div style={{
-                    position: 'absolute',
-                    top: -3,
-                    left: `${previewLevel}%`,
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: isMuted ? 'var(--danger)' : 'var(--accent)',
-                    transform: 'translateX(-50%)',
-                    pointerEvents: 'none',
-                    zIndex: 3,
-                    boxShadow: '0 0 10px rgba(124,111,247,0.4)',
-                    border: '2px solid var(--bg-tertiary)'
-                  }} />
-                )}
-              </div>
-
-              {/* Bouton Augmenter */}
-              <button
-                onClick={increaseVolume}
-                disabled={previewLevel >= 100}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  borderRadius: 4,
-                  color: previewLevel >= 100 ? 'var(--text-tertiary)' : 'var(--text-secondary)',
-                  cursor: previewLevel >= 100 ? 'default' : 'pointer',
-                  padding: '4px 6px',
-                  fontSize: 16,
-                  display: 'flex',
-                  alignItems: 'center',
-                  transition: 'all 0.15s',
-                  opacity: previewLevel >= 100 ? 0.4 : 1
-                }}
-                onMouseEnter={e => {
-                  if (previewLevel < 100) {
-                    e.currentTarget.style.color = 'var(--success)'
-                    e.currentTarget.style.background = 'rgba(29,158,117,0.1)'
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (previewLevel < 100) {
-                    e.currentTarget.style.color = 'var(--text-secondary)'
-                    e.currentTarget.style.background = 'transparent'
-                  }
-                }}
-                title="Augmenter le volume (+5%)"
-              >
-                <i className="ti ti-plus" />
-              </button>
-
-              {/* Boutons Mute et Reset */}
-              <div style={{ display: 'flex', gap: 2, marginLeft: 2 }}>
-                <button
-                  onClick={() => handlePreviewLevelChange(isMuted ? 50 : 0)}
-                  style={{
-                    background: isMuted ? 'rgba(224,82,82,0.15)' : 'transparent',
-                    border: 'none',
-                    borderRadius: 4,
-                    color: isMuted ? 'var(--danger)' : 'var(--text-tertiary)',
-                    cursor: 'pointer',
-                    padding: '4px 4px',
-                    fontSize: 14,
-                    display: 'flex',
-                    alignItems: 'center',
-                    transition: 'all 0.15s'
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = 'var(--bg-hover)'
-                  }}
-                  onMouseLeave={e => {
-                    if (!isMuted) e.currentTarget.style.background = 'transparent'
-                  }}
-                  title={isMuted ? 'Activer le son' : 'Couper le son'}
-                >
-                  <i className={`ti ${isMuted ? 'ti-volume-off' : previewLevel < 30 ? 'ti-volume-2' : 'ti-volume'}`} />
-                </button>
-
-                {!isAtGlobal && !isMuted && (
-                  <button
-                    onClick={resetPreviewVolume}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      borderRadius: 4,
-                      color: 'var(--text-tertiary)',
-                      cursor: 'pointer',
-                      padding: '4px 4px',
-                      fontSize: 13,
-                      display: 'flex',
-                      alignItems: 'center',
-                      transition: 'all 0.15s'
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.color = 'var(--accent)'
-                      e.currentTarget.style.background = 'var(--bg-hover)'
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.color = 'var(--text-tertiary)'
-                      e.currentTarget.style.background = 'transparent'
-                    }}
-                    title="Réinitialiser au volume global"
-                  >
-                    <i className="ti ti-refresh" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <a href="https://www.myinstants.com" target="_blank" rel="noreferrer"
-              style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <i className="ti ti-external-link" /> myinstants.com
-            </a>
-          </div>
+          
+          {/* Contrôle du volume */}
+          <VolumeControl
+            previewLevel={previewLevel}
+            isMuted={isMuted}
+            isAtGlobal={isAtGlobal}
+            onLevelChange={handlePreviewLevelChange}
+            onMuteToggle={() => handlePreviewLevelChange(isMuted ? 50 : 0)}
+            onReset={() => handlePreviewLevelChange(50)}
+          />
         </div>
 
+        {/* Barre de recherche */}
         <form onSubmit={handleSearch} style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
           <input
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+            onChange={e => handleSearchChange(e.target.value)}
             placeholder={tr('searchSound')}
             style={{ flex: 1 }}
           />
@@ -577,71 +296,65 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
             <i className="ti ti-search" /> {tr('searchBtn')}
           </button>
           {(searchQuery || loading) && (
-            <button type="button" className="btn-secondary" onClick={() => { setSearchQuery(''); fetchSounds(activeCategory) }}>
+            <button type="button" className="btn-secondary" onClick={() => {
+              setSearchQuery('')
+              fetchSounds(activeCategory)
+            }}>
               <i className="ti ti-x" />
             </button>
           )}
         </form>
 
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
-          {CATEGORIES.map(cat => (
-            <button key={cat.id} onClick={() => handleCategoryClick(cat)}
+        {/* Catégories */}
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'thin' }}>
+          {categories.map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => handleCategoryClick(cat.id)}
               style={{
-                padding: '5px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer', flexShrink: 0,
-                border: `1px solid ${activeCategory.id === cat.id ? 'var(--accent)' : 'var(--border)'}`,
-                background: activeCategory.id === cat.id ? 'var(--accent-light)' : 'transparent',
-                color: activeCategory.id === cat.id ? 'var(--accent)' : 'var(--text-secondary)',
-                fontWeight: activeCategory.id === cat.id ? 500 : 400
-              }}>
+                padding: '5px 12px',
+                borderRadius: 20,
+                fontSize: 12,
+                cursor: 'pointer',
+                flexShrink: 0,
+                border: `1px solid ${activeCategory === cat.id ? 'var(--accent)' : 'var(--border)'}`,
+                background: activeCategory === cat.id ? 'var(--accent-light)' : 'transparent',
+                color: activeCategory === cat.id ? 'var(--accent)' : 'var(--text-secondary)',
+                fontWeight: activeCategory === cat.id ? 500 : 400,
+                whiteSpace: 'nowrap'
+              }}
+            >
               {cat.label}
             </button>
           ))}
         </div>
       </div>
 
+      {/* Liste des sons */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
-
-        {loading && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 14, color: 'var(--text-secondary)' }}>
-            <i className="ti ti-loader" style={{ fontSize: 36, color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
-            <div style={{ fontSize: 13 }}>{tr('loading')}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{tr('resolvingLinks')}</div>
-          </div>
+        {loading && <LoadingState tr={tr} />}
+        
+        {!loading && error && <ErrorState error={error} onRetry={() => fetchSounds(activeCategory, searchQuery)} tr={tr} />}
+        
+        {!loading && !error && sounds.length === 0 && (
+          <EmptyState tr={tr} />
         )}
 
-        {!loading && error && (
-          <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)' }}>
-            <i className="ti ti-wifi-off" style={{ fontSize: 36, display: 'block', marginBottom: 12 }} />
-            <div style={{ fontWeight: 500, marginBottom: 6 }}>{error}</div>
-            <button className="btn-secondary" onClick={() => fetchSounds(activeCategory, searchQuery)}>
-              <i className="ti ti-refresh" /> {tr('retry')}
-            </button>
-          </div>
-        )}
-
-        {!loading && sounds.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-            {sounds.map(sound => {
-              const owned = downloadedNames.includes(sound.name.toLowerCase().trim())
-              const isDownloading = downloading[sound.id]
-              const isPreviewing = previewing === sound.id
-              return (
-                <SoundDiscoverCard
-                  key={sound.id}
-                  sound={sound}
-                  owned={owned}
-                  isDownloading={isDownloading}
-                  isPreviewing={isPreviewing}
-                  onPreview={() => togglePreview(sound)}
-                  onDownload={() => handleDownload(sound)}
-                  lang={lang}
-                />
-              )
-            })}
-          </div>
+        {!loading && !error && sounds.length > 0 && (
+          <SoundGrid
+            sounds={sounds}
+            downloadedNames={store.sounds.map(s => s.name.toLowerCase().trim())}
+            downloading={downloading}
+            previewing={previewing}
+            onPreview={togglePreview}
+            onDownload={handleDownload}
+            lang={lang}
+            tr={tr}
+          />
         )}
       </div>
 
+      {/* Modal de sélection de profil */}
       {showProfileModal && (
         <ProfilePickerModal
           sound={showProfileModal}
@@ -649,24 +362,228 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
           onConfirm={(profileId) => confirmDownload(showProfileModal, profileId)}
           onClose={() => setShowProfileModal(null)}
           lang={lang}
+          tr={tr}
         />
       )}
-
-      <style>{`
-        @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-        ::-webkit-scrollbar { height: 4px; width: 6px; }
-      `}</style>
     </div>
   )
 }
 
-function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPreview, onDownload, lang }) {
-  const tr = useTranslation(lang || 'fr')
+// ─── SOUS-COMPOSANTS ──────────────────────────────────────────────────────────
+
+function LoadingState({ tr }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 14, color: 'var(--text-secondary)' }}>
+      <i className="ti ti-loader" style={{ fontSize: 36, color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
+      <div style={{ fontSize: 13 }}>{tr('loading')}</div>
+      <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{tr('resolvingLinks')}</div>
+      <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
+    </div>
+  )
+}
+
+function ErrorState({ error, onRetry, tr }) {
+  return (
+    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)' }}>
+      <i className="ti ti-wifi-off" style={{ fontSize: 36, display: 'block', marginBottom: 12 }} />
+      <div style={{ fontWeight: 500, marginBottom: 6 }}>{error}</div>
+      <button className="btn-secondary" onClick={onRetry}>
+        <i className="ti ti-refresh" /> {tr('retry')}
+      </button>
+    </div>
+  )
+}
+
+function EmptyState({ tr }) {
+  return (
+    <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-tertiary)' }}>
+      <i className="ti ti-music-off" style={{ fontSize: 40, display: 'block', marginBottom: 12 }} />
+      <div style={{ fontSize: 14, fontWeight: 500 }}>{tr('noResult')}</div>
+    </div>
+  )
+}
+
+function VolumeControl({ previewLevel, isMuted, isAtGlobal, onLevelChange, onMuteToggle, onReset }) {
+  return (
+    <div style={{ 
+      display: 'flex', 
+      alignItems: 'center', 
+      gap: 6,
+      background: 'var(--bg-tertiary)',
+      padding: '4px 10px 4px 6px',
+      borderRadius: 'var(--radius-md)',
+      border: '1px solid var(--border)',
+      minWidth: 160
+    }}>
+      <button
+        onClick={() => onLevelChange(Math.max(0, previewLevel - 5))}
+        disabled={previewLevel <= 0}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          borderRadius: 4,
+          color: previewLevel <= 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)',
+          cursor: previewLevel <= 0 ? 'default' : 'pointer',
+          padding: '4px 6px',
+          fontSize: 16,
+          opacity: previewLevel <= 0 ? 0.4 : 1
+        }}
+        title="Diminuer (-5%)"
+      >
+        <i className="ti ti-minus" />
+      </button>
+
+      <div 
+        style={{ 
+          flex: 1,
+          height: 6,
+          background: 'var(--bg-secondary)',
+          borderRadius: 3,
+          position: 'relative',
+          cursor: 'pointer',
+          minWidth: 60,
+          border: '1px solid var(--border)',
+          overflow: 'visible'
+        }}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect()
+          const x = (e.clientX - rect.left) / rect.width
+          onLevelChange(Math.max(0, Math.min(100, Math.round(x * 100))))
+        }}
+      >
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          height: '100%',
+          width: `${previewLevel}%`,
+          background: isMuted ? 'var(--danger)' : previewLevel < 30 ? 'var(--warning)' : 'var(--accent)',
+          borderRadius: 3,
+          transition: 'width 0.15s ease, background 0.3s ease',
+          boxShadow: isMuted ? 'none' : '0 0 8px rgba(124,111,247,0.2)'
+        }} />
+
+        <div style={{
+          position: 'absolute',
+          top: -4,
+          left: '50%',
+          width: 2,
+          height: 14,
+          background: 'rgba(255,255,255,0.3)',
+          borderRadius: 1,
+          transform: 'translateX(-50%)',
+          pointerEvents: 'none',
+          zIndex: 2
+        }} />
+
+        {previewLevel > 0 && previewLevel < 100 && (
+          <div style={{
+            position: 'absolute',
+            top: -3,
+            left: `${previewLevel}%`,
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: isMuted ? 'var(--danger)' : 'var(--accent)',
+            transform: 'translateX(-50%)',
+            pointerEvents: 'none',
+            zIndex: 3,
+            boxShadow: '0 0 10px rgba(124,111,247,0.4)',
+            border: '2px solid var(--bg-tertiary)'
+          }} />
+        )}
+      </div>
+
+      <button
+        onClick={() => onLevelChange(Math.min(100, previewLevel + 5))}
+        disabled={previewLevel >= 100}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          borderRadius: 4,
+          color: previewLevel >= 100 ? 'var(--text-tertiary)' : 'var(--text-secondary)',
+          cursor: previewLevel >= 100 ? 'default' : 'pointer',
+          padding: '4px 6px',
+          fontSize: 16,
+          opacity: previewLevel >= 100 ? 0.4 : 1
+        }}
+        title="Augmenter (+5%)"
+      >
+        <i className="ti ti-plus" />
+      </button>
+
+      <div style={{ display: 'flex', gap: 2, marginLeft: 2 }}>
+        <button
+          onClick={onMuteToggle}
+          style={{
+            background: isMuted ? 'rgba(224,82,82,0.15)' : 'transparent',
+            border: 'none',
+            borderRadius: 4,
+            color: isMuted ? 'var(--danger)' : 'var(--text-tertiary)',
+            cursor: 'pointer',
+            padding: '4px 4px',
+            fontSize: 14
+          }}
+          title={isMuted ? 'Activer le son' : 'Couper le son'}
+        >
+          <i className={`ti ${isMuted ? 'ti-volume-off' : previewLevel < 30 ? 'ti-volume-2' : 'ti-volume'}`} />
+        </button>
+
+        {!isAtGlobal && !isMuted && (
+          <button
+            onClick={onReset}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderRadius: 4,
+              color: 'var(--text-tertiary)',
+              cursor: 'pointer',
+              padding: '4px 4px',
+              fontSize: 13
+            }}
+            title="Réinitialiser au volume global"
+          >
+            <i className="ti ti-refresh" />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SoundGrid({ sounds, downloadedNames, downloading, previewing, onPreview, onDownload, lang, tr }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+      {sounds.map(sound => {
+        const owned = downloadedNames.includes(sound.name.toLowerCase().trim())
+        const isDownloading = downloading[sound.id]
+        const isPreviewing = previewing === sound.id
+        
+        return (
+          <SoundDiscoverCard
+            key={sound.id}
+            sound={sound}
+            owned={owned}
+            isDownloading={isDownloading}
+            isPreviewing={isPreviewing}
+            onPreview={() => onPreview(sound)}
+            onDownload={() => onDownload(sound)}
+            lang={lang}
+            tr={tr}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPreview, onDownload, lang, tr }) {
   return (
     <div style={{
       background: 'var(--bg-secondary)',
       border: `1px solid ${isPreviewing ? 'var(--accent)' : owned ? 'var(--success)' : 'var(--border)'}`,
-      borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+      borderRadius: 'var(--radius-lg)',
+      overflow: 'hidden',
       transition: 'border-color 0.15s',
       boxShadow: isPreviewing ? '0 0 0 3px rgba(124,111,247,0.2)' : 'none'
     }}>
@@ -674,32 +591,54 @@ function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPrevie
         onClick={onPreview}
         style={{
           background: isPreviewing ? 'var(--accent-light)' : 'var(--bg-tertiary)',
-          padding: '18px 0', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 38, cursor: 'pointer', position: 'relative', transition: 'background 0.15s'
+          padding: '18px 0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 38,
+          cursor: 'pointer',
+          position: 'relative',
+          transition: 'background 0.15s'
         }}
         title={tr('clickToListen')}
       >
         {sound.emoji}
-        <div style={{
-          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: isPreviewing ? 'rgba(124,111,247,0.3)' : 'transparent', transition: 'background 0.15s'
-        }}>
-          {isPreviewing && (
+        {isPreviewing && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(124,111,247,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
             <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 20 }}>
-              {[1,2,3,4].map(i => (
-                <div key={i} style={{
-                  width: 4, borderRadius: 2, background: 'var(--accent)',
-                  animation: `wave ${0.6 + i * 0.1}s ease-in-out infinite alternate`,
-                  height: `${40 + i * 15}%`
-                }} />
+              {[1, 2, 3, 4].map(i => (
+                <div
+                  key={i}
+                  style={{
+                    width: 4,
+                    borderRadius: 2,
+                    background: 'var(--accent)',
+                    animation: `wave ${0.6 + i * 0.1}s ease-in-out infinite alternate`,
+                    height: `${40 + i * 15}%`
+                  }}
+                />
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div style={{ padding: '10px 12px' }}>
-        <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={sound.name}>
+        <div style={{
+          fontWeight: 500,
+          fontSize: 13,
+          marginBottom: 8,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }} title={sound.name}>
           {sound.name}
         </div>
 
@@ -707,13 +646,17 @@ function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPrevie
           <button
             onClick={onPreview}
             style={{
-              flex: '0 0 auto', padding: '5px 8px', borderRadius: 'var(--radius-sm)',
+              flex: '0 0 auto',
+              padding: '5px 8px',
+              borderRadius: 'var(--radius-sm)',
               border: `1px solid ${isPreviewing ? 'var(--accent)' : 'var(--border)'}`,
               background: isPreviewing ? 'var(--accent-light)' : 'transparent',
               color: isPreviewing ? 'var(--accent)' : 'var(--text-secondary)',
-              fontSize: 12, cursor: 'pointer'
+              fontSize: 12,
+              cursor: 'pointer'
             }}
-            title={isPreviewing ? tr('stopBtn') : tr('previewBtn')}>
+            title={isPreviewing ? tr('stopBtn') : tr('previewBtn')}
+          >
             <i className={`ti ${isPreviewing ? 'ti-player-stop-filled' : 'ti-player-play'}`} />
           </button>
 
@@ -721,14 +664,21 @@ function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPrevie
             onClick={() => !owned && !isDownloading && onDownload()}
             disabled={owned || isDownloading}
             style={{
-              flex: 1, padding: '5px 0', borderRadius: 'var(--radius-sm)',
+              flex: 1,
+              padding: '5px 0',
+              borderRadius: 'var(--radius-sm)',
               border: `1px solid ${owned ? 'var(--success)' : 'var(--accent)'}`,
               background: 'transparent',
               color: owned ? 'var(--success)' : 'var(--accent)',
-              fontSize: 12, cursor: owned ? 'default' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+              fontSize: 12,
+              cursor: owned ? 'default' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
               opacity: isDownloading ? 0.7 : 1
-            }}>
+            }}
+          >
             <i className={`ti ${owned ? 'ti-check' : isDownloading ? 'ti-loader' : 'ti-download'}`}
               style={isDownloading ? { animation: 'spin 1s linear infinite' } : {}} />
             {owned ? tr('alreadyAdded') : isDownloading ? '...' : tr('downloadBtn')}
@@ -741,14 +691,18 @@ function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPrevie
           from { transform: scaleY(0.4); }
           to { transform: scaleY(1); }
         }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
       `}</style>
     </div>
   )
 }
 
-function ProfilePickerModal({ sound, profiles, onConfirm, onClose, lang }) {
-  const tr = useTranslation(lang || 'fr')
+function ProfilePickerModal({ sound, profiles, onConfirm, onClose, lang, tr }) {
   const [selectedProfile, setSelectedProfile] = useState('all')
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal fade-in" onClick={e => e.stopPropagation()}>
@@ -758,17 +712,29 @@ function ProfilePickerModal({ sound, profiles, onConfirm, onClose, lang }) {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {profiles.map(p => (
-            <label key={p.id} style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-              borderRadius: 'var(--radius-md)',
-              border: `1px solid ${selectedProfile === p.id ? 'var(--accent)' : 'var(--border)'}`,
-              background: selectedProfile === p.id ? 'var(--accent-light)' : 'transparent',
-              cursor: 'pointer'
-            }}>
-              <input type="radio" name="profile" value={p.id} checked={selectedProfile === p.id}
-                onChange={() => setSelectedProfile(p.id)} style={{ accentColor: 'var(--accent)', width: 'auto' }} />
+            <label
+              key={p.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '8px 12px',
+                borderRadius: 'var(--radius-md)',
+                border: `1px solid ${selectedProfile === p.id ? 'var(--accent)' : 'var(--border)'}`,
+                background: selectedProfile === p.id ? 'var(--accent-light)' : 'transparent',
+                cursor: 'pointer'
+              }}
+            >
+              <input
+                type="radio"
+                name="profile"
+                value={p.id}
+                checked={selectedProfile === p.id}
+                onChange={() => setSelectedProfile(p.id)}
+                style={{ accentColor: 'var(--accent)', width: 'auto' }}
+              />
               <i className={`ti ${p.isDefault ? 'ti-stack' : 'ti-user'}`} style={{ color: 'var(--text-secondary)' }} />
-              <span style={{ fontSize: 13 }}>{p.name}</span>
+              <span style={{ fontSize: 13 }}>{p.id === 'all' ? tr('allSounds') : p.name}</span>
             </label>
           ))}
         </div>
