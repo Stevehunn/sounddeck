@@ -1,4 +1,3 @@
-// sounddeck/src/pages/Options.jsx
 import { useState, useEffect, useRef, forwardRef, useCallback } from 'react'
 import ShortcutRecorder from '../components/ShortcutRecorder'
 import CustomThemeEditor from '../components/CustomThemeEditor'
@@ -8,11 +7,11 @@ import KeyboardVisualizer from '../components/KeyboardVisualizer'
 
 // Définition des sections
 const SECTIONS = [
-  { id: 'appearance', icon: 'ti-palette', label: 'Apparence' },
-  { id: 'audio', icon: 'ti-volume', label: 'Audio' },
-  { id: 'shortcuts', icon: 'ti-keyboard', label: 'Raccourcis' },
-  { id: 'backup', icon: 'ti-cloud', label: 'Sauvegarde' },
-  { id: 'profiles', icon: 'ti-users', label: 'Profils' },
+  { id: 'appearance', icon: 'ti-palette', labelKey: 'optionsAppearance' },
+  { id: 'audio', icon: 'ti-volume', labelKey: 'optionsAudio' },
+  { id: 'shortcuts', icon: 'ti-keyboard', labelKey: 'optionsShortcuts' },
+  { id: 'backup', icon: 'ti-cloud', labelKey: 'optionsBackup' },
+  { id: 'profiles', icon: 'ti-users', labelKey: 'optionsProfiles' },
 ]
 
 // Composant Section avec forwardRef
@@ -98,9 +97,8 @@ export default function Options({ store, addToast, lang = 'fr' }) {
     detectDevices()
   }, [])
 
-  // ✅ NOUVEAU : Observer les sections pour mettre à jour la navigation
+  // Observer les sections pour mettre à jour la navigation
   useEffect(() => {
-    // Attendre que les refs soient disponibles
     const setupObserver = () => {
       const sections = SECTIONS.map(s => sectionRefs.current[s.id]).filter(Boolean)
       
@@ -109,17 +107,14 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         return
       }
 
-      // Nettoyer l'ancien observer
       if (observerRef.current) {
         observerRef.current.disconnect()
       }
 
       const observer = new IntersectionObserver(
         (entries) => {
-          // Si l'utilisateur est en train de scroller, on ne met pas à jour
           if (isScrollingRef.current) return
 
-          // Trouver la section la plus visible
           let maxRatio = 0
           let maxId = null
 
@@ -131,7 +126,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             }
           })
 
-          // Si on a trouvé une section visible avec un ratio > 0.3
           if (maxId && maxRatio > 0.2) {
             setActiveSection(maxId)
           }
@@ -153,7 +147,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
       }
     }
 
-    // Initialiser l'observer après un court délai
     const timer = setTimeout(setupObserver, 200)
     return () => {
       clearTimeout(timer)
@@ -161,18 +154,16 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         observerRef.current.disconnect()
       }
     }
-  }, []) // Se déclenche une fois au montage
+  }, [])
 
   const scrollToSection = (sectionId) => {
     const ref = sectionRefs.current[sectionId]
     if (ref) {
-      // Marquer que l'utilisateur est en train de scroller
       isScrollingRef.current = true
       setActiveSection(sectionId)
       
       ref.scrollIntoView({ behavior: 'smooth', block: 'start' })
       
-      // Réactiver l'observation après le défilement
       setTimeout(() => {
         isScrollingRef.current = false
       }, 800)
@@ -331,7 +322,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               }}
             >
               <i className={`ti ${section.icon}`} style={{ fontSize: 13 }} />
-              {section.label}
+              {tr(section.labelKey)}
             </button>
           ))}
         </div>
@@ -343,7 +334,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         <Section 
           ref={el => sectionRefs.current['appearance'] = el}
           id="appearance"
-          title="Apparence" 
+          title={tr('optionsAppearance')} 
           icon="ti-palette"
         >
           <OptionRow label={tr('language')}>
@@ -406,7 +397,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         <Section 
           ref={el => sectionRefs.current['audio'] = el}
           id="audio"
-          title="Audio" 
+          title={tr('optionsAudio')} 
           icon="ti-volume"
         >
           <OptionRow label={tr('audioMode')} sub={tr('audioModeDesc')}>
@@ -877,7 +868,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         <Section 
           ref={el => sectionRefs.current['shortcuts'] = el}
           id="shortcuts"
-          title="Raccourcis" 
+          title={tr('optionsShortcuts')} 
           icon="ti-keyboard"
         >
           <OptionRow label={tr('keyboardLayout')} sub={tr('keyboardLayoutDesc')}>
@@ -979,7 +970,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         <Section 
           ref={el => sectionRefs.current['backup'] = el}
           id="backup"
-          title="Sauvegarde" 
+          title={tr('optionsBackup')} 
           icon="ti-cloud"
         >
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -1069,7 +1060,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         <Section 
           ref={el => sectionRefs.current['profiles'] = el}
           id="profiles"
-          title="Profils" 
+          title={tr('optionsProfiles')} 
           icon="ti-users"
         >
           {store.profiles.map(p => (

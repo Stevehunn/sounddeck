@@ -254,6 +254,11 @@ export const TRANSLATIONS = {
     uninstallGuideStep1: 'Va dans Panneau de configuration → Programmes → Désinstaller un programme',
     uninstallGuideStep2: 'Cherche "VB-CABLE" et désinstalle-le.',
     uninstallGuideRestart: '⚠️ Un redémarrage du PC peut être nécessaire après la désinstallation.',
+    optionsAppearance: 'Apparence',
+    optionsAudio: 'Audio',
+    optionsShortcuts: 'Raccourcis',
+    optionsBackup: 'Sauvegarde',
+    optionsProfiles: 'Profils',
 
     // Dans la section Options (audio)
     mixerEnable: 'Mixeur micro + sons',
@@ -856,6 +861,11 @@ export const TRANSLATIONS = {
     uninstallGuideStep1: 'Go to Control Panel → Programs → Uninstall a program',
     uninstallGuideStep2: 'Search for "VB-CABLE" and uninstall it.',
     uninstallGuideRestart: '⚠️ A PC restart may be required after uninstallation.',
+    optionsAppearance: 'Appearance',
+    optionsAudio: 'Audio',
+    optionsShortcuts: 'Shortcuts',
+    optionsBackup: 'Backup',
+    optionsProfiles: 'Profiles',
 
     mixerEnable: 'Mixer mic + sounds',
     mixerEnableDesc: 'Mix your microphone with sounds',
@@ -1448,6 +1458,11 @@ export const TRANSLATIONS = {
     uninstallGuideStep1: 'Ve a Panel de control → Programas → Desinstalar un programa',
     uninstallGuideStep2: 'Busca "VB-CABLE" y desinstálalo.',
     uninstallGuideRestart: '⚠️ Puede ser necesario reiniciar el PC después de la desinstalación.',
+    optionsAppearance: 'Apariencia',
+    optionsAudio: 'Audio',
+    optionsShortcuts: 'Atajos',
+    optionsBackup: 'Copia de seguridad',
+    optionsProfiles: 'Perfiles',
 
     mixerEnable: 'Mezclador micro + sonidos',
     mixerEnableDesc: 'Mezcla tu micrófono con los sonidos',
