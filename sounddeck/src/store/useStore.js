@@ -56,7 +56,6 @@ export function useStore() {
   // Keyboard
   const [keyboardLayout, setKeyboardLayout] = useState('qwerty')
 
-
   // ─── Chargement initial depuis electron-store ────────────────────────────────
   useEffect(() => {
     async function loadData() {
@@ -231,10 +230,34 @@ export function useStore() {
     await switchProfile(next.id)
   }, [profiles, currentProfileId, switchProfile])
 
+  // ─── Réorganisation des profils ──────────────────────────────────────────────
+  const reorderProfiles = useCallback(async (startIndex, endIndex) => {
+    // Ne pas permettre de déplacer le profil "all"
+    const userProfiles = profiles.filter(p => p.id !== 'all')
+    
+    if (startIndex < 0 || startIndex >= userProfiles.length || 
+        endIndex < 0 || endIndex >= userProfiles.length) {
+      console.warn('Indices invalides pour reorderProfiles:', startIndex, endIndex)
+      return false
+    }
+    
+    // Créer une copie du tableau des profils utilisateur
+    const reordered = [...userProfiles]
+    const [removed] = reordered.splice(startIndex, 1)
+    reordered.splice(endIndex, 0, removed)
+    
+    // Reconstruire la liste complète des profils
+    const allProfile = profiles.find(p => p.id === 'all')
+    const newProfiles = [allProfile, ...reordered]
+    
+    setProfiles(newProfiles)
+    await save('profiles', reordered) // Ne sauvegarder que les profils utilisateur
+    return true
+  }, [profiles, save])
+
   // ─── Sons ─────────────────────────────────────────────────────────────────────
   const normalizePath = (p) => p ? p.replace(/\\/g, '/') : p
 
-  // ✅ MODIFICATION 1 : favorites est maintenant un tableau
   const addSound = useCallback(async (soundData) => {
     const newSound = {
       id: uuidv4(),
@@ -242,7 +265,7 @@ export function useStore() {
       path: normalizePath(soundData.path),
       image: normalizePath(soundData.image) || null,
       emoji: soundData.emoji || '🔊',
-      favorites: [], // ✅ CHANGEMENT : favorite: false → favorites: []
+      favorites: [],
       profiles: soundData.profiles || ['all'],
       volume: 0,
       volumeDb: 0,
@@ -314,27 +337,21 @@ export function useStore() {
     await save('sounds', updated)
   }, [sounds, save])
 
-  // ✅ MODIFICATION 2 : toggleFavorite avec gestion des profils
-const toggleFavorite = useCallback(async (soundId) => {
-  const profileId = currentProfileId || 'all';
-  
-  // ✅ AUTORISER le toggle pour le profil "all" également
-  // On utilise "all" comme ID de profil pour les favoris globaux
-
-  const updated = sounds.map(s => {
-    if (s.id !== soundId) return s;
-    const isFav = s.favorites?.includes(profileId) || false;
-    return {
-      ...s,
-      favorites: isFav
-        ? s.favorites.filter(id => id !== profileId)
-        : [...(s.favorites || []), profileId]
-    };
-  });
-  
-  setSounds(updated);
-  await save('sounds', updated);
-}, [sounds, currentProfileId, save]);
+  const toggleFavorite = useCallback(async (soundId) => {
+    const profileId = currentProfileId || 'all'
+    const updated = sounds.map(s => {
+      if (s.id !== soundId) return s
+      const isFav = s.favorites?.includes(profileId) || false
+      return {
+        ...s,
+        favorites: isFav
+          ? s.favorites.filter(id => id !== profileId)
+          : [...(s.favorites || []), profileId]
+      }
+    })
+    setSounds(updated)
+    await save('sounds', updated)
+  }, [sounds, currentProfileId, save])
 
   const addSoundToProfile = useCallback(async (soundId, profileId) => {
     const updated = sounds.map(s => {
@@ -625,27 +642,23 @@ const toggleFavorite = useCallback(async (soundId) => {
         repairMixer
       } = await import('../utils/audioMixer')
       
-      // Vérifier si déjà opérationnel
       if (isMixerOperational()) {
         console.log('✅ Mixeur déjà opérationnel')
         return true
       }
       
-      // Essayer de réparer d'abord
       const repaired = repairMixer()
       if (repaired && isMixerOperational()) {
         console.log('✅ Mixeur réparé avec succès')
         return true
       }
       
-      // Sinon, initialiser complètement
       const mixedStream = await initAudioMixer(microphoneDevice || 'default')
       
       if (mixedStream) {
         resumeAudioContext()
         connectMixerToOutput(audioDevice || 'default')
         
-        // Appliquer le mode de réduction de bruit sauvegardé
         if (noiseSuppressionMode && noiseSuppressionMode !== 'off') {
           try {
             setNoiseSuppressionMode(noiseSuppressionMode)
@@ -659,14 +672,12 @@ const toggleFavorite = useCallback(async (soundId) => {
         return true
       } else {
         console.warn('⚠️ Échec de l\'initialisation automatique du mixeur')
-        // Désactiver le mixeur pour éviter les erreurs
         setMixerEnabled(false)
         await save('mixerEnabled', false)
         return false
       }
     } catch (e) {
       console.error('❌ Erreur lors de l\'initialisation automatique du mixeur:', e)
-      // Désactiver le mixeur pour éviter les erreurs
       setMixerEnabled(false)
       await save('mixerEnabled', false)
       return false
@@ -674,7 +685,6 @@ const toggleFavorite = useCallback(async (soundId) => {
   }, [mixerEnabled, microphoneDevice, audioDevice, noiseSuppressionMode, save])
 
   const updateMicrophoneDeviceId = useCallback(async (deviceId) => {
-    // Vérifier si le deviceId existe
     if (deviceId && deviceId !== 'default') {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices()
@@ -739,10 +749,8 @@ const toggleFavorite = useCallback(async (soundId) => {
 
   // favoriteSounds dynamique par profil
   const favoriteSounds = useMemo(() => {
-  // ✅ Pour le profil "all", on montre les favoris marqués avec "all"
-  // Pour les autres profils, on montre les favoris de ce profil
-  return orderedSounds.filter(s => s.favorites?.includes(currentProfileId) || false);
-}, [orderedSounds, currentProfileId]);
+    return orderedSounds.filter(s => s.favorites?.includes(currentProfileId) || false)
+  }, [orderedSounds, currentProfileId])
 
   return {
     // État
@@ -754,10 +762,10 @@ const toggleFavorite = useCallback(async (soundId) => {
     normalizationEnabled, normalizationTarget,
     // Profils
     createProfile, deleteProfile, renameProfile, switchProfile, switchToNextProfile,
+    reorderProfiles,
     // Sons
     addSound, deleteSound, updateSound, updateSoundVolume, incrementPlayCount, toggleFavorite, 
     addSoundToProfile, removeSoundFromProfile, reorderSounds,
-    // ✅ NOUVEAUX
     updateSoundImage,
     updateSoundEmoji,
     // Raccourcis
@@ -813,5 +821,7 @@ const toggleFavorite = useCallback(async (soundId) => {
     // Keyboard
     keyboardLayout,
     updateKeyboardLayout,
+    // Gain cache
+    resetGainCache,
   }
 }

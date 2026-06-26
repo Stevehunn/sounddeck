@@ -243,6 +243,7 @@ export default function App() {
         onPresentation={() => setPresentationMode(true)}
         lang={store.lang}
         addToast={addToast}
+        onReorderProfiles={store.reorderProfiles}
       />
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>

@@ -21,6 +21,7 @@ export const TRANSLATIONS = {
     volume: 'Volume',
     stopAll: 'Stop tous les sons',
     presentation: 'Présentation',
+    dragToReorder: 'Glisser pour réorganiser',
 
     // ── App ───────────────────────────────────────────────────────────────────
     appLoading: 'Chargement de SoundDeck...',
@@ -628,6 +629,7 @@ export const TRANSLATIONS = {
     volume: 'Volume',
     stopAll: 'Stop all sounds',
     presentation: 'Presentation',
+    dragToReorder: 'Drag to reorder',
 
     // ── App ───────────────────────────────────────────────────────────────────
     appLoading: 'Loading SoundDeck...',
@@ -1225,6 +1227,7 @@ export const TRANSLATIONS = {
     volume: 'Volumen',
     stopAll: 'Parar todos',
     presentation: 'Presentación',
+    dragToReorder: 'Arrastrar para reorganizar',
 
     // ── App ───────────────────────────────────────────────────────────────────
     appLoading: 'Cargando SoundDeck...',

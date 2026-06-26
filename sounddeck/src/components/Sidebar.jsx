@@ -1,14 +1,32 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from '../i18n'
 
-export default function Sidebar({ profiles, currentProfileId, currentPage, onSwitchProfile,
-  onChangePage, onCreateProfile, onToggleLoop, loopEnabled, addToast,
-  volume, onVolumeChange, onStopAll, onPresentation, lang }) {
+export default function Sidebar({ 
+  profiles, 
+  currentProfileId, 
+  currentPage, 
+  onSwitchProfile,
+  onChangePage, 
+  onCreateProfile, 
+  onToggleLoop, 
+  loopEnabled, 
+  addToast,
+  volume, 
+  onVolumeChange, 
+  onStopAll, 
+  onPresentation, 
+  lang,
+  onReorderProfiles // Nouveau prop
+}) {
 
   const [newProfileName, setNewProfileName] = useState('')
   const [showNewProfile, setShowNewProfile] = useState(false)
   const [shortcutsEnabled, setShortcutsEnabled] = useState(true)
   const tr = useTranslation(lang)
+  
+  // États pour le drag & drop
+  const [draggedProfileId, setDraggedProfileId] = useState(null)
+  const [dragOverProfileId, setDragOverProfileId] = useState(null)
 
   useEffect(() => {
     window.electronAPI.getGlobalShortcutsState().then(enabled => {
@@ -41,6 +59,81 @@ export default function Sidebar({ profiles, currentProfileId, currentPage, onSwi
       console.error('Erreur toggle shortcuts:', e)
     }
   }
+
+  // ─── Gestion du drag & drop des profils ──────────────────────────────────
+
+  const handleProfileDragStart = (e, profileId) => {
+    // Ne pas permettre de drag le profil "all"
+    if (profileId === 'all') {
+      e.preventDefault()
+      return
+    }
+    setDraggedProfileId(profileId)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', profileId)
+    // Ajouter un effet visuel sur l'élément dragué
+    setTimeout(() => {
+      if (e.target) {
+        e.target.style.opacity = '0.4'
+      }
+    }, 0)
+  }
+
+  const handleProfileDragEnd = (e) => {
+    if (e.target) {
+      e.target.style.opacity = '1'
+    }
+    setDraggedProfileId(null)
+    setDragOverProfileId(null)
+  }
+
+  const handleProfileDragOver = (e, profileId) => {
+    e.preventDefault()
+    // Ne pas permettre de drop sur "all"
+    if (profileId === 'all') return
+    setDragOverProfileId(profileId)
+  }
+
+  const handleProfileDragLeave = (e) => {
+    setDragOverProfileId(null)
+  }
+
+  const handleProfileDrop = async (e, targetProfileId) => {
+    e.preventDefault()
+    // Ne pas permettre de drop sur "all"
+    if (targetProfileId === 'all') return
+    
+    const sourceId = e.dataTransfer.getData('text/plain')
+    if (!sourceId || sourceId === targetProfileId) {
+      setDraggedProfileId(null)
+      setDragOverProfileId(null)
+      return
+    }
+
+    // Obtenir la liste des profils utilisateur (sans "all")
+    const userProfiles = profiles.filter(p => p.id !== 'all')
+    
+    const startIndex = userProfiles.findIndex(p => p.id === sourceId)
+    const endIndex = userProfiles.findIndex(p => p.id === targetProfileId)
+    
+    if (startIndex === -1 || endIndex === -1) {
+      setDraggedProfileId(null)
+      setDragOverProfileId(null)
+      return
+    }
+
+    const success = await onReorderProfiles(startIndex, endIndex)
+    
+    if (success) {
+      addToast('Profil déplacé', 'success')
+    }
+    
+    setDraggedProfileId(null)
+    setDragOverProfileId(null)
+  }
+
+  // Récupérer les profils utilisateur (sans "all") pour le drag & drop
+  const userProfiles = profiles.filter(p => p.id !== 'all')
 
   return (
     <aside style={{
@@ -81,19 +174,86 @@ export default function Sidebar({ profiles, currentProfileId, currentPage, onSwi
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
         {/* Profils */}
-        <div style={{ padding: '8px 12px 4px', fontSize: 11, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>
-          {tr('profiles')}
+        <div style={{ padding: '8px 12px 4px' }}>
+          <div style={{ 
+            fontSize: 11, 
+            color: 'var(--text-tertiary)', 
+            textTransform: 'uppercase', 
+            letterSpacing: '0.06em', 
+            fontWeight: 500
+          }}>
+            {tr('profiles')}
+          </div>
+          <div style={{ 
+            fontSize: 9, 
+            color: 'var(--text-tertiary)', 
+            fontWeight: 400,
+            marginTop: 2,
+            opacity: 0.6
+          }}>
+            <i className="ti ti-grip-vertical" style={{ fontSize: 10 }} /> {tr('dragToReorder')}
+          </div>
         </div>
 
-        {profiles.map(profile => (
+        {/* Profil "Tous les sons" - non déplaçable */}
+        {profiles.filter(p => p.id === 'all').map(profile => (
           <SidebarItem key={profile.id}
             icon={profile.isDefault ? 'ti-stack' : 'ti-user'}
             label={profile.id === 'all' ? tr('allSounds') : profile.name}
             active={currentProfileId === profile.id && currentPage === 'home'}
             dot={currentProfileId === profile.id}
             onClick={() => { onSwitchProfile(profile.id); onChangePage('home') }}
+            draggable={false}
           />
         ))}
+
+        {/* Profils utilisateur - avec drag & drop */}
+        {userProfiles.map((profile, index) => {
+          const isDragging = draggedProfileId === profile.id
+          const isDragOver = dragOverProfileId === profile.id && !isDragging
+          
+          return (
+            <div
+              key={profile.id}
+              draggable={true}
+              onDragStart={(e) => handleProfileDragStart(e, profile.id)}
+              onDragEnd={handleProfileDragEnd}
+              onDragOver={(e) => handleProfileDragOver(e, profile.id)}
+              onDragLeave={handleProfileDragLeave}
+              onDrop={(e) => handleProfileDrop(e, profile.id)}
+              style={{
+                opacity: isDragging ? 0.3 : 1,
+                transform: isDragOver ? 'scale(1.02)' : 'scale(1)',
+                transition: 'transform 0.15s, opacity 0.15s',
+                position: 'relative',
+                zIndex: isDragging ? 10 : 1,
+                cursor: 'grab'
+              }}
+            >
+              {isDragOver && (
+                <div style={{
+                  position: 'absolute',
+                  top: -2, left: 4, right: 4,
+                  height: 2,
+                  background: 'var(--accent)',
+                  borderRadius: 1,
+                  pointerEvents: 'none',
+                  zIndex: 5,
+                  animation: 'fadeIn 0.15s ease'
+                }} />
+              )}
+              <SidebarItem 
+                icon={profile.isDefault ? 'ti-stack' : 'ti-user'}
+                label={profile.id === 'all' ? tr('allSounds') : profile.name}
+                active={currentProfileId === profile.id && currentPage === 'home'}
+                dot={currentProfileId === profile.id}
+                onClick={() => { onSwitchProfile(profile.id); onChangePage('home') }}
+                draggable={true}
+                showDragHandle={true}
+              />
+            </div>
+          )
+        })}
 
         {showNewProfile ? (
           <div style={{ padding: '4px 12px', display: 'flex', gap: 4 }}>
@@ -184,11 +344,18 @@ export default function Sidebar({ profiles, currentProfileId, currentPage, onSwi
         <SidebarItem icon="ti-book" label={tr('guide')} active={currentPage === 'guide'} onClick={() => onChangePage('guide')} />
         <SidebarItem icon="ti-settings" label={tr('options')} active={currentPage === 'options'} onClick={() => onChangePage('options')} />
       </div>
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scaleX(0.8); }
+          to { opacity: 1; transform: scaleX(1); }
+        }
+      `}</style>
     </aside>
   )
 }
 
-function SidebarItem({ icon, label, active, dot, muted, onClick }) {
+function SidebarItem({ icon, label, active, dot, muted, onClick, draggable = false, showDragHandle = false }) {
   return (
     <button onClick={onClick} style={{
       width: '100%', display: 'flex', alignItems: 'center', gap: 8,
@@ -197,11 +364,14 @@ function SidebarItem({ icon, label, active, dot, muted, onClick }) {
       borderTop: 'none', borderRight: 'none', borderBottom: 'none',
       borderLeft: `2px solid ${active ? 'var(--accent)' : 'transparent'}`,
       fontSize: 13, fontWeight: active ? 500 : 400, textAlign: 'left',
-      cursor: 'pointer',
+      cursor: draggable ? 'grab' : 'pointer',
     }}
       onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-hover)' }}
       onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}>
-      <i className={`ti ${icon}`} style={{ fontSize: 16 }} />
+      {showDragHandle && (
+        <i className="ti ti-grip-vertical" style={{ fontSize: 12, color: 'var(--text-tertiary)', opacity: 0.4 }} />
+      )}
+      {!showDragHandle && <i className={`ti ${icon}`} style={{ fontSize: 16 }} />}
       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
       {dot && <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)', flexShrink: 0 }} />}
     </button>
