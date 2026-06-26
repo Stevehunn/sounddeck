@@ -586,12 +586,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                           } catch { return 'var(--text-tertiary)' }
                         })()
                       }}>
-                        <i className={`ti ${(() => {
-                          try {
-                            const { isMixerOperational } = require('../utils/audioMixer')
-                            return isMixerOperational() ? 'ti-check' : 'ti-x'
-                          } catch { return 'ti-minus' }
-                        })()}`} />
                         <span style={{ marginLeft: 4, fontSize: 11 }}>
                           {(() => {
                             try {
@@ -601,31 +595,40 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                           })()}
                         </span>
                       </span>
-                      <button className="btn-secondary" onClick={async () => {
-                        try {
-                          const { repairMixer, isMixerOperational } = await import('../utils/audioMixer')
-                          if (!isMixerOperational()) {
-                            const success = repairMixer()
-                            if (success) {
-                              addToast(tr('mixerRepaired'), 'success')
-                            } else {
-                              addToast(tr('mixerReset'), 'info')
-                              const { stopMixer, initAudioMixer, connectMixerToOutput, resumeAudioContext } = await import('../utils/audioMixer')
-                              await stopMixer()
-                              const stream = await initAudioMixer(store.microphoneDevice || 'default')
-                              if (stream) {
-                                resumeAudioContext()
-                                connectMixerToOutput(store.audioDevice || 'default')
-                                addToast(tr('mixerResetSuccess'), 'success')
+                      <button 
+                        className="btn-secondary" 
+                        onClick={async () => {
+                          try {
+                            const { repairMixer, isMixerOperational } = await import('../utils/audioMixer')
+                            if (!isMixerOperational()) {
+                              const success = repairMixer()
+                              if (success) {
+                                addToast(tr('mixerRepaired'), 'success')
+                              } else {
+                                addToast(tr('mixerReset'), 'info')
+                                const { stopMixer, initAudioMixer, connectMixerToOutput, resumeAudioContext } = await import('../utils/audioMixer')
+                                await stopMixer()
+                                const stream = await initAudioMixer(store.microphoneDevice || 'default')
+                                if (stream) {
+                                  resumeAudioContext()
+                                  connectMixerToOutput(store.audioDevice || 'default')
+                                  addToast(tr('mixerResetSuccess'), 'success')
+                                }
                               }
+                            } else {
+                              addToast(tr('mixerOperational'), 'success')
                             }
-                          } else {
-                            addToast(tr('mixerOperational'), 'success')
+                          } catch (e) {
+                            addToast(tr('mixerRepairError').replace('{error}', e.message), 'error')
                           }
-                        } catch (e) {
-                          addToast(tr('mixerRepairError').replace('{error}', e.message), 'error')
-                        }
-                      }} style={{ fontSize: 12 }}>
+                        }} 
+                        style={{ 
+                          fontSize: 12, 
+                          minHeight: 34, 
+                          padding: '6px 16px',
+                          borderRadius: 'var(--radius-md)'
+                        }}
+                      >
                         <i className="ti ti-wrench" /> {tr('mixerRepair')}
                       </button>
                     </div>
@@ -637,6 +640,9 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                       onClick={testMicrophone} 
                       style={{ 
                         fontSize: 12,
+                        minHeight: 34, 
+                        padding: '6px 16px',
+                        borderRadius: 'var(--radius-md)',
                         borderColor: isMicrophoneTesting ? 'var(--success)' : undefined,
                         background: isMicrophoneTesting ? 'rgba(29,158,117,0.15)' : undefined,
                         color: isMicrophoneTesting ? 'var(--success)' : undefined
@@ -649,20 +655,29 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                   </OptionRow>
 
                   <OptionRow label={tr('reconnectFlow')} sub={tr('reconnectFlowDesc')}>
-                    <button className="btn-secondary" onClick={async () => {
-                      try {
-                        const { connectMixerToOutput, getMixerStats } = await import('../utils/audioMixer')
-                        const stats = getMixerStats()
-                        if (!stats.isInitialized) {
-                          addToast('❌ ' + tr('mixerNotInitialized'), 'error')
-                          return
+                    <button 
+                      className="btn-secondary" 
+                      onClick={async () => {
+                        try {
+                          const { connectMixerToOutput, getMixerStats } = await import('../utils/audioMixer')
+                          const stats = getMixerStats()
+                          if (!stats.isInitialized) {
+                            addToast('❌ ' + tr('mixerNotInitialized'), 'error')
+                            return
+                          }
+                          const result = connectMixerToOutput(store.audioDevice || 'default')
+                          if (result) addToast('✅ ' + tr('flowReconnected'), 'success')
+                        } catch (e) {
+                          addToast('❌ ' + tr('error') + ': ' + e.message, 'error')
                         }
-                        const result = connectMixerToOutput(store.audioDevice || 'default')
-                        if (result) addToast('✅ ' + tr('flowReconnected'), 'success')
-                      } catch (e) {
-                        addToast('❌ ' + tr('error') + ': ' + e.message, 'error')
-                      }
-                    }} style={{ fontSize: 12 }}>
+                      }} 
+                      style={{ 
+                        fontSize: 12, 
+                        minHeight: 34, 
+                        padding: '6px 16px',
+                        borderRadius: 'var(--radius-md)'
+                      }}
+                    >
                       <i className="ti ti-plug" /> {tr('reconnect')}
                     </button>
                   </OptionRow>
@@ -729,10 +744,19 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           </OptionRow>
 
           <OptionRow label={tr('reanalyzeGains')} sub={tr('reanalyzeGainsDesc')}>
-            <button className="btn-secondary" onClick={async () => {
-              await store.resetGainCache?.()
-              addToast(tr('gainCacheCleared'), 'info')
-            }} style={{ fontSize: 12 }}>
+            <button 
+              className="btn-secondary" 
+              onClick={async () => {
+                await store.resetGainCache?.()
+                addToast(tr('gainCacheCleared'), 'info')
+              }} 
+              style={{ 
+                fontSize: 12, 
+                minHeight: 34, 
+                padding: '6px 16px',
+                borderRadius: 'var(--radius-md)'
+              }}
+            >
               <i className="ti ti-refresh" /> {tr('reanalyzeGains')}
             </button>
           </OptionRow>

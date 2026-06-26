@@ -13,14 +13,59 @@ const BASE_TO_SYMBOL = Object.fromEntries(
   Object.entries(SYMBOL_TO_BASE_KEY).map(([symbol, base]) => [base, symbol])
 )
 
-const QWERTY_ROWS = [
-  ['`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='],
-  ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', '\\'],
-  ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', "'"],
-  ['Z', 'X', 'C', 'V', 'B', 'N', 'M', ',', '.', '/']
-]
+// ✅ Layouts de clavier
+const KEYBOARD_LAYOUTS = {
+  qwerty: {
+    rows: [
+      ['`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='],
+      ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', '\\'],
+      ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', "'"],
+      ['Z', 'X', 'C', 'V', 'B', 'N', 'M', ',', '.', '/']
+    ],
+    numpad: ['NumLock', '/', '*', '-', '7', '8', '9', '+', '4', '5', '6', '1', '2', '3', '0', '.']
+  },
+  azerty: {
+    rows: [
+      ['²', '&', 'é', '"', "'", '(', '-', 'è', '_', 'ç', 'à', ')', '='],
+      ['A', 'Z', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '^', '$', '`'],
+      ['Q', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'ù'],
+      ['W', 'X', 'C', 'V', 'B', 'N', ',', ';', ':', '!']
+    ],
+    numpad: ['NumLock', '/', '*', '-', '7', '8', '9', '+', '4', '5', '6', '1', '2', '3', '0', '.']
+  }
+}
 
-const NUMPAD_KEYS = ['NumLock', '/', '*', '-', '7', '8', '9', '+', '4', '5', '6', '1', '2', '3', '0', '.']
+// ✅ Mapping des touches pour AZERTY
+// QWERTY position → AZERTY display
+const QWERTY_TO_AZERTY = {
+  '1': '&', '2': 'é', '3': '"', '4': "'", '5': '(', '6': '-', '7': 'è', '8': '_', '9': 'ç', '0': 'à',
+  'Q': 'A', 'W': 'Z', 'E': 'E', 'R': 'R', 'T': 'T', 'Y': 'Y', 'U': 'U', 'I': 'I', 'O': 'O', 'P': 'P',
+  'A': 'Q', 'S': 'S', 'D': 'D', 'F': 'F', 'G': 'G', 'H': 'H', 'J': 'J', 'K': 'K', 'L': 'L',
+  'Z': 'W', 'X': 'X', 'C': 'C', 'V': 'V', 'B': 'B', 'N': 'N', 'M': 'M',
+  ';': 'M', "'": 'ù',
+  ',': ',', '.': ';', '/': '!'
+}
+
+// AZERTY display → QWERTY position (pour le matching des raccourcis)
+const AZERTY_TO_QWERTY = Object.fromEntries(
+  Object.entries(QWERTY_TO_AZERTY).map(([qwerty, azerty]) => [azerty, qwerty])
+)
+
+// ✅ Fonction pour obtenir la touche affichée selon le layout
+function getDisplayKey(physicalKey, layout) {
+  if (layout === 'azerty') {
+    return QWERTY_TO_AZERTY[physicalKey] || physicalKey
+  }
+  return physicalKey
+}
+
+// ✅ Fonction pour obtenir la position physique (QWERTY) depuis une touche affichée
+function getPhysicalKey(displayKey, layout) {
+  if (layout === 'azerty') {
+    return AZERTY_TO_QWERTY[displayKey] || displayKey
+  }
+  return displayKey
+}
 
 export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang = 'fr' }) {
   const tr = useTranslation(lang)
@@ -71,6 +116,9 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
   }
 
   const isKeyActive = (displayKey) => {
+    // Convertir la touche affichée en position physique (QWERTY)
+    const physicalKey = getPhysicalKey(displayKey, layout)
+    
     return Object.values(shortcuts).some(shortcut => {
       if (!shortcut) return false
       if (!matchesFiltersExact(shortcut)) return false
@@ -78,31 +126,15 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
       const parts = shortcut.split('+')
       const lastPart = parts[parts.length - 1]
       
+      // Match direct avec la position physique
+      if (lastPart === physicalKey) return true
+      if (lastPart === physicalKey.toUpperCase()) return true
+      
+      // Match avec la touche affichée (pour les caractères spéciaux)
       if (lastPart === displayKey) return true
-      if (lastPart === displayKey.toUpperCase()) return true
-      
-      if (BASE_TO_SYMBOL[displayKey] === lastPart) return true
-      
-      if (SYMBOL_TO_BASE_KEY[displayKey] === lastPart) return true
-      
-      if (filters.shift && BASE_TO_SYMBOL[displayKey]) {
-        const symbol = BASE_TO_SYMBOL[displayKey]
-        if (lastPart === symbol) return true
-      }
       
       return false
     })
-  }
-
-  const getDisplayLabel = (key) => {
-    if (filters.shift && BASE_TO_SYMBOL[key]) {
-      const symbol = BASE_TO_SYMBOL[key]
-      const isUsed = Object.values(shortcuts).some(s => s && s.includes(symbol))
-      if (isUsed) {
-        return { main: symbol, sub: key }
-      }
-    }
-    return { main: key, sub: null }
   }
 
   const getModifierCount = (mod) => {
@@ -143,6 +175,13 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
   const soloShortcuts = Object.values(shortcuts).filter(s => s && !hasModifiers(s))
   const hasSoloShortcuts = soloShortcuts.length > 0
 
+  // ✅ Utiliser le layout sélectionné
+  const currentLayout = KEYBOARD_LAYOUTS[layout] || KEYBOARD_LAYOUTS.qwerty
+  const rows = currentLayout.rows
+  const numpadKeys = currentLayout.numpad
+
+  const layoutLabel = layout === 'azerty' ? 'AZERTY' : 'QWERTY'
+
   return (
     <div style={{ 
       marginBottom: 12,
@@ -171,7 +210,7 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
           )}
         </span>
         <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 500 }}>
-          QWERTY
+          {layoutLabel}
         </span>
         {hasActiveFilters && (
           <span style={{ fontSize: 9, color: 'var(--accent)', background: 'var(--accent-light)', padding: '2px 8px', borderRadius: 10 }}>
@@ -260,13 +299,13 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
         )}
       </div>
 
+      {/* ✅ Clavier avec le layout sélectionné */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-        {QWERTY_ROWS.map((row, rowIndex) => (
+        {rows.map((row, rowIndex) => (
           <div key={rowIndex} style={{ display: 'flex', gap: 4 }}>
             <div style={{ width: rowIndex * 20 }} />
             {row.map((key) => {
               const active = isKeyActive(key)
-              const display = getDisplayLabel(key)
               return (
                 <div
                   key={key}
@@ -278,7 +317,6 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
                     background: active ? 'var(--accent-light)' : 'var(--bg-secondary)',
                     color: active ? 'var(--accent)' : 'var(--text-secondary)',
                     display: 'flex',
-                    flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: 10,
@@ -290,10 +328,7 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
                   }}
                   title={active ? `Raccourci utilisé avec ${getFilterStatus()}` : ''}
                 >
-                  {display.sub && (
-                    <span style={{ fontSize: 7, opacity: 0.4 }}>{display.sub}</span>
-                  )}
-                  <span>{display.main}</span>
+                  <span>{key}</span>
                   {active && (
                     <div style={{
                       position: 'absolute',
@@ -312,10 +347,11 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
           </div>
         ))}
         
+        {/* Pavé numérique */}
         <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
           <div style={{ width: 20 }} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 36px)', gap: 4 }}>
-            {NUMPAD_KEYS.map((key) => {
+            {numpadKeys.map((key) => {
               const active = isKeyActive(key)
               return (
                 <div
@@ -388,7 +424,7 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
         )}
         <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-tertiary)' }}>
           <span style={{ fontSize: 10 }}>⌨️</span>
-          QWERTY
+          {layoutLabel}
         </span>
       </div>
     </div>
