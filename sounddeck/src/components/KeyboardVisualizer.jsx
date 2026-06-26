@@ -1,98 +1,147 @@
+import { useState } from 'react'
 import { useTranslation } from '../i18n'
 
-// Mapping position physique (QWERTY) → AZERTY pour l'affichage
-const PHYSICAL_TO_AZERTY = {
-  '1': '&', '2': 'é', '3': '"', '4': "'", '5': '(', '6': '-', '7': 'è', '8': '_', '9': 'ç', '0': 'à', '-': ')', '=': '=',
-  'Q': 'A', 'W': 'Z', 'E': 'E', 'R': 'R', 'T': 'T', 'Y': 'Y', 'U': 'U', 'I': 'I', 'O': 'O', 'P': 'P',
-  'A': 'Q', 'S': 'S', 'D': 'D', 'F': 'F', 'G': 'G', 'H': 'H', 'J': 'J', 'K': 'K', 'L': 'L',
-  'Z': 'W', 'X': 'X', 'C': 'C', 'V': 'V', 'B': 'B', 'N': 'N', 'M': 'M'
+const SYMBOL_TO_BASE_KEY = {
+  '!': '1', '@': '2', '#': '3', '$': '4', '%': '5',
+  '^': '6', '&': '7', '*': '8', '(': '9', ')': '0',
+  '_': '-', '+': '=', '{': '[', '}': ']', '|': '\\',
+  ':': ';', '"': "'", '<': ',', '>': '.', '?': '/',
+  '~': '`'
 }
+
+const BASE_TO_SYMBOL = Object.fromEntries(
+  Object.entries(SYMBOL_TO_BASE_KEY).map(([symbol, base]) => [base, symbol])
+)
+
+const QWERTY_ROWS = [
+  ['`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='],
+  ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', '\\'],
+  ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', "'"],
+  ['Z', 'X', 'C', 'V', 'B', 'N', 'M', ',', '.', '/']
+]
+
+const NUMPAD_KEYS = ['NumLock', '/', '*', '-', '7', '8', '9', '+', '4', '5', '6', '1', '2', '3', '0', '.']
 
 export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang = 'fr' }) {
   const tr = useTranslation(lang)
   
-  // Définition des touches par ligne (affichage)
-  const rows = {
-    'qwerty': [
-      ['`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='],
-      ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', '\\'],
-      ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', "'"],
-      ['Z', 'X', 'C', 'V', 'B', 'N', 'M', ',', '.', '/']
-    ],
-    'azerty': [
-      ['²', '&', 'é', '"', "'", '(', '-', 'è', '_', 'ç', 'à', ')', '='],
-      ['A', 'Z', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '^', '$', 'ù'],
-      ['Q', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'ù', '*'],
-      ['W', 'X', 'C', 'V', 'B', 'N', ',', ';', ':', '!']
-    ]
+  const [filters, setFilters] = useState({
+    ctrl: false,
+    alt: false,
+    shift: false
+  })
+
+  const hasActiveFilters = Object.values(filters).some(active => active)
+
+  const getActiveMods = () => {
+    const mods = []
+    if (filters.ctrl) mods.push('CommandOrControl')
+    if (filters.alt) mods.push('Alt')
+    if (filters.shift) mods.push('Shift')
+    return mods
   }
 
-  // Touches du pavé numérique (toujours les mêmes)
-  const numpadKeys = ['NumLock', '/', '*', '-', '7', '8', '9', '+', '4', '5', '6', '1', '2', '3', '0', '.']
-
-  const keyboardRows = rows[layout] || rows['qwerty']
-
-  // Fonction pour obtenir la position physique (QWERTY) à partir d'une touche affichée
-  function getPhysicalKey(displayKey, layout) {
-    if (layout === 'azerty') {
-      // Si c'est une touche spéciale AZERTY, trouver sa position physique
-      for (const [physical, azerty] of Object.entries(PHYSICAL_TO_AZERTY)) {
-        if (azerty === displayKey) {
-          return physical
-        }
-      }
-      // Si c'est une lettre qui est la même en AZERTY et QWERTY (E, R, T, etc.)
-      if (displayKey.length === 1 && displayKey.match(/[A-Z]/)) {
-        return displayKey
-      }
-      // Si c'est une lettre minuscule
-      if (displayKey.length === 1 && displayKey.match(/[a-z]/)) {
-        return displayKey.toUpperCase()
-      }
-    }
-    // En QWERTY, la touche affichée est la position physique
-    if (displayKey.length === 1 && displayKey.match(/[a-z]/)) {
-      return displayKey.toUpperCase()
-    }
-    return displayKey
+  const hasModifiers = (shortcut) => {
+    if (!shortcut) return false
+    const mods = ['CommandOrControl', 'Alt', 'Shift']
+    return mods.some(mod => shortcut.includes(mod))
   }
 
-  // Fonction pour vérifier si une touche est utilisée par un raccourci
-  const isKeyUsed = (displayKey) => {
-    // Obtenir la position physique de la touche
-    const physicalKey = getPhysicalKey(displayKey, layout)
+  const matchesFiltersExact = (shortcut) => {
+    if (!shortcut) return false
     
+    const activeMods = getActiveMods()
+    
+    if (activeMods.length === 0) {
+      return !hasModifiers(shortcut)
+    }
+    
+    const parts = shortcut.split('+')
+    
+    const hasAllActive = activeMods.every(mod => parts.includes(mod))
+    if (!hasAllActive) return false
+    
+    const allMods = ['CommandOrControl', 'Alt', 'Shift']
+    const hasNoExtra = allMods.every(mod => {
+      if (activeMods.includes(mod)) return true
+      return !parts.includes(mod)
+    })
+    
+    return hasNoExtra
+  }
+
+  const isKeyActive = (displayKey) => {
     return Object.values(shortcuts).some(shortcut => {
       if (!shortcut) return false
-      const parts = shortcut.split('+')
+      if (!matchesFiltersExact(shortcut)) return false
       
-      return parts.some(part => {
-        // Pour les touches du pavé numérique
-        if (displayKey === '0' && part === 'Num0') return true
-        if (displayKey === '1' && part === 'Num1') return true
-        if (displayKey === '2' && part === 'Num2') return true
-        if (displayKey === '3' && part === 'Num3') return true
-        if (displayKey === '4' && part === 'Num4') return true
-        if (displayKey === '5' && part === 'Num5') return true
-        if (displayKey === '6' && part === 'Num6') return true
-        if (displayKey === '7' && part === 'Num7') return true
-        if (displayKey === '8' && part === 'Num8') return true
-        if (displayKey === '9' && part === 'Num9') return true
-        if (displayKey === '.' && part === 'NumDecimal') return true
-        if (displayKey === '+' && part === 'NumAdd') return true
-        if (displayKey === '-' && part === 'NumSubtract') return true
-        if (displayKey === '*' && part === 'NumMultiply') return true
-        if (displayKey === '/' && part === 'NumDivide') return true
-        if (displayKey === 'Enter' && part === 'NumEnter') return true
-        
-        // Pour les touches normales, comparer avec la position physique stockée
-        return part === physicalKey || part === physicalKey.toUpperCase()
-      })
+      const parts = shortcut.split('+')
+      const lastPart = parts[parts.length - 1]
+      
+      if (lastPart === displayKey) return true
+      if (lastPart === displayKey.toUpperCase()) return true
+      
+      if (BASE_TO_SYMBOL[displayKey] === lastPart) return true
+      
+      if (SYMBOL_TO_BASE_KEY[displayKey] === lastPart) return true
+      
+      if (filters.shift && BASE_TO_SYMBOL[displayKey]) {
+        const symbol = BASE_TO_SYMBOL[displayKey]
+        if (lastPart === symbol) return true
+      }
+      
+      return false
     })
   }
 
-  // Compter les raccourcis utilisés
-  const usedShortcutsCount = Object.values(shortcuts).filter(s => s).length
+  const getDisplayLabel = (key) => {
+    if (filters.shift && BASE_TO_SYMBOL[key]) {
+      const symbol = BASE_TO_SYMBOL[key]
+      const isUsed = Object.values(shortcuts).some(s => s && s.includes(symbol))
+      if (isUsed) {
+        return { main: symbol, sub: key }
+      }
+    }
+    return { main: key, sub: null }
+  }
+
+  const getModifierCount = (mod) => {
+    const searchTerms = {
+      ctrl: ['CommandOrControl', 'Control'],
+      alt: ['Alt'],
+      shift: ['Shift']
+    }
+    const terms = searchTerms[mod] || []
+    return Object.values(shortcuts).filter(s => s && terms.some(t => s.includes(t))).length
+  }
+
+  const toggleFilter = (mod) => {
+    setFilters(prev => ({
+      ...prev,
+      [mod]: !prev[mod]
+    }))
+  }
+
+  const isFilterActive = (mod) => filters[mod]
+  
+  const totalShortcuts = Object.values(shortcuts).filter(s => s).length
+  
+  const activeShortcuts = Object.values(shortcuts).filter(s => s && matchesFiltersExact(s)).length
+
+  const modLabels = {
+    ctrl: 'Ctrl',
+    alt: 'Alt',
+    shift: layout === 'azerty' ? 'Maj' : 'Shift'
+  }
+
+  const getFilterStatus = () => {
+    const active = Object.entries(filters).filter(([_, active]) => active).map(([mod]) => modLabels[mod])
+    if (active.length === 0) return 'Aucun filtre (touches seules)'
+    return active.join(' + ')
+  }
+
+  const soloShortcuts = Object.values(shortcuts).filter(s => s && !hasModifiers(s))
+  const hasSoloShortcuts = soloShortcuts.length > 0
 
   return (
     <div style={{ 
@@ -109,24 +158,115 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
         marginBottom: 12,
         display: 'flex',
         alignItems: 'center',
-        gap: 8
+        gap: 8,
+        flexWrap: 'wrap'
       }}>
         <i className="ti ti-keyboard" /> 
         {tr('keyboardVisualizerTitle')}
         <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 400 }}>
-          ({usedShortcutsCount} {usedShortcutsCount !== 1 ? tr('keyboardVisualizerUsedPlural') : tr('keyboardVisualizerUsed')})
+          {hasActiveFilters ? (
+            `${activeShortcuts} / ${totalShortcuts} avec ${getFilterStatus()}`
+          ) : (
+            `${soloShortcuts.length} touche(s) seule(s) / ${totalShortcuts} raccourcis`
+          )}
         </span>
         <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 500 }}>
-          {layout === 'azerty' ? 'AZERTY' : 'QWERTY'}
+          QWERTY
         </span>
+        {hasActiveFilters && (
+          <span style={{ fontSize: 9, color: 'var(--accent)', background: 'var(--accent-light)', padding: '2px 8px', borderRadius: 10 }}>
+            <i className="ti ti-filter" /> {getFilterStatus()}
+          </span>
+        )}
+        {!hasActiveFilters && !hasSoloShortcuts && (
+          <span style={{ fontSize: 9, color: 'var(--warning)', background: 'rgba(239,159,39,0.1)', padding: '2px 8px', borderRadius: 10 }}>
+            ⚠️ Aucune touche seule
+          </span>
+        )}
+      </div>
+
+      <div style={{ 
+        display: 'flex', 
+        gap: 8, 
+        marginBottom: 12, 
+        justifyContent: 'center',
+        flexWrap: 'wrap'
+      }}>
+        {['ctrl', 'alt', 'shift'].map(mod => {
+          const active = isFilterActive(mod)
+          const count = getModifierCount(mod)
+          return (
+            <button
+              key={mod}
+              onClick={() => toggleFilter(mod)}
+              style={{
+                padding: '6px 16px',
+                borderRadius: 6,
+                border: `2px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                background: active ? 'var(--accent-light)' : 'var(--bg-secondary)',
+                color: active ? 'var(--accent)' : 'var(--text-secondary)',
+                fontSize: 12,
+                fontWeight: active ? 600 : 400,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontFamily: 'inherit'
+              }}
+            >
+              <span style={{ 
+                display: 'inline-block',
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: active ? 'var(--accent)' : 'var(--text-tertiary)',
+                opacity: active ? 1 : 0.3
+              }} />
+              {modLabels[mod]}
+              {count > 0 && (
+                <span style={{ 
+                  fontSize: 9, 
+                  background: active ? 'var(--accent)' : 'var(--border)',
+                  color: active ? 'white' : 'var(--text-tertiary)',
+                  padding: '0 6px',
+                  borderRadius: 10,
+                  fontWeight: 700
+                }}>
+                  {count}
+                </span>
+              )}
+            </button>
+          )
+        })}
+        
+        {hasActiveFilters && (
+          <button
+            onClick={() => setFilters({ ctrl: false, alt: false, shift: false })}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 6,
+              border: '1px solid var(--border)',
+              background: 'transparent',
+              color: 'var(--text-tertiary)',
+              fontSize: 11,
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+              fontFamily: 'inherit'
+            }}
+          >
+            <i className="ti ti-x" /> Réinitialiser
+          </button>
+        )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-        {keyboardRows.map((row, rowIndex) => (
+        {QWERTY_ROWS.map((row, rowIndex) => (
           <div key={rowIndex} style={{ display: 'flex', gap: 4 }}>
             <div style={{ width: rowIndex * 20 }} />
             {row.map((key) => {
-              const used = isKeyUsed(key)
+              const active = isKeyActive(key)
+              const display = getDisplayLabel(key)
               return (
                 <div
                   key={key}
@@ -134,22 +274,27 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
                     width: 36,
                     height: 36,
                     borderRadius: 4,
-                    border: `1px solid ${used ? 'var(--accent)' : 'var(--border)'}`,
-                    background: used ? 'var(--accent-light)' : 'var(--bg-secondary)',
-                    color: used ? 'var(--accent)' : 'var(--text-secondary)',
+                    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                    background: active ? 'var(--accent-light)' : 'var(--bg-secondary)',
+                    color: active ? 'var(--accent)' : 'var(--text-secondary)',
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 11,
-                    fontWeight: used ? 600 : 400,
+                    fontSize: 10,
+                    fontWeight: active ? 600 : 400,
                     transition: 'all 0.15s',
                     position: 'relative',
-                    cursor: 'default'
+                    cursor: 'default',
+                    lineHeight: 1.1
                   }}
-                  title={used ? `Raccourci utilisé` : ''}
+                  title={active ? `Raccourci utilisé avec ${getFilterStatus()}` : ''}
                 >
-                  <span>{key}</span>
-                  {used && (
+                  {display.sub && (
+                    <span style={{ fontSize: 7, opacity: 0.4 }}>{display.sub}</span>
+                  )}
+                  <span>{display.main}</span>
+                  {active && (
                     <div style={{
                       position: 'absolute',
                       top: -3,
@@ -167,12 +312,11 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
           </div>
         ))}
         
-        {/* Pavé numérique */}
         <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
           <div style={{ width: 20 }} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 36px)', gap: 4 }}>
-            {numpadKeys.map((key) => {
-              const used = isKeyUsed(key)
+            {NUMPAD_KEYS.map((key) => {
+              const active = isKeyActive(key)
               return (
                 <div
                   key={key}
@@ -180,22 +324,21 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
                     width: 36,
                     height: 36,
                     borderRadius: 4,
-                    border: `1px solid ${used ? 'var(--accent)' : 'var(--border)'}`,
-                    background: used ? 'var(--accent-light)' : 'var(--bg-secondary)',
-                    color: used ? 'var(--accent)' : 'var(--text-secondary)',
+                    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                    background: active ? 'var(--accent-light)' : 'var(--bg-secondary)',
+                    color: active ? 'var(--accent)' : 'var(--text-secondary)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 10,
-                    fontWeight: used ? 600 : 400,
+                    fontSize: 9,
+                    fontWeight: active ? 600 : 400,
                     transition: 'all 0.15s',
                     position: 'relative',
                     cursor: 'default'
                   }}
-                  title={used ? `Raccourci utilisé` : ''}
                 >
                   <span>{key}</span>
-                  {used && (
+                  {active && (
                     <div style={{
                       position: 'absolute',
                       top: -3,
@@ -212,34 +355,6 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
             })}
           </div>
         </div>
-
-        {/* Modificateurs */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'center' }}>
-          {['Ctrl', 'Alt', layout === 'azerty' ? 'Maj' : 'Shift'].map(mod => {
-            const used = Object.values(shortcuts).some(s => s && s.includes(
-              mod === 'Ctrl' ? 'CommandOrControl' : 
-              mod === 'Alt' ? 'Alt' : 
-              'Shift'
-            ))
-            return (
-              <div
-                key={mod}
-                style={{
-                  padding: '4px 12px',
-                  borderRadius: 4,
-                  border: `1px solid ${used ? 'var(--accent)' : 'var(--border)'}`,
-                  background: used ? 'var(--accent-light)' : 'var(--bg-secondary)',
-                  color: used ? 'var(--accent)' : 'var(--text-secondary)',
-                  fontSize: 11,
-                  fontWeight: used ? 600 : 400,
-                  transition: 'all 0.15s'
-                }}
-              >
-                {mod}
-              </div>
-            )
-          })}
-        </div>
       </div>
 
       <div style={{ 
@@ -248,15 +363,32 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
         color: 'var(--text-tertiary)',
         display: 'flex',
         gap: 16,
-        justifyContent: 'center'
+        justifyContent: 'center',
+        flexWrap: 'wrap'
       }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <div style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--accent-light)', border: '1px solid var(--accent)' }} />
-          {tr('keyboardVisualizerKeyUsed')}
+          Touche active
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <div style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }} />
-          {tr('keyboardVisualizerKeyAvailable')}
+          Touche inactive
+        </span>
+        {hasActiveFilters && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--accent)' }}>
+            <i className="ti ti-filter" style={{ fontSize: 12 }} />
+            {getFilterStatus()}
+          </span>
+        )}
+        {!hasActiveFilters && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-tertiary)' }}>
+            <i className="ti ti-info-circle" style={{ fontSize: 12 }} />
+            Touches sans modificateur
+          </span>
+        )}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-tertiary)' }}>
+          <span style={{ fontSize: 10 }}>⌨️</span>
+          QWERTY
         </span>
       </div>
     </div>

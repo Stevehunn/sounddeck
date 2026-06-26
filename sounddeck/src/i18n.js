@@ -298,6 +298,8 @@ export const TRANSLATIONS = {
     // Pour la disposition du clavier
     keyboardLayout: 'Disposition du clavier',
     keyboardLayoutDesc: 'Sélectionnez votre type de clavier',
+    keyboardVisualizerModifierUsed: 'Modificateur utilisé',
+
 
     // Pour la visualisation du clavier
     keyboardVisualizerTitle: 'Visualisation du clavier',
@@ -892,6 +894,7 @@ export const TRANSLATIONS = {
     localOutputDeviceChanged: 'Local device changed: {device}',
     keyboardLayout: 'Keyboard layout',
     keyboardLayoutDesc: 'Select your keyboard type',
+    keyboardVisualizerModifierUsed: 'Modifier used',
     keyboardVisualizerTitle: 'Keyboard visualization',
     keyboardVisualizerUsed: 'shortcut used',
     keyboardVisualizerUsedPlural: 'shortcuts used',
@@ -1493,6 +1496,8 @@ export const TRANSLATIONS = {
 
     keyboardLayout: 'Disposición del teclado',
     keyboardLayoutDesc: 'Selecciona tu tipo de teclado',
+    keyboardVisualizerModifierUsed: 'Modificador utilizado',
+
 
     keyboardVisualizerTitle: 'Visualización del teclado',
     keyboardVisualizerUsed: 'atajo utilizado',
