@@ -11,5 +11,23 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.js'],
+    include: ['src/**/*.{test,spec}.{js,jsx}'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/',
+        'src/test/',
+        '**/*.test.{js,jsx}',
+        '**/*.spec.{js,jsx}',
+        'src/main.jsx',
+        'src/App.css'
+      ]
+    }
   }
 })
