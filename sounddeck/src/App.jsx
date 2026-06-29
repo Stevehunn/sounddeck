@@ -11,6 +11,7 @@ import Guide from './pages/Guide'
 import Presentation from './pages/Presentation'
 import Toast from './components/Toast'
 import QuitConfirm from './components/QuitConfirm'
+import WelcomeScreen from './components/WelcomeScreen'
 import { playSound, stopAllSounds, setStoreRef } from './utils/audio'
 
 export default function App() {
@@ -19,6 +20,7 @@ export default function App() {
   const [presentationMode, setPresentationMode] = useState(false)
   const [toasts, setToasts] = useState([])
   const [mixerInitialized, setMixerInitialized] = useState(false)
+  const [isFirstLaunch, setIsFirstLaunch] = useState(null)
 
   const soundsRef = useRef([])
   const addToastRef = useRef(null)
@@ -30,6 +32,20 @@ export default function App() {
   const setPresentationRef = useRef(null)
   const [showQuitConfirm, setShowQuitConfirm] = useState(false)
   const isQuittingRef = useRef(false)
+
+  // ✅ Vérifier si c'est le premier lancement
+  useEffect(() => {
+    const checkFirstLaunch = async () => {
+      try {
+        const hasLaunchedBefore = await window.electronAPI.storeGet('hasLaunchedBefore')
+        setIsFirstLaunch(!hasLaunchedBefore)
+      } catch (e) {
+        console.warn('⚠️ Erreur vérification premier lancement:', e)
+        setIsFirstLaunch(false)
+      }
+    }
+    checkFirstLaunch()
+  }, [])
 
   // ✅ Passer la référence du store à audio.js pour le mixeur
   useEffect(() => {
@@ -187,9 +203,7 @@ export default function App() {
       setPresentationRef.current?.(prev => !prev)
     })
 
-    // ✅ Écouter l'événement pour afficher la popup de confirmation
     window.electronAPI.onShowQuitConfirm(() => {
-      // Ne pas afficher la popup si l'app est en train de quitter
       if (!isQuittingRef.current) {
         setShowQuitConfirm(true)
       }
@@ -213,6 +227,7 @@ export default function App() {
 
   useEffect(() => { addToastRef.current = addToast }, [])
 
+  // ✅ Si le store est en chargement
   if (store.loading) {
     return (
       <div style={{
@@ -224,6 +239,11 @@ export default function App() {
         <span>Chargement de SoundDeck...</span>
       </div>
     )
+  }
+
+  // ✅ Si c'est le premier lancement, afficher l'écran de bienvenue
+  if (isFirstLaunch === true) {
+    return <WelcomeScreen onComplete={() => setIsFirstLaunch(false)} />
   }
 
   return (
@@ -266,7 +286,6 @@ export default function App() {
         />
       )}
 
-      {/* ✅ Popup de confirmation de fermeture */}
       {showQuitConfirm && (
         <QuitConfirm 
           onClose={() => setShowQuitConfirm(false)} 

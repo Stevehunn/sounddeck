@@ -8,7 +8,6 @@ export const AUDIO_MODES = {
   ADVANCED: 'advanced'
 }
 
-// Hook principal qui gère tout l'état de l'application
 export function useStore() {
   const [profiles, setProfiles] = useState([])
   const [currentProfileId, setCurrentProfileId] = useState(null)
@@ -36,27 +35,20 @@ export function useStore() {
   const [normalizationTarget, setNormalizationTarget] = useState(0.1)
   const [startMinimized, setStartMinimized] = useState(false)
   const [launchAtStartup, setLaunchAtStartup] = useState(false)
-
-  // Audio modes
   const [audioMode, setAudioMode] = useState(AUDIO_MODES.INTEGRATED)
   const [virtualDriverInstalled, setVirtualDriverInstalled] = useState(false)
   const [virtualDeviceActive, setVirtualDeviceActive] = useState(false)
-
-  // Mixer
   const [mixerEnabled, setMixerEnabled] = useState(false)
   const [microphoneDevice, setMicrophoneDevice] = useState('default')
   const [microphoneVolume, setMicrophoneVolume] = useState(80)
   const [mixerSoundVolume, setMixerSoundVolume] = useState(100)
   const [localAudioDevice, setLocalAudioDevice] = useState('default')
-
-  // Noise suppression
   const [noiseSuppression, setNoiseSuppression] = useState(false)
   const [noiseSuppressionMode, setNoiseSuppressionMode] = useState('auto')
-
-  // Keyboard
   const [keyboardLayout, setKeyboardLayout] = useState('qwerty')
 
-  // ─── Chargement initial depuis electron-store ────────────────────────────────
+  // ─── CHARGEMENT INITIAL ──────────────────────────────────────────────────
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -71,7 +63,6 @@ export function useStore() {
         const savedProfileShortcut = await window.electronAPI.storeGet('profileShortcut') || 'CommandOrControl+Tab'
         const savedTheme = await window.electronAPI.storeGet('theme') || 'dark'
         const savedCustomTheme = await window.electronAPI.storeGet('customTheme') || null
-        const savedLang = await window.electronAPI.storeGet('lang') || 'fr'
         const savedAudioDevice = await window.electronAPI.storeGet('audioDevice') || 'default'
         const savedVolume = await window.electronAPI.storeGet('volume') ?? 80
         const savedPlayLocally = await window.electronAPI.storeGet('playLocally') ?? true
@@ -116,15 +107,53 @@ export function useStore() {
         setNoiseSuppression(savedNoiseSuppression)
         setNoiseSuppressionMode(savedNoiseSuppressionMode)
 
-        const savedKeyboardLayout = await window.electronAPI.storeGet('keyboardLayout') || 'qwerty'
-        setKeyboardLayout(savedKeyboardLayout)
+        const savedLocalAudioDevice = await window.electronAPI.storeGet('localAudioDevice') || 'default'
+        setLocalAudioDevice(savedLocalAudioDevice)
 
-        const savedToggleWindowShortcut = await window.electronAPI.storeGet('toggleWindowShortcut') || 'CommandOrControl+Shift+S'
-        setToggleWindowShortcut(savedToggleWindowShortcut)
+        // ─── LANGUE ────────────────────────────────────────────────────────────
+        const savedLang = await window.electronAPI.storeGet('lang')
+        let defaultLang = savedLang || 'fr'
+        
+        if (!savedLang) {
+          // ✅ Si la langue n'est pas sauvegardée, utiliser la langue système
+          try {
+            const systemLang = await window.electronAPI.getSystemLanguage?.()
+            if (systemLang) {
+              defaultLang = systemLang
+              console.log(`🌐 Langue système détectée: ${defaultLang}`)
+              // Sauvegarder immédiatement la langue détectée
+              await window.electronAPI.storeSet('lang', defaultLang)
+            }
+          } catch (e) {
+            console.warn('⚠️ Erreur récupération langue système:', e)
+          }
+        }
+        setLang(defaultLang)
+
+        // ─── LAYOUT CLAVIER ──────────────────────────────────────────────────
+        const savedKeyboardLayout = await window.electronAPI.storeGet('keyboardLayout')
+        let defaultLayout = savedKeyboardLayout || 'qwerty'
+        
+        if (!savedKeyboardLayout) {
+          // ✅ Si le layout n'est pas sauvegardé, utiliser le layout système
+          try {
+            const systemLayout = await window.electronAPI.getSystemKeyboardLayout?.()
+            if (systemLayout) {
+              defaultLayout = systemLayout
+              console.log(`⌨️ Layout clavier système détecté: ${defaultLayout}`)
+              // Sauvegarder immédiatement le layout détecté
+              await window.electronAPI.storeSet('keyboardLayout', defaultLayout)
+            }
+          } catch (e) {
+            console.warn('⚠️ Erreur récupération layout clavier:', e)
+          }
+        }
+        setKeyboardLayout(defaultLayout)
 
         setProfiles(allProfiles)
         setSounds(savedSounds)
         setShortcuts(savedShortcuts)
+        
         // ═════════Nettoyage des raccourcis orphelins════════════════════════════
         const soundIds = new Set(savedSounds.map(s => s.id))
         const cleanedShortcuts = { ...savedShortcuts }
@@ -146,7 +175,6 @@ export function useStore() {
         setProfileShortcut(savedProfileShortcut)
         setTheme(savedTheme)
         if (savedCustomTheme) setCustomTheme(savedCustomTheme)
-        setLang(savedLang)
         setAudioDevice(savedAudioDevice)
         setVolume(savedVolume)
         setPlayLocally(savedPlayLocally)
@@ -161,8 +189,9 @@ export function useStore() {
         setNormalizationEnabled(savedNormalizationEnabled)
         setNormalizationTarget(savedNormalizationTarget)
 
-        const savedLocalAudioDevice = await window.electronAPI.storeGet('localAudioDevice') || 'default'
-        setLocalAudioDevice(savedLocalAudioDevice)
+        const savedToggleWindowShortcut = await window.electronAPI.storeGet('toggleWindowShortcut') || 'CommandOrControl+Shift+S'
+        setToggleWindowShortcut(savedToggleWindowShortcut)
+
       } catch (e) {
         console.error('Erreur chargement store:', e)
         setProfiles([{ id: 'all', name: 'Tous les sons', isDefault: true }])

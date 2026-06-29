@@ -188,6 +188,81 @@ function createTray(lang = 'fr') {
   })
 }
 
+// ─── DÉTECTION DE LA LANGUE SYSTÈME ──────────────────────────────────────
+
+function getSystemLanguage() {
+  try {
+    const locale = app.getLocale() // 'fr', 'en', 'es', 'fr-FR', etc.
+    const lang = locale.split('-')[0] // Prendre seulement la partie langue
+    const supported = ['fr', 'en', 'es']
+    return supported.includes(lang) ? lang : 'fr'
+  } catch (e) {
+    console.warn('⚠️ Erreur détection langue:', e)
+    return 'fr'
+  }
+}
+
+// ─── DÉTECTION DU LAYOUT CLAVIER ──────────────────────────────────────────
+
+function getSystemKeyboardLayout() {
+  if (process.platform !== 'win32') {
+    // Sur macOS/Linux, on utilise une approche différente
+    return 'qwerty'
+  }
+
+  try {
+    const { execSync } = require('child_process')
+    
+    // Méthode: Lire la langue d'installation du système via le registre
+    try {
+      // Récupérer la langue d'installation de Windows
+      const result = execSync(
+        'reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout\\DosKeybCodes" /v "0000040c" 2>nul || echo NOT_FOUND',
+        { encoding: 'utf8', timeout: 3000 }
+      )
+      
+      // Si la clé 0000040c (français) existe, c'est probablement AZERTY
+      if (result.includes('0000040c')) {
+        return 'azerty'
+      }
+    } catch (e) {
+      // La clé n'existe pas, on continue
+    }
+
+    // Méthode alternative: Lire la langue système
+    try {
+      const result = execSync(
+        'wmic os get locale /value',
+        { encoding: 'utf8', timeout: 3000 }
+      )
+      
+      // Locale 040c = Français (France) -> AZERTY
+      // 080c = Français (Belgique) -> AZERTY
+      // 100c = Français (Suisse) -> AZERTY
+      const azertyLocales = ['040c', '080c', '100c']
+      
+      const match = result.match(/Locale=([0-9a-fA-F]+)/)
+      if (match) {
+        const locale = match[1].toLowerCase()
+        if (azertyLocales.includes(locale)) {
+          return 'azerty'
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Erreur détection locale:', e.message)
+    }
+
+    // Fallback: utiliser la langue système
+    const lang = getSystemLanguage()
+    const azertyCountries = ['fr', 'be', 'ch']
+    return azertyCountries.includes(lang) ? 'azerty' : 'qwerty'
+    
+  } catch (e) {
+    console.warn('⚠️ Erreur détection clavier:', e)
+    return 'qwerty'
+  }
+}
+
 // ─── IPC HANDLERS POUR LE TRAY ──────────────────────────────────────────────
 
 ipcMain.handle('update-tray-language', (event, lang) => {
@@ -1171,6 +1246,23 @@ app.whenReady().then
 
 app.whenReady().then(async () => {
   cleanupOrphanShortcuts()
+  
+  // ✅ Détecter et sauvegarder la langue système si jamais définie
+  const systemLang = getSystemLanguage()
+  const savedLang = store.get('lang')
+  if (!savedLang) {
+    store.set('lang', systemLang)
+    console.log(`🌐 Langue système détectée: ${systemLang}`)
+  }
+
+  // ✅ Détecter et sauvegarder le layout clavier système si jamais défini
+  const systemLayout = getSystemKeyboardLayout()
+  const savedLayout = store.get('keyboardLayout')
+  if (!savedLayout) {
+    store.set('keyboardLayout', systemLayout)
+    console.log(`⌨️ Layout clavier système détecté: ${systemLayout}`)
+  }
+
   createTray('fr')
   createWindow()
   registerShortcuts()
@@ -1810,6 +1902,14 @@ ipcMain.handle('get-sounds-dir', () => soundsDir)
 ipcMain.handle('cleanup-orphan-shortcuts', () => {
   cleanupOrphanShortcuts()
   return true
+})
+
+ipcMain.handle('get-system-language', () => {
+  return getSystemLanguage()
+})
+
+ipcMain.handle('get-system-keyboard-layout', () => {
+  return getSystemKeyboardLayout()
 })
 
 // ─── Scraper myinstants ───────────────────────────────────────────────────────

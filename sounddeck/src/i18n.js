@@ -35,6 +35,12 @@ export const TRANSLATIONS = {
     quitConfirmMinimize: 'Réduire dans la barre d\'état',
     quitConfirmCancel: 'Annuler',
     quitConfirmRemember: 'Ne plus me demander',
+    // ─── WELCOME SCREEN ──────────────────────────────────────────────────────
+    welcomeTitle: 'Bienvenue ! Choisissez vos préférences',
+    welcomeLanguage: 'Langue',
+    welcomeKeyboard: 'Disposition du clavier',
+    welcomeContinue: 'Continuer',
+    welcomeNote: 'Vous pourrez modifier ces paramètres à tout moment dans les Options',
 
     // ── Home ──────────────────────────────────────────────────────────────────
     allSounds: 'Tous les sons',
@@ -645,6 +651,13 @@ export const TRANSLATIONS = {
     quitConfirmCancel: 'Cancel',
     quitConfirmRemember: 'Don\'t ask again',
 
+    // ─── WELCOME SCREEN ──────────────────────────────────────────────────────
+    welcomeTitle: 'Welcome! Choose your preferences',
+    welcomeLanguage: 'Language',
+    welcomeKeyboard: 'Keyboard layout',
+    welcomeContinue: 'Continue',
+    welcomeNote: 'You can change these settings at any time in Options',
+
     // ── Home ──────────────────────────────────────────────────────────────────
     allSounds: 'All Sounds',
     sounds: 'sound(s)',
@@ -1243,6 +1256,13 @@ export const TRANSLATIONS = {
     quitConfirmMinimize: 'Minimizar a la bandeja',
     quitConfirmCancel: 'Cancelar',
     quitConfirmRemember: 'No volver a preguntar',
+
+    // ─── WELCOME SCREEN ──────────────────────────────────────────────────────
+    welcomeTitle: '¡Bienvenido! Elige tus preferencias',
+    welcomeLanguage: 'Idioma',
+    welcomeKeyboard: 'Distribución del teclado',
+    welcomeContinue: 'Continuar',
+    welcomeNote: 'Puedes cambiar estos ajustes en cualquier momento en Opciones',
 
     // ── Home ──────────────────────────────────────────────────────────────────
     allSounds: 'Todos los sonidos',

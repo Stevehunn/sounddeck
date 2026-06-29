@@ -2,6 +2,7 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  // ─── FICHIERS ────────────────────────────────────────────────────────────
   openFileDialog: () => ipcRenderer.invoke('open-file-dialog'),
   openImageDialog: () => ipcRenderer.invoke('open-image-dialog'),
   importSoundFile: (filePath) => ipcRenderer.invoke('import-sound-file', filePath),
@@ -10,29 +11,41 @@ contextBridge.exposeInMainWorld('electronAPI', {
   trimSoundFile: (filePath, start, end) => ipcRenderer.invoke('trim-sound-file', filePath, start, end),
   deleteSoundFile: (filePath) => ipcRenderer.invoke('delete-sound-file', filePath),
   getSoundsDir: () => ipcRenderer.invoke('get-sounds-dir'),
-  fetchMyinstants: (query) => ipcRenderer.invoke('fetch-myinstants', query),
+  fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath),
+  writeDroppedFile: (fileName, arrayBuffer) => ipcRenderer.invoke('write-dropped-file', fileName, arrayBuffer),
+
+  // ─── STORE ──────────────────────────────────────────────────────────────
   storeGet: (key) => ipcRenderer.invoke('store-get', key),
   storeSet: (key, value) => ipcRenderer.invoke('store-set', key, value),
   storeDelete: (key) => ipcRenderer.invoke('store-delete', key),
+  storeSetLang: (lang) => ipcRenderer.invoke('store-set-lang', lang),
+
+  // ─── MYINSTANTS ──────────────────────────────────────────────────────────
+  fetchMyinstants: (query, mode, lang) => ipcRenderer.invoke('fetch-myinstants', query, mode, lang),
+
+  // ─── RACCOURCIS ──────────────────────────────────────────────────────────
   updateShortcuts: (shortcuts) => ipcRenderer.invoke('update-shortcuts', shortcuts),
   updateProfileShortcut: (acc) => ipcRenderer.invoke('update-profile-shortcut', acc),
   updateLoopShortcut: (acc) => ipcRenderer.invoke('update-loop-shortcut', acc),
   updateStopAllShortcut: (acc) => ipcRenderer.invoke('update-stop-all-shortcut', acc),
   updatePresentationShortcut: (acc) => ipcRenderer.invoke('update-presentation-shortcut', acc),
   updateToggleShortcutsAccelerator: (accelerator) => ipcRenderer.invoke('update-toggle-shortcuts-accelerator', accelerator),
+  updateToggleWindowShortcut: (accelerator) => ipcRenderer.invoke('update-toggle-window-shortcut', accelerator),
+  toggleGlobalShortcuts: () => ipcRenderer.invoke('toggle-global-shortcuts'),
+  getGlobalShortcutsState: () => ipcRenderer.invoke('get-global-shortcuts-state'),
+
+  // ─── IPC LISTENERS ──────────────────────────────────────────────────────
   onPlaySound: (cb) => ipcRenderer.on('play-sound', (e, id) => cb(id)),
   onSwitchProfile: (cb) => ipcRenderer.on('switch-profile', () => cb()),
   onToggleLoop: (cb) => ipcRenderer.on('toggle-loop', () => cb()),
   onStopAllSounds: (cb) => ipcRenderer.on('stop-all-sounds', () => cb()),
   onTogglePresentation: (cb) => ipcRenderer.on('toggle-presentation', () => cb()),
-  toggleGlobalShortcuts: () => ipcRenderer.invoke('toggle-global-shortcuts'),
-  getGlobalShortcutsState: () => ipcRenderer.invoke('get-global-shortcuts-state'),
   onShortcutsToggle: (cb) => ipcRenderer.on('shortcuts-toggle', (e, enabled) => cb(enabled)),
+  onShowQuitConfirm: (cb) => ipcRenderer.on('show-quit-confirm', () => cb()),
   removeAllListeners: (ch) => ipcRenderer.removeAllListeners(ch),
-  updateTrayLanguage: (lang) => ipcRenderer.invoke('update-tray-language', lang),
-  setNoiseSuppression: (enabled) => ipcRenderer.invoke('set-noise-suppression', enabled),
 
-  // Nouvelles API pour le tray
+  // ─── TRAY ────────────────────────────────────────────────────────────────
+  updateTrayLanguage: (lang) => ipcRenderer.invoke('update-tray-language', lang),
   getStartMinimized: () => ipcRenderer.invoke('get-start-minimized'),
   setStartMinimized: (value) => ipcRenderer.invoke('set-start-minimized', value),
   getLaunchAtStartup: () => ipcRenderer.invoke('get-launch-at-startup'),
@@ -40,31 +53,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
   quitApp: () => ipcRenderer.invoke('quit-app'),
   hideWindow: () => ipcRenderer.invoke('hide-window'),
   showWindow: () => ipcRenderer.invoke('show-window'),
+  confirmQuit: (action, remember) => ipcRenderer.invoke('confirm-quit', action, remember),
 
-  // Nouvelles API pour le pilote virtuel
+  // ─── PILOTE AUDIO ────────────────────────────────────────────────────────
   installVirtualDriver: () => ipcRenderer.invoke('install-virtual-driver'),
   uninstallVirtualDriver: () => ipcRenderer.invoke('uninstall-virtual-driver'),
   getVirtualDriverStatus: () => ipcRenderer.invoke('get-virtual-driver-status'),
+  setNoiseSuppression: (enabled) => ipcRenderer.invoke('set-noise-suppression', enabled),
 
-  // Expose process.versions pour détecter Electron dans le renderer
-  isElectron: true,
-
-  writeDroppedFile: (fileName, arrayBuffer) => ipcRenderer.invoke('write-dropped-file', fileName, arrayBuffer),
-  fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath),
+  // ─── YOUTUBE ─────────────────────────────────────────────────────────────
   checkYtdlp: () => ipcRenderer.invoke('check-ytdlp'),
   downloadYtdlp: () => ipcRenderer.invoke('download-ytdlp'),
   youtubeInfo: (url) => ipcRenderer.invoke('youtube-info', url),
   youtubeDownload: (url, start, end, title) => ipcRenderer.invoke('youtube-download', url, start, end, title),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
+
+  // ─── EXPORT / IMPORT ────────────────────────────────────────────────────
   exportProfile: (profileId) => ipcRenderer.invoke('export-profile', profileId),
   importProfile: () => ipcRenderer.invoke('import-profile'),
   exportConfig: () => ipcRenderer.invoke('export-config'),
   exportFull: () => ipcRenderer.invoke('export-full'),
   exportSoundsOnly: () => ipcRenderer.invoke('export-sounds-only'),
   importBackup: () => ipcRenderer.invoke('import-backup'),
-  confirmQuit: (action, remember) => ipcRenderer.invoke('confirm-quit', action, remember),
-  onShowQuitConfirm: (cb) => ipcRenderer.on('show-quit-confirm', () => cb()),
-  updateToggleWindowShortcut: (accelerator) => ipcRenderer.invoke('update-toggle-window-shortcut', accelerator),
+
+  // ─── SYSTÈME ─────────────────────────────────────────────────────────────
+  // ✅ Nouvelles APIs pour la détection système
+  getSystemLanguage: () => ipcRenderer.invoke('get-system-language'),
+  getSystemKeyboardLayout: () => ipcRenderer.invoke('get-system-keyboard-layout'),
+
+  // ─── DIVERS ──────────────────────────────────────────────────────────────
+  isElectron: true,
 })
 
 // Exposer également via window pour accès direct dans les event handlers
