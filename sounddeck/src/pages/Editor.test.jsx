@@ -1,4 +1,3 @@
-// sounddeck/src/pages/Editor.test.jsx (correction du test "devrait sélectionner un son au clic")
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'

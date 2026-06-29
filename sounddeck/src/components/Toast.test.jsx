@@ -1,13 +1,12 @@
-// sounddeck/src/components/Toast.test.jsx
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import Toast from './Toast'
 
 describe('Toast', () => {
   it('ne devrait rien afficher quand la liste est vide', () => {
-    render(<Toast toasts={[]} />)
-    const container = document.querySelector('.toast-container')
-    expect(container).toBeNull()
+    const { container } = render(<Toast toasts={[]} />)
+    const containerElement = container.querySelector('.toast-container')
+    expect(containerElement).toBeNull()
   })
 
   it('devrait afficher un toast de type success', () => {
