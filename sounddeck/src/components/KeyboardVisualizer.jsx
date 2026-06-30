@@ -36,7 +36,6 @@ const KEYBOARD_LAYOUTS = {
 }
 
 // ✅ Mapping des touches pour AZERTY
-// QWERTY position → AZERTY display
 const QWERTY_TO_AZERTY = {
   '1': '&', '2': 'é', '3': '"', '4': "'", '5': '(', '6': '-', '7': 'è', '8': '_', '9': 'ç', '0': 'à',
   'Q': 'A', 'W': 'Z', 'E': 'E', 'R': 'R', 'T': 'T', 'Y': 'Y', 'U': 'U', 'I': 'I', 'O': 'O', 'P': 'P',
@@ -46,7 +45,6 @@ const QWERTY_TO_AZERTY = {
   ',': ',', '.': ';', '/': '!'
 }
 
-// AZERTY display → QWERTY position (pour le matching des raccourcis)
 const AZERTY_TO_QWERTY = Object.fromEntries(
   Object.entries(QWERTY_TO_AZERTY).map(([qwerty, azerty]) => [azerty, qwerty])
 )
@@ -88,7 +86,7 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
 
   const hasModifiers = (shortcut) => {
     if (!shortcut) return false
-    const mods = ['CommandOrControl', 'Alt', 'Shift']
+    const mods = ['CommandOrControl', 'Alt', 'Shift', 'Control']
     return mods.some(mod => shortcut.includes(mod))
   }
 
@@ -101,11 +99,17 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
       return !hasModifiers(shortcut)
     }
     
-    const parts = shortcut.split('+')
+    // Nettoyer le raccourci
+    let clean = shortcut
+      .replace(/CommandOrControl/g, 'CommandOrControl')
     
+    const parts = clean.split('+').map(p => p.trim())
+    
+    // Vérifier que tous les modificateurs actifs sont présents
     const hasAllActive = activeMods.every(mod => parts.includes(mod))
     if (!hasAllActive) return false
     
+    // Vérifier qu'il n'y a pas d'autres modificateurs
     const allMods = ['CommandOrControl', 'Alt', 'Shift']
     const hasNoExtra = allMods.every(mod => {
       if (activeMods.includes(mod)) return true
@@ -113,6 +117,19 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
     })
     
     return hasNoExtra
+  }
+
+  // ✅ Extraire la touche finale d'un raccourci (la dernière partie après les modificateurs)
+  const getKeyFromShortcut = (shortcut) => {
+    if (!shortcut) return null
+    
+    let clean = shortcut
+      .replace(/CommandOrControl/g, 'CommandOrControl')
+    
+    const parts = clean.split('+').map(p => p.trim())
+    
+    // La dernière partie est la touche
+    return parts[parts.length - 1]
   }
 
   const isKeyActive = (displayKey) => {
@@ -123,15 +140,30 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
       if (!shortcut) return false
       if (!matchesFiltersExact(shortcut)) return false
       
-      const parts = shortcut.split('+')
-      const lastPart = parts[parts.length - 1]
+      const key = getKeyFromShortcut(shortcut)
+      if (!key) return false
       
       // Match direct avec la position physique
-      if (lastPart === physicalKey) return true
-      if (lastPart === physicalKey.toUpperCase()) return true
+      if (key === physicalKey) return true
+      if (key === physicalKey.toUpperCase()) return true
+      if (key === physicalKey.toLowerCase()) return true
       
       // Match avec la touche affichée (pour les caractères spéciaux)
-      if (lastPart === displayKey) return true
+      if (key === displayKey) return true
+      if (key === displayKey.toUpperCase()) return true
+      if (key === displayKey.toLowerCase()) return true
+      
+      // Pour les symboles (ex: '!' -> '1')
+      if (SYMBOL_TO_BASE_KEY[key]) {
+        const baseKey = SYMBOL_TO_BASE_KEY[key]
+        if (baseKey === physicalKey || baseKey === displayKey) return true
+      }
+      
+      // Pour les chiffres
+      if (key === '0' || key === '1' || key === '2' || key === '3' || key === '4' ||
+          key === '5' || key === '6' || key === '7' || key === '8' || key === '9') {
+        if (key === physicalKey || key === displayKey) return true
+      }
       
       return false
     })
@@ -168,14 +200,14 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
 
   const getFilterStatus = () => {
     const active = Object.entries(filters).filter(([_, active]) => active).map(([mod]) => modLabels[mod])
-    if (active.length === 0) return 'Aucun filtre (touches seules)'
+    if (active.length === 0) return tr('noFilter')
     return active.join(' + ')
   }
 
   const soloShortcuts = Object.values(shortcuts).filter(s => s && !hasModifiers(s))
   const hasSoloShortcuts = soloShortcuts.length > 0
 
-  // ✅ Utiliser le layout sélectionné
+  // Utiliser le layout sélectionné
   const currentLayout = KEYBOARD_LAYOUTS[layout] || KEYBOARD_LAYOUTS.qwerty
   const rows = currentLayout.rows
   const numpadKeys = currentLayout.numpad
@@ -204,9 +236,9 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
         {tr('keyboardVisualizerTitle')}
         <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 400 }}>
           {hasActiveFilters ? (
-            `${activeShortcuts} / ${totalShortcuts} avec ${getFilterStatus()}`
+            `${activeShortcuts} / ${totalShortcuts} ${tr('withFilter')} ${getFilterStatus()}`
           ) : (
-            `${soloShortcuts.length} touche(s) seule(s) / ${totalShortcuts} raccourcis`
+            `${soloShortcuts.length} ${tr('soloKeys')} / ${totalShortcuts} ${tr('shortcutsTotal')}`
           )}
         </span>
         <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 500 }}>
@@ -217,9 +249,14 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
             <i className="ti ti-filter" /> {getFilterStatus()}
           </span>
         )}
-        {!hasActiveFilters && !hasSoloShortcuts && (
+        {!hasActiveFilters && !hasSoloShortcuts && totalShortcuts > 0 && (
           <span style={{ fontSize: 9, color: 'var(--warning)', background: 'rgba(239,159,39,0.1)', padding: '2px 8px', borderRadius: 10 }}>
-            ⚠️ Aucune touche seule
+            ⚠️ {tr('noSoloKeys')}
+          </span>
+        )}
+        {totalShortcuts === 0 && (
+          <span style={{ fontSize: 9, color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: 10 }}>
+            {tr('noShortcutsDefined')}
           </span>
         )}
       </div>
@@ -294,12 +331,12 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
               fontFamily: 'inherit'
             }}
           >
-            <i className="ti ti-x" /> Réinitialiser
+            <i className="ti ti-x" /> {tr('reset')}
           </button>
         )}
       </div>
 
-      {/* ✅ Clavier avec le layout sélectionné */}
+      {/* Clavier avec le layout sélectionné */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
         {rows.map((row, rowIndex) => (
           <div key={rowIndex} style={{ display: 'flex', gap: 4 }}>
@@ -326,7 +363,7 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
                     cursor: 'default',
                     lineHeight: 1.1
                   }}
-                  title={active ? `Raccourci utilisé avec ${getFilterStatus()}` : ''}
+                  title={active ? `${tr('shortcutUsedWith')} ${getFilterStatus()}` : ''}
                 >
                   <span>{key}</span>
                   {active && (
@@ -404,11 +441,11 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
       }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <div style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--accent-light)', border: '1px solid var(--accent)' }} />
-          Touche active
+          {tr('keyActive')}
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <div style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }} />
-          Touche inactive
+          {tr('keyInactive')}
         </span>
         {hasActiveFilters && (
           <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--accent)' }}>
@@ -419,7 +456,7 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
         {!hasActiveFilters && (
           <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-tertiary)' }}>
             <i className="ti ti-info-circle" style={{ fontSize: 12 }} />
-            Touches sans modificateur
+            {tr('keysWithoutModifier')}
           </span>
         )}
         <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-tertiary)' }}>

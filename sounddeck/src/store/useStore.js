@@ -8,6 +8,27 @@ export const AUDIO_MODES = {
   ADVANCED: 'advanced'
 }
 
+// ─── CONFIGURATION PAR DÉFAUT DE LA SIDEBAR ──────────────────────────────
+
+const DEFAULT_SIDEBAR_CONFIG = {
+  mode: 'default',
+  items: [
+    // Navigation principale (sans les profils)
+    { id: 'home', group: 'navigation', label: 'Mes sons', icon: 'ti-home', visible: true, pinned: false, order: 0, canHide: true },
+    { id: 'discover', group: 'navigation', label: 'Découverte', icon: 'ti-compass', visible: true, pinned: false, order: 1, canHide: true },
+    { id: 'editor', group: 'navigation', label: 'Éditeur', icon: 'ti-cut', visible: true, pinned: false, order: 2, canHide: true },
+    { id: 'sequencer', group: 'navigation', label: 'Séquenceur', icon: 'ti-playlist', visible: true, pinned: false, order: 3, canHide: true },
+    { id: 'youtube', group: 'navigation', label: 'YouTube', icon: 'ti-brand-youtube', visible: true, pinned: false, order: 4, canHide: true },
+    // Actions
+    { id: 'loop', group: 'actions', label: 'Répétition', icon: 'ti-repeat', visible: true, pinned: false, order: 5, canHide: false },
+    { id: 'shortcuts', group: 'actions', label: 'Raccourcis', icon: 'ti-keyboard', visible: true, pinned: false, order: 6, canHide: false },
+    { id: 'presentation', group: 'actions', label: 'Présentation', icon: 'ti-layout-grid', visible: true, pinned: false, order: 7, canHide: false },
+    // Footer
+    { id: 'guide', group: 'footer', label: 'Guide Discord', icon: 'ti-book', visible: true, pinned: false, order: 8, canHide: true },
+    { id: 'options', group: 'footer', label: 'Options', icon: 'ti-settings', visible: true, pinned: false, order: 9, canHide: true },
+  ]
+}
+
 export function useStore() {
   const [profiles, setProfiles] = useState([])
   const [currentProfileId, setCurrentProfileId] = useState(null)
@@ -46,6 +67,11 @@ export function useStore() {
   const [noiseSuppression, setNoiseSuppression] = useState(false)
   const [noiseSuppressionMode, setNoiseSuppressionMode] = useState('auto')
   const [keyboardLayout, setKeyboardLayout] = useState('qwerty')
+
+  // ─── SIDEBAR CONFIG ──────────────────────────────────────────────────────────
+  const [sidebarConfig, setSidebarConfig] = useState(null)
+  const [sidebarEditMode, setSidebarEditMode] = useState(false)
+  const [sidebarVersion, setSidebarVersion] = useState(0)
 
   // ─── CHARGEMENT INITIAL ──────────────────────────────────────────────────
 
@@ -113,15 +139,13 @@ export function useStore() {
         // ─── LANGUE ────────────────────────────────────────────────────────────
         const savedLang = await window.electronAPI.storeGet('lang')
         let defaultLang = savedLang || 'fr'
-        
+
         if (!savedLang) {
-          // ✅ Si la langue n'est pas sauvegardée, utiliser la langue système
           try {
             const systemLang = await window.electronAPI.getSystemLanguage?.()
             if (systemLang) {
               defaultLang = systemLang
               console.log(`🌐 Langue système détectée: ${defaultLang}`)
-              // Sauvegarder immédiatement la langue détectée
               await window.electronAPI.storeSet('lang', defaultLang)
             }
           } catch (e) {
@@ -133,15 +157,13 @@ export function useStore() {
         // ─── LAYOUT CLAVIER ──────────────────────────────────────────────────
         const savedKeyboardLayout = await window.electronAPI.storeGet('keyboardLayout')
         let defaultLayout = savedKeyboardLayout || 'qwerty'
-        
+
         if (!savedKeyboardLayout) {
-          // ✅ Si le layout n'est pas sauvegardé, utiliser le layout système
           try {
             const systemLayout = await window.electronAPI.getSystemKeyboardLayout?.()
             if (systemLayout) {
               defaultLayout = systemLayout
               console.log(`⌨️ Layout clavier système détecté: ${defaultLayout}`)
-              // Sauvegarder immédiatement le layout détecté
               await window.electronAPI.storeSet('keyboardLayout', defaultLayout)
             }
           } catch (e) {
@@ -153,7 +175,7 @@ export function useStore() {
         setProfiles(allProfiles)
         setSounds(savedSounds)
         setShortcuts(savedShortcuts)
-        
+
         // ═════════Nettoyage des raccourcis orphelins════════════════════════════
         const soundIds = new Set(savedSounds.map(s => s.id))
         const cleanedShortcuts = { ...savedShortcuts }
@@ -171,7 +193,7 @@ export function useStore() {
           console.log('✅ Raccourcis orphelins nettoyés au chargement')
         }
         // ═══════════════════════════════════════════════════════════════════════
-        
+
         setProfileShortcut(savedProfileShortcut)
         setTheme(savedTheme)
         if (savedCustomTheme) setCustomTheme(savedCustomTheme)
@@ -192,6 +214,87 @@ export function useStore() {
         const savedToggleWindowShortcut = await window.electronAPI.storeGet('toggleWindowShortcut') || 'CommandOrControl+Shift+S'
         setToggleWindowShortcut(savedToggleWindowShortcut)
 
+        // ─── SIDEBAR CONFIG ──────────────────────────────────────────────────
+        let savedSidebarConfig = await window.electronAPI.storeGet('sidebarConfig')
+        
+        if (savedSidebarConfig) {
+          // ✅ Synchroniser les profils avec la config sauvegardée
+          const existingProfileIds = (savedSidebarConfig.items || [])
+            .filter(item => item.id && item.id.startsWith('profile-'))
+            .map(item => item.id.replace('profile-', ''))
+          
+          // Ajouter les profils manquants
+          let items = [...(savedSidebarConfig.items || [])]
+          
+          allProfiles.forEach(profile => {
+            const profileId = `profile-${profile.id}`
+            const existingIndex = items.findIndex(item => item.id === profileId)
+            
+            if (existingIndex === -1) {
+              items.push({
+                id: profileId,
+                group: 'profiles',
+                label: profile.name,
+                icon: profile.id === 'all' ? 'ti-stack' : 'ti-user',
+                visible: true,
+                pinned: false,
+                order: items.length,
+                canHide: profile.id !== 'all',
+                isProfile: true,
+                isDefaultProfile: profile.id === 'all'
+              })
+            } else {
+              items[existingIndex].label = profile.name
+            }
+          })
+          
+          // Supprimer les profils qui n'existent plus
+          const currentProfileIds = new Set(allProfiles.map(p => `profile-${p.id}`))
+          items = items.filter(item => {
+            if (item.id.startsWith('profile-')) {
+              return currentProfileIds.has(item.id)
+            }
+            return true
+          })
+          
+          savedSidebarConfig = {
+            ...savedSidebarConfig,
+            items
+          }
+          
+          setSidebarConfig(savedSidebarConfig)
+        } else {
+          // ✅ Créer la config par défaut avec les profils
+          const defaultItems = [...DEFAULT_SIDEBAR_CONFIG.items]
+          
+          // Ajouter les profils
+          allProfiles.forEach(profile => {
+            defaultItems.push({
+              id: `profile-${profile.id}`,
+              group: 'profiles',
+              label: profile.name,
+              icon: profile.id === 'all' ? 'ti-stack' : 'ti-user',
+              visible: true,
+              pinned: false,
+              order: defaultItems.length,
+              canHide: profile.id !== 'all',
+              isProfile: true,
+              isDefaultProfile: profile.id === 'all'
+            })
+          })
+          
+          const defaultConfig = {
+            mode: 'default',
+            items: defaultItems,
+            sectionOrder: ['pinned', 'profiles', 'navigation', 'actions', 'footer'] // ← Modifier l'ordre
+          }
+          
+          setSidebarConfig(defaultConfig)
+          await window.electronAPI.storeSet('sidebarConfig', defaultConfig)
+        }
+        
+        setSidebarVersion(prev => prev + 1)
+
       } catch (e) {
         console.error('Erreur chargement store:', e)
         setProfiles([{ id: 'all', name: 'Tous les sons', isDefault: true }])
@@ -208,6 +311,65 @@ export function useStore() {
     await window.electronAPI.storeSet(key, value)
   }, [])
 
+  // ─── SYNC PROFILS VERS SIDEBAR ──────────────────────────────────────────────
+  // ✅ DÉCLARER syncProfilesToSidebar AVANT de l'utiliser dans les autres fonctions
+
+  const syncProfilesToSidebar = useCallback(async (profileList) => {
+    const currentConfig = sidebarConfig || DEFAULT_SIDEBAR_CONFIG
+    
+    // Récupérer tous les profils (y compris "all")
+    const allProfiles = [{ id: 'all', name: 'Tous les sons', isDefault: true }, ...(profileList || [])]
+    
+    // Créer la nouvelle liste d'items
+    let newItems = [...(currentConfig.items || [])]
+    
+    // Ajouter ou mettre à jour les profils
+    allProfiles.forEach(profile => {
+      const profileId = `profile-${profile.id}`
+      const existingIndex = newItems.findIndex(item => item.id === profileId)
+      
+      if (existingIndex === -1) {
+        // Profil manquant, l'ajouter
+        newItems.push({
+          id: profileId,
+          group: 'profiles',
+          label: profile.name,
+          icon: profile.id === 'all' ? 'ti-stack' : 'ti-user',
+          visible: true,
+          pinned: false,
+          order: newItems.length,
+          canHide: profile.id !== 'all',
+          isProfile: true,
+          isDefaultProfile: profile.id === 'all'
+        })
+      } else {
+        // Profil existant, mettre à jour le nom
+        newItems[existingIndex].label = profile.name
+      }
+    })
+    
+    // Supprimer les profils qui n'existent plus
+    const currentProfileIds = new Set(allProfiles.map(p => `profile-${p.id}`))
+    newItems = newItems.filter(item => {
+      if (item.id.startsWith('profile-')) {
+        return currentProfileIds.has(item.id)
+      }
+      return true
+    })
+    
+    // Mettre à jour la config
+    const updatedConfig = {
+      ...currentConfig,
+      items: newItems
+    }
+    
+    setSidebarConfig(updatedConfig)
+    setSidebarVersion(prev => prev + 1)
+    await save('sidebarConfig', updatedConfig)
+    
+    return updatedConfig
+  }, [sidebarConfig, save])
+
   // ─── Sauvegarde périphérique audio local ──────────────────────────────────────────────────────────────────
   const updateLocalAudioDevice = useCallback(async (deviceId) => {
     setLocalAudioDevice(deviceId)
@@ -221,8 +383,12 @@ export function useStore() {
     setProfiles(updated)
     const userProfiles = updated.filter(p => p.id !== 'all')
     await save('profiles', userProfiles)
+    
+    // ✅ Ajouter le nouveau profil à la sidebar
+    await syncProfilesToSidebar(updated.filter(p => p.id !== 'all'))
+    
     return newProfile
-  }, [profiles, save])
+  }, [profiles, save, syncProfilesToSidebar])
 
   const deleteProfile = useCallback(async (profileId) => {
     if (profileId === 'all') return
@@ -240,13 +406,19 @@ export function useStore() {
     await save('sounds', updatedSounds)
     await save('soundOrder', updatedOrder)
     if (currentProfileId === profileId) setCurrentProfileId('all')
-  }, [profiles, sounds, currentProfileId, save, soundOrder])
+    
+    // ✅ Supprimer le profil de la sidebar
+    await syncProfilesToSidebar(updated.filter(p => p.id !== 'all'))
+  }, [profiles, sounds, currentProfileId, save, soundOrder, syncProfilesToSidebar])
 
   const renameProfile = useCallback(async (profileId, newName) => {
     const updated = profiles.map(p => p.id === profileId ? { ...p, name: newName } : p)
     setProfiles(updated)
     await save('profiles', updated.filter(p => p.id !== 'all'))
-  }, [profiles, save])
+    
+    // ✅ Mettre à jour le nom du profil dans la sidebar
+    await syncProfilesToSidebar(updated.filter(p => p.id !== 'all'))
+  }, [profiles, save, syncProfilesToSidebar])
 
   const switchProfile = useCallback(async (profileId) => {
     setCurrentProfileId(profileId)
@@ -261,28 +433,29 @@ export function useStore() {
 
   // ─── Réorganisation des profils ──────────────────────────────────────────────
   const reorderProfiles = useCallback(async (startIndex, endIndex) => {
-    // Ne pas permettre de déplacer le profil "all"
     const userProfiles = profiles.filter(p => p.id !== 'all')
-    
-    if (startIndex < 0 || startIndex >= userProfiles.length || 
+
+    if (startIndex < 0 || startIndex >= userProfiles.length ||
         endIndex < 0 || endIndex >= userProfiles.length) {
       console.warn('Indices invalides pour reorderProfiles:', startIndex, endIndex)
       return false
     }
-    
-    // Créer une copie du tableau des profils utilisateur
+
     const reordered = [...userProfiles]
     const [removed] = reordered.splice(startIndex, 1)
     reordered.splice(endIndex, 0, removed)
-    
-    // Reconstruire la liste complète des profils
+
     const allProfile = profiles.find(p => p.id === 'all')
     const newProfiles = [allProfile, ...reordered]
-    
+
     setProfiles(newProfiles)
-    await save('profiles', reordered) // Ne sauvegarder que les profils utilisateur
+    await save('profiles', reordered)
+    
+    // ✅ Mettre à jour l'ordre des profils dans la sidebar
+    await syncProfilesToSidebar(reordered)
+    
     return true
-  }, [profiles, save])
+  }, [profiles, save, syncProfilesToSidebar])
 
   // ─── Sons ─────────────────────────────────────────────────────────────────────
   const normalizePath = (p) => p ? p.replace(/\\/g, '/') : p
@@ -359,7 +532,7 @@ export function useStore() {
 
   const updateSoundVolume = useCallback(async (soundId, volumeDb) => {
     const clampedDb = Math.max(-24, Math.min(24, volumeDb))
-    const updated = sounds.map(s => 
+    const updated = sounds.map(s =>
       s.id === soundId ? { ...s, volume: clampedDb, volumeDb: clampedDb } : s
     )
     setSounds(updated)
@@ -424,24 +597,24 @@ export function useStore() {
   const reorderSounds = useCallback(async (startIndex, endIndex) => {
     const profileId = currentProfileId || 'all'
     const currentOrder = soundOrder[profileId] || []
-    
+
     const profileSounds = profileId === 'all'
       ? sounds
       : sounds.filter(s => s.profiles.includes(profileId))
-    
-    let orderedIds = currentOrder.length === profileSounds.length 
-      ? currentOrder 
+
+    let orderedIds = currentOrder.length === profileSounds.length
+      ? currentOrder
       : profileSounds.map(s => s.id)
-    
-    if (startIndex < 0 || startIndex >= orderedIds.length || 
+
+    if (startIndex < 0 || startIndex >= orderedIds.length ||
         endIndex < 0 || endIndex >= orderedIds.length) {
       console.warn('Indices invalides pour reorderSounds:', startIndex, endIndex)
       return false
     }
-    
+
     const [removed] = orderedIds.splice(startIndex, 1)
     orderedIds.splice(endIndex, 0, removed)
-    
+
     const updatedOrder = { ...soundOrder, [profileId]: orderedIds }
     setSoundOrder(updatedOrder)
     await save('soundOrder', updatedOrder)
@@ -517,7 +690,7 @@ export function useStore() {
     const soundIds = new Set(sounds.map(s => s.id))
     const updatedShortcuts = { ...shortcuts }
     let hasChanges = false
-    
+
     Object.keys(updatedShortcuts).forEach(id => {
       if (!soundIds.has(id)) {
         console.log(`🗑️ Suppression du raccourci orphelin pour l'ID: ${id}`)
@@ -525,7 +698,7 @@ export function useStore() {
         hasChanges = true
       }
     })
-    
+
     if (hasChanges) {
       setShortcuts(updatedShortcuts)
       await save('shortcuts', updatedShortcuts)
@@ -606,7 +779,6 @@ export function useStore() {
     await save('normalizationTarget', target)
   }, [save])
 
-  // Forcer la réanalyse des gains
   const resetGainCache = useCallback(async () => {
     const { gainCache } = await import('../utils/audio')
     Object.keys(gainCache).forEach(key => delete gainCache[key])
@@ -652,7 +824,7 @@ export function useStore() {
       console.log('ℹ️ Mixeur désactivé, pas d\'initialisation automatique')
       return true
     }
-    
+
     try {
       console.log('🎛️ Initialisation automatique du mixeur au démarrage...')
       console.log('📊 État du mixeur au démarrage:', {
@@ -661,33 +833,33 @@ export function useStore() {
         audioDevice,
         noiseSuppressionMode
       })
-      
-      const { 
-        initAudioMixer, 
-        resumeAudioContext, 
-        connectMixerToOutput, 
+
+      const {
+        initAudioMixer,
+        resumeAudioContext,
+        connectMixerToOutput,
         setNoiseSuppressionMode,
         isMixerOperational,
         repairMixer
       } = await import('../utils/audioMixer')
-      
+
       if (isMixerOperational()) {
         console.log('✅ Mixeur déjà opérationnel')
         return true
       }
-      
+
       const repaired = repairMixer()
       if (repaired && isMixerOperational()) {
         console.log('✅ Mixeur réparé avec succès')
         return true
       }
-      
+
       const mixedStream = await initAudioMixer(microphoneDevice || 'default')
-      
+
       if (mixedStream) {
         resumeAudioContext()
         connectMixerToOutput(audioDevice || 'default')
-        
+
         if (noiseSuppressionMode && noiseSuppressionMode !== 'off') {
           try {
             setNoiseSuppressionMode(noiseSuppressionMode)
@@ -696,7 +868,7 @@ export function useStore() {
             console.warn('⚠️ Erreur lors de l\'application du mode de réduction de bruit:', e)
           }
         }
-        
+
         console.log('✅ Mixeur initialisé automatiquement avec succès')
         return true
       } else {
@@ -719,7 +891,7 @@ export function useStore() {
         const devices = await navigator.mediaDevices.enumerateDevices()
         const audioInputs = devices.filter(d => d.kind === 'audioinput')
         const deviceExists = audioInputs.some(d => d.deviceId === deviceId)
-        
+
         if (!deviceExists) {
           console.warn(`⚠️ Périphérique ${deviceId} non trouvé, utilisation du périphérique par défaut`)
           deviceId = 'default'
@@ -729,28 +901,71 @@ export function useStore() {
         deviceId = 'default'
       }
     }
-    
+
     setMicrophoneDevice(deviceId)
     await save('microphoneDevice', deviceId)
   }, [save])
 
-  // ─── ✅ NOUVELLE FONCTION : Changer l'image d'un son ──────────────────────
+  // ─── Image et Emoji des sons ──────────────────────────────────────────────
   const updateSoundImage = useCallback(async (soundId, imagePath) => {
-    const updated = sounds.map(s => 
+    const updated = sounds.map(s =>
       s.id === soundId ? { ...s, image: normalizePath(imagePath) } : s
     )
     setSounds(updated)
     await save('sounds', updated)
   }, [sounds, save])
 
-  // ─── ✅ NOUVELLE FONCTION : Changer l'émoticône d'un son ──────────────────
   const updateSoundEmoji = useCallback(async (soundId, emoji) => {
-    const updated = sounds.map(s => 
+    const updated = sounds.map(s =>
       s.id === soundId ? { ...s, emoji } : s
     )
     setSounds(updated)
     await save('sounds', updated)
   }, [sounds, save])
+
+  // ─── SIDEBAR CONFIG ──────────────────────────────────────────────────────────
+
+  const resetSidebarConfig = useCallback(async () => {
+    // ✅ Réinitialiser avec les profils actuels
+    const allProfiles = profiles || []
+    const defaultItems = [...DEFAULT_SIDEBAR_CONFIG.items]
+    
+    // Ajouter les profils
+    allProfiles.forEach(profile => {
+      defaultItems.push({
+        id: `profile-${profile.id}`,
+        group: 'profiles',
+        label: profile.name,
+        icon: profile.id === 'all' ? 'ti-stack' : 'ti-user',
+        visible: true,
+        pinned: false,
+        order: defaultItems.length,
+        canHide: profile.id !== 'all',
+        isProfile: true,
+        isDefaultProfile: profile.id === 'all'
+      })
+    })
+    
+    const defaultConfig = {
+      mode: 'default',
+      items: defaultItems,
+      sectionOrder: ['pinned', 'profiles', 'navigation', 'actions', 'footer'] // ← Modifier l'ordre
+    }
+    
+    setSidebarConfig(defaultConfig)
+    setSidebarVersion(prev => prev + 1)
+    await save('sidebarConfig', defaultConfig)
+  }, [profiles, save])
+
+  const updateSidebarConfig = useCallback(async (newConfig) => {
+    setSidebarConfig(newConfig)
+    setSidebarVersion(prev => prev + 1)
+    await save('sidebarConfig', newConfig)
+  }, [save])
+
+  const toggleSidebarEditMode = useCallback(() => {
+    setSidebarEditMode(prev => !prev)
+  }, [])
 
   // ─── Sons ordonnés selon le profil ──────────────────────────────────────────
   const orderedSounds = useMemo(() => {
@@ -758,20 +973,20 @@ export function useStore() {
     const profileSounds = profileId === 'all'
       ? sounds
       : sounds.filter(s => s.profiles.includes(profileId))
-    
+
     const order = soundOrder[profileId] || []
-    
+
     if (order.length === 0 || order.length !== profileSounds.length) {
       return profileSounds
     }
-    
+
     const soundMap = {}
     profileSounds.forEach(s => { soundMap[s.id] = s })
-    
+
     const ordered = order
       .filter(id => soundMap[id])
       .map(id => soundMap[id])
-    
+
     const missing = profileSounds.filter(s => !order.includes(s.id))
     return [...ordered, ...missing]
   }, [sounds, soundOrder, currentProfileId, orderVersion])
@@ -782,75 +997,122 @@ export function useStore() {
   }, [orderedSounds, currentProfileId])
 
   return {
-    // État
-    profiles, currentProfileId, sounds, currentSounds: orderedSounds, favoriteSounds,
-    shortcuts, profileShortcut, theme, audioDevice, volume, playLocally, loading,
-    previewVolume, shortcutsEnabled, toggleShortcutsAccelerator,
+    // ─── État ──────────────────────────────────────────────────────────────────
+    profiles,
+    currentProfileId,
+    sounds,
+    currentSounds: orderedSounds,
+    favoriteSounds,
+    shortcuts,
+    profileShortcut,
+    theme,
+    customTheme,
+    lang,
+    audioDevice,
+    volume,
+    playLocally,
+    loading,
+    previewVolume,
+    shortcutsEnabled,
+    toggleShortcutsAccelerator,
+    toggleWindowShortcut,
     soundOrder,
-    // Normalisation
-    normalizationEnabled, normalizationTarget,
-    // Profils
-    createProfile, deleteProfile, renameProfile, switchProfile, switchToNextProfile,
-    reorderProfiles,
-    // Sons
-    addSound, deleteSound, updateSound, updateSoundVolume, incrementPlayCount, toggleFavorite, 
-    addSoundToProfile, removeSoundFromProfile, reorderSounds,
-    updateSoundImage,
-    updateSoundEmoji,
-    // Raccourcis
-    setShortcut, clearShortcut, updateProfileShortcut,
-    // Options
-    loopEnabled, loopShortcut, toggleLoop, updateLoopShortcut,
-    stopAllShortcut, updateStopAllShortcut,
-    presentationShortcut, updatePresentationShortcut,
-    lang, updateLang,
-    customTheme, updateTheme, updateCustomTheme, updateAudioDevice, updateVolume, updatePlayLocally,
-    updatePreviewVolume,
-    // Audio Mode
+    normalizationEnabled,
+    normalizationTarget,
     audioMode,
     virtualDriverInstalled,
     virtualDeviceActive,
-    updateAudioMode,
-    updateVirtualDriverInstalled,
-    updateVirtualDeviceActive,
-    // Raccourcis globaux
-    toggleGlobalShortcuts,
-    updateToggleShortcutsAccelerator,
-    toggleWindowShortcut,
-    updateToggleWindowShortcut,
-    // Normalisation
-    updateNormalizationEnabled,
-    updateNormalizationTarget,
-    // Mixer
     mixerEnabled,
     microphoneDevice,
     microphoneVolume,
     mixerSoundVolume,
+    localAudioDevice,
+    noiseSuppression,
+    noiseSuppressionMode,
+    keyboardLayout,
+    loopEnabled,
+    loopShortcut,
+    stopAllShortcut,
+    presentationShortcut,
+    startMinimized,
+    launchAtStartup,
+
+    // ─── Sidebar ──────────────────────────────────────────────────────────────
+    sidebarConfig,
+    sidebarEditMode,
+    sidebarVersion,
+    DEFAULT_SIDEBAR_CONFIG,
+    resetSidebarConfig,
+    updateSidebarConfig,
+    toggleSidebarEditMode,
+    syncProfilesToSidebar,
+
+    // ─── Profils ──────────────────────────────────────────────────────────────
+    createProfile,
+    deleteProfile,
+    renameProfile,
+    switchProfile,
+    switchToNextProfile,
+    reorderProfiles,
+
+    // ─── Sons ─────────────────────────────────────────────────────────────────
+    addSound,
+    deleteSound,
+    updateSound,
+    updateSoundVolume,
+    incrementPlayCount,
+    toggleFavorite,
+    addSoundToProfile,
+    removeSoundFromProfile,
+    reorderSounds,
+    updateSoundImage,
+    updateSoundEmoji,
+
+    // ─── Raccourcis ──────────────────────────────────────────────────────────
+    setShortcut,
+    clearShortcut,
+    updateProfileShortcut,
+    toggleLoop,
+    updateLoopShortcut,
+    updateStopAllShortcut,
+    updatePresentationShortcut,
+    toggleGlobalShortcuts,
+    updateToggleShortcutsAccelerator,
+    updateToggleWindowShortcut,
+    cleanupOrphanShortcuts,
+
+    // ─── Options ──────────────────────────────────────────────────────────────
+    updateLang,
+    updateTheme,
+    updateCustomTheme,
+    updateAudioDevice,
+    updateVolume,
+    updatePlayLocally,
+    updatePreviewVolume,
+    updateKeyboardLayout,
+    updateAudioMode,
+    updateVirtualDriverInstalled,
+    updateVirtualDeviceActive,
+
+    // ─── Normalisation ────────────────────────────────────────────────────────
+    updateNormalizationEnabled,
+    updateNormalizationTarget,
+    resetGainCache,
+
+    // ─── Mixer ────────────────────────────────────────────────────────────────
     updateMixerEnabled,
     updateMicrophoneDeviceId,
     updateMicrophoneVolume,
     updateMixerSoundVolume,
-    // Noise Suppression
-    noiseSuppression,
-    noiseSuppressionMode,
     updateNoiseSuppression,
     updateNoiseSuppressionMode,
-    // Initialisation
     initMixerOnStartup,
-    // Démarrage
-    startMinimized,
-    launchAtStartup,
+
+    // ─── Démarrage ────────────────────────────────────────────────────────────
     setStartMinimized: (val) => { setStartMinimized(val); save('startMinimized', val) },
     setLaunchAtStartup: (val) => { setLaunchAtStartup(val); save('launchAtStartup', val) },
-    // Périphérique audio local
-    localAudioDevice,
+
+    // ─── Périphérique audio local ────────────────────────────────────────────
     updateLocalAudioDevice,
-    // Nettoyage des raccourcis orphelins
-    cleanupOrphanShortcuts,
-    // Keyboard
-    keyboardLayout,
-    updateKeyboardLayout,
-    // Gain cache
-    resetGainCache,
   }
 }

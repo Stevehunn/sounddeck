@@ -249,6 +249,7 @@ export default function App() {
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg-primary)' }}>
       <Sidebar
+        key={store.sidebarVersion}
         profiles={store.profiles}
         currentProfileId={store.currentProfileId}
         currentPage={currentPage}
@@ -264,6 +265,9 @@ export default function App() {
         lang={store.lang}
         addToast={addToast}
         onReorderProfiles={store.reorderProfiles}
+        sidebarConfig={store.sidebarConfig}
+        sidebarEditMode={store.sidebarEditMode}
+        sidebarVersion={store.sidebarVersion} // ✅ Ajout de sidebarVersion
       />
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>

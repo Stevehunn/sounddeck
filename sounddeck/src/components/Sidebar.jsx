@@ -1,46 +1,71 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from '../i18n'
 
-export default function Sidebar({ 
-  profiles, 
-  currentProfileId, 
-  currentPage, 
+// IDs des éléments qui sont toujours des actions
+const ACTION_IDS = ['loop', 'shortcuts', 'presentation']
+
+export default function Sidebar({
+  profiles,
+  currentProfileId,
+  currentPage,
   onSwitchProfile,
-  onChangePage, 
-  onCreateProfile, 
-  onToggleLoop, 
-  loopEnabled, 
-  addToast,
-  volume, 
-  onVolumeChange, 
-  onStopAll, 
-  onPresentation, 
+  onChangePage,
+  onCreateProfile,
+  onToggleLoop,
+  loopEnabled,
+  volume,
+  onVolumeChange,
+  onStopAll,
+  onPresentation,
   lang,
-  onReorderProfiles
+  addToast,
+  onReorderProfiles,
+  sidebarConfig,
+  sidebarEditMode,
+  sidebarVersion = 0,
 }) {
 
   const [newProfileName, setNewProfileName] = useState('')
   const [showNewProfile, setShowNewProfile] = useState(false)
   const [shortcutsEnabled, setShortcutsEnabled] = useState(true)
   const tr = useTranslation(lang)
-  
+
   const [draggedProfileId, setDraggedProfileId] = useState(null)
   const [dragOverProfileId, setDragOverProfileId] = useState(null)
 
+  // ─── Raccourcis ──────────────────────────────────────────────────────────────
   useEffect(() => {
     window.electronAPI.getGlobalShortcutsState().then(enabled => {
       setShortcutsEnabled(enabled)
     }).catch(() => {})
-    
+
     window.electronAPI.onShortcutsToggle((enabled) => {
       setShortcutsEnabled(enabled)
     })
-    
+
     return () => {
       window.electronAPI.removeAllListeners('shortcuts-toggle')
     }
   }, [])
 
+  // ─── Debug ──────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    console.log('🔄 Sidebar re-rendue avec version:', sidebarVersion)
+    console.log('📋 Sidebar config:', sidebarConfig)
+    console.log('📋 Profils disponibles:', profiles.map(p => p.id))
+    
+    if (sidebarConfig?.items) {
+      const groups = {}
+      sidebarConfig.items.forEach(item => {
+        const key = item.pinned ? 'pinned' : item.group
+        if (!groups[key]) groups[key] = []
+        groups[key].push(item.id)
+      })
+      console.log('📊 Groupes dans la config:', groups)
+    }
+  }, [sidebarVersion, sidebarConfig, profiles])
+
+  // ─── Profils ──────────────────────────────────────────────────────────────────
   const handleCreateProfile = async () => {
     if (!newProfileName.trim()) return
     await onCreateProfile(newProfileName.trim())
@@ -59,6 +84,7 @@ export default function Sidebar({
     }
   }
 
+  // ─── Drag & Drop des profils ──────────────────────────────────────────────
   const handleProfileDragStart = (e, profileId) => {
     if (profileId === 'all') {
       e.preventDefault()
@@ -95,7 +121,7 @@ export default function Sidebar({
   const handleProfileDrop = async (e, targetProfileId) => {
     e.preventDefault()
     if (targetProfileId === 'all') return
-    
+
     const sourceId = e.dataTransfer.getData('text/plain')
     if (!sourceId || sourceId === targetProfileId) {
       setDraggedProfileId(null)
@@ -106,7 +132,7 @@ export default function Sidebar({
     const userProfiles = profiles.filter(p => p.id !== 'all')
     const startIndex = userProfiles.findIndex(p => p.id === sourceId)
     const endIndex = userProfiles.findIndex(p => p.id === targetProfileId)
-    
+
     if (startIndex === -1 || endIndex === -1) {
       setDraggedProfileId(null)
       setDragOverProfileId(null)
@@ -117,12 +143,472 @@ export default function Sidebar({
     if (success) {
       addToast('Profil déplacé', 'success')
     }
-    
+
     setDraggedProfileId(null)
     setDragOverProfileId(null)
   }
 
-  const userProfiles = profiles.filter(p => p.id !== 'all')
+  // ─── CONFIGURATION DE LA SIDEBAR ────────────────────────────────────────────
+
+  const visibleItems = useMemo(() => {
+    console.log('🔄 Recalcul de visibleItems avec config:', sidebarConfig?.mode)
+    
+    if (!sidebarConfig || !sidebarConfig.items) {
+      return { pinned: [], groups: {} }
+    }
+
+    const visible = sidebarConfig.items.filter(item => item.visible !== false)
+
+    const pinned = visible.filter(item => item.pinned === true)
+    const others = visible.filter(item => item.pinned !== true)
+
+    const groups = {}
+    others.forEach(item => {
+      const groupKey = item.group || 'other'
+      if (!groups[groupKey]) groups[groupKey] = []
+      groups[groupKey].push(item)
+    })
+
+    console.log('📊 visibleItems calculé:', { 
+      pinned: pinned.length, 
+      groups: Object.keys(groups),
+      actions: groups.actions?.length || 0
+    })
+
+    return { pinned, groups }
+  }, [sidebarConfig])
+
+  const isItemActive = (itemId) => {
+    if (itemId === 'home') return currentPage === 'home'
+    if (itemId === 'discover') return currentPage === 'discover'
+    if (itemId === 'editor') return currentPage === 'editor'
+    if (itemId === 'sequencer') return currentPage === 'sequencer'
+    if (itemId === 'youtube') return currentPage === 'youtube'
+    if (itemId === 'guide') return currentPage === 'guide'
+    if (itemId === 'options') return currentPage === 'options'
+    if (itemId === 'library') return currentPage === 'library'
+    if (itemId === 'mixer') return currentPage === 'mixer'
+    return false
+  }
+
+  const handleNavClick = (itemId) => {
+    if (itemId === 'home') onChangePage('home')
+    else if (itemId === 'discover') onChangePage('discover')
+    else if (itemId === 'editor') onChangePage('editor')
+    else if (itemId === 'sequencer') onChangePage('sequencer')
+    else if (itemId === 'youtube') onChangePage('youtube')
+    else if (itemId === 'guide') onChangePage('guide')
+    else if (itemId === 'options') onChangePage('options')
+    else if (itemId === 'library') onChangePage('library')
+    else if (itemId === 'mixer') onChangePage('mixer')
+  }
+
+  // ✅ Rendre un élément de navigation standard
+  const renderNavItem = (item) => {
+    const isAction = ACTION_IDS.includes(item.id)
+    return (
+      <SidebarItem
+        key={item.id}
+        icon={item.icon}
+        label={item.label}
+        active={isItemActive(item.id)}
+        onClick={() => handleNavClick(item.id)}
+        isAction={isAction}
+      />
+    )
+  }
+
+  // ✅ Rendre un profil individuel
+  const renderProfileItem = (profile, showDragHandle = false) => {
+    const isDragging = draggedProfileId === profile.id
+    const isDragOver = dragOverProfileId === profile.id && !isDragging
+
+    if (profile.id === 'all') {
+      return (
+        <SidebarItem
+          key={profile.id}
+          icon="ti-stack"
+          label={tr('allSounds')}
+          active={currentProfileId === profile.id && currentPage === 'home'}
+          dot={currentProfileId === profile.id}
+          onClick={() => { onSwitchProfile(profile.id); onChangePage('home') }}
+        />
+      )
+    }
+
+    return (
+      <div
+        key={profile.id}
+        draggable={true}
+        onDragStart={(e) => handleProfileDragStart(e, profile.id)}
+        onDragEnd={handleProfileDragEnd}
+        onDragOver={(e) => handleProfileDragOver(e, profile.id)}
+        onDragLeave={handleProfileDragLeave}
+        onDrop={(e) => handleProfileDrop(e, profile.id)}
+        style={{
+          opacity: isDragging ? 0.3 : 1,
+          transform: isDragOver ? 'scale(1.02)' : 'scale(1)',
+          transition: 'transform 0.15s, opacity 0.15s',
+          position: 'relative',
+          zIndex: isDragging ? 10 : 1,
+          cursor: 'grab'
+        }}
+      >
+        {isDragOver && (
+          <div style={{
+            position: 'absolute',
+            top: -2,
+            left: 4,
+            right: 4,
+            height: 2,
+            background: 'var(--accent)',
+            borderRadius: 1,
+            pointerEvents: 'none',
+            zIndex: 5,
+            animation: 'fadeIn 0.15s ease'
+          }} />
+        )}
+        <SidebarItem
+          icon="ti-user"
+          label={profile.name}
+          active={currentProfileId === profile.id && currentPage === 'home'}
+          dot={currentProfileId === profile.id}
+          onClick={() => { onSwitchProfile(profile.id); onChangePage('home') }}
+          showDragHandle={showDragHandle}
+          isProfile={true}
+        />
+      </div>
+    )
+  }
+
+  // ✅ Rendre un élément d'action
+  const renderActionItem = (item) => {
+    console.log('🎯 renderActionItem appelé pour:', item.id, 'groupe:', item.group)
+    
+    if (item.id === 'loop') {
+      return (
+        <button key={item.id} onClick={onToggleLoop} style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '7px 8px',
+          borderRadius: 8,
+          background: loopEnabled ? 'rgba(29,158,117,0.15)' : 'var(--bg-tertiary)',
+          border: `1px solid ${loopEnabled ? 'var(--success)' : 'var(--border)'}`,
+          color: loopEnabled ? 'var(--success)' : 'var(--text-tertiary)',
+          fontSize: 12,
+          fontWeight: loopEnabled ? 600 : 400,
+          cursor: 'pointer',
+          transition: 'all 0.15s'
+        }}>
+          <i className="ti ti-repeat" style={{ fontSize: 15 }} />
+          <span style={{ flex: 1, textAlign: 'left' }}>{tr('loop')}</span>
+          <span style={{
+            fontSize: 10,
+            padding: '1px 6px',
+            borderRadius: 10,
+            background: loopEnabled ? 'var(--success)' : 'var(--border)',
+            color: loopEnabled ? 'white' : 'var(--text-tertiary)'
+          }}>
+            {loopEnabled ? 'ON' : 'OFF'}
+          </span>
+        </button>
+      )
+    }
+    if (item.id === 'shortcuts') {
+      return (
+        <button key={item.id} onClick={handleToggleShortcuts} style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '7px 8px',
+          borderRadius: 8,
+          background: shortcutsEnabled ? 'rgba(124,111,247,0.15)' : 'rgba(224,82,82,0.15)',
+          border: `1px solid ${shortcutsEnabled ? 'var(--accent)' : 'var(--danger)'}`,
+          color: shortcutsEnabled ? 'var(--accent)' : 'var(--danger)',
+          fontSize: 12,
+          fontWeight: shortcutsEnabled ? 600 : 400,
+          cursor: 'pointer',
+          transition: 'all 0.15s'
+        }}>
+          <i className={`ti ${shortcutsEnabled ? 'ti-keyboard' : 'ti-keyboard-off'}`} style={{ fontSize: 15 }} />
+          <span style={{ flex: 1, textAlign: 'left' }}>{tr('shortcuts')}</span>
+          <span style={{
+            fontSize: 10,
+            padding: '1px 6px',
+            borderRadius: 10,
+            background: shortcutsEnabled ? 'var(--accent)' : 'var(--danger)',
+            color: 'white'
+          }}>
+            {shortcutsEnabled ? 'ON' : 'OFF'}
+          </span>
+        </button>
+      )
+    }
+    if (item.id === 'presentation') {
+      return (
+        <button key={item.id} onClick={onPresentation} style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '7px 8px',
+          borderRadius: 8,
+          background: 'var(--bg-tertiary)',
+          border: '1px solid var(--border)',
+          color: 'var(--text-secondary)',
+          fontSize: 12,
+          cursor: 'pointer',
+          transition: 'all 0.15s'
+        }}>
+          <i className="ti ti-layout-grid" style={{ fontSize: 15 }} />
+          <span style={{ flex: 1, textAlign: 'left' }}>{tr('presentation')}</span>
+          <i className="ti ti-arrow-right" style={{ fontSize: 12 }} />
+        </button>
+      )
+    }
+    return null
+  }
+
+  // ─── RENDU ──────────────────────────────────────────────────────────────────
+
+  const sectionOrder = sidebarConfig?.sectionOrder || ['pinned', 'profiles', 'navigation', 'actions', 'footer']
+  
+  const orderedSections = [...sectionOrder]
+  const pinnedIdx = orderedSections.indexOf('pinned')
+  if (pinnedIdx > 0) {
+    const [pinned] = orderedSections.splice(pinnedIdx, 1)
+    orderedSections.unshift(pinned)
+  }
+  const footerIdx = orderedSections.indexOf('footer')
+  if (footerIdx !== -1 && footerIdx < orderedSections.length - 1) {
+    const [footer] = orderedSections.splice(footerIdx, 1)
+    orderedSections.push(footer)
+  }
+
+  const sectionsToRender = orderedSections.filter(section => {
+    if (section === 'pinned') {
+      return visibleItems.pinned.length > 0
+    }
+    // ✅ Ne pas inclure 'footer' dans les sections scrollables
+    if (section === 'footer') return false
+    return visibleItems.groups?.[section]?.length > 0
+  })
+
+  console.log('📋 Sections à afficher (sans footer):', sectionsToRender)
+
+  // ✅ Fonction pour rendre une section générique (navigation, footer, etc.)
+  const renderGenericSection = (sectionKey, title) => {
+    const items = visibleItems.groups[sectionKey] || []
+    if (items.length === 0) return null
+
+    // Filtrer les éléments qui sont en réalité des actions (ils seront rendus ailleurs)
+    const nonActionItems = items.filter(item => !ACTION_IDS.includes(item.id))
+    if (nonActionItems.length === 0) return null
+
+    return (
+      <div key={sectionKey}>
+        <div style={{ padding: '8px 12px 4px', marginTop: 4 }}>
+          <div style={{
+            fontSize: 11,
+            color: 'var(--text-tertiary)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            fontWeight: 500
+          }}>
+            {title}
+          </div>
+        </div>
+        {nonActionItems.map(item => renderNavItem(item))}
+      </div>
+    )
+  }
+
+  // ✅ Fonction pour vérifier si un profil est épinglé
+  const isProfilePinned = (profileId) => {
+    return sidebarConfig?.items?.some(i => 
+      i.id === `profile-${profileId}` && i.pinned === true
+    ) || false
+  }
+
+  // ✅ Rendu des sections (sauf footer)
+  const renderSections = () => {
+    return sectionsToRender.map(sectionKey => {
+      // ─── SECTION ÉPINGLÉS ───────────────────────────────────────────────
+      if (sectionKey === 'pinned') {
+        return (
+          <div key="pinned">
+            <div style={{ padding: '8px 12px 4px' }}>
+              <div style={{
+                fontSize: 11,
+                color: 'var(--accent)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4
+              }}>
+                <i className="ti ti-pinned" style={{ fontSize: 12 }} /> {tr('pinned')}
+              </div>
+            </div>
+            {visibleItems.pinned.map(item => {
+              // Profil épinglé
+              if (item.id.startsWith('profile-')) {
+                const profileId = item.id.replace('profile-', '')
+                const profile = profiles.find(p => p.id === profileId)
+                if (profile) return renderProfileItem(profile, true)
+                return null
+              }
+              // Action épinglée
+              if (ACTION_IDS.includes(item.id)) {
+                return renderActionItem(item)
+              }
+              // Navigation épinglée
+              return renderNavItem(item)
+            })}
+          </div>
+        )
+      }
+
+      // ─── SECTION PROFILS ────────────────────────────────────────────────
+      if (sectionKey === 'profiles') {
+        // Récupérer les profils qui ne sont pas épinglés
+        const nonPinnedProfiles = profiles.filter(p => 
+          p.id !== 'all' && !isProfilePinned(p.id)
+        )
+        
+        // Vérifier si "Tous les sons" est épinglé
+        const allPinned = isProfilePinned('all')
+
+        return (
+          <div key="profiles">
+            <div style={{ padding: '8px 12px 4px', marginTop: 4 }}>
+              <div style={{
+                fontSize: 11,
+                color: 'var(--text-tertiary)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                fontWeight: 500
+              }}>
+                {tr('profiles')}
+              </div>
+            </div>
+            
+            {/* Profil "Tous les sons" (s'il n'est pas épinglé) */}
+            {!allPinned && renderProfileItem(profiles.find(p => p.id === 'all'))}
+            
+            {/* Profils utilisateur non épinglés */}
+            {nonPinnedProfiles.map(profile => renderProfileItem(profile, true))}
+
+            {/* Nouveau profil */}
+            {showNewProfile ? (
+              <div style={{ padding: '4px 12px', display: 'flex', gap: 4 }}>
+                <input
+                  autoFocus
+                  value={newProfileName}
+                  onChange={e => setNewProfileName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleCreateProfile()
+                    if (e.key === 'Escape') setShowNewProfile(false)
+                  }}
+                  placeholder={tr('newProfile')}
+                  style={{ fontSize: 12, padding: '5px 8px', flex: 1 }}
+                />
+                <button className="btn-primary btn-sm" onClick={handleCreateProfile}>
+                  <i className="ti ti-check" />
+                </button>
+                <button className="btn-secondary btn-sm" onClick={() => setShowNewProfile(false)}>
+                  <i className="ti ti-x" />
+                </button>
+              </div>
+            ) : (
+              <SidebarItem
+                icon="ti-plus"
+                label={tr('newProfile')}
+                muted
+                onClick={() => setShowNewProfile(true)}
+              />
+            )}
+          </div>
+        )
+      }
+
+      // ─── SECTION NAVIGATION ─────────────────────────────────────────────
+      if (sectionKey === 'navigation') {
+        return renderGenericSection('navigation', tr('navigation'))
+      }
+
+      // ─── SECTION ACTIONS ─────────────────────────────────────────────────
+      if (sectionKey === 'actions') {
+        const items = visibleItems.groups.actions || []
+        
+        // Filtrer les éléments déjà épinglés
+        const nonPinnedActions = items.filter(item => {
+          const isPinned = sidebarConfig?.items?.find(i => i.id === item.id && i.pinned)
+          return !isPinned
+        })
+        
+        // Ajouter les éléments qui sont des actions mais dans d'autres groupes
+        const allActionItems = nonPinnedActions.filter(item => ACTION_IDS.includes(item.id))
+        
+        if (allActionItems.length === 0) return null
+        
+        console.log('⚡ Rendu des actions:', allActionItems.map(i => i.id))
+        
+        return (
+          <div key="actions">
+            <div style={{ padding: '8px 12px 4px', marginTop: 4 }}>
+              <div style={{
+                fontSize: 11,
+                color: 'var(--accent)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                fontWeight: 500
+              }}>
+                ⚡ Actions
+              </div>
+            </div>
+            <div style={{ margin: '0 8px' }}>
+              {allActionItems.map(item => renderActionItem(item))}
+            </div>
+          </div>
+        )
+      }
+
+      return null
+    })
+  }
+
+  // ✅ Rendu du footer (fixe en bas)
+  const renderFooter = () => {
+    const footerItems = visibleItems.groups.footer || []
+    if (footerItems.length === 0) return null
+
+    return (
+      <div style={{ 
+        flexShrink: 0,
+        borderTop: '1px solid var(--border)',
+        padding: '4px 0 8px',
+        background: 'var(--bg-secondary)'
+      }}>
+        <div style={{ padding: '8px 12px 4px' }}>
+          <div style={{
+            fontSize: 11,
+            color: 'var(--text-tertiary)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            fontWeight: 500
+          }}>
+            {tr('footer')}
+          </div>
+        </div>
+        {footerItems.map(item => renderNavItem(item))}
+      </div>
+    )
+  }
 
   return (
     <aside style={{
@@ -134,20 +620,21 @@ export default function Sidebar({
       flexShrink: 0,
       height: '100vh'
     }}>
-      {/* Logo */}
+      {/* Logo - toujours en haut */}
       <div style={{
         padding: '16px 16px 12px',
         display: 'flex',
         alignItems: 'center',
         gap: 8,
-        borderBottom: '1px solid var(--border)'
+        borderBottom: '1px solid var(--border)',
+        flexShrink: 0
       }}>
         <i className="ti ti-speakerphone" style={{ fontSize: 22, color: 'var(--accent)' }} />
         <span style={{ fontWeight: 600, fontSize: 15 }}>SoundDeck</span>
       </div>
 
-      {/* Volume maître */}
-      <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+      {/* Volume maître - toujours visible */}
+      <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <i className={`ti ${volume === 0 ? 'ti-volume-off' : volume < 50 ? 'ti-volume-2' : 'ti-volume'}`}
@@ -175,264 +662,43 @@ export default function Sidebar({
           gap: 5,
           fontWeight: 500,
           transition: 'all 0.15s'
-        }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(224,82,82,0.2)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'rgba(224,82,82,0.1)'}>
+        }}>
           <i className="ti ti-player-stop-filled" /> {tr('stopAll')}
         </button>
       </div>
 
+      {/* Contenu principal - scrollable */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
-        {/* Profils */}
-        <div style={{ padding: '8px 12px 4px' }}>
-          <div style={{
-            fontSize: 11,
-            color: 'var(--text-tertiary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            fontWeight: 500
-          }}>
-            {tr('profiles')}
-          </div>
-          <div style={{
-            fontSize: 9,
-            color: 'var(--text-tertiary)',
-            fontWeight: 400,
-            marginTop: 2,
-            opacity: 0.6
-          }}>
-            <i className="ti ti-grip-vertical" style={{ fontSize: 10 }} /> {tr('dragToReorder')}
-          </div>
-        </div>
-
-        {/* Profil "Tous les sons" */}
-        {profiles.filter(p => p.id === 'all').map(profile => (
-          <SidebarItem
-            key={profile.id}
-            icon="ti-stack"
-            label={tr('allSounds')}
-            active={currentProfileId === profile.id && currentPage === 'home'}
-            dot={currentProfileId === profile.id}
-            onClick={() => { onSwitchProfile(profile.id); onChangePage('home') }}
-          />
-        ))}
-
-        {/* Profils utilisateur */}
-        {userProfiles.map((profile) => {
-          const isDragging = draggedProfileId === profile.id
-          const isDragOver = dragOverProfileId === profile.id && !isDragging
-          
-          return (
-            <div
-              key={profile.id}
-              draggable={true}
-              onDragStart={(e) => handleProfileDragStart(e, profile.id)}
-              onDragEnd={handleProfileDragEnd}
-              onDragOver={(e) => handleProfileDragOver(e, profile.id)}
-              onDragLeave={handleProfileDragLeave}
-              onDrop={(e) => handleProfileDrop(e, profile.id)}
-              style={{
-                opacity: isDragging ? 0.3 : 1,
-                transform: isDragOver ? 'scale(1.02)' : 'scale(1)',
-                transition: 'transform 0.15s, opacity 0.15s',
-                position: 'relative',
-                zIndex: isDragging ? 10 : 1,
-                cursor: 'grab'
-              }}
-            >
-              {isDragOver && (
-                <div style={{
-                  position: 'absolute',
-                  top: -2,
-                  left: 4,
-                  right: 4,
-                  height: 2,
-                  background: 'var(--accent)',
-                  borderRadius: 1,
-                  pointerEvents: 'none',
-                  zIndex: 5,
-                  animation: 'fadeIn 0.15s ease'
-                }} />
-              )}
-              <SidebarItem
-                icon="ti-user"
-                label={profile.name}
-                active={currentProfileId === profile.id && currentPage === 'home'}
-                dot={currentProfileId === profile.id}
-                onClick={() => { onSwitchProfile(profile.id); onChangePage('home') }}
-                showDragHandle={true}
-              />
-            </div>
-          )
-        })}
-
-        {showNewProfile ? (
-          <div style={{ padding: '4px 12px', display: 'flex', gap: 4 }}>
-            <input
-              autoFocus
-              value={newProfileName}
-              onChange={e => setNewProfileName(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleCreateProfile()
-                if (e.key === 'Escape') setShowNewProfile(false)
-              }}
-              placeholder={tr('newProfile')}
-              style={{ fontSize: 12, padding: '5px 8px' }}
-            />
-            <button className="btn-primary btn-sm" onClick={handleCreateProfile}>
-              <i className="ti ti-check" />
-            </button>
-          </div>
-        ) : (
-          <SidebarItem
-            icon="ti-plus"
-            label={tr('newProfile')}
-            muted
-            onClick={() => setShowNewProfile(true)}
-          />
-        )}
-
-        {/* Navigation */}
-        <div style={{
-          padding: '12px 12px 4px',
-          fontSize: 11,
-          color: 'var(--text-tertiary)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-          fontWeight: 500,
-          marginTop: 4
-        }}>
-          {tr('navigation')}
-        </div>
-
-        <SidebarItem icon="ti-home" label={tr('mySounds')} active={currentPage === 'home'} onClick={() => onChangePage('home')} />
-        <SidebarItem icon="ti-compass" label={tr('discover')} active={currentPage === 'discover'} onClick={() => onChangePage('discover')} />
-        <SidebarItem icon="ti-cut" label={tr('editor')} active={currentPage === 'editor'} onClick={() => onChangePage('editor')} />
-        <SidebarItem icon="ti-playlist" label={tr('sequencer')} active={currentPage === 'sequencer'} onClick={() => onChangePage('sequencer')} />
-        <SidebarItem icon="ti-brand-youtube" label={tr('youtube')} active={currentPage === 'youtube'} onClick={() => onChangePage('youtube')} />
-
-        {/* Loop */}
-        <div style={{ margin: '6px 8px 0' }}>
-          <button onClick={onToggleLoop} style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '7px 8px',
-            borderRadius: 8,
-            background: loopEnabled ? 'rgba(29,158,117,0.15)' : 'var(--bg-tertiary)',
-            border: `1px solid ${loopEnabled ? 'var(--success)' : 'var(--border)'}`,
-            color: loopEnabled ? 'var(--success)' : 'var(--text-tertiary)',
-            fontSize: 12,
-            fontWeight: loopEnabled ? 600 : 400,
-            cursor: 'pointer'
-          }}>
-            <i className="ti ti-repeat" style={{ fontSize: 15 }} />
-            <span style={{ flex: 1, textAlign: 'left' }}>{tr('loop')}</span>
-            <span style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              borderRadius: 10,
-              background: loopEnabled ? 'var(--success)' : 'var(--border)',
-              color: loopEnabled ? 'white' : 'var(--text-tertiary)'
-            }}>
-              {loopEnabled ? 'ON' : 'OFF'}
-            </span>
-          </button>
-        </div>
-
-        {/* Toggle Raccourcis */}
-        <div style={{ margin: '6px 8px 0' }}>
-          <button onClick={handleToggleShortcuts} style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '7px 8px',
-            borderRadius: 8,
-            background: shortcutsEnabled ? 'rgba(124,111,247,0.15)' : 'rgba(224,82,82,0.15)',
-            border: `1px solid ${shortcutsEnabled ? 'var(--accent)' : 'var(--danger)'}`,
-            color: shortcutsEnabled ? 'var(--accent)' : 'var(--danger)',
-            fontSize: 12,
-            fontWeight: shortcutsEnabled ? 600 : 400,
-            cursor: 'pointer',
-            transition: 'all 0.15s'
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.transform = 'scale(1.02)'
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.transform = 'scale(1)'
-          }}>
-            <i className={`ti ${shortcutsEnabled ? 'ti-keyboard' : 'ti-keyboard-off'}`} style={{ fontSize: 15 }} />
-            <span style={{ flex: 1, textAlign: 'left' }}>{tr('shortcuts')}</span>
-            <span style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              borderRadius: 10,
-              background: shortcutsEnabled ? 'var(--accent)' : 'var(--danger)',
-              color: 'white'
-            }}>
-              {shortcutsEnabled ? 'ON' : 'OFF'}
-            </span>
-          </button>
-        </div>
-
-        {/* Présentation */}
-        <div style={{ margin: '6px 8px 0' }}>
-          <button onClick={onPresentation} style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '7px 8px',
-            borderRadius: 8,
-            background: 'var(--bg-tertiary)',
-            border: '1px solid var(--border)',
-            color: 'var(--text-secondary)',
-            fontSize: 12,
-            cursor: 'pointer',
-            transition: 'all 0.15s'
-          }}
-            onMouseEnter={e => {
-              e.currentTarget.style.borderColor = 'var(--accent)'
-              e.currentTarget.style.color = 'var(--accent)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.borderColor = 'var(--border)'
-              e.currentTarget.style.color = 'var(--text-secondary)'
-            }}>
-            <i className="ti ti-layout-grid" style={{ fontSize: 15 }} />
-            <span style={{ flex: 1, textAlign: 'left' }}>{tr('presentation')}</span>
-            <i className="ti ti-arrow-right" style={{ fontSize: 12 }} />
-          </button>
-        </div>
+        {renderSections()}
       </div>
 
-      {/* Options en bas */}
-      <div style={{ borderTop: '1px solid var(--border)', padding: '4px 0' }}>
-        <SidebarItem icon="ti-book" label={tr('guide')} active={currentPage === 'guide'} onClick={() => onChangePage('guide')} />
-        <SidebarItem icon="ti-settings" label={tr('options')} active={currentPage === 'options'} onClick={() => onChangePage('options')} />
-      </div>
+      {/* ✅ Footer - fixe en bas */}
+      {renderFooter()}
     </aside>
   )
 }
 
-function SidebarItem({ icon, label, active, dot, muted, onClick, showDragHandle = false }) {
+// ─── COMPOSANT SidebarItem ──────────────────────────────────────────────────
+
+function SidebarItem({ icon, label, active, dot, muted, onClick, showDragHandle = false, isAction = false, isProfile = false }) {
+  const isActive = active || false
+  
   return (
     <button
       onClick={onClick}
-      className={`sidebar-item ${active ? 'active' : ''} ${muted ? 'muted' : ''}`}
+      className={`sidebar-item ${isActive ? 'active' : ''} ${muted ? 'muted' : ''}`}
       style={{
-        cursor: showDragHandle ? 'grab' : 'pointer'
+        cursor: showDragHandle ? 'grab' : 'pointer',
+        color: isAction && !isActive ? 'var(--accent)' : undefined,
+        fontWeight: isAction && !isActive ? 500 : undefined,
       }}
       onMouseEnter={e => {
-        if (!active && !muted) {
+        if (!isActive && !muted) {
           e.currentTarget.style.background = 'var(--bg-hover)'
         }
       }}
       onMouseLeave={e => {
-        if (!active && !muted) {
+        if (!isActive && !muted) {
           e.currentTarget.style.background = 'transparent'
         }
       }}
@@ -443,6 +709,9 @@ function SidebarItem({ icon, label, active, dot, muted, onClick, showDragHandle 
       {!showDragHandle && <i className={`ti ${icon}`} style={{ fontSize: 16 }} />}
       <span className="label">{label}</span>
       {dot && <span className="dot" />}
+      {isAction && !isActive && !isProfile && (
+        <span style={{ fontSize: 9, color: 'var(--accent)', opacity: 0.6 }}>⚡</span>
+      )}
     </button>
   )
 }

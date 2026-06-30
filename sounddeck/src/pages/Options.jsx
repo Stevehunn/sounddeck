@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, forwardRef, useCallback } from 'react'
 import ShortcutRecorder from '../components/ShortcutRecorder'
 import CustomThemeEditor from '../components/CustomThemeEditor'
+import SidebarEditor from '../components/SidebarEditor'
 import { LANGUAGES, useTranslation } from '../i18n'
 import { getMicrophoneStatus, getMixerStats, testMicrophoneOnce, connectMixerToOutput } from '../utils/audioMixer'
 import KeyboardVisualizer from '../components/KeyboardVisualizer'
@@ -270,6 +271,16 @@ export default function Options({ store, addToast, lang = 'fr' }) {
     }
   }
 
+  // ✅ Fonction de réinitialisation de la sidebar qui force la mise à jour du store
+  const handleResetSidebar = useCallback(async () => {
+    if (confirm(tr('sidebarEditorResetConfirm'))) {
+      await store.resetSidebarConfig()
+      // ✅ Forcer la mise à jour de la version pour que la sidebar se rafraîchisse
+      // Le store.resetSidebarConfig() doit incrémenter sidebarVersion
+      addToast(tr('sidebarEditorResetSuccess'), 'success')
+    }
+  }, [store, tr, addToast])
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{ 
@@ -397,6 +408,57 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               }}
             />
           )}
+
+          <OptionRow label={tr('sidebarCustomization')} sub={tr('sidebarCustomizationDesc')}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                {store.sidebarConfig?.mode === 'custom' 
+                  ? `🎨 ${tr('sidebarCustomized')}` 
+                  : `📋 ${tr('sidebarDefault')}`}
+              </span>
+              <button
+                className="btn-secondary btn-sm"
+                onClick={store.toggleSidebarEditMode}
+                style={{
+                  fontSize: 12,
+                  minHeight: 34,
+                  padding: '6px 16px',
+                  borderRadius: 'var(--radius-md)',
+                  borderColor: store.sidebarEditMode ? 'var(--accent)' : 'var(--border)',
+                  background: store.sidebarEditMode ? 'var(--accent-light)' : 'var(--bg-tertiary)',
+                  color: store.sidebarEditMode ? 'var(--accent)' : 'var(--text-secondary)'
+                }}
+              >
+                <i className={`ti ${store.sidebarEditMode ? 'ti-edit' : 'ti-edit'}`} />
+                {store.sidebarEditMode ? tr('sidebarEditorClose') : tr('sidebarEditorOpen')}
+              </button>
+              {store.sidebarConfig?.mode === 'custom' && (
+                <button
+                  className="btn-ghost btn-sm"
+                  onClick={handleResetSidebar}
+                  style={{ fontSize: 12, color: 'var(--text-tertiary)' }}
+                >
+                  <i className="ti ti-refresh" /> {tr('sidebarEditorReset')}
+                </button>
+              )}
+            </div>
+          </OptionRow>
+
+        {store.sidebarEditMode && (
+          <SidebarEditor
+            key={store.sidebarVersion} // ✅ Force le re-rendu quand la version change
+            config={store.sidebarConfig}
+            onSave={async (config) => {
+              await store.updateSidebarConfig(config)
+              store.toggleSidebarEditMode()
+              addToast(tr('sidebarEditorSaved'), 'success')
+            }}
+            onCancel={store.toggleSidebarEditMode}
+            onReset={handleResetSidebar}
+            lang={store.lang}
+            profiles={store.profiles}
+          />
+        )}
         </Section>
 
         {/* Section Audio */}
@@ -437,8 +499,20 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                         )}
                       </button>
                     )}
-                    <button className="btn-secondary" onClick={handleDetectDevices} disabled={isDetecting} style={{ fontSize: 12 }}>
-                      <i className="ti ti-refresh" /> {isDetecting ? '...' : tr('detect')}
+                    <button 
+                      className="btn-secondary" 
+                      onClick={handleDetectDevices} 
+                      disabled={isDetecting} 
+                      style={{ 
+                        fontSize: 12, 
+                        minHeight: 34, 
+                        padding: '6px 16px',
+                        borderRadius: 'var(--radius-md)'
+                      }}
+                    >
+                      <i className={`ti ${isDetecting ? 'ti-loader' : 'ti-refresh'}`} 
+                        style={isDetecting ? { animation: 'spin 1s linear infinite' } : {}} />
+                      {isDetecting ? '...' : tr('detect')}
                     </button>
                   </div>
                   
