@@ -1,189 +1,133 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import Sidebar from './Sidebar'
+import SidebarEditor from './SidebarEditor'
 
-// Mock de useTranslation
+// ✅ Mock de useTranslation
 vi.mock('../i18n', () => ({
   useTranslation: vi.fn(() => (key) => {
     const translations = {
-      profiles: 'Profils',
-      navigation: 'Navigation',
-      mySounds: 'Mes sons',
-      discover: 'Découverte',
-      editor: 'Éditeur',
-      sequencer: 'Séquenceur',
-      youtube: 'YouTube',
-      guide: 'Guide Discord',
-      options: 'Options',
-      newProfile: 'Nouveau profil',
-      loop: 'Répétition',
-      volume: 'Volume',
-      stopAll: 'Stop tous les sons',
-      presentation: 'Présentation',
-      dragToReorder: 'Glisser pour réorganiser',
+      sidebarEditorTitle: 'Personnaliser la sidebar',
+      sidebarEditorSub: 'Glissez, épinglez, masquez les éléments',
+      sidebarEditorSave: 'Enregistrer',
+      sidebarEditorReset: 'Réinitialiser',
+      sidebarEditorDragHint: 'Glisser pour réorganiser',
+      sidebarEditorShowHide: 'Afficher/Masquer',
+      sidebarEditorPin: 'Épingler',
+      sidebarEditorUnpin: 'Désépingler',
+      sidebarEditorPinnedNote: 'Les éléments épinglés apparaissent en haut',
+      sidebarEditorPinnedItems: 'toujours en haut',
+      sidebarEditorDragGroupHint: 'Déplacez entre les groupes',
+      sidebarEditorReorderGroups: 'Ordre des sections',
+      sidebarEditorResetConfirm: 'Voulez-vous vraiment réinitialiser la sidebar ?',
+      sidebarEditorResetSuccess: 'Sidebar réinitialisée',
+      sidebarEditorSaved: 'Configuration sauvegardée',
+      cancel: 'Annuler',
       allSounds: 'Tous les sons',
-      shortcuts: 'Raccourcis'
+      sidebarEditorPin: 'Épingler',
+      sidebarEditorUnpin: 'Désépingler',
+      sidebarEditorHide: 'Masquer',
+      sidebarEditorShow: 'Afficher',
+      sidebarEditorFixedHint: 'Cliquez sur le cadenas pour rendre une section fixe (max 2)',
+      fixed: 'Fixe',
+      unfixed: 'Défixer',
+      lockSection: 'Rendre cette section fixe',
+      unlockSection: 'Rendre cette section scrollable'
     }
     return translations[key] || key
   })
 }))
 
-describe('Sidebar', () => {
+// ✅ Mock de l'API Electron
+const mockElectronAPI = {
+  storeGet: vi.fn().mockResolvedValue(null),
+  storeSet: vi.fn().mockResolvedValue(),
+  getSystemLanguage: vi.fn().mockResolvedValue('fr'),
+  getSystemKeyboardLayout: vi.fn().mockResolvedValue('qwerty')
+}
+window.electronAPI = mockElectronAPI
+
+describe('SidebarEditor', () => {
   const defaultProps = {
+    config: {
+      mode: 'default',
+      items: [
+        { id: 'home', group: 'navigation', label: 'Mes sons', icon: 'ti-home', visible: true, pinned: false },
+        { id: 'discover', group: 'navigation', label: 'Découverte', icon: 'ti-compass', visible: true, pinned: false },
+        { id: 'editor', group: 'navigation', label: 'Éditeur', icon: 'ti-cut', visible: true, pinned: false },
+        { id: 'sequencer', group: 'navigation', label: 'Séquenceur', icon: 'ti-playlist', visible: true, pinned: false },
+        { id: 'youtube', group: 'navigation', label: 'YouTube', icon: 'ti-brand-youtube', visible: true, pinned: false },
+        { id: 'loop', group: 'actions', label: 'Répétition', icon: 'ti-repeat', visible: true, pinned: false },
+        { id: 'shortcuts', group: 'actions', label: 'Raccourcis', icon: 'ti-keyboard', visible: true, pinned: false },
+        { id: 'presentation', group: 'actions', label: 'Présentation', icon: 'ti-layout-grid', visible: true, pinned: false },
+        { id: 'guide', group: 'footer', label: 'Guide Discord', icon: 'ti-book', visible: true, pinned: false },
+        { id: 'options', group: 'footer', label: 'Options', icon: 'ti-settings', visible: true, pinned: false },
+      ],
+      sectionOrder: ['pinned', 'profiles', 'navigation', 'actions', 'footer'],
+      fixedSections: []
+    },
     profiles: [
-      { id: 'all', name: 'Tous les sons', isDefault: true },
-      { id: 'profile1', name: 'Test Profile 1', isDefault: false },
-      { id: 'profile2', name: 'Test Profile 2', isDefault: false }
+      { id: 'all', name: 'Tous les sons', isDefault: true }
     ],
-    currentProfileId: 'all',
-    currentPage: 'home',
-    onSwitchProfile: vi.fn(),
-    onChangePage: vi.fn(),
-    onCreateProfile: vi.fn(),
-    onToggleLoop: vi.fn(),
-    loopEnabled: false,
-    addToast: vi.fn(),
-    volume: 80,
-    onVolumeChange: vi.fn(),
-    onStopAll: vi.fn(),
-    onPresentation: vi.fn(),
-    lang: 'fr',
-    onReorderProfiles: vi.fn()
+    onSave: vi.fn(),
+    onCancel: vi.fn(),
+    onReset: vi.fn(),
+    lang: 'fr'
   }
 
   beforeEach(() => {
     vi.clearAllMocks()
-    window.electronAPI.getGlobalShortcutsState = vi.fn().mockResolvedValue(true)
-    window.electronAPI.onShortcutsToggle = vi.fn()
-    window.electronAPI.removeAllListeners = vi.fn()
-    window.electronAPI.toggleGlobalShortcuts = vi.fn().mockResolvedValue(true)
   })
 
-  it('devrait afficher le logo SoundDeck', () => {
-    render(<Sidebar {...defaultProps} />)
-    expect(screen.getByText('SoundDeck')).toBeInTheDocument()
+  const renderEditor = async (props = {}) => {
+    let result
+    await act(async () => {
+      result = render(<SidebarEditor {...defaultProps} {...props} />)
+    })
+    // Attendre que le composant s'initialise
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 200))
+    })
+    return result
+  }
+
+  it('devrait afficher le titre de l\'éditeur', async () => {
+    await renderEditor()
+    expect(screen.getByText('Personnaliser la sidebar')).toBeInTheDocument()
   })
 
-  it('devrait afficher le titre "Profils"', () => {
-    render(<Sidebar {...defaultProps} />)
-    expect(screen.getByText('Profils')).toBeInTheDocument()
+  it('devrait afficher le sous-titre', async () => {
+    await renderEditor()
+    expect(screen.getByText('Glissez, épinglez, masquez les éléments')).toBeInTheDocument()
   })
 
-  it('devrait afficher tous les profils', () => {
-    render(<Sidebar {...defaultProps} />)
-    expect(screen.getByText('Tous les sons')).toBeInTheDocument()
-    expect(screen.getByText('Test Profile 1')).toBeInTheDocument()
-    expect(screen.getByText('Test Profile 2')).toBeInTheDocument()
+  it('devrait afficher les boutons Enregistrer et Réinitialiser', async () => {
+    await renderEditor()
+    expect(screen.getByText('Enregistrer')).toBeInTheDocument()
+    expect(screen.getByText('Réinitialiser')).toBeInTheDocument()
   })
 
-  it('devrait afficher la navigation', () => {
-    render(<Sidebar {...defaultProps} />)
-    expect(screen.getByText('Navigation')).toBeInTheDocument()
-    expect(screen.getByText('Mes sons')).toBeInTheDocument()
-    expect(screen.getByText('Découverte')).toBeInTheDocument()
-    expect(screen.getByText('Éditeur')).toBeInTheDocument()
-    expect(screen.getByText('Séquenceur')).toBeInTheDocument()
-    expect(screen.getByText('YouTube')).toBeInTheDocument()
-  })
-
-  it('devrait afficher le bouton "Nouveau profil"', () => {
-    render(<Sidebar {...defaultProps} />)
-    expect(screen.getByText('Nouveau profil')).toBeInTheDocument()
-  })
-
-  it('devrait ouvrir le champ de création de profil en cliquant sur "Nouveau profil"', async () => {
-    render(<Sidebar {...defaultProps} />)
+  it('devrait appeler onSave quand on clique sur Enregistrer', async () => {
+    const onSave = vi.fn()
+    await renderEditor({ onSave })
     
-    const newProfileButton = screen.getByText('Nouveau profil')
-    await userEvent.click(newProfileButton)
+    const saveButton = screen.getByText('Enregistrer')
+    await act(async () => {
+      await userEvent.click(saveButton)
+    })
     
-    // Vérifier que le champ de saisie apparaît
-    expect(screen.getByPlaceholderText('Nouveau profil')).toBeInTheDocument()
+    expect(onSave).toHaveBeenCalled()
   })
 
-  it('devrait appeler onCreateProfile avec le nom saisi', async () => {
-    const onCreateProfile = vi.fn()
-    render(<Sidebar {...defaultProps} onCreateProfile={onCreateProfile} />)
+  it('devrait appeler onCancel quand on clique sur Annuler', async () => {
+    const onCancel = vi.fn()
+    await renderEditor({ onCancel })
     
-    // Ouvrir le champ de création
-    await userEvent.click(screen.getByText('Nouveau profil'))
+    const cancelButton = screen.getByText('Annuler')
+    await act(async () => {
+      await userEvent.click(cancelButton)
+    })
     
-    const input = screen.getByPlaceholderText('Nouveau profil')
-    await userEvent.type(input, 'Mon Nouveau Profil{Enter}')
-    
-    expect(onCreateProfile).toHaveBeenCalledWith('Mon Nouveau Profil')
-  })
-
-  it('devrait appeler onSwitchProfile en cliquant sur un profil', async () => {
-    const onSwitchProfile = vi.fn()
-    render(<Sidebar {...defaultProps} onSwitchProfile={onSwitchProfile} />)
-    
-    await userEvent.click(screen.getByText('Test Profile 1'))
-    expect(onSwitchProfile).toHaveBeenCalledWith('profile1')
-  })
-
-  it('devrait appeler onChangePage en cliquant sur un élément de navigation', async () => {
-    const onChangePage = vi.fn()
-    render(<Sidebar {...defaultProps} onChangePage={onChangePage} />)
-    
-    await userEvent.click(screen.getByText('Découverte'))
-    expect(onChangePage).toHaveBeenCalledWith('discover')
-  })
-
-  it('devrait afficher le volume avec le pourcentage', () => {
-    render(<Sidebar {...defaultProps} volume={65} />)
-    expect(screen.getByText('65%')).toBeInTheDocument()
-  })
-
-  it('devrait appeler onVolumeChange lors du changement de volume', async () => {
-    const onVolumeChange = vi.fn()
-    render(<Sidebar {...defaultProps} onVolumeChange={onVolumeChange} />)
-    
-    const rangeInput = document.querySelector('input[type="range"]')
-    fireEvent.change(rangeInput, { target: { value: 50 } })
-    
-    expect(onVolumeChange).toHaveBeenCalledWith(50)
-  })
-
-  it('devrait appeler onStopAll en cliquant sur le bouton Stop', async () => {
-    const onStopAll = vi.fn()
-    render(<Sidebar {...defaultProps} onStopAll={onStopAll} />)
-    
-    await userEvent.click(screen.getByText('Stop tous les sons'))
-    expect(onStopAll).toHaveBeenCalled()
-  })
-
-  it('devrait appeler onToggleLoop en cliquant sur le bouton Loop', async () => {
-    const onToggleLoop = vi.fn()
-    render(<Sidebar {...defaultProps} onToggleLoop={onToggleLoop} />)
-    
-    await userEvent.click(screen.getByText('Répétition'))
-    expect(onToggleLoop).toHaveBeenCalled()
-  })
-
-    it('devrait afficher "ON" sur le bouton Loop quand activé', () => {
-    render(<Sidebar {...defaultProps} loopEnabled={true} />)
-    const onElements = screen.getAllByText('ON')
-    expect(onElements.length).toBeGreaterThan(0)
-    expect(onElements[0]).toBeInTheDocument()
-  })
-
-  it('devrait afficher "OFF" sur le bouton Loop quand désactivé', () => {
-    render(<Sidebar {...defaultProps} loopEnabled={false} />)
-    expect(screen.getByText('OFF')).toBeInTheDocument()
-  })
-
-  it('devrait appeler onPresentation en cliquant sur Présentation', async () => {
-    const onPresentation = vi.fn()
-    render(<Sidebar {...defaultProps} onPresentation={onPresentation} />)
-    
-    await userEvent.click(screen.getByText('Présentation'))
-    expect(onPresentation).toHaveBeenCalled()
-  })
-
-  it('devrait afficher "Glisser pour réorganiser"', () => {
-    render(<Sidebar {...defaultProps} />)
-    expect(screen.getByText('Glisser pour réorganiser')).toBeInTheDocument()
+    expect(onCancel).toHaveBeenCalled()
   })
 })

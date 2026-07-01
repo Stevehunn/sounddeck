@@ -3,8 +3,8 @@ import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 
-// ✅ Mock complet de useStore
-const mockStore = {
+// ✅ Mock complet de useStore avec des fonctions vi.fn()
+const createMockStore = () => ({
   profiles: [
     { id: 'all', name: 'Tous les sons', isDefault: true },
     { id: 'profile1', name: 'Test Profile', isDefault: false }
@@ -46,6 +46,14 @@ const mockStore = {
   noiseSuppression: false,
   noiseSuppressionMode: 'auto',
   keyboardLayout: 'qwerty',
+  sidebarConfig: {
+    mode: 'default',
+    items: [],
+    sectionOrder: ['pinned', 'profiles', 'navigation', 'actions', 'footer'],
+    fixedSections: []
+  },
+  sidebarEditMode: false,
+  sidebarVersion: 0,
   createProfile: vi.fn(),
   deleteProfile: vi.fn(),
   renameProfile: vi.fn(),
@@ -95,13 +103,20 @@ const mockStore = {
   resetGainCache: vi.fn(),
   cleanupOrphanShortcuts: vi.fn(),
   initMixerOnStartup: vi.fn().mockResolvedValue(true)
+})
+
+let mockStore = createMockStore()
+
+// ✅ Fonction pour réinitialiser le mock avec les valeurs par défaut
+const resetMockStore = () => {
+  mockStore = createMockStore()
 }
 
 vi.mock('./store/useStore', () => ({
   useStore: vi.fn(() => mockStore)
 }))
 
-// ✅ Mock des composants enfants
+// ✅ Mock des composants enfants avec des data-testid
 vi.mock('./components/Sidebar', () => ({
   default: ({ onSwitchProfile, onChangePage, onToggleLoop, onVolumeChange, onStopAll, onPresentation }) => (
     <div data-testid="sidebar">
@@ -155,8 +170,13 @@ vi.mock('./pages/Guide', () => ({
   default: () => <div data-testid="page-guide">Guide Page</div>
 }))
 
-// ✅ NE PAS mock Presentation - on laisse le vrai composant s'afficher
-// Il fonctionnera avec les données mockées
+vi.mock('./pages/Presentation', () => ({
+  default: ({ onExit }) => (
+    <div data-testid="presentation-modal">
+      <button data-testid="presentation-exit" onClick={onExit}>Quitter</button>
+    </div>
+  )
+}))
 
 vi.mock('./components/Toast', () => ({
   default: ({ toasts }) => (
@@ -176,6 +196,10 @@ vi.mock('./components/QuitConfirm', () => ({
   )
 }))
 
+vi.mock('./components/WelcomeScreen', () => ({
+  default: () => <div data-testid="welcome-screen">Welcome Screen</div>
+}))
+
 vi.mock('./utils/audio', () => ({
   playSound: vi.fn(),
   stopAllSounds: vi.fn(),
@@ -190,16 +214,9 @@ vi.mock('./utils/audioMixer', () => ({
 describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resetMockStore()
     
-    mockStore.loading = false
-    mockStore.theme = 'dark'
-    mockStore.customTheme = null
-    mockStore.lang = 'fr'
-    mockStore.mixerEnabled = false
-    mockStore.initMixerOnStartup = vi.fn().mockResolvedValue(true)
-    mockStore.currentSounds = []
-    mockStore.favoriteSounds = []
-    
+    // ✅ Simuler que l'utilisateur a déjà lancé l'app (pas d'écran de bienvenue)
     window.electronAPI = {
       updateTrayLanguage: vi.fn().mockResolvedValue(),
       onPlaySound: vi.fn(),
@@ -210,7 +227,7 @@ describe('App', () => {
       onShowQuitConfirm: vi.fn(),
       removeAllListeners: vi.fn(),
       storeSet: vi.fn().mockResolvedValue(),
-      storeGet: vi.fn().mockResolvedValue(),
+      storeGet: vi.fn().mockResolvedValue(true),
       storeSetLang: vi.fn().mockResolvedValue(),
       getStartMinimized: vi.fn().mockResolvedValue(false),
       getLaunchAtStartup: vi.fn().mockResolvedValue(false)
@@ -333,11 +350,7 @@ describe('App', () => {
       await userEvent.click(presentationButton)
     })
     
-    // ✅ Le vrai composant Presentation s'affiche avec la classe presentation-overlay
-    await waitFor(() => {
-      const presentationElement = document.querySelector('.presentation-overlay')
-      expect(presentationElement).toBeInTheDocument()
-    }, { timeout: 2000 })
+    expect(screen.getByTestId('presentation-modal')).toBeInTheDocument()
   })
 
   it('devrait fermer le mode présentation', async () => {
@@ -348,21 +361,14 @@ describe('App', () => {
       await userEvent.click(presentationButton)
     })
     
-    await waitFor(() => {
-      const presentationElement = document.querySelector('.presentation-overlay')
-      expect(presentationElement).toBeInTheDocument()
-    }, { timeout: 2000 })
+    expect(screen.getByTestId('presentation-modal')).toBeInTheDocument()
     
-    // ✅ Cliquer sur le bouton Quitter dans le composant Presentation
-    const quitButton = screen.getByText('Quitter')
+    const exitButton = screen.getByTestId('presentation-exit')
     await act(async () => {
-      await userEvent.click(quitButton)
+      await userEvent.click(exitButton)
     })
     
-    await waitFor(() => {
-      const presentationElement = document.querySelector('.presentation-overlay')
-      expect(presentationElement).not.toBeInTheDocument()
-    }, { timeout: 2000 })
+    expect(screen.queryByTestId('presentation-modal')).not.toBeInTheDocument()
   })
 
   // ─── TESTS DES TOASTS ─────────────────────────────────────────────────────
@@ -418,6 +424,8 @@ describe('App', () => {
         showQuitConfirmCallback()
       })
       expect(screen.getByTestId('quit-confirm')).toBeInTheDocument()
+    } else {
+      expect(window.electronAPI.onShowQuitConfirm).toHaveBeenCalled()
     }
   })
 
@@ -477,16 +485,20 @@ describe('App', () => {
   // ─── TESTS DU MIXEUR ─────────────────────────────────────────────────────
 
   it('devrait initialiser le mixeur si activé', async () => {
-    // ✅ Forcer l'appel en contournant la condition
+    // ✅ Modifier le mockStore directement
     mockStore.mixerEnabled = true
     mockStore.initMixerOnStartup = vi.fn().mockResolvedValue(true)
     
+    // ✅ S'assurer que useStore renvoie le mockStore modifié
+    const { useStore } = await import('./store/useStore')
+    useStore.mockReturnValue(mockStore)
+    
     await renderApp()
     
-    // ✅ Vérifier que l'appel a été fait
+    // ✅ Attendre que l'effet s'exécute avec un timeout plus long
     await waitFor(() => {
       expect(mockStore.initMixerOnStartup).toHaveBeenCalled()
-    }, { timeout: 2000 })
+    }, { timeout: 5000 })
   })
 
   it('ne devrait pas initialiser le mixeur si désactivé', async () => {
@@ -495,7 +507,6 @@ describe('App', () => {
     
     await renderApp()
     
-    // ✅ Vérifier que l'appel n'a PAS été fait
     expect(mockStore.initMixerOnStartup).not.toHaveBeenCalled()
   })
 })

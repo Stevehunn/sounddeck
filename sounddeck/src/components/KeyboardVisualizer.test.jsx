@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import KeyboardVisualizer from './KeyboardVisualizer'
 
@@ -8,7 +8,21 @@ vi.mock('../i18n', () => ({
     const translations = {
       keyboardVisualizerTitle: 'Visualisation du clavier',
       keyboardVisualizerUsed: 'raccourci utilisé',
-      keyboardVisualizerUsedPlural: 'raccourcis utilisés'
+      keyboardVisualizerUsedPlural: 'raccourcis utilisés',
+      soloKeys: 'touche(s) seule(s)',
+      shortcutsTotal: 'raccourcis',
+      noSoloKeys: 'Aucune touche seule',
+      noShortcutsDefined: 'Aucun raccourci défini',
+      noFilter: 'Aucun filtre (touches seules)',
+      withFilter: 'avec',
+      reset: 'Réinitialiser',
+      shortcutUsedWith: 'Raccourci utilisé avec',
+      keyActive: 'Touche active',
+      keyInactive: 'Touche inactive',
+      keysWithoutModifier: 'Touches sans modificateur',
+      showAll: 'Tout afficher',
+      numpad: 'Pavé num.',
+      activeCombinations: 'Combinaisons actives'
     }
     return translations[key] || key
   })
@@ -70,8 +84,8 @@ describe('KeyboardVisualizer', () => {
   it('devrait afficher le pavé numérique', () => {
     render(<KeyboardVisualizer {...defaultProps} />)
     
-    // ✅ Utiliser getAllByText pour les caractères qui apparaissent plusieurs fois
     expect(screen.getByText('NumLock')).toBeInTheDocument()
+    // Utiliser getAllByText pour les caractères qui apparaissent plusieurs fois
     expect(screen.getAllByText('/').length).toBeGreaterThan(0)
     expect(screen.getByText('*')).toBeInTheDocument()
     expect(screen.getAllByText('-').length).toBeGreaterThan(0)
@@ -86,6 +100,8 @@ describe('KeyboardVisualizer', () => {
     }
     render(<KeyboardVisualizer {...defaultProps} shortcuts={shortcuts} />)
     
+    // Le texte affiché est "0 touche(s) seule(s) / 3 raccourcis" ou similaire
+    // On cherche le texte "3 raccourcis"
     expect(screen.getByText(/3 raccourcis/)).toBeInTheDocument()
   })
 
@@ -96,7 +112,8 @@ describe('KeyboardVisualizer', () => {
     }
     render(<KeyboardVisualizer {...defaultProps} shortcuts={shortcuts} />)
     
-    expect(screen.getByText(/⚠️ Aucune touche seule/)).toBeInTheDocument()
+    // Le texte est "⚠️ Aucune touche seule" avec l'emoji
+    expect(screen.getByText(/Aucune touche seule/)).toBeInTheDocument()
   })
 
   it('devrait afficher les touches seules quand il y a des raccourcis sans modificateur', () => {
@@ -106,6 +123,9 @@ describe('KeyboardVisualizer', () => {
     }
     render(<KeyboardVisualizer {...defaultProps} shortcuts={shortcuts} />)
     
-    expect(screen.queryByText(/⚠️ Aucune touche seule/)).not.toBeInTheDocument()
+    // Le message "Aucune touche seule" ne devrait pas être présent
+    expect(screen.queryByText(/Aucune touche seule/)).not.toBeInTheDocument()
+    // On devrait voir "2 touche(s) seule(s)"
+    expect(screen.getByText(/2 touche\(s\) seule\(s\)/)).toBeInTheDocument()
   })
 })
