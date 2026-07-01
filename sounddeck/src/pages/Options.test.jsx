@@ -1,3 +1,4 @@
+// sounddeck/src/pages/Options.test.jsx
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -157,12 +158,10 @@ vi.mock('../i18n', () => ({
       noiseSuppressionActivated: '🔇 Réduction de bruit activée',
       noiseSuppressionDeactivated: '🔊 Réduction de bruit désactivée',
       noiseSuppressionModeChanged: 'Mode réduction de bruit: {mode}',
-      shortcutPlaceholder: '+ Raccourci',
       close: 'Fermer',
       cancel: 'Annuler',
       add: 'Ajouter',
       download: 'Télécharger',
-      shortcutSet: 'Raccourci défini :',
       toastShortcutSet: 'Raccourci défini :',
       toastShortcutLoop: 'Raccourci loop :',
       toastShortcutStop: 'Raccourci stop :',
@@ -171,13 +170,137 @@ vi.mock('../i18n', () => ({
       toggleShortcutRemoved: 'Raccourci toggle supprimé',
       toggleWindowShortcutSet: 'Raccourci fenêtre défini :',
       toggleWindowShortcutRemoved: 'Raccourci fenêtre supprimé',
-      manageProfile: 'Gérer le profil',
       volumeDefault: '(par défaut)',
       volumeReset: 'Réinitialiser le volume',
       reset: '0 dB',
-      importSectionLabel: 'Importer',
-      exportSectionLabel: 'Exporter',
-      optionsShortcuts: 'Raccourcis'
+      sidebarDefault: 'Par défaut',
+      sidebarCustomized: 'Personnalisé',
+      sidebarCustomization: 'Personnaliser la sidebar',
+      sidebarCustomizationDesc: 'Réorganisez, épinglez ou masquez les éléments',
+      sidebarEditorOpen: 'Personnaliser',
+      sidebarEditorClose: 'Fermer l\'éditeur',
+      sidebarEditorSaved: '✅ Configuration de la sidebar sauvegardée !',
+      sidebarEditorResetConfirm: 'Voulez-vous vraiment réinitialiser la sidebar à sa configuration par défaut ?',
+      sidebarEditorReset: 'Réinitialiser',
+      sidebarEditorResetSuccess: '✅ Sidebar réinitialisée',
+      toastConfigExported: 'Configuration exportée ✓',
+      toastArchiveCreating: 'Création de l\'archive en cours...',
+      toastSoundsCompressing: 'Compression des sons en cours...',
+      toastProfileExporting: 'Création de l\'archive du profil...',
+      virtualDriverDetected: '✅ Pilote VB-Cable installé !',
+      virtualDriverNotDetected: 'Aucun périphérique virtuel détecté',
+      virtualDriverInfo: 'Installe automatiquement le pilote VB-Cable',
+      virtualDriverSuccess: '✅ Pilote VB-Cable installé !',
+      uninstallGuideTitle: '📌 Si tu as besoin de désinstaller VB-Cable',
+      uninstallGuideStep1: 'Va dans Panneau de configuration → Programmes → Désinstaller un programme',
+      uninstallGuideStep2: 'Cherche "VB-CABLE" et désinstalle-le.',
+      uninstallGuideRestart: '⚠️ Un redémarrage du PC peut être nécessaire',
+      localOutputDevice: 'Périphérique de sortie local',
+      localOutputDeviceDesc: 'Périphérique utilisé pour l\'écoute locale (casque)',
+      localOutputDeviceDefault: 'Par défaut',
+      localOutputDeviceChanged: 'Périphérique local changé : {device}',
+      keyboardLayout: 'Disposition du clavier',
+      keyboardLayoutDesc: 'Sélectionnez votre type de clavier',
+      switchProfile: 'Changer de profil',
+      switchProfileDesc: 'Cycle entre vos profils',
+      toggleLoop: 'Activer/désactiver le Loop',
+      toggleLoopDesc: 'Active le mode répétition pour tous les sons',
+      stopAllShortcut: 'Stop tous les sons',
+      stopAllDesc: 'Coupe immédiatement tous les sons en cours',
+      presentationShortcut: 'Mode présentation',
+      presentationDesc: 'Ouvre/ferme le mode présentation plein écran',
+      toggleShortcuts: 'Toggle raccourcis',
+      toggleShortcutsDesc: 'Activer/désactiver tous les raccourcis globaux',
+      toggleWindowShortcut: 'Afficher/cacher la fenêtre',
+      toggleWindowShortcutDesc: 'Raccourci pour montrer ou cacher la fenêtre de SoundDeck',
+      shortcutPlaceholder: '+ Raccourci',
+      shortcutPressKey: '⌨️ Appuyez sur une touche...',
+      shortcutNeedMod: '⚠️ Ajoutez Ctrl/Alt/Shift',
+      shortcutHintMod: 'Combinaison requise (ex: Ctrl+Shift+P)',
+      shortcutHintAny: 'Une touche ou une combinaison (ex: F1, Ctrl+1)',
+      shortcutsPerSoundNote: 'Les raccourcis par son se configurent directement sur chaque carte de son',
+      restartRequired: 'redémarre l\'app',
+      configImported: 'Config importée',
+      archiveImported: 'Archive importée',
+      error: 'Erreur',
+      exported: 'exportés',
+      archiveCreated: 'Archive créée',
+      detect: 'Détecter',
+      unknown: 'Inconnue',
+      installError: 'Erreur installation',
+      driverInstalled: 'Pilote VB-Cable installé avec succès !',
+      downloadingDriver: 'Téléchargement du pilote VB-Cable...',
+      allSounds: 'Tous les sons',
+      sounds: 'son(s)',
+      exportProfile: 'Exporter',
+      importProfile: 'Importer un profil partagé',
+      reanalyzeGains: 'Réanalyser les gains',
+      reanalyzeGainsDesc: 'Force la réanalyse des niveaux sonores',
+      gainCacheCleared: 'Cache des gains vidé',
+      normalizationTarget: 'Seuil de normalisation',
+      normalizationTargetDesc: 'Plus la valeur est élevée, plus les sons sont amplifiés',
+      normalizationLabelLow: 'Plus fort 🔈',
+      normalizationLabelMedium: 'Équilibre ⚖️',
+      normalizationLabelHigh: 'Plus faible 🔉',
+      normalizationDefaultLabel: 'Par défaut',
+      normalizationAdvice: 'Conseil :',
+      normalizationAdviceLow: '🔈 Sons très réduits',
+      normalizationAdviceMedium: '⚖️ Équilibre par défaut',
+      normalizationAdviceModerate: '🔊 Sons modérément amplifiés',
+      normalizationAdviceHigh: '🔊🔊 Sons fortement amplifiés',
+      noiseSuppressionMode: 'Mode de réduction de bruit',
+      noiseSuppressionModeDesc: 'AudioWorklet = plus efficace, Filtre = plus compatible',
+      noiseSuppressionModeAuto: 'Auto (recommandé)',
+      noiseSuppressionModeWorklet: 'AudioWorklet (meilleur)',
+      noiseSuppressionModeFilter: 'Filtre basique (compatible)',
+      noiseSuppressionModeOff: 'Désactivé',
+      microphone: 'Micro',
+      microphoneSelect: 'Sélectionne ton micro',
+      microphoneDefault: 'Micro par défaut',
+      microphoneLabel: 'Micro',
+      microphoneChanged: 'Micro changé',
+      microphoneVolume: 'Volume du micro',
+      mixerSoundVolume: 'Volume des sons',
+      testMicrophone: 'Tester le micro',
+      test: 'Tester',
+      reconnectFlow: 'Reconnecter le flux',
+      reconnectFlowDesc: 'Force la reconnexion du flux au périphérique de sortie',
+      reconnect: 'Reconnecter',
+      mixerStatus: 'État du mixeur',
+      mixerStatusSub: 'Vérifier et réparer si nécessaire',
+      mixerOperational: 'Mixeur opérationnel',
+      mixerNotOperational: 'Mixeur non opérationnel',
+      mixerRepair: 'Vérifier/Réparer',
+      mixerRepaired: '✅ Mixeur réparé avec succès',
+      mixerReset: '🔄 Réinitialisation du mixeur...',
+      mixerResetSuccess: '✅ Mixeur réinitialisé avec succès',
+      mixerRepairError: '❌ Erreur: {error}',
+      mixerActivated: 'Mixeur activé !',
+      mixerActivationError: 'Erreur activation du mixeur',
+      mixerDeactivated: 'Mixeur désactivé',
+      mixerActive: 'Mixage actif',
+      mixerActiveDesc: 'Ton micro et les sons sont mélangés dans un seul flux.',
+      mixerDiscordTip: '📌 Dans Discord, sélectionne "CABLE Output" comme périphérique d\'entrée.',
+      mixerNotInitialized: 'Mixeur non initialisé',
+      flowReconnected: 'Flux reconnecté',
+      noiseSuppressionActivated: '🔇 Réduction de bruit activée',
+      noiseSuppressionDeactivated: '🔊 Réduction de bruit désactivée',
+      noiseSuppressionModeChanged: 'Mode réduction de bruit: {mode}',
+      close: 'Fermer',
+      cancel: 'Annuler',
+      add: 'Ajouter',
+      download: 'Télécharger',
+      toastShortcutSet: 'Raccourci défini :',
+      toastShortcutLoop: 'Raccourci loop :',
+      toastShortcutStop: 'Raccourci stop :',
+      toastShortcutPresentation: 'Raccourci présentation :',
+      toggleShortcutSet: 'Raccourci toggle défini :',
+      toggleShortcutRemoved: 'Raccourci toggle supprimé',
+      toggleWindowShortcutSet: 'Raccourci fenêtre défini :',
+      toggleWindowShortcutRemoved: 'Raccourci fenêtre supprimé',
+      volumeDefault: '(par défaut)',
+      volumeReset: 'Réinitialiser le volume',
+      reset: '0 dB'
     }
     return translations[key] || key
   }),
@@ -210,6 +333,18 @@ vi.mock('../components/KeyboardVisualizer', () => ({
   default: () => <div data-testid="keyboard-visualizer">Visualisation clavier</div>
 }))
 
+vi.mock('../components/SidebarEditor', () => ({
+  default: ({ config, onSave, onCancel, onReset }) => (
+    <div data-testid="sidebar-editor">
+      <button data-testid="sidebar-save" onClick={() => onSave({ ...config, mode: 'custom' })}>
+        Enregistrer
+      </button>
+      <button data-testid="sidebar-cancel" onClick={onCancel}>Annuler</button>
+      <button data-testid="sidebar-reset" onClick={onReset}>Réinitialiser</button>
+    </div>
+  )
+}))
+
 vi.mock('../utils/audioMixer', () => ({
   getMicrophoneStatus: vi.fn(() => ({ isConnected: false })),
   getMixerStats: vi.fn(() => ({ isInitialized: false })),
@@ -231,7 +366,6 @@ class MockIntersectionObserver {
   constructor(callback) {
     this.callback = callback
     this.observe = vi.fn((element) => {
-      // ✅ Simuler que l'élément est visible
       if (this.callback) {
         this.callback([
           {
@@ -279,6 +413,13 @@ describe('Options', () => {
       { id: 'all', name: 'Tous les sons', isDefault: true },
       { id: 'profile1', name: 'Test Profile', isDefault: false }
     ],
+    sidebarConfig: {
+      mode: 'default',
+      items: [],
+      sectionOrder: ['pinned', 'profiles', 'navigation', 'actions', 'footer']
+    },
+    sidebarEditMode: false,
+    sidebarVersion: 0,
     updateLang: vi.fn(),
     updateTheme: vi.fn(),
     updateCustomTheme: vi.fn(),
@@ -305,7 +446,10 @@ describe('Options', () => {
     deleteProfile: vi.fn(),
     switchProfile: vi.fn(),
     updateSound: vi.fn(),
-    addSound: vi.fn()
+    addSound: vi.fn(),
+    updateSidebarConfig: vi.fn(),
+    resetSidebarConfig: vi.fn(),
+    toggleSidebarEditMode: vi.fn()
   }
 
   const defaultProps = {
@@ -417,20 +561,16 @@ describe('Options', () => {
   it('devrait changer le mode audio', async () => {
     await renderOptions()
     
-    // ✅ Aller dans la section Audio
     const audioTab = screen.getByRole('button', { name: 'Audio' })
     await act(async () => {
       await userEvent.click(audioTab)
     })
     
-    // ✅ Attendre que le contenu se rende
     await act(async () => {
       await new Promise(resolve => setTimeout(resolve, 300))
     })
     
-    // ✅ Chercher le select par son label "Mode audio"
     const audioModeLabel = screen.getByText('Mode audio')
-    // Trouver le select associé (dans le même .option-row)
     const optionRow = audioModeLabel.closest('.option-row')
     const audioModeSelect = optionRow?.querySelector('select')
     
@@ -495,10 +635,121 @@ describe('Options', () => {
     expect(screen.getByText('Test Profile')).toBeInTheDocument()
   })
 
+  it('devrait supprimer un profil', async () => {
+    const storeWithDelete = {
+      ...mockStore,
+      deleteProfile: vi.fn().mockResolvedValue(),
+      profiles: [
+        { id: 'all', name: 'Tous les sons', isDefault: true },
+        { id: 'profile1', name: 'Test Profile', isDefault: false },
+        { id: 'profile2', name: 'Profile 2', isDefault: false }
+      ],
+      sounds: []
+    }
+    const addToast = vi.fn()
+    await renderOptions({ store: storeWithDelete, addToast })
+    await goToSection('Profils')
+    
+    // ✅ Trouver le bouton de suppression par son icône
+    const deleteButtons = document.querySelectorAll('.btn-danger')
+    expect(deleteButtons.length).toBeGreaterThan(0)
+    
+    if (deleteButtons.length > 0) {
+      // ✅ Simuler la confirmation de suppression
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+      
+      await act(async () => {
+        await userEvent.click(deleteButtons[0])
+      })
+      
+      await waitFor(() => {
+        expect(storeWithDelete.deleteProfile).toHaveBeenCalled()
+        expect(addToast).toHaveBeenCalled()
+      }, { timeout: 3000 })
+      
+      confirmSpy.mockRestore()
+    }
+  })
+
   it('devrait afficher les raccourcis', async () => {
     await renderOptions()
     await goToSection('Raccourcis')
     expect(screen.getByTestId('keyboard-visualizer')).toBeInTheDocument()
     expect(screen.getAllByTestId('shortcut-recorder').length).toBeGreaterThan(0)
+  })
+
+  it('devrait afficher l\'éditeur de sidebar quand le mode édition est activé', async () => {
+    const storeWithEditMode = {
+      ...mockStore,
+      sidebarEditMode: true,
+      sidebarConfig: {
+        mode: 'default',
+        items: [],
+        sectionOrder: ['pinned', 'profiles', 'navigation', 'actions', 'footer']
+      }
+    }
+    await renderOptions({ store: storeWithEditMode })
+    expect(screen.getByTestId('sidebar-editor')).toBeInTheDocument()
+  })
+
+  it('devrait sauvegarder la sidebar', async () => {
+    const storeWithEditMode = {
+      ...mockStore,
+      sidebarEditMode: true,
+      sidebarConfig: {
+        mode: 'default',
+        items: [],
+        sectionOrder: ['pinned', 'profiles', 'navigation', 'actions', 'footer']
+      },
+      updateSidebarConfig: vi.fn().mockResolvedValue(),
+      toggleSidebarEditMode: vi.fn()
+    }
+    const addToast = vi.fn()
+    await renderOptions({ store: storeWithEditMode, addToast })
+    
+    const saveButton = screen.getByTestId('sidebar-save')
+    await act(async () => {
+      await userEvent.click(saveButton)
+    })
+    
+    await waitFor(() => {
+      expect(storeWithEditMode.updateSidebarConfig).toHaveBeenCalled()
+      expect(storeWithEditMode.toggleSidebarEditMode).toHaveBeenCalled()
+      expect(addToast).toHaveBeenCalled()
+    }, { timeout: 3000 })
+  })
+
+  it('devrait afficher le bouton "Par défaut" quand la sidebar n\'est pas personnalisée', async () => {
+    await renderOptions()
+    expect(screen.getByText('📋 Par défaut')).toBeInTheDocument()
+  })
+
+  it('devrait afficher "Personnalisé" quand la sidebar est personnalisée', async () => {
+    const storeWithCustom = {
+      ...mockStore,
+      sidebarConfig: {
+        mode: 'custom',
+        items: [],
+        sectionOrder: ['pinned', 'profiles', 'navigation', 'actions', 'footer']
+      }
+    }
+    await renderOptions({ store: storeWithCustom })
+    expect(screen.getByText('🎨 Personnalisé')).toBeInTheDocument()
+  })
+
+  it('devrait basculer le mode édition de la sidebar', async () => {
+    const toggleSidebarEditMode = vi.fn()
+    const storeWithToggle = {
+      ...mockStore,
+      toggleSidebarEditMode
+    }
+    await renderOptions({ store: storeWithToggle })
+    
+    const customizeButton = screen.getByText('Personnaliser')
+    await act(async () => {
+      await userEvent.click(customizeButton)
+    })
+    
+    expect(toggleSidebarEditMode).toHaveBeenCalled()
   })
 })
