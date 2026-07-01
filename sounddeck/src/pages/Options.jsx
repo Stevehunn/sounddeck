@@ -275,11 +275,35 @@ export default function Options({ store, addToast, lang = 'fr' }) {
   const handleResetSidebar = useCallback(async () => {
     if (confirm(tr('sidebarEditorResetConfirm'))) {
       await store.resetSidebarConfig()
-      // ✅ Forcer la mise à jour de la version pour que la sidebar se rafraîchisse
-      // Le store.resetSidebarConfig() doit incrémenter sidebarVersion
       addToast(tr('sidebarEditorResetSuccess'), 'success')
     }
   }, [store, tr, addToast])
+
+  // ✅ Fonction pour basculer une section en mode fixe
+  const handleToggleSectionFixed = useCallback((sectionKey) => {
+    const currentFixed = store.sidebarConfig?.fixedSections || []
+    
+    let newFixed
+    if (currentFixed.includes(sectionKey)) {
+      // Retirer la section des fixes
+      newFixed = currentFixed.filter(s => s !== sectionKey)
+      addToast(`Section "${sectionKey}" déverrouillée`, 'info')
+    } else {
+      // Ajouter la section aux fixes (max 2)
+      if (currentFixed.length >= 2) {
+        addToast('Maximum 2 sections fixes', 'warning')
+        return
+      }
+      newFixed = [...currentFixed, sectionKey]
+      addToast(`Section "${sectionKey}" verrouillée`, 'success')
+    }
+    
+    // Mettre à jour la config
+    store.updateSidebarConfig({
+      ...store.sidebarConfig,
+      fixedSections: newFixed
+    })
+  }, [store, addToast])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -444,21 +468,21 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             </div>
           </OptionRow>
 
-        {store.sidebarEditMode && (
-          <SidebarEditor
-            key={store.sidebarVersion} // ✅ Force le re-rendu quand la version change
-            config={store.sidebarConfig}
-            onSave={async (config) => {
-              await store.updateSidebarConfig(config)
-              store.toggleSidebarEditMode()
-              addToast(tr('sidebarEditorSaved'), 'success')
-            }}
-            onCancel={store.toggleSidebarEditMode}
-            onReset={handleResetSidebar}
-            lang={store.lang}
-            profiles={store.profiles}
-          />
-        )}
+          {store.sidebarEditMode && (
+            <SidebarEditor
+              key={store.sidebarVersion}
+              config={store.sidebarConfig}
+              onSave={async (config) => {
+                await store.updateSidebarConfig(config)
+                store.toggleSidebarEditMode()
+                addToast(tr('sidebarEditorSaved'), 'success')
+              }}
+              onCancel={store.toggleSidebarEditMode}
+              onReset={handleResetSidebar}
+              lang={store.lang}
+              profiles={store.profiles}
+            />
+          )}
         </Section>
 
         {/* Section Audio */}

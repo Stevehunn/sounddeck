@@ -49,6 +49,9 @@ const DEFAULT_LABELS = {
 // IDs des éléments qui sont toujours des actions (peu importe leur groupe)
 const ACTION_IDS = ['loop', 'shortcuts', 'presentation']
 
+// ✅ Sections disponibles pour le mode fixe
+const FIXABLE_SECTIONS = ['pinned', 'profiles', 'navigation', 'actions']
+
 export default function SidebarEditor({
   config,
   onSave,
@@ -60,14 +63,12 @@ export default function SidebarEditor({
   const tr = useTranslation(lang)
   const [items, setItems] = useState([])
   const [sectionOrder, setSectionOrder] = useState(DEFAULT_SECTION_ORDER)
+  const [fixedSections, setFixedSections] = useState([]) // ✅ État pour les sections fixes
   const [draggedIndex, setDraggedIndex] = useState(null)
   const [dragOverIndex, setDragOverIndex] = useState(null)
   const [draggedGroup, setDraggedGroup] = useState(null)
   const [dragOverGroup, setDragOverGroup] = useState(null)
   const [isInitialized, setIsInitialized] = useState(false)
-  
-  // ✅ Référence pour stocker la configuration initiale (au moment de l'ouverture)
-  const initialConfigRef = useRef(null)
 
   // Référence pour éviter les mises à jour en boucle
   const initializingRef = useRef(false)
@@ -77,19 +78,20 @@ export default function SidebarEditor({
     console.log('[SidebarEditor]', ...args)
   }, [])
 
-  // ─── FONCTION DE CONSTRUCTION DE LA CONFIGURATION ──────────────────────────
+  // ─── INITIALISATION ──────────────────────────────────────────────────────────
 
-  // ✅ Fonction pour construire la configuration complète à partir des données
-  const buildConfig = useCallback((configData, profilesData) => {
-    log('🔨 Construction de la configuration...')
+  useEffect(() => {
+    if (initializingRef.current || !config || isInitialized) {
+      return
+    }
     
-    const userProfiles = profilesData || []
-    const allProfile = { id: 'all', name: tr('allSounds'), isDefault: true }
-    const allProfiles = [allProfile, ...userProfiles]
+    log('🚀 Début initialisation...')
+    initializingRef.current = true
 
-    // Récupérer l'ordre des sections
-    let newSectionOrder = configData?.sectionOrder || DEFAULT_SECTION_ORDER
+    // Récupérer l'ordre des sections depuis la config
+    let newSectionOrder = config.sectionOrder || DEFAULT_SECTION_ORDER
     
+    // S'assurer que toutes les sections existent
     const allGroups = new Set(['pinned', 'profiles', 'navigation', 'actions', 'footer'])
     const existingGroups = new Set(newSectionOrder)
     allGroups.forEach(g => {
@@ -98,6 +100,7 @@ export default function SidebarEditor({
       }
     })
     
+    // S'assurer que pinned est en premier et footer en dernier
     const pinnedIndex = newSectionOrder.indexOf('pinned')
     if (pinnedIndex > 0) {
       const [pinned] = newSectionOrder.splice(pinnedIndex, 1)
@@ -109,8 +112,24 @@ export default function SidebarEditor({
       newSectionOrder.push(footer)
     }
 
-    // Récupérer les éléments existants
-    const existingItems = configData?.items || []
+    setSectionOrder(newSectionOrder)
+    
+    // ✅ Récupérer les sections fixes
+    const fixed = config.fixedSections || []
+    setFixedSections(fixed)
+    log('📋 Sections fixes:', fixed)
+
+    // ─── Récupérer les éléments existants ──────────────────────────────────────
+    const existingItems = config.items || []
+    log('📦 Éléments existants:', existingItems.length)
+    
+    // ─── Créer la liste des profils ───────────────────────────────────────────
+    const userProfiles = profiles || []
+    const allProfile = { id: 'all', name: tr('allSounds'), isDefault: true }
+    const allProfiles = [allProfile, ...userProfiles]
+    log('👤 Profils reçus:', allProfiles.map(p => p.id))
+
+    // ─── Construire la nouvelle liste d'éléments ──────────────────────────────
     const newItems = []
     const processedIds = new Set()
 
@@ -210,68 +229,13 @@ export default function SidebarEditor({
     // Trier les items par order
     newItems.sort((a, b) => (a.order || 0) - (b.order || 0))
     
-    return {
-      items: newItems,
-      sectionOrder: newSectionOrder
-    }
-  }, [tr])
-
-  // ─── INITIALISATION ──────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (initializingRef.current || !config || isInitialized) {
-      return
-    }
-    
-    log('🚀 Début initialisation...')
-    initializingRef.current = true
-
-    // ✅ Stocker la configuration initiale (une copie profonde)
-    initialConfigRef.current = {
-      config: JSON.parse(JSON.stringify(config)),
-      profiles: [...(profiles || [])]
-    }
-
-    const { items: newItems, sectionOrder: newSectionOrder } = buildConfig(config, profiles)
+    log(`📊 Total items: ${newItems.length}`)
 
     setItems(newItems)
-    setSectionOrder(newSectionOrder)
     setIsInitialized(true)
     initializingRef.current = false
     log('✅ Initialisation terminée')
-  }, [config, profiles, buildConfig, isInitialized])
-
-  // ─── RÉINITIALISATION ──────────────────────────────────────────────────────
-
-  // ✅ Fonction de réinitialisation qui recharge la configuration initiale
-  const handleReset = useCallback(() => {
-    log('🔄 Réinitialisation demandée')
-    
-    if (!initialConfigRef.current) {
-      log('❌ Pas de configuration initiale disponible')
-      return
-    }
-
-    // Reconstruire la configuration à partir de la config initiale
-    const { config: initialConfig, profiles: initialProfiles } = initialConfigRef.current
-    const { items: resetItems, sectionOrder: resetSectionOrder } = buildConfig(initialConfig, initialProfiles)
-    
-    log('📊 Réinitialisation avec:', {
-      items: resetItems.length,
-      sectionOrder: resetSectionOrder
-    })
-
-    // ✅ Écraser complètement l'état local
-    setItems(resetItems)
-    setSectionOrder(resetSectionOrder)
-    
-    // ✅ Appeler onReset pour informer le parent (qui doit recharger la config)
-    if (onReset) {
-      onReset()
-    }
-    
-    log('✅ Réinitialisation terminée')
-  }, [buildConfig, onReset])
+  }, [config, profiles, tr, isInitialized])
 
   // ─── RÉORGANISATION DES SECTIONS ───────────────────────────────────────────
 
@@ -306,6 +270,30 @@ export default function SidebarEditor({
     
     setSectionOrder(newOrder)
   }, [sectionOrder])
+
+  // ─── GESTION DES SECTIONS FIXES ──────────────────────────────────────────
+
+  const toggleFixedSection = useCallback((sectionKey) => {
+    log(`🔒 Toggle section fixe: ${sectionKey}`)
+    
+    setFixedSections(prev => {
+      if (prev.includes(sectionKey)) {
+        // Retirer la section des fixes
+        return prev.filter(s => s !== sectionKey)
+      } else {
+        // Ajouter la section aux fixes (max 2)
+        if (prev.length >= 2) {
+          // Ne pas dépasser 2 sections fixes
+          return prev
+        }
+        return [...prev, sectionKey]
+      }
+    })
+  }, [])
+
+  const isSectionFixed = useCallback((sectionKey) => {
+    return fixedSections.includes(sectionKey)
+  }, [fixedSections])
 
   // ─── GESTION DES ÉLÉMENTS ──────────────────────────────────────────────────
 
@@ -543,36 +531,45 @@ export default function SidebarEditor({
       originalGroup: undefined
     }))
     
+    // S'assurer que toutes les sections sont représentées
     const allGroups = new Set(items.map(item => item.pinned ? 'pinned' : item.group))
     const finalSectionOrder = sectionOrder.filter(s => allGroups.has(s))
     
+    // Ajouter les groupes manquants à la fin
     allGroups.forEach(group => {
       if (!finalSectionOrder.includes(group)) {
         finalSectionOrder.push(group)
       }
     })
 
+    // S'assurer que pinned est en premier
     const pinnedIdx = finalSectionOrder.indexOf('pinned')
     if (pinnedIdx > 0) {
       const [pinned] = finalSectionOrder.splice(pinnedIdx, 1)
       finalSectionOrder.unshift(pinned)
     }
     
+    // S'assurer que footer est en dernier
     const footerIdx = finalSectionOrder.indexOf('footer')
     if (footerIdx !== -1 && footerIdx < finalSectionOrder.length - 1) {
       const [footer] = finalSectionOrder.splice(footerIdx, 1)
       finalSectionOrder.push(footer)
     }
 
+    // ✅ Nettoyer les sections fixes (garder uniquement celles qui existent)
+    const validFixedSections = fixedSections.filter(s => finalSectionOrder.includes(s))
+
     log('📋 Ordre final des sections:', finalSectionOrder)
+    log('📋 Sections fixes:', validFixedSections)
 
     onSave({ 
       ...config, 
       items: updatedItems, 
       sectionOrder: finalSectionOrder,
+      fixedSections: validFixedSections, // ✅ Inclure les sections fixes
       mode: 'custom' 
     })
-  }, [items, sectionOrder, config, onSave])
+  }, [items, sectionOrder, fixedSections, config, onSave])
 
   // ─── GROUPEMENT DES ITEMS ────────────────────────────────────────────────
 
@@ -661,6 +658,47 @@ export default function SidebarEditor({
       }}>
         <span style={{ color: 'var(--text-tertiary)' }}>Chargement...</span>
       </div>
+    )
+  }
+
+  // ✅ Rendu du bouton cadenas pour une section (dans l'éditeur)
+  const renderFixedToggle = (sectionKey) => {
+    // Le footer ne peut pas être rendu fixe (il l'est toujours)
+    if (sectionKey === 'footer') return null
+    
+    const isFixed = isSectionFixed(sectionKey)
+    const canLock = !isFixed && fixedSections.length < 2
+    const canUnlock = isFixed
+    
+    // Si la section n'est ni verrouillable ni déverrouillable, ne pas afficher le bouton
+    if (!canLock && !canUnlock) return null
+    
+    return (
+      <button
+        onClick={() => toggleFixedSection(sectionKey)}
+        style={{
+          padding: '2px 6px',
+          borderRadius: 4,
+          border: '1px solid',
+          borderColor: isFixed ? 'var(--accent)' : 'var(--border)',
+          background: isFixed ? 'var(--accent-light)' : 'transparent',
+          color: isFixed ? 'var(--accent)' : 'var(--text-tertiary)',
+          cursor: canLock || canUnlock ? 'pointer' : 'not-allowed',
+          fontSize: 12,
+          transition: 'all 0.15s',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 4,
+          opacity: canLock || canUnlock ? 1 : 0.3
+        }}
+        title={isFixed ? tr('unlockSection') : tr('lockSection')}
+      >
+        <i className={`ti ${isFixed ? 'ti-lock' : 'ti-lock-open'}`} />
+        <span style={{ fontSize: 8 }}>
+          {isFixed ? tr('fixed') : tr('unfixed')}
+        </span>
+      </button>
     )
   }
 
@@ -938,7 +976,7 @@ export default function SidebarEditor({
         <div style={{ display: 'flex', gap: 6 }}>
           <button
             className="btn-ghost btn-sm"
-            onClick={handleReset}
+            onClick={onReset}
             style={{ fontSize: 12, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
           >
             <i className="ti ti-refresh" /> {tr('sidebarEditorReset')}
@@ -983,7 +1021,7 @@ export default function SidebarEditor({
           📌 Le footer reste toujours en bas
         </span>
         <span style={{ color: 'var(--accent)', fontSize: 10 }}>
-          ⚡ Les actions peuvent être épinglées mais pas déplacées
+          🔒 {tr('sidebarEditorFixedHint')} ({fixedSections.length}/2)
         </span>
       </div>
 
@@ -996,6 +1034,7 @@ export default function SidebarEditor({
           const isFooter = groupKey === 'footer'
           const isPinned = groupKey === 'pinned'
           const isActionGroup = groupKey === 'actions'
+          const isFixed = isSectionFixed(groupKey)
 
           const containerStyles = {
             marginBottom: 12,
@@ -1017,6 +1056,12 @@ export default function SidebarEditor({
             containerStyles.backgroundColor = 'rgba(124,111,247,0.04)'
             containerStyles.borderRadius = 'var(--radius-md)'
             containerStyles.border = '1px solid rgba(124,111,247,0.15)'
+          }
+
+          if (isFixed) {
+            containerStyles.backgroundColor = 'rgba(124,111,247,0.06)'
+            containerStyles.border = '1px solid var(--accent)'
+            containerStyles.borderRadius = 'var(--radius-md)'
           }
 
           return (
@@ -1073,7 +1118,7 @@ export default function SidebarEditor({
               <div style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: isPinned ? 'var(--accent)' : isFooter ? 'var(--text-tertiary)' : isActionGroup ? 'var(--accent)' : 'var(--text-tertiary)',
+                color: isPinned ? 'var(--accent)' : isFooter ? 'var(--text-tertiary)' : isActionGroup ? 'var(--accent)' : isFixed ? 'var(--accent)' : 'var(--text-tertiary)',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
                 marginBottom: 6,
@@ -1118,6 +1163,17 @@ export default function SidebarEditor({
                       (⚡ épinglables mais non déplaçables)
                     </span>
                   )}
+                  {isFixed && (
+                    <span style={{
+                      fontSize: 9,
+                      color: 'var(--accent)',
+                      marginLeft: 4,
+                      fontWeight: 400,
+                      textTransform: 'none'
+                    }}>
+                      🔒 {tr('fixed')}
+                    </span>
+                  )}
                   <span style={{
                     fontSize: 9,
                     color: 'var(--text-tertiary)',
@@ -1150,44 +1206,49 @@ export default function SidebarEditor({
                   )}
                 </div>
                 
-                {!isPinned && !isFooter && !isActionGroup && (
-                  <div style={{ display: 'flex', gap: 2 }}>
-                    <button
-                      onClick={() => moveSectionUp(groupKey)}
-                      disabled={sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === 0}
-                      style={{
-                        padding: '2px 4px',
-                        borderRadius: 'var(--radius-sm)',
-                        border: 'none',
-                        backgroundColor: 'transparent',
-                        color: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)',
-                        cursor: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === 0 ? 'default' : 'pointer',
-                        fontSize: 12,
-                        opacity: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === 0 ? 0.3 : 1
-                      }}
-                      title="Déplacer vers le haut"
-                    >
-                      <i className="ti ti-arrow-up" />
-                    </button>
-                    <button
-                      onClick={() => moveSectionDown(groupKey)}
-                      disabled={sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').length - 1}
-                      style={{
-                        padding: '2px 4px',
-                        borderRadius: 'var(--radius-sm)',
-                        border: 'none',
-                        backgroundColor: 'transparent',
-                        color: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').length - 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)',
-                        cursor: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').length - 1 ? 'default' : 'pointer',
-                        fontSize: 12,
-                        opacity: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').length - 1 ? 0.3 : 1
-                      }}
-                      title="Déplacer vers le bas"
-                    >
-                      <i className="ti ti-arrow-down" />
-                    </button>
-                  </div>
-                )}
+                <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                  {/* ✅ Bouton pour rendre la section fixe */}
+                  {renderFixedToggle(groupKey)}
+                  
+                  {!isPinned && !isFooter && !isActionGroup && (
+                    <>
+                      <button
+                        onClick={() => moveSectionUp(groupKey)}
+                        disabled={sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === 0}
+                        style={{
+                          padding: '2px 4px',
+                          borderRadius: 'var(--radius-sm)',
+                          border: 'none',
+                          backgroundColor: 'transparent',
+                          color: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)',
+                          cursor: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === 0 ? 'default' : 'pointer',
+                          fontSize: 12,
+                          opacity: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === 0 ? 0.3 : 1
+                        }}
+                        title="Déplacer vers le haut"
+                      >
+                        <i className="ti ti-arrow-up" />
+                      </button>
+                      <button
+                        onClick={() => moveSectionDown(groupKey)}
+                        disabled={sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').length - 1}
+                        style={{
+                          padding: '2px 4px',
+                          borderRadius: 'var(--radius-sm)',
+                          border: 'none',
+                          backgroundColor: 'transparent',
+                          color: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').length - 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)',
+                          cursor: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').length - 1 ? 'default' : 'pointer',
+                          fontSize: 12,
+                          opacity: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').length - 1 ? 0.3 : 1
+                        }}
+                        title="Déplacer vers le bas"
+                      >
+                        <i className="ti ti-arrow-down" />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               {itemsInGroup.map((item, index) => renderItem(item, groupKey, index))}
@@ -1213,11 +1274,11 @@ export default function SidebarEditor({
           <span key={s} style={{
             padding: '1px 6px',
             borderRadius: 3,
-            backgroundColor: s === 'footer' ? 'rgba(224,82,82,0.2)' : s === 'pinned' ? 'var(--accent-light)' : s === 'actions' ? 'rgba(124,111,247,0.15)' : 'var(--bg-secondary)',
-            border: `1px solid ${s === 'footer' ? 'var(--danger)' : s === 'pinned' ? 'var(--accent)' : s === 'actions' ? 'var(--accent)' : 'var(--border)'}`,
+            backgroundColor: s === 'footer' ? 'rgba(224,82,82,0.2)' : s === 'pinned' ? 'var(--accent-light)' : s === 'actions' ? 'rgba(124,111,247,0.15)' : fixedSections.includes(s) ? 'rgba(124,111,247,0.2)' : 'var(--bg-secondary)',
+            border: `1px solid ${s === 'footer' ? 'var(--danger)' : s === 'pinned' ? 'var(--accent)' : s === 'actions' ? 'var(--accent)' : fixedSections.includes(s) ? 'var(--accent)' : 'var(--border)'}`,
             fontSize: 9
           }}>
-            {s} {s === 'footer' && '🔒'} {s === 'actions' && '⚡'}
+            {s} {s === 'footer' && '🔒'} {s === 'actions' && '⚡'} {fixedSections.includes(s) && '🔒'}
           </span>
         ))}
         <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--text-tertiary)' }}>
@@ -1228,6 +1289,9 @@ export default function SidebarEditor({
         </span>
         <span style={{ fontSize: 9, color: 'var(--text-tertiary)' }}>
           Profils: {profiles.length}
+        </span>
+        <span style={{ fontSize: 9, color: 'var(--accent)' }}>
+          Fixes: {fixedSections.length}/2
         </span>
       </div>
     </div>

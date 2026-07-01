@@ -267,7 +267,8 @@ export default function App() {
         onReorderProfiles={store.reorderProfiles}
         sidebarConfig={store.sidebarConfig}
         sidebarEditMode={store.sidebarEditMode}
-        sidebarVersion={store.sidebarVersion} // ✅ Ajout de sidebarVersion
+        sidebarVersion={store.sidebarVersion}
+        onToggleSectionFixed={store.toggleSectionFixed} // ✅ Nouveau prop
       />
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>

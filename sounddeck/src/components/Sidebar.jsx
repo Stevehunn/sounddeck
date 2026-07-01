@@ -376,35 +376,57 @@ export default function Sidebar({
 
   const sectionOrder = sidebarConfig?.sectionOrder || ['pinned', 'profiles', 'navigation', 'actions', 'footer']
   
-  const orderedSections = [...sectionOrder]
-  const pinnedIdx = orderedSections.indexOf('pinned')
-  if (pinnedIdx > 0) {
-    const [pinned] = orderedSections.splice(pinnedIdx, 1)
-    orderedSections.unshift(pinned)
-  }
+  // S'assurer que 'footer' est toujours en dernier
+  let orderedSections = [...sectionOrder]
   const footerIdx = orderedSections.indexOf('footer')
   if (footerIdx !== -1 && footerIdx < orderedSections.length - 1) {
     const [footer] = orderedSections.splice(footerIdx, 1)
     orderedSections.push(footer)
   }
+  // S'assurer que 'pinned' est toujours en premier
+  const pinnedIdx = orderedSections.indexOf('pinned')
+  if (pinnedIdx > 0) {
+    const [pinned] = orderedSections.splice(pinnedIdx, 1)
+    orderedSections.unshift(pinned)
+  }
 
-  const sectionsToRender = orderedSections.filter(section => {
+  // ✅ Récupérer les sections fixes (celles que l'utilisateur a choisies)
+  const userFixedSections = sidebarConfig?.fixedSections || []
+
+  // Filtrer les sections qui ont du contenu
+  const sectionsWithContent = orderedSections.filter(section => {
     if (section === 'pinned') {
       return visibleItems.pinned.length > 0
     }
-    // ✅ Ne pas inclure 'footer' dans les sections scrollables
-    if (section === 'footer') return false
     return visibleItems.groups?.[section]?.length > 0
   })
 
-  console.log('📋 Sections à afficher (sans footer):', sectionsToRender)
+  // Séparer les sections avec contenu
+  const footerSection = 'footer'
+
+  // ✅ Garder l'ordre original des sections fixes (selon sectionOrder)
+  const fixedSectionsList = userFixedSections.filter(s => 
+    s !== 'footer' && sectionsWithContent.includes(s)
+  )
+
+  // ✅ Limiter à 2 sections fixes maximum et conserver l'ordre
+  const maxFixedSections = 2
+  const limitedFixedSections = fixedSectionsList.slice(0, maxFixedSections)
+
+  // ✅ Les sections scrollables = toutes les sections avec contenu SAUF footer ET SAUF les sections fixes
+  const scrollableSections = sectionsWithContent.filter(s => 
+    s !== footerSection && !limitedFixedSections.includes(s)
+  )
+
+  console.log('📋 Sections scrollables:', scrollableSections)
+  console.log('📋 Sections fixes:', limitedFixedSections)
+  console.log('📋 Footer:', footerSection)
 
   // ✅ Fonction pour rendre une section générique (navigation, footer, etc.)
   const renderGenericSection = (sectionKey, title) => {
     const items = visibleItems.groups[sectionKey] || []
     if (items.length === 0) return null
 
-    // Filtrer les éléments qui sont en réalité des actions (ils seront rendus ailleurs)
     const nonActionItems = items.filter(item => !ACTION_IDS.includes(item.id))
     if (nonActionItems.length === 0) return null
 
@@ -433,160 +455,136 @@ export default function Sidebar({
     ) || false
   }
 
-  // ✅ Rendu des sections (sauf footer)
-  const renderSections = () => {
-    return sectionsToRender.map(sectionKey => {
-      // ─── SECTION ÉPINGLÉS ───────────────────────────────────────────────
-      if (sectionKey === 'pinned') {
-        return (
-          <div key="pinned">
-            <div style={{ padding: '8px 12px 4px' }}>
-              <div style={{
-                fontSize: 11,
-                color: 'var(--accent)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4
-              }}>
-                <i className="ti ti-pinned" style={{ fontSize: 12 }} /> {tr('pinned')}
-              </div>
+  // ✅ Rendu d'une section
+  const renderSection = (sectionKey) => {
+    if (sectionKey === 'pinned') {
+      return (
+        <div key="pinned">
+          <div style={{ padding: '8px 12px 4px' }}>
+            <div style={{
+              fontSize: 11,
+              color: 'var(--accent)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
+            }}>
+              <i className="ti ti-pinned" style={{ fontSize: 12 }} /> {tr('pinned')}
             </div>
-            {visibleItems.pinned.map(item => {
-              // Profil épinglé
-              if (item.id.startsWith('profile-')) {
-                const profileId = item.id.replace('profile-', '')
-                const profile = profiles.find(p => p.id === profileId)
-                if (profile) return renderProfileItem(profile, true)
-                return null
-              }
-              // Action épinglée
-              if (ACTION_IDS.includes(item.id)) {
-                return renderActionItem(item)
-              }
-              // Navigation épinglée
-              return renderNavItem(item)
-            })}
           </div>
-        )
-      }
+          {visibleItems.pinned.map(item => {
+            if (item.id.startsWith('profile-')) {
+              const profileId = item.id.replace('profile-', '')
+              const profile = profiles.find(p => p.id === profileId)
+              if (profile) return renderProfileItem(profile, true)
+              return null
+            }
+            if (ACTION_IDS.includes(item.id)) {
+              return renderActionItem(item)
+            }
+            return renderNavItem(item)
+          })}
+        </div>
+      )
+    }
 
-      // ─── SECTION PROFILS ────────────────────────────────────────────────
-      if (sectionKey === 'profiles') {
-        // Récupérer les profils qui ne sont pas épinglés
-        const nonPinnedProfiles = profiles.filter(p => 
-          p.id !== 'all' && !isProfilePinned(p.id)
-        )
-        
-        // Vérifier si "Tous les sons" est épinglé
-        const allPinned = isProfilePinned('all')
+    if (sectionKey === 'profiles') {
+      const nonPinnedProfiles = profiles.filter(p => 
+        p.id !== 'all' && !isProfilePinned(p.id)
+      )
+      const allPinned = isProfilePinned('all')
 
-        return (
-          <div key="profiles">
-            <div style={{ padding: '8px 12px 4px', marginTop: 4 }}>
-              <div style={{
-                fontSize: 11,
-                color: 'var(--text-tertiary)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                fontWeight: 500
-              }}>
-                {tr('profiles')}
-              </div>
+      return (
+        <div key="profiles">
+          <div style={{ padding: '8px 12px 4px', marginTop: 4 }}>
+            <div style={{
+              fontSize: 11,
+              color: 'var(--text-tertiary)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              fontWeight: 500
+            }}>
+              {tr('profiles')}
             </div>
-            
-            {/* Profil "Tous les sons" (s'il n'est pas épinglé) */}
-            {!allPinned && renderProfileItem(profiles.find(p => p.id === 'all'))}
-            
-            {/* Profils utilisateur non épinglés */}
-            {nonPinnedProfiles.map(profile => renderProfileItem(profile, true))}
-
-            {/* Nouveau profil */}
-            {showNewProfile ? (
-              <div style={{ padding: '4px 12px', display: 'flex', gap: 4 }}>
-                <input
-                  autoFocus
-                  value={newProfileName}
-                  onChange={e => setNewProfileName(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleCreateProfile()
-                    if (e.key === 'Escape') setShowNewProfile(false)
-                  }}
-                  placeholder={tr('newProfile')}
-                  style={{ fontSize: 12, padding: '5px 8px', flex: 1 }}
-                />
-                <button className="btn-primary btn-sm" onClick={handleCreateProfile}>
-                  <i className="ti ti-check" />
-                </button>
-                <button className="btn-secondary btn-sm" onClick={() => setShowNewProfile(false)}>
-                  <i className="ti ti-x" />
-                </button>
-              </div>
-            ) : (
-              <SidebarItem
-                icon="ti-plus"
-                label={tr('newProfile')}
-                muted
-                onClick={() => setShowNewProfile(true)}
+          </div>
+          {!allPinned && renderProfileItem(profiles.find(p => p.id === 'all'))}
+          {nonPinnedProfiles.map(profile => renderProfileItem(profile, true))}
+          {showNewProfile ? (
+            <div style={{ padding: '4px 12px', display: 'flex', gap: 4 }}>
+              <input
+                autoFocus
+                value={newProfileName}
+                onChange={e => setNewProfileName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleCreateProfile()
+                  if (e.key === 'Escape') setShowNewProfile(false)
+                }}
+                placeholder={tr('newProfile')}
+                style={{ fontSize: 12, padding: '5px 8px', flex: 1 }}
               />
-            )}
-          </div>
-        )
-      }
-
-      // ─── SECTION NAVIGATION ─────────────────────────────────────────────
-      if (sectionKey === 'navigation') {
-        return renderGenericSection('navigation', tr('navigation'))
-      }
-
-      // ─── SECTION ACTIONS ─────────────────────────────────────────────────
-      if (sectionKey === 'actions') {
-        const items = visibleItems.groups.actions || []
-        
-        // Filtrer les éléments déjà épinglés
-        const nonPinnedActions = items.filter(item => {
-          const isPinned = sidebarConfig?.items?.find(i => i.id === item.id && i.pinned)
-          return !isPinned
-        })
-        
-        // Ajouter les éléments qui sont des actions mais dans d'autres groupes
-        const allActionItems = nonPinnedActions.filter(item => ACTION_IDS.includes(item.id))
-        
-        if (allActionItems.length === 0) return null
-        
-        console.log('⚡ Rendu des actions:', allActionItems.map(i => i.id))
-        
-        return (
-          <div key="actions">
-            <div style={{ padding: '8px 12px 4px', marginTop: 4 }}>
-              <div style={{
-                fontSize: 11,
-                color: 'var(--accent)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                fontWeight: 500
-              }}>
-                ⚡ Actions
-              </div>
+              <button className="btn-primary btn-sm" onClick={handleCreateProfile}>
+                <i className="ti ti-check" />
+              </button>
+              <button className="btn-secondary btn-sm" onClick={() => setShowNewProfile(false)}>
+                <i className="ti ti-x" />
+              </button>
             </div>
-            <div style={{ margin: '0 8px' }}>
-              {allActionItems.map(item => renderActionItem(item))}
+          ) : (
+            <SidebarItem
+              icon="ti-plus"
+              label={tr('newProfile')}
+              muted
+              onClick={() => setShowNewProfile(true)}
+            />
+          )}
+        </div>
+      )
+    }
+
+    if (sectionKey === 'navigation') {
+      return renderGenericSection('navigation', tr('navigation'))
+    }
+
+    if (sectionKey === 'actions') {
+      const items = visibleItems.groups.actions || []
+      const nonPinnedActions = items.filter(item => {
+        const isPinned = sidebarConfig?.items?.find(i => i.id === item.id && i.pinned)
+        return !isPinned
+      })
+      const allActionItems = nonPinnedActions.filter(item => ACTION_IDS.includes(item.id))
+      
+      if (allActionItems.length === 0) return null
+      
+      return (
+        <div key="actions">
+          <div style={{ padding: '8px 12px 4px', marginTop: 4 }}>
+            <div style={{
+              fontSize: 11,
+              color: 'var(--accent)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              fontWeight: 500
+            }}>
+              ⚡ Actions
             </div>
           </div>
-        )
-      }
+          <div style={{ margin: '0 8px' }}>
+            {allActionItems.map(item => renderActionItem(item))}
+          </div>
+        </div>
+      )
+    }
 
-      return null
-    })
+    return null
   }
 
-  // ✅ Rendu du footer (fixe en bas)
+  // ✅ Rendu du footer (toujours en bas)
   const renderFooter = () => {
     const footerItems = visibleItems.groups.footer || []
     if (footerItems.length === 0) return null
-
+    
     return (
       <div style={{ 
         flexShrink: 0,
@@ -594,18 +592,33 @@ export default function Sidebar({
         padding: '4px 0 8px',
         background: 'var(--bg-secondary)'
       }}>
-        <div style={{ padding: '8px 12px 4px' }}>
-          <div style={{
-            fontSize: 11,
-            color: 'var(--text-tertiary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            fontWeight: 500
-          }}>
-            {tr('footer')}
-          </div>
-        </div>
         {footerItems.map(item => renderNavItem(item))}
+      </div>
+    )
+  }
+
+  // ✅ Rendu des sections fixes (au-dessus du footer) - DANS L'ORDRE ORIGINAL
+  const renderFixedSections = () => {
+    if (limitedFixedSections.length === 0) return null
+    
+    // ✅ Trier les sections fixes selon l'ordre original
+    const sortedFixedSections = [...limitedFixedSections].sort((a, b) => {
+      return sectionsWithContent.indexOf(a) - sectionsWithContent.indexOf(b)
+    })
+    
+    return (
+      <div style={{ flexShrink: 0 }}>
+        {sortedFixedSections.map((sectionKey, index) => {
+          const isLast = index === sortedFixedSections.length - 1
+          return (
+            <div key={`fixed-${sectionKey}`} style={{
+              borderBottom: isLast ? '1px solid var(--border)' : 'none',
+              paddingBottom: isLast ? 4 : 0
+            }}>
+              {renderSection(sectionKey)}
+            </div>
+          )
+        })}
       </div>
     )
   }
@@ -667,12 +680,15 @@ export default function Sidebar({
         </button>
       </div>
 
-      {/* Contenu principal - scrollable */}
+      {/* ✅ Contenu scrollable */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
-        {renderSections()}
+        {scrollableSections.map(sectionKey => renderSection(sectionKey))}
       </div>
 
-      {/* ✅ Footer - fixe en bas */}
+      {/* ✅ Sections fixes (au-dessus du footer) - DANS L'ORDRE ORIGINAL */}
+      {renderFixedSections()}
+
+      {/* ✅ Footer - toujours en bas */}
       {renderFooter()}
     </aside>
   )
