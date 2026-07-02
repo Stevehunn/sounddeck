@@ -632,6 +632,18 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                     </select>
                   </OptionRow>
 
+                  <OptionRow label={tr('lowLatencyMode')} sub={tr('lowLatencyModeDesc')}>
+                    <Toggle 
+                      value={store.lowLatencyMode || false} 
+                      onChange={async (val) => {
+                        await store.updateLowLatencyMode(val)
+                        const { setLowLatencyMode } = await import('../utils/audioMixer')
+                        setLowLatencyMode(val)
+                        addToast(val ? tr('lowLatencyActivated') : tr('lowLatencyDeactivated'), 'info')
+                      }} 
+                    />
+                  </OptionRow>
+
                   <OptionRow label={tr('microphoneVolume')} sub={`${store.microphoneVolume}%`}>
                     <input type="range" min="0" max="100" value={store.microphoneVolume}
                       onChange={async (e) => {

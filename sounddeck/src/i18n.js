@@ -314,6 +314,10 @@ export const TRANSLATIONS = {
     mixerActive: 'Mixage actif',
     mixerActiveDesc: 'Ton micro et les sons sont mélangés dans un seul flux.',
     mixerDiscordTip: '📌 Dans Discord, sélectionne "CABLE Output" comme périphérique d\'entrée.',
+    lowLatencyMode: 'Mode basse latence',
+    lowLatencyModeDesc: 'Désactive les filtres audio pour réduire la latence (recommandé pour le jeu)',
+    lowLatencyActivated: '⚡ Mode basse latence activé',
+    lowLatencyDeactivated: '🔊 Mode basse latence désactivé',
 
     // Réduction de bruit
     noiseSuppression: 'Réduction de bruit micro',
@@ -987,6 +991,10 @@ export const TRANSLATIONS = {
     mixerActive: 'Mixer active',
     mixerActiveDesc: 'Your mic and sounds are mixed into a single stream.',
     mixerDiscordTip: '📌 In Discord, select "CABLE Output" as input device.',
+    lowLatencyMode: 'Low latency mode',
+    lowLatencyModeDesc: 'Disables audio filters to reduce latency (recommended for gaming)',
+    lowLatencyActivated: '⚡ Low latency mode activated',
+    lowLatencyDeactivated: '🔊 Low latency mode deactivated',
 
     noiseSuppression: 'Microphone noise suppression',
     noiseSuppressionDesc: 'Filters background noise (fan, keyboard, etc.)',
@@ -1651,6 +1659,10 @@ export const TRANSLATIONS = {
     mixerActive: 'Mezclador activo',
     mixerActiveDesc: 'Tu micrófono y los sonidos se mezclan en un solo flujo.',
     mixerDiscordTip: '📌 En Discord, selecciona "CABLE Output" como dispositivo de entrada.',
+    lowLatencyMode: 'Modo baja latencia',
+    lowLatencyModeDesc: 'Desactiva los filtros de audio para reducir la latencia (recomendado para juegos)',
+    lowLatencyActivated: '⚡ Modo baja latencia activado',
+    lowLatencyDeactivated: '🔊 Modo baja latencia desactivado',
 
     noiseSuppression: 'Supresión de ruido del micrófono',
     noiseSuppressionDesc: 'Filtra el ruido de fondo (ventilador, teclado, etc.)',

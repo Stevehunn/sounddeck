@@ -13,6 +13,7 @@ import Toast from './components/Toast'
 import QuitConfirm from './components/QuitConfirm'
 import WelcomeScreen from './components/WelcomeScreen'
 import { playSound, stopAllSounds, setStoreRef } from './utils/audio'
+import { warmupAudioContext } from './utils/audioMixer'
 
 export default function App() {
   const store = useStore()
@@ -51,6 +52,19 @@ export default function App() {
   useEffect(() => {
     setStoreRef(store)
   }, [store])
+
+  // ✅ PRÉCHAUFFAGE DU CONTEXTE AUDIO - au démarrage de l'app
+  useEffect(() => {
+    if (store.loading) return
+    
+    // Attendre 500ms pour que l'application soit stable
+    const timer = setTimeout(() => {
+      console.log('🔥 Démarrage du préchauffage audio...')
+      warmupAudioContext()
+    }, 500)
+    
+    return () => clearTimeout(timer)
+  }, [store.loading])
 
   useEffect(() => { soundsRef.current = store.sounds }, [store.sounds])
   useEffect(() => { switchToNextProfileRef.current = store.switchToNextProfile }, [store.switchToNextProfile])
@@ -268,7 +282,7 @@ export default function App() {
         sidebarConfig={store.sidebarConfig}
         sidebarEditMode={store.sidebarEditMode}
         sidebarVersion={store.sidebarVersion}
-        onToggleSectionFixed={store.toggleSectionFixed} // ✅ Nouveau prop
+        onToggleSectionFixed={store.toggleSectionFixed}
       />
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>

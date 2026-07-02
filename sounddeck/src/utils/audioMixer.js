@@ -8,6 +8,7 @@ let isInitialized = false
 let currentDeviceId = null
 let isMicrophoneMuted = false
 let audioElement = null
+let lowLatencyMode = false
 
 // Variables pour la réduction de bruit
 let noiseSuppressionEnabled = false
@@ -18,7 +19,16 @@ let noiseWorkletNode = null
 let workletLoaded = false
 let noiseSuppressionMode = 'auto'
 
-// État du mixeur
+// ✅ Cache des nœuds pour réutilisation
+let cachedNodes = {
+  micGain: null,
+  soundGain: null,
+  masterGain: null,
+  destination: null,
+  ctx: null
+}
+
+// ✅ État du mixeur
 export const mixerState = {
   isRunning: false,
   microphoneLevel: 1.0,
@@ -27,7 +37,189 @@ export const mixerState = {
   stream: null,
   isMicrophoneConnected: false,
   noiseSuppression: false,
-  noiseSuppressionMode: 'off'
+  noiseSuppressionMode: 'off',
+  lowLatencyMode: false,
+  isWarmup: false
+}
+
+// ✅ Promise pour le préchauffage du worklet
+let workletPromise = null
+
+// ─── PRÉCHAUFFAGE DU CONTEXTE AUDIO ──────────────────────────────────────
+
+export async function warmupAudioContext() {
+  if (mixerState.isWarmup) return
+  
+  mixerState.isWarmup = true
+  console.log('🔥 Préchauffage du contexte audio...')
+  
+  try {
+    // Créer un contexte temporaire
+    const ctx = new AudioContext()
+    
+    // Reprendre le contexte
+    if (ctx.state === 'suspended') {
+      await ctx.resume()
+    }
+    
+    // Créer un silence pour maintenir le contexte actif
+    const buffer = ctx.createBuffer(1, 1, 44100)
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    source.connect(ctx.destination)
+    source.start()
+    source.onended = () => source.disconnect()
+    
+    // Précharger le worklet en arrière-plan
+    if (ctx.audioWorklet) {
+      workletPromise = ctx.audioWorklet.addModule('/noise-suppression.js')
+        .then(() => {
+          workletLoaded = true
+          console.log('✅ AudioWorklet préchargé')
+          return true
+        })
+        .catch(() => false)
+    }
+    
+    // Fermer le contexte temporaire après le préchauffage
+    setTimeout(async () => {
+      await ctx.close()
+      mixerState.isWarmup = false
+      console.log('✅ Contexte audio préchauffé')
+    }, 100)
+    
+  } catch (e) {
+    console.warn('⚠️ Erreur préchauffage:', e)
+    mixerState.isWarmup = false
+  }
+}
+
+// ─── INITIALISATION DU MIXEUR ──────────────────────────────────────────────
+
+export async function initAudioMixer(microphoneDeviceId = 'default') {
+  const startTime = performance.now()
+  console.log('🎛️ Démarrage du mixeur audio...')
+  
+  try {
+    // Fermer l'ancien contexte si existant
+    if (audioContext && audioContext.state !== 'closed') {
+      await audioContext.close()
+      console.log('🔄 Ancien contexte fermé')
+    }
+    
+    // Nettoyer l'ancien élément audio
+    if (audioElement) {
+      audioElement.pause()
+      audioElement.srcObject = null
+      audioElement = null
+    }
+    
+    // ✅ Réinitialiser l'état du worklet
+    workletLoaded = false
+    noiseWorkletNode = null
+    noiseSuppressionNode = null
+    noiseFilter = null
+    noiseCompressor = null
+    
+    // ✅ Créer le contexte audio
+    audioContext = new (window.AudioContext || window.webkitAudioContext)()
+    console.log('✅ AudioContext créé, état:', audioContext.state)
+    
+    // ✅ Si le contexte est suspendu, le reprendre
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume()
+      console.log('▶️ AudioContext repris, état:', audioContext.state)
+    }
+    
+    // ✅ Utiliser le worklet préchargé si disponible
+    if (workletPromise) {
+      await workletPromise
+    } else if (audioContext.audioWorklet && noiseSuppressionMode !== 'filter') {
+      await loadNoiseSuppressionWorklet()
+    }
+    
+    // ✅ Créer les nœuds de gain
+    microphoneGain = audioContext.createGain()
+    microphoneGain.gain.value = 1.0
+    
+    soundGain = audioContext.createGain()
+    soundGain.gain.value = 1.0
+    
+    // ✅ Créer un gain de mixage final
+    masterGain = audioContext.createGain()
+    masterGain.gain.value = 1.0
+    
+    // ✅ Créer la destination (flux mixé)
+    destination = audioContext.createMediaStreamDestination()
+    
+    // ✅ Connecter les gains à la destination
+    microphoneGain.connect(masterGain)
+    soundGain.connect(masterGain)
+    masterGain.connect(destination)
+    
+    console.log('✅ Noeuds audio créés et connectés')
+    
+    // ✅ Initialiser le micro
+    const success = await initMicrophone(microphoneDeviceId)
+    if (!success) {
+      console.warn('⚠️ Impossible d\'initialiser le micro')
+    }
+    
+    // ✅ Préconnecter le flux
+    preconnectMixer()
+    
+    isInitialized = true
+    mixerState.isRunning = true
+    mixerState.stream = destination.stream
+    mixerState.isMicrophoneConnected = success
+    mixerState.noiseSuppression = noiseSuppressionEnabled
+    mixerState.noiseSuppressionMode = noiseSuppressionMode
+    mixerState.lowLatencyMode = lowLatencyMode
+    
+    const latency = (performance.now() - startTime).toFixed(2)
+    console.log(`✅ Mixeur audio initialisé en ${latency}ms`)
+    console.log('📊 Micro connecté:', success)
+    console.log('📊 Mode basse latence:', lowLatencyMode)
+    console.log('📊 Réduction de bruit:', noiseSuppressionEnabled)
+    console.log('📊 Mode:', noiseSuppressionMode)
+    console.log('📊 Worklet chargé:', workletLoaded)
+    
+    return destination.stream
+    
+  } catch (e) {
+    console.error('❌ Erreur initialisation mixeur:', e)
+    isInitialized = false
+    mixerState.isRunning = false
+    return null
+  }
+}
+
+// ─── PRÉCONNEXION DU FLUX ──────────────────────────────────────────────────
+
+export function preconnectMixer() {
+  if (!destination || !destination.stream) return false
+  
+  try {
+    if (audioElement) {
+      audioElement.pause()
+      audioElement.srcObject = null
+      audioElement = null
+    }
+    
+    audioElement = new Audio()
+    audioElement.srcObject = destination.stream
+    
+    // ✅ Si le flux est déjà prêt, démarrer immédiatement
+    if (audioElement.readyState >= 2) {
+      audioElement.play().catch(() => {})
+      console.log('✅ Flux préconnecté')
+    }
+    
+    return true
+  } catch (e) {
+    console.warn('⚠️ Erreur préconnexion:', e)
+    return false
+  }
 }
 
 // ─── CHARGEMENT DE L'AUDIOWORKLET ──────────────────────────────────────────
@@ -36,12 +228,11 @@ async function loadNoiseSuppressionWorklet() {
   if (workletLoaded) return true
   
   try {
-    if (!audioContext.audioWorklet) {
+    if (!audioContext || !audioContext.audioWorklet) {
       console.warn('⚠️ AudioWorklet non supporté par ce navigateur')
       return false
     }
     
-    // ✅ En production, le fichier est à la racine
     const baseUrl = window.location.origin
     const workletUrl = `${baseUrl}/noise-suppression.js`
     
@@ -58,21 +249,27 @@ async function loadNoiseSuppressionWorklet() {
   }
 }
 
-// ─── RECONFIGURATION DE LA RÉDUCTION DE BRUIT ─────────────────────────────
+// ─── MODE BASSE LATENCE ────────────────────────────────────────────────────
 
-function reconfigureNoiseSuppression() {
+export function setLowLatencyMode(enabled) {
+  lowLatencyMode = enabled
+  mixerState.lowLatencyMode = enabled
+  console.log(`⚡ Mode basse latence ${enabled ? 'activé' : 'désactivé'}`)
+  
+  // Si le mixeur est initialisé, on reconfigure
+  if (isInitialized && microphoneSource && microphoneGain) {
+    reconfigureMicrophoneConnection()
+  }
+}
+
+// ─── RECONFIGURATION DE LA CONNEXION MICRO ──────────────────────────────
+
+function reconfigureMicrophoneConnection() {
   try {
-    // Déconnecter l'ancien noeud si existant
-    if (microphoneSource) {
-      microphoneSource.disconnect()
-    }
+    if (!microphoneSource || !microphoneGain) return
     
-    // Si le micro n'est pas connecté, on ne fait rien
-    if (!microphoneGain) {
-      return
-    }
-    
-    // Nettoyer les anciens noeuds
+    // Déconnecter tout
+    try { microphoneSource.disconnect() } catch (e) {}
     if (noiseWorkletNode) {
       try { noiseWorkletNode.disconnect() } catch (e) {}
       noiseWorkletNode = null
@@ -85,69 +282,22 @@ function reconfigureNoiseSuppression() {
       try { noiseCompressor.disconnect() } catch (e) {}
       noiseCompressor = null
     }
-    noiseSuppressionNode = null
     
-    if (!noiseSuppressionEnabled) {
-      // ❌ Réduction de bruit désactivée - connexion directe
+    if (lowLatencyMode) {
+      // ✅ MODE BASSE LATENCE : connexion directe
       microphoneSource.connect(microphoneGain)
-      console.log('🔊 Réduction de bruit désactivée')
-      return
-    }
-    
-    // ✅ Réduction de bruit activée
-    
-    // ESSAYER AUDIOWORKLET D'ABORD (si supporté et disponible)
-    if (noiseSuppressionMode === 'auto' || noiseSuppressionMode === 'worklet') {
-      if (audioContext.audioWorklet && workletLoaded) {
-        try {
-          noiseWorkletNode = new AudioWorkletNode(audioContext, 'noise-suppression')
-          microphoneSource.connect(noiseWorkletNode)
-          noiseWorkletNode.connect(microphoneGain)
-          console.log('🔇 Réduction de bruit (AudioWorklet) activée')
-          return
-        } catch (e) {
-          console.warn('⚠️ Erreur création AudioWorklet:', e.message)
-          noiseWorkletNode = null
-          // Fallback vers le filtre basique
-        }
-      } else if (noiseSuppressionMode === 'worklet') {
-        console.warn('⚠️ AudioWorklet demandé mais non disponible, fallback vers filtre basique')
-      }
-    }
-    
-    // FALLBACK : FILTRE BIQUAD + COMPRESSEUR
-    try {
-      // Créer un nœud de filtrage pour réduire le bruit
-      noiseFilter = audioContext.createBiquadFilter()
-      noiseFilter.type = 'lowpass'
-      noiseFilter.frequency.value = 4000 // Coupe les fréquences au-dessus de 4kHz
-      noiseFilter.Q.value = 0.7
-      
-      // Ajouter un compresseur léger pour lisser le volume
-      noiseCompressor = audioContext.createDynamicsCompressor()
-      noiseCompressor.threshold.value = -30
-      noiseCompressor.knee.value = 40
-      noiseCompressor.ratio.value = 12
-      noiseCompressor.attack.value = 0.003
-      noiseCompressor.release.value = 0.25
-      
-      // Connecter : micro → filtre → compresseur → gain micro
-      microphoneSource.connect(noiseFilter)
-      noiseFilter.connect(noiseCompressor)
-      noiseCompressor.connect(microphoneGain)
-      
-      noiseSuppressionNode = { filter: noiseFilter, compressor: noiseCompressor }
-      console.log('🔇 Réduction de bruit (filtre basique) activée')
-      
-    } catch (e) {
-      console.warn('⚠️ Erreur création filtre basique:', e)
-      // Dernier recours : connexion directe
+      console.log('⚡ Mode basse latence : connexion directe micro → gain')
+    } else if (noiseSuppressionEnabled && noiseSuppressionMode !== 'off') {
+      // ✅ Mode normal avec réduction de bruit
+      applyNoiseSuppressionConnection()
+    } else {
+      // ✅ Mode normal sans réduction de bruit
       microphoneSource.connect(microphoneGain)
+      console.log('🔊 Connexion standard micro → gain')
     }
     
   } catch (e) {
-    console.warn('⚠️ Erreur lors de la reconfiguration du filtre:', e)
-    // Fallback: connexion directe
+    console.warn('⚠️ Erreur reconfiguration:', e)
     try {
       if (microphoneSource && microphoneGain) {
         microphoneSource.disconnect()
@@ -157,145 +307,54 @@ function reconfigureNoiseSuppression() {
   }
 }
 
-// ─── API PUBLIQUE POUR LA RÉDUCTION DE BRUIT ──────────────────────────────
+// ─── APPLICATION DE LA RÉDUCTION DE BRUIT ───────────────────────────────
 
-// Activer/désactiver la réduction de bruit
-export function setNoiseSuppression(enabled) {
-  noiseSuppressionEnabled = enabled
-  mixerState.noiseSuppression = enabled
-  console.log(`🎤 Réduction de bruit ${enabled ? 'activée' : 'désactivée'}`)
-  
-  // Si le mixeur est initialisé, on reconfigure
-  if (isInitialized && microphoneSource && microphoneGain) {
-    reconfigureNoiseSuppression()
-  }
-}
-
-// Définir le mode de réduction de bruit
-// 'auto' : essaye AudioWorklet, fallback sur filtre basique
-// 'worklet' : utilise AudioWorklet uniquement (fallback si indisponible)
-// 'filter' : utilise le filtre basique uniquement
-// 'off' : désactivé
-export function setNoiseSuppressionMode(mode) {
-  const validModes = ['auto', 'worklet', 'filter', 'off']
-  if (!validModes.includes(mode)) {
-    console.warn(`⚠️ Mode invalide: ${mode}, utilisation de 'auto'`)
-    mode = 'auto'
-  }
-  
-  noiseSuppressionMode = mode
-  mixerState.noiseSuppressionMode = mode
-  
-  if (mode === 'off') {
-    setNoiseSuppression(false)
-  } else {
-    setNoiseSuppression(true)
-  }
-  
-  console.log(`🎤 Mode réduction de bruit: ${mode}`)
-}
-
-// Obtenir le statut de la réduction de bruit
-export function getNoiseSuppressionStatus() {
-  return {
-    enabled: noiseSuppressionEnabled,
-    mode: noiseSuppressionMode,
-    workletAvailable: workletLoaded && !!audioContext?.audioWorklet,
-    activeMethod: noiseWorkletNode ? 'worklet' : (noiseSuppressionNode ? 'filter' : 'none'),
-    workletLoaded
-  }
-}
-
-// ─── INITIALISATION DU MIXEUR ──────────────────────────────────────────────
-
-export async function initAudioMixer(microphoneDeviceId = 'default') {
+function applyNoiseSuppressionConnection() {
   try {
-    console.log('🎛️ Démarrage du mixeur audio...')
+    if (!microphoneSource || !microphoneGain || !audioContext) return
     
-    // Fermer l'ancien contexte si existant
-    if (audioContext && audioContext.state !== 'closed') {
-      await audioContext.close()
-      console.log('🔄 Ancien contexte fermé')
+    // ESSAYER AUDIOWORKLET (si supporté et disponible)
+    if (noiseSuppressionMode !== 'filter' && audioContext.audioWorklet && workletLoaded) {
+      try {
+        noiseWorkletNode = new AudioWorkletNode(audioContext, 'noise-suppression')
+        microphoneSource.connect(noiseWorkletNode)
+        noiseWorkletNode.connect(microphoneGain)
+        console.log('🔇 Réduction de bruit (AudioWorklet) activée')
+        return
+      } catch (e) {
+        console.warn('⚠️ Erreur création AudioWorklet:', e.message)
+        noiseWorkletNode = null
+      }
     }
     
-    // Nettoyer l'ancien élément audio
-    if (audioElement) {
-      audioElement.pause()
-      audioElement.srcObject = null
-      audioElement = null
-    }
+    // FALLBACK : FILTRE BIQUAD + COMPRESSEUR
+    noiseFilter = audioContext.createBiquadFilter()
+    noiseFilter.type = 'lowpass'
+    noiseFilter.frequency.value = 4000
+    noiseFilter.Q.value = 0.7
     
-    // Réinitialiser l'état du worklet
-    workletLoaded = false
-    noiseWorkletNode = null
-    noiseSuppressionNode = null
-    noiseFilter = null
-    noiseCompressor = null
+    noiseCompressor = audioContext.createDynamicsCompressor()
+    noiseCompressor.threshold.value = -30
+    noiseCompressor.knee.value = 40
+    noiseCompressor.ratio.value = 12
+    noiseCompressor.attack.value = 0.003
+    noiseCompressor.release.value = 0.25
     
-    // Créer le contexte audio
-    audioContext = new (window.AudioContext || window.webkitAudioContext)()
-    console.log('✅ AudioContext créé, état:', audioContext.state)
+    microphoneSource.connect(noiseFilter)
+    noiseFilter.connect(noiseCompressor)
+    noiseCompressor.connect(microphoneGain)
     
-    // Si le contexte est suspendu, le reprendre
-    if (audioContext.state === 'suspended') {
-      await audioContext.resume()
-      console.log('▶️ AudioContext repris, état:', audioContext.state)
-    }
-    
-    // Charger l'AudioWorklet si supporté
-    if (audioContext.audioWorklet && noiseSuppressionMode !== 'filter') {
-      await loadNoiseSuppressionWorklet()
-    }
-    
-    // Créer les noeuds de gain
-    microphoneGain = audioContext.createGain()
-    microphoneGain.gain.value = 1.0
-    
-    soundGain = audioContext.createGain()
-    soundGain.gain.value = 1.0
-    
-    // Créer un gain de mixage final
-    masterGain = audioContext.createGain()
-    masterGain.gain.value = 1.0
-    
-    // Créer la destination (flux mixé)
-    destination = audioContext.createMediaStreamDestination()
-    
-    // Connecter les gains à la destination
-    microphoneGain.connect(masterGain)
-    soundGain.connect(masterGain)
-    masterGain.connect(destination)
-    
-    console.log('✅ Noeuds audio créés et connectés')
-    
-    // Initialiser le micro (avec la réduction de bruit si activée)
-    const success = await initMicrophone(microphoneDeviceId)
-    if (!success) {
-      console.warn('⚠️ Impossible d\'initialiser le micro')
-    }
-    
-    isInitialized = true
-    mixerState.isRunning = true
-    mixerState.stream = destination.stream
-    mixerState.isMicrophoneConnected = success
-    mixerState.noiseSuppression = noiseSuppressionEnabled
-    mixerState.noiseSuppressionMode = noiseSuppressionMode
-    
-    console.log('✅ Mixeur audio initialisé avec succès')
-    console.log('📊 Micro connecté:', success)
-    console.log('📊 Flux audio disponible:', !!destination.stream)
-    console.log('📊 État AudioContext:', audioContext.state)
-    console.log('📊 Réduction de bruit:', noiseSuppressionEnabled)
-    console.log('📊 Mode:', noiseSuppressionMode)
-    console.log('📊 Worklet chargé:', workletLoaded)
-    
-    return destination.stream
+    noiseSuppressionNode = { filter: noiseFilter, compressor: noiseCompressor }
+    console.log('🔇 Réduction de bruit (filtre basique) activée')
     
   } catch (e) {
-    console.error('❌ Erreur initialisation mixeur:', e)
-    isInitialized = false
-    mixerState.isRunning = false
-    return null
+    console.warn('⚠️ Erreur création filtre:', e)
+    try {
+      if (microphoneSource && microphoneGain) {
+        microphoneSource.disconnect()
+        microphoneSource.connect(microphoneGain)
+      }
+    } catch (err) {}
   }
 }
 
@@ -324,7 +383,7 @@ async function initMicrophone(deviceId) {
     }
     noiseSuppressionNode = null
     
-    // ✅ Récupérer la liste des périphériques pour vérifier si le deviceId existe
+    // ✅ Vérifier si le deviceId existe
     let actualDeviceId = deviceId
     if (deviceId && deviceId !== 'default') {
       try {
@@ -335,11 +394,9 @@ async function initMicrophone(deviceId) {
         if (!deviceExists) {
           console.warn(`⚠️ Périphérique ${deviceId} non trouvé, utilisation du périphérique par défaut`)
           actualDeviceId = 'default'
-        } else {
-          console.log(`✅ Périphérique trouvé: ${deviceId}`)
         }
       } catch (e) {
-        console.warn('⚠️ Erreur lors de l\'énumération des périphériques:', e)
+        console.warn('⚠️ Erreur énumération périphériques:', e)
         actualDeviceId = 'default'
       }
     }
@@ -347,11 +404,11 @@ async function initMicrophone(deviceId) {
     const constraints = {
       audio: {
         deviceId: actualDeviceId && actualDeviceId !== 'default' ? { exact: actualDeviceId } : undefined,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        sampleRate: 48000,
-        channelCount: 2
+        echoCancellation: !lowLatencyMode, // ✅ Désactivé en mode basse latence
+        noiseSuppression: !lowLatencyMode, // ✅ Désactivé en mode basse latence
+        autoGainControl: !lowLatencyMode, // ✅ Désactivé en mode basse latence
+        sampleRate: lowLatencyMode ? 16000 : 48000, // ✅ Taux d'échantillonnage réduit en mode basse latence
+        channelCount: lowLatencyMode ? 1 : 2
       }
     }
     
@@ -359,7 +416,6 @@ async function initMicrophone(deviceId) {
     
     const stream = await navigator.mediaDevices.getUserMedia(constraints)
     
-    // Vérifier que le stream a des pistes audio
     if (!stream.getAudioTracks().length) {
       console.error('❌ Aucune piste audio dans le stream')
       return false
@@ -370,29 +426,8 @@ async function initMicrophone(deviceId) {
     // Créer la source micro
     microphoneSource = audioContext.createMediaStreamSource(stream)
     
-    // Appliquer la réduction de bruit si activée
-    if (noiseSuppressionEnabled && noiseSuppressionMode !== 'off') {
-      
-      // ESSAYER AUDIOWORKLET (si supporté et disponible)
-      if (noiseSuppressionMode !== 'filter' && audioContext.audioWorklet && workletLoaded) {
-        try {
-          noiseWorkletNode = new AudioWorkletNode(audioContext, 'noise-suppression')
-          microphoneSource.connect(noiseWorkletNode)
-          noiseWorkletNode.connect(microphoneGain)
-          console.log('🔇 Réduction de bruit (AudioWorklet) activée')
-        } catch (e) {
-          console.warn('⚠️ Erreur création AudioWorklet:', e.message)
-          noiseWorkletNode = null
-          applyBasicNoiseFilter()
-        }
-      } else {
-        applyBasicNoiseFilter()
-      }
-      
-    } else {
-      microphoneSource.connect(microphoneGain)
-      console.log('🔊 Réduction de bruit désactivée')
-    }
+    // ✅ Appliquer la connexion selon le mode
+    reconfigureMicrophoneConnection()
     
     currentDeviceId = actualDeviceId
     mixerState.microphoneDeviceId = actualDeviceId
@@ -404,7 +439,7 @@ async function initMicrophone(deviceId) {
       audioContextState: audioContext.state,
       gainValue: microphoneGain.gain.value,
       noiseSuppression: noiseSuppressionEnabled,
-      noiseMethod: noiseWorkletNode ? 'worklet' : (noiseSuppressionNode ? 'filter' : 'none'),
+      lowLatencyMode: lowLatencyMode,
       trackReady: stream.getAudioTracks()[0]?.readyState || 'unknown'
     })
     
@@ -417,47 +452,60 @@ async function initMicrophone(deviceId) {
   }
 }
 
-// Fonction helper pour appliquer le filtre basique
-function applyBasicNoiseFilter() {
-  try {
-    if (!microphoneSource || !microphoneGain) return
-    
-    // Créer un nœud de filtrage
-    noiseFilter = audioContext.createBiquadFilter()
-    noiseFilter.type = 'lowpass'
-    noiseFilter.frequency.value = 4000
-    noiseFilter.Q.value = 0.7
-    
-    // Ajouter un compresseur léger
-    noiseCompressor = audioContext.createDynamicsCompressor()
-    noiseCompressor.threshold.value = -30
-    noiseCompressor.knee.value = 40
-    noiseCompressor.ratio.value = 12
-    noiseCompressor.attack.value = 0.003
-    noiseCompressor.release.value = 0.25
-    
-    microphoneSource.connect(noiseFilter)
-    noiseFilter.connect(noiseCompressor)
-    noiseCompressor.connect(microphoneGain)
-    
-    noiseSuppressionNode = { filter: noiseFilter, compressor: noiseCompressor }
-    console.log('🔇 Réduction de bruit (filtre basique) activée')
-    
-  } catch (e) {
-    console.warn('⚠️ Erreur création filtre basique:', e)
-    // Fallback: connexion directe
-    try {
-      if (microphoneSource && microphoneGain) {
-        microphoneSource.disconnect()
-        microphoneSource.connect(microphoneGain)
-      }
-    } catch (err) {}
+// ─── API PUBLIQUE POUR LE MODE BASSE LATENCE ─────────────────────────────
+
+export function getLowLatencyStatus() {
+  return {
+    enabled: lowLatencyMode,
+    supported: true,
+    latencyReduction: lowLatencyMode ? '~50-100ms' : '0'
+  }
+}
+
+// ─── API PUBLIQUE POUR LA RÉDUCTION DE BRUIT ──────────────────────────────
+
+export function setNoiseSuppression(enabled) {
+  noiseSuppressionEnabled = enabled
+  mixerState.noiseSuppression = enabled
+  console.log(`🎤 Réduction de bruit ${enabled ? 'activée' : 'désactivée'}`)
+  
+  if (isInitialized && microphoneSource && microphoneGain) {
+    reconfigureMicrophoneConnection()
+  }
+}
+
+export function setNoiseSuppressionMode(mode) {
+  const validModes = ['auto', 'worklet', 'filter', 'off']
+  if (!validModes.includes(mode)) {
+    console.warn(`⚠️ Mode invalide: ${mode}, utilisation de 'auto'`)
+    mode = 'auto'
+  }
+  
+  noiseSuppressionMode = mode
+  mixerState.noiseSuppressionMode = mode
+  
+  if (mode === 'off') {
+    setNoiseSuppression(false)
+  } else {
+    setNoiseSuppression(true)
+  }
+  
+  console.log(`🎤 Mode réduction de bruit: ${mode}`)
+}
+
+export function getNoiseSuppressionStatus() {
+  return {
+    enabled: noiseSuppressionEnabled,
+    mode: noiseSuppressionMode,
+    workletAvailable: workletLoaded && !!audioContext?.audioWorklet,
+    activeMethod: noiseWorkletNode ? 'worklet' : (noiseSuppressionNode ? 'filter' : 'none'),
+    workletLoaded,
+    lowLatencyMode
   }
 }
 
 // ─── RESTE DES FONCTIONS (connexion, lecture, etc.) ──────────────────────
 
-// Connecter le flux mixé à un périphérique de sortie
 export function connectMixerToOutput(deviceId) {
   if (!destination || !destination.stream) {
     console.warn('⚠️ Aucun flux mixé disponible')
@@ -480,7 +528,6 @@ export function connectMixerToOutput(deviceId) {
         console.log('✅ Flux mixé redirigé vers:', deviceId)
       }).catch(err => {
         console.warn('⚠️ Impossible de rediriger le flux vers', deviceId, ':', err)
-        audioElement.setSinkId('default').catch(() => {})
       })
     }
     
@@ -497,7 +544,6 @@ export function connectMixerToOutput(deviceId) {
   }
 }
 
-// Jouer un son dans le mixeur
 export function playSoundInMixer(audioBuffer, volume = 1.0) {
   if (!isInitialized || !audioContext || !destination) {
     console.warn('⚠️ Mixeur non initialisé, impossible de jouer le son')
@@ -522,8 +568,7 @@ export function playSoundInMixer(audioBuffer, volume = 1.0) {
     console.log('🔊 Son joué dans le mixeur, volume:', volume)
     
     if (!audioElement) {
-      const defaultDevice = 'default'
-      connectMixerToOutput(defaultDevice)
+      connectMixerToOutput('default')
     }
     
     return source
@@ -533,7 +578,6 @@ export function playSoundInMixer(audioBuffer, volume = 1.0) {
   }
 }
 
-// Charger un fichier audio dans un buffer
 export async function loadAudioBuffer(fileUrl) {
   if (!audioContext) {
     console.warn('⚠️ AudioContext non initialisé')
@@ -558,7 +602,6 @@ export async function loadAudioBuffer(fileUrl) {
   }
 }
 
-// Régler le volume du micro
 export function setMicrophoneVolume(volume) {
   if (!microphoneGain) return
   const clampedVolume = Math.max(0, Math.min(1, volume))
@@ -567,7 +610,6 @@ export function setMicrophoneVolume(volume) {
   console.log('🎤 Volume micro réglé à:', clampedVolume)
 }
 
-// Régler le volume des sons
 export function setSoundVolume(volume) {
   if (!soundGain) return
   const clampedVolume = Math.max(0, Math.min(1, volume))
@@ -576,17 +618,14 @@ export function setSoundVolume(volume) {
   console.log('🔊 Volume sons réglé à:', clampedVolume)
 }
 
-// Obtenir le flux audio mixé
 export function getMixedStream() {
   return destination ? destination.stream : null
 }
 
-// Vérifier si le mixeur est actif
 export function isMixerActive() {
   return isInitialized && audioContext && audioContext.state === 'running'
 }
 
-// Démarrer le contexte audio
 export function resumeAudioContext() {
   if (audioContext && audioContext.state === 'suspended') {
     audioContext.resume()
@@ -594,7 +633,6 @@ export function resumeAudioContext() {
   }
 }
 
-// Couper/activer le micro
 export function toggleMicrophoneMute() {
   if (!microphoneGain) return
   isMicrophoneMuted = !isMicrophoneMuted
@@ -603,7 +641,6 @@ export function toggleMicrophoneMute() {
   return isMicrophoneMuted
 }
 
-// Test ponctuel du micro
 export async function testMicrophoneOnce(deviceId = 'default') {
   let tempContext = null
   let tempStream = null
@@ -678,7 +715,6 @@ export async function testMicrophoneOnce(deviceId = 'default') {
   }
 }
 
-// Obtenir l'état du micro
 export function getMicrophoneStatus() {
   return {
     isConnected: mixerState.isMicrophoneConnected,
@@ -687,11 +723,11 @@ export function getMicrophoneStatus() {
     gainValue: microphoneGain?.gain?.value || 0,
     noiseSuppression: noiseSuppressionEnabled,
     noiseMode: noiseSuppressionMode,
-    activeMethod: noiseWorkletNode ? 'worklet' : (noiseSuppressionNode ? 'filter' : 'none')
+    activeMethod: noiseWorkletNode ? 'worklet' : (noiseSuppressionNode ? 'filter' : 'none'),
+    lowLatencyMode
   }
 }
 
-// Obtenir les statistiques du mixeur
 export function getMixerStats() {
   return {
     isInitialized,
@@ -708,11 +744,11 @@ export function getMixerStats() {
     noiseSuppression: noiseSuppressionEnabled,
     noiseMode: noiseSuppressionMode,
     workletAvailable: workletLoaded,
-    activeMethod: noiseWorkletNode ? 'worklet' : (noiseSuppressionNode ? 'filter' : 'none')
+    activeMethod: noiseWorkletNode ? 'worklet' : (noiseSuppressionNode ? 'filter' : 'none'),
+    lowLatencyMode
   }
 }
 
-// Changer le périphérique micro
 export async function changeMicrophone(deviceId) {
   if (!isInitialized) {
     console.warn('⚠️ Mixeur non initialisé')
@@ -721,12 +757,10 @@ export async function changeMicrophone(deviceId) {
   return await initMicrophone(deviceId)
 }
 
-// Changer le périphérique de sortie
 export function changeOutputDevice(deviceId) {
   return connectMixerToOutput(deviceId)
 }
 
-// Arrêter et nettoyer le mixeur
 export async function stopMixer() {
   try {
     if (audioElement) {
@@ -789,7 +823,6 @@ export async function stopMixer() {
   }
 }
 
-// Obtenir la liste des périphériques audio
 export async function getAudioInputDevices() {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices()
@@ -800,9 +833,6 @@ export async function getAudioInputDevices() {
   }
 }
 
-// ─── VÉRIFICATION ET RÉPARATION DU MIXEUR ─────────────────────────────────────
-
-// Vérifier si le mixeur est opérationnel
 export function isMixerOperational() {
   if (!isInitialized) {
     console.log('ℹ️ Mixeur non initialisé')
@@ -827,7 +857,6 @@ export function isMixerOperational() {
   return true
 }
 
-// Réparer le mixeur si nécessaire
 export function repairMixer() {
   if (!isInitialized) {
     console.warn('⚠️ Mixeur non initialisé, impossible de réparer')
@@ -837,16 +866,13 @@ export function repairMixer() {
   try {
     console.log('🔧 Tentative de réparation du mixeur...')
     
-    // 1. Vérifier et reprendre le contexte
     if (audioContext.state === 'suspended') {
       audioContext.resume()
       console.log('▶️ AudioContext repris')
     }
     
-    // 2. Reconnecter les noeuds si nécessaire
     try {
       if (microphoneGain && masterGain) {
-        // Déconnecter et reconnecter pour être sûr
         try { microphoneGain.disconnect() } catch (e) {}
         microphoneGain.connect(masterGain)
         console.log('🔗 MicrophoneGain reconnecté')
@@ -865,7 +891,6 @@ export function repairMixer() {
       console.warn('⚠️ Erreur lors des reconnexions:', e)
     }
     
-    // 3. Recréer l'élément audio de sortie
     if (audioElement) {
       try {
         audioElement.pause()
@@ -883,7 +908,6 @@ export function repairMixer() {
       console.log('✅ Élément audio recréé')
     }
     
-    // 4. Vérifier si la réparation a fonctionné
     const operational = isMixerOperational()
     if (operational) {
       console.log('✅ Mixeur réparé avec succès')
@@ -903,6 +927,9 @@ export function repairMixer() {
 
 export default {
   initAudioMixer,
+  warmupAudioContext,
+  setLowLatencyMode,
+  getLowLatencyStatus,
   changeMicrophone,
   changeOutputDevice,
   connectMixerToOutput,
@@ -924,5 +951,6 @@ export default {
   getNoiseSuppressionStatus,
   isMixerOperational,
   repairMixer,
+  preconnectMixer,
   mixerState
 }

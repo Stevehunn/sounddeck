@@ -67,6 +67,7 @@ export function useStore() {
   const [noiseSuppression, setNoiseSuppression] = useState(false)
   const [noiseSuppressionMode, setNoiseSuppressionMode] = useState('auto')
   const [keyboardLayout, setKeyboardLayout] = useState('qwerty')
+  const [lowLatencyMode, setLowLatencyMode] = useState(false)
 
   // ─── SIDEBAR CONFIG ──────────────────────────────────────────────────────────
   const [sidebarConfig, setSidebarConfig] = useState(null)
@@ -135,6 +136,9 @@ export function useStore() {
 
         const savedLocalAudioDevice = await window.electronAPI.storeGet('localAudioDevice') || 'default'
         setLocalAudioDevice(savedLocalAudioDevice)
+
+        const savedLowLatencyMode = await window.electronAPI.storeGet('lowLatencyMode') ?? false
+        setLowLatencyMode(savedLowLatencyMode)
 
         // ─── LANGUE ────────────────────────────────────────────────────────────
         const savedLang = await window.electronAPI.storeGet('lang')
@@ -807,6 +811,11 @@ export function useStore() {
     await save('mixerSoundVolume', volume)
   }, [save])
 
+  const updateLowLatencyMode = useCallback(async (enabled) => {
+    setLowLatencyMode(enabled)
+    await save('lowLatencyMode', enabled)
+  }, [save])
+
   // ─── Noise Suppression ──────────────────────────────────────────────────────
   const updateNoiseSuppression = useCallback(async (enabled) => {
     setNoiseSuppression(enabled)
@@ -1114,5 +1123,9 @@ export function useStore() {
 
     // ─── Périphérique audio local ────────────────────────────────────────────
     updateLocalAudioDevice,
+
+    // ─── Mode basse latence ───────────────────────────────────────────────
+    lowLatencyMode,
+    updateLowLatencyMode,
   }
 }
