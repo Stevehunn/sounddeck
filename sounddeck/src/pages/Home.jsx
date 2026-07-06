@@ -7,6 +7,7 @@ import AIGenerator from '../components/AIGenerator'
 import { useTranslation } from '../i18n'
 import { playSound, stopAllSounds, stopSound } from '../utils/audio'
 import { analyzeAudio } from '../utils/aiTagging'
+import { compressAudio, formatSize } from '../utils/audioConverter'
 
 const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
 
@@ -232,22 +233,66 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
     setImportProgress(0)
     let count = 0
     
+    const compressOnImport = store.compressOnImport || false
+    const compressionBitrate = store.compressionBitrate || 128
+    
     for (let i = 0; i < filePaths.length; i++) {
       const fp = filePaths[i]
-      const result = await window.electronAPI.importSoundFile(fp)
+      let result = await window.electronAPI.importSoundFile(fp)
+      
+      // Si la compression est activée, compresser le fichier
+      if (result.success && compressOnImport) {
+        try {
+          const originalPath = result.path
+          const ext = originalPath.split('.').pop() || 'mp3'
+          const compressedPath = originalPath.replace(`.${ext}`, `_compressed.${ext}`)
+          
+          const compressionResult = await compressAudio(originalPath, compressedPath, {
+            bitrate: compressionBitrate,
+            format: ext === 'mp3' ? 'mp3' : 'aac'
+          })
+          
+          if (compressionResult.success) {
+            // Remplacer le fichier original par le fichier compressé
+            result.path = compressedPath
+            result.compressed = true
+            result.originalSize = compressionResult.originalSize
+            result.compressedSize = compressionResult.size
+            result.compressionRatio = compressionResult.ratio
+            
+            // Supprimer le fichier original
+            await window.electronAPI.deleteSoundFile(originalPath)
+            
+            console.log(`✅ Fichier compressé: ${formatSize(compressionResult.originalSize)} → ${formatSize(compressionResult.size)} (${Math.round((1 - compressionResult.ratio) * 100)}% réduction)`)
+          } else {
+            console.warn('⚠️ Compression échouée, utilisation du fichier original:', compressionResult.error)
+          }
+        } catch (e) {
+          console.warn('⚠️ Erreur compression:', e)
+        }
+      }
+      
       if (result.success) {
         await store.addSound({ 
           name: result.name, 
           path: result.path, 
           emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)], 
-          profiles: [currentProfileId] 
+          profiles: [currentProfileId],
+          compressed: result.compressed || false,
+          originalSize: result.originalSize,
+          compressedSize: result.compressedSize
         })
         count++
       }
       setImportProgress(i + 1)
     }
     
-    if (count > 0) addToast(`${count} ${tr('sounds')} ${tr('imported')}`, 'success')
+    if (count > 0) {
+      const msg = compressOnImport 
+        ? `${count} ${tr('sounds')} ${tr('importedAndCompressed')}`
+        : `${count} ${tr('sounds')} ${tr('imported')}`
+      addToast(msg, 'success')
+    }
     setShowImport(false)
     setImportProgress(0)
     setTotalFiles(0)
@@ -290,31 +335,48 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
     }
 
     let imported = 0
+    const compressOnImport = store.compressOnImport || false
+    const compressionBitrate = store.compressionBitrate || 128
+    
     for (const file of audioFiles) {
       try {
+        let result = null
+        
         if (file.path && file.path.length > 2) {
-          const result = await window.electronAPI.importSoundFile(file.path)
-          if (result.success) {
-            await store.addSound({
-              name: result.name,
-              path: result.path,
-              emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
-              profiles: [currentProfileId]
-            })
-            imported++
-            continue
-          }
+          result = await window.electronAPI.importSoundFile(file.path)
+        } else {
+          const arrayBuffer = await new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = (e) => resolve(e.target.result)
+            reader.onerror = () => reject(new Error(tr('readError')))
+            reader.readAsArrayBuffer(file)
+          })
+          result = await window.electronAPI.writeDroppedFile(file.name, arrayBuffer)
         }
-
-        const arrayBuffer = await new Promise((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = (e) => resolve(e.target.result)
-          reader.onerror = () => reject(new Error(tr('readError')))
-          reader.readAsArrayBuffer(file)
-        })
-
-        const result = await window.electronAPI.writeDroppedFile(file.name, arrayBuffer)
+        
         if (result.success) {
+          // Compression si activée
+          if (compressOnImport) {
+            try {
+              const originalPath = result.path
+              const ext = originalPath.split('.').pop() || 'mp3'
+              const compressedPath = originalPath.replace(`.${ext}`, `_compressed.${ext}`)
+              
+              const compressionResult = await compressAudio(originalPath, compressedPath, {
+                bitrate: compressionBitrate,
+                format: ext === 'mp3' ? 'mp3' : 'aac'
+              })
+              
+              if (compressionResult.success) {
+                result.path = compressedPath
+                await window.electronAPI.deleteSoundFile(originalPath)
+                console.log(`✅ Fichier compressé: ${formatSize(compressionResult.originalSize)} → ${formatSize(compressionResult.size)}`)
+              }
+            } catch (e) {
+              console.warn('⚠️ Erreur compression:', e)
+            }
+          }
+          
           await store.addSound({
             name: result.name,
             path: result.path,
@@ -323,7 +385,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
           })
           imported++
         } else {
-          addToast(`${tr('errorFor')} ${file.name} : ${result.error}`, 'error')
+          addToast(`${tr('errorFor')} ${file.name} : ${result?.error || tr('unknown')}`, 'error')
         }
       } catch (err) {
         console.error('Drop import error:', err)
@@ -334,7 +396,10 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
     setImporting(false)
     if (imported > 0) {
       setImportSuccess(imported)
-      addToast(`${imported} ${tr('sounds')} ${tr('importedSuccessfully')}`, 'success')
+      const msg = compressOnImport
+        ? `${imported} ${tr('sounds')} ${tr('importedAndCompressed')}`
+        : `${imported} ${tr('sounds')} ${tr('importedSuccessfully')}`
+      addToast(msg, 'success')
       setTimeout(() => setImportSuccess(0), 3000)
     }
   }
@@ -602,14 +667,61 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
           dragOver={dragOver}
           setDragOver={setDragOver}
           currentProfileId={currentProfileId}
+          store={store}
           onManualAdd={async (name, filePath, imagePath, emoji) => {
-            await store.addSound({ name, path: filePath, image: imagePath || null, emoji: emoji || '🔊', profiles: [currentProfileId] })
+            let finalPath = filePath
+            const compressOnImport = store.compressOnImport || false
+            
+            // Compression si activée
+            if (compressOnImport) {
+              try {
+                const ext = filePath.split('.').pop() || 'mp3'
+                const compressedPath = filePath.replace(`.${ext}`, `_compressed.${ext}`)
+                const compressionResult = await compressAudio(filePath, compressedPath, {
+                  bitrate: store.compressionBitrate || 128,
+                  format: ext === 'mp3' ? 'mp3' : 'aac'
+                })
+                if (compressionResult.success) {
+                  finalPath = compressedPath
+                  await window.electronAPI.deleteSoundFile(filePath)
+                }
+              } catch (e) {
+                console.warn('⚠️ Erreur compression:', e)
+              }
+            }
+            
+            await store.addSound({ 
+              name, 
+              path: finalPath, 
+              image: imagePath || null, 
+              emoji: emoji || '🔊', 
+              profiles: [currentProfileId] 
+            })
             addToast(`"${name}" ${tr('added')}`, 'success')
             setShowImport(false)
           }}
           onUrlImport={async (url, name) => {
             const safeName = name.replace(/\s+/g, '_') + '_' + Date.now() + '.mp3'
-            const result = await window.electronAPI.downloadSoundUrl(url, safeName)
+            let result = await window.electronAPI.downloadSoundUrl(url, safeName)
+            
+            // Compression si activée
+            if (result.success && store.compressOnImport) {
+              try {
+                const ext = result.path.split('.').pop() || 'mp3'
+                const compressedPath = result.path.replace(`.${ext}`, `_compressed.${ext}`)
+                const compressionResult = await compressAudio(result.path, compressedPath, {
+                  bitrate: store.compressionBitrate || 128,
+                  format: ext === 'mp3' ? 'mp3' : 'aac'
+                })
+                if (compressionResult.success) {
+                  result.path = compressedPath
+                  await window.electronAPI.deleteSoundFile(result.path.replace(`_compressed.${ext}`, `.${ext}`))
+                }
+              } catch (e) {
+                console.warn('⚠️ Erreur compression:', e)
+              }
+            }
+            
             if (result.success) {
               await store.addSound({ name, path: result.path, emoji: '🔊', profiles: [currentProfileId] })
               addToast(`"${name}" ${tr('downloaded')}`, 'success')
@@ -778,7 +890,7 @@ function OutsideCard({ sound, onAdd, lang }) {
   )
 }
 
-function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onUrlImport, onManualAdd, lang }) {
+function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onUrlImport, onManualAdd, store, lang }) {
   const tr = useTranslation(lang || 'fr')
   const [tab, setTab] = useState('file')
   const [url, setUrl] = useState('')
@@ -788,6 +900,8 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
   const [manualImage, setManualImage] = useState(null)
   const [manualEmoji, setManualEmoji] = useState('🔊')
   const [showTrimmer, setShowTrimmer] = useState(false)
+  const [compressOnImport, setCompressOnImport] = useState(store?.compressOnImport || false)
+  const [compressionBitrate, setCompressionBitrate] = useState(store?.compressionBitrate || 128)
 
   const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
 
@@ -854,9 +968,55 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
                 <i className="ti ti-folder-open" /> {tr('orBrowse')}
               </div>
             </div>
+
+            {/* Option de compression - visible dans tous les onglets */}
+            <div style={{
+              padding: '8px 12px',
+              background: 'var(--bg-tertiary)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border)',
+              marginTop: 12
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={compressOnImport}
+                  onChange={e => setCompressOnImport(e.target.checked)}
+                  style={{ width: 'auto', accentColor: 'var(--accent)' }}
+                />
+                <label style={{ fontSize: 12, cursor: 'pointer' }}>
+                  <i className="ti ti-file-zip" style={{ marginRight: 4 }} />
+                  {tr('compressOnImport')}
+                </label>
+              </div>
+              
+              {compressOnImport && (
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                    {tr('compressionBitrate')}:
+                  </span>
+                  <select
+                    value={compressionBitrate}
+                    onChange={e => setCompressionBitrate(Number(e.target.value))}
+                    style={{ width: 120, fontSize: 12 }}
+                  >
+                    <option value="64">64 kbps</option>
+                    <option value="96">96 kbps</option>
+                    <option value="128">128 kbps</option>
+                    <option value="192">192 kbps</option>
+                    <option value="256">256 kbps</option>
+                  </select>
+                  <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                    ({tr('compressOnImportDesc')})
+                  </span>
+                </div>
+              )}
+            </div>
+
             <div className="modal-actions">
               <button className="btn-secondary btn-lg" onClick={onClose}>{tr('close')}</button>
-            </div>          </>
+            </div>
+          </>
         )}
 
         {tab === 'manual' && !showTrimmer && (
@@ -905,6 +1065,47 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
                 </div>
               </div>
             )}
+
+            {/* Compression dans l'onglet Manuel */}
+            <div style={{
+              padding: '8px 12px',
+              background: 'var(--bg-tertiary)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={compressOnImport}
+                  onChange={e => setCompressOnImport(e.target.checked)}
+                  style={{ width: 'auto', accentColor: 'var(--accent)' }}
+                />
+                <label style={{ fontSize: 12, cursor: 'pointer' }}>
+                  <i className="ti ti-file-zip" style={{ marginRight: 4 }} />
+                  {tr('compressOnImport')}
+                </label>
+              </div>
+              
+              {compressOnImport && (
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                    {tr('compressionBitrate')}:
+                  </span>
+                  <select
+                    value={compressionBitrate}
+                    onChange={e => setCompressionBitrate(Number(e.target.value))}
+                    style={{ width: 120, fontSize: 12 }}
+                  >
+                    <option value="64">64 kbps</option>
+                    <option value="96">96 kbps</option>
+                    <option value="128">128 kbps</option>
+                    <option value="192">192 kbps</option>
+                    <option value="256">256 kbps</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
             <div className="modal-actions">
               <button className="btn-secondary btn-lg" onClick={onClose}>{tr('cancel')}</button>
               <button className="btn-primary btn-lg" onClick={() => handleManualAdd(null)} disabled={!manualFile || !manualName}>
@@ -937,6 +1138,47 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{tr('urlLabel')}</label>
               <input value={url} onChange={e => setUrl(e.target.value)} placeholder={tr('urlPlaceholder')} />
             </div>
+
+            {/* Compression dans l'onglet URL */}
+            <div style={{
+              padding: '8px 12px',
+              background: 'var(--bg-tertiary)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={compressOnImport}
+                  onChange={e => setCompressOnImport(e.target.checked)}
+                  style={{ width: 'auto', accentColor: 'var(--accent)' }}
+                />
+                <label style={{ fontSize: 12, cursor: 'pointer' }}>
+                  <i className="ti ti-file-zip" style={{ marginRight: 4 }} />
+                  {tr('compressOnImport')}
+                </label>
+              </div>
+              
+              {compressOnImport && (
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                    {tr('compressionBitrate')}:
+                  </span>
+                  <select
+                    value={compressionBitrate}
+                    onChange={e => setCompressionBitrate(Number(e.target.value))}
+                    style={{ width: 120, fontSize: 12 }}
+                  >
+                    <option value="64">64 kbps</option>
+                    <option value="96">96 kbps</option>
+                    <option value="128">128 kbps</option>
+                    <option value="192">192 kbps</option>
+                    <option value="256">256 kbps</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', borderRadius: 6, padding: '8px 10px', lineHeight: 1.6 }}>
               <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
               <strong>{tr('supportedLinks')} :</strong> {tr('urlInfo')}<br/>

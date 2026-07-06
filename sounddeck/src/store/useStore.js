@@ -69,6 +69,8 @@ export function useStore() {
   const [noiseSuppressionMode, setNoiseSuppressionMode] = useState('auto')
   const [keyboardLayout, setKeyboardLayout] = useState('qwerty')
   const [lowLatencyMode, setLowLatencyMode] = useState(false)
+  const [compressOnImport, setCompressOnImport] = useState(false)
+  const [compressionBitrate, setCompressionBitrate] = useState(128)
 
   // ─── Étape 1 : Taille des cartes ──────────────────────────────────────────
   const [cardSize, setCardSize] = useState('medium') // 'small' | 'medium' | 'large'
@@ -151,6 +153,11 @@ export function useStore() {
 
         const savedLowLatencyMode = await window.electronAPI.storeGet('lowLatencyMode') ?? false
         setLowLatencyMode(savedLowLatencyMode)
+
+        const savedCompressOnImport = await window.electronAPI.storeGet('compressOnImport') ?? false
+        const savedCompressionBitrate = await window.electronAPI.storeGet('compressionBitrate') ?? 128
+        setCompressOnImport(savedCompressOnImport)
+        setCompressionBitrate(savedCompressionBitrate)
 
         // ─── Étape 1 : Chargement de la taille des cartes ──────────────────
         const savedCardSize = await window.electronAPI.storeGet('cardSize') || 'medium'
@@ -639,6 +646,17 @@ export function useStore() {
     setOrderVersion(prev => prev + 1)
     return true
   }, [sounds, currentProfileId, soundOrder, save])
+
+  // ─── Compression audio ──────────────────────────────────────────────────────
+  const updateCompressOnImport = useCallback(async (enabled) => {
+    setCompressOnImport(enabled)
+    await save('compressOnImport', enabled)
+  }, [save])
+
+  const updateCompressionBitrate = useCallback(async (bitrate) => {
+    setCompressionBitrate(bitrate)
+    await save('compressionBitrate', bitrate)
+  }, [save])
 
   // ─── Raccourcis ───────────────────────────────────────────────────────────────
   const setShortcut = useCallback(async (soundId, accelerator) => {
@@ -1199,5 +1217,11 @@ export function useStore() {
 
     lazyLoadingEnabled,
     updateLazyLoadingEnabled,
+
+    // Compression audio
+    compressOnImport,
+    compressionBitrate,
+    updateCompressOnImport,
+    updateCompressionBitrate,
   }
 }

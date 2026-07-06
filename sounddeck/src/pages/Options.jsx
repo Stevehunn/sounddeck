@@ -924,6 +924,35 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             </div>
           )}
 
+          <OptionRow label={tr('compressOnImport')} sub={tr('compressOnImportDesc')}>
+            <Toggle 
+              value={store.compressOnImport || false}
+              onChange={async (val) => {
+                await store.updateCompressOnImport(val)
+                addToast(val ? tr('compressOnImportEnabled') : tr('compressOnImportDisabled'), 'info')
+              }}
+            />
+          </OptionRow>
+
+          {store.compressOnImport && (
+            <OptionRow label={tr('compressionBitrate')} sub={tr('compressionBitrateDesc')}>
+              <select 
+                value={store.compressionBitrate || 128}
+                onChange={async (e) => {
+                  const val = Number(e.target.value)
+                  await store.updateCompressionBitrate(val)
+                }}
+                style={{ width: 140, fontSize: 12 }}
+              >
+                <option value="64">64 kbps</option>
+                <option value="96">96 kbps</option>
+                <option value="128">128 kbps (recommandé)</option>
+                <option value="192">192 kbps</option>
+                <option value="256">256 kbps</option>
+              </select>
+            </OptionRow>
+          )}
+
           <OptionRow label={tr('normalization')} sub={tr('normalizationDesc')}>
             <Toggle value={store.normalizationEnabled} onChange={store.updateNormalizationEnabled} />
           </OptionRow>
