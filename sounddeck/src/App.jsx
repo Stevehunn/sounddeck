@@ -8,10 +8,13 @@ import Editor from './pages/Editor'
 import Sequencer from './pages/Sequencer'
 import YouTube from './pages/YouTube'
 import Guide from './pages/Guide'
+import Stats from './pages/Stats'
 import Presentation from './pages/Presentation'
 import Toast from './components/Toast'
 import QuitConfirm from './components/QuitConfirm'
 import WelcomeScreen from './components/WelcomeScreen'
+import Tutorial from './components/Tutorial'
+import TutorialAdvanced from './components/TutorialAdvanced'
 import { playSound, stopAllSounds, setStoreRef } from './utils/audio'
 import { warmupAudioContext } from './utils/audioMixer'
 
@@ -22,6 +25,8 @@ export default function App() {
   const [toasts, setToasts] = useState([])
   const [mixerInitialized, setMixerInitialized] = useState(false)
   const [isFirstLaunch, setIsFirstLaunch] = useState(null)
+  const [showTutorial, setShowTutorial] = useState(false)
+  const [showAdvancedTutorial, setShowAdvancedTutorial] = useState(false)
 
   const soundsRef = useRef([])
   const addToastRef = useRef(null)
@@ -39,13 +44,34 @@ export default function App() {
     const checkFirstLaunch = async () => {
       try {
         const hasLaunchedBefore = await window.electronAPI.storeGet('hasLaunchedBefore')
-        setIsFirstLaunch(!hasLaunchedBefore)
+        const tutorialDone = localStorage.getItem('sounddeck-tutorial-done')
+        
+        if (!hasLaunchedBefore) {
+          setIsFirstLaunch(true)
+        } else if (!tutorialDone) {
+          setTimeout(() => {
+            setShowTutorial(true)
+          }, 500)
+        }
       } catch (e) {
         console.warn('⚠️ Erreur vérification premier lancement:', e)
         setIsFirstLaunch(false)
       }
     }
     checkFirstLaunch()
+  }, [])
+
+  // ✅ Écouter l'ouverture du tutoriel avancé
+  useEffect(() => {
+    const handleOpenAdvanced = () => {
+      setShowAdvancedTutorial(true)
+    }
+    
+    window.addEventListener('open-advanced-tutorial', handleOpenAdvanced)
+    
+    return () => {
+      window.removeEventListener('open-advanced-tutorial', handleOpenAdvanced)
+    }
   }, [])
 
   // ✅ Passer la référence du store à audio.js pour le mixeur
@@ -73,29 +99,28 @@ export default function App() {
   useEffect(() => { volumeRef.current = store.volume }, [store.volume])
   useEffect(() => { setPresentationRef.current = setPresentationMode }, [setPresentationMode])
 
-  // ✅ FOCUS MODE - Restauration et raccourci clavier
+  // ✅ Raccourcis souris - Molette pour changer de profil
   useEffect(() => {
-    // Restaurer l'état du focus mode au chargement
-    const savedFocus = localStorage.getItem('sounddeck-focus-mode')
-    if (savedFocus === 'true') {
-      document.body.classList.add('focus-mode')
-    }
-
-    const handleKeyDown = (e) => {
-      // Ctrl+Shift+F pour basculer le mode focus
-      if (e.ctrlKey && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+    const handleWheel = (e) => {
+      const target = e.target
+      const isOnSidebar = target.closest?.('aside') || target.closest?.('.sidebar')
+      
+      if (isOnSidebar && e.ctrlKey) {
         e.preventDefault()
-        document.body.classList.toggle('focus-mode')
-        const isFocus = document.body.classList.contains('focus-mode')
-        localStorage.setItem('sounddeck-focus-mode', isFocus ? 'true' : 'false')
-        addToast(isFocus ? 'Focus Mode activé' : 'Focus Mode désactivé', 'info')
+        if (e.deltaY > 0) {
+          store.switchToNextProfile?.()
+        } else {
+          const profiles = store.profiles || []
+          const currentIndex = profiles.findIndex(p => p.id === store.currentProfileId)
+          const prevIndex = currentIndex > 0 ? currentIndex - 1 : profiles.length - 1
+          store.switchProfile?.(profiles[prevIndex]?.id)
+        }
       }
     }
-    
-    window.addEventListener('keydown', handleKeyDown)
-    
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+
+    window.addEventListener('wheel', handleWheel, { passive: false })
+    return () => window.removeEventListener('wheel', handleWheel)
+  }, [store.currentProfileId, store.profiles])
 
   // Appliquer le thème
   useEffect(() => {
@@ -305,7 +330,6 @@ export default function App() {
         sidebarConfig={store.sidebarConfig}
         sidebarEditMode={store.sidebarEditMode}
         sidebarVersion={store.sidebarVersion}
-        onToggleSectionFixed={store.toggleSectionFixed}
       />
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -316,6 +340,7 @@ export default function App() {
         {currentPage === 'sequencer' && <Sequencer store={store} addToast={addToast} lang={store.lang} />}
         {currentPage === 'youtube' && <YouTube store={store} addToast={addToast} lang={store.lang} />}
         {currentPage === 'guide' && <Guide key={store.lang} lang={store.lang} />}
+        {currentPage === 'stats' && <Stats store={store} lang={store.lang} />}
       </main>
 
       <Toast toasts={toasts} />
@@ -331,6 +356,20 @@ export default function App() {
       {showQuitConfirm && (
         <QuitConfirm 
           onClose={() => setShowQuitConfirm(false)} 
+          lang={store.lang} 
+        />
+      )}
+
+      {showTutorial && (
+        <Tutorial 
+          onComplete={() => setShowTutorial(false)} 
+          lang={store.lang} 
+        />
+      )}
+
+      {showAdvancedTutorial && (
+        <TutorialAdvanced 
+          onComplete={() => setShowAdvancedTutorial(false)} 
           lang={store.lang} 
         />
       )}

@@ -481,6 +481,33 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             </div>
           </OptionRow>
 
+          <OptionRow label={tr('tutorialRestart')} sub={tr('tutorialRestartDesc')}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                className="btn-secondary btn-sm"
+                onClick={() => {
+                  localStorage.removeItem('sounddeck-tutorial-done')
+                  // Forcer le rechargement pour afficher le tutoriel
+                  window.location.reload()
+                }}
+                style={{ fontSize: 12, minHeight: 34, padding: '6px 16px', borderRadius: 'var(--radius-md)' }}
+              >
+                <i className="ti ti-book" /> {tr('tutorialRestart')}
+              </button>
+              <button
+                className="btn-primary btn-sm"
+                onClick={() => {
+                  // Ouvrir le tutoriel avancé
+                  const event = new CustomEvent('open-advanced-tutorial')
+                  window.dispatchEvent(event)
+                }}
+                style={{ fontSize: 12, minHeight: 34, padding: '6px 16px', borderRadius: 'var(--radius-md)' }}
+              >
+                <i className="ti ti-rocket" /> {tr('tutorialAdvanced')}
+              </button>
+            </div>
+          </OptionRow>
+
           <OptionRow label={tr('sidebarCustomization')} sub={tr('sidebarCustomizationDesc')}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>

@@ -172,6 +172,7 @@ export default function Guide({ lang = 'fr' }) {
 
   return (
     <div key={renderKey} style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      {/* Sidebar gauche */}
       <div style={{ width: 220, flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-secondary)' }}>
         <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -210,8 +211,19 @@ export default function Guide({ lang = 'fr' }) {
         </div>
       </div>
 
+      {/* Contenu principal */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* Header avec tutoriels */}
+        <div style={{ 
+          padding: '16px 24px', 
+          borderBottom: '1px solid var(--border)', 
+          flexShrink: 0, 
+          background: 'var(--bg-secondary)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 12,
+          flexWrap: 'wrap'
+        }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: active?.color + '22', border: `2px solid ${active?.color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
             {active?.icon}
           </div>
@@ -221,19 +233,51 @@ export default function Guide({ lang = 'fr' }) {
               {tr('guideStepOf')} {steps.findIndex(s => s.id === activeStep) + 1} / {steps.length}
             </div>
           </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+
+          {/* ✅ Boutons Tutoriels */}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button
+              className="btn-secondary btn-sm"
+              onClick={() => {
+                localStorage.removeItem('sounddeck-tutorial-done')
+                window.location.reload()
+              }}
+              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
+            >
+              <i className="ti ti-book" /> {tr('tutorialRestart')}
+            </button>
+            <button
+              className="btn-primary btn-sm"
+              onClick={() => {
+                const event = new CustomEvent('open-advanced-tutorial')
+                window.dispatchEvent(event)
+              }}
+              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
+            >
+              <i className="ti ti-rocket" /> {tr('tutorialAdvanced')}
+            </button>
+          </div>
+
+          {/* Boutons Précédent/Suivant */}
+          <div style={{ display: 'flex', gap: 6 }}>
             <button className="btn-secondary btn-sm"
               disabled={activeStep === steps[0].id}
-              onClick={() => { const idx = steps.findIndex(s => s.id === activeStep); if (idx > 0) setActiveStep(steps[idx - 1].id) }}>
+              onClick={() => { const idx = steps.findIndex(s => s.id === activeStep); if (idx > 0) setActiveStep(steps[idx - 1].id) }}
+              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
+            >
               <i className="ti ti-arrow-left" /> {tr('guidePrev')}
             </button>
             <button className="btn-primary btn-sm"
               disabled={activeStep === steps[steps.length - 1].id}
-              onClick={() => { const idx = steps.findIndex(s => s.id === activeStep); if (idx < steps.length - 1) setActiveStep(steps[idx + 1].id) }}>
+              onClick={() => { const idx = steps.findIndex(s => s.id === activeStep); if (idx < steps.length - 1) setActiveStep(steps[idx + 1].id) }}
+              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
+            >
               {tr('guideNext')} <i className="ti ti-arrow-right" />
             </button>
           </div>
         </div>
+
+        {/* Contenu */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px', fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.7 }}>
           <div className="fade-in" key={activeStep + lang + renderKey}>
             {renderContent()}
@@ -243,6 +287,8 @@ export default function Guide({ lang = 'fr' }) {
     </div>
   )
 }
+
+// ─── SOUS-COMPOSANTS ──────────────────────────────────────────────────────────
 
 function DownloadCard({ icon, name, desc, url, instructions, lang }) {
   const tr = useTranslation(lang || 'fr')

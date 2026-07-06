@@ -188,6 +188,7 @@ export default function Sidebar({
     if (itemId === 'options') return currentPage === 'options'
     if (itemId === 'library') return currentPage === 'library'
     if (itemId === 'mixer') return currentPage === 'mixer'
+    if (itemId === 'stats') return currentPage === 'stats'
     return false
   }
 
@@ -201,6 +202,7 @@ export default function Sidebar({
     else if (itemId === 'options') onChangePage('options')
     else if (itemId === 'library') onChangePage('library')
     else if (itemId === 'mixer') onChangePage('mixer')
+    else if (itemId === 'stats') onChangePage('stats')
   }
 
   // ✅ Rendre un élément de navigation standard

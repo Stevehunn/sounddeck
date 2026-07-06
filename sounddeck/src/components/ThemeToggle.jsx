@@ -4,17 +4,28 @@ import { useTranslation } from '../i18n'
 export default function ThemeToggle({ currentTheme, onThemeChange, lang = 'fr' }) {
   const tr = useTranslation(lang)
   const [autoTheme, setAutoTheme] = useState(false)
-  
+  const [currentHour, setCurrentHour] = useState(new Date().getHours())
+
   useEffect(() => {
-    // Vérifier si le thème automatique est activé
     const savedAuto = localStorage.getItem('sounddeck-auto-theme') === 'true'
     setAutoTheme(savedAuto)
     
     if (savedAuto) {
       applyAutoTheme()
     }
+
+    // Mettre à jour l'heure toutes les minutes
+    const interval = setInterval(() => {
+      const hour = new Date().getHours()
+      setCurrentHour(hour)
+      if (autoTheme) {
+        applyAutoTheme()
+      }
+    }, 60000)
+
+    return () => clearInterval(interval)
   }, [])
-  
+
   const applyAutoTheme = () => {
     const hour = new Date().getHours()
     const isNight = hour < 6 || hour > 19
@@ -31,13 +42,17 @@ export default function ThemeToggle({ currentTheme, onThemeChange, lang = 'fr' }
       applyAutoTheme()
     }
   }
-  
+
+  const hour = new Date().getHours()
+  const isNight = hour < 6 || hour > 19
+  const timeEmoji = isNight ? '🌙' : '☀️'
+
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
       <button
         onClick={toggleAutoTheme}
         style={{
-          padding: '6px 12px',
+          padding: '6px 14px',
           borderRadius: 8,
           cursor: 'pointer',
           fontSize: 12,
@@ -51,8 +66,19 @@ export default function ThemeToggle({ currentTheme, onThemeChange, lang = 'fr' }
           transition: 'all 0.15s ease'
         }}
       >
-        <i className="ti ti-sun-moon" style={{ fontSize: 14 }} />
+        <span style={{ fontSize: 16 }}>{timeEmoji}</span>
         {autoTheme ? tr('themeAutoOn') : tr('themeAutoOff')}
+        {autoTheme && (
+          <span style={{
+            fontSize: 9,
+            color: 'var(--text-tertiary)',
+            background: 'var(--bg-tertiary)',
+            padding: '0 6px',
+            borderRadius: 10
+          }}>
+            {isNight ? '🌙 Nuit' : '☀️ Jour'}
+          </span>
+        )}
       </button>
     </div>
   )
