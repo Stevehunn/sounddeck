@@ -45,6 +45,8 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
     setPlayingId(sound.id)
   }
 
+  const cardSize = store.cardSize || 'medium'
+
   return (
     <div className="presentation-overlay">
       <div className="presentation-header">
@@ -112,7 +114,11 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
             {tr('noSounds')}
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: `repeat(auto-fill, minmax(${cardSize === 'small' ? 130 : cardSize === 'large' ? 180 : 150}px, 1fr))`, 
+          gap: 12 
+        }}>
           {filtered.map(s => (
             <PresentationCard
               key={s.id}
@@ -120,7 +126,7 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
               shortcut={store.shortcuts[s.id]}
               playing={playingId === s.id}
               onPlay={() => handlePlay(s)}
-              size="normal"
+              size={cardSize}
               lang={lang}
             />
           ))}
@@ -181,9 +187,15 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size, lang }) {
     return () => clearInterval(interval)
   }, [playing, sound.id])
 
-  const isLarge = size === 'large'
-  const cardSize = isLarge ? 140 : 120
-  const emojiSize = isLarge ? 40 : 32
+  const sizeConfigs = {
+    small: { cardSize: 120, emojiSize: 32, nameSize: 11, shortcutSize: 9, gap: 6 },
+    medium: { cardSize: 140, emojiSize: 38, nameSize: 12, shortcutSize: 10, gap: 8 },
+    large: { cardSize: 170, emojiSize: 48, nameSize: 14, shortcutSize: 11, gap: 10 }
+  }
+
+  const config = sizeConfigs[size] || sizeConfigs.medium
+  const cardSize = config.cardSize
+  const emojiSize = config.emojiSize
 
   return (
     <div
@@ -211,7 +223,7 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size, lang }) {
         )}
       </div>
 
-      <div className="name" style={{ fontSize: isLarge ? 13 : 12 }}>
+      <div className="name" style={{ fontSize: config.nameSize }}>
         {sound.name}
       </div>
 
@@ -219,7 +231,7 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size, lang }) {
         <div style={{ display: 'flex', gap: 3, justifyContent: 'center', flexWrap: 'wrap', marginTop: 2 }}>
           {formatShortcut(shortcut).map((key, i) => (
             <kbd key={i} style={{
-              fontSize: isLarge ? 11 : 10,
+              fontSize: config.shortcutSize,
               border: `1px solid ${playing ? 'var(--accent)' : 'var(--border)'}`,
               borderBottom: `2px solid ${playing ? 'var(--accent)' : 'var(--text-tertiary)'}`,
               color: playing ? 'var(--accent)' : 'var(--text-secondary)',

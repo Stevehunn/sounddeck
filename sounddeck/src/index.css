@@ -1209,3 +1209,464 @@ kbd {
   pointer-events: none;
   animation: fadeIn 0.2s ease;
 }
+
+/* ─── TRANSITIONS ───────────────────────────────────────────────────────────── */
+.sidebar,
+.header,
+.search-bar,
+.categories-scroll,
+.favorites-section,
+.sound-grid,
+.sound-card {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+body.focus-mode .sound-grid {
+  animation: fadeIn 0.3s ease;
+}
+
+/* ─── DRAG & DROP ───────────────────────────────────────────────────────────── */
+.dragging {
+  opacity: 0.4;
+  transform: scale(0.95);
+}
+
+.drag-over {
+  border-color: var(--accent) !important;
+  background: rgba(124, 111, 247, 0.08) !important;
+  transform: scale(1.02);
+}
+
+.drag-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  border: 3px dashed var(--accent);
+  background: rgba(124, 111, 247, 0.05);
+  border-radius: var(--radius-lg);
+  animation: pulse-border 1s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% { border-color: var(--accent); opacity: 0.5; }
+  50% { border-color: var(--accent-hover); opacity: 1; }
+}
+
+.drop-indicator {
+  position: absolute;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  animation: slideIn 0.2s ease;
+}
+
+@keyframes slideIn {
+  from { transform: scaleX(0); opacity: 0; }
+  to { transform: scaleX(1); opacity: 1; }
+}
+
+/* ─── SOUND CARD SIZES ─────────────────────────────────────────────────────── */
+.sound-card-small {
+  padding: 6px;
+}
+
+.sound-card-small .preview {
+  font-size: 20px;
+}
+
+.sound-card-small .name {
+  font-size: 9px;
+}
+
+.sound-card-medium {
+  padding: 8px;
+}
+
+.sound-card-medium .preview {
+  font-size: 26px;
+}
+
+.sound-card-medium .name {
+  font-size: 11px;
+}
+
+.sound-card-large {
+  padding: 10px;
+}
+
+.sound-card-large .preview {
+  font-size: 32px;
+}
+
+.sound-card-large .name {
+  font-size: 13px;
+}
+
+/* ─── VOICE CONTROL ────────────────────────────────────────────────────────── */
+.voice-wave {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+  height: 20px;
+}
+
+.voice-wave .bar {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.voice-wave .bar:nth-child(1) { animation: voiceWave 0.5s ease-in-out infinite alternate; }
+.voice-wave .bar:nth-child(2) { animation: voiceWave 0.6s ease-in-out infinite alternate 0.1s; }
+.voice-wave .bar:nth-child(3) { animation: voiceWave 0.7s ease-in-out infinite alternate 0.2s; }
+.voice-wave .bar:nth-child(4) { animation: voiceWave 0.5s ease-in-out infinite alternate 0.3s; }
+.voice-wave .bar:nth-child(5) { animation: voiceWave 0.8s ease-in-out infinite alternate 0.15s; }
+
+@keyframes voiceWave {
+  from { transform: scaleY(0.3); }
+  to { transform: scaleY(1); }
+}
+
+/* ─── AI GENERATOR ──────────────────────────────────────────────────────────── */
+.ai-generator-prompt {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  transition: border-color 0.3s ease;
+}
+
+.ai-generator-prompt:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(124, 111, 247, 0.15);
+}
+
+.ai-generator-result {
+  background: rgba(29, 158, 117, 0.1);
+  border: 1px solid var(--success);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  animation: fadeIn 0.3s ease;
+}
+
+/* ─── AUTO-TAG BUTTON ───────────────────────────────────────────────────────── */
+.auto-tag-btn {
+  transition: all 0.3s ease;
+}
+
+.auto-tag-btn:active {
+  transform: scale(0.95);
+}
+
+.auto-tag-btn .spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* ─── ERROR DIALOG ────────────────────────────────────────────────────────── */
+.error-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s ease;
+}
+
+.error-dialog-content {
+  background: var(--bg-secondary);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-xl);
+}
+
+/* ─── BACKUP LIST ──────────────────────────────────────────────────────────── */
+.backup-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  transition: border-color 0.3s ease;
+}
+
+.backup-item:hover {
+  border-color: var(--accent);
+}
+
+.backup-item .timestamp {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.backup-item .info {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+/* ─── LAZY LOADING ────────────────────────────────────────────────────────── */
+.lazy-loader {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.lazy-loader .spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* ─── FOCUS MODE ────────────────────────────────────────────────────────────── */
+body.focus-mode .sidebar,
+body.focus-mode .presentation-header,
+body.focus-mode .search-bar,
+body.focus-mode .categories-scroll,
+body.focus-mode .favorites-section,
+body.focus-mode .header,
+body.focus-mode .sound-card .header,
+body.focus-mode .sound-card .shortcut-wrapper,
+body.focus-mode .sound-card .play-count,
+body.focus-mode .option-row,
+body.focus-mode .modal-title,
+body.focus-mode .modal-actions,
+body.focus-mode .section-title {
+  display: none !important;
+}
+
+body.focus-mode .sound-grid {
+  padding: 20px;
+  gap: 12px;
+}
+
+body.focus-mode .sound-card {
+  border-radius: var(--radius-lg);
+  border-color: var(--accent) !important;
+}
+
+body.focus-mode .sound-card .name {
+  font-size: 14px;
+}
+
+body.focus-mode .main-content {
+  padding: 0 !important;
+}
+
+body.focus-mode .sound-card .preview {
+  font-size: 40px !important;
+}
+
+/* Transitions */
+.sidebar,
+.header,
+.search-bar,
+.categories-scroll,
+.favorites-section,
+.sound-grid,
+.sound-card {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+body.focus-mode .sound-grid {
+  animation: fadeIn 0.3s ease;
+}
+
+.drag-drop-folder {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transform-origin: center center;
+}
+
+.drag-drop-folder.expanded {
+  transform: scale(1.05);
+  background: rgba(59, 130, 246, 0.05);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+  padding: 16px !important;
+  margin: 8px 0 !important;
+}
+
+.drag-drop-folder.drag-over {
+  border-color: #3b82f6 !important;
+  background: rgba(59, 130, 246, 0.08) !important;
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.2) !important;
+}
+
+.drag-drop-folder .folder-sounds {
+  transition: all 0.3s ease;
+}
+
+.drag-drop-folder.expanded .folder-sounds {
+  gap: 8px;
+}
+
+.drag-drop-folder .drop-indicator {
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.draggable-sound {
+  transition: transform 0.2s ease;
+  cursor: grab;
+}
+
+.draggable-sound:active {
+  cursor: grabbing;
+}
+
+.draggable-sound.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+/* Dans index.css ou App.css */
+
+.draggable-sound {
+  cursor: grab;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.draggable-sound:active {
+  cursor: grabbing;
+}
+
+.draggable-sound.dragging {
+  opacity: 0.4;
+  transform: scale(0.95);
+}
+
+.drag-drop-folder {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.drag-drop-folder.drag-over {
+  border-color: var(--accent) !important;
+  background: rgba(124, 111, 247, 0.05) !important;
+  box-shadow: 0 0 40px rgba(124, 111, 247, 0.15) !important;
+}
+
+.drag-drop-folder.expanded {
+  transform: scale(1.02);
+  background: rgba(124, 111, 247, 0.03);
+  padding: 4px !important;
+  margin: 4px 0 !important;
+}
+
+.drag-drop-folder .folder-content {
+  transition: all 0.3s ease;
+}
+
+/* Animation de pulsation pour l'indicateur de drop */
+@keyframes dropPulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+.drag-drop-folder.drag-over .drop-indicator {
+  animation: dropPulse 1s ease-in-out infinite;
+}
+
+@keyframes dropPulse {
+  0%, 100% { 
+    opacity: 0.8; 
+    transform: scale(1); 
+  }
+  50% { 
+    opacity: 1; 
+    transform: scale(1.03); 
+  }
+}
+
+/* Effet d'agrandissement des dossiers - UNIQUEMENT pendant le drag */
+.drag-drop-folder {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center center;
+}
+
+.drag-drop-folder.drag-over {
+  border-color: var(--accent) !important;
+  background: rgba(124, 111, 247, 0.05) !important;
+  box-shadow: 0 0 40px rgba(124, 111, 247, 0.12) !important;
+}
+
+.drag-drop-folder.folder-drag-expanded {
+  transform: scale(1.04) !important;
+  background: rgba(124, 111, 247, 0.04) !important;
+  padding: 8px !important;
+  margin: 4px 0 !important;
+  min-height: 80px !important;
+}
+
+.drag-drop-folder .folder-content {
+  transition: all 0.3s ease;
+}
+
+/* Overlay d'indicateur de drop */
+.drop-indicator-overlay {
+  animation: fadeInOverlay 0.2s ease;
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Effet de survol sur les éléments du dossier */
+.drag-drop-folder .folder-item {
+  transition: all 0.15s ease;
+}
+
+.drag-drop-folder .folder-item:hover {
+  transform: translateX(4px);
+}
+
+@keyframes dropPulse {
+  0%, 100% { 
+    opacity: 0.8; 
+    transform: scale(1); 
+  }
+  50% { 
+    opacity: 1; 
+    transform: scale(1.03); 
+  }
+}
+
+.drag-drop-folder {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center center;
+}
+
+.drag-drop-folder.drag-over {
+  border-color: var(--accent) !important;
+  background: rgba(124, 111, 247, 0.05) !important;
+  box-shadow: 0 0 40px rgba(124, 111, 247, 0.12) !important;
+}
+
+.drag-drop-folder.folder-drag-expanded {
+  transform: scale(1.04) !important;
+  background: rgba(124, 111, 247, 0.04) !important;
+  padding: 8px !important;
+  margin: 4px 0 !important;
+  min-height: 80px !important;
+}
+
+.drop-indicator-overlay {
+  animation: fadeInOverlay 0.2s ease;
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

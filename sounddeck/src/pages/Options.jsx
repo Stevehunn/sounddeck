@@ -2,6 +2,9 @@ import { useState, useEffect, useRef, forwardRef, useCallback } from 'react'
 import ShortcutRecorder from '../components/ShortcutRecorder'
 import CustomThemeEditor from '../components/CustomThemeEditor'
 import SidebarEditor from '../components/SidebarEditor'
+import OBSControl from '../components/OBSControl'
+import TwitchAlerts from '../components/TwitchAlerts'
+import BackupSettings from '../components/BackupSettings'
 import { LANGUAGES, useTranslation } from '../i18n'
 import { getMicrophoneStatus, getMixerStats, testMicrophoneOnce, connectMixerToOutput } from '../utils/audioMixer'
 import KeyboardVisualizer from '../components/KeyboardVisualizer'
@@ -10,6 +13,8 @@ const SECTIONS = [
   { id: 'appearance', icon: 'ti-palette', labelKey: 'optionsAppearance' },
   { id: 'audio', icon: 'ti-volume', labelKey: 'optionsAudio' },
   { id: 'shortcuts', icon: 'ti-keyboard', labelKey: 'optionsShortcuts' },
+  { id: 'integrations', icon: 'ti-plug', labelKey: 'integrations' },
+  { id: 'performance', icon: 'ti-gauge', labelKey: 'performance' },
   { id: 'backup', icon: 'ti-cloud', labelKey: 'optionsBackup' },
   { id: 'profiles', icon: 'ti-users', labelKey: 'optionsProfiles' },
 ]
@@ -271,7 +276,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
     }
   }
 
-  // ✅ Fonction de réinitialisation de la sidebar qui force la mise à jour du store
+  // ✅ Fonction de réinitialisation de la sidebar
   const handleResetSidebar = useCallback(async () => {
     if (confirm(tr('sidebarEditorResetConfirm'))) {
       await store.resetSidebarConfig()
@@ -285,11 +290,9 @@ export default function Options({ store, addToast, lang = 'fr' }) {
     
     let newFixed
     if (currentFixed.includes(sectionKey)) {
-      // Retirer la section des fixes
       newFixed = currentFixed.filter(s => s !== sectionKey)
       addToast(`Section "${sectionKey}" déverrouillée`, 'info')
     } else {
-      // Ajouter la section aux fixes (max 2)
       if (currentFixed.length >= 2) {
         addToast('Maximum 2 sections fixes', 'warning')
         return
@@ -298,7 +301,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
       addToast(`Section "${sectionKey}" verrouillée`, 'success')
     }
     
-    // Mettre à jour la config
     store.updateSidebarConfig({
       ...store.sidebarConfig,
       fixedSections: newFixed
@@ -432,6 +434,52 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               }}
             />
           )}
+
+          {/* Étape 1 : Taille des cartes */}
+          <OptionRow label={tr('cardSize')} sub={tr('cardSizeDesc')}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {[
+                { val: 'small', label: tr('cardSizeSmall'), icon: 'ti-layout-grid' },
+                { val: 'medium', label: tr('cardSizeMedium'), icon: 'ti-layout-grid' },
+                { val: 'large', label: tr('cardSizeLarge'), icon: 'ti-layout-grid' },
+              ].map(({ val, label, icon }) => (
+                <button
+                  key={val}
+                  onClick={() => store.updateCardSize(val)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    border: `2px solid ${store.cardSize === val ? 'var(--accent)' : 'var(--border)'}`,
+                    background: store.cardSize === val ? 'var(--accent-light)' : 'var(--bg-tertiary)',
+                    color: store.cardSize === val ? 'var(--accent)' : 'var(--text-secondary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontWeight: store.cardSize === val ? 600 : 400,
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={e => {
+                    if (store.cardSize !== val) {
+                      e.currentTarget.style.borderColor = 'var(--accent)'
+                      e.currentTarget.style.color = 'var(--text-primary)'
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (store.cardSize !== val) {
+                      e.currentTarget.style.borderColor = 'var(--border)'
+                      e.currentTarget.style.color = 'var(--text-secondary)'
+                    }
+                  }}
+                >
+                  <i className={icon} style={{ fontSize: 14 }} />
+                  {label}
+                  {store.cardSize === val && <i className="ti ti-check" style={{ fontSize: 11 }} />}
+                </button>
+              ))}
+            </div>
+          </OptionRow>
 
           <OptionRow label={tr('sidebarCustomization')} sub={tr('sidebarCustomizationDesc')}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1104,6 +1152,169 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
             {tr('shortcutsPerSoundNote')}
           </div>
+        </Section>
+
+        {/* Section Intégrations - Étape 6 */}
+        <Section 
+          ref={el => sectionRefs.current['integrations'] = el}
+          id="integrations"
+          title={tr('integrations')} 
+          icon="ti-plug"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <OBSControl lang={lang} />
+            <TwitchAlerts store={store} addToast={addToast} lang={lang} />
+            
+            {/* ⚠️ Stream Deck - Commenté car la dépendance n'existe pas */}
+            {/*
+            <div style={{
+              padding: '12px',
+              background: 'var(--bg-secondary)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border)'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="ti ti-device-desktop" style={{ color: 'var(--accent)' }} />
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>
+                    {tr('streamDeck')}
+                  </span>
+                  <span style={{
+                    fontSize: 10,
+                    color: 'var(--text-tertiary)',
+                    background: 'var(--bg-tertiary)',
+                    padding: '2px 8px',
+                    borderRadius: 10
+                  }}>
+                    {tr('beta')}
+                  </span>
+                </div>
+                <button
+                  className="btn-secondary btn-sm"
+                  onClick={async () => {
+                    const { detectStreamDecks } = await import('../utils/streamDeckIntegration')
+                    const result = await detectStreamDecks()
+                    if (result.success) {
+                      addToast(`${result.devices.length} Stream Deck(s) détecté(s)`, 'success')
+                    } else {
+                      addToast('Aucun Stream Deck détecté', 'info')
+                    }
+                  }}
+                >
+                  <i className="ti ti-search" /> {tr('detect')}
+                </button>
+              </div>
+              <div style={{
+                marginTop: 8,
+                fontSize: 11,
+                color: 'var(--text-tertiary)'
+              }}>
+                {tr('streamDeckDesc')}
+              </div>
+            </div>
+            */}
+          </div>
+        </Section>
+
+        {/* Section Performance - Étape 7 */}
+        <Section 
+          ref={el => sectionRefs.current['performance'] = el}
+          id="performance"
+          title={tr('performance')} 
+          icon="ti-gauge"
+        >
+          <OptionRow label={tr('autoBackup')} sub={tr('autoBackupDesc')}>
+            <Toggle 
+              value={store.autoBackupEnabled || false}
+              onChange={async (val) => {
+                await store.updateAutoBackupEnabled(val)
+                if (val) {
+                  const { initBackupManager } = await import('../utils/backupManager')
+                  initBackupManager(store)
+                  addToast(tr('autoBackupEnabled'), 'success')
+                } else {
+                  const { stopAutoBackup } = await import('../utils/backupManager')
+                  stopAutoBackup()
+                  addToast(tr('autoBackupDisabled'), 'info')
+                }
+              }}
+            />
+          </OptionRow>
+
+          <OptionRow label={tr('backupInterval')} sub={tr('backupIntervalDesc')}>
+            <select 
+              value={store.backupInterval || 5}
+              onChange={async (e) => {
+                const val = Number(e.target.value)
+                await store.updateBackupInterval(val)
+                if (store.autoBackupEnabled) {
+                  const { stopAutoBackup, startAutoBackup } = await import('../utils/backupManager')
+                  stopAutoBackup()
+                  startAutoBackup(store)
+                }
+                addToast(`${tr('backupIntervalChanged')} ${val} ${tr('minutes')}`, 'info')
+              }}
+              style={{ width: 120, fontSize: 12 }}
+            >
+              <option value="1">1 {tr('minute')}</option>
+              <option value="5">5 {tr('minutes')}</option>
+              <option value="15">15 {tr('minutes')}</option>
+              <option value="30">30 {tr('minutes')}</option>
+              <option value="60">60 {tr('minutes')}</option>
+            </select>
+          </OptionRow>
+
+          <OptionRow label={tr('lazyLoading')} sub={tr('lazyLoadingDesc')}>
+            <Toggle 
+              value={store.lazyLoadingEnabled || true}
+              onChange={async (val) => {
+                await store.updateLazyLoadingEnabled(val)
+                addToast(val ? tr('lazyLoadingEnabled') : tr('lazyLoadingDisabled'), 'info')
+              }}
+            />
+          </OptionRow>
+
+          <OptionRow label={tr('errorLogs')} sub={tr('errorLogsDesc')}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button 
+                className="btn-secondary btn-sm"
+                onClick={async () => {
+                  const logs = await window.electronAPI.storeGet('errorLogs') || []
+                  if (logs.length === 0) {
+                    addToast('Aucun log d\'erreur', 'info')
+                  } else {
+                    const json = JSON.stringify(logs, null, 2)
+                    const blob = new Blob([json], { type: 'application/json' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `error-logs-${new Date().toISOString().slice(0,10)}.json`
+                    a.click()
+                    URL.revokeObjectURL(url)
+                  }
+                }}
+              >
+                <i className="ti ti-file-text" /> {tr('exportLogs')}
+              </button>
+              <button 
+                className="btn-danger btn-sm"
+                onClick={async () => {
+                  if (confirm(tr('clearLogsConfirm'))) {
+                    await window.electronAPI.storeDelete('errorLogs')
+                    addToast(tr('logsCleared'), 'info')
+                  }
+                }}
+              >
+                <i className="ti ti-trash" /> {tr('clearLogs')}
+              </button>
+            </div>
+          </OptionRow>
+
+          <BackupSettings store={store} addToast={addToast} lang={lang} />
         </Section>
 
         {/* Section Sauvegarde */}

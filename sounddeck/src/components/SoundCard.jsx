@@ -43,7 +43,13 @@ export default function SoundCard({
   draggable = true, 
   layout = 'qwerty',
   onChangeImage,
-  onChangeEmoji
+  onChangeEmoji,
+  // Étape 2 : Tags
+  tags = [],
+  onAddTag,
+  onRemoveTag,
+  // Étape 1 : Taille des cartes
+  size = 'medium'
 }) {
   const tr = useTranslation(lang)
   const [playing, setPlaying] = useState(false)
@@ -53,6 +59,10 @@ export default function SoundCard({
   const [nameValue, setNameValue] = useState(sound.name)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [emojiPickerPosition, setEmojiPickerPosition] = useState({ top: 0, left: 0 })
+  
+  // ⚠️ AJOUT : États pour les tags
+  const [showTagInput, setShowTagInput] = useState(false)
+  const [newTagValue, setNewTagValue] = useState('')
   
   const initialVolume = sound.volumeDb !== undefined ? sound.volumeDb : convertOldVolumeToDb(sound.volume)
   const [localVolume, setLocalVolume] = useState(initialVolume)
@@ -66,6 +76,14 @@ export default function SoundCard({
   const cardRef = useRef(null)
   const buttonRef = useRef(null)
   const menuRef = useRef(null)
+
+  // Étape 1 : Tailles des cartes
+  const cardSizes = {
+    small: { padding: 6, fontSize: 9, emojiSize: 20, nameSize: 10 },
+    medium: { padding: 8, fontSize: 11, emojiSize: 26, nameSize: 11 },
+    large: { padding: 10, fontSize: 13, emojiSize: 32, nameSize: 13 }
+  }
+  const sizeConfig = cardSizes[size] || cardSizes.medium
 
   useEffect(() => { 
     const newVolume = sound.volumeDb !== undefined ? sound.volumeDb : convertOldVolumeToDb(sound.volume)
@@ -264,18 +282,23 @@ export default function SoundCard({
         draggable={draggable && !isDraggingVolume && !showVolume}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        data-sound-id={sound.id}
+        className={`sound-card sound-card-${size}`}
         style={{
           background: 'var(--bg-secondary)',
           border: `1px solid ${fileError ? 'var(--danger)' : playing ? (loopEnabled ? 'var(--success)' : 'var(--accent)') : 'var(--border)'}`,
-          borderRadius: 'var(--radius-md)', padding: 8, position: 'relative',
-          transition: 'border-color 0.15s',
+          borderRadius: 'var(--radius-md)',
+          padding: sizeConfig.padding,
+          position: 'relative',
+          transition: 'border-color 0.15s, transform 0.15s ease, box-shadow 0.15s ease',
           cursor: draggable && !isDraggingVolume && !showVolume ? 'grab' : 'default',
-          userSelect: isDraggingVolume || showVolume ? 'none' : 'auto'
+          userSelect: isDraggingVolume || showVolume ? 'none' : 'auto',
+          boxShadow: playing ? '0 0 20px rgba(124,111,247,0.15)' : 'none'
         }} 
         className={playing ? 'playing-pulse' : ''}
       >
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <button onClick={e => { e.stopPropagation(); onToggleFavorite(sound.id) }}
             style={{
               background: isFavorite ? 'rgba(239,159,39,0.15)' : 'var(--bg-tertiary)',
@@ -307,7 +330,7 @@ export default function SoundCard({
           style={{
             width: '100%', aspectRatio: '1', background: 'var(--bg-tertiary)',
             borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 26, marginBottom: 7, position: 'relative', overflow: 'hidden', cursor: 'pointer'
+            fontSize: sizeConfig.emojiSize, marginBottom: 4, position: 'relative', overflow: 'hidden', cursor: 'pointer'
           }}
           onMouseEnter={e => { const o = e.currentTarget.querySelector('.play-overlay'); if (o) o.style.opacity = 1 }}
           onMouseLeave={e => { const o = e.currentTarget.querySelector('.play-overlay'); if (o && !playing) o.style.opacity = 0 }}
@@ -320,7 +343,7 @@ export default function SoundCard({
             />
           )}
           {!showImage && (
-            <span style={{ fontSize: 26 }}>{sound.emoji || '🔊'}</span>
+            <span style={{ fontSize: sizeConfig.emojiSize }}>{sound.emoji || '🔊'}</span>
           )}
           <div className="play-overlay" style={{
             position: 'absolute', inset: 0,
@@ -330,7 +353,7 @@ export default function SoundCard({
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             opacity: playing ? 1 : 0, transition: 'opacity 0.15s, background 0.15s', borderRadius: 8
           }}>
-            <i className={`ti ${playing ? 'ti-player-stop-filled' : 'ti-player-play-filled'}`} style={{ fontSize: 26, color: 'white' }} />
+            <i className={`ti ${playing ? 'ti-player-stop-filled' : 'ti-player-play-filled'}`} style={{ fontSize: sizeConfig.emojiSize, color: 'white' }} />
             {playing && loopEnabled && (
               <i className="ti ti-repeat" style={{ position: 'absolute', bottom: 4, right: 4, fontSize: 12, color: 'white', opacity: 0.8 }} />
             )}
@@ -341,11 +364,177 @@ export default function SoundCard({
           <input autoFocus value={nameValue} onChange={e => setNameValue(e.target.value)}
             onBlur={handleRename}
             onKeyDown={e => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setEditingName(false) }}
-            style={{ fontSize: 11, padding: '3px 6px', marginBottom: 4 }}
+            style={{ fontSize: sizeConfig.nameSize, padding: '3px 6px', marginBottom: 2 }}
             onClick={e => e.stopPropagation()} />
         ) : (
-          <div style={{ fontSize: 11, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 5 }}>
+          <div style={{ 
+            fontSize: sizeConfig.nameSize, 
+            fontWeight: 500, 
+            overflow: 'hidden', 
+            textOverflow: 'ellipsis', 
+            whiteSpace: 'nowrap', 
+            marginBottom: 2,
+            textAlign: 'center'
+          }}>
             {sound.name}
+          </div>
+        )}
+
+        {/* Étape 2 : Tags - Version avec input inline */}
+        {tags.length > 0 && (
+          <div style={{ 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: 3, 
+            marginTop: 2,
+            justifyContent: 'center'
+          }}>
+            {tags.map(tag => (
+              <span
+                key={tag}
+                style={{
+                  fontSize: 8,
+                  padding: '1px 6px',
+                  borderRadius: 10,
+                  background: 'var(--accent-light)',
+                  color: 'var(--accent)',
+                  border: '1px solid var(--accent)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRemoveTag?.(sound.id, tag)
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(224,82,82,0.15)'
+                  e.currentTarget.style.color = 'var(--danger)'
+                  e.currentTarget.style.borderColor = 'var(--danger)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'var(--accent-light)'
+                  e.currentTarget.style.color = 'var(--accent)'
+                  e.currentTarget.style.borderColor = 'var(--accent)'
+                }}
+              >
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Bouton Ajouter un tag avec input inline */}
+        {onAddTag && (
+          <div style={{ position: 'relative', display: 'inline-flex', justifyContent: 'center', marginTop: 2 }}>
+            {showTagInput ? (
+              <div style={{
+                display: 'flex',
+                gap: 4,
+                alignItems: 'center',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--accent)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '2px 4px',
+                width: '100%'
+              }} onClick={e => e.stopPropagation()}>
+                <input
+                  autoFocus
+                  value={newTagValue}
+                  onChange={e => setNewTagValue(e.target.value)}
+                  placeholder="Tag..."
+                  style={{
+                    flex: 1,
+                    fontSize: 9,
+                    padding: '2px 6px',
+                    minHeight: 20,
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-primary)',
+                    width: '100%'
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && newTagValue.trim()) {
+                      onAddTag(sound.id, newTagValue.trim().toLowerCase())
+                      setNewTagValue('')
+                      setShowTagInput(false)
+                    }
+                    if (e.key === 'Escape') {
+                      setShowTagInput(false)
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    if (newTagValue.trim()) {
+                      onAddTag(sound.id, newTagValue.trim().toLowerCase())
+                      setNewTagValue('')
+                      setShowTagInput(false)
+                    }
+                  }}
+                  className="btn-primary btn-sm"
+                  style={{
+                    padding: '1px 6px',
+                    fontSize: 9,
+                    borderRadius: 'var(--radius-sm)',
+                    minHeight: 20,
+                    minWidth: 20
+                  }}
+                >
+                  <i className="ti ti-check" style={{ fontSize: 10 }} />
+                </button>
+                <button
+                  onClick={() => setShowTagInput(false)}
+                  className="btn-secondary btn-sm"
+                  style={{
+                    padding: '1px 6px',
+                    fontSize: 9,
+                    borderRadius: 'var(--radius-sm)',
+                    minHeight: 20,
+                    minWidth: 20
+                  }}
+                >
+                  <i className="ti ti-x" style={{ fontSize: 10 }} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowTagInput(true)
+                  // Utiliser une référence ou un timeout plus court
+                  setTimeout(() => {
+                    // Chercher l'input dans le DOM après le rendu
+                    const input = document.querySelector('.tag-input-inline')
+                    if (input) input.focus()
+                  }, 10)
+                }}
+                style={{
+                  fontSize: 8,
+                  padding: '1px 6px',
+                  borderRadius: 10,
+                  background: 'var(--bg-tertiary)',
+                  color: 'var(--text-tertiary)',
+                  border: '1px dashed var(--border)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={e => {
+                  if (e.currentTarget) {
+                    e.currentTarget.style.borderColor = 'var(--accent)'
+                    e.currentTarget.style.color = 'var(--accent)'
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (e.currentTarget) {
+                    e.currentTarget.style.borderColor = 'var(--border)'
+                    e.currentTarget.style.color = 'var(--text-tertiary)'
+                  }
+                }}
+              >
+                + Tag
+              </button>
+            )}
           </div>
         )}
 
@@ -380,7 +569,7 @@ export default function SoundCard({
           </div>
         )}
         {sound.playCount > 0 && (
-          <div style={{ fontSize: 9, color: 'var(--text-tertiary)', textAlign: 'center', marginTop: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+          <div style={{ fontSize: 8, color: 'var(--text-tertiary)', textAlign: 'center', marginTop: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
             <i className="ti ti-player-play" style={{ fontSize: 8 }} />
             {sound.playCount} {tr('playCount')}
           </div>

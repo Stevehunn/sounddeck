@@ -57,7 +57,6 @@ export default function App() {
   useEffect(() => {
     if (store.loading) return
     
-    // Attendre 500ms pour que l'application soit stable
     const timer = setTimeout(() => {
       console.log('🔥 Démarrage du préchauffage audio...')
       warmupAudioContext()
@@ -73,6 +72,30 @@ export default function App() {
   useEffect(() => { audioDeviceRef.current = store.audioDevice }, [store.audioDevice])
   useEffect(() => { volumeRef.current = store.volume }, [store.volume])
   useEffect(() => { setPresentationRef.current = setPresentationMode }, [setPresentationMode])
+
+  // ✅ FOCUS MODE - Restauration et raccourci clavier
+  useEffect(() => {
+    // Restaurer l'état du focus mode au chargement
+    const savedFocus = localStorage.getItem('sounddeck-focus-mode')
+    if (savedFocus === 'true') {
+      document.body.classList.add('focus-mode')
+    }
+
+    const handleKeyDown = (e) => {
+      // Ctrl+Shift+F pour basculer le mode focus
+      if (e.ctrlKey && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+        e.preventDefault()
+        document.body.classList.toggle('focus-mode')
+        const isFocus = document.body.classList.contains('focus-mode')
+        localStorage.setItem('sounddeck-focus-mode', isFocus ? 'true' : 'false')
+        addToast(isFocus ? 'Focus Mode activé' : 'Focus Mode désactivé', 'info')
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Appliquer le thème
   useEffect(() => {

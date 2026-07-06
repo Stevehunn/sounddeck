@@ -263,19 +263,51 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
 
   useEffect(() => () => stopSequence(), [stopSequence])
 
+  // ─── DRAG & DROP AMÉLIORÉ ──────────────────────────────────────────────────
   const handleDragStart = (e, idx) => {
+    e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', String(idx))
+    // Ajouter un délai pour l'effet visuel
+    setTimeout(() => {
+      if (e.target) {
+        e.target.style.opacity = '0.4'
+        e.target.classList.add('dragging')
+      }
+    }, 0)
+  }
+
+  const handleDragEnd = (e) => {
+    if (e.target) {
+      e.target.style.opacity = '1'
+      e.target.classList.remove('dragging')
+    }
+    setDragOverIdx(null)
+  }
+
+  const handleDragOver = (e, idx) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverIdx(idx)
+  }
+
+  const handleDragLeave = () => {
+    setDragOverIdx(null)
   }
 
   const handleDrop = (e, toIdx) => {
     e.preventDefault()
     const fromIdx = parseInt(e.dataTransfer.getData('text/plain'))
-    if (fromIdx === toIdx) return
+    if (isNaN(fromIdx) || fromIdx === toIdx) {
+      setDragOverIdx(null)
+      return
+    }
+    
     const updated = [...items]
     const [moved] = updated.splice(fromIdx, 1)
     updated.splice(toIdx, 0, moved)
     setDragOverIdx(null)
     saveItems(updated)
+    addToast(tr('soundMoved'), 'success')
   }
 
   const updateItem = (idx, changes) => {
@@ -458,18 +490,49 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
         {items.map((item, idx) => {
           const sound = sounds.find(s => s.id === item.soundId)
           const isActive = currentIdx === idx && playing
+          const isDragOver = dragOverIdx === idx
+          
           return (
-            <div key={item.id}
+            <div 
+              key={item.id}
               draggable
-              onDragStart={e => handleDragStart(e, idx)}
-              onDragOver={e => { e.preventDefault(); setDragOverIdx(idx) }}
-              onDragLeave={() => setDragOverIdx(null)}
-              onDrop={e => handleDrop(e, idx)}
-              className={`sequencer-item ${isActive ? 'active' : ''} ${dragOverIdx === idx ? 'drag-over' : ''}`}
-              style={{ borderRadius: 'var(--radius-md)' }}
+              onDragStart={(e) => handleDragStart(e, idx)}
+              onDragEnd={handleDragEnd}
+              onDragOver={(e) => handleDragOver(e, idx)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, idx)}
+              className={`sequencer-item ${isActive ? 'active' : ''} ${isDragOver ? 'drag-over' : ''}`}
+              style={{ 
+                borderRadius: 'var(--radius-md)',
+                transform: isDragOver ? 'scale(1.02)' : 'scale(1)',
+                transition: 'transform 0.15s ease, background 0.15s ease, border-color 0.15s ease',
+                cursor: 'grab',
+                border: isDragOver ? '2px solid var(--accent)' : '1px solid var(--border)',
+                background: isDragOver ? 'rgba(124,111,247,0.08)' : isActive ? 'var(--accent-light)' : 'var(--bg-secondary)',
+                boxShadow: isDragOver ? '0 0 20px rgba(124,111,247,0.15)' : 'none',
+                position: 'relative',
+                zIndex: isDragOver ? 10 : 1
+              }}
             >
+              {/* Indicateur de drop */}
+              {isDragOver && (
+                <div style={{
+                  position: 'absolute',
+                  top: -2,
+                  left: 4,
+                  right: 4,
+                  height: 3,
+                  background: 'var(--accent)',
+                  borderRadius: 2,
+                  pointerEvents: 'none',
+                  zIndex: 5,
+                  animation: 'slideIn 0.2s ease',
+                  boxShadow: '0 0 10px var(--accent)'
+                }} />
+              )}
+
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-tertiary)', fontSize: 12, flexShrink: 0 }}>
-                <i className="ti ti-grip-vertical" />
+                <i className="ti ti-grip-vertical" style={{ opacity: 0.4 }} />
                 <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 600, color: isActive ? 'var(--accent)' : 'var(--text-tertiary)' }}>
                   {idx + 1}
                 </span>
@@ -519,7 +582,6 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
                 </div>
               </div>
 
-              {/* ✅ Bouton poubelle rouge au survol */}
               <button 
                 onClick={() => removeItem(idx)}
                 className="btn-ghost btn-sm"
@@ -559,6 +621,10 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
 
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes slideIn {
+          from { transform: scaleX(0); opacity: 0; }
+          to { transform: scaleX(1); opacity: 1; }
+        }
       `}</style>
     </div>
   )

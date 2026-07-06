@@ -69,6 +69,17 @@ export function useStore() {
   const [keyboardLayout, setKeyboardLayout] = useState('qwerty')
   const [lowLatencyMode, setLowLatencyMode] = useState(false)
 
+  // ─── Étape 1 : Taille des cartes ──────────────────────────────────────────
+  const [cardSize, setCardSize] = useState('medium') // 'small' | 'medium' | 'large'
+
+  // ─── Étape 2 : Tags ──────────────────────────────────────────────────────
+  const [tags, setTags] = useState({}) // { soundId: ['tag1', 'tag2'] }
+
+  // ─── Étape 7 : Performance ─────────────────────────────────────────────────
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState(true)
+  const [backupInterval, setBackupInterval] = useState(5) // minutes
+  const [lazyLoadingEnabled, setLazyLoadingEnabled] = useState(true)
+
   // ─── SIDEBAR CONFIG ──────────────────────────────────────────────────────────
   const [sidebarConfig, setSidebarConfig] = useState(null)
   const [sidebarEditMode, setSidebarEditMode] = useState(false)
@@ -139,6 +150,22 @@ export function useStore() {
 
         const savedLowLatencyMode = await window.electronAPI.storeGet('lowLatencyMode') ?? false
         setLowLatencyMode(savedLowLatencyMode)
+
+        // ─── Étape 1 : Chargement de la taille des cartes ──────────────────
+        const savedCardSize = await window.electronAPI.storeGet('cardSize') || 'medium'
+        setCardSize(savedCardSize)
+
+        // ─── Étape 2 : Chargement des tags ─────────────────────────────────
+        const savedTags = await window.electronAPI.storeGet('tags') || {}
+        setTags(savedTags)
+
+        // ─── Étape 7 : Chargement des options de performance ──────────────
+        const savedAutoBackup = await window.electronAPI.storeGet('autoBackupEnabled') ?? true
+        const savedBackupInterval = await window.electronAPI.storeGet('backupInterval') ?? 5
+        const savedLazyLoading = await window.electronAPI.storeGet('lazyLoadingEnabled') ?? true
+        setAutoBackupEnabled(savedAutoBackup)
+        setBackupInterval(savedBackupInterval)
+        setLazyLoadingEnabled(savedLazyLoading)
 
         // ─── LANGUE ────────────────────────────────────────────────────────────
         const savedLang = await window.electronAPI.storeGet('lang')
@@ -290,7 +317,7 @@ export function useStore() {
           const defaultConfig = {
             mode: 'default',
             items: defaultItems,
-            sectionOrder: ['pinned', 'profiles', 'navigation', 'actions', 'footer'] // ← Modifier l'ordre
+            sectionOrder: ['pinned', 'profiles', 'navigation', 'actions', 'footer']
           }
           
           setSidebarConfig(defaultConfig)
@@ -316,24 +343,19 @@ export function useStore() {
   }, [])
 
   // ─── SYNC PROFILS VERS SIDEBAR ──────────────────────────────────────────────
-  // ✅ DÉCLARER syncProfilesToSidebar AVANT de l'utiliser dans les autres fonctions
 
   const syncProfilesToSidebar = useCallback(async (profileList) => {
     const currentConfig = sidebarConfig || DEFAULT_SIDEBAR_CONFIG
     
-    // Récupérer tous les profils (y compris "all")
     const allProfiles = [{ id: 'all', name: 'Tous les sons', isDefault: true }, ...(profileList || [])]
     
-    // Créer la nouvelle liste d'items
     let newItems = [...(currentConfig.items || [])]
     
-    // Ajouter ou mettre à jour les profils
     allProfiles.forEach(profile => {
       const profileId = `profile-${profile.id}`
       const existingIndex = newItems.findIndex(item => item.id === profileId)
       
       if (existingIndex === -1) {
-        // Profil manquant, l'ajouter
         newItems.push({
           id: profileId,
           group: 'profiles',
@@ -347,12 +369,10 @@ export function useStore() {
           isDefaultProfile: profile.id === 'all'
         })
       } else {
-        // Profil existant, mettre à jour le nom
         newItems[existingIndex].label = profile.name
       }
     })
     
-    // Supprimer les profils qui n'existent plus
     const currentProfileIds = new Set(allProfiles.map(p => `profile-${p.id}`))
     newItems = newItems.filter(item => {
       if (item.id.startsWith('profile-')) {
@@ -361,7 +381,6 @@ export function useStore() {
       return true
     })
     
-    // Mettre à jour la config
     const updatedConfig = {
       ...currentConfig,
       items: newItems
@@ -374,7 +393,7 @@ export function useStore() {
     return updatedConfig
   }, [sidebarConfig, save])
 
-  // ─── Sauvegarde périphérique audio local ──────────────────────────────────────────────────────────────────
+  // ─── Sauvegarde périphérique audio local ───────────────────────────────────
   const updateLocalAudioDevice = useCallback(async (deviceId) => {
     setLocalAudioDevice(deviceId)
     await save('localAudioDevice', deviceId)
@@ -388,7 +407,6 @@ export function useStore() {
     const userProfiles = updated.filter(p => p.id !== 'all')
     await save('profiles', userProfiles)
     
-    // ✅ Ajouter le nouveau profil à la sidebar
     await syncProfilesToSidebar(updated.filter(p => p.id !== 'all'))
     
     return newProfile
@@ -411,7 +429,6 @@ export function useStore() {
     await save('soundOrder', updatedOrder)
     if (currentProfileId === profileId) setCurrentProfileId('all')
     
-    // ✅ Supprimer le profil de la sidebar
     await syncProfilesToSidebar(updated.filter(p => p.id !== 'all'))
   }, [profiles, sounds, currentProfileId, save, soundOrder, syncProfilesToSidebar])
 
@@ -420,7 +437,6 @@ export function useStore() {
     setProfiles(updated)
     await save('profiles', updated.filter(p => p.id !== 'all'))
     
-    // ✅ Mettre à jour le nom du profil dans la sidebar
     await syncProfilesToSidebar(updated.filter(p => p.id !== 'all'))
   }, [profiles, save, syncProfilesToSidebar])
 
@@ -435,7 +451,6 @@ export function useStore() {
     await switchProfile(next.id)
   }, [profiles, currentProfileId, switchProfile])
 
-  // ─── Réorganisation des profils ──────────────────────────────────────────────
   const reorderProfiles = useCallback(async (startIndex, endIndex) => {
     const userProfiles = profiles.filter(p => p.id !== 'all')
 
@@ -455,7 +470,6 @@ export function useStore() {
     setProfiles(newProfiles)
     await save('profiles', reordered)
     
-    // ✅ Mettre à jour l'ordre des profils dans la sidebar
     await syncProfilesToSidebar(reordered)
     
     return true
@@ -597,7 +611,6 @@ export function useStore() {
     setOrderVersion(prev => prev + 1)
   }, [sounds, save, soundOrder])
 
-  // ─── Réorganisation des sons ──────────────────────────────────────────────
   const reorderSounds = useCallback(async (startIndex, endIndex) => {
     const profileId = currentProfileId || 'all'
     const currentOrder = soundOrder[profileId] || []
@@ -670,7 +683,6 @@ export function useStore() {
     await window.electronAPI.updateLoopShortcut(accelerator)
   }, [save])
 
-  // ─── Raccourcis globaux (toggle) ──────────────────────────────────────────
   const toggleGlobalShortcuts = useCallback(async () => {
     const newState = await window.electronAPI.toggleGlobalShortcuts()
     setShortcutsEnabled(newState)
@@ -756,6 +768,49 @@ export function useStore() {
     await save('keyboardLayout', layout)
   }, [save])
 
+  // ─── Étape 1 : Mise à jour de la taille des cartes ─────────────────────
+  const updateCardSize = useCallback(async (size) => {
+    setCardSize(size)
+    await save('cardSize', size)
+  }, [save])
+
+  // ─── Étape 2 : Gestion des tags ──────────────────────────────────────────
+  const addTagToSound = useCallback(async (soundId, tag) => {
+    const currentTags = tags[soundId] || []
+    if (currentTags.includes(tag)) return
+    const updated = { ...tags, [soundId]: [...currentTags, tag] }
+    setTags(updated)
+    await save('tags', updated)
+  }, [tags, save])
+
+  const removeTagFromSound = useCallback(async (soundId, tag) => {
+    const currentTags = tags[soundId] || []
+    const updated = { ...tags, [soundId]: currentTags.filter(t => t !== tag) }
+    if (updated[soundId].length === 0) delete updated[soundId]
+    setTags(updated)
+    await save('tags', updated)
+  }, [tags, save])
+
+  const getSoundTags = useCallback((soundId) => {
+    return tags[soundId] || []
+  }, [tags])
+
+  // ─── Étape 7 : Performance ──────────────────────────────────────────────
+  const updateAutoBackupEnabled = useCallback(async (enabled) => {
+    setAutoBackupEnabled(enabled)
+    await save('autoBackupEnabled', enabled)
+  }, [save])
+
+  const updateBackupInterval = useCallback(async (interval) => {
+    setBackupInterval(interval)
+    await save('backupInterval', interval)
+  }, [save])
+
+  const updateLazyLoadingEnabled = useCallback(async (enabled) => {
+    setLazyLoadingEnabled(enabled)
+    await save('lazyLoadingEnabled', enabled)
+  }, [save])
+
   // ─── Audio Mode ──────────────────────────────────────────────────────────────
   const updateAudioMode = useCallback(async (mode) => {
     setAudioMode(mode)
@@ -816,7 +871,6 @@ export function useStore() {
     await save('lowLatencyMode', enabled)
   }, [save])
 
-  // ─── Noise Suppression ──────────────────────────────────────────────────────
   const updateNoiseSuppression = useCallback(async (enabled) => {
     setNoiseSuppression(enabled)
     await save('noiseSuppression', enabled)
@@ -827,7 +881,6 @@ export function useStore() {
     await save('noiseSuppressionMode', mode)
   }, [save])
 
-  // ─── Initialisation du mixeur au démarrage ──────────────────────────────────
   const initMixerOnStartup = useCallback(async () => {
     if (!mixerEnabled) {
       console.log('ℹ️ Mixeur désactivé, pas d\'initialisation automatique')
@@ -935,11 +988,9 @@ export function useStore() {
   // ─── SIDEBAR CONFIG ──────────────────────────────────────────────────────────
 
   const resetSidebarConfig = useCallback(async () => {
-    // ✅ Réinitialiser avec les profils actuels
     const allProfiles = profiles || []
     const defaultItems = [...DEFAULT_SIDEBAR_CONFIG.items]
     
-    // Ajouter les profils
     allProfiles.forEach(profile => {
       defaultItems.push({
         id: `profile-${profile.id}`,
@@ -958,7 +1009,7 @@ export function useStore() {
     const defaultConfig = {
       mode: 'default',
       items: defaultItems,
-      sectionOrder: ['pinned', 'profiles', 'navigation', 'actions', 'footer'] // ← Modifier l'ordre
+      sectionOrder: ['pinned', 'profiles', 'navigation', 'actions', 'footer']
     }
     
     setSidebarConfig(defaultConfig)
@@ -1000,7 +1051,6 @@ export function useStore() {
     return [...ordered, ...missing]
   }, [sounds, soundOrder, currentProfileId, orderVersion])
 
-  // favoriteSounds dynamique par profil
   const favoriteSounds = useMemo(() => {
     return orderedSounds.filter(s => s.favorites?.includes(currentProfileId) || false)
   }, [orderedSounds, currentProfileId])
@@ -1045,6 +1095,24 @@ export function useStore() {
     presentationShortcut,
     startMinimized,
     launchAtStartup,
+
+    // ─── Étape 1 : Taille des cartes ────────────────────────────────────────
+    cardSize,
+    updateCardSize,
+
+    // ─── Étape 2 : Tags ─────────────────────────────────────────────────────
+    tags,
+    addTagToSound,
+    removeTagFromSound,
+    getSoundTags,
+
+    // ─── Étape 7 : Performance ──────────────────────────────────────────────
+    autoBackupEnabled,
+    backupInterval,
+    lazyLoadingEnabled,
+    updateAutoBackupEnabled,
+    updateBackupInterval,
+    updateLazyLoadingEnabled,
 
     // ─── Sidebar ──────────────────────────────────────────────────────────────
     sidebarConfig,
@@ -1124,8 +1192,11 @@ export function useStore() {
     // ─── Périphérique audio local ────────────────────────────────────────────
     updateLocalAudioDevice,
 
-    // ─── Mode basse latence ───────────────────────────────────────────────
+    // ─── Mode basse latence ──────────────────────────────────────────────────
     lowLatencyMode,
     updateLowLatencyMode,
+
+    lazyLoadingEnabled,
+    updateLazyLoadingEnabled,
   }
 }

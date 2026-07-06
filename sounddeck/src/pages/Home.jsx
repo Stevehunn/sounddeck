@@ -2,7 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import SoundCard from '../components/SoundCard'
 import AudioTrimmer from '../components/AudioTrimmer'
 import ProfileManagerModal from '../components/ProfileManagerModal'
+import VoiceControl from '../components/VoiceControl'
+import AIGenerator from '../components/AIGenerator'
 import { useTranslation } from '../i18n'
+import { playSound, stopAllSounds, stopSound } from '../utils/audio'
+import { analyzeAudio } from '../utils/aiTagging'
 
 const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
 
@@ -13,6 +17,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
   const [showAllOther, setShowAllOther] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [showProfileManager, setShowProfileManager] = useState(false)
+  const [showAIGenerator, setShowAIGenerator] = useState(false)
   const [sortBy, setSortBy] = useState('custom')
   const [dragOver, setDragOver] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -21,6 +26,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
   const [importSuccess, setImportSuccess] = useState(0)
   const [localSearch, setLocalSearch] = useState('')
   const [columns, setColumns] = useState(6)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
   const gridRef = useRef(null)
   const favoritesGridRef = useRef(null)
 
@@ -32,17 +38,25 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
   const [dragSource, setDragSource] = useState(null)
 
   const { currentSounds, favoriteSounds, shortcuts, audioDevice, volume, sounds, currentProfileId } = store
+
   const soundsOutsideProfile = currentProfileId !== 'all'
     ? sounds.filter(s => !s.profiles.includes(currentProfileId))
     : []
 
   const favoriteSoundsForProfile = currentSounds.filter(s => s.favorites?.includes(currentProfileId) || false)
 
+  // Calculer les colonnes en fonction de la taille des cartes
   useEffect(() => {
     const calculateColumns = () => {
       if (!gridRef.current) return
       const containerWidth = gridRef.current.offsetWidth
-      const cardWidth = 110 + 10
+      
+      const cardSizes = {
+        small: 90,
+        medium: 110,
+        large: 140
+      }
+      const cardWidth = cardSizes[store.cardSize || 'medium'] + 10
       const nbColumns = Math.max(2, Math.floor(containerWidth / cardWidth))
       setColumns(nbColumns)
     }
@@ -50,13 +64,20 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
     calculateColumns()
     window.addEventListener('resize', calculateColumns)
     return () => window.removeEventListener('resize', calculateColumns)
-  }, [])
+  }, [store.cardSize])
 
-  const baseFiltered = searchTerm
-    ? currentSounds.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
+  // Filtrer les sons avec recherche par tags
+  const filtered = searchTerm
+    ? currentSounds.filter(s => {
+        const nameMatch = s.name.toLowerCase().includes(searchTerm.toLowerCase())
+        const tagMatch = (store.tags[s.id] || []).some(t => 
+          t.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        return nameMatch || tagMatch
+      })
     : currentSounds
 
-  const filtered = [...baseFiltered].sort((a, b) => {
+  const sortedFiltered = [...filtered].sort((a, b) => {
     if (sortBy === 'custom') return 0
     if (sortBy === 'popular') return (b.playCount || 0) - (a.playCount || 0)
     if (sortBy === 'recent') return (b.lastPlayed || 0) - (a.lastPlayed || 0)
@@ -65,7 +86,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
   })
 
   const itemsPerPage = columns * 2
-  const displayed = showAll ? filtered : filtered.slice(0, itemsPerPage)
+  const displayed = showAll ? sortedFiltered : sortedFiltered.slice(0, itemsPerPage)
   const displayedOther = showAllOther ? soundsOutsideProfile : soundsOutsideProfile.slice(0, itemsPerPage)
 
   const findGlobalIndex = (soundId) => {
@@ -76,6 +97,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
     return currentSounds.filter(s => s.favorites?.includes(currentProfileId) || false)
   }
 
+  // ─── Drag & Drop ──────────────────────────────────────────────────────────
   const handleDragStart = (e, soundId, index, source) => {
     if (sortBy !== 'custom') {
       addToast('Le drag and drop est disponible uniquement en tri "Personnalisé"', 'info')
@@ -204,6 +226,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
     addToast(tr('soundMoved'), 'success')
   }
 
+  // ─── Import ──────────────────────────────────────────────────────────────
   const handleImportFiles = async (filePaths) => {
     setTotalFiles(filePaths.length)
     setImportProgress(0)
@@ -316,6 +339,60 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
     }
   }
 
+  // ─── Analyse IA ──────────────────────────────────────────────────────────
+  const handleAnalyzeSounds = async () => {
+    setIsAnalyzing(true)
+    const soundsToAnalyze = currentSounds.slice(0, 10)
+    
+    let analyzed = 0
+    for (const sound of soundsToAnalyze) {
+      try {
+        const tags = await analyzeAudio(sound.path)
+        if (tags && tags.length > 0) {
+          for (const tag of tags) {
+            await store.addTagToSound(sound.id, tag.tag)
+          }
+        }
+        analyzed++
+      } catch (e) {
+        console.error('Erreur analyse:', e)
+      }
+    }
+    
+    setIsAnalyzing(false)
+    addToast(`${analyzed} ${tr('sounds')} ${tr('autoTagSuccess')}`, 'success')
+  }
+
+  // ─── Commandes vocales ──────────────────────────────────────────────────
+  const handleVoiceCommand = (text) => {
+    const words = text.split(' ')
+    for (const word of words) {
+      const found = currentSounds.find(s => 
+        s.name.toLowerCase().includes(word) || 
+        (store.tags[s.id] || []).some(t => t === word)
+      )
+      if (found) {
+        playSound(found, audioDevice, volume, loopEnabled, playLocally)
+        addToast(`🎤 "${found.name}" ${tr('played')}`, 'success')
+        return
+      }
+    }
+    
+    if (text.includes('stop') || text.includes('arrête')) {
+      stopAllSounds()
+      addToast('🔇 ' + tr('toastAllStopped'), 'info')
+      return
+    }
+    
+    if (text.includes('loop') || text.includes('répète')) {
+      store.toggleLoop()
+      addToast(`🔄 ${tr('loop')} ${loopEnabled ? tr('toastLoopOff') : tr('toastLoopOn')}`, 'info')
+      return
+    }
+    
+    addToast(`❓ ${tr('commandNotRecognized')}: "${text}"`, 'warning')
+  }
+
   const currentProfile = store.profiles.find(p => p.id === currentProfileId)
 
   return (
@@ -326,7 +403,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{currentSounds.length} {tr('sounds')}</div>
           {searchTerm && (
             <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>
-              <i className="ti ti-search" style={{ fontSize: 10 }} /> Résultats pour "{searchTerm}" ({filtered.length})
+              <i className="ti ti-search" style={{ fontSize: 10 }} /> {tr('resultsFor')} "{searchTerm}" ({filtered.length})
             </div>
           )}
         </div>
@@ -344,11 +421,40 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
           className="input-sm"
           style={{ width: 160, minWidth: 120 }} 
         />
-        <button className="btn-primary btn-sm" onClick={() => setShowImport(true)}>
+        
+        <VoiceControl 
+          store={store}
+          onCommand={handleVoiceCommand}
+          lang={lang}
+        />
+        
+        <button 
+          className="btn-secondary btn-sm"
+          onClick={handleAnalyzeSounds}
+          disabled={isAnalyzing}
+          style={{ minHeight: 34 }}
+        >
+          {isAnalyzing ? (
+            <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('analyzing')}</>
+          ) : (
+            <><i className="ti ti-wand" /> {tr('autoTag')}</>
+          )}
+        </button>
+        
+        <button 
+          className="btn-secondary btn-sm"
+          onClick={() => setShowAIGenerator(true)}
+          style={{ minHeight: 34 }}
+        >
+          <i className="ti ti-wand" /> {tr('aiGenerator')}
+        </button>
+        
+        <button className="btn-primary btn-sm" onClick={() => setShowImport(true)} style={{ minHeight: 34 }}>
           <i className="ti ti-plus" /> {tr('addSound')}
         </button>
+        
         {currentProfileId !== 'all' && (
-          <button className="btn-secondary btn-sm" onClick={() => setShowProfileManager(true)}>
+          <button className="btn-secondary btn-sm" onClick={() => setShowProfileManager(true)} style={{ minHeight: 34 }}>
             <i className="ti ti-settings" /> {tr('manageProfile')}
           </button>
         )}
@@ -457,7 +563,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
               dropTarget="profile"
             />
             {filtered.length > itemsPerPage && (
-              <button className="btn-secondary btn-sm" onClick={() => setShowAll(!showAll)} style={{ width: '100%', marginTop: 10, justifyContent: 'center' }}>
+              <button className="btn-secondary btn-sm" onClick={() => setShowAll(!showAll)} style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}>
                 <i className={`ti ${showAll ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
                 {showAll ? tr('showLess') : `${tr('showMore')} ${filtered.length - itemsPerPage}`}
               </button>
@@ -479,7 +585,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
               ))}
             </div>
             {soundsOutsideProfile.length > itemsPerPage && (
-              <button className="btn-secondary btn-sm" onClick={() => setShowAllOther(!showAllOther)} style={{ width: '100%', marginTop: 10, justifyContent: 'center' }}>
+              <button className="btn-secondary btn-sm" onClick={() => setShowAllOther(!showAllOther)} style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}>
                 <i className={`ti ${showAllOther ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
                 {showAllOther ? tr('showLess') : `${tr('showMore')} ${soundsOutsideProfile.length - itemsPerPage}`}
               </button>
@@ -526,10 +632,23 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
         />
       )}
 
+      {showAIGenerator && (
+        <AIGenerator
+          store={store}
+          onAddSound={() => {
+            addToast(tr('soundGenerated'), 'success')
+          }}
+          onClose={() => setShowAIGenerator(false)}
+          lang={lang}
+        />
+      )}
+
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }
+
+// ─── SOUS-COMPOSANTS ──────────────────────────────────────────────────────────
 
 function Section({ title, icon, iconColor, count, muted, children }) {
   return (
@@ -554,9 +673,16 @@ function Section({ title, icon, iconColor, count, muted, children }) {
 
 function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLocally, store, addToast, lang, gridRef, draggable, onDragStart, onDragEnd, onDragOver, onDrop, draggedSoundId, dragOverIndex, dropTarget }) {
   const tr = useTranslation(lang || 'fr')
+  const cardSize = store.cardSize || 'medium'
+  
+  const cardSizes = {
+    small: 90,
+    medium: 110,
+    large: 140
+  }
   
   return (
-    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10, position: 'relative', zIndex: 1 }}>
+    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${cardSizes[cardSize]}px, 1fr))`, gap: 10, position: 'relative', zIndex: 1 }}>
       {sounds.map((s, index) => {
         const isDragging = draggedSoundId === s.id
         const isDragOver = dragOverIndex === index && !isDragging
@@ -571,22 +697,27 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLo
             onDrop={(e) => draggable && onDrop(e, index, dropTarget)}
             style={{
               opacity: isDragging ? 0.3 : 1,
-              transform: isDragOver ? 'scale(1.02)' : 'scale(1)',
-              transition: 'transform 0.15s, opacity 0.15s',
+              transform: isDragOver ? 'scale(1.03)' : 'scale(1)',
+              transition: 'transform 0.2s ease, opacity 0.2s ease',
               cursor: draggable ? 'grab' : 'default',
               position: 'relative',
-              zIndex: isDragging ? 10 : 1
+              zIndex: isDragging ? 10 : 1,
+              boxShadow: isDragOver ? '0 0 20px rgba(124,111,247,0.3)' : 'none'
             }}
           >
             {isDragOver && (
               <div style={{
                 position: 'absolute',
-                top: -4, left: -4, right: -4, bottom: -4,
-                border: '2px solid var(--accent)',
-                borderRadius: 'var(--radius-md)',
+                top: -2,
+                left: 4,
+                right: 4,
+                height: 3,
+                background: 'var(--accent)',
+                borderRadius: 2,
                 pointerEvents: 'none',
                 zIndex: 5,
-                animation: 'fadeIn 0.15s ease'
+                animation: 'fadeIn 0.2s ease',
+                boxShadow: '0 0 10px var(--accent)'
               }} />
             )}
             <SoundCard 
@@ -606,11 +737,21 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLo
               onRename={(id, name) => store.updateSound(id, { name })}
               onChangeImage={store.updateSoundImage}
               onChangeEmoji={store.updateSoundEmoji}
+              onAddTag={async (id, tag) => {
+                await store.addTagToSound(id, tag)
+                addToast(`${tr('tagAdded')}: #${tag}`, 'success')
+              }}
+              onRemoveTag={async (id, tag) => {
+                await store.removeTagFromSound(id, tag)
+                addToast(`${tr('tagRemoved')}: #${tag}`, 'info')
+              }}
+              tags={store.tags[s.id] || []}
               draggable={draggable}
               lang={lang}
               onDragStart={(e) => draggable && onDragStart(e, s.id, index, dropTarget)}
               onDragEnd={(e) => draggable && onDragEnd(e)}
               layout={store.keyboardLayout || 'qwerty'}
+              size={cardSize}
             />
           </div>
         )

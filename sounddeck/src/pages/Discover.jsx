@@ -70,6 +70,12 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
       let mode = category.mode
       let search = query || category.query
 
+      // ✅ Si on est en mode 'local' et qu'il y a une recherche, on passe en mode 'search'
+      if (mode === 'local' && query && query.trim()) {
+        mode = 'search'
+        search = query.trim()
+      }
+
       if (mode === 'local') {
         const langData = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0]
         const country = langData.country || 'fr'
@@ -144,6 +150,14 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
       clearTimeout(searchTimeoutRef.current)
     }
     
+    // ✅ Si on est dans la catégorie 'trending' et qu'il y a une recherche
+    if (activeCategory === 'trending' && value.trim().length >= 2) {
+      searchTimeoutRef.current = setTimeout(() => {
+        fetchSounds(activeCategory, value.trim())
+      }, 500)
+      return
+    }
+    
     if (value.trim().length >= 2) {
       searchTimeoutRef.current = setTimeout(() => {
         fetchSounds(activeCategory, value.trim())
@@ -198,6 +212,7 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     setShowProfileModal(sound)
   }
 
+  // ✅ Fonction confirmDownload - CORRIGÉE : définie avant le return
   const confirmDownload = async (sound, profileId) => {
     setShowProfileModal(null)
     setDownloading(prev => ({ ...prev, [sound.id]: true }))
@@ -615,6 +630,7 @@ function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPrevie
   )
 }
 
+// ✅ ProfilePickerModal - Version corrigée avec boutons uniformisés
 function ProfilePickerModal({ sound, profiles, onConfirm, onClose, lang, tr }) {
   const [selectedProfile, setSelectedProfile] = useState('all')
 
@@ -652,9 +668,11 @@ function ProfilePickerModal({ sound, profiles, onConfirm, onClose, lang, tr }) {
             </label>
           ))}
         </div>
-        <div className="modal-actions">
-          <button className="btn-secondary" onClick={onClose}>{tr('cancel')}</button>
-          <button className="btn-primary" onClick={() => onConfirm(selectedProfile)}>
+        <div className="modal-actions" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+          <button className="btn-secondary btn-lg" onClick={onClose} style={{ borderRadius: 'var(--radius-md)', minHeight: 40, padding: '8px 20px' }}>
+            <i className="ti ti-x" /> {tr('cancel')}
+          </button>
+          <button className="btn-primary btn-lg" onClick={() => onConfirm(selectedProfile)} style={{ borderRadius: 'var(--radius-md)', minHeight: 40, padding: '8px 20px' }}>
             <i className="ti ti-download" /> {tr('downloadBtn')}
           </button>
         </div>
