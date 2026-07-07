@@ -8,6 +8,8 @@ import BackupSettings from '../components/BackupSettings'
 import { LANGUAGES, useTranslation } from '../i18n'
 import { getMicrophoneStatus, getMixerStats, testMicrophoneOnce, connectMixerToOutput } from '../utils/audioMixer'
 import KeyboardVisualizer from '../components/KeyboardVisualizer'
+import FeedbackModal from '../components/FeedbackModal'
+import ReactDOM from 'react-dom/client'
 
 const SECTIONS = [
   { id: 'appearance', icon: 'ti-palette', labelKey: 'optionsAppearance' },
@@ -1332,6 +1334,45 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 addToast(val ? tr('lazyLoadingEnabled') : tr('lazyLoadingDisabled'), 'info')
               }}
             />
+          </OptionRow>
+
+          <OptionRow label={tr('feedback')} sub={tr('feedbackDesc')}>
+            <button
+              className="btn-primary btn-sm"
+              onClick={() => {
+                import('../components/FeedbackModal').then(module => {
+                  // Afficher le modal
+                  const Modal = module.default
+                  const container = document.createElement('div')
+                  container.style.position = 'fixed'
+                  container.style.inset = '0'
+                  container.style.zIndex = '10000'
+                  document.body.appendChild(container)
+                  
+                  // Créer un root React
+                  const root = ReactDOM.createRoot(container)
+                  root.render(
+                    <Modal
+                      onClose={() => {
+                        root.unmount()
+                        container.remove()
+                      }}
+                      lang={lang}
+                      store={store}
+                      onSubmit={async (feedback) => {
+                        console.log('📤 Feedback reçu:', feedback)
+                        // Ici tu peux ajouter un vrai service de bug tracking
+                      }}
+                    />
+                  )
+                }).catch(err => {
+                  console.error('Erreur chargement FeedbackModal:', err)
+                })
+              }}
+              style={{ fontSize: 12, minHeight: 34 }}
+            >
+              <i className="ti ti-message" /> {tr('feedbackSend')}
+            </button>
           </OptionRow>
 
           <OptionRow label={tr('errorLogs')} sub={tr('errorLogsDesc')}>

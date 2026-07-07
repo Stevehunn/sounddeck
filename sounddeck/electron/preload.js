@@ -68,6 +68,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   youtubeDownload: (url, start, end, title) => ipcRenderer.invoke('youtube-download', url, start, end, title),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
+  // ─── SPOTIFY / SOUNDCLOUD ───────────────────────────────────────────────────
+  spotifyTrackInfo: (trackId) => ipcRenderer.invoke('spotify-track-info', trackId),
+  soundcloudTrackInfo: (url) => ipcRenderer.invoke('soundcloud-track-info', url),
+  downloadPlatformTrack: (params) => ipcRenderer.invoke('download-platform-track', params),
+
   // ─── EXPORT / IMPORT ────────────────────────────────────────────────────
   exportProfile: (profileId) => ipcRenderer.invoke('export-profile', profileId),
   importProfile: () => ipcRenderer.invoke('import-profile'),

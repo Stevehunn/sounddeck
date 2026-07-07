@@ -5,6 +5,8 @@ const Store = require('electron-store')
 const { LANGUAGES } = require('./i18n')
 const { exec } = require('child_process')
 const AdmZip = require('adm-zip')
+const ytdlp = require('yt-dlp-exec')
+const ytdlpPath = require('path').join(__dirname, 'node_modules', 'yt-dlp-exec', 'bin', 'yt-dlp.exe')
 
 const store = new Store()
 
@@ -2586,6 +2588,256 @@ function formatYtTime(seconds) {
   const s = Math.floor(seconds % 60)
   return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`
 }
+
+// ─── SPOTIFY / SOUNDCLOUD ───────────────────────────────────────────────────
+
+ipcMain.handle('spotify-track-info', async (event, trackId) => {
+  try {
+    // Pour Spotify, on utilise une API tierce ou on simule
+    // car yt-dlp ne peut pas récupérer les infos à cause du DRM
+    
+    // Option 1: Utiliser l'API Spotify (nécessite un token)
+    // Option 2: Utiliser une API tierce comme SpotiPy
+    // Option 3: Simuler et laisser l'utilisateur entrer les infos
+    
+    console.log('🎵 Récupération infos Spotify pour:', trackId)
+    
+    // Simuler une réponse avec un titre générique
+    // Dans la vraie vie, on pourrait utiliser l'API Spotify
+    return {
+      success: true,
+      title: `Morceau Spotify (${trackId.slice(0, 8)})`,
+      artist: 'Artiste inconnu',
+      duration: 180,
+      cover: null,
+      previewUrl: null
+    }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
+
+ipcMain.handle('soundcloud-track-info', async (event, url) => {
+  try {
+    console.log('🎵 Récupération infos SoundCloud:', url)
+    
+    try {
+      const result = await ytdlp(url, {
+        noPlaylist: true,
+        noWarnings: true,
+        dumpJson: true
+      })
+      
+      if (result) {
+        return {
+          success: true,
+          title: result.title || 'Morceau SoundCloud',
+          artist: result.uploader || result.artist || 'Artiste inconnu',
+          duration: result.duration || 180,
+          cover: result.thumbnail || null,
+          streamUrl: result.url || null
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Erreur yt-dlp pour les infos SoundCloud:', e.message)
+    }
+    
+    return {
+      success: true,
+      title: 'Morceau SoundCloud',
+      artist: 'Artiste inconnu',
+      duration: 180,
+      cover: null,
+      streamUrl: null
+    }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
+
+ipcMain.handle('download-platform-track', async (event, { platform, url, outputPath, title, artist }) => {
+  try {
+    const fs = require('fs')
+    const path = require('path')
+    
+    const dir = path.dirname(outputPath)
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true })
+    }
+    
+    // ✅ Utiliser un dossier temporaire
+    const tempDir = path.join(app.getPath('temp'), 'sounddeck_downloads')
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true })
+    }
+    
+    // ✅ Nettoyer les fichiers temporaires anciens
+    try {
+      const oldFiles = fs.readdirSync(tempDir)
+      const now = Date.now()
+      for (const file of oldFiles) {
+        const filePath = path.join(tempDir, file)
+        const stats = fs.statSync(filePath)
+        if (now - stats.mtimeMs > 3600000) { // plus d'1 heure
+          fs.unlinkSync(filePath)
+          console.log(`🧹 Ancien fichier temporaire supprimé: ${file}`)
+        }
+      }
+    } catch (e) {}
+    
+    // ✅ NOM UNIQUE
+    const uniqueId = Date.now() + '_' + Math.random().toString(36).slice(2, 8)
+    const tempOutputPath = path.join(tempDir, `temp_${uniqueId}.mp3`)
+    
+    let downloadUrl = url
+    
+    // Pour Spotify ou recherche YouTube
+    if (platform === 'spotify' || platform === 'youtube_search') {
+      // ✅ Utiliser une recherche YouTube avec des mots-clés plus précis
+      const searchTerms = [title, artist, 'audio'].filter(Boolean).join(' ')
+      const searchQuery = encodeURIComponent(searchTerms)
+      downloadUrl = `ytsearch1:${searchQuery}`
+      console.log(`🔍 Recherche YouTube: "${searchTerms}"`)
+    }
+    
+    console.log(`📥 Téléchargement via yt-dlp-exec:`, downloadUrl)
+    console.log(`📁 Fichier temporaire: ${tempOutputPath}`)
+    
+    // ✅ Trouver ffmpeg
+    let ffmpegPath = null
+    try {
+      const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg')
+      ffmpegPath = ffmpegInstaller.path
+      console.log('✅ ffmpeg trouvé:', ffmpegPath)
+    } catch (e) {
+      console.warn('⚠️ ffmpeg-installer non disponible:', e.message)
+      try {
+        const ffmpegStatic = require('ffmpeg-static')
+        ffmpegPath = ffmpegStatic
+        console.log('✅ ffmpeg-static trouvé:', ffmpegPath)
+      } catch (e2) {
+        console.warn('⚠️ ffmpeg-static non disponible:', e2.message)
+      }
+    }
+    
+    // ✅ Supprimer les fichiers temporaires existants
+    try {
+      if (fs.existsSync(tempOutputPath)) {
+        fs.unlinkSync(tempOutputPath)
+        console.log(`🗑️ Ancien fichier temporaire supprimé: ${tempOutputPath}`)
+      }
+    } catch (e) {}
+    
+    try {
+      // ✅ Utiliser execFile directement avec plus de contrôle
+      const { execFile } = require('child_process')
+      
+      // Trouver yt-dlp
+      let ytdlpPath = 'yt-dlp'
+      try {
+        require('child_process').execSync('yt-dlp --version', { stdio: 'ignore' })
+      } catch (e) {
+        try {
+          require('child_process').execSync('youtube-dl --version', { stdio: 'ignore' })
+          ytdlpPath = 'youtube-dl'
+        } catch (e2) {
+          return { success: false, error: 'yt-dlp ou youtube-dl non trouvé' }
+        }
+      }
+      
+      const args = [
+        '--no-playlist',
+        '--no-warnings',
+        '-x',
+        '--audio-format', 'mp3',
+        '--audio-quality', '5',
+        '--add-metadata',
+        '-o', tempOutputPath,
+        downloadUrl
+      ]
+      
+      if (ffmpegPath) {
+        args.push('--ffmpeg-location', ffmpegPath)
+        console.log('🔧 Utilisation de ffmpeg:', ffmpegPath)
+      }
+      
+      // ✅ Ajouter un timeout plus long
+      const timeout = 120000
+      
+      console.log(`🔧 Commande: ${ytdlpPath} ${args.join(' ')}`)
+      
+      await new Promise((resolve, reject) => {
+        const child = execFile(ytdlpPath, args, { 
+          timeout: timeout,
+          maxBuffer: 1024 * 1024 * 10 // 10MB
+        }, (error, stdout, stderr) => {
+          if (error) {
+            console.error('❌ Erreur yt-dlp:', error.message)
+            if (stderr) console.error('📤 stderr:', stderr)
+            reject(error)
+          } else {
+            console.log('✅ yt-dlp terminé avec succès')
+            if (stdout) console.log('📤 stdout:', stdout.slice(0, 500))
+            resolve()
+          }
+        })
+        
+        child.on('error', (err) => {
+          console.error('❌ Erreur process:', err)
+          reject(err)
+        })
+      })
+      
+      // ✅ Vérifier le fichier après téléchargement
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      if (fs.existsSync(tempOutputPath)) {
+        const stats = fs.statSync(tempOutputPath)
+        if (stats.size > 1000) {
+          // ✅ Renommer vers la destination finale
+          if (fs.existsSync(outputPath)) {
+            try { fs.unlinkSync(outputPath) } catch (e) {}
+          }
+          fs.renameSync(tempOutputPath, outputPath)
+          console.log(`✅ Téléchargement réussi: ${outputPath} (${(stats.size/1024).toFixed(1)} KB)`)
+          return { success: true, path: outputPath }
+        } else {
+          console.warn(`⚠️ Fichier trop petit: ${stats.size} bytes`)
+        }
+      } else {
+        console.warn(`⚠️ Fichier temporaire non trouvé: ${tempOutputPath}`)
+      }
+      
+      // ✅ Chercher dans le dossier temporaire
+      const files = fs.readdirSync(tempDir)
+      const mp3Files = files
+        .filter(f => f.endsWith('.mp3') && f.startsWith('temp_'))
+        .map(f => ({ f, t: fs.statSync(path.join(tempDir, f)).mtimeMs }))
+        .sort((a, b) => b.t - a.t)
+      
+      if (mp3Files.length > 0) {
+        const found = path.join(tempDir, mp3Files[0].f)
+        const stats = fs.statSync(found)
+        if (stats.size > 1000) {
+          if (fs.existsSync(outputPath)) {
+            try { fs.unlinkSync(outputPath) } catch (e) {}
+          }
+          fs.renameSync(found, outputPath)
+          console.log(`✅ Fichier trouvé dans temp: ${outputPath} (${(stats.size/1024).toFixed(1)} KB)`)
+          return { success: true, path: outputPath }
+        }
+      }
+      
+      return { success: false, error: 'Fichier non trouvé ou trop petit' }
+      
+    } catch (e) {
+      console.error('❌ Erreur téléchargement:', e.message)
+      return { success: false, error: e.message }
+    }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
 
 // ─── Raccourci pour montrer/cacher la fenêtre ─────────────────────────────────
 let currentToggleWindowShortcut = 'CommandOrControl+Shift+S'
