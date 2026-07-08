@@ -1014,6 +1014,18 @@ export const TRANSLATIONS = {
     soundcloudPlaylist: 'Importer une playlist SoundCloud',
     soundcloudPlaylistDesc: 'Téléchargez tous les morceaux d\'une playlist',
     soundcloudTrackLimit: 'Limite de 10 morceaux par playlist',
+
+    // ─── CONFIRMATION ───────────────────────────────────────────────
+    deletePlaylist: 'Supprimer la playlist',
+    deletePlaylistConfirm: 'Voulez-vous vraiment supprimer cette playlist ?',
+    deleteProfileConfirm: 'Voulez-vous vraiment supprimer le profil "{name}" ?',
+    soundExists: 'Son existant',
+    soundExistsConfirm: 'Un son nommé "{name}" existe déjà. Voulez-vous quand même l\'ajouter ?',
+    restoreBackup: 'Restaurer la sauvegarde',
+    restoreBackupConfirm: 'Voulez-vous vraiment restaurer cette sauvegarde ?',
+    profileManagerDeleteConfirm: 'Supprimer le profil',
+    profileManagerDeleteMessage: 'Le profil "{name}" contient {count} sons. Voulez-vous vraiment le supprimer ?',
+
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2025,6 +2037,17 @@ export const TRANSLATIONS = {
     soundcloudPlaylist: 'Import SoundCloud playlist',
     soundcloudPlaylistDesc: 'Download all tracks from a playlist',
     soundcloudTrackLimit: 'Limit of 10 tracks per playlist',
+
+    // ─── CONFIRMATION ───────────────────────────────────────────────
+    deletePlaylist: 'Delete playlist',
+    deletePlaylistConfirm: 'Do you really want to delete this playlist?',
+    deleteProfileConfirm: 'Do you really want to delete the profile "{name}"?',
+    soundExists: 'Sound exists',
+    soundExistsConfirm: 'A sound named "{name}" already exists. Do you still want to add it?',
+    restoreBackup: 'Restore backup',
+    restoreBackupConfirm: 'Do you really want to restore this backup?',
+    profileManagerDeleteConfirm: 'Delete profile',
+    profileManagerDeleteMessage: 'The profile "{name}" contains {count} sounds. Do you really want to delete it?',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -3036,6 +3059,17 @@ export const TRANSLATIONS = {
     soundcloudPlaylist: 'Importar playlist de SoundCloud',
     soundcloudPlaylistDesc: 'Descargar todas las canciones de una playlist',
     soundcloudTrackLimit: 'Límite de 10 canciones por playlist',
+
+    // ─── CONFIRMATION ───────────────────────────────────────────────
+    deletePlaylist: 'Eliminar lista de reproducción',
+    deletePlaylistConfirm: '¿Realmente quieres eliminar esta lista de reproducción?',
+    deleteProfileConfirm: '¿Realmente quieres eliminar el perfil "{name}"?',
+    soundExists: 'Sonido existente',
+    soundExistsConfirm: 'Ya existe un sonido llamado "{name}". ¿Quieres añadirlo de todos modos?',
+    restoreBackup: 'Restaurar copia de seguridad',
+    restoreBackupConfirm: '¿Realmente quieres restaurar esta copia de seguridad?',
+    profileManagerDeleteConfirm: 'Eliminar perfil',
+    profileManagerDeleteMessage: 'El perfil "{name}" contiene {count} sonidos. ¿Realmente quieres eliminarlo?',
   },
 }
 

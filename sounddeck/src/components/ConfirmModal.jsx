@@ -7,7 +7,7 @@ export default function ConfirmModal({
   cancelText, 
   onConfirm, 
   onCancel,
-  type = 'danger', // 'danger' | 'warning' | 'info'
+  type = 'danger',
   lang = 'fr'
 }) {
   const tr = useTranslation(lang)
@@ -69,13 +69,16 @@ export default function ConfirmModal({
               padding: '8px 20px',
               background: style.button,
               borderColor: style.button,
-              color: 'white'
+              color: 'white',
+              transition: 'all 0.15s ease'
             }}
             onMouseEnter={e => {
               e.currentTarget.style.opacity = '0.8'
+              e.currentTarget.style.transform = 'scale(1.02)'
             }}
             onMouseLeave={e => {
               e.currentTarget.style.opacity = '1'
+              e.currentTarget.style.transform = 'scale(1)'
             }}
           >
             <i className="ti ti-check" /> {confirmText || tr('confirm')}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useTranslation } from '../i18n'
+import useConfirm from '../hooks/useConfirm.jsx'
 
 // Configuration par défaut - sections ordonnées (Profils en premier)
 const DEFAULT_SECTION_ORDER = ['pinned', 'profiles', 'navigation', 'actions', 'footer']
@@ -61,19 +62,18 @@ export default function SidebarEditor({
   lang = 'fr'
 }) {
   const tr = useTranslation(lang)
+  const { confirm, ConfirmWrapper } = useConfirm({ lang })
   const [items, setItems] = useState([])
   const [sectionOrder, setSectionOrder] = useState(DEFAULT_SECTION_ORDER)
-  const [fixedSections, setFixedSections] = useState([]) // ✅ État pour les sections fixes
+  const [fixedSections, setFixedSections] = useState([])
   const [draggedIndex, setDraggedIndex] = useState(null)
   const [dragOverIndex, setDragOverIndex] = useState(null)
   const [draggedGroup, setDraggedGroup] = useState(null)
   const [dragOverGroup, setDragOverGroup] = useState(null)
   const [isInitialized, setIsInitialized] = useState(false)
 
-  // Référence pour éviter les mises à jour en boucle
   const initializingRef = useRef(false)
 
-  // ─── DEBUG ────────────────────────────────────────────────────────────────────
   const log = useCallback((...args) => {
     console.log('[SidebarEditor]', ...args)
   }, [])
@@ -88,10 +88,8 @@ export default function SidebarEditor({
     log('🚀 Début initialisation...')
     initializingRef.current = true
 
-    // Récupérer l'ordre des sections depuis la config
     let newSectionOrder = config.sectionOrder || DEFAULT_SECTION_ORDER
     
-    // S'assurer que toutes les sections existent
     const allGroups = new Set(['pinned', 'profiles', 'navigation', 'actions', 'footer'])
     const existingGroups = new Set(newSectionOrder)
     allGroups.forEach(g => {
@@ -100,7 +98,6 @@ export default function SidebarEditor({
       }
     })
     
-    // S'assurer que pinned est en premier et footer en dernier
     const pinnedIndex = newSectionOrder.indexOf('pinned')
     if (pinnedIndex > 0) {
       const [pinned] = newSectionOrder.splice(pinnedIndex, 1)
@@ -114,26 +111,21 @@ export default function SidebarEditor({
 
     setSectionOrder(newSectionOrder)
     
-    // ✅ Récupérer les sections fixes
     const fixed = config.fixedSections || []
     setFixedSections(fixed)
     log('📋 Sections fixes:', fixed)
 
-    // ─── Récupérer les éléments existants ──────────────────────────────────────
     const existingItems = config.items || []
     log('📦 Éléments existants:', existingItems.length)
     
-    // ─── Créer la liste des profils ───────────────────────────────────────────
     const userProfiles = profiles || []
     const allProfile = { id: 'all', name: tr('allSounds'), isDefault: true }
     const allProfiles = [allProfile, ...userProfiles]
     log('👤 Profils reçus:', allProfiles.map(p => p.id))
 
-    // ─── Construire la nouvelle liste d'éléments ──────────────────────────────
     const newItems = []
     const processedIds = new Set()
 
-    // 1. Ajouter les éléments existants
     existingItems.forEach(item => {
       if (item.id) {
         const isProfile = item.id.startsWith('profile-')
@@ -185,7 +177,6 @@ export default function SidebarEditor({
       }
     })
 
-    // 2. Ajouter les profils manquants
     allProfiles.forEach(profile => {
       const profileId = `profile-${profile.id}`
       if (processedIds.has(profileId)) return
@@ -205,7 +196,6 @@ export default function SidebarEditor({
       newItems.push(newItem)
     })
 
-    // 3. Ajouter les éléments de navigation manquants
     const defaultItemIds = ['home', 'discover', 'editor', 'sequencer', 'youtube', 'loop', 'shortcuts', 'presentation', 'guide', 'options']
     defaultItemIds.forEach(id => {
       if (processedIds.has(id)) return
@@ -226,7 +216,6 @@ export default function SidebarEditor({
       newItems.push(newItem)
     })
 
-    // Trier les items par order
     newItems.sort((a, b) => (a.order || 0) - (b.order || 0))
     
     log(`📊 Total items: ${newItems.length}`)
@@ -278,12 +267,9 @@ export default function SidebarEditor({
     
     setFixedSections(prev => {
       if (prev.includes(sectionKey)) {
-        // Retirer la section des fixes
         return prev.filter(s => s !== sectionKey)
       } else {
-        // Ajouter la section aux fixes (max 2)
         if (prev.length >= 2) {
-          // Ne pas dépasser 2 sections fixes
           return prev
         }
         return [...prev, sectionKey]
@@ -441,7 +427,6 @@ export default function SidebarEditor({
       return
     }
 
-    // Même groupe - réorganiser
     if (sourceGroup === targetGroup) {
       const groupItems = items.filter(item => item.group === sourceGroup)
       const start = sourceIndex
@@ -469,7 +454,6 @@ export default function SidebarEditor({
       return
     }
 
-    // Déplacement inter-groupes
     const movedItem = { ...sourceItems[sourceIndex] }
     log(`📦 Déplacement de l'élément: ${movedItem.id} (${sourceGroup} -> ${targetGroup})`)
 
@@ -531,32 +515,27 @@ export default function SidebarEditor({
       originalGroup: undefined
     }))
     
-    // S'assurer que toutes les sections sont représentées
     const allGroups = new Set(items.map(item => item.pinned ? 'pinned' : item.group))
     const finalSectionOrder = sectionOrder.filter(s => allGroups.has(s))
     
-    // Ajouter les groupes manquants à la fin
     allGroups.forEach(group => {
       if (!finalSectionOrder.includes(group)) {
         finalSectionOrder.push(group)
       }
     })
 
-    // S'assurer que pinned est en premier
     const pinnedIdx = finalSectionOrder.indexOf('pinned')
     if (pinnedIdx > 0) {
       const [pinned] = finalSectionOrder.splice(pinnedIdx, 1)
       finalSectionOrder.unshift(pinned)
     }
     
-    // S'assurer que footer est en dernier
     const footerIdx = finalSectionOrder.indexOf('footer')
     if (footerIdx !== -1 && footerIdx < finalSectionOrder.length - 1) {
       const [footer] = finalSectionOrder.splice(footerIdx, 1)
       finalSectionOrder.push(footer)
     }
 
-    // ✅ Nettoyer les sections fixes (garder uniquement celles qui existent)
     const validFixedSections = fixedSections.filter(s => finalSectionOrder.includes(s))
 
     log('📋 Ordre final des sections:', finalSectionOrder)
@@ -566,7 +545,7 @@ export default function SidebarEditor({
       ...config, 
       items: updatedItems, 
       sectionOrder: finalSectionOrder,
-      fixedSections: validFixedSections, // ✅ Inclure les sections fixes
+      fixedSections: validFixedSections,
       mode: 'custom' 
     })
   }, [items, sectionOrder, fixedSections, config, onSave])
@@ -661,16 +640,13 @@ export default function SidebarEditor({
     )
   }
 
-  // ✅ Rendu du bouton cadenas pour une section (dans l'éditeur)
   const renderFixedToggle = (sectionKey) => {
-    // Le footer ne peut pas être rendu fixe (il l'est toujours)
     if (sectionKey === 'footer') return null
     
     const isFixed = isSectionFixed(sectionKey)
     const canLock = !isFixed && fixedSections.length < 2
     const canUnlock = isFixed
     
-    // Si la section n'est ni verrouillable ni déverrouillable, ne pas afficher le bouton
     if (!canLock && !canUnlock) return null
     
     return (
@@ -947,353 +923,356 @@ export default function SidebarEditor({
   }
 
   return (
-    <div style={{
-      marginTop: 12,
-      border: '1px solid var(--accent)',
-      borderRadius: 'var(--radius-lg)',
-      overflow: 'hidden',
-      backgroundColor: 'var(--bg-primary)'
-    }}>
+    <>
       <div style={{
-        padding: '12px 16px',
-        backgroundColor: 'var(--accent-light)',
-        borderBottom: '1px solid var(--accent)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: 8
+        marginTop: 12,
+        border: '1px solid var(--accent)',
+        borderRadius: 'var(--radius-lg)',
+        overflow: 'hidden',
+        backgroundColor: 'var(--bg-primary)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <i className="ti ti-layout-sidebar" style={{ color: 'var(--accent)' }} />
-          <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--accent)' }}>
-            {tr('sidebarEditorTitle')}
+        {/* Header */}
+        <div style={{
+          padding: '12px 16px',
+          backgroundColor: 'var(--accent-light)',
+          borderBottom: '1px solid var(--accent)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 8
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <i className="ti ti-layout-sidebar" style={{ color: 'var(--accent)' }} />
+            <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--accent)' }}>
+              {tr('sidebarEditorTitle')}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+              {tr('sidebarEditorSub')}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              className="btn-ghost btn-sm"
+              onClick={onReset}
+              style={{ fontSize: 12, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
+            >
+              <i className="ti ti-refresh" /> {tr('sidebarEditorReset')}
+            </button>
+            <button
+              className="btn-secondary btn-sm"
+              onClick={onCancel}
+              style={{ fontSize: 12, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
+            >
+              <i className="ti ti-x" /> {tr('cancel')}
+            </button>
+            <button
+              className="btn-primary btn-sm"
+              onClick={handleSave}
+              style={{ fontSize: 12, padding: '4px 12px', borderRadius: 'var(--radius-sm)' }}
+            >
+              <i className="ti ti-check" /> {tr('sidebarEditorSave')}
+            </button>
+          </div>
+        </div>
+
+        <div style={{
+          padding: '8px 16px',
+          backgroundColor: 'var(--bg-tertiary)',
+          borderBottom: '1px solid var(--border)',
+          display: 'flex',
+          gap: 16,
+          flexWrap: 'wrap',
+          fontSize: 11,
+          color: 'var(--text-tertiary)'
+        }}>
+          <span><span style={{ opacity: 0.4 }}>☰</span> {tr('sidebarEditorDragHint')}</span>
+          <span><i className="ti ti-eye" /> {tr('sidebarEditorShowHide')}</span>
+          <span><i className="ti ti-pinned" /> {tr('sidebarEditorPin')}</span>
+          <span style={{ color: 'var(--text-tertiary)', fontSize: 10 }}>
+            💡 {tr('sidebarEditorPinnedNote')}
           </span>
-          <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-            {tr('sidebarEditorSub')}
+          <span style={{ color: 'var(--accent)', fontSize: 10 }}>
+            <i className="ti ti-arrows-sort" /> {tr('sidebarEditorDragGroupHint')}
+          </span>
+          <span style={{ color: 'var(--warning)', fontSize: 10 }}>
+            📌 Le footer reste toujours en bas
+          </span>
+          <span style={{ color: 'var(--accent)', fontSize: 10 }}>
+            🔒 {tr('sidebarEditorFixedHint')} ({fixedSections.length}/2)
           </span>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button
-            className="btn-ghost btn-sm"
-            onClick={onReset}
-            style={{ fontSize: 12, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
-          >
-            <i className="ti ti-refresh" /> {tr('sidebarEditorReset')}
-          </button>
-          <button
-            className="btn-secondary btn-sm"
-            onClick={onCancel}
-            style={{ fontSize: 12, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
-          >
-            <i className="ti ti-x" /> {tr('cancel')}
-          </button>
-          <button
-            className="btn-primary btn-sm"
-            onClick={handleSave}
-            style={{ fontSize: 12, padding: '4px 12px', borderRadius: 'var(--radius-sm)' }}
-          >
-            <i className="ti ti-check" /> {tr('sidebarEditorSave')}
-          </button>
-        </div>
-      </div>
 
-      <div style={{
-        padding: '8px 16px',
-        backgroundColor: 'var(--bg-tertiary)',
-        borderBottom: '1px solid var(--border)',
-        display: 'flex',
-        gap: 16,
-        flexWrap: 'wrap',
-        fontSize: 11,
-        color: 'var(--text-tertiary)'
-      }}>
-        <span><span style={{ opacity: 0.4 }}>☰</span> {tr('sidebarEditorDragHint')}</span>
-        <span><i className="ti ti-eye" /> {tr('sidebarEditorShowHide')}</span>
-        <span><i className="ti ti-pinned" /> {tr('sidebarEditorPin')}</span>
-        <span style={{ color: 'var(--text-tertiary)', fontSize: 10 }}>
-          💡 {tr('sidebarEditorPinnedNote')}
-        </span>
-        <span style={{ color: 'var(--accent)', fontSize: 10 }}>
-          <i className="ti ti-arrows-sort" /> {tr('sidebarEditorDragGroupHint')}
-        </span>
-        <span style={{ color: 'var(--warning)', fontSize: 10 }}>
-          📌 Le footer reste toujours en bas
-        </span>
-        <span style={{ color: 'var(--accent)', fontSize: 10 }}>
-          🔒 {tr('sidebarEditorFixedHint')} ({fixedSections.length}/2)
-        </span>
-      </div>
+        <div style={{ padding: '12px 16px', maxHeight: 400, overflowY: 'auto' }}>
+          {Object.keys(groupedItems).map(groupKey => {
+            const itemsInGroup = groupedItems[groupKey]
+            if (itemsInGroup.length === 0) return null
 
-      <div style={{ padding: '12px 16px', maxHeight: 400, overflowY: 'auto' }}>
-        {Object.keys(groupedItems).map(groupKey => {
-          const itemsInGroup = groupedItems[groupKey]
-          if (itemsInGroup.length === 0) return null
+            const isDraggingOverGroup = dragOverGroup === groupKey && draggedGroup !== groupKey
+            const isFooter = groupKey === 'footer'
+            const isPinned = groupKey === 'pinned'
+            const isActionGroup = groupKey === 'actions'
+            const isFixed = isSectionFixed(groupKey)
 
-          const isDraggingOverGroup = dragOverGroup === groupKey && draggedGroup !== groupKey
-          const isFooter = groupKey === 'footer'
-          const isPinned = groupKey === 'pinned'
-          const isActionGroup = groupKey === 'actions'
-          const isFixed = isSectionFixed(groupKey)
+            const containerStyles = {
+              marginBottom: 12,
+              padding: isPinned ? '4px 6px' : '4px 6px',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: isDraggingOverGroup ? 'rgba(124,111,247,0.1)' : 'transparent',
+              border: isDraggingOverGroup ? '2px dashed var(--accent)' : '2px solid transparent',
+              transition: 'all 0.15s',
+              opacity: isFooter ? 0.8 : 1
+            }
 
-          const containerStyles = {
-            marginBottom: 12,
-            padding: isPinned ? '4px 6px' : '4px 6px',
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: isDraggingOverGroup ? 'rgba(124,111,247,0.1)' : 'transparent',
-            border: isDraggingOverGroup ? '2px dashed var(--accent)' : '2px solid transparent',
-            transition: 'all 0.15s',
-            opacity: isFooter ? 0.8 : 1
-          }
+            if (isFooter) {
+              containerStyles.borderTop = '2px solid var(--border)'
+              containerStyles.paddingTop = 12
+              containerStyles.marginTop = 8
+            }
 
-          if (isFooter) {
-            containerStyles.borderTop = '2px solid var(--border)'
-            containerStyles.paddingTop = 12
-            containerStyles.marginTop = 8
-          }
+            if (isActionGroup) {
+              containerStyles.backgroundColor = 'rgba(124,111,247,0.04)'
+              containerStyles.borderRadius = 'var(--radius-md)'
+              containerStyles.border = '1px solid rgba(124,111,247,0.15)'
+            }
 
-          if (isActionGroup) {
-            containerStyles.backgroundColor = 'rgba(124,111,247,0.04)'
-            containerStyles.borderRadius = 'var(--radius-md)'
-            containerStyles.border = '1px solid rgba(124,111,247,0.15)'
-          }
+            if (isFixed) {
+              containerStyles.backgroundColor = 'rgba(124,111,247,0.06)'
+              containerStyles.border = '1px solid var(--accent)'
+              containerStyles.borderRadius = 'var(--radius-md)'
+            }
 
-          if (isFixed) {
-            containerStyles.backgroundColor = 'rgba(124,111,247,0.06)'
-            containerStyles.border = '1px solid var(--accent)'
-            containerStyles.borderRadius = 'var(--radius-md)'
-          }
-
-          return (
-            <div 
-              key={groupKey} 
-              style={containerStyles}
-              onDragOver={(e) => {
-                e.preventDefault()
-                if (groupKey === 'actions') {
-                  try {
-                    const data = JSON.parse(e.dataTransfer.getData('text/plain'))
-                    const sourceItem = items.find((_, i) => i === data.index)
-                    if (sourceItem && !sourceItem.isAction) {
+            return (
+              <div 
+                key={groupKey} 
+                style={containerStyles}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  if (groupKey === 'actions') {
+                    try {
+                      const data = JSON.parse(e.dataTransfer.getData('text/plain'))
+                      const sourceItem = items.find((_, i) => i === data.index)
+                      if (sourceItem && !sourceItem.isAction) {
+                        e.dataTransfer.dropEffect = 'none'
+                        return
+                      }
+                    } catch {
                       e.dataTransfer.dropEffect = 'none'
                       return
                     }
-                  } catch {
-                    e.dataTransfer.dropEffect = 'none'
-                    return
                   }
-                }
-                setDragOverGroup(groupKey)
-              }}
-              onDragLeave={() => {
-                setDragOverGroup(null)
-              }}
-              onDrop={(e) => {
-                if (groupKey === 'actions') {
-                  try {
-                    const data = JSON.parse(e.dataTransfer.getData('text/plain'))
-                    const sourceItem = items.find((_, i) => i === data.index)
-                    if (sourceItem && !sourceItem.isAction) {
+                  setDragOverGroup(groupKey)
+                }}
+                onDragLeave={() => {
+                  setDragOverGroup(null)
+                }}
+                onDrop={(e) => {
+                  if (groupKey === 'actions') {
+                    try {
+                      const data = JSON.parse(e.dataTransfer.getData('text/plain'))
+                      const sourceItem = items.find((_, i) => i === data.index)
+                      if (sourceItem && !sourceItem.isAction) {
+                        return
+                      }
+                    } catch {
                       return
                     }
+                  }
+
+                  let sourceData
+                  try {
+                    sourceData = JSON.parse(e.dataTransfer.getData('text/plain'))
                   } catch {
                     return
                   }
-                }
-
-                let sourceData
-                try {
-                  sourceData = JSON.parse(e.dataTransfer.getData('text/plain'))
-                } catch {
-                  return
-                }
-                if (sourceData) {
-                  const sourceItem = items.find((_, i) => i === sourceData.index)
-                  if (sourceItem && sourceItem.group !== groupKey) {
-                    handleDrop(e, itemsInGroup.length, groupKey)
+                  if (sourceData) {
+                    const sourceItem = items.find((_, i) => i === sourceData.index)
+                    if (sourceItem && sourceItem.group !== groupKey) {
+                      handleDrop(e, itemsInGroup.length, groupKey)
+                    }
                   }
-                }
-              }}
-            >
-              <div style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: isPinned ? 'var(--accent)' : isFooter ? 'var(--text-tertiary)' : isActionGroup ? 'var(--accent)' : isFixed ? 'var(--accent)' : 'var(--text-tertiary)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                marginBottom: 6,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                justifyContent: 'space-between'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <i className={`ti ${groupIcons[groupKey] || 'ti-circle'}`} style={{ fontSize: 12 }} />
-                  {groupLabels[groupKey] || groupKey}
-                  {isPinned && (
-                    <span style={{
-                      fontSize: 9,
-                      color: 'var(--accent)',
-                      marginLeft: 4,
-                      fontWeight: 400,
-                      textTransform: 'none'
-                    }}>
-                      {tr('sidebarEditorPinnedItems')}
-                    </span>
-                  )}
-                  {isFooter && (
+                }}
+              >
+                <div style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: isPinned ? 'var(--accent)' : isFooter ? 'var(--text-tertiary)' : isActionGroup ? 'var(--accent)' : isFixed ? 'var(--accent)' : 'var(--text-tertiary)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  marginBottom: 6,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  justifyContent: 'space-between'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <i className={`ti ${groupIcons[groupKey] || 'ti-circle'}`} style={{ fontSize: 12 }} />
+                    {groupLabels[groupKey] || groupKey}
+                    {isPinned && (
+                      <span style={{
+                        fontSize: 9,
+                        color: 'var(--accent)',
+                        marginLeft: 4,
+                        fontWeight: 400,
+                        textTransform: 'none'
+                      }}>
+                        {tr('sidebarEditorPinnedItems')}
+                      </span>
+                    )}
+                    {isFooter && (
+                      <span style={{
+                        fontSize: 9,
+                        color: 'var(--text-tertiary)',
+                        marginLeft: 4,
+                        fontWeight: 400,
+                        textTransform: 'none'
+                      }}>
+                        (toujours en bas)
+                      </span>
+                    )}
+                    {isActionGroup && (
+                      <span style={{
+                        fontSize: 9,
+                        color: 'var(--accent)',
+                        marginLeft: 4,
+                        fontWeight: 400,
+                        textTransform: 'none'
+                      }}>
+                        (⚡ épinglables mais non déplaçables)
+                      </span>
+                    )}
+                    {isFixed && (
+                      <span style={{
+                        fontSize: 9,
+                        color: 'var(--accent)',
+                        marginLeft: 4,
+                        fontWeight: 400,
+                        textTransform: 'none'
+                      }}>
+                        🔒 {tr('fixed')}
+                      </span>
+                    )}
                     <span style={{
                       fontSize: 9,
                       color: 'var(--text-tertiary)',
-                      marginLeft: 4,
                       fontWeight: 400,
                       textTransform: 'none'
                     }}>
-                      (toujours en bas)
+                      ({itemsInGroup.length})
                     </span>
-                  )}
-                  {isActionGroup && (
-                    <span style={{
-                      fontSize: 9,
-                      color: 'var(--accent)',
-                      marginLeft: 4,
-                      fontWeight: 400,
-                      textTransform: 'none'
-                    }}>
-                      (⚡ épinglables mais non déplaçables)
-                    </span>
-                  )}
-                  {isFixed && (
-                    <span style={{
-                      fontSize: 9,
-                      color: 'var(--accent)',
-                      marginLeft: 4,
-                      fontWeight: 400,
-                      textTransform: 'none'
-                    }}>
-                      🔒 {tr('fixed')}
-                    </span>
-                  )}
-                  <span style={{
-                    fontSize: 9,
-                    color: 'var(--text-tertiary)',
-                    fontWeight: 400,
-                    textTransform: 'none'
-                  }}>
-                    ({itemsInGroup.length})
-                  </span>
-                  {isDraggingOverGroup && draggedGroup !== groupKey && !isActionGroup && (
-                    <span style={{
-                      fontSize: 9,
-                      color: 'var(--accent)',
-                      fontWeight: 400,
-                      marginLeft: 4,
-                      textTransform: 'none'
-                    }}>
-                      <i className="ti ti-arrow-up" /> Déposer ici
-                    </span>
-                  )}
-                  {isActionGroup && isDraggingOverGroup && (
-                    <span style={{
-                      fontSize: 9,
-                      color: 'var(--warning)',
-                      fontWeight: 400,
-                      marginLeft: 4,
-                      textTransform: 'none'
-                    }}>
-                      ⚡ Actions uniquement
-                    </span>
-                  )}
-                </div>
-                
-                <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                  {/* ✅ Bouton pour rendre la section fixe */}
-                  {renderFixedToggle(groupKey)}
+                    {isDraggingOverGroup && draggedGroup !== groupKey && !isActionGroup && (
+                      <span style={{
+                        fontSize: 9,
+                        color: 'var(--accent)',
+                        fontWeight: 400,
+                        marginLeft: 4,
+                        textTransform: 'none'
+                      }}>
+                        <i className="ti ti-arrow-up" /> Déposer ici
+                      </span>
+                    )}
+                    {isActionGroup && isDraggingOverGroup && (
+                      <span style={{
+                        fontSize: 9,
+                        color: 'var(--warning)',
+                        fontWeight: 400,
+                        marginLeft: 4,
+                        textTransform: 'none'
+                      }}>
+                        ⚡ Actions uniquement
+                      </span>
+                    )}
+                  </div>
                   
-                  {!isPinned && !isFooter && !isActionGroup && (
-                    <>
-                      <button
-                        onClick={() => moveSectionUp(groupKey)}
-                        disabled={sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === 0}
-                        style={{
-                          padding: '2px 4px',
-                          borderRadius: 'var(--radius-sm)',
-                          border: 'none',
-                          backgroundColor: 'transparent',
-                          color: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)',
-                          cursor: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === 0 ? 'default' : 'pointer',
-                          fontSize: 12,
-                          opacity: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === 0 ? 0.3 : 1
-                        }}
-                        title="Déplacer vers le haut"
-                      >
-                        <i className="ti ti-arrow-up" />
-                      </button>
-                      <button
-                        onClick={() => moveSectionDown(groupKey)}
-                        disabled={sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').length - 1}
-                        style={{
-                          padding: '2px 4px',
-                          borderRadius: 'var(--radius-sm)',
-                          border: 'none',
-                          backgroundColor: 'transparent',
-                          color: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').length - 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)',
-                          cursor: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').length - 1 ? 'default' : 'pointer',
-                          fontSize: 12,
-                          opacity: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').length - 1 ? 0.3 : 1
-                        }}
-                        title="Déplacer vers le bas"
-                      >
-                        <i className="ti ti-arrow-down" />
-                      </button>
-                    </>
-                  )}
+                  <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                    {renderFixedToggle(groupKey)}
+                    
+                    {!isPinned && !isFooter && !isActionGroup && (
+                      <>
+                        <button
+                          onClick={() => moveSectionUp(groupKey)}
+                          disabled={sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === 0}
+                          style={{
+                            padding: '2px 4px',
+                            borderRadius: 'var(--radius-sm)',
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            color: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)',
+                            cursor: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === 0 ? 'default' : 'pointer',
+                            fontSize: 12,
+                            opacity: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === 0 ? 0.3 : 1
+                          }}
+                          title="Déplacer vers le haut"
+                        >
+                          <i className="ti ti-arrow-up" />
+                        </button>
+                        <button
+                          onClick={() => moveSectionDown(groupKey)}
+                          disabled={sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').length - 1}
+                          style={{
+                            padding: '2px 4px',
+                            borderRadius: 'var(--radius-sm)',
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            color: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').length - 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)',
+                            cursor: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').length - 1 ? 'default' : 'pointer',
+                            fontSize: 12,
+                            opacity: sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').indexOf(groupKey) === sectionOrder.filter(s => s !== 'footer' && s !== 'pinned').length - 1 ? 0.3 : 1
+                          }}
+                          title="Déplacer vers le bas"
+                        >
+                          <i className="ti ti-arrow-down" />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
+
+                {itemsInGroup.map((item, index) => renderItem(item, groupKey, index))}
               </div>
+            )
+          })}
+        </div>
 
-              {itemsInGroup.map((item, index) => renderItem(item, groupKey, index))}
-            </div>
-          )
-        })}
-      </div>
-
-      <div style={{
-        padding: '8px 16px',
-        borderTop: '1px solid var(--border)',
-        backgroundColor: 'var(--bg-tertiary)',
-        fontSize: 10,
-        color: 'var(--text-tertiary)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        flexWrap: 'wrap'
-      }}>
-        <span style={{ color: 'var(--accent)' }}>🔍 Debug:</span>
-        <span>Ordre des sections: </span>
-        {sectionOrder.map((s, i) => (
-          <span key={s} style={{
-            padding: '1px 6px',
-            borderRadius: 3,
-            backgroundColor: s === 'footer' ? 'rgba(224,82,82,0.2)' : s === 'pinned' ? 'var(--accent-light)' : s === 'actions' ? 'rgba(124,111,247,0.15)' : fixedSections.includes(s) ? 'rgba(124,111,247,0.2)' : 'var(--bg-secondary)',
-            border: `1px solid ${s === 'footer' ? 'var(--danger)' : s === 'pinned' ? 'var(--accent)' : s === 'actions' ? 'var(--accent)' : fixedSections.includes(s) ? 'var(--accent)' : 'var(--border)'}`,
-            fontSize: 9
-          }}>
-            {s} {s === 'footer' && '🔒'} {s === 'actions' && '⚡'} {fixedSections.includes(s) && '🔒'}
+        <div style={{
+          padding: '8px 16px',
+          borderTop: '1px solid var(--border)',
+          backgroundColor: 'var(--bg-tertiary)',
+          fontSize: 10,
+          color: 'var(--text-tertiary)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          flexWrap: 'wrap'
+        }}>
+          <span style={{ color: 'var(--accent)' }}>🔍 Debug:</span>
+          <span>Ordre des sections: </span>
+          {sectionOrder.map((s, i) => (
+            <span key={s} style={{
+              padding: '1px 6px',
+              borderRadius: 3,
+              backgroundColor: s === 'footer' ? 'rgba(224,82,82,0.2)' : s === 'pinned' ? 'var(--accent-light)' : s === 'actions' ? 'rgba(124,111,247,0.15)' : fixedSections.includes(s) ? 'rgba(124,111,247,0.2)' : 'var(--bg-secondary)',
+              border: `1px solid ${s === 'footer' ? 'var(--danger)' : s === 'pinned' ? 'var(--accent)' : s === 'actions' ? 'var(--accent)' : fixedSections.includes(s) ? 'var(--accent)' : 'var(--border)'}`,
+              fontSize: 9
+            }}>
+              {s} {s === 'footer' && '🔒'} {s === 'actions' && '⚡'} {fixedSections.includes(s) && '🔒'}
+            </span>
+          ))}
+          <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--text-tertiary)' }}>
+            Groupes: {Object.keys(groupedItems).join(', ')}
           </span>
-        ))}
-        <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--text-tertiary)' }}>
-          Groupes: {Object.keys(groupedItems).join(', ')}
-        </span>
-        <span style={{ fontSize: 9, color: 'var(--text-tertiary)' }}>
-          Items: {items.length}
-        </span>
-        <span style={{ fontSize: 9, color: 'var(--text-tertiary)' }}>
-          Profils: {profiles.length}
-        </span>
-        <span style={{ fontSize: 9, color: 'var(--accent)' }}>
-          Fixes: {fixedSections.length}/2
-        </span>
+          <span style={{ fontSize: 9, color: 'var(--text-tertiary)' }}>
+            Items: {items.length}
+          </span>
+          <span style={{ fontSize: 9, color: 'var(--text-tertiary)' }}>
+            Profils: {profiles.length}
+          </span>
+          <span style={{ fontSize: 9, color: 'var(--accent)' }}>
+            Fixes: {fixedSections.length}/2
+          </span>
+        </div>
       </div>
-    </div>
+      <ConfirmWrapper />
+    </>
   )
 }

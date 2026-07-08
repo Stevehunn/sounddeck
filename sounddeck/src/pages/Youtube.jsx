@@ -3,11 +3,13 @@ import Waveform from '../components/Waveform'
 import { useTranslation } from '../i18n'
 import { detectPlatform, getSpotifyTrack, getSoundCloudTrack, sanitizeFilename } from '../utils/platformImport'
 import { Howl } from 'howler'
+import useConfirm from '../hooks/useConfirm.jsx'
 
 const EMOJIS = ['🎵','🎤','🎸','🎹','🥁','🎺','🎻','🎼','🔊','💥','😂','🔥']
 
 export default function YouTube({ store, addToast, lang = 'fr' }) {
   const tr = useTranslation(lang)
+  const { confirm, ConfirmWrapper } = useConfirm({ lang })
   const [ytdlpStatus, setYtdlpStatus] = useState(null)
   const [downloading, setDownloading] = useState(false)
   const [url, setUrl] = useState('')
@@ -246,16 +248,17 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
   }
 
   const handleSave = async () => {
-    if (!soundName.trim() || !downloadedPath) return
-    
-    // ✅ Vérifier les doublons
-    const existingSound = store.sounds.find(s => s.name.toLowerCase() === soundName.trim().toLowerCase())
-    if (existingSound) {
-      const confirm = window.confirm(
-        `Un son nommé "${soundName.trim()}" existe déjà.\nVoulez-vous quand même l'ajouter ?`
-      )
-      if (!confirm) return
-    }
+      if (!soundName.trim() || !downloadedPath) return
+      
+      const existingSound = store.sounds.find(s => s.name.toLowerCase() === soundName.trim().toLowerCase())
+      if (existingSound) {
+        const confirmed = await confirm({
+          title: tr('soundExists'),
+          message: tr('soundExistsConfirm').replace('{name}', soundName.trim()),
+          type: 'warning'
+        })
+        if (!confirmed) return
+      }
     
     await store.addSound({
       name: soundName.trim(),
@@ -325,6 +328,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
           </div>
         </div>
         <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+        <ConfirmWrapper />
       </div>
     )
   }

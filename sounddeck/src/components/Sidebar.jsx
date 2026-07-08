@@ -4,6 +4,51 @@ import { useTranslation } from '../i18n'
 // IDs des éléments qui sont toujours des actions
 const ACTION_IDS = ['loop', 'shortcuts', 'presentation']
 
+// Map des labels par défaut pour les éléments (traductions)
+const getDefaultLabels = (tr) => ({
+  home: tr('mySounds'),
+  discover: tr('discover'),
+  editor: tr('editor'),
+  sequencer: tr('sequencer'),
+  youtube: tr('youtube'),
+  loop: tr('loop'),
+  shortcuts: tr('shortcuts'),
+  presentation: tr('presentation'),
+  guide: tr('guide'),
+  options: tr('options'),
+  stats: tr('stats'),
+})
+
+// Map des groupes par défaut pour les éléments
+const DEFAULT_GROUPS = {
+  home: 'navigation',
+  discover: 'navigation',
+  editor: 'navigation',
+  sequencer: 'navigation',
+  youtube: 'navigation',
+  loop: 'actions',
+  shortcuts: 'actions',
+  presentation: 'actions',
+  guide: 'footer',
+  options: 'footer',
+  stats: 'navigation',
+}
+
+// Map des icônes par défaut pour les éléments
+const DEFAULT_ICONS = {
+  home: 'ti-home',
+  discover: 'ti-compass',
+  editor: 'ti-cut',
+  sequencer: 'ti-playlist',
+  youtube: 'ti-brand-youtube',
+  loop: 'ti-repeat',
+  shortcuts: 'ti-keyboard',
+  presentation: 'ti-layout-grid',
+  guide: 'ti-book',
+  options: 'ti-settings',
+  stats: 'ti-chart-bar',
+}
+
 export default function Sidebar({
   profiles,
   currentProfileId,
@@ -150,6 +195,42 @@ export default function Sidebar({
 
   // ─── CONFIGURATION DE LA SIDEBAR ────────────────────────────────────────────
 
+  // ✅ Fonction pour obtenir les labels traduits d'un item
+  const getItemLabel = (item) => {
+    const defaultLabels = getDefaultLabels(tr)
+    
+    // Si c'est un profil, utiliser le nom du profil
+    if (item.id && item.id.startsWith('profile-')) {
+      const profileId = item.id.replace('profile-', '')
+      const profile = profiles.find(p => p.id === profileId)
+      return profile?.name || item.label || profileId
+    }
+    
+    // Si c'est un élément avec un label traduit
+    if (item.id && defaultLabels[item.id]) {
+      return defaultLabels[item.id]
+    }
+    
+    // Fallback: utiliser le label existant
+    return item.label || item.id
+  }
+
+  // ✅ Fonction pour obtenir l'icône d'un item
+  const getItemIcon = (item) => {
+    if (item.id && DEFAULT_ICONS[item.id]) {
+      return DEFAULT_ICONS[item.id]
+    }
+    return item.icon || 'ti-circle'
+  }
+
+  // ✅ Fonction pour obtenir le groupe d'un item
+  const getItemGroup = (item) => {
+    if (item.id && DEFAULT_GROUPS[item.id]) {
+      return DEFAULT_GROUPS[item.id]
+    }
+    return item.group || 'other'
+  }
+
   const visibleItems = useMemo(() => {
     console.log('🔄 Recalcul de visibleItems avec config:', sidebarConfig?.mode)
     
@@ -157,7 +238,15 @@ export default function Sidebar({
       return { pinned: [], groups: {} }
     }
 
-    const visible = sidebarConfig.items.filter(item => item.visible !== false)
+    // Mettre à jour les labels et icônes des items avec les traductions
+    const updatedItems = sidebarConfig.items.map(item => ({
+      ...item,
+      label: getItemLabel(item),
+      icon: getItemIcon(item),
+      group: getItemGroup(item),
+    }))
+
+    const visible = updatedItems.filter(item => item.visible !== false)
 
     const pinned = visible.filter(item => item.pinned === true)
     const others = visible.filter(item => item.pinned !== true)
@@ -176,7 +265,7 @@ export default function Sidebar({
     })
 
     return { pinned, groups }
-  }, [sidebarConfig])
+  }, [sidebarConfig, lang, profiles])
 
   const isItemActive = (itemId) => {
     if (itemId === 'home') return currentPage === 'home'
@@ -514,7 +603,7 @@ export default function Sidebar({
           {!allPinned && renderProfileItem(profiles.find(p => p.id === 'all'))}
           {nonPinnedProfiles.map(profile => renderProfileItem(profile, true))}
           {showNewProfile ? (
-            <div style={{ padding: '4px 12px', display: 'flex', gap: 4 }}>
+            <div style={{ padding: '4px 12px', display: 'flex', gap: 4 }}> 
               <input
                 autoFocus
                 value={newProfileName}

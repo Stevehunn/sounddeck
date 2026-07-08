@@ -10,6 +10,7 @@ import { getMicrophoneStatus, getMixerStats, testMicrophoneOnce, connectMixerToO
 import KeyboardVisualizer from '../components/KeyboardVisualizer'
 import FeedbackModal from '../components/FeedbackModal'
 import ReactDOM from 'react-dom/client'
+import useConfirm from '../hooks/useConfirm'
 
 const SECTIONS = [
   { id: 'appearance', icon: 'ti-palette', labelKey: 'optionsAppearance' },
@@ -49,6 +50,7 @@ Section.displayName = 'Section'
 
 export default function Options({ store, addToast, lang = 'fr' }) {
   const tr = useTranslation(lang)
+  const { confirm, ConfirmWrapper } = useConfirm({ lang })
   const [activeSection, setActiveSection] = useState('appearance')
   const [audioDevices, setAudioDevices] = useState([])
   const [isDetecting, setIsDetecting] = useState(false)
@@ -278,13 +280,18 @@ export default function Options({ store, addToast, lang = 'fr' }) {
     }
   }
 
-  // ✅ Fonction de réinitialisation de la sidebar
+  // ✅ Fonction de réinitialisation de la sidebar avec confirmation
   const handleResetSidebar = useCallback(async () => {
-    if (confirm(tr('sidebarEditorResetConfirm'))) {
-      await store.resetSidebarConfig()
-      addToast(tr('sidebarEditorResetSuccess'), 'success')
-    }
-  }, [store, tr, addToast])
+    const confirmed = await confirm({
+      title: tr('sidebarEditorReset'),
+      message: tr('sidebarEditorResetConfirm'),
+      type: 'warning'
+    })
+    if (!confirmed) return
+    
+    await store.resetSidebarConfig()
+    addToast(tr('sidebarEditorResetSuccess'), 'success')
+  }, [store, tr, addToast, confirm])
 
   // ✅ Fonction pour basculer une section en mode fixe
   const handleToggleSectionFixed = useCallback((sectionKey) => {
@@ -308,6 +315,19 @@ export default function Options({ store, addToast, lang = 'fr' }) {
       fixedSections: newFixed
     })
   }, [store, addToast])
+
+  // ✅ Fonction pour effacer les logs avec confirmation
+  const handleClearLogs = useCallback(async () => {
+    const confirmed = await confirm({
+      title: tr('clearLogs'),
+      message: tr('clearLogsConfirm'),
+      type: 'danger'
+    })
+    if (!confirmed) return
+    
+    await window.electronAPI.storeDelete('errorLogs')
+    addToast(tr('logsCleared'), 'info')
+  }, [confirm, tr, addToast])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -437,7 +457,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             />
           )}
 
-          {/* Étape 1 : Taille des cartes */}
           <OptionRow label={tr('cardSize')} sub={tr('cardSizeDesc')}>
             <div style={{ display: 'flex', gap: 6 }}>
               {[
@@ -489,7 +508,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 className="btn-secondary btn-sm"
                 onClick={() => {
                   localStorage.removeItem('sounddeck-tutorial-done')
-                  // Forcer le rechargement pour afficher le tutoriel
                   window.location.reload()
                 }}
                 style={{ fontSize: 12, minHeight: 34, padding: '6px 16px', borderRadius: 'var(--radius-md)' }}
@@ -499,7 +517,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               <button
                 className="btn-primary btn-sm"
                 onClick={() => {
-                  // Ouvrir le tutoriel avancé
                   const event = new CustomEvent('open-advanced-tutorial')
                   window.dispatchEvent(event)
                 }}
@@ -1341,7 +1358,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               className="btn-primary btn-sm"
               onClick={() => {
                 import('../components/FeedbackModal').then(module => {
-                  // Afficher le modal
                   const Modal = module.default
                   const container = document.createElement('div')
                   container.style.position = 'fixed'
@@ -1349,7 +1365,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                   container.style.zIndex = '10000'
                   document.body.appendChild(container)
                   
-                  // Créer un root React
                   const root = ReactDOM.createRoot(container)
                   root.render(
                     <Modal
@@ -1361,7 +1376,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                       store={store}
                       onSubmit={async (feedback) => {
                         console.log('📤 Feedback reçu:', feedback)
-                        // Ici tu peux ajouter un vrai service de bug tracking
                       }}
                     />
                   )
@@ -1399,12 +1413,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               </button>
               <button 
                 className="btn-danger btn-sm"
-                onClick={async () => {
-                  if (confirm(tr('clearLogsConfirm'))) {
-                    await window.electronAPI.storeDelete('errorLogs')
-                    addToast(tr('logsCleared'), 'info')
-                  }
-                }}
+                onClick={handleClearLogs}
               >
                 <i className="ti ti-trash" /> {tr('clearLogs')}
               </button>
@@ -1572,6 +1581,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         </Section>
 
       </div>
+      <ConfirmWrapper />
     </div>
   )
 }

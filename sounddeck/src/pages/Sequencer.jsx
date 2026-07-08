@@ -2,9 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Howl } from 'howler'
 import { registerStopSequencerCallback, getSoundProgress } from '../utils/audio'
 import { useTranslation } from '../i18n'
+import useConfirm from '../hooks/useConfirm.jsx'
 
 export default function Sequencer({ store, addToast, lang = 'fr' }) {
   const tr = useTranslation(lang)
+  const { confirm, ConfirmWrapper } = useConfirm({ lang })
   const [playlists, setPlaylists] = useState([])
   const [activePlaylist, setActivePlaylist] = useState(null)
   const [showNewPlaylist, setShowNewPlaylist] = useState(false)
@@ -37,6 +39,13 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
   }
 
   const deletePlaylist = async (id) => {
+    const confirmed = await confirm({
+      title: tr('deletePlaylist'),
+      message: tr('deletePlaylistConfirm'),
+      type: 'danger'
+    })
+    if (!confirmed) return
+    
     const updated = playlists.filter(p => p.id !== id)
     await savePlaylists(updated)
     if (activePlaylist?.id === id) setActivePlaylist(null)
@@ -124,6 +133,7 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
           <EmptyState lang={lang} />
         )}
       </div>
+      <ConfirmWrapper /> 
     </div>
   )
 }

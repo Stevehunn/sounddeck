@@ -5,11 +5,13 @@ import ProfileManagerModal from '../components/ProfileManagerModal'
 import { useTranslation } from '../i18n'
 import { playSound, stopAllSounds, stopSound } from '../utils/audio'
 import { compressAudio, formatSize } from '../utils/audioConverter'
+import useConfirm from '../hooks/useConfirm.jsx'
 
 const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
 
 export default function Home({ store, addToast, loopEnabled, lang = 'fr', globalSearch = '' }) {
   const tr = useTranslation(lang)
+  const { confirm, ConfirmWrapper } = useConfirm({ lang })
   const playLocally = store.playLocally
   const [showAll, setShowAll] = useState(false)
   const [showAllOther, setShowAllOther] = useState(false)
@@ -248,14 +250,12 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
           })
           
           if (compressionResult.success) {
-            // Remplacer le fichier original par le fichier compressé
             result.path = compressedPath
             result.compressed = true
             result.originalSize = compressionResult.originalSize
             result.compressedSize = compressionResult.size
             result.compressionRatio = compressionResult.ratio
             
-            // Supprimer le fichier original
             await window.electronAPI.deleteSoundFile(originalPath)
             
             console.log(`✅ Fichier compressé: ${formatSize(compressionResult.originalSize)} → ${formatSize(compressionResult.size)} (${Math.round((1 - compressionResult.ratio) * 100)}% réduction)`)
@@ -402,264 +402,265 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
   const currentProfile = store.profiles.find(p => p.id === currentProfileId)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 150 }}>
-          <div style={{ fontWeight: 600, fontSize: 15 }}>{currentProfile?.id === 'all' ? tr('allSounds') : currentProfile?.name}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{currentSounds.length} {tr('sounds')}</div>
-          {searchTerm && (
-            <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>
-              <i className="ti ti-search" style={{ fontSize: 10 }} /> {tr('resultsFor')} "{searchTerm}" ({filtered.length})
-            </div>
-          )}
-        </div>
-        <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="input-sm" style={{ width: 'auto', minWidth: 120 }}>
-          <option value="custom">{tr('sortCustom')}</option>
-          <option value="default">{tr('sortDefault')}</option>
-          <option value="popular">{tr('sortPopular')}</option>
-          <option value="recent">{tr('sortRecent')}</option>
-          <option value="alpha">{tr('sortAlpha')}</option>
-        </select>
-        <input 
-          value={localSearch} 
-          onChange={e => setLocalSearch(e.target.value)} 
-          placeholder={tr('search')} 
-          className="input-sm"
-          style={{ width: 160, minWidth: 120 }} 
-        />
-        
-        <button className="btn-primary btn-sm" onClick={() => setShowImport(true)} style={{ minHeight: 34 }}>
-          <i className="ti ti-plus" /> {tr('addSound')}
-        </button>
-        
-        {currentProfileId !== 'all' && (
-          <button className="btn-secondary btn-sm" onClick={() => setShowProfileManager(true)} style={{ minHeight: 34 }}>
-            <i className="ti ti-settings" /> {tr('manageProfile')}
-          </button>
-        )}
-      </div>
-
-      <div style={{ flex: 1, overflowY: importing ? 'hidden' : 'auto', padding: '16px 20px', position: 'relative' }}
-        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-        onDragLeave={e => {
-          if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false)
-        }}
-        onDrop={handleDropFiles}>
-
-        {dragOver && (
-          <div className="drop-overlay">
-            <i className="ti ti-music-plus" style={{ fontSize: 48, color: 'var(--accent)' }} />
-            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--accent)' }}>{tr('dropToImport')}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>MP3, WAV, OGG, FLAC, M4A</div>
-          </div>
-        )}
-
-        {importing && (
-          <div className="import-overlay">
-            <i className="ti ti-loader" style={{ fontSize: 40, color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>{tr('importing')}</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
-              {totalFiles > 0 ? `${importProgress} / ${totalFiles} fichiers` : tr('importingFiles')}
-            </div>
-            {totalFiles > 0 && (
-              <div style={{ width: 200, height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{
-                  width: `${(importProgress / totalFiles) * 100}%`,
-                  height: '100%',
-                  background: 'var(--accent)',
-                  borderRadius: 2,
-                  transition: 'width 0.3s ease'
-                }} />
+    <>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 150 }}>
+            <div style={{ fontWeight: 600, fontSize: 15 }}>{currentProfile?.id === 'all' ? tr('allSounds') : currentProfile?.name}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{currentSounds.length} {tr('sounds')}</div>
+            {searchTerm && (
+              <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>
+                <i className="ti ti-search" style={{ fontSize: 10 }} /> {tr('resultsFor')} "{searchTerm}" ({filtered.length})
               </div>
             )}
           </div>
-        )}
+          <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="input-sm" style={{ width: 'auto', minWidth: 120 }}>
+            <option value="custom">{tr('sortCustom')}</option>
+            <option value="default">{tr('sortDefault')}</option>
+            <option value="popular">{tr('sortPopular')}</option>
+            <option value="recent">{tr('sortRecent')}</option>
+            <option value="alpha">{tr('sortAlpha')}</option>
+          </select>
+          <input 
+            value={localSearch} 
+            onChange={e => setLocalSearch(e.target.value)} 
+            placeholder={tr('search')} 
+            className="input-sm"
+            style={{ width: 160, minWidth: 120 }} 
+          />
+          
+          <button className="btn-primary btn-sm" onClick={() => setShowImport(true)} style={{ minHeight: 34 }}>
+            <i className="ti ti-plus" /> {tr('addSound')}
+          </button>
+          
+          {currentProfileId !== 'all' && (
+            <button className="btn-secondary btn-sm" onClick={() => setShowProfileManager(true)} style={{ minHeight: 34 }}>
+              <i className="ti ti-settings" /> {tr('manageProfile')}
+            </button>
+          )}
+        </div>
 
-        {importSuccess > 0 && !importing && (
-          <div className="success-overlay">
-            <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className="ti ti-check" style={{ fontSize: 32, color: 'white' }} />
+        <div style={{ flex: 1, overflowY: importing ? 'hidden' : 'auto', padding: '16px 20px', position: 'relative' }}
+          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={e => {
+            if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false)
+          }}
+          onDrop={handleDropFiles}>
+
+          {dragOver && (
+            <div className="drop-overlay">
+              <i className="ti ti-music-plus" style={{ fontSize: 48, color: 'var(--accent)' }} />
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--accent)' }}>{tr('dropToImport')}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>MP3, WAV, OGG, FLAC, M4A</div>
             </div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--success)' }}>
-              {importSuccess} {tr('sounds')} {tr('added')} !
+          )}
+
+          {importing && (
+            <div className="import-overlay">
+              <i className="ti ti-loader" style={{ fontSize: 40, color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>{tr('importing')}</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
+                {totalFiles > 0 ? `${importProgress} / ${totalFiles} fichiers` : tr('importingFiles')}
+              </div>
+              {totalFiles > 0 && (
+                <div style={{ width: 200, height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${(importProgress / totalFiles) * 100}%`,
+                    height: '100%',
+                    background: 'var(--accent)',
+                    borderRadius: 2,
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )}
 
-        {filtered.length === 0 && soundsOutsideProfile.length === 0 && !importing && (
-          <div className="drop-zone" onClick={() => setShowImport(true)} style={{ cursor: 'pointer' }}>
-            <i className="ti ti-music-plus" style={{ fontSize: 32, display: 'block', marginBottom: 8 }} />
-            <div style={{ fontWeight: 500, marginBottom: 4 }}>{tr('noSoundsForProfile')}</div>
-            <div style={{ fontSize: 12 }}>{tr('dropHere')}</div>
-          </div>
-        )}
-
-        {favoriteSoundsForProfile.length > 0 && (
-          <Section title={tr('favorites')} icon="ti-star-filled" iconColor="var(--warning)" count={favoriteSoundsForProfile.length}>
-            <SoundGrid 
-              sounds={favoriteSoundsForProfile} 
-              shortcuts={shortcuts} 
-              audioDevice={audioDevice} 
-              volume={volume} 
-              loopEnabled={loopEnabled} 
-              playLocally={playLocally} 
-              store={store} 
-              addToast={addToast} 
-              lang={lang}
-              gridRef={favoritesGridRef}
-              draggable={sortBy === 'custom'}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-              draggedSoundId={draggedSoundId}
-              dragOverIndex={dragOverIndex}
-              dropTarget="favorites"
-            />
-          </Section>
-        )}
-
-        {filtered.length > 0 && (
-          <Section title={tr('profileSounds')} icon="ti-music" count={filtered.length}>
-            <SoundGrid 
-              sounds={displayed} 
-              shortcuts={shortcuts} 
-              audioDevice={audioDevice} 
-              volume={volume} 
-              loopEnabled={loopEnabled} 
-              playLocally={playLocally} 
-              store={store} 
-              addToast={addToast} 
-              lang={lang}
-              gridRef={gridRef}
-              draggable={sortBy === 'custom'}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onDragOver={handleDragOver}
-              onDrop={handleMainDrop}
-              draggedSoundId={draggedSoundId}
-              dragOverIndex={dragOverIndex}
-              dropTarget="profile"
-            />
-            {filtered.length > itemsPerPage && (
-              <button className="btn-secondary btn-sm" onClick={() => setShowAll(!showAll)} style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}>
-                <i className={`ti ${showAll ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
-                {showAll ? tr('showLess') : `${tr('showMore')} ${filtered.length - itemsPerPage}`}
-              </button>
-            )}
-          </Section>
-        )}
-
-        {soundsOutsideProfile.length > 0 && (
-          <Section title={tr('otherSounds')} icon="ti-circle-plus" iconColor="var(--text-tertiary)" count={soundsOutsideProfile.length} muted>
-            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>
-              {tr('clickToAdd')}
+          {importSuccess > 0 && !importing && (
+            <div className="success-overlay">
+              <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <i className="ti ti-check" style={{ fontSize: 32, color: 'white' }} />
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--success)' }}>
+                {importSuccess} {tr('sounds')} {tr('added')} !
+              </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
-              {displayedOther.map(s => (
-                <OutsideCard key={s.id} sound={s} onAdd={async () => {
-                  await store.addSoundToProfile(s.id, currentProfileId)
-                  addToast(`"${s.name}" ${tr('addedToProfile')}`, 'success')
-                }} lang={lang} />
-              ))}
+          )}
+
+          {filtered.length === 0 && soundsOutsideProfile.length === 0 && !importing && (
+            <div className="drop-zone" onClick={() => setShowImport(true)} style={{ cursor: 'pointer' }}>
+              <i className="ti ti-music-plus" style={{ fontSize: 32, display: 'block', marginBottom: 8 }} />
+              <div style={{ fontWeight: 500, marginBottom: 4 }}>{tr('noSoundsForProfile')}</div>
+              <div style={{ fontSize: 12 }}>{tr('dropHere')}</div>
             </div>
-            {soundsOutsideProfile.length > itemsPerPage && (
-              <button className="btn-secondary btn-sm" onClick={() => setShowAllOther(!showAllOther)} style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}>
-                <i className={`ti ${showAllOther ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
-                {showAllOther ? tr('showLess') : `${tr('showMore')} ${soundsOutsideProfile.length - itemsPerPage}`}
-              </button>
-            )}
-          </Section>
+          )}
+
+          {favoriteSoundsForProfile.length > 0 && (
+            <Section title={tr('favorites')} icon="ti-star-filled" iconColor="var(--warning)" count={favoriteSoundsForProfile.length}>
+              <SoundGrid 
+                sounds={favoriteSoundsForProfile} 
+                shortcuts={shortcuts} 
+                audioDevice={audioDevice} 
+                volume={volume} 
+                loopEnabled={loopEnabled} 
+                playLocally={playLocally} 
+                store={store} 
+                addToast={addToast} 
+                lang={lang}
+                gridRef={favoritesGridRef}
+                draggable={sortBy === 'custom'}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                draggedSoundId={draggedSoundId}
+                dragOverIndex={dragOverIndex}
+                dropTarget="favorites"
+              />
+            </Section>
+          )}
+
+          {filtered.length > 0 && (
+            <Section title={tr('profileSounds')} icon="ti-music" count={filtered.length}>
+              <SoundGrid 
+                sounds={displayed} 
+                shortcuts={shortcuts} 
+                audioDevice={audioDevice} 
+                volume={volume} 
+                loopEnabled={loopEnabled} 
+                playLocally={playLocally} 
+                store={store} 
+                addToast={addToast} 
+                lang={lang}
+                gridRef={gridRef}
+                draggable={sortBy === 'custom'}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragOver={handleDragOver}
+                onDrop={handleMainDrop}
+                draggedSoundId={draggedSoundId}
+                dragOverIndex={dragOverIndex}
+                dropTarget="profile"
+              />
+              {filtered.length > itemsPerPage && (
+                <button className="btn-secondary btn-sm" onClick={() => setShowAll(!showAll)} style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}>
+                  <i className={`ti ${showAll ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
+                  {showAll ? tr('showLess') : `${tr('showMore')} ${filtered.length - itemsPerPage}`}
+                </button>
+              )}
+            </Section>
+          )}
+
+          {soundsOutsideProfile.length > 0 && (
+            <Section title={tr('otherSounds')} icon="ti-circle-plus" iconColor="var(--text-tertiary)" count={soundsOutsideProfile.length} muted>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>
+                {tr('clickToAdd')}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
+                {displayedOther.map(s => (
+                  <OutsideCard key={s.id} sound={s} onAdd={async () => {
+                    await store.addSoundToProfile(s.id, currentProfileId)
+                    addToast(`"${s.name}" ${tr('addedToProfile')}`, 'success')
+                  }} lang={lang} />
+                ))}
+              </div>
+              {soundsOutsideProfile.length > itemsPerPage && (
+                <button className="btn-secondary btn-sm" onClick={() => setShowAllOther(!showAllOther)} style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}>
+                  <i className={`ti ${showAllOther ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
+                  {showAllOther ? tr('showLess') : `${tr('showMore')} ${soundsOutsideProfile.length - itemsPerPage}`}
+                </button>
+              )}
+            </Section>
+          )}
+        </div>
+
+        {showImport && (
+          <ImportModal
+            onClose={() => setShowImport(false)}
+            onOpenDialog={handleOpenDialog}
+            onDrop={handleDropFiles}
+            dragOver={dragOver}
+            setDragOver={setDragOver}
+            currentProfileId={currentProfileId}
+            store={store}
+            onManualAdd={async (name, filePath, imagePath, emoji) => {
+              let finalPath = filePath
+              const compressOnImport = store.compressOnImport || false
+              
+              if (compressOnImport) {
+                try {
+                  const ext = filePath.split('.').pop() || 'mp3'
+                  const compressedPath = filePath.replace(`.${ext}`, `_compressed.${ext}`)
+                  const compressionResult = await compressAudio(filePath, compressedPath, {
+                    bitrate: store.compressionBitrate || 128,
+                    format: ext === 'mp3' ? 'mp3' : 'aac'
+                  })
+                  if (compressionResult.success) {
+                    finalPath = compressedPath
+                    await window.electronAPI.deleteSoundFile(filePath)
+                  }
+                } catch (e) {
+                  console.warn('⚠️ Erreur compression:', e)
+                }
+              }
+              
+              await store.addSound({ 
+                name, 
+                path: finalPath, 
+                image: imagePath || null, 
+                emoji: emoji || '🔊', 
+                profiles: [currentProfileId] 
+              })
+              addToast(`"${name}" ${tr('added')}`, 'success')
+              setShowImport(false)
+            }}
+            onUrlImport={async (url, name) => {
+              const safeName = name.replace(/\s+/g, '_') + '_' + Date.now() + '.mp3'
+              let result = await window.electronAPI.downloadSoundUrl(url, safeName)
+              
+              if (result.success && store.compressOnImport) {
+                try {
+                  const ext = result.path.split('.').pop() || 'mp3'
+                  const compressedPath = result.path.replace(`.${ext}`, `_compressed.${ext}`)
+                  const compressionResult = await compressAudio(result.path, compressedPath, {
+                    bitrate: store.compressionBitrate || 128,
+                    format: ext === 'mp3' ? 'mp3' : 'aac'
+                  })
+                  if (compressionResult.success) {
+                    result.path = compressedPath
+                    await window.electronAPI.deleteSoundFile(result.path.replace(`_compressed.${ext}`, `.${ext}`))
+                  }
+                } catch (e) {
+                  console.warn('⚠️ Erreur compression:', e)
+                }
+              }
+              
+              if (result.success) {
+                await store.addSound({ name, path: result.path, emoji: '🔊', profiles: [currentProfileId] })
+                addToast(`"${name}" ${tr('downloaded')}`, 'success')
+              } else addToast(`${tr('error')} : ${result.error}`, 'error')
+              setShowImport(false)
+            }}
+            lang={lang}
+          />
         )}
+
+        {showProfileManager && (
+          <ProfileManagerModal
+            profileId={currentProfileId}
+            profileName={currentProfile?.name || 'Profil'}
+            sounds={currentSounds}
+            store={store}
+            onClose={() => setShowProfileManager(false)}
+            addToast={addToast}
+            lang={lang}
+          />
+        )}
+
+        <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
       </div>
-
-      {showImport && (
-        <ImportModal
-          onClose={() => setShowImport(false)}
-          onOpenDialog={handleOpenDialog}
-          onDrop={handleDropFiles}
-          dragOver={dragOver}
-          setDragOver={setDragOver}
-          currentProfileId={currentProfileId}
-          store={store}
-          onManualAdd={async (name, filePath, imagePath, emoji) => {
-            let finalPath = filePath
-            const compressOnImport = store.compressOnImport || false
-            
-            // Compression si activée
-            if (compressOnImport) {
-              try {
-                const ext = filePath.split('.').pop() || 'mp3'
-                const compressedPath = filePath.replace(`.${ext}`, `_compressed.${ext}`)
-                const compressionResult = await compressAudio(filePath, compressedPath, {
-                  bitrate: store.compressionBitrate || 128,
-                  format: ext === 'mp3' ? 'mp3' : 'aac'
-                })
-                if (compressionResult.success) {
-                  finalPath = compressedPath
-                  await window.electronAPI.deleteSoundFile(filePath)
-                }
-              } catch (e) {
-                console.warn('⚠️ Erreur compression:', e)
-              }
-            }
-            
-            await store.addSound({ 
-              name, 
-              path: finalPath, 
-              image: imagePath || null, 
-              emoji: emoji || '🔊', 
-              profiles: [currentProfileId] 
-            })
-            addToast(`"${name}" ${tr('added')}`, 'success')
-            setShowImport(false)
-          }}
-          onUrlImport={async (url, name) => {
-            const safeName = name.replace(/\s+/g, '_') + '_' + Date.now() + '.mp3'
-            let result = await window.electronAPI.downloadSoundUrl(url, safeName)
-            
-            // Compression si activée
-            if (result.success && store.compressOnImport) {
-              try {
-                const ext = result.path.split('.').pop() || 'mp3'
-                const compressedPath = result.path.replace(`.${ext}`, `_compressed.${ext}`)
-                const compressionResult = await compressAudio(result.path, compressedPath, {
-                  bitrate: store.compressionBitrate || 128,
-                  format: ext === 'mp3' ? 'mp3' : 'aac'
-                })
-                if (compressionResult.success) {
-                  result.path = compressedPath
-                  await window.electronAPI.deleteSoundFile(result.path.replace(`_compressed.${ext}`, `.${ext}`))
-                }
-              } catch (e) {
-                console.warn('⚠️ Erreur compression:', e)
-              }
-            }
-            
-            if (result.success) {
-              await store.addSound({ name, path: result.path, emoji: '🔊', profiles: [currentProfileId] })
-              addToast(`"${name}" ${tr('downloaded')}`, 'success')
-            } else addToast(`${tr('error')} : ${result.error}`, 'error')
-            setShowImport(false)
-          }}
-          lang={lang}
-        />
-      )}
-
-      {showProfileManager && (
-        <ProfileManagerModal
-          profileId={currentProfileId}
-          profileName={currentProfile?.name || 'Profil'}
-          sounds={currentSounds}
-          store={store}
-          onClose={() => setShowProfileManager(false)}
-          addToast={addToast}
-          lang={lang}
-        />
-      )}
-
-      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
-    </div>
+      <ConfirmWrapper />
+    </>
   )
 }
 
@@ -872,7 +873,6 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
               </div>
             </div>
 
-            {/* Option de compression - visible dans tous les onglets */}
             <div style={{
               padding: '8px 12px',
               background: 'var(--bg-tertiary)',
@@ -969,7 +969,6 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
               </div>
             )}
 
-            {/* Compression dans l'onglet Manuel */}
             <div style={{
               padding: '8px 12px',
               background: 'var(--bg-tertiary)',
@@ -1042,7 +1041,6 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
               <input value={url} onChange={e => setUrl(e.target.value)} placeholder={tr('urlPlaceholder')} />
             </div>
 
-            {/* Compression dans l'onglet URL */}
             <div style={{
               padding: '8px 12px',
               background: 'var(--bg-tertiary)',

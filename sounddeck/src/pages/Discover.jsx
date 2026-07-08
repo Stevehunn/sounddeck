@@ -711,8 +711,8 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
         <ConfirmModal
           title={tr('discoverClearCache')}
           message={tr('discoverClearCacheConfirm')}
-          confirmText={tr('confirm')}  // ← Utilise la traduction
-          cancelText={tr('cancel')}    // ← Utilise la traduction
+          confirmText={tr('confirm')}
+          cancelText={tr('cancel')}
           onConfirm={confirmClearCache}
           onCancel={() => setShowConfirmModal(false)}
           type="danger"
