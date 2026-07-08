@@ -2,11 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import SoundCard from '../components/SoundCard'
 import AudioTrimmer from '../components/AudioTrimmer'
 import ProfileManagerModal from '../components/ProfileManagerModal'
-import VoiceControl from '../components/VoiceControl'
-import AIGenerator from '../components/AIGenerator'
 import { useTranslation } from '../i18n'
 import { playSound, stopAllSounds, stopSound } from '../utils/audio'
-import { analyzeAudio } from '../utils/aiTagging'
 import { compressAudio, formatSize } from '../utils/audioConverter'
 
 const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
@@ -18,7 +15,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
   const [showAllOther, setShowAllOther] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [showProfileManager, setShowProfileManager] = useState(false)
-  const [showAIGenerator, setShowAIGenerator] = useState(false)
   const [sortBy, setSortBy] = useState('custom')
   const [dragOver, setDragOver] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -27,7 +23,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
   const [importSuccess, setImportSuccess] = useState(0)
   const [localSearch, setLocalSearch] = useState('')
   const [columns, setColumns] = useState(6)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
   const gridRef = useRef(null)
   const favoritesGridRef = useRef(null)
 
@@ -404,60 +399,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
     }
   }
 
-  // ─── Analyse IA ──────────────────────────────────────────────────────────
-  const handleAnalyzeSounds = async () => {
-    setIsAnalyzing(true)
-    const soundsToAnalyze = currentSounds.slice(0, 10)
-    
-    let analyzed = 0
-    for (const sound of soundsToAnalyze) {
-      try {
-        const tags = await analyzeAudio(sound.path)
-        if (tags && tags.length > 0) {
-          for (const tag of tags) {
-            await store.addTagToSound(sound.id, tag.tag)
-          }
-        }
-        analyzed++
-      } catch (e) {
-        console.error('Erreur analyse:', e)
-      }
-    }
-    
-    setIsAnalyzing(false)
-    addToast(`${analyzed} ${tr('sounds')} ${tr('autoTagSuccess')}`, 'success')
-  }
-
-  // ─── Commandes vocales ──────────────────────────────────────────────────
-  const handleVoiceCommand = (text) => {
-    const words = text.split(' ')
-    for (const word of words) {
-      const found = currentSounds.find(s => 
-        s.name.toLowerCase().includes(word) || 
-        (store.tags[s.id] || []).some(t => t === word)
-      )
-      if (found) {
-        playSound(found, audioDevice, volume, loopEnabled, playLocally)
-        addToast(`🎤 "${found.name}" ${tr('played')}`, 'success')
-        return
-      }
-    }
-    
-    if (text.includes('stop') || text.includes('arrête')) {
-      stopAllSounds()
-      addToast('🔇 ' + tr('toastAllStopped'), 'info')
-      return
-    }
-    
-    if (text.includes('loop') || text.includes('répète')) {
-      store.toggleLoop()
-      addToast(`🔄 ${tr('loop')} ${loopEnabled ? tr('toastLoopOff') : tr('toastLoopOn')}`, 'info')
-      return
-    }
-    
-    addToast(`❓ ${tr('commandNotRecognized')}: "${text}"`, 'warning')
-  }
-
   const currentProfile = store.profiles.find(p => p.id === currentProfileId)
 
   return (
@@ -486,33 +427,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
           className="input-sm"
           style={{ width: 160, minWidth: 120 }} 
         />
-        
-        <VoiceControl 
-          store={store}
-          onCommand={handleVoiceCommand}
-          lang={lang}
-        />
-        
-        <button 
-          className="btn-secondary btn-sm"
-          onClick={handleAnalyzeSounds}
-          disabled={isAnalyzing}
-          style={{ minHeight: 34 }}
-        >
-          {isAnalyzing ? (
-            <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('analyzing')}</>
-          ) : (
-            <><i className="ti ti-wand" /> {tr('autoTag')}</>
-          )}
-        </button>
-        
-        <button 
-          className="btn-secondary btn-sm"
-          onClick={() => setShowAIGenerator(true)}
-          style={{ minHeight: 34 }}
-        >
-          <i className="ti ti-wand" /> {tr('aiGenerator')}
-        </button>
         
         <button className="btn-primary btn-sm" onClick={() => setShowImport(true)} style={{ minHeight: 34 }}>
           <i className="ti ti-plus" /> {tr('addSound')}
@@ -740,17 +654,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
           store={store}
           onClose={() => setShowProfileManager(false)}
           addToast={addToast}
-          lang={lang}
-        />
-      )}
-
-      {showAIGenerator && (
-        <AIGenerator
-          store={store}
-          onAddSound={() => {
-            addToast(tr('soundGenerated'), 'success')
-          }}
-          onClose={() => setShowAIGenerator(false)}
           lang={lang}
         />
       )}
