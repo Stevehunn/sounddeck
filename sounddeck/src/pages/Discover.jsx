@@ -30,6 +30,66 @@ const BASE_URLS = {
   es: 'https://www.myinstants.com/fr/index/es/',
 }
 
+// ─── CACHE DES CATÉGORIES ──────────────────────────────────────────────────
+const CACHE_KEY = 'sounddeck_discover_cache'
+const CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 heures
+
+function getCachedCategory(categoryId) {
+  try {
+    const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')
+    const entry = cache[categoryId]
+    if (!entry) return null
+    
+    if (Date.now() - entry.timestamp > CACHE_DURATION) {
+      delete cache[categoryId]
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cache))
+      return null
+    }
+    
+    return entry.data
+  } catch (e) {
+    return null
+  }
+}
+
+function setCachedCategory(categoryId, data) {
+  try {
+    const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')
+    cache[categoryId] = {
+      timestamp: Date.now(),
+      data: data
+    }
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cache))
+  } catch (e) {
+    console.warn('Erreur sauvegarde cache:', e)
+  }
+}
+
+function getCacheInfo() {
+  try {
+    const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')
+    const info = {}
+    for (const [key, entry] of Object.entries(cache)) {
+      const age = Date.now() - entry.timestamp
+      const hours = Math.floor(age / (60 * 60 * 1000))
+      info[key] = {
+        age: hours,
+        expired: age > CACHE_DURATION,
+        count: entry.data?.length || 0
+      }
+    }
+    return info
+  } catch (e) {
+    return {}
+  }
+}
+
+function formatCacheAge(hours, tr) {
+  if (hours < 1) return tr('discoverCacheRecent')
+  if (hours === 1) return `1${tr('discoverCacheAge')}`
+  return `${hours}${tr('discoverCacheAge')}`
+}
+
 // ─── COMPOSANT PRINCIPAL ──────────────────────────────────────────────────────
 
 export default function Discover({ store, addToast, lang = 'fr' }) {
@@ -44,6 +104,8 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
   const [showProfileModal, setShowProfileModal] = useState(null)
   const [error, setError] = useState('')
   const [previewLevel, setPreviewLevel] = useState(store.previewVolume ?? 50)
+  const [lastRefresh, setLastRefresh] = useState(null)
+  const [cacheInfo, setCacheInfo] = useState({})
   
   const previewHowlRef = useRef(null)
   const searchTimeoutRef = useRef(null)
@@ -58,9 +120,20 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     }
   }
 
-  const fetchSounds = async (categoryId, query = '') => {
+  const fetchSounds = async (categoryId, query = '', forceRefresh = false) => {
     const category = CATEGORY_CONFIG[categoryId]
     if (!category) return
+
+    if (!forceRefresh && !query) {
+      const cached = getCachedCategory(categoryId)
+      if (cached && cached.length > 0) {
+        setSounds(cached)
+        setError('')
+        setLastRefresh(Date.now())
+        setCacheInfo(getCacheInfo())
+        return
+      }
+    }
 
     setLoading(true)
     setError('')
@@ -70,7 +143,6 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
       let mode = category.mode
       let search = query || category.query
 
-      // ✅ Si on est en mode 'local' et qu'il y a une recherche, on passe en mode 'search'
       if (mode === 'local' && query && query.trim()) {
         mode = 'search'
         search = query.trim()
@@ -102,8 +174,13 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
         })
         
         setSounds(unique)
+        if (!query) {
+          setCachedCategory(categoryId, unique)
+        }
         if (unique.length === 0) setError(tr('noResult'))
         setLoading(false)
+        setLastRefresh(Date.now())
+        setCacheInfo(getCacheInfo())
         return
       }
 
@@ -111,6 +188,11 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
       
       if (result.success && result.sounds.length > 0) {
         setSounds(result.sounds)
+        if (!query) {
+          setCachedCategory(categoryId, result.sounds)
+        }
+        setLastRefresh(Date.now())
+        setCacheInfo(getCacheInfo())
       } else {
         setError(result.error || tr('noResult'))
       }
@@ -124,6 +206,8 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
 
   useEffect(() => {
     fetchSounds('trending')
+    setCacheInfo(getCacheInfo())
+    
     return () => stopPreview()
   }, [lang])
 
@@ -131,6 +215,20 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     setActiveCategory(categoryId)
     setSearchQuery('')
     fetchSounds(categoryId)
+  }
+
+  const handleRefresh = () => {
+    fetchSounds(activeCategory, '', true)
+    addToast(`🔄 ${tr('discoverRefreshed')}`, 'info')
+  }
+
+  const handleClearCache = () => {
+    if (confirm(tr('discoverClearCache') + ' ?')) {
+      localStorage.removeItem(CACHE_KEY)
+      setCacheInfo({})
+      fetchSounds(activeCategory, '', true)
+      addToast(`🗑️ ${tr('discoverCacheCleared')}`, 'info')
+    }
   }
 
   const handleSearch = (e) => {
@@ -150,7 +248,6 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
       clearTimeout(searchTimeoutRef.current)
     }
     
-    // ✅ Si on est dans la catégorie 'trending' et qu'il y a une recherche
     if (activeCategory === 'trending' && value.trim().length >= 2) {
       searchTimeoutRef.current = setTimeout(() => {
         fetchSounds(activeCategory, value.trim())
@@ -212,7 +309,6 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     setShowProfileModal(sound)
   }
 
-  // ✅ Fonction confirmDownload - CORRIGÉE : définie avant le return
   const confirmDownload = async (sound, profileId) => {
     setShowProfileModal(null)
     setDownloading(prev => ({ ...prev, [sound.id]: true }))
@@ -247,26 +343,65 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
   const isMuted = previewLevel === 0
   const isAtGlobal = previewLevel === 50
 
+  const cacheAge = lastRefresh ? Math.floor((Date.now() - lastRefresh) / (60 * 60 * 1000)) : null
+  const isCached = cacheInfo[activeCategory]?.count > 0
+  const isExpired = cacheInfo[activeCategory]?.expired || false
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 15 }}>{tr('discoverTitle')}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-              {tr('discoverSub')} <strong>MyInstants</strong> · {sounds.length} {tr('discoverResults')}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>{tr('discoverTitle')}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                {tr('discoverSub')} <strong>MyInstants</strong> · {sounds.length} {tr('discoverResults')}
+                {isCached && (
+                  <span style={{ marginLeft: 8, color: 'var(--text-tertiary)' }}>
+                    · 💾 {tr('discoverCache')} {formatCacheAge(cacheAge, tr)}
+                    {isExpired && <span style={{ color: 'var(--warning)' }}> ⚠️ {tr('discoverCacheExpired')}</span>}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           
-          <VolumeControl
-            previewLevel={previewLevel}
-            isMuted={isMuted}
-            isAtGlobal={isAtGlobal}
-            onLevelChange={handlePreviewLevelChange}
-            onMuteToggle={() => handlePreviewLevelChange(isMuted ? 50 : 0)}
-            onReset={() => handlePreviewLevelChange(50)}
-          />
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Bouton Rafraîchir */}
+            <button
+              className="btn-secondary btn-sm"
+              onClick={handleRefresh}
+              disabled={loading}
+              style={{ minHeight: 28, fontSize: 11 }}
+              title={`${tr('discoverRefresh')} (1x/jour recommandé)`}
+            >
+              <i className={`ti ${loading ? 'ti-loader' : 'ti-refresh'}`} 
+                 style={loading ? { animation: 'spin 1s linear infinite' } : {}} />
+              {loading ? '...' : `🔄 ${tr('discoverRefresh')}`}
+            </button>
+
+            {/* Bouton vider cache (visible en dev) */}
+            {process.env.NODE_ENV === 'development' && (
+              <button
+                className="btn-ghost btn-sm"
+                onClick={handleClearCache}
+                style={{ minHeight: 28, fontSize: 10, color: 'var(--text-tertiary)' }}
+              >
+                <i className="ti ti-trash" /> {tr('discoverClearCache')}
+              </button>
+            )}
+
+            <VolumeControl
+              previewLevel={previewLevel}
+              isMuted={isMuted}
+              isAtGlobal={isAtGlobal}
+              onLevelChange={handlePreviewLevelChange}
+              onMuteToggle={() => handlePreviewLevelChange(isMuted ? 50 : 0)}
+              onReset={() => handlePreviewLevelChange(50)}
+              tr={tr}
+            />
+          </div>
         </div>
 
         {/* Barre de recherche */}
@@ -298,15 +433,29 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
 
         {/* Catégories */}
         <div className="categories-scroll">
-          {categories.map(cat => (
-            <button
-              key={cat.id}
-              className={`category-btn ${activeCategory === cat.id ? 'active' : ''}`}
-              onClick={() => handleCategoryClick(cat.id)}
-            >
-              {cat.label}
-            </button>
-          ))}
+          {categories.map(cat => {
+            const isCached = cacheInfo[cat.id]?.count > 0
+            return (
+              <button
+                key={cat.id}
+                className={`category-btn ${activeCategory === cat.id ? 'active' : ''}`}
+                onClick={() => handleCategoryClick(cat.id)}
+                style={isCached ? { borderColor: 'var(--success)' } : {}}
+              >
+                {cat.label}
+                {isCached && (
+                  <span style={{ 
+                    fontSize: 8, 
+                    marginLeft: 4, 
+                    color: 'var(--success)',
+                    opacity: 0.6
+                  }}>
+                    💾
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -314,23 +463,57 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
         {loading && <LoadingState tr={tr} />}
         
-        {!loading && error && <ErrorState error={error} onRetry={() => fetchSounds(activeCategory, searchQuery)} tr={tr} />}
+        {!loading && error && <ErrorState error={error} onRetry={() => fetchSounds(activeCategory, searchQuery, true)} tr={tr} />}
         
         {!loading && !error && sounds.length === 0 && (
           <EmptyState tr={tr} />
         )}
 
         {!loading && !error && sounds.length > 0 && (
-          <SoundGrid
-            sounds={sounds}
-            downloadedNames={store.sounds.map(s => s.name.toLowerCase().trim())}
-            downloading={downloading}
-            previewing={previewing}
-            onPreview={togglePreview}
-            onDownload={handleDownload}
-            lang={lang}
-            tr={tr}
-          />
+          <>
+            {/* Indicateur de source des données */}
+            {isCached && !loading && (
+              <div style={{
+                fontSize: 10,
+                color: 'var(--text-tertiary)',
+                marginBottom: 8,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}>
+                <i className="ti ti-database" style={{ fontSize: 12 }} />
+                {tr('discoverFromCache')}
+                {cacheAge !== null && (
+                  <span>({cacheAge < 1 ? tr('discoverFromCacheLess') : `${cacheAge}${tr('discoverCacheAge')}`})</span>
+                )}
+                <span style={{ opacity: 0.5 }}>·</span>
+                <button
+                  onClick={handleRefresh}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--accent)',
+                    cursor: 'pointer',
+                    fontSize: 10,
+                    textDecoration: 'underline'
+                  }}
+                >
+                  <i className="ti ti-refresh" style={{ fontSize: 10 }} /> {tr('discoverRefresh')}
+                </button>
+              </div>
+            )}
+
+            <SoundGrid
+              sounds={sounds}
+              downloadedNames={store.sounds.map(s => s.name.toLowerCase().trim())}
+              downloading={downloading}
+              previewing={previewing}
+              onPreview={togglePreview}
+              onDownload={handleDownload}
+              lang={lang}
+              tr={tr}
+            />
+          </>
         )}
       </div>
 
@@ -381,7 +564,7 @@ function EmptyState({ tr }) {
   )
 }
 
-function VolumeControl({ previewLevel, isMuted, isAtGlobal, onLevelChange, onMuteToggle, onReset }) {
+function VolumeControl({ previewLevel, isMuted, isAtGlobal, onLevelChange, onMuteToggle, onReset, tr }) {
   return (
     <div style={{ 
       display: 'flex', 
@@ -630,7 +813,6 @@ function SoundDiscoverCard({ sound, owned, isDownloading, isPreviewing, onPrevie
   )
 }
 
-// ✅ ProfilePickerModal - Version corrigée avec boutons uniformisés
 function ProfilePickerModal({ sound, profiles, onConfirm, onClose, lang, tr }) {
   const [selectedProfile, setSelectedProfile] = useState('all')
 
