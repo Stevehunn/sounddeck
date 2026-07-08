@@ -1,36 +1,56 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Howl } from 'howler'
 import { LANGUAGES, useTranslation } from '../i18n'
+import ConfirmModal from '../components/ConfirmModal'
 
-// ─── CONFIGURATION DES CATÉGORIES ────────────────────────────────────────────
+// ─── CONFIGURATION DES CATÉGORIES SIMPLIFIÉE ────────────────────────────────
 const CATEGORY_CONFIG = {
-  trending: { icon: '🔥', key: 'catTrending', mode: 'local', query: '' },
-  best: { icon: '🏆', key: 'catBest', mode: 'multi', query: 'vine boom,bruh,airhorn,oof' },
-  discord: { icon: '💬', key: 'catDiscord', mode: 'multi', query: 'discord,notification,ping' },
-  anime: { icon: '⛩️', key: 'catAnime', mode: 'category', query: 'anime & manga' },
-  games: { icon: '🎮', key: 'catGames', mode: 'category', query: 'games' },
-  memes: { icon: '😂', key: 'catMemes', mode: 'category', query: 'memes' },
-  movies: { icon: '🎬', key: 'catMovies', mode: 'category', query: 'movies' },
-  music: { icon: '🎵', key: 'catMusic', mode: 'category', query: 'music' },
-  politics: { icon: '🗳️', key: 'catPolitics', mode: 'category', query: 'politics' },
-  pranks: { icon: '🤣', key: 'catPranks', mode: 'category', query: 'pranks' },
-  reactions: { icon: '😱', key: 'catReactions', mode: 'category', query: 'reactions' },
-  sfx: { icon: '🔊', key: 'catSfx', mode: 'category', query: 'sound effects' },
-  sports: { icon: '⚽', key: 'catSports', mode: 'category', query: 'sports' },
-  tv: { icon: '📺', key: 'catTv', mode: 'category', query: 'television' },
-  tiktok: { icon: '📱', key: 'catTiktok', mode: 'category', query: 'tiktok trends' },
-  viral: { icon: '📣', key: 'catViral', mode: 'category', query: 'viral' },
-  whatsapp: { icon: '💬', key: 'catWhatsapp', mode: 'category', query: 'whatsapp audios' },
+  trending: { 
+    icon: '🔥', 
+    key: 'catTrending', 
+    mode: 'local', 
+    query: '',
+  },
+  best: { 
+    icon: '🏆', 
+    key: 'catBest', 
+    mode: 'multi', 
+    query: 'vine boom,bruh,airhorn,oof',
+  },
+  multimedia: { 
+    icon: '🎬', 
+    key: 'catMultimedia', 
+    mode: 'multi', 
+    query: 'movies,television,music,sound effects,sound effect',
+  },
+  memes: { 
+    icon: '😂', 
+    key: 'catMemes', 
+    mode: 'multi', 
+    query: 'memes,viral',
+  },
+  gaming: { 
+    icon: '🎮', 
+    key: 'catGaming', 
+    mode: 'multi', 
+    query: 'games,discord,notification,ping',
+  },
+  anime: { 
+    icon: '⛩️', 
+    key: 'catAnime', 
+    mode: 'search', 
+    query: 'anime & manga',
+  },
 }
 
-// URLs par pays
+// URLs par pays pour le mode local
 const BASE_URLS = {
   fr: 'https://www.myinstants.com/fr/index/fr/',
   en: 'https://www.myinstants.com/fr/index/us/',
   es: 'https://www.myinstants.com/fr/index/es/',
 }
 
-// ─── CACHE DES CATÉGORIES ──────────────────────────────────────────────────
+// ─── CACHE ──────────────────────────────────────────────────────────────────
 const CACHE_KEY = 'sounddeck_discover_cache'
 const CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 heures
 
@@ -102,10 +122,16 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
   const [downloading, setDownloading] = useState({})
   const [previewing, setPreviewing] = useState(null)
   const [showProfileModal, setShowProfileModal] = useState(null)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [error, setError] = useState('')
   const [previewLevel, setPreviewLevel] = useState(store.previewVolume ?? 50)
   const [lastRefresh, setLastRefresh] = useState(null)
   const [cacheInfo, setCacheInfo] = useState({})
+  const [isPreloading, setIsPreloading] = useState(false)
+  const [preloadProgress, setPreloadProgress] = useState(0)
+  const [preloadTotal, setPreloadTotal] = useState(0)
+  const [preloadStatus, setPreloadStatus] = useState('')
+  const [isPreloadComplete, setIsPreloadComplete] = useState(false)
   
   const previewHowlRef = useRef(null)
   const searchTimeoutRef = useRef(null)
@@ -119,6 +145,8 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
       previewHowlRef.current.volume(volumeRatio)
     }
   }
+
+  // ─── CHARGEMENT DES SONS ──────────────────────────────────────────────────
 
   const fetchSounds = async (categoryId, query = '', forceRefresh = false) => {
     const category = CATEGORY_CONFIG[categoryId]
@@ -157,27 +185,26 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
       if (mode === 'multi') {
         const terms = search.split(',').map(t => t.trim()).filter(Boolean)
         const results = []
+        const seen = new Set()
         
-        for (const term of terms.slice(0, 4)) {
+        for (const term of terms) {
           const result = await window.electronAPI.fetchMyinstants(term, 'search', lang)
           if (result.success) {
-            results.push(...result.sounds)
+            for (const sound of result.sounds) {
+              if (!seen.has(sound.slug)) {
+                seen.add(sound.slug)
+                results.push(sound)
+              }
+            }
           }
           await new Promise(r => setTimeout(r, 200))
         }
         
-        const seen = new Set()
-        const unique = results.filter(s => {
-          if (seen.has(s.slug)) return false
-          seen.add(s.slug)
-          return true
-        })
-        
-        setSounds(unique)
+        setSounds(results)
         if (!query) {
-          setCachedCategory(categoryId, unique)
+          setCachedCategory(categoryId, results)
         }
-        if (unique.length === 0) setError(tr('noResult'))
+        if (results.length === 0) setError(tr('noResult'))
         setLoading(false)
         setLastRefresh(Date.now())
         setCacheInfo(getCacheInfo())
@@ -204,12 +231,117 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     setLoading(false)
   }
 
-  useEffect(() => {
-    fetchSounds('trending')
+  // ─── PRÉCHARGEMENT ────────────────────────────────────────────────────────
+
+  const preloadAllCategories = useCallback(async () => {
+    if (isPreloadComplete || isPreloading) return
+    
+    // Vérifier si toutes les catégories sont déjà en cache
+    const allCached = Object.keys(CATEGORY_CONFIG).every(id => {
+      const cached = getCachedCategory(id)
+      return cached && cached.length > 0
+    })
+    
+    if (allCached) {
+      setIsPreloadComplete(true)
+      return
+    }
+
+    setIsPreloading(true)
+    
+    const categories = Object.entries(CATEGORY_CONFIG)
+    const total = categories.length
+    let loaded = 0
+    
+    setPreloadTotal(total)
+    setPreloadStatus(tr('discoverPreloading'))
+    
+    for (const [id, config] of categories) {
+      // Vérifier si déjà en cache
+      const cached = getCachedCategory(id)
+      if (cached && cached.length > 0) {
+        loaded++
+        setPreloadProgress(Math.round((loaded / total) * 100))
+        continue
+      }
+      
+      try {
+        let mode = config.mode
+        let search = config.query
+        
+        if (mode === 'local') {
+          const langData = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0]
+          const country = langData.country || 'fr'
+          search = BASE_URLS[country] || BASE_URLS.fr
+        }
+        
+        if (mode === 'multi') {
+          const terms = search.split(',').map(t => t.trim()).filter(Boolean)
+          const results = []
+          const seen = new Set()
+          
+          for (const term of terms) {
+            const result = await window.electronAPI.fetchMyinstants(term, 'search', lang)
+            if (result.success) {
+              for (const sound of result.sounds) {
+                if (!seen.has(sound.slug)) {
+                  seen.add(sound.slug)
+                  results.push(sound)
+                }
+              }
+            }
+            await new Promise(r => setTimeout(r, 200))
+          }
+          
+          if (results.length > 0) {
+            setCachedCategory(id, results)
+          }
+        } else {
+          const result = await window.electronAPI.fetchMyinstants(search, mode, lang)
+          if (result.success && result.sounds.length > 0) {
+            setCachedCategory(id, result.sounds)
+          }
+        }
+        
+        loaded++
+        setPreloadProgress(Math.round((loaded / total) * 100))
+        setPreloadStatus(`${tr('discoverPreloadProgress')} ${loaded}/${total}`)
+        
+        await new Promise(r => setTimeout(r, 300))
+        
+      } catch (e) {
+        console.warn(`⚠️ Échec préchargement de ${id}:`, e)
+        loaded++
+        setPreloadProgress(Math.round((loaded / total) * 100))
+      }
+    }
+    
+    setIsPreloading(false)
+    setPreloadProgress(100)
+    setIsPreloadComplete(true)
+    setPreloadStatus(`✅ ${tr('discoverPreloadComplete')}`)
     setCacheInfo(getCacheInfo())
     
+  }, [lang, tr, isPreloadComplete, isPreloading])
+
+  // ─── INITIALISATION ──────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const init = async () => {
+      await fetchSounds('trending')
+      setCacheInfo(getCacheInfo())
+      
+      // Lancer le préchargement en arrière-plan
+      setTimeout(() => {
+        preloadAllCategories()
+      }, 1000)
+    }
+    
+    init()
     return () => stopPreview()
   }, [lang])
+
+  // ─── HANDLERS ─────────────────────────────────────────────────────────────
 
   const handleCategoryClick = (categoryId) => {
     setActiveCategory(categoryId)
@@ -223,12 +355,16 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
   }
 
   const handleClearCache = () => {
-    if (confirm(tr('discoverClearCache') + ' ?')) {
-      localStorage.removeItem(CACHE_KEY)
-      setCacheInfo({})
-      fetchSounds(activeCategory, '', true)
-      addToast(`🗑️ ${tr('discoverCacheCleared')}`, 'info')
-    }
+    setShowConfirmModal(true)
+  }
+
+  const confirmClearCache = () => {
+    localStorage.removeItem(CACHE_KEY)
+    setCacheInfo({})
+    setIsPreloadComplete(false)
+    fetchSounds(activeCategory, '', true)
+    addToast(`🗑️ ${tr('discoverCacheCleared')}`, 'info')
+    setShowConfirmModal(false)
   }
 
   const handleSearch = (e) => {
@@ -246,13 +382,6 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current)
-    }
-    
-    if (activeCategory === 'trending' && value.trim().length >= 2) {
-      searchTimeoutRef.current = setTimeout(() => {
-        fetchSounds(activeCategory, value.trim())
-      }, 500)
-      return
     }
     
     if (value.trim().length >= 2) {
@@ -334,6 +463,8 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
     setDownloading(prev => ({ ...prev, [sound.id]: false }))
   }
 
+  // ─── AFFICHAGE ────────────────────────────────────────────────────────────
+
   const categories = Object.entries(CATEGORY_CONFIG).map(([id, config]) => ({
     id,
     ...config,
@@ -342,7 +473,6 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
 
   const isMuted = previewLevel === 0
   const isAtGlobal = previewLevel === 50
-
   const cacheAge = lastRefresh ? Math.floor((Date.now() - lastRefresh) / (60 * 60 * 1000)) : null
   const isCached = cacheInfo[activeCategory]?.count > 0
   const isExpired = cacheInfo[activeCategory]?.expired || false
@@ -352,18 +482,21 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
       {/* Header */}
       <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 15 }}>{tr('discoverTitle')}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                {tr('discoverSub')} <strong>MyInstants</strong> · {sounds.length} {tr('discoverResults')}
-                {isCached && (
-                  <span style={{ marginLeft: 8, color: 'var(--text-tertiary)' }}>
-                    · 💾 {tr('discoverCache')} {formatCacheAge(cacheAge, tr)}
-                    {isExpired && <span style={{ color: 'var(--warning)' }}> ⚠️ {tr('discoverCacheExpired')}</span>}
-                  </span>
-                )}
-              </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 15 }}>{tr('discoverTitle')}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+              {tr('discoverSub')} · {sounds.length} {tr('discoverResults')}
+              {isCached && (
+                <span style={{ marginLeft: 8, color: 'var(--text-tertiary)' }}>
+                  · 💾 {tr('discoverCache')} {formatCacheAge(cacheAge, tr)}
+                  {isExpired && <span style={{ color: 'var(--warning)' }}> ⚠️ {tr('discoverCacheExpired')}</span>}
+                </span>
+              )}
+              {isPreloadComplete && (
+                <span style={{ marginLeft: 8, color: 'var(--success)' }}>
+                  · ✅ {tr('discoverPreloadComplete')}
+                </span>
+              )}
             </div>
           </div>
           
@@ -374,23 +507,40 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
               onClick={handleRefresh}
               disabled={loading}
               style={{ minHeight: 28, fontSize: 11 }}
-              title={`${tr('discoverRefresh')} (1x/jour recommandé)`}
             >
               <i className={`ti ${loading ? 'ti-loader' : 'ti-refresh'}`} 
                  style={loading ? { animation: 'spin 1s linear infinite' } : {}} />
               {loading ? '...' : `🔄 ${tr('discoverRefresh')}`}
             </button>
 
-            {/* Bouton vider cache (visible en dev) */}
-            {process.env.NODE_ENV === 'development' && (
-              <button
-                className="btn-ghost btn-sm"
-                onClick={handleClearCache}
-                style={{ minHeight: 28, fontSize: 10, color: 'var(--text-tertiary)' }}
-              >
-                <i className="ti ti-trash" /> {tr('discoverClearCache')}
-              </button>
-            )}
+            {/* Bouton Vider le cache avec effet de survol rouge */}
+            <button
+              className="btn-ghost btn-sm"
+              onClick={handleClearCache}
+              style={{ 
+                minHeight: 28, 
+                fontSize: 10, 
+                color: 'var(--text-tertiary)',
+                padding: '4px 8px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)',
+                background: 'transparent',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.color = 'var(--danger)'
+                e.currentTarget.style.borderColor = 'var(--danger)'
+                e.currentTarget.style.background = 'rgba(224,82,82,0.1)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.color = 'var(--text-tertiary)'
+                e.currentTarget.style.borderColor = 'var(--border)'
+                e.currentTarget.style.background = 'transparent'
+              }}
+            >
+              <i className="ti ti-trash" style={{ fontSize: 12 }} /> {tr('discoverClearCache')}
+            </button>
 
             <VolumeControl
               previewLevel={previewLevel}
@@ -459,6 +609,46 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
         </div>
       </div>
 
+      {/* Barre de progression du préchargement */}
+      {isPreloading && (
+        <div style={{
+          padding: '6px 20px',
+          background: 'var(--accent-light)',
+          borderBottom: '1px solid var(--accent)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          flexShrink: 0,
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+            <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite', fontSize: 14, color: 'var(--accent)' }} />
+            <span style={{ fontSize: 12, color: 'var(--accent)' }}>
+              {preloadStatus}
+            </span>
+          </div>
+          <div style={{ 
+            flex: 1, 
+            minWidth: 100,
+            height: 4, 
+            background: 'var(--bg-tertiary)', 
+            borderRadius: 2,
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              width: `${preloadProgress}%`,
+              height: '100%',
+              background: 'var(--accent)',
+              borderRadius: 2,
+              transition: 'width 0.3s ease'
+            }} />
+          </div>
+          <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+            {preloadProgress}%
+          </span>
+        </div>
+      )}
+
       {/* Liste des sons */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
         {loading && <LoadingState tr={tr} />}
@@ -471,7 +661,6 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
 
         {!loading && !error && sounds.length > 0 && (
           <>
-            {/* Indicateur de source des données */}
             {isCached && !loading && (
               <div style={{
                 fontSize: 10,
@@ -517,6 +706,21 @@ export default function Discover({ store, addToast, lang = 'fr' }) {
         )}
       </div>
 
+      {/* Modal de confirmation pour vider le cache */}
+      {showConfirmModal && (
+        <ConfirmModal
+          title={tr('discoverClearCache')}
+          message={tr('discoverClearCacheConfirm')}
+          confirmText={tr('confirm')}  // ← Utilise la traduction
+          cancelText={tr('cancel')}    // ← Utilise la traduction
+          onConfirm={confirmClearCache}
+          onCancel={() => setShowConfirmModal(false)}
+          type="danger"
+          lang={lang}
+        />
+      )}
+
+      {/* Modal de choix du profil pour le téléchargement */}
       {showProfileModal && (
         <ProfilePickerModal
           sound={showProfileModal}
