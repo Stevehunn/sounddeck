@@ -44,11 +44,9 @@ export default function SoundCard({
   layout = 'qwerty',
   onChangeImage,
   onChangeEmoji,
-  // Étape 2 : Tags
   tags = [],
   onAddTag,
   onRemoveTag,
-  // Étape 1 : Taille des cartes
   size = 'medium'
 }) {
   const tr = useTranslation(lang)
@@ -59,8 +57,6 @@ export default function SoundCard({
   const [nameValue, setNameValue] = useState(sound.name)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [emojiPickerPosition, setEmojiPickerPosition] = useState({ top: 0, left: 0 })
-  
-  // ⚠️ AJOUT : États pour les tags
   const [showTagInput, setShowTagInput] = useState(false)
   const [newTagValue, setNewTagValue] = useState('')
   
@@ -72,12 +68,12 @@ export default function SoundCard({
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
   const [volumePosition, setVolumePosition] = useState({ top: 0, left: 0 })
   const [isDraggingVolume, setIsDraggingVolume] = useState(false)
+  const [menuHeight, setMenuHeight] = useState(0)
 
   const cardRef = useRef(null)
   const buttonRef = useRef(null)
   const menuRef = useRef(null)
 
-  // Étape 1 : Tailles des cartes
   const cardSizes = {
     small: { padding: 6, fontSize: 9, emojiSize: 20, nameSize: 10 },
     medium: { padding: 8, fontSize: 11, emojiSize: 26, nameSize: 11 },
@@ -175,6 +171,50 @@ export default function SoundCard({
   const imageUrl = buildImageUrl(sound.image)
   const showImage = !!(sound.image) && !imgError
 
+  // Fonction pour calculer la position du menu
+  const calculateMenuPosition = useCallback(() => {
+    if (!buttonRef.current) return
+
+    const rect = buttonRef.current.getBoundingClientRect()
+    const menuWidth = 220
+    
+    // Position horizontale : alignée à gauche du bouton
+    let left = rect.left - 10
+    
+    // Ajustement horizontal si le menu dépasse à droite
+    const spaceRight = window.innerWidth - left - menuWidth
+    if (spaceRight < 10) {
+      left = Math.max(10, window.innerWidth - menuWidth - 10)
+    }
+    
+    // Si la hauteur du menu n'est pas encore connue, utiliser une estimation
+    const estimatedHeight = menuHeight > 0 ? menuHeight : 300
+    
+    // Vérifier l'espace en bas
+    const spaceBottom = window.innerHeight - rect.bottom - 6
+    
+    let top
+    if (spaceBottom >= estimatedHeight) {
+      // Assez d'espace en bas → ouvrir vers le bas
+      top = rect.bottom + 6
+    } else {
+      // Pas assez d'espace en bas → essayer vers le haut
+      const spaceTop = rect.top - 6
+      if (spaceTop >= estimatedHeight) {
+        top = rect.top - estimatedHeight - 6
+      } else {
+        // Ni en haut ni en bas → centrer dans la fenêtre
+        top = Math.max(10, (window.innerHeight - estimatedHeight) / 2)
+      }
+    }
+    
+    // Ajustements finaux pour rester dans l'écran
+    top = Math.max(10, Math.min(top, window.innerHeight - estimatedHeight - 10))
+    left = Math.max(10, Math.min(left, window.innerWidth - menuWidth - 10))
+    
+    setMenuPosition({ top, left })
+  }, [menuHeight])
+
   const handleMenuToggle = (e) => {
     e.stopPropagation()
     if (showMenu) {
@@ -182,29 +222,8 @@ export default function SoundCard({
       return
     }
     
-    if (buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect()
-      let top = rect.bottom + 4
-      let left = rect.left - 10
-      
-      const menuWidth = 220
-      const menuHeight = 320
-      
-      if (left + menuWidth > window.innerWidth) {
-        left = window.innerWidth - menuWidth - 10
-      }
-      if (left < 10) {
-        left = 10
-      }
-      if (top + menuHeight > window.innerHeight) {
-        top = rect.top - menuHeight - 4
-      }
-      if (top < 10) {
-        top = 10
-      }
-      
-      setMenuPosition({ top, left })
-    }
+    // Calculer la position avec la hauteur estimée
+    calculateMenuPosition()
     setShowMenu(true)
     setShowVolume(false)
   }
@@ -255,6 +274,13 @@ export default function SoundCard({
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showMenu])
+
+  // Recalculer la position quand la hauteur du menu change
+  useEffect(() => {
+    if (showMenu && menuHeight > 0) {
+      calculateMenuPosition()
+    }
+  }, [showMenu, menuHeight, calculateMenuPosition])
 
   const handleDragStart = (e) => {
     if (isDraggingVolume || showVolume) {
@@ -380,7 +406,6 @@ export default function SoundCard({
           </div>
         )}
 
-        {/* Étape 2 : Tags - Version avec input inline */}
         {tags.length > 0 && (
           <div style={{ 
             display: 'flex', 
@@ -423,7 +448,6 @@ export default function SoundCard({
           </div>
         )}
 
-        {/* Bouton Ajouter un tag avec input inline */}
         {onAddTag && (
           <div style={{ position: 'relative', display: 'inline-flex', justifyContent: 'center', marginTop: 2 }}>
             {showTagInput ? (
@@ -502,9 +526,7 @@ export default function SoundCard({
                 onClick={(e) => {
                   e.stopPropagation()
                   setShowTagInput(true)
-                  // Utiliser une référence ou un timeout plus court
                   setTimeout(() => {
-                    // Chercher l'input dans le DOM après le rendu
                     const input = document.querySelector('.tag-input-inline')
                     if (input) input.focus()
                   }, 10)
@@ -591,6 +613,7 @@ export default function SoundCard({
             onChangeEmoji={handleChangeEmoji}
             position={menuPosition}
             lang={lang}
+            onHeightMeasured={setMenuHeight}
           />
         </div>,
         document.body
@@ -925,30 +948,74 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
 }
 
 // ContextMenuPortal
-function ContextMenuPortal({ sound, currentProfileId, onClose, onToggleFavorite, onRename, onVolumeOpen, onRemoveFromProfile, onDelete, position, lang = 'fr' }) {
+function ContextMenuPortal({ 
+  sound, 
+  currentProfileId, 
+  onClose, 
+  onToggleFavorite, 
+  onRename, 
+  onVolumeOpen, 
+  onRemoveFromProfile, 
+  onDelete,
+  onChangeImage,
+  onChangeEmoji,
+  position, 
+  lang = 'fr',
+  onHeightMeasured
+}) {
   const tr = useTranslation(lang)
   const menuRef = useRef(null)
 
+  // Mesurer la hauteur réelle du menu après le rendu
   useEffect(() => {
     if (!menuRef.current) return
-    const rect = menuRef.current.getBoundingClientRect()
-    let { top, left } = position
     
-    if (rect.right > window.innerWidth) {
-      left = position.left - rect.width
-    }
-    if (rect.bottom > window.innerHeight) {
-      top = position.top - rect.height
-    }
-    if (left < 10) {
-      left = 10
-    }
-    if (top < 10) {
-      top = 10
-    }
+    // Utiliser requestAnimationFrame pour s'assurer que le DOM est rendu
+    requestAnimationFrame(() => {
+      if (!menuRef.current) return
+      const height = menuRef.current.getBoundingClientRect().height
+      if (onHeightMeasured && height > 0) {
+        onHeightMeasured(height)
+      }
+    })
+  }, [onHeightMeasured])
+
+  // Ajuster la position si le menu dépasse
+  useEffect(() => {
+    if (!menuRef.current) return
     
-    menuRef.current.style.top = top + 'px'
-    menuRef.current.style.left = left + 'px'
+    requestAnimationFrame(() => {
+      if (!menuRef.current) return
+      
+      const rect = menuRef.current.getBoundingClientRect()
+      let { top, left } = position
+      
+      // Ajuster si le menu dépasse à droite
+      if (rect.right > window.innerWidth) {
+        left = Math.max(10, window.innerWidth - rect.width - 10)
+      }
+      
+      // Ajuster si le menu dépasse en bas
+      if (rect.bottom > window.innerHeight) {
+        top = Math.max(10, window.innerHeight - rect.height - 10)
+      }
+      
+      // Ajuster si le menu dépasse à gauche
+      if (left < 10) {
+        left = 10
+      }
+      
+      // Ajuster si le menu dépasse en haut
+      if (top < 10) {
+        top = 10
+      }
+      
+      // Appliquer les positions si elles ont changé
+      if (top !== position.top || left !== position.left) {
+        menuRef.current.style.top = top + 'px'
+        menuRef.current.style.left = left + 'px'
+      }
+    })
   }, [position])
 
   const handleMenuClick = (e) => {
@@ -996,6 +1063,21 @@ function ContextMenuPortal({ sound, currentProfileId, onClose, onToggleFavorite,
         onClick={() => handleAction(onVolumeOpen)}
         lang={lang}
       />
+      
+      <MenuItem 
+        icon="ti-photo" 
+        label={tr('menuChangeImage')} 
+        onClick={() => handleAction(onChangeImage)}
+        lang={lang}
+      />
+      
+      <MenuItem 
+        icon="ti-mood-smile" 
+        label={tr('menuChangeEmoji')} 
+        onClick={() => handleAction(onChangeEmoji)}
+        lang={lang}
+      />
+      
       {onRemoveFromProfile && currentProfileId !== 'all' && (
         <>
           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
