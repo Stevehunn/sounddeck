@@ -42,6 +42,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onTogglePresentation: (cb) => ipcRenderer.on('toggle-presentation', () => cb()),
   onShortcutsToggle: (cb) => ipcRenderer.on('shortcuts-toggle', (e, enabled) => cb(enabled)),
   onShowQuitConfirm: (cb) => ipcRenderer.on('show-quit-confirm', () => cb()),
+  onHideQuitConfirm: (cb) => ipcRenderer.on('hide-quit-confirm', () => cb()),
+  onShowWindow: (cb) => ipcRenderer.on('show-window', () => cb()),
   removeAllListeners: (ch) => ipcRenderer.removeAllListeners(ch),
 
   // ─── TRAY ────────────────────────────────────────────────────────────────

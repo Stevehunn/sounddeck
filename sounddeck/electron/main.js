@@ -97,12 +97,7 @@ function buildTrayMenu(lang) {
     {
       label: labels.open,
       click: () => {
-        if (mainWindow) {
-          mainWindow.show()
-          mainWindow.focus()
-        } else {
-          createWindow()
-        }
+        showMainWindow()
       }
     },
     {
@@ -181,13 +176,28 @@ function createTray(lang = 'fr') {
       if (mainWindow.isVisible()) {
         mainWindow.hide()
       } else {
-        mainWindow.show()
-        mainWindow.focus()
+        showMainWindow()
       }
     } else {
       createWindow()
     }
   })
+}
+// ─── RÉOUVERTURE CENTRALISÉE DE LA FENÊTRE ──────────────────────────────────
+function showMainWindow() {
+  if (mainWindow) {
+    const wasHidden = !mainWindow.isVisible()
+
+    if (wasHidden) {
+      // ✅ Vraie réouverture depuis le tray : on annule une éventuelle popup
+      mainWindow.webContents.send('hide-quit-confirm')
+    }
+
+    mainWindow.show()
+    mainWindow.focus()
+  } else {
+    createWindow()
+  }
 }
 
 // ─── DÉTECTION DE LA LANGUE SYSTÈME ──────────────────────────────────────
@@ -1089,17 +1099,22 @@ function createWindow() {
   })
 
   mainWindow.on('close', (e) => {
+    console.log(`🔴 [MAIN] close event - isQuitting: ${isQuitting}, pendingQuit: ${pendingQuit}, closeToTray: ${closeToTray}`)
+    
     if (isQuitting || pendingQuit) {
+      console.log(`🔴 [MAIN] Quitting, pas de popup`)
       return
     }
 
     if (closeToTray === false) {
+      console.log(`🔴 [MAIN] closeToTray === false, quit direct`)
       isQuitting = true
       app.quit()
       return
     }
 
     e.preventDefault()
+    console.log(`🔴 [MAIN] Envoi de show-quit-confirm`)
     mainWindow.webContents.send('show-quit-confirm')
   })
 }
@@ -1584,7 +1599,6 @@ ipcMain.handle('confirm-quit', (event, action, remember) => {
   console.log('🔍 confirm-quit appelé avec:', { action, remember })
 
   if (action === 'quit') {
-    // L'utilisateur veut quitter
     if (remember) {
       closeToTray = false
       store.set('closeToTray', false)
@@ -1595,19 +1609,19 @@ ipcMain.handle('confirm-quit', (event, action, remember) => {
     app.quit()
     return 'quit'
   } else if (action === 'minimize') {
-    // ✅ L'utilisateur veut réduire - on cache la fenêtre maintenant
     if (remember) {
       closeToTray = true
       store.set('closeToTray', true)
       console.log('💾 closeToTray sauvegardé:', true)
     }
-    // On cache la fenêtre
+    
+    // ✅ Envoyer l'événement AVANT de cacher la fenêtre
     if (mainWindow) {
+      mainWindow.webContents.send('show-window')
       mainWindow.hide()
     }
     return 'minimize'
   } else {
-    // Annuler - on ne fait rien, la fenêtre reste visible
     return 'cancel'
   }
 })
@@ -1620,12 +1634,7 @@ ipcMain.handle('hide-window', () => {
 })
 
 ipcMain.handle('show-window', () => {
-  if (mainWindow) {
-    mainWindow.show()
-    mainWindow.focus()
-  } else {
-    createWindow()
-  }
+  showMainWindow()
   return true
 })
 
@@ -2864,8 +2873,7 @@ function registerToggleWindowShortcut(shortcut) {
         if (mainWindow.isVisible()) {
           mainWindow.hide()
         } else {
-          mainWindow.show()
-          mainWindow.focus()
+          showMainWindow()
         }
       } else {
         createWindow()

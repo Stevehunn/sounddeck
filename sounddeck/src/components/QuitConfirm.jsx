@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { useTranslation } from '../i18n'
+import { useState } from 'react'
 
 export default function QuitConfirm({ onClose, lang = 'fr' }) {
   const tr = useTranslation(lang)
@@ -7,14 +7,23 @@ export default function QuitConfirm({ onClose, lang = 'fr' }) {
   const [processing, setProcessing] = useState(false)
 
   const handleAction = async (action) => {
+    console.log(`📌 [QUIT] handleAction - action: ${action}`)
     if (processing) return
     setProcessing(true)
     
     try {
+      // ✅ Si l'utilisateur choisit "Réduire", fermer la popup IMMÉDIATEMENT
+      if (action === 'minimize') {
+        console.log(`📌 [QUIT] minimize - fermeture immédiate`)
+        onClose()
+      }
+
+      console.log(`📌 [QUIT] Appel de confirmQuit avec action: ${action}, remember: ${remember}`)
       const result = await window.electronAPI.confirmQuit(action, remember)
-      console.log('📤 Résultat confirmQuit:', result)
+      console.log(`📤 [QUIT] Résultat confirmQuit: ${result}`)
       
       if (result === 'cancel') {
+        console.log(`📌 [QUIT] cancel - fermeture`)
         onClose()
       }
     } catch (e) {
@@ -25,8 +34,10 @@ export default function QuitConfirm({ onClose, lang = 'fr' }) {
     }
   }
 
+  console.log(`🎨 [QUIT] Rendu de la popup`)
+
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" onClick={() => handleAction('cancel')}>
       <div className="modal" style={{ width: 420 }} onClick={e => e.stopPropagation()}>
         <div className="modal-title" style={{ color: 'var(--warning)' }}>
           <i className="ti ti-alert-triangle" style={{ color: 'var(--warning)', marginRight: 8 }} />

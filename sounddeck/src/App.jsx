@@ -27,6 +27,7 @@ export default function App() {
   const [isFirstLaunch, setIsFirstLaunch] = useState(null)
   const [showTutorial, setShowTutorial] = useState(false)
   const [showAdvancedTutorial, setShowAdvancedTutorial] = useState(false)
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false)
 
   const soundsRef = useRef([])
   const addToastRef = useRef(null)
@@ -36,8 +37,32 @@ export default function App() {
   const audioDeviceRef = useRef('default')
   const volumeRef = useRef(80)
   const setPresentationRef = useRef(null)
-  const [showQuitConfirm, setShowQuitConfirm] = useState(false)
   const isQuittingRef = useRef(false)
+
+  // ✅ Passer la référence du store à audio.js pour le mixeur
+  useEffect(() => {
+    setStoreRef(store)
+  }, [store])
+
+  // ✅ PRÉCHAUFFAGE DU CONTEXTE AUDIO - au démarrage de l'app
+  useEffect(() => {
+    if (store.loading) return
+    
+    const timer = setTimeout(() => {
+      console.log('🔥 Démarrage du préchauffage audio...')
+      warmupAudioContext()
+    }, 500)
+    
+    return () => clearTimeout(timer)
+  }, [store.loading])
+
+  useEffect(() => { soundsRef.current = store.sounds }, [store.sounds])
+  useEffect(() => { switchToNextProfileRef.current = store.switchToNextProfile }, [store.switchToNextProfile])
+  useEffect(() => { toggleLoopRef.current = store.toggleLoop }, [store.toggleLoop])
+  useEffect(() => { playLocallyRef.current = store.playLocally }, [store.playLocally])
+  useEffect(() => { audioDeviceRef.current = store.audioDevice }, [store.audioDevice])
+  useEffect(() => { volumeRef.current = store.volume }, [store.volume])
+  useEffect(() => { setPresentationRef.current = setPresentationMode }, [setPresentationMode])
 
   // ✅ Vérifier si c'est le premier lancement
   useEffect(() => {
@@ -74,31 +99,6 @@ export default function App() {
     }
   }, [])
 
-  // ✅ Passer la référence du store à audio.js pour le mixeur
-  useEffect(() => {
-    setStoreRef(store)
-  }, [store])
-
-  // ✅ PRÉCHAUFFAGE DU CONTEXTE AUDIO - au démarrage de l'app
-  useEffect(() => {
-    if (store.loading) return
-    
-    const timer = setTimeout(() => {
-      console.log('🔥 Démarrage du préchauffage audio...')
-      warmupAudioContext()
-    }, 500)
-    
-    return () => clearTimeout(timer)
-  }, [store.loading])
-
-  useEffect(() => { soundsRef.current = store.sounds }, [store.sounds])
-  useEffect(() => { switchToNextProfileRef.current = store.switchToNextProfile }, [store.switchToNextProfile])
-  useEffect(() => { toggleLoopRef.current = store.toggleLoop }, [store.toggleLoop])
-  useEffect(() => { playLocallyRef.current = store.playLocally }, [store.playLocally])
-  useEffect(() => { audioDeviceRef.current = store.audioDevice }, [store.audioDevice])
-  useEffect(() => { volumeRef.current = store.volume }, [store.volume])
-  useEffect(() => { setPresentationRef.current = setPresentationMode }, [setPresentationMode])
-
   // ✅ Raccourcis souris - Molette pour changer de profil
   useEffect(() => {
     const handleWheel = (e) => {
@@ -121,6 +121,27 @@ export default function App() {
     window.addEventListener('wheel', handleWheel, { passive: false })
     return () => window.removeEventListener('wheel', handleWheel)
   }, [store.currentProfileId, store.profiles])
+
+  // ✅ Gestion de la popup - SOLUTION FINALE
+  useEffect(() => {
+    const handleShowQuitConfirm = () => setShowQuitConfirm(true)
+    const handleHideQuitConfirm = () => setShowQuitConfirm(false)
+
+    window.electronAPI?.onShowQuitConfirm?.(handleShowQuitConfirm)
+    window.electronAPI?.onHideQuitConfirm?.(handleHideQuitConfirm)
+
+    return () => {
+      window.electronAPI?.removeAllListeners?.('show-quit-confirm')
+      window.electronAPI?.removeAllListeners?.('hide-quit-confirm')
+    }
+  }, [])
+
+  // ✅ Debug de l'état de la popup
+  useEffect(() => {
+    if (showQuitConfirm) {
+      console.log(`💬 showQuitConfirm = true`)
+    }
+  }, [showQuitConfirm])
 
   // Appliquer le thème
   useEffect(() => {
@@ -265,19 +286,12 @@ export default function App() {
       setPresentationRef.current?.(prev => !prev)
     })
 
-    window.electronAPI.onShowQuitConfirm(() => {
-      if (!isQuittingRef.current) {
-        setShowQuitConfirm(true)
-      }
-    })
-
     return () => {
       window.electronAPI.removeAllListeners('play-sound')
       window.electronAPI.removeAllListeners('switch-profile')
       window.electronAPI.removeAllListeners('toggle-loop')
       window.electronAPI.removeAllListeners('stop-all-sounds')
       window.electronAPI.removeAllListeners('toggle-presentation')
-      window.electronAPI.removeAllListeners('show-quit-confirm')
     }
   }, [store.loopEnabled, store.mixerEnabled])
 
