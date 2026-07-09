@@ -16,6 +16,7 @@ const SECTIONS = [
   { id: 'appearance', icon: 'ti-palette', labelKey: 'optionsAppearance' },
   { id: 'audio', icon: 'ti-volume', labelKey: 'optionsAudio' },
   { id: 'shortcuts', icon: 'ti-keyboard', labelKey: 'optionsShortcuts' },
+  { id: 'soundManagement', icon: 'ti-music', labelKey: 'soundManagement' },
   { id: 'integrations', icon: 'ti-plug', labelKey: 'integrations' },
   { id: 'performance', icon: 'ti-gauge', labelKey: 'performance' },
   { id: 'backup', icon: 'ti-cloud', labelKey: 'optionsBackup' },
@@ -280,7 +281,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
     }
   }
 
-  // ✅ Fonction de réinitialisation de la sidebar avec confirmation
   const handleResetSidebar = useCallback(async () => {
     const confirmed = await confirm({
       title: tr('sidebarEditorReset'),
@@ -293,30 +293,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
     addToast(tr('sidebarEditorResetSuccess'), 'success')
   }, [store, tr, addToast, confirm])
 
-  // ✅ Fonction pour basculer une section en mode fixe
-  const handleToggleSectionFixed = useCallback((sectionKey) => {
-    const currentFixed = store.sidebarConfig?.fixedSections || []
-    
-    let newFixed
-    if (currentFixed.includes(sectionKey)) {
-      newFixed = currentFixed.filter(s => s !== sectionKey)
-      addToast(`Section "${sectionKey}" déverrouillée`, 'info')
-    } else {
-      if (currentFixed.length >= 2) {
-        addToast('Maximum 2 sections fixes', 'warning')
-        return
-      }
-      newFixed = [...currentFixed, sectionKey]
-      addToast(`Section "${sectionKey}" verrouillée`, 'success')
-    }
-    
-    store.updateSidebarConfig({
-      ...store.sidebarConfig,
-      fixedSections: newFixed
-    })
-  }, [store, addToast])
-
-  // ✅ Fonction pour effacer les logs avec confirmation
   const handleClearLogs = useCallback(async () => {
     const confirmed = await confirm({
       title: tr('clearLogs'),
@@ -383,7 +359,9 @@ export default function Options({ store, addToast, lang = 'fr' }) {
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-        {/* Section Apparence */}
+        {/* ============================ */}
+        {/* SECTION 1 : APPARENCE */}
+        {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['appearance'] = el}
           id="appearance"
@@ -579,13 +557,54 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           )}
         </Section>
 
-        {/* Section Audio */}
+        {/* ============================ */}
+        {/* SECTION 2 : AUDIO */}
+        {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['audio'] = el}
           id="audio"
           title={tr('optionsAudio')} 
           icon="ti-volume"
         >
+          {/* Périphériques audio - en haut */}
+          <OptionRow label={tr('outputDevice')} sub={tr('outputDeviceDesc')}>
+            <select value={store.audioDevice} onChange={e => store.updateAudioDevice(e.target.value)}
+              style={{ width: 220, fontSize: 12 }}>
+              <option value="default">{tr('outputDeviceDefault')}</option>
+              {audioDevices.map(d => (
+                <option key={d.deviceId} value={d.deviceId}>
+                  {d.label || `${tr('outputDeviceLabel')} ${d.deviceId.slice(0, 8)}`}
+                </option>
+              ))}
+            </select>
+          </OptionRow>
+
+          <OptionRow label={tr('localOutputDevice')} sub={tr('localOutputDeviceDesc')}>
+            <select 
+              value={store.localAudioDevice || 'default'} 
+              onChange={async (e) => {
+                const deviceId = e.target.value
+                await store.updateLocalAudioDevice(deviceId)
+                addToast(tr('localOutputDeviceChanged').replace('{device}', deviceId === 'default' ? tr('localOutputDeviceDefault') : deviceId), 'info')
+              }}
+              style={{ width: 220, fontSize: 12 }}
+            >
+              <option value="default">{tr('localOutputDeviceDefault')}</option>
+              {audioDevices.map(d => (
+                <option key={d.deviceId} value={d.deviceId}>
+                  {d.label || `${tr('outputDeviceLabel')} ${d.deviceId.slice(0, 8)}`}
+                </option>
+              ))}
+            </select>
+          </OptionRow>
+
+          <OptionRow label={tr('playLocally')} sub={tr('playLocallyDesc')}>
+            <Toggle value={store.playLocally} onChange={store.updatePlayLocally} />
+          </OptionRow>
+
+          <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
+
+          {/* Mode audio - après les périphériques */}
           <OptionRow label={tr('audioMode')} sub={tr('audioModeDesc')}>
             <select value={store.audioMode || 'simple'} onChange={e => store.updateAudioMode(e.target.value)}
               style={{ width: 180, fontSize: 12 }}>
@@ -662,18 +681,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 </div>
               </OptionRow>
 
-              <OptionRow label={tr('outputDevice')} sub={tr('outputDeviceDesc')}>
-                <select value={store.audioDevice} onChange={e => store.updateAudioDevice(e.target.value)}
-                  style={{ width: 220, fontSize: 12 }}>
-                  <option value="default">{tr('outputDeviceDefault')}</option>
-                  {audioDevices.map(d => (
-                    <option key={d.deviceId} value={d.deviceId}>
-                      {d.label || `${tr('outputDeviceLabel')} ${d.deviceId.slice(0, 8)}`}
-                    </option>
-                  ))}
-                </select>
-              </OptionRow>
-
               <OptionRow label={tr('mixerEnable')} sub={tr('mixerEnableDesc')}>
                 <Toggle value={store.mixerEnabled} onChange={async (val) => {
                   await store.updateMixerEnabled(val)
@@ -726,6 +733,28 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                     </select>
                   </OptionRow>
 
+                  <OptionRow label={tr('microphoneVolume')} sub={`${store.microphoneVolume}%`}>
+                    <input type="range" min="0" max="100" value={store.microphoneVolume}
+                      onChange={async (e) => {
+                        const val = Number(e.target.value)
+                        await store.updateMicrophoneVolume(val)
+                        const { setMicrophoneVolume } = await import('../utils/audioMixer')
+                        setMicrophoneVolume(val / 100)
+                      }}
+                      style={{ width: 140, accentColor: 'var(--accent)' }} />
+                  </OptionRow>
+
+                  <OptionRow label={tr('mixerSoundVolume')} sub={`${store.mixerSoundVolume}%`}>
+                    <input type="range" min="0" max="100" value={store.mixerSoundVolume}
+                      onChange={async (e) => {
+                        const val = Number(e.target.value)
+                        await store.updateMixerSoundVolume(val)
+                        const { setSoundVolume } = await import('../utils/audioMixer')
+                        setSoundVolume(val / 100)
+                      }}
+                      style={{ width: 140, accentColor: 'var(--accent)' }} />
+                  </OptionRow>
+
                   <OptionRow label={tr('lowLatencyMode')} sub={tr('lowLatencyModeDesc')}>
                     <Toggle 
                       value={store.lowLatencyMode || false} 
@@ -736,17 +765,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                         addToast(val ? tr('lowLatencyActivated') : tr('lowLatencyDeactivated'), 'info')
                       }} 
                     />
-                  </OptionRow>
-
-                  <OptionRow label={tr('microphoneVolume')} sub={`${store.microphoneVolume}%`}>
-                    <input type="range" min="0" max="100" value={store.microphoneVolume}
-                      onChange={async (e) => {
-                        const val = Number(e.target.value)
-                        await store.updateMicrophoneVolume(val)
-                        const { setMicrophoneVolume } = await import('../utils/audioMixer')
-                        setMicrophoneVolume(val / 100)
-                      }}
-                      style={{ width: 140, accentColor: 'var(--accent)' }} />
                   </OptionRow>
 
                   <OptionRow label={tr('noiseSuppressionMode')} sub={tr('noiseSuppressionModeDesc')}>
@@ -766,17 +784,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                       <option value="filter">{tr('noiseSuppressionModeFilter')}</option>
                       <option value="off">{tr('noiseSuppressionModeOff')}</option>
                     </select>
-                  </OptionRow>
-
-                  <OptionRow label={tr('mixerSoundVolume')} sub={`${store.mixerSoundVolume}%`}>
-                    <input type="range" min="0" max="100" value={store.mixerSoundVolume}
-                      onChange={async (e) => {
-                        const val = Number(e.target.value)
-                        await store.updateMixerSoundVolume(val)
-                        const { setSoundVolume } = await import('../utils/audioMixer')
-                        setSoundVolume(val / 100)
-                      }}
-                      style={{ width: 140, accentColor: 'var(--accent)' }} />
                   </OptionRow>
 
                   <OptionRow label={tr('mixerStatus')} sub={tr('mixerStatusSub')}>
@@ -896,29 +903,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                   </div>
                 </>
               )}
-
-              <OptionRow label={tr('playLocally')} sub={tr('playLocallyDesc')}>
-                <Toggle value={store.playLocally} onChange={store.updatePlayLocally} />
-              </OptionRow>
-
-              <OptionRow label={tr('localOutputDevice')} sub={tr('localOutputDeviceDesc')}>
-                <select 
-                  value={store.localAudioDevice || 'default'} 
-                  onChange={async (e) => {
-                    const deviceId = e.target.value
-                    await store.updateLocalAudioDevice(deviceId)
-                    addToast(tr('localOutputDeviceChanged').replace('{device}', deviceId === 'default' ? tr('localOutputDeviceDefault') : deviceId), 'info')
-                  }}
-                  style={{ width: 220, fontSize: 12 }}
-                >
-                  <option value="default">{tr('localOutputDeviceDefault')}</option>
-                  {audioDevices.map(d => (
-                    <option key={d.deviceId} value={d.deviceId}>
-                      {d.label || `${tr('outputDeviceLabel')} ${d.deviceId.slice(0, 8)}`}
-                    </option>
-                  ))}
-                </select>
-              </OptionRow>
             </>
           )}
 
@@ -942,7 +926,121 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               </span>
             </div>
           )}
+        </Section>
 
+        {/* ============================ */}
+        {/* SECTION 3 : RACCOURCIS CLAVIER */}
+        {/* ============================ */}
+        <Section 
+          ref={el => sectionRefs.current['shortcuts'] = el}
+          id="shortcuts"
+          title={tr('optionsShortcuts')} 
+          icon="ti-keyboard"
+        >
+          <OptionRow label={tr('keyboardLayout')} sub={tr('keyboardLayoutDesc')}>
+            <select 
+              value={store.keyboardLayout || 'qwerty'} 
+              onChange={async (e) => {
+                const layout = e.target.value
+                await store.updateKeyboardLayout(layout)
+                addToast(`Disposition: ${layout === 'azerty' ? 'AZERTY' : 'QWERTY'}`, 'info')
+              }}
+              style={{ width: 140, fontSize: 12 }}
+            >
+              <option value="qwerty">QWERTY</option>
+              <option value="azerty">AZERTY</option>
+            </select>
+          </OptionRow>
+
+          <KeyboardVisualizer 
+            shortcuts={store.shortcuts} 
+            layout={store.keyboardLayout || 'qwerty'} 
+            lang={store.lang}
+          />
+
+          <OptionRow label={tr('switchProfile')} sub={tr('switchProfileDesc')}>
+            <ShortcutRecorder
+              value={store.profileShortcut}
+              onSave={async (acc) => { await store.updateProfileShortcut(acc); addToast(`${tr('toastShortcutSet')} ${acc}`, 'success') }}
+              onClear={() => store.updateProfileShortcut('')}
+              requireMod
+              layout={store.keyboardLayout || 'qwerty'}
+            />
+          </OptionRow>
+          <OptionRow label={tr('toggleLoop')} sub={tr('toggleLoopDesc')}>
+            <ShortcutRecorder
+              value={store.loopShortcut}
+              onSave={async (acc) => { await store.updateLoopShortcut(acc); addToast(`${tr('toastShortcutLoop')} ${acc}`, 'success') }}
+              onClear={() => store.updateLoopShortcut('')}
+              requireMod
+              layout={store.keyboardLayout || 'qwerty'}
+            />
+          </OptionRow>
+          <OptionRow label={tr('stopAllShortcut')} sub={tr('stopAllDesc')}>
+            <ShortcutRecorder
+              value={store.stopAllShortcut}
+              onSave={async (acc) => { await store.updateStopAllShortcut(acc); addToast(`${tr('toastShortcutStop')} ${acc}`, 'success') }}
+              onClear={() => store.updateStopAllShortcut('')}
+              requireMod
+              layout={store.keyboardLayout || 'qwerty'}
+            />
+          </OptionRow>
+          <OptionRow label={tr('presentationShortcut')} sub={tr('presentationDesc')}>
+            <ShortcutRecorder
+              value={store.presentationShortcut}
+              onSave={async (acc) => { await store.updatePresentationShortcut(acc); addToast(`${tr('toastShortcutPresentation')} ${acc}`, 'success') }}
+              onClear={() => store.updatePresentationShortcut('')}
+              requireMod
+              layout={store.keyboardLayout || 'qwerty'}
+            />
+          </OptionRow>
+          
+          <OptionRow label={tr('toggleShortcuts')} sub={tr('toggleShortcutsDesc')}>
+            <ShortcutRecorder
+              value={store.toggleShortcutsAccelerator || 'CommandOrControl+Shift+K'}
+              onSave={async (acc) => { 
+                await store.updateToggleShortcutsAccelerator(acc)
+                addToast(`${tr('toggleShortcutSet')} ${acc}`, 'success')
+              }}
+              onClear={() => {
+                store.updateToggleShortcutsAccelerator('')
+                addToast(tr('toggleShortcutRemoved'), 'info')
+              }}
+              requireMod
+              layout={store.keyboardLayout || 'qwerty'}
+            />
+          </OptionRow>
+
+          <OptionRow label={tr('toggleWindowShortcut')} sub={tr('toggleWindowShortcutDesc')}>
+            <ShortcutRecorder
+              value={store.toggleWindowShortcut || 'CommandOrControl+Shift+S'}
+              onSave={async (acc) => { 
+                await store.updateToggleWindowShortcut(acc)
+                addToast(`${tr('toggleWindowShortcutSet')} ${acc}`, 'success')
+              }}
+              onClear={() => {
+                store.updateToggleWindowShortcut('')
+                addToast(tr('toggleWindowShortcutRemoved'), 'info')
+              }}
+              requireMod
+              layout={store.keyboardLayout || 'qwerty'}
+            />
+          </OptionRow>
+
+          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+            {tr('shortcutsPerSoundNote')}
+          </div>
+        </Section>
+
+        {/* ============================ */}
+        {/* SECTION 4 : GESTION DES SONS */}
+        {/* ============================ */}
+        <Section 
+          ref={el => sectionRefs.current['soundManagement'] = el}
+          id="soundManagement"
+          title={tr('soundManagement')} 
+          icon="ti-music"
+        >
           <OptionRow label={tr('compressOnImport')} sub={tr('compressOnImportDesc')}>
             <Toggle 
               value={store.compressOnImport || false}
@@ -1127,109 +1225,9 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           )}
         </Section>
 
-        {/* Section Raccourcis */}
-        <Section 
-          ref={el => sectionRefs.current['shortcuts'] = el}
-          id="shortcuts"
-          title={tr('optionsShortcuts')} 
-          icon="ti-keyboard"
-        >
-          <OptionRow label={tr('keyboardLayout')} sub={tr('keyboardLayoutDesc')}>
-            <select 
-              value={store.keyboardLayout || 'qwerty'} 
-              onChange={async (e) => {
-                const layout = e.target.value
-                await store.updateKeyboardLayout(layout)
-                addToast(`Disposition: ${layout === 'azerty' ? 'AZERTY' : 'QWERTY'}`, 'info')
-              }}
-              style={{ width: 140, fontSize: 12 }}
-            >
-              <option value="qwerty">QWERTY</option>
-              <option value="azerty">AZERTY</option>
-            </select>
-          </OptionRow>
-
-          <KeyboardVisualizer 
-            shortcuts={store.shortcuts} 
-            layout={store.keyboardLayout || 'qwerty'} 
-            lang={store.lang}
-          />
-
-          <OptionRow label={tr('switchProfile')} sub={tr('switchProfileDesc')}>
-            <ShortcutRecorder
-              value={store.profileShortcut}
-              onSave={async (acc) => { await store.updateProfileShortcut(acc); addToast(`${tr('toastShortcutSet')} ${acc}`, 'success') }}
-              onClear={() => store.updateProfileShortcut('')}
-              requireMod
-              layout={store.keyboardLayout || 'qwerty'}
-            />
-          </OptionRow>
-          <OptionRow label={tr('toggleLoop')} sub={tr('toggleLoopDesc')}>
-            <ShortcutRecorder
-              value={store.loopShortcut}
-              onSave={async (acc) => { await store.updateLoopShortcut(acc); addToast(`${tr('toastShortcutLoop')} ${acc}`, 'success') }}
-              onClear={() => store.updateLoopShortcut('')}
-              requireMod
-              layout={store.keyboardLayout || 'qwerty'}
-            />
-          </OptionRow>
-          <OptionRow label={tr('stopAllShortcut')} sub={tr('stopAllDesc')}>
-            <ShortcutRecorder
-              value={store.stopAllShortcut}
-              onSave={async (acc) => { await store.updateStopAllShortcut(acc); addToast(`${tr('toastShortcutStop')} ${acc}`, 'success') }}
-              onClear={() => store.updateStopAllShortcut('')}
-              requireMod
-              layout={store.keyboardLayout || 'qwerty'}
-            />
-          </OptionRow>
-          <OptionRow label={tr('presentationShortcut')} sub={tr('presentationDesc')}>
-            <ShortcutRecorder
-              value={store.presentationShortcut}
-              onSave={async (acc) => { await store.updatePresentationShortcut(acc); addToast(`${tr('toastShortcutPresentation')} ${acc}`, 'success') }}
-              onClear={() => store.updatePresentationShortcut('')}
-              requireMod
-              layout={store.keyboardLayout || 'qwerty'}
-            />
-          </OptionRow>
-          
-          <OptionRow label={tr('toggleShortcuts')} sub={tr('toggleShortcutsDesc')}>
-            <ShortcutRecorder
-              value={store.toggleShortcutsAccelerator || 'CommandOrControl+Shift+K'}
-              onSave={async (acc) => { 
-                await store.updateToggleShortcutsAccelerator(acc)
-                addToast(`${tr('toggleShortcutSet')} ${acc}`, 'success')
-              }}
-              onClear={() => {
-                store.updateToggleShortcutsAccelerator('')
-                addToast(tr('toggleShortcutRemoved'), 'info')
-              }}
-              requireMod
-              layout={store.keyboardLayout || 'qwerty'}
-            />
-          </OptionRow>
-
-          <OptionRow label={tr('toggleWindowShortcut')} sub={tr('toggleWindowShortcutDesc')}>
-            <ShortcutRecorder
-              value={store.toggleWindowShortcut || 'CommandOrControl+Shift+S'}
-              onSave={async (acc) => { 
-                await store.updateToggleWindowShortcut(acc)
-                addToast(`${tr('toggleWindowShortcutSet')} ${acc}`, 'success')
-              }}
-              onClear={() => {
-                store.updateToggleWindowShortcut('')
-                addToast(tr('toggleWindowShortcutRemoved'), 'info')
-              }}
-              requireMod
-              layout={store.keyboardLayout || 'qwerty'}
-            />
-          </OptionRow>
-
-          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
-            {tr('shortcutsPerSoundNote')}
-          </div>
-        </Section>
-
-        {/* Section Intégrations - Étape 6 */}
+        {/* ============================ */}
+        {/* SECTION 5 : INTÉGRATIONS */}
+        {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['integrations'] = el}
           id="integrations"
@@ -1239,120 +1237,18 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <OBSControl lang={lang} />
             <TwitchAlerts store={store} addToast={addToast} lang={lang} />
-            
-            {/* ⚠️ Stream Deck - Commenté car la dépendance n'existe pas */}
-            {/*
-            <div style={{
-              padding: '12px',
-              background: 'var(--bg-secondary)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <i className="ti ti-device-desktop" style={{ color: 'var(--accent)' }} />
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>
-                    {tr('streamDeck')}
-                  </span>
-                  <span style={{
-                    fontSize: 10,
-                    color: 'var(--text-tertiary)',
-                    background: 'var(--bg-tertiary)',
-                    padding: '2px 8px',
-                    borderRadius: 10
-                  }}>
-                    {tr('beta')}
-                  </span>
-                </div>
-                <button
-                  className="btn-secondary btn-sm"
-                  onClick={async () => {
-                    const { detectStreamDecks } = await import('../utils/streamDeckIntegration')
-                    const result = await detectStreamDecks()
-                    if (result.success) {
-                      addToast(`${result.devices.length} Stream Deck(s) détecté(s)`, 'success')
-                    } else {
-                      addToast('Aucun Stream Deck détecté', 'info')
-                    }
-                  }}
-                >
-                  <i className="ti ti-search" /> {tr('detect')}
-                </button>
-              </div>
-              <div style={{
-                marginTop: 8,
-                fontSize: 11,
-                color: 'var(--text-tertiary)'
-              }}>
-                {tr('streamDeckDesc')}
-              </div>
-            </div>
-            */}
           </div>
         </Section>
 
-        {/* Section Performance - Étape 7 */}
+        {/* ============================ */}
+        {/* SECTION 6 : PERFORMANCE & FEEDBACK */}
+        {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['performance'] = el}
           id="performance"
           title={tr('performance')} 
           icon="ti-gauge"
         >
-          <OptionRow label={tr('autoBackup')} sub={tr('autoBackupDesc')}>
-            <Toggle 
-              value={store.autoBackupEnabled || false}
-              onChange={async (val) => {
-                await store.updateAutoBackupEnabled(val)
-                if (val) {
-                  const { initBackupManager } = await import('../utils/backupManager')
-                  initBackupManager(store)
-                  addToast(tr('autoBackupEnabled'), 'success')
-                } else {
-                  const { stopAutoBackup } = await import('../utils/backupManager')
-                  stopAutoBackup()
-                  addToast(tr('autoBackupDisabled'), 'info')
-                }
-              }}
-            />
-          </OptionRow>
-
-          <OptionRow label={tr('backupInterval')} sub={tr('backupIntervalDesc')}>
-            <select 
-              value={store.backupInterval || 5}
-              onChange={async (e) => {
-                const val = Number(e.target.value)
-                await store.updateBackupInterval(val)
-                if (store.autoBackupEnabled) {
-                  const { stopAutoBackup, startAutoBackup } = await import('../utils/backupManager')
-                  stopAutoBackup()
-                  startAutoBackup(store)
-                }
-                addToast(`${tr('backupIntervalChanged')} ${val} ${tr('minutes')}`, 'info')
-              }}
-              style={{ width: 120, fontSize: 12 }}
-            >
-              <option value="1">1 {tr('minute')}</option>
-              <option value="5">5 {tr('minutes')}</option>
-              <option value="15">15 {tr('minutes')}</option>
-              <option value="30">30 {tr('minutes')}</option>
-              <option value="60">60 {tr('minutes')}</option>
-            </select>
-          </OptionRow>
-
-          <OptionRow label={tr('lazyLoading')} sub={tr('lazyLoadingDesc')}>
-            <Toggle 
-              value={store.lazyLoadingEnabled || true}
-              onChange={async (val) => {
-                await store.updateLazyLoadingEnabled(val)
-                addToast(val ? tr('lazyLoadingEnabled') : tr('lazyLoadingDisabled'), 'info')
-              }}
-            />
-          </OptionRow>
-
           <OptionRow label={tr('feedback')} sub={tr('feedbackDesc')}>
             <button
               className="btn-primary btn-sm"
@@ -1419,18 +1315,61 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               </button>
             </div>
           </OptionRow>
-
-          <BackupSettings store={store} addToast={addToast} lang={lang} />
         </Section>
 
-        {/* Section Sauvegarde */}
+        {/* ============================ */}
+        {/* SECTION 7 : SAUVEGARDE */}
+        {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['backup'] = el}
           id="backup"
           title={tr('optionsBackup')} 
           icon="ti-cloud"
         >
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <OptionRow label={tr('autoBackup')} sub={tr('autoBackupDesc')}>
+            <Toggle 
+              value={store.autoBackupEnabled || false}
+              onChange={async (val) => {
+                await store.updateAutoBackupEnabled(val)
+                if (val) {
+                  const { initBackupManager } = await import('../utils/backupManager')
+                  initBackupManager(store)
+                  addToast(tr('autoBackupEnabled'), 'success')
+                } else {
+                  const { stopAutoBackup } = await import('../utils/backupManager')
+                  stopAutoBackup()
+                  addToast(tr('autoBackupDisabled'), 'info')
+                }
+              }}
+            />
+          </OptionRow>
+
+          <OptionRow label={tr('backupInterval')} sub={tr('backupIntervalDesc')}>
+            <select 
+              value={store.backupInterval || 5}
+              onChange={async (e) => {
+                const val = Number(e.target.value)
+                await store.updateBackupInterval(val)
+                if (store.autoBackupEnabled) {
+                  const { stopAutoBackup, startAutoBackup } = await import('../utils/backupManager')
+                  stopAutoBackup()
+                  startAutoBackup(store)
+                }
+                addToast(`${tr('backupIntervalChanged')} ${val} ${tr('minutes')}`, 'info')
+              }}
+              style={{ width: 120, fontSize: 12 }}
+            >
+              <option value="1">1 {tr('minute')}</option>
+              <option value="5">5 {tr('minutes')}</option>
+              <option value="15">15 {tr('minutes')}</option>
+              <option value="30">30 {tr('minutes')}</option>
+              <option value="60">60 {tr('minutes')}</option>
+            </select>
+          </OptionRow>
+
+          <BackupSettings store={store} addToast={addToast} lang={lang} />
+
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, marginTop: 16, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             {tr('exportSectionLabel')}
           </div>
           
@@ -1530,7 +1469,9 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           </div>
         </Section>
 
-        {/* Section Profils */}
+        {/* ============================ */}
+        {/* SECTION 8 : PROFILS */}
+        {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['profiles'] = el}
           id="profiles"
