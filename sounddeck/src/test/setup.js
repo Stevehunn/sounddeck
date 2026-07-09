@@ -36,7 +36,6 @@ vi.mock('uuid', () => ({
 }))
 
 // ─── MOCK DE NAVIGATOR.MEDIADEVICES ──────────────────────────────────────────
-// ✅ CORRECTION : Utiliser Object.defineProperty pour éviter l'erreur de lecture seule
 Object.defineProperty(global.navigator, 'mediaDevices', {
   value: {
     enumerateDevices: vi.fn().mockResolvedValue([
@@ -445,6 +444,3 @@ export const createMockStore = (overrides = {}) => ({
   reorderProfiles: vi.fn(),
   ...overrides
 })
-
-// ─── EXPORTS ──────────────────────────────────────────────────────────────────
-export { act } from '@testing-library/react'
