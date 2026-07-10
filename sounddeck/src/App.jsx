@@ -39,6 +39,10 @@ export default function App() {
   const setPresentationRef = useRef(null)
   const isQuittingRef = useRef(false)
 
+  // ✅ Blocage simple avec ref
+  const isPopupBlockedRef = useRef(false)
+  const blockTimerRef = useRef(null)
+
   // ✅ Passer la référence du store à audio.js pour le mixeur
   useEffect(() => {
     setStoreRef(store)
@@ -122,17 +126,66 @@ export default function App() {
     return () => window.removeEventListener('wheel', handleWheel)
   }, [store.currentProfileId, store.profiles])
 
-  // ✅ Gestion de la popup - SOLUTION FINALE
+  // ✅ Gestion de la popup
   useEffect(() => {
-    const handleShowQuitConfirm = () => setShowQuitConfirm(true)
-    const handleHideQuitConfirm = () => setShowQuitConfirm(false)
+    // ✅ Bloquer la popup pendant 1 seconde
+    const blockPopup = () => {
+      console.log('🚫 [BLOCK] Blocage de la popup')
+      isPopupBlockedRef.current = true
+      
+      if (blockTimerRef.current) {
+        clearTimeout(blockTimerRef.current)
+      }
+      
+      blockTimerRef.current = setTimeout(() => {
+        console.log('✅ [BLOCK] Fin du blocage')
+        isPopupBlockedRef.current = false
+        blockTimerRef.current = null
+      }, 1000)
+    }
 
+    // ✅ Afficher la popup
+    const handleShowQuitConfirm = () => {
+      console.log(`📌 SHOW_QUIT_CONFIRM - blocked: ${isPopupBlockedRef.current}`)
+      
+      // ✅ Si la popup est bloquée, ignorer
+      if (isPopupBlockedRef.current) {
+        console.log('🚫 Popup REFUSÉE - Blocage actif')
+        return
+      }
+
+      // ✅ Si la fenêtre est masquée, ignorer
+      if (document.hidden) {
+        console.log('🚫 Popup REFUSÉE - Fenêtre masquée')
+        return
+      }
+
+      console.log('✅ Popup ACCEPTÉE')
+      setShowQuitConfirm(true)
+    }
+
+    // ✅ Cacher la popup
+    const handleHideQuitConfirm = () => {
+      console.log('🔇 hide-quit-confirm reçu')
+      setShowQuitConfirm(false)
+      
+      // ✅ Bloquer la popup pour éviter qu'elle ne réapparaisse
+      blockPopup()
+    }
+
+    // ✅ Enregistrer les listeners
     window.electronAPI?.onShowQuitConfirm?.(handleShowQuitConfirm)
     window.electronAPI?.onHideQuitConfirm?.(handleHideQuitConfirm)
 
     return () => {
       window.electronAPI?.removeAllListeners?.('show-quit-confirm')
       window.electronAPI?.removeAllListeners?.('hide-quit-confirm')
+      
+      if (blockTimerRef.current) {
+        clearTimeout(blockTimerRef.current)
+        blockTimerRef.current = null
+      }
+      isPopupBlockedRef.current = false
     }
   }, [])
 

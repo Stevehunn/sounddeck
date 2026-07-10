@@ -183,6 +183,7 @@ function createTray(lang = 'fr') {
     }
   })
 }
+
 // ─── RÉOUVERTURE CENTRALISÉE DE LA FENÊTRE ──────────────────────────────────
 function showMainWindow() {
   if (mainWindow) {
@@ -1615,10 +1616,16 @@ ipcMain.handle('confirm-quit', (event, action, remember) => {
       console.log('💾 closeToTray sauvegardé:', true)
     }
     
-    // ✅ Envoyer l'événement AVANT de cacher la fenêtre
+    // ✅ Fermer la popup immédiatement
     if (mainWindow) {
-      mainWindow.webContents.send('show-window')
-      mainWindow.hide()
+      mainWindow.webContents.send('hide-quit-confirm')
+      
+      // ✅ Attendre 500ms avant de cacher la fenêtre
+      // pour que la popup ait le temps de se fermer proprement
+      setTimeout(() => {
+        console.log('🔴 [MAIN] Minimisation de la fenêtre après délai')
+        mainWindow.hide()
+      }, 500)
     }
     return 'minimize'
   } else {

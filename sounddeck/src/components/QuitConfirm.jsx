@@ -7,23 +7,18 @@ export default function QuitConfirm({ onClose, lang = 'fr' }) {
   const [processing, setProcessing] = useState(false)
 
   const handleAction = async (action) => {
-    console.log(`📌 [QUIT] handleAction - action: ${action}`)
     if (processing) return
     setProcessing(true)
     
     try {
-      // ✅ Si l'utilisateur choisit "Réduire", fermer la popup IMMÉDIATEMENT
+      // ✅ Si l'utilisateur choisit "Réduire", fermer la popup immédiatement
       if (action === 'minimize') {
-        console.log(`📌 [QUIT] minimize - fermeture immédiate`)
         onClose()
       }
 
-      console.log(`📌 [QUIT] Appel de confirmQuit avec action: ${action}, remember: ${remember}`)
       const result = await window.electronAPI.confirmQuit(action, remember)
-      console.log(`📤 [QUIT] Résultat confirmQuit: ${result}`)
       
       if (result === 'cancel') {
-        console.log(`📌 [QUIT] cancel - fermeture`)
         onClose()
       }
     } catch (e) {
@@ -33,8 +28,6 @@ export default function QuitConfirm({ onClose, lang = 'fr' }) {
       setProcessing(false)
     }
   }
-
-  console.log(`🎨 [QUIT] Rendu de la popup`)
 
   return (
     <div className="modal-overlay" onClick={() => handleAction('cancel')}>
