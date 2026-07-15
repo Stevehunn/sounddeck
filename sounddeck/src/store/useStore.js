@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 
 // Constantes des modes audio
@@ -16,17 +16,18 @@ const DEFAULT_SIDEBAR_CONFIG = {
     // Navigation principale
     { id: 'home', group: 'navigation', label: 'Mes sons', icon: 'ti-home', visible: true, pinned: false, order: 0, canHide: true },
     { id: 'discover', group: 'navigation', label: 'Découverte', icon: 'ti-compass', visible: true, pinned: false, order: 1, canHide: true },
-    { id: 'editor', group: 'navigation', label: 'Éditeur', icon: 'ti-cut', visible: true, pinned: false, order: 2, canHide: true },
-    { id: 'sequencer', group: 'navigation', label: 'Séquenceur', icon: 'ti-playlist', visible: true, pinned: false, order: 3, canHide: true },
-    { id: 'youtube', group: 'navigation', label: 'YouTube', icon: 'ti-brand-youtube', visible: true, pinned: false, order: 4, canHide: true },
-    { id: 'stats', group: 'navigation', label: 'Statistiques', icon: 'ti-chart-bar', visible: true, pinned: false, order: 5, canHide: true },
+    { id: 'trimmer', group: 'navigation', label: 'Rogner', icon: 'ti-cut', visible: true, pinned: false, order: 2, canHide: true },
+    { id: 'editor', group: 'navigation', label: 'Éditeur', icon: 'ti-wand', visible: true, pinned: false, order: 3, canHide: true },
+    { id: 'sequencer', group: 'navigation', label: 'Séquenceur', icon: 'ti-playlist', visible: true, pinned: false, order: 4, canHide: true },
+    { id: 'youtube', group: 'navigation', label: 'YouTube', icon: 'ti-brand-youtube', visible: true, pinned: false, order: 5, canHide: true },
+    { id: 'stats', group: 'navigation', label: 'Statistiques', icon: 'ti-chart-bar', visible: true, pinned: false, order: 6, canHide: true },
     // Actions
-    { id: 'loop', group: 'actions', label: 'Répétition', icon: 'ti-repeat', visible: true, pinned: false, order: 6, canHide: false },
-    { id: 'shortcuts', group: 'actions', label: 'Raccourcis', icon: 'ti-keyboard', visible: true, pinned: false, order: 7, canHide: false },
-    { id: 'presentation', group: 'actions', label: 'Présentation', icon: 'ti-layout-grid', visible: true, pinned: false, order: 8, canHide: false },
+    { id: 'loop', group: 'actions', label: 'Répétition', icon: 'ti-repeat', visible: true, pinned: false, order: 7, canHide: false },
+    { id: 'shortcuts', group: 'actions', label: 'Raccourcis', icon: 'ti-keyboard', visible: true, pinned: false, order: 8, canHide: false },
+    { id: 'presentation', group: 'actions', label: 'Présentation', icon: 'ti-layout-grid', visible: true, pinned: false, order: 9, canHide: false },
     // Footer
-    { id: 'guide', group: 'footer', label: 'Guide Discord', icon: 'ti-book', visible: true, pinned: false, order: 9, canHide: true },
-    { id: 'options', group: 'footer', label: 'Options', icon: 'ti-settings', visible: true, pinned: false, order: 10, canHide: true },
+    { id: 'guide', group: 'footer', label: 'Guide Discord', icon: 'ti-book', visible: true, pinned: false, order: 10, canHide: true },
+    { id: 'options', group: 'footer', label: 'Options', icon: 'ti-settings', visible: true, pinned: false, order: 11, canHide: true },
   ]
 }
 
@@ -87,6 +88,38 @@ export function useStore() {
   const [sidebarConfig, setSidebarConfig] = useState(null)
   const [sidebarEditMode, setSidebarEditMode] = useState(false)
   const [sidebarVersion, setSidebarVersion] = useState(0)
+
+  // ─── ÉDITEUR AVANCÉ (PROJET) ──────────────────────────────────────────────
+  const [editorProject, setEditorProject] = useState({
+    id: null,
+    name: 'Nouveau projet',
+    tracks: [],
+    duration: 60,
+    sampleRate: 44100,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  })
+
+  const [selectedClipId, setSelectedClipId] = useState(null)
+
+  // ─── ZONE DE BOUCLE DE L'ÉDITEUR (lecture en boucle sur une plage) ──────────
+  const [editorLoopRegion, setEditorLoopRegionState] = useState({ enabled: false, start: 0, end: 4 })
+
+  // Poser/redimensionner la zone en glissant sur la règle (pas d'historique undo ici,
+  // ce n'est pas une modification du projet mais une préférence de lecture)
+  const setEditorLoopRegion = useCallback((start, end) => {
+    const s = Math.max(0, Math.min(start, end))
+    const e = Math.max(s + 0.1, Math.max(start, end))
+    setEditorLoopRegionState(prev => ({ ...prev, start: s, end: e }))
+  }, [])
+
+  const toggleEditorLoop = useCallback(() => {
+    setEditorLoopRegionState(prev => ({ ...prev, enabled: !prev.enabled }))
+  }, [])
+
+  const clearEditorLoopRegion = useCallback(() => {
+    setEditorLoopRegionState({ enabled: false, start: 0, end: 4 })
+  }, [])
 
   // ─── CHARGEMENT INITIAL ──────────────────────────────────────────────────
 
@@ -253,6 +286,17 @@ export function useStore() {
         const savedToggleWindowShortcut = await window.electronAPI.storeGet('toggleWindowShortcut') || 'CommandOrControl+Shift+S'
         setToggleWindowShortcut(savedToggleWindowShortcut)
 
+        // ─── CHARGEMENT DU PROJET ÉDITEUR ──────────────────────────────────
+        const savedEditorProject = await window.electronAPI.storeGet('editorProject')
+        if (savedEditorProject) {
+          setEditorProject(savedEditorProject)
+        }
+
+        const savedSelectedClipId = await window.electronAPI.storeGet('selectedClipId')
+        if (savedSelectedClipId) {
+          setSelectedClipId(savedSelectedClipId)
+        }
+
         // ─── SIDEBAR CONFIG ──────────────────────────────────────────────────
         let savedSidebarConfig = await window.electronAPI.storeGet('sidebarConfig')
         
@@ -349,6 +393,49 @@ export function useStore() {
   const save = useCallback(async (key, value) => {
     await window.electronAPI.storeSet(key, value)
   }, [])
+
+  // ─── HISTORIQUE UNDO/REDO DE L'ÉDITEUR ──────────────────────────────────────
+  const editorUndoStack = useRef([])
+  const editorRedoStack = useRef([])
+  const EDITOR_HISTORY_LIMIT = 50
+  const [canUndoEditor, setCanUndoEditor] = useState(false)
+  const [canRedoEditor, setCanRedoEditor] = useState(false)
+
+  // ✅ Point de passage unique pour toute modification du projet éditeur.
+  // Empile l'état précédent dans l'historique et vide le "refaire".
+  const commitEditorProject = useCallback(async (updated, { skipHistory = false } = {}) => {
+    if (!skipHistory) {
+      editorUndoStack.current.push(editorProject)
+      if (editorUndoStack.current.length > EDITOR_HISTORY_LIMIT) {
+        editorUndoStack.current.shift()
+      }
+      editorRedoStack.current = []
+      setCanUndoEditor(true)
+      setCanRedoEditor(false)
+    }
+    setEditorProject(updated)
+    await save('editorProject', updated)
+  }, [editorProject, save])
+
+  const undoEditor = useCallback(async () => {
+    const previous = editorUndoStack.current.pop()
+    if (!previous) return
+    editorRedoStack.current.push(editorProject)
+    setCanUndoEditor(editorUndoStack.current.length > 0)
+    setCanRedoEditor(true)
+    setEditorProject(previous)
+    await save('editorProject', previous)
+  }, [editorProject, save])
+
+  const redoEditor = useCallback(async () => {
+    const next = editorRedoStack.current.pop()
+    if (!next) return
+    editorUndoStack.current.push(editorProject)
+    setCanRedoEditor(editorRedoStack.current.length > 0)
+    setCanUndoEditor(true)
+    setEditorProject(next)
+    await save('editorProject', next)
+  }, [editorProject, save])
 
   // ─── SYNC PROFILS VERS SIDEBAR ──────────────────────────────────────────────
 
@@ -1046,6 +1133,431 @@ export function useStore() {
     setSidebarEditMode(prev => !prev)
   }, [])
 
+  // ─── ÉDITEUR AVANCÉ ──────────────────────────────────────────────────────────
+
+  // Créer un nouveau projet
+  const createEditorProject = useCallback(async (name = 'Nouveau projet') => {
+    const project = {
+      id: uuidv4(),
+      name,
+      tracks: [],
+      duration: 60,
+      sampleRate: 44100,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    }
+    setEditorProject(project)
+    await save('editorProject', project)
+    return project
+  }, [save])
+
+  // Ajouter une piste
+  const addTrack = useCallback(async () => {
+    const newTrack = {
+      id: `track-${Date.now()}`,
+      name: `Piste ${editorProject.tracks.length + 1}`,
+      clips: [],
+      volume: 1,
+      muted: false,
+      solo: false,
+      effects: []
+    }
+    const updated = {
+      ...editorProject,
+      tracks: [...editorProject.tracks, newTrack],
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+    return newTrack
+  }, [editorProject, commitEditorProject])
+
+  // ✅ Mettre à jour une piste (volume, mute, solo, nom, couleur...)
+  // Remplace la logique bricolée qui appelait updateClip(trackId, null, ...)
+  const updateTrack = useCallback(async (trackId, updates) => {
+    const updated = {
+      ...editorProject,
+      tracks: editorProject.tracks.map(track => {
+        if (track.id === trackId) {
+          return { ...track, ...updates }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+  }, [editorProject, commitEditorProject])
+
+  // ✅ Réordonner les pistes (drag & drop dans l'en-tête de piste)
+  const reorderTracks = useCallback(async (startIndex, endIndex) => {
+    const tracks = [...editorProject.tracks]
+    if (startIndex < 0 || startIndex >= tracks.length || endIndex < 0 || endIndex >= tracks.length) {
+      return
+    }
+    const [moved] = tracks.splice(startIndex, 1)
+    tracks.splice(endIndex, 0, moved)
+    const updated = {
+      ...editorProject,
+      tracks,
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+  }, [editorProject, commitEditorProject])
+
+  // Supprimer une piste
+  const removeTrack = useCallback(async (trackId) => {
+    const updated = {
+      ...editorProject,
+      tracks: editorProject.tracks.filter(t => t.id !== trackId),
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+  }, [editorProject, commitEditorProject])
+
+  // Ajouter un clip à une piste
+  const addClipToTrack = useCallback(async (trackId, soundId, start = 0, duration = 3) => {
+    const sound = sounds.find(s => s.id === soundId)
+    if (!sound) {
+      console.warn('Son non trouvé:', soundId)
+      return null
+    }
+
+    // ✅ Vérifier que le fichier existe
+    const fileExists = await window.electronAPI.fileExists?.(sound.path)
+    if (!fileExists && sound.path) {
+      console.warn('Fichier son introuvable:', sound.path)
+      // On continue quand même, le clip sera marqué comme manquant
+    }
+
+    const newClip = {
+      id: `clip-${Date.now()}`,
+      soundId: sound.id,
+      name: sound.name,
+      path: sound.path,
+      start: start,
+      duration: duration,
+      offset: 0,
+      volume: 0,
+      volumeDb: 0,
+      effects: [],
+      fadeIn: 0,
+      fadeOut: 0,
+      pitch: 0,
+      speed: 1
+    }
+
+    const updated = {
+      ...editorProject,
+      tracks: editorProject.tracks.map(track => {
+        if (track.id === trackId) {
+          return { ...track, clips: [...track.clips, newClip] }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+    return newClip
+  }, [editorProject, sounds, commitEditorProject])
+
+  // Ajouter un clip depuis un fichier externe
+  const addClipFromFile = useCallback(async (trackId, filePath, start = 0) => {
+    const fileName = filePath.split(/[\\/]/).pop() || 'audio'
+    const newClip = {
+      id: `clip-${Date.now()}`,
+      soundId: null,
+      name: fileName,
+      path: filePath,
+      start: start,
+      duration: 3,
+      offset: 0,
+      volume: 0,
+      volumeDb: 0,
+      effects: [],
+      fadeIn: 0,
+      fadeOut: 0,
+      pitch: 0,
+      speed: 1,
+      isExternal: true
+    }
+
+    const updated = {
+      ...editorProject,
+      tracks: editorProject.tracks.map(track => {
+        if (track.id === trackId) {
+          return { ...track, clips: [...track.clips, newClip] }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+    return newClip
+  }, [editorProject, commitEditorProject])
+
+  // Mettre à jour un clip
+  const updateClip = useCallback(async (trackId, clipId, updates) => {
+    const updated = {
+      ...editorProject,
+      tracks: editorProject.tracks.map(track => {
+        if (track.id === trackId) {
+          return {
+            ...track,
+            clips: track.clips.map(clip => {
+              if (clip.id === clipId) {
+                return { ...clip, ...updates }
+              }
+              return clip
+            })
+          }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+  }, [editorProject, commitEditorProject])
+
+  // Supprimer un clip
+  const removeClip = useCallback(async (trackId, clipId) => {
+    const updated = {
+      ...editorProject,
+      tracks: editorProject.tracks.map(track => {
+        if (track.id === trackId) {
+          return {
+            ...track,
+            clips: track.clips.filter(clip => clip.id !== clipId)
+          }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+  }, [editorProject, commitEditorProject])
+
+  // Déplacer un clip
+  const moveClip = useCallback(async (trackId, clipId, newStart, newTrackId = null) => {
+    // Trouver le clip à déplacer
+    let clipToMove = null
+    let sourceTrack = null
+
+    const updatedTracks = editorProject.tracks.map(track => {
+      if (track.id === trackId) {
+        const clip = track.clips.find(c => c.id === clipId)
+        if (clip) {
+          clipToMove = { ...clip }
+          sourceTrack = track
+          return {
+            ...track,
+            clips: track.clips.filter(c => c.id !== clipId)
+          }
+        }
+      }
+      return track
+    })
+
+    if (!clipToMove) return
+
+    clipToMove.start = newStart
+
+    const targetTrackId = newTrackId || trackId
+    const finalTracks = updatedTracks.map(track => {
+      if (track.id === targetTrackId) {
+        // Insérer le clip dans l'ordre
+        const clips = [...track.clips, clipToMove]
+        clips.sort((a, b) => a.start - b.start)
+        return { ...track, clips }
+      }
+      return track
+    })
+
+    const updated = {
+      ...editorProject,
+      tracks: finalTracks,
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+  }, [editorProject, commitEditorProject])
+
+  // Dupliquer un clip
+  const duplicateClip = useCallback(async (trackId, clipId) => {
+    const track = editorProject.tracks.find(t => t.id === trackId)
+    if (!track) return
+
+    const clip = track.clips.find(c => c.id === clipId)
+    if (!clip) return
+
+    const newClip = {
+      ...clip,
+      id: `clip-${Date.now()}`,
+      start: clip.start + clip.duration + 0.5
+    }
+
+    const updated = {
+      ...editorProject,
+      tracks: editorProject.tracks.map(t => {
+        if (t.id === trackId) {
+          const clips = [...t.clips, newClip]
+          clips.sort((a, b) => a.start - b.start)
+          return { ...t, clips }
+        }
+        return t
+      }),
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+  }, [editorProject, commitEditorProject])
+
+  // ✅ Couper un clip en deux à un instant donné (raccourci "S")
+  const splitClip = useCallback(async (trackId, clipId, atTime) => {
+    const track = editorProject.tracks.find(t => t.id === trackId)
+    if (!track) return null
+
+    const clip = track.clips.find(c => c.id === clipId)
+    if (!clip) return null
+
+    const clipDuration = clip.duration || 3
+    const splitOffset = atTime - clip.start
+
+    // Le point de coupe doit tomber strictement à l'intérieur du clip
+    if (splitOffset <= 0.05 || splitOffset >= clipDuration - 0.05) {
+      return null
+    }
+
+    const firstPart = {
+      ...clip,
+      duration: splitOffset,
+      fadeOut: 0
+    }
+
+    const secondPart = {
+      ...clip,
+      id: `clip-${Date.now()}`,
+      start: clip.start + splitOffset,
+      duration: clipDuration - splitOffset,
+      offset: (clip.offset || 0) + splitOffset,
+      fadeIn: 0,
+      effects: clip.effects.map(e => ({ ...e, id: `effect-${Date.now()}-${e.id}` }))
+    }
+
+    const updated = {
+      ...editorProject,
+      tracks: editorProject.tracks.map(t => {
+        if (t.id === trackId) {
+          const clips = t.clips.map(c => c.id === clipId ? firstPart : c)
+          clips.push(secondPart)
+          clips.sort((a, b) => a.start - b.start)
+          return { ...t, clips }
+        }
+        return t
+      }),
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+    return secondPart
+  }, [editorProject, commitEditorProject])
+
+  // Ajouter un effet à un clip
+  const addEffectToClip = useCallback(async (trackId, clipId, effectType, params = {}) => {
+    const effect = {
+      id: `effect-${Date.now()}`,
+      type: effectType,
+      params: params,
+      enabled: true
+    }
+
+    const updated = {
+      ...editorProject,
+      tracks: editorProject.tracks.map(track => {
+        if (track.id === trackId) {
+          return {
+            ...track,
+            clips: track.clips.map(clip => {
+              if (clip.id === clipId) {
+                return {
+                  ...clip,
+                  effects: [...clip.effects, effect]
+                }
+              }
+              return clip
+            })
+          }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+    return effect
+  }, [editorProject, commitEditorProject])
+
+  // Supprimer un effet d'un clip
+  const removeEffectFromClip = useCallback(async (trackId, clipId, effectId) => {
+    const updated = {
+      ...editorProject,
+      tracks: editorProject.tracks.map(track => {
+        if (track.id === trackId) {
+          return {
+            ...track,
+            clips: track.clips.map(clip => {
+              if (clip.id === clipId) {
+                return {
+                  ...clip,
+                  effects: clip.effects.filter(e => e.id !== effectId)
+                }
+              }
+              return clip
+            })
+          }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+  }, [editorProject, commitEditorProject])
+
+  // Mettre à jour un paramètre d'effet
+  const updateEffectParam = useCallback(async (trackId, clipId, effectId, param, value) => {
+    const updated = {
+      ...editorProject,
+      tracks: editorProject.tracks.map(track => {
+        if (track.id === trackId) {
+          return {
+            ...track,
+            clips: track.clips.map(clip => {
+              if (clip.id === clipId) {
+                return {
+                  ...clip,
+                  effects: clip.effects.map(effect => {
+                    if (effect.id === effectId) {
+                      return {
+                        ...effect,
+                        params: { ...effect.params, [param]: value }
+                      }
+                    }
+                    return effect
+                  })
+                }
+              }
+              return clip
+            })
+          }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+  }, [editorProject, commitEditorProject])
+
+  // Exporter le projet vers la bibliothèque
+  const exportProjectToLibrary = useCallback(async (name) => {
+    // Cette fonction sera implémentée dans la page Editor
+    // Elle doit exporter le mix final vers la bibliothèque SoundDeck
+    console.log('Export du projet vers la bibliothèque:', name)
+  }, [])
+
   // ─── Sons ordonnés selon le profil ──────────────────────────────────────────
   const orderedSounds = useMemo(() => {
     const profileId = currentProfileId || 'all'
@@ -1223,5 +1735,38 @@ export function useStore() {
     compressionBitrate,
     updateCompressOnImport,
     updateCompressionBitrate,
+
+    // ─── ÉDITEUR AVANCÉ ──────────────────────────────────────────────────────
+    editorProject,
+    selectedClipId,
+    setSelectedClipId,
+    createEditorProject,
+    addTrack,
+    updateTrack,
+    reorderTracks,
+    removeTrack,
+    addClipToTrack,
+    addClipFromFile,
+    updateClip,
+    removeClip,
+    moveClip,
+    duplicateClip,
+    splitClip,
+    addEffectToClip,
+    removeEffectFromClip,
+    updateEffectParam,
+    exportProjectToLibrary,
+
+    // Undo/Redo
+    undoEditor,
+    redoEditor,
+    canUndoEditor,
+    canRedoEditor,
+
+    // Zone de boucle
+    editorLoopRegion,
+    setEditorLoopRegion,
+    toggleEditorLoop,
+    clearEditorLoopRegion,
   }
 }

@@ -1,405 +1,802 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Howl } from 'howler'
-import Waveform, { formatTime } from '../components/Waveform'
 import { useTranslation } from '../i18n'
-import useConfirm from '../hooks/useConfirm.jsx'
+import { Howl } from 'howler'
+import EditorTimeline from '../components/editor/EditorTimeline'
+import EditorToolbar from '../components/editor/EditorToolbar'
+import EditorEffectsPanel from '../components/editor/EditorEffectsPanel'
+import { generateWaveformData } from '../utils/waveformGenerator'
 
-// ✅ Emojis uniques - supprimer les doublons
-const EMOJIS = [
-  '🔊','🎵','🎶','🎼','🎧','🎤','🎸','🎹','🎺','🎻','🥁','🪗','🪘','🎷','🪕',
-  '😂','🤣','😱','😬','🤡','👾','🦄','💥','🔥','⭐','🌟','✨','💫','🌈','⚡',
-  '🔔','📢','📣','💬','🗣️','👏','🙌','🤘','👍','👎','💀','👻','🎃','🤖','👽',
-  '🐸','🐧','🐱','🐶','🦊','🐻','🐼','🐨','🦁','🐮','🐷','🐒','🐲','🐉','🦕',
-  '🎮','🕹️','🎯','🎱','🎳','🎰','🧩','🃏','🎴','♠️','♥️','♦️','♣️','🀄','🎲',
-  '🍕','🍔','🌮','🌯','🍣','🍜','🍩','🍪','🎂','🧁','🍫','🍭','🍬','🍺','🍻',
-  '🚀','🛸','💎','💰','💵','💶','💷','💴','🪙','🧿','🔮','🪄','⚔️','🛡️','🏹'
-]
+// Liste d'emojis pour l'export
+const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
 
 export default function Editor({ store, addToast, lang = 'fr' }) {
   const tr = useTranslation(lang)
-  const [selectedSound, setSelectedSound] = useState(null)
-  const [search, setSearch] = useState('')
-
-  const filtered = store.sounds.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase())
-  )
-
-  return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-      <div style={{
-        width: 220, flexShrink: 0, borderRight: '1px solid var(--border)',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden'
-      }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <i className="ti ti-cut" style={{ color: 'var(--accent)' }} />
-            {tr('editorTitle')}
-          </div>
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder={tr('editorSearch')}
-            className="input-sm"
-            style={{ borderRadius: 'var(--radius-md)' }}
-          />
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
-          {filtered.length === 0 && (
-            <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>
-              {tr('editorNoSound')}
-            </div>
-          )}
-          {filtered.map(sound => (
-            <SoundListItem
-              key={sound.id}
-              sound={sound}
-              active={selectedSound?.id === sound.id}
-              onClick={() => setSelectedSound(sound)}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {selectedSound ? (
-          <SoundEditor
-            key={selectedSound.id}
-            sound={selectedSound}
-            store={store}
-            addToast={addToast}
-            onDone={() => setSelectedSound(null)}
-            lang={lang}
-          />
-        ) : (
-          <EmptyState lang={lang} />
-        )}
-      </div>
-    </div>
-  )
-}
-
-function SoundListItem({ sound, active, onClick }) {
-  const imageUrl = sound.image
-    ? (sound.image.startsWith('file://') ? sound.image : `file:///${sound.image.replace(/\\/g, '/')}`)
-    : null
-
-  return (
-    <button 
-      onClick={onClick} 
-      className={`sidebar-item ${active ? 'active' : ''}`}
-      style={{ borderLeft: `2px solid ${active ? 'var(--accent)' : 'transparent'}` }}
-    >
-      <div style={{
-        width: 28, height: 28, borderRadius: 6, background: 'var(--bg-tertiary)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 14, flexShrink: 0, overflow: 'hidden'
-      }}>
-        {imageUrl
-          ? <img src={imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : sound.emoji || '🔊'}
-      </div>
-      <span className="label" style={{ fontSize: 12 }}>
-        {sound.name}
-      </span>
-    </button>
-  )
-}
-
-function EmptyState({ lang = 'fr' }) {
-  const tr = useTranslation(lang)
-  return (
-    <div className="flex-center" style={{ flexDirection: 'column', height: '100%', gap: 12, color: 'var(--text-tertiary)' }}>
-      <i className="ti ti-cut" style={{ fontSize: 48, color: 'var(--border)' }} />
-      <div style={{ fontWeight: 500, fontSize: 14 }}>{tr('selectSound')}</div>
-      <div style={{ fontSize: 12, textAlign: 'center', maxWidth: 260, lineHeight: 1.6 }}>
-        {tr('selectSoundDesc')}
-      </div>
-    </div>
-  )
-}
-
-function SoundEditor({ sound, store, addToast, onDone, lang = 'fr' }) {
-  const tr = useTranslation(lang)
-  const { confirm, ConfirmWrapper } = useConfirm({ lang })
-  const [duration, setDuration] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
-  const [playing, setPlaying] = useState(false)
-  const [start, setStart] = useState(0)
-  const [end, setEnd] = useState(0)
-  const [name, setName] = useState(sound.name + ' (copie)')
-  const [emoji, setEmoji] = useState(sound.emoji || '🔊')
-  const [image, setImage] = useState(null)
-  const [imagePreview, setImagePreview] = useState(null)
-  const [targetProfiles, setTargetProfiles] = useState([sound.profiles?.[0] || 'all'])
-  const [saving, setSaving] = useState(false)
+  const [totalDuration, setTotalDuration] = useState(10)
+  const [selectedClipId, setSelectedClipId] = useState(null)
+  const [selectedTrackId, setSelectedTrackId] = useState(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [waveformData, setWaveformData] = useState({})
+  const [clipDurations, setClipDurations] = useState({})
+  const [snapEnabled, setSnapEnabled] = useState(true)
+  
+  // État pour le modal d'export
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportName, setExportName] = useState('')
+  const [exportEmoji, setExportEmoji] = useState('🔊')
+  const [exportImage, setExportImage] = useState(null)
+  const [exportProfiles, setExportProfiles] = useState(['all'])
+  const [exportAddToLibrary, setExportAddToLibrary] = useState(true)
+  const [isExporting, setIsExporting] = useState(false)
 
+  // Références
   const audioRef = useRef(null)
-  const timelineRef = useRef(null)
+  const animationRef = useRef(null)
+  const projectRef = useRef(store.editorProject)
+  const startTimeRef = useRef(0)
+  const pausedTimeRef = useRef(0)
+  const allHowlsRef = useRef([])
+  const isPlayingRef = useRef(false)
+  const loopRegionRef = useRef(store.editorLoopRegion)
 
-  const fileUrl = sound.path.startsWith('file://')
-    ? sound.path
-    : 'file:///' + sound.path.replace(/\\/g, '/')
-
+  // ✅ Garder une ref à jour de la zone de boucle (lue dans des closures d'animation)
   useEffect(() => {
-    const audio = new Audio(fileUrl)
-    audioRef.current = audio
-    audio.addEventListener('loadedmetadata', () => {
-      setDuration(audio.duration)
-      setEnd(audio.duration)
-    })
-    audio.addEventListener('timeupdate', () => setCurrentTime(audio.currentTime))
-    audio.addEventListener('ended', () => { setPlaying(false) })
-    return () => { audio.pause(); audio.src = '' }
-  }, [fileUrl])
+    loopRegionRef.current = store.editorLoopRegion
+  }, [store.editorLoopRegion])
 
+  // Mettre à jour la référence du projet
   useEffect(() => {
-    if (audioRef.current && playing && currentTime >= end) {
-      audioRef.current.pause()
-      audioRef.current.currentTime = start
-      setCurrentTime(start)
-      setPlaying(false)
+    projectRef.current = store.editorProject
+  }, [store.editorProject])
+
+  // ✅ Calculer la durée TOTALE dynamique en fonction des clips
+  useEffect(() => {
+    const calculateTotalDuration = async () => {
+      const project = store.editorProject
+      if (!project || !project.tracks) return
+
+      let maxDuration = 10
+      const newClipDurations = { ...clipDurations }
+
+      for (const track of project.tracks) {
+        for (const clip of track.clips) {
+          // Si on n'a pas encore la durée du clip, on la charge
+          if (!newClipDurations[clip.id] && clip.path) {
+            try {
+              const fileUrl = clip.path.startsWith('file://') 
+                ? clip.path 
+                : 'file:///' + clip.path.replace(/\\/g, '/')
+              
+              const audio = new Audio()
+              audio.src = fileUrl
+              
+              const duration = await new Promise((resolve) => {
+                audio.addEventListener('loadedmetadata', () => {
+                  resolve(audio.duration)
+                })
+                audio.addEventListener('error', () => {
+                  resolve(3) // Durée par défaut en cas d'erreur
+                })
+                // Si le chargement prend trop de temps
+                setTimeout(() => resolve(3), 3000)
+              })
+              
+              newClipDurations[clip.id] = duration
+              // Mettre à jour la durée du clip dans le store
+              if (duration > 0 && clip.duration !== duration) {
+                store.updateClip(track.id, clip.id, { duration })
+              }
+            } catch (e) {
+              console.warn('Erreur chargement durée:', e)
+              newClipDurations[clip.id] = clip.duration || 3
+            }
+          }
+
+          // Calculer la fin du clip
+          const clipDuration = newClipDurations[clip.id] || clip.duration || 3
+          const end = clip.start + clipDuration
+          if (end > maxDuration) maxDuration = end
+        }
+      }
+
+      setClipDurations(newClipDurations)
+      // Ajouter 2 secondes de marge
+      const newTotal = Math.max(maxDuration + 2, 10)
+      setTotalDuration(newTotal)
     }
-  }, [currentTime, end, start, playing])
 
-  const togglePlay = () => {
-    const audio = audioRef.current
-    if (!audio) return
-    if (playing) {
-      audio.pause()
-      setPlaying(false)
-    } else {
-      audio.currentTime = start
-      audio.play()
-      setPlaying(true)
+    calculateTotalDuration()
+  }, [store.editorProject?.tracks])
+
+  // Charger les waveforms des clips
+  useEffect(() => {
+    const loadWaveforms = async () => {
+      const project = store.editorProject
+      if (!project || !project.tracks) return
+
+      setIsLoading(true)
+      const newWaveformData = {}
+
+      for (const track of project.tracks) {
+        for (const clip of track.clips) {
+          if (clip.path && !waveformData[clip.id]) {
+            try {
+              const data = await generateWaveformData(clip.path, 200)
+              if (data) {
+                newWaveformData[clip.id] = data
+              }
+            } catch (e) {
+              console.warn('Erreur génération waveform:', e)
+            }
+          }
+        }
+      }
+
+      setWaveformData(prev => ({ ...prev, ...newWaveformData }))
+      setIsLoading(false)
+    }
+
+    loadWaveforms()
+  }, [store.editorProject?.tracks])
+
+  // Nettoyer l'animation et l'audio
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+      }
+      if (audioRef.current) {
+        audioRef.current.stop()
+        audioRef.current.unload()
+      }
+      // Nettoyer tous les howls
+      allHowlsRef.current.forEach(item => {
+        if (item.howl) {
+          if (item.howl.playing()) item.howl.stop()
+          item.howl.unload()
+        }
+      })
+      allHowlsRef.current = []
+    }
+  }, [])
+
+  // Créer un projet automatiquement si inexistant
+  useEffect(() => {
+    const project = store.editorProject
+    if (!project || !project.id) {
+      store.createEditorProject('Nouveau projet')
+    }
+  }, [])
+
+  // ─── GESTION DU PROJET ──────────────────────────────────────────────────────
+
+  const handleAddTrack = async () => {
+    await store.addTrack()
+    addToast(tr('editorTrackAdded'), 'success')
+  }
+
+  const handleRemoveTrack = async (trackId) => {
+    await store.removeTrack(trackId)
+    if (selectedTrackId === trackId) {
+      setSelectedTrackId(null)
+      setSelectedClipId(null)
+    }
+    addToast(tr('editorTrackRemoved'), 'info')
+  }
+
+  const handleAddClip = async (trackId, soundId) => {
+    const sound = store.sounds.find(s => s.id === soundId)
+    if (!sound) {
+      addToast(tr('editorSoundNotFound'), 'error')
+      return
+    }
+
+    const track = store.editorProject.tracks.find(t => t.id === trackId)
+    let start = 0
+    if (track && track.clips.length > 0) {
+      const lastClip = track.clips.reduce((max, clip) => 
+        clip.start + clip.duration > max.start + max.duration ? clip : max
+      )
+      start = lastClip.start + lastClip.duration + 0.5
+    }
+
+    // Durée par défaut : 3 secondes, sera mise à jour après chargement
+    const clip = await store.addClipToTrack(trackId, soundId, start, 3)
+    if (clip) {
+      addToast(`"${sound.name}" ${tr('editorClipAdded')}`, 'success')
+      setSelectedClipId(clip.id)
+      setSelectedTrackId(trackId)
     }
   }
 
-  const fmt = formatTime
+  const handleRemoveClip = async (trackId, clipId) => {
+    await store.removeClip(trackId, clipId)
+    if (selectedClipId === clipId) {
+      setSelectedClipId(null)
+    }
+    addToast(tr('editorClipRemoved'), 'info')
+  }
+
+  const handleClipSelect = (clipId, trackId) => {
+    setSelectedClipId(clipId)
+    setSelectedTrackId(trackId)
+  }
+
+  // ─── LECTURE CORRIGÉE ──────────────────────────────────────────────────────
+
+  // ✅ Fonction pour arrêter complètement la lecture
+  const stopPlayback = useCallback(() => {
+    // Arrêter tous les howls
+    allHowlsRef.current.forEach(item => {
+      if (item.howl) {
+        if (item.howl.playing()) item.howl.stop()
+        item.howl.unload()
+      }
+    })
+    allHowlsRef.current = []
+
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current)
+      animationRef.current = null
+    }
+    
+    setIsPlaying(false)
+    setIsPaused(false)
+    setCurrentTime(0)
+    startTimeRef.current = 0
+    pausedTimeRef.current = 0
+    isPlayingRef.current = false
+  }, [])
+
+  // ✅ Fonction pour mettre en pause
+  const pausePlayback = useCallback(() => {
+    if (isPlayingRef.current) {
+      // Mettre en pause tous les howls
+      allHowlsRef.current.forEach(item => {
+        if (item.howl && item.howl.playing()) {
+          item.howl.pause()
+        }
+      })
+      
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+        animationRef.current = null
+      }
+      
+      setIsPaused(true)
+      setIsPlaying(false)
+      pausedTimeRef.current = currentTime
+      isPlayingRef.current = false
+    }
+  }, [currentTime])
+
+  // ✅ Fonction pour reprendre la lecture
+  const resumePlayback = useCallback(() => {
+    if (isPaused) {
+      // Reprendre tous les howls
+      allHowlsRef.current.forEach(item => {
+        if (item.howl && !item.howl.playing()) {
+          item.howl.play()
+        }
+      })
+      
+      setIsPaused(false)
+      setIsPlaying(true)
+      isPlayingRef.current = true
+      startTimeRef.current = Date.now() - pausedTimeRef.current * 1000
+      
+      // Reprendre l'animation
+      const updateProgress = () => {
+        if (!isPlayingRef.current) {
+          return
+        }
+        const elapsed = (Date.now() - startTimeRef.current) / 1000
+        const newTime = Math.min(elapsed, totalDuration)
+        setCurrentTime(newTime)
+
+        // Émettre l'événement pour la timeline
+        window.dispatchEvent(new CustomEvent('clip-progress', { 
+          detail: { current: newTime, duration: totalDuration } 
+        }))
+
+        const loop = loopRegionRef.current
+        if (loop?.enabled && newTime >= loop.end) {
+          stopPlayback()
+          playAllClips(loop.start)
+          return
+        }
+
+        if (newTime >= totalDuration) {
+          stopPlayback()
+          return
+        }
+
+        animationRef.current = requestAnimationFrame(updateProgress)
+      }
+      updateProgress()
+    }
+  }, [isPaused, totalDuration, stopPlayback])
+
+  // ✅ Lecture de tous les clips en parallèle (startAt permet de démarrer ailleurs qu'à 0, utilisé par la boucle)
+  const playAllClips = useCallback((startAt = 0) => {
+    const project = store.editorProject
+    if (!project || project.tracks.length === 0) {
+      addToast(tr('editorNoTracks'), 'info')
+      return
+    }
+
+    // Vérifier s'il y a des clips
+    let hasClips = false
+    project.tracks.forEach(track => {
+      if (track.clips.length > 0) hasClips = true
+    })
+
+    if (!hasClips) {
+      addToast(tr('editorNoClips'), 'info')
+      return
+    }
+
+    // Arrêter toute lecture en cours
+    stopPlayback()
+
+    setIsPlaying(true)
+    setIsPaused(false)
+    isPlayingRef.current = true
+    setCurrentTime(startAt)
+    startTimeRef.current = Date.now() - startAt * 1000
+    pausedTimeRef.current = 0
+
+    // Créer et démarrer tous les clips
+    const howls = []
+    project.tracks.forEach(track => {
+      track.clips.forEach(clip => {
+        const fileUrl = clip.path.startsWith('file://') 
+          ? clip.path 
+          : 'file:///' + clip.path.replace(/\\/g, '/')
+
+        // Récupérer la durée réelle du clip
+        const clipDuration = clipDurations[clip.id] || clip.duration || 3
+
+        // Appliquer les effets
+        let volume = 1.0
+        let speed = 1.0
+
+        clip.effects?.forEach(effect => {
+          if (effect.enabled) {
+            switch (effect.type) {
+              case 'volume':
+                volume = effect.params.value || 1.0
+                break
+              case 'speed':
+                speed = effect.params.value || 1.0
+                break
+            }
+          }
+        })
+
+        const howl = new Howl({
+          src: [fileUrl],
+          volume: volume * (store.volume / 100),
+          rate: speed,
+          html5: true,
+          onloaderror: (id, err) => {
+            console.error('Erreur lecture clip:', clip.name, err)
+          }
+        })
+
+        howls.push({
+          howl,
+          clip,
+          startOffset: clip.start,
+          started: false,
+          duration: clipDuration
+        })
+      })
+    })
+
+    allHowlsRef.current = howls
+
+    // Fonction pour démarrer les clips à leur moment
+    const startClipsAtTime = (time) => {
+      howls.forEach(item => {
+        if (!item.started && time >= item.startOffset) {
+          try {
+            item.howl.play()
+            const seekTime = Math.min(time - item.startOffset, item.duration)
+            if (seekTime > 0) {
+              item.howl.seek(seekTime)
+            }
+            item.started = true
+          } catch (e) {
+            console.warn('Erreur démarrage clip:', e)
+          }
+        }
+      })
+    }
+
+    // Animation de progression
+    const updateProgress = () => {
+      if (!isPlayingRef.current) {
+        return
+      }
+
+      const elapsed = (Date.now() - startTimeRef.current) / 1000
+      const current = Math.min(elapsed, totalDuration)
+
+      // Démarrer les clips qui doivent commencer
+      startClipsAtTime(current)
+
+      // Mettre à jour le temps
+      setCurrentTime(current)
+
+      // Émettre l'événement pour la timeline
+      window.dispatchEvent(new CustomEvent('clip-progress', { 
+        detail: { current, duration: totalDuration } 
+      }))
+
+      // Zone de boucle : on relance la lecture au début de la boucle
+      const loop = loopRegionRef.current
+      if (loop?.enabled && current >= loop.end) {
+        stopPlayback()
+        playAllClips(loop.start)
+        return
+      }
+
+      // Vérifier si on a atteint la fin
+      if (current >= totalDuration) {
+        stopPlayback()
+        return
+      }
+
+      animationRef.current = requestAnimationFrame(updateProgress)
+    }
+
+    // Démarrer immédiatement les clips qui commencent à startAt
+    startClipsAtTime(startAt)
+    updateProgress()
+  }, [store.editorProject, store.volume, totalDuration, clipDurations, addToast, tr, stopPlayback])
+
+  // ✅ Play/Pause principal
+  const handlePlay = useCallback(() => {
+    if (isPlaying) {
+      pausePlayback()
+    } else if (isPaused) {
+      resumePlayback()
+    } else {
+      // ✅ Si on a cliqué sur la timeline, démarrer depuis la position actuelle
+      playAllClips(currentTime > 0 ? currentTime : 0)
+    }
+  }, [isPlaying, isPaused, currentTime, pausePlayback, resumePlayback, playAllClips])
+
+  // ✅ Stop/Retour au début
+  const handleStop = useCallback(() => {
+    stopPlayback()
+    setCurrentTime(0)
+  }, [stopPlayback])
+
+  // ✅ Fonction de recherche (seek)
+  const handleSeek = useCallback((time) => {
+    const clampedTime = Math.max(0, Math.min(totalDuration, time))
+    setCurrentTime(clampedTime)
+    
+    // ✅ Si on est en lecture, mettre à jour le temps de départ
+    if (isPlaying) {
+      // Mettre à jour le temps de départ pour que la lecture continue depuis la nouvelle position
+      startTimeRef.current = Date.now() - clampedTime * 1000
+      
+      // Si on a des howls en cours, les mettre à jour
+      allHowlsRef.current.forEach(item => {
+        if (item.howl && item.howl.playing()) {
+          // Calculer la position dans le clip
+          const clipStart = item.clip.start
+          const clipDuration = clipDurations[item.clip.id] || item.clip.duration || 3
+          const seekInClip = Math.max(0, Math.min(clampedTime - clipStart, clipDuration))
+          if (seekInClip >= 0 && seekInClip <= clipDuration) {
+            try {
+              item.howl.seek(seekInClip)
+            } catch (e) {
+              console.warn('Erreur seek:', e)
+            }
+          }
+        }
+      })
+    }
+    
+    // ✅ Si on est en pause, mettre à jour le temps de pause
+    if (isPaused) {
+      pausedTimeRef.current = clampedTime
+    }
+  }, [totalDuration, isPlaying, isPaused, clipDurations])
+
+  // ✅ Couper le clip sélectionné au niveau du curseur (raccourci "S")
+  const handleSplit = useCallback(async () => {
+    if (!selectedClipId || !selectedTrackId) return
+    const newClip = await store.splitClip(selectedTrackId, selectedClipId, currentTime)
+    if (newClip) {
+      addToast(tr('editorClipSplit'), 'success')
+    } else {
+      addToast(tr('editorSplitOutOfRange'), 'info')
+    }
+  }, [selectedClipId, selectedTrackId, currentTime, store, addToast, tr])
+
+  // ✅ Raccourcis clavier de l'éditeur
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const tag = e.target.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return
+
+      if (e.key === ' ') {
+        e.preventDefault()
+        handlePlay()
+      } else if (e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        handleSplit()
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedClipId && selectedTrackId) {
+          e.preventDefault()
+          handleRemoveClip(selectedTrackId, selectedClipId)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handlePlay, handleSplit, selectedClipId, selectedTrackId])
+
+  // ─── EXPORT ──────────────────────────────────────────────────────────────────
+
+  const handleExportClick = () => {
+    const project = store.editorProject
+    if (!project || project.tracks.length === 0 || project.tracks.every(t => t.clips.length === 0)) {
+      addToast(tr('editorNothingToExport'), 'info')
+      return
+    }
+    setExportName(project.name || 'Mon mix')
+    setExportEmoji('🔊')
+    setExportProfiles(['all'])
+    setShowExportModal(true)
+  }
+
+  const handleExportConfirm = async () => {
+    if (!exportName.trim()) {
+      addToast(tr('editorExportNameRequired'), 'error')
+      return
+    }
+
+    if (exportAddToLibrary && exportProfiles.length === 0) {
+      addToast(tr('editorExportProfileRequired'), 'error')
+      return
+    }
+
+    setIsExporting(true)
+    setShowExportModal(false)
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1500))
+
+      if (exportAddToLibrary) {
+        const soundData = {
+          name: exportName.trim(),
+          path: '/path/to/exported/file.mp3',
+          image: exportImage || null,
+          emoji: exportEmoji,
+          profiles: exportProfiles
+        }
+        await store.addSound(soundData)
+        addToast(`"${exportName.trim()}" ${tr('editorExportSuccess')}`, 'success')
+      } else {
+        addToast(tr('editorExportFileOnlySuccess'), 'success')
+      }
+    } catch (e) {
+      console.error('Export error:', e)
+      addToast(tr('editorExportError') + ': ' + e.message, 'error')
+    } finally {
+      setIsExporting(false)
+      setExportName('')
+      setExportEmoji('🔊')
+      setExportImage(null)
+      setExportProfiles(['all'])
+      setExportAddToLibrary(true)
+    }
+  }
 
   const handlePickImage = async () => {
     const imgPath = await window.electronAPI.openImageDialog()
     if (imgPath) {
       const result = await window.electronAPI.importImageFile(imgPath)
       if (result.success) {
-        setImage(result.path)
-        setImagePreview(result.path.startsWith('file://')
-          ? result.path
-          : `file:///${result.path.replace(/\\/g, '/')}`)
+        setExportImage(result.path)
+        addToast(tr('editorExportImageAdded'), 'success')
       }
     }
   }
 
-  const toggleProfile = (profileId) => {
-    setTargetProfiles(prev =>
-      prev.includes(profileId)
-        ? prev.filter(p => p !== profileId)
-        : [...prev, profileId]
+  // ─── RENDU ──────────────────────────────────────────────────────────────────
+
+  const selectedClip = selectedClipId 
+    ? store.editorProject.tracks
+        .flatMap(t => t.clips)
+        .find(c => c.id === selectedClipId)
+    : null
+
+  const project = store.editorProject
+
+  if (!project || !project.id) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+        color: 'var(--text-tertiary)',
+        gap: 12
+      }}>
+        <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
+        <span>{tr('editorLoading')}</span>
+      </div>
     )
   }
 
-  const handleSave = async () => {
-    if (!name.trim()) { addToast(tr('editorNameRequired'), 'error'); return }
-    if (targetProfiles.length === 0) { addToast(tr('editorProfileRequired'), 'error'); return }
-
-    // Vérifier les doublons
-    const existingSound = store.sounds.find(s => s.name.toLowerCase() === name.trim().toLowerCase())
-    if (existingSound) {
-      const confirmed = await confirm({
-        title: tr('soundExists'),
-        message: tr('soundExistsConfirm').replace('{name}', name.trim()),
-        type: 'warning'
-      })
-      if (!confirmed) return
-    }
-
-    setSaving(true)
-    if (playing) { audioRef.current?.pause(); setPlaying(false) }
-
-    const trimResult = await window.electronAPI.trimSoundFile(sound.path, start, end)
-
-    if (!trimResult.success) {
-      addToast(`${tr('trimmerError')} ${trimResult.error}`, 'error')
-      setSaving(false)
-      return
-    }
-
-    if (trimResult.warning) {
-      addToast(trimResult.warning, 'info')
-    }
-
-    await store.addSound({
-      name: name.trim(),
-      path: trimResult.path,
-      image: image || null,
-      emoji: image ? sound.emoji : emoji,
-      profiles: targetProfiles
-    })
-
-    addToast(`"${name.trim()}" ${tr('editorCreated')}`, 'success')
-    setSaving(false)
-    onDone()
-  }
-
   return (
-    <>
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 150 }}>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{tr('editingOf')} <span style={{ color: 'var(--accent)' }}>{sound.name}</span></div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{tr('originalKept')}</div>
-          </div>
-          <button className="btn-secondary btn-lg" onClick={onDone} style={{ borderRadius: 'var(--radius-md)' }}>
-            <i className="ti ti-x" /> {tr('cancel')}
-          </button>
-          <button className="btn-primary btn-lg" onClick={handleSave} disabled={saving} style={{ borderRadius: 'var(--radius-md)' }}>
-            {saving
-              ? <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('creating')}</>
-              : <><i className="ti ti-check" /> {tr('createSound')}</>}
-          </button>
-        </div>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      overflow: 'hidden',
+      background: 'var(--bg-primary)'
+    }}>
+      {/* Barre d'outils */}
+      <EditorToolbar
+        isPlaying={isPlaying}
+        isPaused={isPaused}
+        currentTime={currentTime}
+        totalDuration={totalDuration}
+        onPlay={handlePlay}
+        onStop={handleStop}
+        onExport={handleExportClick}
+        onAddTrack={handleAddTrack}
+        onAddClip={handleAddClip}
+        tracks={project?.tracks || []}
+        sounds={store.sounds}
+        lang={lang}
+        tr={tr}
+        isLoading={isLoading}
+        isExporting={isExporting}
+        onUndo={store.undoEditor}
+        onRedo={store.redoEditor}
+        canUndo={store.canUndoEditor}
+        canRedo={store.canRedoEditor}
+        snapEnabled={snapEnabled}
+        onToggleSnap={() => setSnapEnabled(prev => !prev)}
+        onSplit={handleSplit}
+        canSplit={!!selectedClipId}
+        loopEnabled={store.editorLoopRegion.enabled}
+        onToggleLoop={store.toggleEditorLoop}
+      />
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+      {/* Timeline */}
+      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+        <EditorTimeline
+          tracks={project?.tracks || []}
+          selectedClipId={selectedClipId}
+          selectedTrackId={selectedTrackId}
+          totalDuration={totalDuration}
+          onClipSelect={handleClipSelect}
+          onClipMove={store.moveClip}
+          onClipUpdate={store.updateClip}
+          onClipRemove={handleRemoveClip}
+          onClipDuplicate={store.duplicateClip}
+          onTrackRemove={handleRemoveTrack}
+          onSeek={handleSeek}
+          onTrackMute={(trackId, muted) => store.updateTrack(trackId, { muted })}
+          waveformData={waveformData}
+          currentTime={currentTime}
+          isPlaying={isPlaying || isPaused}
+          clipDurations={clipDurations}
+          lang={lang}
+          tr={tr}
+        />
+      </div>
 
-          <div style={{ flex: 1, minWidth: 300 }}>
-            <SectionTitle icon="ti-cut" label={tr('trimSound')} />
+      {/* Panneau d'effets */}
+      {selectedClip && (
+        <EditorEffectsPanel
+          clip={selectedClip}
+          trackId={selectedTrackId}
+          onEffectAdd={store.addEffectToClip}
+          onEffectRemove={store.removeEffectFromClip}
+          onEffectUpdate={store.updateEffectParam}
+          onEffectToggle={(trackId, clipId, effectId, enabled) => {
+            const clip = store.editorProject.tracks
+              .flatMap(t => t.clips)
+              .find(c => c.id === clipId)
+            if (clip) {
+              const effects = clip.effects.map(e => 
+                e.id === effectId ? { ...e, enabled } : e
+              )
+              store.updateClip(trackId, clipId, { effects })
+            }
+          }}
+          lang={lang}
+          tr={tr}
+        />
+      )}
 
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              marginBottom: 12, padding: '8px 12px', background: 'var(--bg-tertiary)',
-              borderRadius: 'var(--radius-md)', fontSize: 12
-            }}>
-              <span style={{ color: 'var(--text-secondary)' }}>
-                <i className="ti ti-clock" style={{ marginRight: 4 }} />
-                {tr('start')} : <strong>{fmt(start)}</strong>
-              </span>
-              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
-                {tr('duration')} : {fmt(end - start)}
-              </span>
-              <span style={{ color: 'var(--text-secondary)' }}>
-                {tr('end')} : <strong>{fmt(end)}</strong>
-              </span>
+      {/* Modal d'export */}
+      {showExportModal && (
+        <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
+          <div className="modal" style={{ width: 460, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">
+              <i className="ti ti-package-export" style={{ color: 'var(--accent)' }} />
+              {tr('editorExportTitle')}
             </div>
 
-            <div style={{ marginBottom: 24 }}>
-              <Waveform
-                filePath={sound.path}
-                start={start}
-                end={end}
-                currentTime={currentTime}
-                duration={duration}
-                height={80}
-                showHandles
-                onSeek={(pos) => {
-                  if (audioRef.current) audioRef.current.currentTime = pos
-                  setCurrentTime(pos)
-                }}
-                onStartChange={(pos) => setStart(Math.max(0, pos))}
-                onEndChange={(pos) => setEnd(Math.min(duration, pos))}
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-                  {tr('start')} : {fmt(start)}
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+                  {tr('soundName')} *
                 </label>
-                <input type="range" min="0" max={duration} step="0.01" value={start}
-                  onChange={e => setStart(Math.min(Number(e.target.value), end - 0.1))}
-                  style={{ width: '100%', accentColor: 'var(--accent)' }} />
+                <input
+                  value={exportName}
+                  onChange={e => setExportName(e.target.value)}
+                  placeholder={tr('editorExportNamePlaceholder')}
+                  className="input-lg"
+                  style={{ fontSize: 13, borderRadius: 'var(--radius-md)' }}
+                  autoFocus
+                />
               </div>
+
               <div>
-                <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-                  {tr('end')} : {fmt(end)}
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+                  {tr('image')}
                 </label>
-                <input type="range" min="0" max={duration} step="0.01" value={end}
-                  onChange={e => setEnd(Math.max(Number(e.target.value), start + 0.1))}
-                  style={{ width: '100%', accentColor: 'var(--accent)' }} />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <button onClick={togglePlay} className="btn-secondary btn-lg" style={{ flex: 1, justifyContent: 'center', borderRadius: 'var(--radius-md)', minWidth: 120 }}>
-                <i className={`ti ${playing ? 'ti-player-pause' : 'ti-player-play'}`} />
-                {playing ? tr('trimmerPause') : tr('listenSelection')}
-              </button>
-              <button onClick={() => { setStart(0); setEnd(duration) }} className="btn-ghost btn-lg" title={tr('selectAll')} style={{ borderRadius: 'var(--radius-md)' }}>
-                <i className="ti ti-refresh" /> {tr('selectAll')}
-              </button>
-            </div>
-
-            <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text-tertiary)', padding: '8px 10px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
-              <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
-              {tr('editorTrimNote')}
-            </div>
-          </div>
-
-          <div style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-            <div>
-              <SectionTitle icon="ti-eye" label={tr('editorPreview')} />
-              <div style={{
-                background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)',
-                padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8
-              }}>
-                <div style={{
-                  width: 64, height: 64, borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 32, overflow: 'hidden', border: '1px solid var(--border)'
-                }}>
-                  {imagePreview
-                    ? <img src={imagePreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    : emoji}
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 500, textAlign: 'center', color: 'var(--text-primary)' }}>
-                  {name || tr('editorNamePlaceholder')}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <SectionTitle icon="ti-pencil" label={tr('editorNameLabel')} />
-              <input
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder={tr('editorNamePlaceholder')}
-                className="input-lg"
-                style={{ fontSize: 13, borderRadius: 'var(--radius-md)' }}
-              />
-            </div>
-
-            <div>
-              <SectionTitle icon="ti-photo" label={tr('editorImageLabel')} />
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <button className="btn-secondary" onClick={handlePickImage} style={{ flex: 1, justifyContent: 'center', fontSize: 12, borderRadius: 'var(--radius-md)', minHeight: 34 }}>
-                  <i className="ti ti-upload" /> {imagePreview ? tr('editorImageChange') : tr('editorImageChoose')}
-                </button>
-                {imagePreview && (
-                  <button className="btn-ghost" onClick={() => { setImage(null); setImagePreview(null) }} title={tr('menuDelete')} style={{ borderRadius: 'var(--radius-sm)', minHeight: 34 }}>
-                    <i className="ti ti-x" />
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  {exportImage && (
+                    <img 
+                      src={`file:///${exportImage.replace(/\\/g, '/')}`} 
+                      style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} 
+                      alt="Aperçu"
+                    />
+                  )}
+                  <button 
+                    className="btn-secondary btn-sm" 
+                    onClick={handlePickImage}
+                    style={{ fontSize: 12, padding: '4px 12px', borderRadius: 'var(--radius-sm)' }}
+                  >
+                    <i className="ti ti-photo" /> {exportImage ? tr('editorImageChange') : tr('editorImageChoose')}
                   </button>
-                )}
-              </div>
-            </div>
-
-            {!imagePreview && (
-              <div>
-                <SectionTitle icon="ti-mood-smile" label={tr('editorEmojiLabel')} />
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, maxHeight: 200, overflowY: 'auto' }}>
-                  {EMOJIS.map(e => (
+                  {exportImage && (
                     <button 
-                      key={e} 
-                      onClick={() => setEmoji(e)}
+                      className="btn-ghost btn-sm" 
+                      onClick={() => setExportImage(null)}
+                      style={{ fontSize: 12, padding: '4px 6px', borderRadius: 'var(--radius-sm)', color: 'var(--danger)' }}
+                    >
+                      <i className="ti ti-x" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+                  {tr('editorEmojiLabel')}
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {EMOJIS.map(e => (
+                    <button
+                      key={e}
+                      onClick={() => setExportEmoji(e)}
                       style={{
-                        width: 34, height: 34, fontSize: 16, borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                        border: `1px solid ${emoji === e ? 'var(--accent)' : 'var(--border)'}`,
-                        background: emoji === e ? 'var(--accent-light)' : 'var(--bg-tertiary)',
-                        transition: 'all var(--transition-base) ease'
-                      }}
-                      onMouseEnter={e => {
-                        if (emoji !== e) e.currentTarget.style.borderColor = 'var(--accent)'
-                      }}
-                      onMouseLeave={e => {
-                        if (emoji !== e) e.currentTarget.style.borderColor = 'var(--border)'
+                        width: 34,
+                        height: 34,
+                        fontSize: 16,
+                        borderRadius: 'var(--radius-sm)',
+                        cursor: 'pointer',
+                        border: `1px solid ${exportEmoji === e ? 'var(--accent)' : 'var(--border)'}`,
+                        background: exportEmoji === e ? 'var(--accent-light)' : 'var(--bg-tertiary)',
+                        transition: 'all 0.15s ease'
                       }}
                     >
                       {e}
@@ -407,41 +804,134 @@ function SoundEditor({ sound, store, addToast, onDone, lang = 'fr' }) {
                   ))}
                 </div>
               </div>
-            )}
 
-            <div>
-              <SectionTitle icon="ti-users" label={tr('editorProfilesLabel')} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {store.profiles.map(p => (
-                  <label key={p.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
-                    borderRadius: 'var(--radius-md)', cursor: 'pointer',
-                    border: `1px solid ${targetProfiles.includes(p.id) ? 'var(--accent)' : 'var(--border)'}`,
-                    background: targetProfiles.includes(p.id) ? 'var(--accent-light)' : 'transparent',
-                    fontSize: 12
-                  }}>
-                    <input type="checkbox" checked={targetProfiles.includes(p.id)}
-                      onChange={() => toggleProfile(p.id)}
-                      style={{ accentColor: 'var(--accent)', width: 'auto' }} />
-                    <i className={`ti ${p.isDefault ? 'ti-stack' : 'ti-user'}`} style={{ color: 'var(--text-secondary)' }} />
-                    {p.id === 'all' ? tr('allSounds') : p.name}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 10px',
+                borderRadius: 'var(--radius-md)',
+                border: `1px solid ${exportAddToLibrary ? 'var(--accent)' : 'var(--border)'}`,
+                background: exportAddToLibrary ? 'var(--accent-light)' : 'transparent'
+              }}>
+                <input
+                  type="checkbox"
+                  id="exportAddToLibrary"
+                  checked={exportAddToLibrary}
+                  onChange={e => setExportAddToLibrary(e.target.checked)}
+                  style={{ accentColor: 'var(--accent)', width: 'auto' }}
+                />
+                <label htmlFor="exportAddToLibrary" style={{ fontSize: 13, cursor: 'pointer', flex: 1 }}>
+                  {tr('editorAddToLibrary')}
+                </label>
+              </div>
+
+              {exportAddToLibrary && (
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+                    {tr('editorProfilesLabel')} *
                   </label>
-                ))}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {store.profiles.map(p => (
+                      <label
+                        key={p.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '6px 10px',
+                          borderRadius: 'var(--radius-md)',
+                          cursor: 'pointer',
+                          border: `1px solid ${exportProfiles.includes(p.id) ? 'var(--accent)' : 'var(--border)'}`,
+                          background: exportProfiles.includes(p.id) ? 'var(--accent-light)' : 'transparent',
+                          fontSize: 12
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={exportProfiles.includes(p.id)}
+                          onChange={() => {
+                            setExportProfiles(prev =>
+                              prev.includes(p.id)
+                                ? prev.filter(id => id !== p.id)
+                                : [...prev, p.id]
+                            )
+                          }}
+                          style={{ accentColor: 'var(--accent)', width: 'auto' }}
+                        />
+                        <i className={`ti ${p.isDefault ? 'ti-stack' : 'ti-user'}`} style={{ color: 'var(--text-secondary)' }} />
+                        {p.id === 'all' ? tr('allSounds') : p.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{
+                fontSize: 11,
+                color: 'var(--text-tertiary)',
+                padding: '8px 12px',
+                background: 'var(--bg-tertiary)',
+                borderRadius: 'var(--radius-md)',
+                lineHeight: 1.6
+              }}>
+                <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
+                {tr('editorExportNote')}
               </div>
             </div>
 
+            <div className="modal-actions">
+              <button
+                className="btn-secondary btn-lg"
+                onClick={() => setShowExportModal(false)}
+                disabled={isExporting}
+                style={{ borderRadius: 'var(--radius-md)' }}
+              >
+                {tr('cancel')}
+              </button>
+              <button
+                className="btn-primary btn-lg"
+                onClick={handleExportConfirm}
+                disabled={isExporting || !exportName.trim() || (exportAddToLibrary && exportProfiles.length === 0)}
+                style={{ borderRadius: 'var(--radius-md)' }}
+              >
+                {isExporting ? (
+                  <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('editorExporting')}</>
+                ) : (
+                  <><i className="ti ti-check" /> {tr('editorExport')}</>
+                )}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-      <ConfirmWrapper />
-    </>
-  )
-}
+      )}
 
-function SectionTitle({ icon, label }) {
-  return (
-    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 5 }}>
-      <i className={`ti ${icon}`} />{label}
+      {isLoading && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: 'var(--bg-secondary)',
+          padding: '20px 30px',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border)',
+          zIndex: 10,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12
+        }}>
+          <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite', fontSize: 20 }} />
+          <span>{tr('editorLoading')}</span>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   )
 }

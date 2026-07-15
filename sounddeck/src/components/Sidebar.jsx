@@ -8,6 +8,7 @@ const ACTION_IDS = ['loop', 'shortcuts', 'presentation']
 const getDefaultLabels = (tr) => ({
   home: tr('mySounds'),
   discover: tr('discover'),
+  trimmer: tr('trimmer'),
   editor: tr('editor'),
   sequencer: tr('sequencer'),
   youtube: tr('youtube'),
@@ -23,6 +24,7 @@ const getDefaultLabels = (tr) => ({
 const DEFAULT_GROUPS = {
   home: 'navigation',
   discover: 'navigation',
+  trimmer: 'navigation',
   editor: 'navigation',
   sequencer: 'navigation',
   youtube: 'navigation',
@@ -38,7 +40,8 @@ const DEFAULT_GROUPS = {
 const DEFAULT_ICONS = {
   home: 'ti-home',
   discover: 'ti-compass',
-  editor: 'ti-cut',
+  trimmer: 'ti-cut',
+  editor: 'ti-wand',
   sequencer: 'ti-playlist',
   youtube: 'ti-brand-youtube',
   loop: 'ti-repeat',
@@ -270,6 +273,7 @@ export default function Sidebar({
   const isItemActive = (itemId) => {
     if (itemId === 'home') return currentPage === 'home'
     if (itemId === 'discover') return currentPage === 'discover'
+    if (itemId === 'trimmer') return currentPage === 'trimmer'
     if (itemId === 'editor') return currentPage === 'editor'
     if (itemId === 'sequencer') return currentPage === 'sequencer'
     if (itemId === 'youtube') return currentPage === 'youtube'
@@ -284,6 +288,7 @@ export default function Sidebar({
   const handleNavClick = (itemId) => {
     if (itemId === 'home') onChangePage('home')
     else if (itemId === 'discover') onChangePage('discover')
+    else if (itemId === 'trimmer') onChangePage('trimmer')
     else if (itemId === 'editor') onChangePage('editor')
     else if (itemId === 'sequencer') onChangePage('sequencer')
     else if (itemId === 'youtube') onChangePage('youtube')

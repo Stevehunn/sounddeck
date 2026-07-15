@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar'
 import Home from './pages/Home'
 import Discover from './pages/Discover'
 import Options from './pages/Options'
+import Trimmer from './pages/Trimmer'
 import Editor from './pages/Editor'
 import Sequencer from './pages/Sequencer'
 import YouTube from './pages/YouTube'
@@ -403,7 +404,8 @@ export default function App() {
         {currentPage === 'home' && <Home store={store} addToast={addToast} loopEnabled={store.loopEnabled} lang={store.lang} />}
         {currentPage === 'discover' && <Discover store={store} addToast={addToast} lang={store.lang} />}
         {currentPage === 'options' && <Options store={store} addToast={addToast} lang={store.lang} />}
-        {currentPage === 'editor' && <Editor store={store} addToast={addToast} lang={store.lang} />}
+        {currentPage === 'trimmer' && <Trimmer store={store} addToast={addToast} lang={store.lang} />}
+        {currentPage === 'editor' && <Editor store={store} addToast={addToast} lang={store.lang} />} {/* ✅ AJOUTÉ */}
         {currentPage === 'sequencer' && <Sequencer store={store} addToast={addToast} lang={store.lang} />}
         {currentPage === 'youtube' && <YouTube store={store} addToast={addToast} lang={store.lang} />}
         {currentPage === 'guide' && <Guide key={store.lang} lang={store.lang} />}
