@@ -11,13 +11,20 @@ export default function EditorTimeline({
   onClipUpdate,
   onClipRemove,
   onClipDuplicate,
+  onClipFade,
   onTrackRemove,
+  onTrackMute,
+  onTrackSolo,
+  onTrackVolume,
+  onTrackReorder,
   waveformData,
   currentTime,
   isPlaying,
   clipDurations,
   onSeek,
-  onTrackMute,
+  snapEnabled,
+  loopRegion,
+  onSetLoopRegion,
   lang,
   tr
 }) {
@@ -29,10 +36,66 @@ export default function EditorTimeline({
   const [isPanning, setIsPanning] = useState(false)
   const [panStartX, setPanStartX] = useState(0)
   const [scrollLeft, setScrollLeft] = useState(0)
+  const [loopDrag, setLoopDrag] = useState(null) // { mode: 'create' | 'start' | 'end', anchor: number }
 
+  const TRACK_HEAD_WIDTH = 190
   const BASE_PIXELS_PER_SECOND = 80
   const pixelsPerSecond = BASE_PIXELS_PER_SECOND * zoomLevel
   const totalWidth = Math.max(totalDuration * pixelsPerSecond + 100, 600)
+
+  // ✅ Convertit une position d'écran (clientX) en secondes dans la timeline
+  const clientXToTime = (clientX) => {
+    const timeline = timelineRef.current
+    if (!timeline) return 0
+    const timelineRect = timeline.getBoundingClientRect()
+    // ⚠️ timelineRect.left tient déjà compte du scroll (c'est un enfant de containerRef,
+    // sa position à l'écran bouge avec le scroll) : il ne faut PAS rajouter scrollLeft en plus,
+    // sinon le décalage est compté deux fois et grandit avec le scroll.
+    const clickInTimeline = (clientX - timelineRect.left) - TRACK_HEAD_WIDTH
+    const maxPixels = totalDuration * pixelsPerSecond
+    const clampedX = Math.max(0, Math.min(maxPixels, clickInTimeline))
+    return clampedX / pixelsPerSecond
+  }
+
+  // ✅ Grille d'accroche : le pas dépend du niveau de zoom (plus on zoome, plus le pas est fin)
+  const getSnapStep = () => {
+    if (zoomLevel < 0.15) return 5
+    if (zoomLevel < 0.4) return 1
+    if (zoomLevel < 1.2) return 0.5
+    return 0.1
+  }
+
+  // ✅ Accroche un instant à la grille et aux bords des autres clips de la même piste
+  const snapTimeForClip = (time, trackId, clipId) => {
+    if (!snapEnabled) return time
+
+    const step = getSnapStep()
+    let best = Math.round(time / step) * step
+    let bestDist = Math.abs(time - best)
+
+    const thresholdSeconds = 8 / pixelsPerSecond // ~8px d'accroche
+    const track = tracks.find(t => t.id === trackId)
+    if (track) {
+      track.clips.forEach(c => {
+        if (c.id === clipId) return
+        const cDuration = clipDurations?.[c.id] || c.duration || 3
+        ;[c.start, c.start + cDuration].forEach(edge => {
+          const dist = Math.abs(time - edge)
+          if (dist < bestDist) {
+            best = edge
+            bestDist = dist
+          }
+        })
+      })
+    }
+
+    return bestDist <= thresholdSeconds ? best : time
+  }
+
+  const handleClipMoveWithSnap = (trackId, clipId, newStart) => {
+    const snapped = snapTimeForClip(Math.max(0, newStart), trackId, clipId)
+    onClipMove(trackId, clipId, snapped)
+  }
 
   // Gestion du zoom avec la molette
   useEffect(() => {
@@ -85,61 +148,49 @@ export default function EditorTimeline({
     containerRef.current?.style.setProperty('cursor', 'default')
   }
 
-  // ✅ Cliquer sur la timeline pour chercher (seek) - CORRIGÉ avec clientX
+  // ✅ Cliquer sur la timeline pour chercher (seek)
   const handleTimelineClick = (e) => {
     if (isPanning) return
     if (e.target.closest('.editor-clip-wrapper')) return
     if (e.target.closest('button')) return
+    if (e.target.closest('.loop-strip')) return
 
-    const container = containerRef.current
-    const timeline = timelineRef.current
-    if (!container || !timeline) return
-
-    // ✅ Utiliser clientX pour avoir la position absolue
-    const clientX = e.clientX
-    
-    // ✅ Récupérer la position de la timeline
-    const timelineRect = timeline.getBoundingClientRect()
-    
-    // ✅ Position du clic par rapport à la timeline (en pixels)
-    const clickX = clientX - timelineRect.left
-    
-    // ✅ Scroll actuel
-    const currentScroll = container.scrollLeft
-    
-    // ✅ La zone des pistes commence à 150px (marge de gauche)
-    const offsetX = 150
-    
-    // ✅ Position du clic dans la zone de la timeline (après la marge)
-    const clickInTimeline = clickX - offsetX
-    
-    // ✅ Position absolue dans la timeline (en pixels) = clic + scroll
-    const absoluteX = clickInTimeline + currentScroll
-    
-    // ✅ Convertir en secondes
-    const maxPixels = totalDuration * pixelsPerSecond
-    const clampedX = Math.max(0, Math.min(maxPixels, absoluteX))
-    const seekTime = clampedX / pixelsPerSecond
-
-    console.log('📍 Seek avec clientX:', {
-      clientX,
-      timelineRectLeft: timelineRect.left,
-      clickX,
-      currentScroll,
-      offsetX,
-      clickInTimeline,
-      absoluteX: clampedX,
-      maxPixels,
-      pixelsPerSecond,
-      seekTime,
-      totalDuration,
-      zoomLevel
-    })
-
+    const seekTime = clientXToTime(e.clientX)
     if (onSeek) {
       onSeek(seekTime)
     }
   }
+
+  // ✅ Zone de boucle : démarrer la création ou le redimensionnement en cliquant-glissant
+  const handleLoopStripMouseDown = (e) => {
+    e.stopPropagation()
+    const time = clientXToTime(e.clientX)
+    setLoopDrag({ mode: 'create', anchor: time })
+    onSetLoopRegion?.(time, time + 0.1)
+  }
+
+  const handleLoopHandleMouseDown = (mode) => (e) => {
+    e.stopPropagation()
+    const anchor = mode === 'start' ? loopRegion.end : loopRegion.start
+    setLoopDrag({ mode, anchor })
+  }
+
+  useEffect(() => {
+    if (!loopDrag) return
+
+    const handleMove = (e) => {
+      const time = clientXToTime(e.clientX)
+      onSetLoopRegion?.(Math.min(loopDrag.anchor, time), Math.max(loopDrag.anchor, time))
+    }
+    const handleUp = () => setLoopDrag(null)
+
+    document.addEventListener('mousemove', handleMove)
+    document.addEventListener('mouseup', handleUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMove)
+      document.removeEventListener('mouseup', handleUp)
+    }
+  }, [loopDrag, totalDuration, pixelsPerSecond])
 
   // Raccourcis clavier pour le zoom
   useEffect(() => {
@@ -225,7 +276,7 @@ export default function EditorTimeline({
 
   // Curseur de lecture
   const renderPlayhead = () => {
-    const position = Math.min((currentTime / totalDuration) * totalWidth, totalWidth)
+    const position = Math.min(currentTime * pixelsPerSecond, totalWidth)
     return (
       <div style={{
         position: 'absolute',
@@ -313,7 +364,7 @@ export default function EditorTimeline({
             background: 'var(--bg-secondary)',
             borderBottom: '1px solid var(--border)',
             zIndex: 5,
-            marginLeft: 150,
+            marginLeft: TRACK_HEAD_WIDTH,
             cursor: 'pointer'
           }}
         >
@@ -321,8 +372,86 @@ export default function EditorTimeline({
           {renderPlayhead()}
         </div>
 
+        {/* Bande dédiée pour poser/redimensionner la zone de boucle par cliquer-glisser */}
+        <div
+          className="loop-strip"
+          onMouseDown={handleLoopStripMouseDown}
+          style={{
+            position: 'sticky',
+            top: 40,
+            height: 10,
+            marginLeft: TRACK_HEAD_WIDTH,
+            background: 'var(--bg-tertiary)',
+            borderBottom: '1px solid var(--border)',
+            zIndex: 5,
+            cursor: 'text'
+          }}
+        >
+          {loopRegion && (loopRegion.enabled || loopRegion.end > loopRegion.start) && (
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: loopRegion.start * pixelsPerSecond,
+              width: (loopRegion.end - loopRegion.start) * pixelsPerSecond,
+              background: loopRegion.enabled ? 'var(--accent)' : 'var(--text-tertiary)',
+              opacity: 0.7
+            }} />
+          )}
+        </div>
+
+        {/* Bornes de la zone de boucle — simples lignes fines, ne recouvrent pas les waveforms */}
+        {loopRegion && loopRegion.end > loopRegion.start && (
+          <>
+            <div
+              onMouseDown={handleLoopHandleMouseDown('start')}
+              style={{
+                position: 'absolute',
+                top: 50,
+                bottom: 0,
+                left: TRACK_HEAD_WIDTH + loopRegion.start * pixelsPerSecond - 4,
+                width: 8,
+                cursor: 'ew-resize',
+                zIndex: 4,
+                display: 'flex',
+                justifyContent: 'center'
+              }}
+              title={tr('editorLoopRegion')}
+            >
+              <div style={{
+                width: 2,
+                height: '100%',
+                background: loopRegion.enabled ? 'var(--accent)' : 'var(--text-tertiary)',
+                opacity: loopRegion.enabled ? 0.9 : 0.4
+              }} />
+            </div>
+            <div
+              onMouseDown={handleLoopHandleMouseDown('end')}
+              style={{
+                position: 'absolute',
+                top: 50,
+                bottom: 0,
+                left: TRACK_HEAD_WIDTH + loopRegion.end * pixelsPerSecond - 4,
+                width: 8,
+                cursor: 'ew-resize',
+                zIndex: 4,
+                display: 'flex',
+                justifyContent: 'center'
+              }}
+              title={tr('editorLoopRegion')}
+            >
+              <div style={{
+                width: 2,
+                height: '100%',
+                background: loopRegion.enabled ? 'var(--accent)' : 'var(--text-tertiary)',
+                opacity: loopRegion.enabled ? 0.9 : 0.4
+              }} />
+            </div>
+          </>
+        )}
+
         {/* Zone des pistes */}
-        <div style={{ marginLeft: 150 }}>
+        <div style={{ marginLeft: TRACK_HEAD_WIDTH }}>
           {tracks.length === 0 && (
             <div style={{
               display: 'flex',
@@ -349,16 +478,20 @@ export default function EditorTimeline({
               selectedClipId={selectedClipId}
               selectedTrackId={selectedTrackId}
               onClipSelect={onClipSelect}
-              onClipMove={onClipMove}
+              onClipMove={handleClipMoveWithSnap}
               onClipUpdate={onClipUpdate}
               onClipRemove={onClipRemove}
               onClipDuplicate={onClipDuplicate}
+              onClipFade={onClipFade}
               onTrackRemove={onTrackRemove}
               waveformData={waveformData}
               isPlaying={isPlaying}
               currentTime={currentTime}
               clipDurations={clipDurations}
               onTrackMute={onTrackMute}
+              onTrackSolo={onTrackSolo}
+              onTrackVolume={onTrackVolume}
+              onTrackReorder={onTrackReorder}
               lang={lang}
               tr={tr}
             />

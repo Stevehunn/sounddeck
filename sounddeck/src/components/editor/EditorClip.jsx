@@ -16,12 +16,19 @@ export default function EditorClip({
   onRemove,
   onDuplicate,
   onDragStart,
+  onFadeInChange,
+  onFadeOutChange,
   tr
 }) {
   const [isDragging, setIsDragging] = useState(false)
   const [dragStartX, setDragStartX] = useState(0)
   const [isResizing, setIsResizing] = useState(false)
   const [resizeSide, setResizeSide] = useState(null)
+  const [isHovered, setIsHovered] = useState(false)
+  const [fadeDrag, setFadeDrag] = useState(null) // { edge: 'in' | 'out', startX, startDuration }
+  const [liveFadeIn, setLiveFadeIn] = useState(null)
+  const [liveFadeOut, setLiveFadeOut] = useState(null)
+  const dragValueRef = useRef(0)
   const clipRef = useRef(null)
 
   // ✅ Utiliser la durée réelle du clip
@@ -33,6 +40,53 @@ export default function EditorClip({
   const hue = (index * 30 + 200) % 360
   const color = `hsl(${hue}, 70%, 50%)`
   const colorLight = `hsl(${hue}, 70%, 65%)`
+
+  // ✅ Fades — durée en cours (valeur "live" pendant le drag, sinon celle stockée dans les effets)
+  const fadeInEffect = clip.effects?.find(e => e.type === 'fadeIn')
+  const fadeOutEffect = clip.effects?.find(e => e.type === 'fadeOut')
+  const fadeInDuration = liveFadeIn != null ? liveFadeIn : (fadeInEffect?.enabled ? (fadeInEffect.params?.duration || 0) : 0)
+  const fadeOutDuration = liveFadeOut != null ? liveFadeOut : (fadeOutEffect?.enabled ? (fadeOutEffect.params?.duration || 0) : 0)
+  const maxFade = duration / 2
+
+  const handleFadeMouseDown = (e, edge) => {
+    e.stopPropagation()
+    const current = edge === 'in' ? fadeInDuration : fadeOutDuration
+    dragValueRef.current = current
+    setFadeDrag({ edge, startX: e.clientX, startDuration: current })
+  }
+
+  useEffect(() => {
+    if (!fadeDrag) return
+
+    const handleMove = (e) => {
+      const deltaSeconds = (e.clientX - fadeDrag.startX) / pixelsPerSecond
+      const raw = fadeDrag.edge === 'in'
+        ? fadeDrag.startDuration + deltaSeconds
+        : fadeDrag.startDuration - deltaSeconds
+      const clamped = Math.max(0, Math.min(maxFade, raw))
+      dragValueRef.current = clamped
+      if (fadeDrag.edge === 'in') setLiveFadeIn(clamped)
+      else setLiveFadeOut(clamped)
+    }
+
+    const handleUp = () => {
+      if (fadeDrag.edge === 'in') {
+        onFadeInChange?.(dragValueRef.current)
+        setLiveFadeIn(null)
+      } else {
+        onFadeOutChange?.(dragValueRef.current)
+        setLiveFadeOut(null)
+      }
+      setFadeDrag(null)
+    }
+
+    document.addEventListener('mousemove', handleMove)
+    document.addEventListener('mouseup', handleUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMove)
+      document.removeEventListener('mouseup', handleUp)
+    }
+  }, [fadeDrag, pixelsPerSecond, maxFade, onFadeInChange, onFadeOutChange])
 
   // Gestion du drag
   const handleMouseDown = (e) => {
@@ -132,6 +186,8 @@ export default function EditorClip({
         userSelect: 'none'
       }}
       onMouseDown={handleMouseDown}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Waveform */}
       <div style={{
@@ -235,6 +291,48 @@ export default function EditorClip({
           zIndex: 4,
           animation: 'pulse 0.8s ease-in-out infinite'
         }} />
+      )}
+
+      {/* Poignées de fade — visibles seulement au survol ou à la sélection */}
+      {(isHovered || isSelected || fadeDrag) && (
+        <>
+          {/* Triangle de fade in (haut-gauche) */}
+          <div
+            onMouseDown={(e) => handleFadeMouseDown(e, 'in')}
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: 0,
+              height: 0,
+              borderStyle: 'solid',
+              borderWidth: `0 0 ${Math.min(trackHeight, Math.max(10, fadeInDuration * pixelsPerSecond))}px ${Math.min(width / 2, Math.max(10, fadeInDuration * pixelsPerSecond))}px`,
+              borderColor: 'transparent transparent rgba(0,0,0,0.4) transparent',
+              cursor: 'ew-resize',
+              zIndex: 5,
+              transition: fadeDrag ? 'none' : 'border-width 0.1s ease'
+            }}
+            title={tr('editorFadeIn')}
+          />
+          {/* Triangle de fade out (haut-droite) */}
+          <div
+            onMouseDown={(e) => handleFadeMouseDown(e, 'out')}
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              width: 0,
+              height: 0,
+              borderStyle: 'solid',
+              borderWidth: `0 ${Math.min(width / 2, Math.max(10, fadeOutDuration * pixelsPerSecond))}px ${Math.min(trackHeight, Math.max(10, fadeOutDuration * pixelsPerSecond))}px 0`,
+              borderColor: 'transparent rgba(0,0,0,0.4) transparent transparent',
+              cursor: 'ew-resize',
+              zIndex: 5,
+              transition: fadeDrag ? 'none' : 'border-width 0.1s ease'
+            }}
+            title={tr('editorFadeOut')}
+          />
+        </>
       )}
 
       {/* Poignées de resize */}

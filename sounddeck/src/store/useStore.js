@@ -104,7 +104,9 @@ export function useStore() {
   const [selectedClipId, setSelectedClipId] = useState(null)
 
   // ─── ZONE DE BOUCLE DE L'ÉDITEUR ──────────────────────────────────────────
-  const [editorLoopRegion, setEditorLoopRegionState] = useState({ enabled: false, start: 0, end: 4 })
+  // ✅ start === end signifie "aucune zone définie" (on ne veut rien afficher tant
+  // que l'utilisateur n'a pas glissé sur la bande dédiée pour en poser une)
+  const [editorLoopRegion, setEditorLoopRegionState] = useState({ enabled: false, start: 0, end: 0 })
 
   const setEditorLoopRegion = useCallback((start, end) => {
     const s = Math.max(0, Math.min(start, end))
@@ -117,7 +119,7 @@ export function useStore() {
   }, [])
 
   const clearEditorLoopRegion = useCallback(() => {
-    setEditorLoopRegionState({ enabled: false, start: 0, end: 4 })
+    setEditorLoopRegionState({ enabled: false, start: 0, end: 0 })
   }, [])
 
   // ─── CHARGEMENT INITIAL ──────────────────────────────────────────────────
@@ -1406,14 +1408,17 @@ export function useStore() {
     await commitEditorProject(updated)
   }, [editorProject, commitEditorProject])
 
-  const splitClip = useCallback(async (trackId, clipId, atTime) => {
+  // ✅ knownDuration : la vraie durée du clip, calculée côté Editor.jsx (clipDurations) à partir
+  // du fichier audio réel. clip.duration n'est souvent qu'un défaut/placeholder — sans ça, le split
+  // échouait dès que le curseur dépassait le défaut de secours (3s).
+  const splitClip = useCallback(async (trackId, clipId, atTime, knownDuration) => {
     const track = editorProject.tracks.find(t => t.id === trackId)
     if (!track) return null
 
     const clip = track.clips.find(c => c.id === clipId)
     if (!clip) return null
 
-    const clipDuration = clip.duration || 3
+    const clipDuration = knownDuration || clip.duration || 3
     const splitOffset = atTime - clip.start
 
     if (splitOffset <= 0.05 || splitOffset >= clipDuration - 0.05) {
@@ -1538,6 +1543,52 @@ export function useStore() {
           }
         }
         return track
+      }),
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+  }, [editorProject, commitEditorProject])
+
+  // ✅ Poser/ajuster le fade in ou fade out d'un clip via les poignées visuelles
+  // (crée l'effet fadeIn/fadeOut s'il n'existe pas encore, sinon met juste à jour sa durée)
+  const setClipFade = useCallback(async (trackId, clipId, edge, duration) => {
+    const effectType = edge === 'in' ? 'fadeIn' : 'fadeOut'
+    const track = editorProject.tracks.find(t => t.id === trackId)
+    const clip = track?.clips.find(c => c.id === clipId)
+    if (!clip) return
+
+    const existing = clip.effects.find(e => e.type === effectType)
+    const roundedDuration = Math.round(duration * 100) / 100
+
+    const updated = {
+      ...editorProject,
+      tracks: editorProject.tracks.map(t => {
+        if (t.id !== trackId) return t
+        return {
+          ...t,
+          clips: t.clips.map(c => {
+            if (c.id !== clipId) return c
+            if (existing) {
+              return {
+                ...c,
+                effects: c.effects.map(e => e.id === existing.id
+                  ? { ...e, enabled: roundedDuration > 0, params: { ...e.params, duration: roundedDuration } }
+                  : e
+                )
+              }
+            }
+            if (roundedDuration <= 0) return c
+            return {
+              ...c,
+              effects: [...c.effects, {
+                id: `effect-${Date.now()}`,
+                type: effectType,
+                params: { duration: roundedDuration },
+                enabled: true
+              }]
+            }
+          })
+        }
       }),
       updatedAt: Date.now()
     }
@@ -1745,6 +1796,7 @@ export function useStore() {
     addEffectToClip,
     removeEffectFromClip,
     updateEffectParam,
+    setClipFade,
     exportProjectToLibrary,
 
     // Undo/Redo

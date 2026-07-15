@@ -40,6 +40,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
   const allHowlsRef = useRef([])
   const isPlayingRef = useRef(false)
   const loopRegionRef = useRef(store.editorLoopRegion)
+  const playAllClipsRef = useRef(null)
 
   // ✅ Garder une ref à jour de la zone de boucle (lue dans des closures d'animation)
   useEffect(() => {
@@ -272,52 +273,14 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     }
   }, [currentTime])
 
-  // ✅ Fonction pour reprendre la lecture
+  // ✅ Fonction pour reprendre la lecture — relance simplement playAllClips à la position
+  // où on s'est arrêté (pausedTimeRef), au lieu de juste "play()" les howls existants
+  // qui ignoraient un éventuel déplacement du curseur pendant la pause.
   const resumePlayback = useCallback(() => {
     if (isPaused) {
-      // Reprendre tous les howls
-      allHowlsRef.current.forEach(item => {
-        if (item.howl && !item.howl.playing()) {
-          item.howl.play()
-        }
-      })
-      
-      setIsPaused(false)
-      setIsPlaying(true)
-      isPlayingRef.current = true
-      startTimeRef.current = Date.now() - pausedTimeRef.current * 1000
-      
-      // Reprendre l'animation
-      const updateProgress = () => {
-        if (!isPlayingRef.current) {
-          return
-        }
-        const elapsed = (Date.now() - startTimeRef.current) / 1000
-        const newTime = Math.min(elapsed, totalDuration)
-        setCurrentTime(newTime)
-
-        // Émettre l'événement pour la timeline
-        window.dispatchEvent(new CustomEvent('clip-progress', { 
-          detail: { current: newTime, duration: totalDuration } 
-        }))
-
-        const loop = loopRegionRef.current
-        if (loop?.enabled && newTime >= loop.end) {
-          stopPlayback()
-          playAllClips(loop.start)
-          return
-        }
-
-        if (newTime >= totalDuration) {
-          stopPlayback()
-          return
-        }
-
-        animationRef.current = requestAnimationFrame(updateProgress)
-      }
-      updateProgress()
+      playAllClipsRef.current?.(pausedTimeRef.current)
     }
-  }, [isPaused, totalDuration, stopPlayback])
+  }, [isPaused])
 
   // ✅ Lecture de tous les clips en parallèle (startAt permet de démarrer ailleurs qu'à 0, utilisé par la boucle)
   const playAllClips = useCallback((startAt = 0) => {
@@ -458,6 +421,11 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     updateProgress()
   }, [store.editorProject, store.volume, totalDuration, clipDurations, addToast, tr, stopPlayback])
 
+  // ✅ Garder une ref à jour vers playAllClips (utilisée par resumePlayback, défini plus haut dans le fichier)
+  useEffect(() => {
+    playAllClipsRef.current = playAllClips
+  }, [playAllClips])
+
   // ✅ Play/Pause principal
   const handlePlay = useCallback(() => {
     if (isPlaying) {
@@ -510,16 +478,50 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     }
   }, [totalDuration, isPlaying, isPaused, clipDurations])
 
-  // ✅ Couper le clip sélectionné au niveau du curseur (raccourci "S")
+  // ✅ Trouve le clip qui se trouve réellement sous le curseur (currentTime), pas juste "sélectionné"
+  // — sélectionner un clip (clic) ne déplace pas le curseur, donc s'appuyer uniquement sur
+  // selectedClipId faisait échouer le split dès que le curseur n'était pas, par coïncidence,
+  // au même endroit que le clip cliqué.
+  const getClipUnderPlayhead = useCallback(() => {
+    const project = store.editorProject
+    if (!project) return null
+
+    const isUnderPlayhead = (c) => {
+      const dur = clipDurations[c.id] || c.duration || 3
+      return currentTime > c.start + 0.05 && currentTime < c.start + dur - 0.05
+    }
+
+    // Priorité à la piste/clip actuellement sélectionné, s'il est bien sous le curseur
+    const selectedTrack = project.tracks.find(t => t.id === selectedTrackId)
+    const selectedClip = selectedTrack?.clips.find(c => c.id === selectedClipId)
+    if (selectedClip && isUnderPlayhead(selectedClip)) {
+      return { trackId: selectedTrackId, clip: selectedClip }
+    }
+
+    // Sinon, chercher sur toutes les pistes le clip qui couvre la position du curseur
+    for (const track of project.tracks) {
+      const found = track.clips.find(isUnderPlayhead)
+      if (found) return { trackId: track.id, clip: found }
+    }
+    return null
+  }, [store.editorProject, selectedTrackId, selectedClipId, currentTime, clipDurations])
+
+  // ✅ Couper le clip sous le curseur en deux (raccourci "S")
   const handleSplit = useCallback(async () => {
-    if (!selectedClipId || !selectedTrackId) return
-    const newClip = await store.splitClip(selectedTrackId, selectedClipId, currentTime)
+    const target = getClipUnderPlayhead()
+    if (!target) {
+      addToast(tr('editorSplitNoClipHere'), 'info')
+      return
+    }
+    const newClip = await store.splitClip(target.trackId, target.clip.id, currentTime, clipDurations[target.clip.id])
     if (newClip) {
+      setSelectedTrackId(target.trackId)
+      setSelectedClipId(target.clip.id)
       addToast(tr('editorClipSplit'), 'success')
     } else {
       addToast(tr('editorSplitOutOfRange'), 'info')
     }
-  }, [selectedClipId, selectedTrackId, currentTime, store, addToast, tr])
+  }, [getClipUnderPlayhead, currentTime, clipDurations, store, addToast, tr])
 
   // ✅ Raccourcis clavier de l'éditeur
   useEffect(() => {
@@ -671,9 +673,16 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         snapEnabled={snapEnabled}
         onToggleSnap={() => setSnapEnabled(prev => !prev)}
         onSplit={handleSplit}
-        canSplit={!!selectedClipId}
+        canSplit={!!getClipUnderPlayhead()}
         loopEnabled={store.editorLoopRegion.enabled}
-        onToggleLoop={store.toggleEditorLoop}
+        onToggleLoop={() => {
+          const loop = store.editorLoopRegion
+          if (loop.end <= loop.start) {
+            addToast(tr('editorLoopNoRegion'), 'info')
+            return
+          }
+          store.toggleEditorLoop()
+        }}
       />
 
       {/* Timeline */}
@@ -688,13 +697,20 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
           onClipUpdate={store.updateClip}
           onClipRemove={handleRemoveClip}
           onClipDuplicate={store.duplicateClip}
+          onClipFade={(trackId, clipId, edge, duration) => store.setClipFade(trackId, clipId, edge, duration)}
           onTrackRemove={handleRemoveTrack}
           onSeek={handleSeek}
           onTrackMute={(trackId, muted) => store.updateTrack(trackId, { muted })}
+          onTrackSolo={(trackId, solo) => store.updateTrack(trackId, { solo })}
+          onTrackVolume={(trackId, volume) => store.updateTrack(trackId, { volume })}
+          onTrackReorder={store.reorderTracks}
           waveformData={waveformData}
           currentTime={currentTime}
           isPlaying={isPlaying || isPaused}
           clipDurations={clipDurations}
+          snapEnabled={snapEnabled}
+          loopRegion={store.editorLoopRegion}
+          onSetLoopRegion={store.setEditorLoopRegion}
           lang={lang}
           tr={tr}
         />
