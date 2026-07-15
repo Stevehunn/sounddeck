@@ -2,7 +2,6 @@ import { useEffect, useState, useRef } from 'react'
 import { useStore } from './store/useStore'
 import Sidebar from './components/Sidebar'
 import Home from './pages/Home'
-import Discover from './pages/Discover'
 import Options from './pages/Options'
 import Trimmer from './pages/Trimmer'
 import Editor from './pages/Editor'
@@ -19,7 +18,12 @@ import TutorialAdvanced from './components/TutorialAdvanced'
 import { playSound, stopAllSounds, setStoreRef } from './utils/audio'
 import { warmupAudioContext } from './utils/audioMixer'
 
-export default function App() {
+// ✅ IMPORT DU SYSTÈME DE PLUGINS
+import { PluginProvider, usePlugins } from './core/PluginContext'
+import { usePluginPage } from './core/hooks/usePluginPage'
+
+// ─── COMPOSANT PRINCIPAL AVEC PLUGINS ────────────────────────────────────────
+function AppContent() {
   const store = useStore()
   const [currentPage, setCurrentPage] = useState('home')
   const [presentationMode, setPresentationMode] = useState(false)
@@ -29,6 +33,56 @@ export default function App() {
   const [showTutorial, setShowTutorial] = useState(false)
   const [showAdvancedTutorial, setShowAdvancedTutorial] = useState(false)
   const [showQuitConfirm, setShowQuitConfirm] = useState(false)
+
+  // ✅ Récupérer l'état des plugins
+  const { isPluginPage, getPage, pages, loaded: pluginsLoaded, pluginManager } = usePlugins()
+
+  // ✅ Charger la page plugin si nécessaire
+  const { 
+    Component: PluginComponent, 
+    loading: pluginLoading, 
+    error: pluginError 
+  } = usePluginPage(isPluginPage(currentPage) ? currentPage : null)
+
+  // ✅ Charger le plugin MyInstants automatiquement au démarrage
+  useEffect(() => {
+    const loadMyInstantsPlugin = async () => {
+      // Attendre que le PluginManager soit initialisé
+      if (!pluginsLoaded) return
+      
+      // Vérifier si le plugin est déjà chargé
+      if (pluginManager.isPluginLoaded('myinstants')) {
+        console.log('✅ Plugin MyInstants déjà chargé')
+        return
+      }
+
+      try {
+        console.log('📦 Chargement automatique du plugin MyInstants...')
+        
+        // Créer les informations du plugin
+        const pluginInfo = {
+          id: 'myinstants',
+          name: 'MyInstants Discovery',
+          version: '1.0.0',
+          path: './plugins/myinstants',
+          enabled: true
+        }
+        
+        // Charger le plugin
+        const result = await pluginManager.loadPlugin(pluginInfo)
+        
+        if (result) {
+          console.log('✅ Plugin MyInstants chargé avec succès')
+        } else {
+          console.warn('⚠️ Échec du chargement du plugin MyInstants')
+        }
+      } catch (e) {
+        console.error('❌ Erreur lors du chargement du plugin MyInstants:', e)
+      }
+    }
+
+    loadMyInstantsPlugin()
+  }, [pluginsLoaded, pluginManager])
 
   const soundsRef = useRef([])
   const addToastRef = useRef(null)
@@ -149,13 +203,11 @@ export default function App() {
     const handleShowQuitConfirm = () => {
       console.log(`📌 SHOW_QUIT_CONFIRM - blocked: ${isPopupBlockedRef.current}`)
       
-      // ✅ Si la popup est bloquée, ignorer
       if (isPopupBlockedRef.current) {
         console.log('🚫 Popup REFUSÉE - Blocage actif')
         return
       }
 
-      // ✅ Si la fenêtre est masquée, ignorer
       if (document.hidden) {
         console.log('🚫 Popup REFUSÉE - Fenêtre masquée')
         return
@@ -357,6 +409,121 @@ export default function App() {
 
   useEffect(() => { addToastRef.current = addToast }, [])
 
+  // ✅ RENDU DES PAGES (avec support plugins)
+  const renderPage = () => {
+    // Pages core
+    if (currentPage === 'home') {
+      return <Home store={store} addToast={addToast} loopEnabled={store.loopEnabled} lang={store.lang} />
+    }
+    if (currentPage === 'options') {
+      return <Options store={store} addToast={addToast} lang={store.lang} />
+    }
+    if (currentPage === 'trimmer') {
+      return <Trimmer store={store} addToast={addToast} lang={store.lang} />
+    }
+    if (currentPage === 'editor') {
+      return <Editor store={store} addToast={addToast} lang={store.lang} />
+    }
+    if (currentPage === 'sequencer') {
+      return <Sequencer store={store} addToast={addToast} lang={store.lang} />
+    }
+    if (currentPage === 'youtube') {
+      return <YouTube store={store} addToast={addToast} lang={store.lang} />
+    }
+    if (currentPage === 'guide') {
+      return <Guide key={store.lang} lang={store.lang} />
+    }
+    if (currentPage === 'stats') {
+      return <Stats store={store} lang={store.lang} />
+    }
+
+    // ✅ Pages plugin
+    if (isPluginPage(currentPage)) {
+      if (pluginLoading) {
+        return (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            color: 'var(--text-tertiary)',
+            gap: 12
+          }}>
+            <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
+            <span>Chargement du plugin...</span>
+          </div>
+        )
+      }
+      
+      if (pluginError) {
+        return (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            color: 'var(--danger)',
+            gap: 12,
+            padding: 20,
+            textAlign: 'center'
+          }}>
+            <i className="ti ti-alert-triangle" style={{ fontSize: 32 }} />
+            <div style={{ fontSize: 16, fontWeight: 600 }}>Erreur de chargement</div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{pluginError}</div>
+            <button 
+              className="btn-secondary btn-sm" 
+              onClick={() => setCurrentPage('home')}
+            >
+              Retour à l'accueil
+            </button>
+          </div>
+        )
+      }
+      
+      if (PluginComponent) {
+        return <PluginComponent store={store} addToast={addToast} lang={store.lang} />
+      }
+      
+      return (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          color: 'var(--text-tertiary)',
+          gap: 12
+        }}>
+          <i className="ti ti-puzzle" style={{ fontSize: 32 }} />
+          <div style={{ fontSize: 16 }}>Plugin non trouvé</div>
+          <button 
+            className="btn-secondary btn-sm" 
+            onClick={() => setCurrentPage('home')}
+          >
+            Retour à l'accueil
+          </button>
+        </div>
+      )
+    }
+
+    // Page non trouvée
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+        color: 'var(--text-tertiary)',
+        gap: 12
+      }}>
+        <i className="ti ti-404" style={{ fontSize: 32 }} />
+        <div style={{ fontSize: 16 }}>Page non trouvée</div>
+      </div>
+    )
+  }
+
   // ✅ Si le store est en chargement
   if (store.loading) {
     return (
@@ -398,18 +565,13 @@ export default function App() {
         sidebarConfig={store.sidebarConfig}
         sidebarEditMode={store.sidebarEditMode}
         sidebarVersion={store.sidebarVersion}
+        // ✅ Passage des pages plugins
+        pluginPages={pages}
+        isPluginPage={isPluginPage}
       />
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {currentPage === 'home' && <Home store={store} addToast={addToast} loopEnabled={store.loopEnabled} lang={store.lang} />}
-        {currentPage === 'discover' && <Discover store={store} addToast={addToast} lang={store.lang} />}
-        {currentPage === 'options' && <Options store={store} addToast={addToast} lang={store.lang} />}
-        {currentPage === 'trimmer' && <Trimmer store={store} addToast={addToast} lang={store.lang} />}
-        {currentPage === 'editor' && <Editor store={store} addToast={addToast} lang={store.lang} />} {/* ✅ AJOUTÉ */}
-        {currentPage === 'sequencer' && <Sequencer store={store} addToast={addToast} lang={store.lang} />}
-        {currentPage === 'youtube' && <YouTube store={store} addToast={addToast} lang={store.lang} />}
-        {currentPage === 'guide' && <Guide key={store.lang} lang={store.lang} />}
-        {currentPage === 'stats' && <Stats store={store} lang={store.lang} />}
+        {renderPage()}
       </main>
 
       <Toast toasts={toasts} />
@@ -442,6 +604,39 @@ export default function App() {
           lang={store.lang} 
         />
       )}
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
+  )
+}
+
+// ─── WRAPPER AVEC PLUGIN PROVIDER ────────────────────────────────────────────
+
+export default function App() {
+  const store = useStore()
+  
+  // Ne pas rendre l'app tant que le store n'est pas chargé
+  if (store.loading) {
+    return (
+      <div style={{
+        height: '100vh', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', background: 'var(--bg-primary)',
+        color: 'var(--text-secondary)', flexDirection: 'column', gap: 12
+      }}>
+        <i className="ti ti-speakerphone" style={{ fontSize: 32, color: 'var(--accent)' }} />
+        <span>Chargement de SoundDeck...</span>
+      </div>
+    )
+  }
+
+  return (
+    <PluginProvider store={store}>
+      <AppContent />
+    </PluginProvider>
   )
 }

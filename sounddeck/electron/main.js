@@ -7,6 +7,8 @@ const { exec } = require('child_process')
 const AdmZip = require('adm-zip')
 const ytdlp = require('yt-dlp-exec')
 const ytdlpPath = require('path').join(__dirname, 'node_modules', 'yt-dlp-exec', 'bin', 'yt-dlp.exe')
+const { v4: uuidv4 } = require('uuid')
+const PLUGINS_DIR = path.join(app.getPath('userData'), 'plugins')
 
 const store = new Store()
 
@@ -1643,6 +1645,201 @@ ipcMain.handle('hide-window', () => {
 ipcMain.handle('show-window', () => {
   showMainWindow()
   return true
+})
+
+// electron/main.js
+
+// ─── HANDLERS POUR LES PLUGINS ───────────────────────────────────────────────
+
+// ✅ NOUVEAU HANDLER : Installation depuis un buffer
+ipcMain.handle('install-plugin-from-buffer', async (event, buffer, fileName) => {
+  console.log('📦 Installation depuis buffer, fichier:', fileName)
+  console.log('📦 Taille du buffer:', buffer?.byteLength || 0)
+
+  try {
+    if (!buffer || buffer.byteLength === 0) {
+      console.error('❌ Buffer vide')
+      return { success: false, error: 'Fichier vide' }
+    }
+
+    // Sauvegarder le buffer dans un fichier temporaire
+    const tempDir = app.getPath('temp')
+    const tempFile = path.join(tempDir, `plugin_${Date.now()}_${fileName || 'plugin.zip'}`)
+    console.log('📁 Fichier temporaire:', tempFile)
+
+    // Écrire le buffer dans un fichier
+    const bufferObj = Buffer.from(buffer)
+    fs.writeFileSync(tempFile, bufferObj)
+    console.log('✅ Fichier temporaire écrit, taille:', bufferObj.length)
+
+    // Vérifier que le fichier est un ZIP valide
+    try {
+      const zip = new AdmZip(tempFile)
+      const entries = zip.getEntries()
+      console.log('📦 Entrées du ZIP:', entries.map(e => e.entryName))
+
+      const manifestEntry = zip.getEntry('plugin.json')
+      if (!manifestEntry) {
+        console.error('❌ plugin.json manquant')
+        fs.unlinkSync(tempFile)
+        return { success: false, error: 'plugin.json manquant dans l\'archive' }
+      }
+
+      const manifest = JSON.parse(manifestEntry.getData().toString('utf-8'))
+      console.log('📄 Manifeste:', manifest)
+
+      if (!manifest.id) {
+        console.error('❌ id manquant dans plugin.json')
+        fs.unlinkSync(tempFile)
+        return { success: false, error: 'id manquant dans plugin.json' }
+      }
+
+      const pluginId = manifest.id.replace(/[^a-zA-Z0-9_-]/g, '')
+      console.log('🔑 ID du plugin:', pluginId)
+
+      const pluginDir = path.join(PLUGINS_DIR, pluginId)
+      console.log('📁 Dossier du plugin:', pluginDir)
+
+      // Supprimer l'ancienne version
+      if (fs.existsSync(pluginDir)) {
+        console.log('🗑️ Suppression de l\'ancienne version')
+        fs.rmSync(pluginDir, { recursive: true, force: true })
+      }
+
+      // Extraire l'archive
+      zip.extractAllTo(pluginDir, true)
+      console.log('✅ Archive extraite')
+
+      // Nettoyer le fichier temporaire
+      fs.unlinkSync(tempFile)
+      console.log('🧹 Fichier temporaire supprimé')
+
+      console.log(`✅ Plugin "${manifest.name || manifest.id}" installé avec succès`)
+
+      return {
+        success: true,
+        id: pluginId,
+        name: manifest.name || manifest.id,
+        version: manifest.version || '1.0.0'
+      }
+
+    } catch (zipError) {
+      console.error('❌ Erreur lecture ZIP:', zipError)
+      try { fs.unlinkSync(tempFile) } catch (e) {}
+      return { success: false, error: 'Fichier ZIP invalide: ' + zipError.message }
+    }
+
+  } catch (e) {
+    console.error('❌ Erreur installation plugin:', e)
+    return {
+      success: false,
+      error: e.message
+    }
+  }
+})
+
+// ✅ Garder les anciens handlers pour compatibilité
+ipcMain.handle('install-plugin', async (event, tempPath) => {
+  console.log('📦 install-plugin appelé avec tempPath:', tempPath)
+  
+  try {
+    // Si c'est une URL blob, on ne peut pas fetch depuis le main process
+    // On essaie de lire le fichier si c'est un chemin local
+    if (tempPath.startsWith('blob:')) {
+      console.error('❌ Les URLs blob ne sont pas supportées depuis le main process')
+      return { success: false, error: 'Format blob non supporté, utilisez install-plugin-from-buffer' }
+    }
+
+    if (!fs.existsSync(tempPath)) {
+      return { success: false, error: `Fichier introuvable: ${tempPath}` }
+    }
+
+    const zip = new AdmZip(tempPath)
+    const manifestEntry = zip.getEntry('plugin.json')
+    
+    if (!manifestEntry) {
+      return { success: false, error: 'plugin.json manquant dans l\'archive' }
+    }
+    
+    const manifest = JSON.parse(manifestEntry.getData().toString('utf-8'))
+    
+    if (!manifest.id) {
+      return { success: false, error: 'id manquant dans plugin.json' }
+    }
+    
+    const pluginId = manifest.id.replace(/[^a-zA-Z0-9_-]/g, '')
+    const pluginDir = path.join(PLUGINS_DIR, pluginId)
+    
+    if (fs.existsSync(pluginDir)) {
+      fs.rmSync(pluginDir, { recursive: true, force: true })
+    }
+    
+    zip.extractAllTo(pluginDir, true)
+    
+    return {
+      success: true,
+      id: pluginId,
+      name: manifest.name || manifest.id,
+      version: manifest.version || '1.0.0'
+    }
+    
+  } catch (e) {
+    console.error('❌ Erreur installation plugin:', e)
+    return { success: false, error: e.message }
+  }
+})
+
+// Récupérer la liste des plugins installés
+ipcMain.handle('get-installed-plugins', async () => {
+  console.log('📋 Récupération des plugins installés')
+  const plugins = []
+  
+  if (!fs.existsSync(PLUGINS_DIR)) {
+    console.log('📁 Dossier plugins inexistant')
+    return plugins
+  }
+  
+  const folders = fs.readdirSync(PLUGINS_DIR)
+  console.log('📁 Dossiers trouvés:', folders)
+  
+  for (const folder of folders) {
+    const manifestPath = path.join(PLUGINS_DIR, folder, 'plugin.json')
+    if (fs.existsSync(manifestPath)) {
+      try {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'))
+        plugins.push({
+          ...manifest,
+          path: path.join(PLUGINS_DIR, folder),
+          enabled: true,
+          pages: manifest.pages?.length || 0
+        })
+        console.log(`✅ Plugin chargé: ${manifest.name || manifest.id}`)
+      } catch (e) {
+        console.warn(`⚠️ Plugin invalide dans ${folder}:`, e.message)
+      }
+    }
+  }
+  
+  console.log(`📋 ${plugins.length} plugins trouvés`)
+  return plugins
+})
+
+// Désinstaller un plugin
+ipcMain.handle('uninstall-plugin', async (event, pluginId) => {
+  console.log('🗑️ Désinstallation du plugin:', pluginId)
+  const pluginDir = path.join(PLUGINS_DIR, pluginId)
+  if (fs.existsSync(pluginDir)) {
+    try {
+      fs.rmSync(pluginDir, { recursive: true, force: true })
+      console.log('✅ Plugin désinstallé')
+      return { success: true }
+    } catch (e) {
+      console.error('❌ Erreur désinstallation:', e)
+      return { success: false, error: e.message }
+    }
+  }
+  console.log('❌ Plugin non trouvé')
+  return { success: false, error: 'Plugin non trouvé' }
 })
 
 // ─── Mise à jour des raccourcis ─────────────────────────────────────────────

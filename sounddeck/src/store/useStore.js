@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { v4 as uuidv4 } from 'uuid'
+import { DEFAULT_SOUNDS } from './defaultSounds'
 
 // Constantes des modes audio
 export const AUDIO_MODES = {
@@ -74,14 +75,14 @@ export function useStore() {
   const [compressionBitrate, setCompressionBitrate] = useState(128)
 
   // ─── Étape 1 : Taille des cartes ──────────────────────────────────────────
-  const [cardSize, setCardSize] = useState('medium') // 'small' | 'medium' | 'large'
+  const [cardSize, setCardSize] = useState('medium')
 
   // ─── Étape 2 : Tags ──────────────────────────────────────────────────────
-  const [tags, setTags] = useState({}) // { soundId: ['tag1', 'tag2'] }
+  const [tags, setTags] = useState({})
 
   // ─── Étape 7 : Performance ─────────────────────────────────────────────────
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(true)
-  const [backupInterval, setBackupInterval] = useState(5) // minutes
+  const [backupInterval, setBackupInterval] = useState(5)
   const [lazyLoadingEnabled, setLazyLoadingEnabled] = useState(true)
 
   // ─── SIDEBAR CONFIG ──────────────────────────────────────────────────────────
@@ -102,11 +103,9 @@ export function useStore() {
 
   const [selectedClipId, setSelectedClipId] = useState(null)
 
-  // ─── ZONE DE BOUCLE DE L'ÉDITEUR (lecture en boucle sur une plage) ──────────
+  // ─── ZONE DE BOUCLE DE L'ÉDITEUR ──────────────────────────────────────────
   const [editorLoopRegion, setEditorLoopRegionState] = useState({ enabled: false, start: 0, end: 4 })
 
-  // Poser/redimensionner la zone en glissant sur la règle (pas d'historique undo ici,
-  // ce n'est pas une modification du projet mais une préférence de lecture)
   const setEditorLoopRegion = useCallback((start, end) => {
     const s = Math.max(0, Math.min(start, end))
     const e = Math.max(s + 0.1, Math.max(start, end))
@@ -192,15 +191,12 @@ export function useStore() {
         setCompressOnImport(savedCompressOnImport)
         setCompressionBitrate(savedCompressionBitrate)
 
-        // ─── Étape 1 : Chargement de la taille des cartes ──────────────────
         const savedCardSize = await window.electronAPI.storeGet('cardSize') || 'medium'
         setCardSize(savedCardSize)
 
-        // ─── Étape 2 : Chargement des tags ─────────────────────────────────
         const savedTags = await window.electronAPI.storeGet('tags') || {}
         setTags(savedTags)
 
-        // ─── Étape 7 : Chargement des options de performance ──────────────
         const savedAutoBackup = await window.electronAPI.storeGet('autoBackupEnabled') ?? true
         const savedBackupInterval = await window.electronAPI.storeGet('backupInterval') ?? 5
         const savedLazyLoading = await window.electronAPI.storeGet('lazyLoadingEnabled') ?? true
@@ -245,11 +241,36 @@ export function useStore() {
         setKeyboardLayout(defaultLayout)
 
         setProfiles(allProfiles)
-        setSounds(savedSounds)
+
+        // ✅ AJOUT DES SONS PAR DÉFAUT SI AUCUN SON N'EXISTE
+        let finalSounds = savedSounds
+        if (savedSounds.length === 0) {
+          console.log('🔊 Aucun son trouvé, ajout des sons par défaut...')
+          
+          const defaultSoundsWithPaths = DEFAULT_SOUNDS.map((sound, index) => ({
+            id: `default_${sound.id || index}`,
+            name: sound.name,
+            emoji: sound.emoji,
+            path: `default-sounds/${sound.file}`,
+            profiles: ['all'],
+            favorites: [],
+            tags: sound.tags || [],
+            volume: 0,
+            volumeDb: 0,
+            playCount: 0,
+            createdAt: Date.now() + index,
+            isDefault: true
+          }))
+          
+          finalSounds = defaultSoundsWithPaths
+          await save('sounds', finalSounds)
+        }
+        
+        setSounds(finalSounds)
         setShortcuts(savedShortcuts)
 
         // ═════════Nettoyage des raccourcis orphelins════════════════════════════
-        const soundIds = new Set(savedSounds.map(s => s.id))
+        const soundIds = new Set(finalSounds.map(s => s.id))
         const cleanedShortcuts = { ...savedShortcuts }
         let hasChanges = false
         Object.keys(cleanedShortcuts).forEach(id => {
@@ -301,12 +322,10 @@ export function useStore() {
         let savedSidebarConfig = await window.electronAPI.storeGet('sidebarConfig')
         
         if (savedSidebarConfig) {
-          // ✅ Synchroniser les profils avec la config sauvegardée
           const existingProfileIds = (savedSidebarConfig.items || [])
             .filter(item => item.id && item.id.startsWith('profile-'))
             .map(item => item.id.replace('profile-', ''))
           
-          // Ajouter les profils manquants
           let items = [...(savedSidebarConfig.items || [])]
           
           allProfiles.forEach(profile => {
@@ -331,7 +350,6 @@ export function useStore() {
             }
           })
           
-          // Supprimer les profils qui n'existent plus
           const currentProfileIds = new Set(allProfiles.map(p => `profile-${p.id}`))
           items = items.filter(item => {
             if (item.id.startsWith('profile-')) {
@@ -347,10 +365,8 @@ export function useStore() {
           
           setSidebarConfig(savedSidebarConfig)
         } else {
-          // ✅ Créer la config par défaut avec les profils
           const defaultItems = [...DEFAULT_SIDEBAR_CONFIG.items]
           
-          // Ajouter les profils
           allProfiles.forEach(profile => {
             defaultItems.push({
               id: `profile-${profile.id}`,
@@ -401,8 +417,6 @@ export function useStore() {
   const [canUndoEditor, setCanUndoEditor] = useState(false)
   const [canRedoEditor, setCanRedoEditor] = useState(false)
 
-  // ✅ Point de passage unique pour toute modification du projet éditeur.
-  // Empile l'état précédent dans l'historique et vide le "refaire".
   const commitEditorProject = useCallback(async (updated, { skipHistory = false } = {}) => {
     if (!skipHistory) {
       editorUndoStack.current.push(editorProject)
@@ -1135,7 +1149,6 @@ export function useStore() {
 
   // ─── ÉDITEUR AVANCÉ ──────────────────────────────────────────────────────────
 
-  // Créer un nouveau projet
   const createEditorProject = useCallback(async (name = 'Nouveau projet') => {
     const project = {
       id: uuidv4(),
@@ -1151,7 +1164,6 @@ export function useStore() {
     return project
   }, [save])
 
-  // Ajouter une piste
   const addTrack = useCallback(async () => {
     const newTrack = {
       id: `track-${Date.now()}`,
@@ -1171,8 +1183,6 @@ export function useStore() {
     return newTrack
   }, [editorProject, commitEditorProject])
 
-  // ✅ Mettre à jour une piste (volume, mute, solo, nom, couleur...)
-  // Remplace la logique bricolée qui appelait updateClip(trackId, null, ...)
   const updateTrack = useCallback(async (trackId, updates) => {
     const updated = {
       ...editorProject,
@@ -1187,7 +1197,6 @@ export function useStore() {
     await commitEditorProject(updated)
   }, [editorProject, commitEditorProject])
 
-  // ✅ Réordonner les pistes (drag & drop dans l'en-tête de piste)
   const reorderTracks = useCallback(async (startIndex, endIndex) => {
     const tracks = [...editorProject.tracks]
     if (startIndex < 0 || startIndex >= tracks.length || endIndex < 0 || endIndex >= tracks.length) {
@@ -1203,7 +1212,6 @@ export function useStore() {
     await commitEditorProject(updated)
   }, [editorProject, commitEditorProject])
 
-  // Supprimer une piste
   const removeTrack = useCallback(async (trackId) => {
     const updated = {
       ...editorProject,
@@ -1213,7 +1221,6 @@ export function useStore() {
     await commitEditorProject(updated)
   }, [editorProject, commitEditorProject])
 
-  // Ajouter un clip à une piste
   const addClipToTrack = useCallback(async (trackId, soundId, start = 0, duration = 3) => {
     const sound = sounds.find(s => s.id === soundId)
     if (!sound) {
@@ -1221,11 +1228,9 @@ export function useStore() {
       return null
     }
 
-    // ✅ Vérifier que le fichier existe
     const fileExists = await window.electronAPI.fileExists?.(sound.path)
     if (!fileExists && sound.path) {
       console.warn('Fichier son introuvable:', sound.path)
-      // On continue quand même, le clip sera marqué comme manquant
     }
 
     const newClip = {
@@ -1259,7 +1264,6 @@ export function useStore() {
     return newClip
   }, [editorProject, sounds, commitEditorProject])
 
-  // Ajouter un clip depuis un fichier externe
   const addClipFromFile = useCallback(async (trackId, filePath, start = 0) => {
     const fileName = filePath.split(/[\\/]/).pop() || 'audio'
     const newClip = {
@@ -1294,7 +1298,6 @@ export function useStore() {
     return newClip
   }, [editorProject, commitEditorProject])
 
-  // Mettre à jour un clip
   const updateClip = useCallback(async (trackId, clipId, updates) => {
     const updated = {
       ...editorProject,
@@ -1317,7 +1320,6 @@ export function useStore() {
     await commitEditorProject(updated)
   }, [editorProject, commitEditorProject])
 
-  // Supprimer un clip
   const removeClip = useCallback(async (trackId, clipId) => {
     const updated = {
       ...editorProject,
@@ -1335,9 +1337,7 @@ export function useStore() {
     await commitEditorProject(updated)
   }, [editorProject, commitEditorProject])
 
-  // Déplacer un clip
   const moveClip = useCallback(async (trackId, clipId, newStart, newTrackId = null) => {
-    // Trouver le clip à déplacer
     let clipToMove = null
     let sourceTrack = null
 
@@ -1363,7 +1363,6 @@ export function useStore() {
     const targetTrackId = newTrackId || trackId
     const finalTracks = updatedTracks.map(track => {
       if (track.id === targetTrackId) {
-        // Insérer le clip dans l'ordre
         const clips = [...track.clips, clipToMove]
         clips.sort((a, b) => a.start - b.start)
         return { ...track, clips }
@@ -1379,7 +1378,6 @@ export function useStore() {
     await commitEditorProject(updated)
   }, [editorProject, commitEditorProject])
 
-  // Dupliquer un clip
   const duplicateClip = useCallback(async (trackId, clipId) => {
     const track = editorProject.tracks.find(t => t.id === trackId)
     if (!track) return
@@ -1408,7 +1406,6 @@ export function useStore() {
     await commitEditorProject(updated)
   }, [editorProject, commitEditorProject])
 
-  // ✅ Couper un clip en deux à un instant donné (raccourci "S")
   const splitClip = useCallback(async (trackId, clipId, atTime) => {
     const track = editorProject.tracks.find(t => t.id === trackId)
     if (!track) return null
@@ -1419,7 +1416,6 @@ export function useStore() {
     const clipDuration = clip.duration || 3
     const splitOffset = atTime - clip.start
 
-    // Le point de coupe doit tomber strictement à l'intérieur du clip
     if (splitOffset <= 0.05 || splitOffset >= clipDuration - 0.05) {
       return null
     }
@@ -1457,7 +1453,6 @@ export function useStore() {
     return secondPart
   }, [editorProject, commitEditorProject])
 
-  // Ajouter un effet à un clip
   const addEffectToClip = useCallback(async (trackId, clipId, effectType, params = {}) => {
     const effect = {
       id: `effect-${Date.now()}`,
@@ -1491,7 +1486,6 @@ export function useStore() {
     return effect
   }, [editorProject, commitEditorProject])
 
-  // Supprimer un effet d'un clip
   const removeEffectFromClip = useCallback(async (trackId, clipId, effectId) => {
     const updated = {
       ...editorProject,
@@ -1517,7 +1511,6 @@ export function useStore() {
     await commitEditorProject(updated)
   }, [editorProject, commitEditorProject])
 
-  // Mettre à jour un paramètre d'effet
   const updateEffectParam = useCallback(async (trackId, clipId, effectId, param, value) => {
     const updated = {
       ...editorProject,
@@ -1551,10 +1544,7 @@ export function useStore() {
     await commitEditorProject(updated)
   }, [editorProject, commitEditorProject])
 
-  // Exporter le projet vers la bibliothèque
   const exportProjectToLibrary = useCallback(async (name) => {
-    // Cette fonction sera implémentée dans la page Editor
-    // Elle doit exporter le mix final vers la bibliothèque SoundDeck
     console.log('Export du projet vers la bibliothèque:', name)
   }, [])
 

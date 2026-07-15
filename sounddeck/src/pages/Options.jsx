@@ -5,6 +5,7 @@ import SidebarEditor from '../components/SidebarEditor'
 import OBSControl from '../components/OBSControl'
 import TwitchAlerts from '../components/TwitchAlerts'
 import BackupSettings from '../components/BackupSettings'
+import PluginInstaller from '../components/PluginInstaller'
 import { LANGUAGES, useTranslation } from '../i18n'
 import { getMicrophoneStatus, getMixerStats, testMicrophoneOnce, connectMixerToOutput } from '../utils/audioMixer'
 import KeyboardVisualizer from '../components/KeyboardVisualizer'
@@ -17,6 +18,7 @@ const SECTIONS = [
   { id: 'audio', icon: 'ti-volume', labelKey: 'optionsAudio' },
   { id: 'shortcuts', icon: 'ti-keyboard', labelKey: 'optionsShortcuts' },
   { id: 'soundManagement', icon: 'ti-music', labelKey: 'soundManagement' },
+  { id: 'plugins', icon: 'ti-puzzle', labelKey: 'optionsPlugins' },
   { id: 'integrations', icon: 'ti-plug', labelKey: 'integrations' },
   { id: 'performance', icon: 'ti-gauge', labelKey: 'performance' },
   { id: 'backup', icon: 'ti-cloud', labelKey: 'optionsBackup' },
@@ -58,10 +60,26 @@ export default function Options({ store, addToast, lang = 'fr' }) {
   const [microphones, setMicrophones] = useState([])
   const [isInstallingDriver, setIsInstallingDriver] = useState(false)
   const [isMicrophoneTesting, setIsMicrophoneTesting] = useState(false)
+  const [showPluginInstaller, setShowPluginInstaller] = useState(false)
+  const [plugins, setPlugins] = useState([]) // ✅ AJOUTÉ
   const micTestRef = useRef(null)
   const sectionRefs = useRef({})
   const observerRef = useRef(null)
   const isScrollingRef = useRef(false)
+
+  // ─── CHARGEMENT DES PLUGINS ────────────────────────────────────────────────
+  const loadPlugins = useCallback(async () => {
+    try {
+      const installed = await window.electronAPI.getInstalledPlugins?.() || []
+      setPlugins(installed)
+    } catch (e) {
+      console.warn('Erreur chargement plugins:', e)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadPlugins()
+  }, [loadPlugins])
 
   useEffect(() => {
     return () => {
@@ -304,6 +322,8 @@ export default function Options({ store, addToast, lang = 'fr' }) {
     await window.electronAPI.storeDelete('errorLogs')
     addToast(tr('logsCleared'), 'info')
   }, [confirm, tr, addToast])
+
+  // ─── RENDU ──────────────────────────────────────────────────────────────────
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -1222,6 +1242,217 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 {store.normalizationTarget >= 0.6 && ` ${tr('normalizationAdviceHigh')}`}
               </div>
             </>
+          )}
+        </Section>
+
+        {/* ============================ */}
+        {/* SECTION PLUGINS */}
+        {/* ============================ */}
+        <Section 
+          ref={el => sectionRefs.current['plugins'] = el}
+          id="plugins"
+          title={tr('optionsPlugins')} 
+          icon="ti-puzzle"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Bouton d'installation */}
+            <div className="option-row" style={{ padding: '12px 14px' }}>
+              <div>
+                <div className="label">{tr('pluginsInstall')}</div>
+                <div className="sub">{tr('pluginsInstallDesc')}</div>
+              </div>
+              <button 
+                className="btn-primary btn-sm"
+                onClick={() => setShowPluginInstaller(true)}
+                style={{ minHeight: 34, padding: '6px 16px' }}
+              >
+                <i className="ti ti-plus" /> {tr('pluginsInstallBtn')}
+              </button>
+            </div>
+
+            {/* Liste des plugins installés */}
+            <div style={{ 
+              border: '1px solid var(--border)', 
+              borderRadius: 'var(--radius-md)',
+              overflow: 'hidden'
+            }}>
+              <div style={{ 
+                padding: '8px 14px', 
+                background: 'var(--bg-tertiary)',
+                borderBottom: '1px solid var(--border)',
+                fontSize: 11,
+                fontWeight: 600,
+                color: 'var(--text-secondary)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                display: 'flex',
+                justifyContent: 'space-between'
+              }}>
+                <span>Plugins installés</span>
+                <span>{plugins.length} plugin(s)</span>
+              </div>
+
+              {plugins.length === 0 && (
+                <div style={{ 
+                  padding: '24px', 
+                  textAlign: 'center', 
+                  color: 'var(--text-tertiary)',
+                  fontSize: 13
+                }}>
+                  <i className="ti ti-puzzle" style={{ fontSize: 24, display: 'block', marginBottom: 8 }} />
+                  Aucun plugin installé
+                  <br />
+                  <span style={{ fontSize: 11 }}>
+                    Installez des plugins pour ajouter des fonctionnalités à SoundDeck
+                  </span>
+                </div>
+              )}
+
+              {plugins.map(plugin => (
+                <div 
+                  key={plugin.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    borderBottom: '1px solid var(--border)',
+                    background: 'var(--bg-secondary)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+                    <div style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 8,
+                      background: 'var(--bg-tertiary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 18
+                    }}>
+                      🧩
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 500, fontSize: 13 }}>
+                        {plugin.name}
+                        <span style={{ 
+                          fontSize: 10, 
+                          color: 'var(--text-tertiary)',
+                          marginLeft: 8,
+                          fontWeight: 400
+                        }}>
+                          v{plugin.version}
+                        </span>
+                      </div>
+                      <div style={{ 
+                        fontSize: 11, 
+                        color: 'var(--text-tertiary)',
+                        display: 'flex',
+                        gap: 12,
+                        alignItems: 'center'
+                      }}>
+                        <span>par {plugin.author || 'Inconnu'}</span>
+                        {plugin.pages > 0 && (
+                          <span>
+                            <i className="ti ti-files" style={{ fontSize: 10 }} />
+                            {plugin.pages} page(s)
+                          </span>
+                        )}
+                        <span style={{ 
+                          fontSize: 9, 
+                          color: 'var(--success)',
+                          background: 'rgba(29,158,117,0.1)',
+                          padding: '1px 8px',
+                          borderRadius: 10
+                        }}>
+                          <i className="ti ti-check" /> Activé
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button 
+                      className="btn-ghost btn-sm"
+                      onClick={() => {
+                        // Recharger le plugin
+                        window.location.reload()
+                      }}
+                      style={{ 
+                        fontSize: 11, 
+                        padding: '4px 8px',
+                        color: 'var(--text-tertiary)'
+                      }}
+                      title="Recharger le plugin"
+                    >
+                      <i className="ti ti-refresh" />
+                    </button>
+                    <button 
+                      className="btn-danger btn-sm"
+                      onClick={async () => {
+                        if (confirm(`Voulez-vous vraiment désinstaller le plugin "${plugin.name}" ?`)) {
+                          const result = await window.electronAPI.uninstallPlugin?.(plugin.id)
+                          if (result?.success) {
+                            addToast(`Plugin "${plugin.name}" désinstallé`, 'info')
+                            // Recharger la page pour mettre à jour
+                            window.location.reload()
+                          } else {
+                            addToast(`Erreur: ${result?.error || 'Échec de la désinstallation'}`, 'error')
+                          }
+                        }
+                      }}
+                      style={{ 
+                        fontSize: 11, 
+                        padding: '4px 8px',
+                        color: 'var(--danger)'
+                      }}
+                      title="Désinstaller le plugin"
+                    >
+                      <i className="ti ti-trash" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Info sur les plugins */}
+            <div style={{ 
+              fontSize: 11, 
+              color: 'var(--text-tertiary)',
+              padding: '10px 14px',
+              background: 'var(--bg-tertiary)',
+              borderRadius: 'var(--radius-md)',
+              lineHeight: 1.6,
+              border: '1px solid var(--border)'
+            }}>
+              <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
+              <strong>Où trouver des plugins ?</strong>
+              <br />
+              Les plugins sont des fichiers <code style={{ 
+                background: 'var(--bg-secondary)', 
+                padding: '1px 6px', 
+                borderRadius: 3,
+                fontSize: 10
+              }}>.sdplugin</code> qui ajoutent des fonctionnalités à SoundDeck.
+              <br />
+              <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                💡 Vous pouvez créer vos propres plugins ou les télécharger depuis la communauté.
+              </span>
+            </div>
+          </div>
+
+          {/* Modal d'installation */}
+          {showPluginInstaller && (
+            <PluginInstaller
+              onClose={() => setShowPluginInstaller(false)}
+              addToast={addToast}
+              lang={lang}
+              onInstall={(result) => {
+                // Recharger la liste des plugins
+                loadPlugins()
+              }}
+            />
           )}
         </Section>
 

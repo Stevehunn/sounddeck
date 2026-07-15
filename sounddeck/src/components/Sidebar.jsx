@@ -71,6 +71,9 @@ export default function Sidebar({
   sidebarConfig,
   sidebarEditMode,
   sidebarVersion = 0,
+  // ✅ NOUVEAUX PROPS POUR LES PLUGINS
+  pluginPages = [],
+  isPluginPage = () => false,
 }) {
 
   const [newProfileName, setNewProfileName] = useState('')
@@ -101,6 +104,7 @@ export default function Sidebar({
     console.log('🔄 Sidebar re-rendue avec version:', sidebarVersion)
     console.log('📋 Sidebar config:', sidebarConfig)
     console.log('📋 Profils disponibles:', profiles.map(p => p.id))
+    console.log('📋 Pages plugins:', pluginPages.map(p => p.id))
     
     if (sidebarConfig?.items) {
       const groups = {}
@@ -111,7 +115,7 @@ export default function Sidebar({
       })
       console.log('📊 Groupes dans la config:', groups)
     }
-  }, [sidebarVersion, sidebarConfig, profiles])
+  }, [sidebarVersion, sidebarConfig, profiles, pluginPages])
 
   // ─── Profils ──────────────────────────────────────────────────────────────────
   const handleCreateProfile = async () => {
@@ -234,6 +238,34 @@ export default function Sidebar({
     return item.group || 'other'
   }
 
+  // ✅ Fusionner les pages core + plugins pour la sidebar
+  const allPages = useMemo(() => {
+    // Pages core de la sidebar
+    const corePages = [
+      { id: 'home', label: tr('mySounds'), icon: 'ti-home', group: 'navigation', isCore: true },
+      { id: 'library', label: tr('library'), icon: 'ti-library', isCore: true, group: 'navigation' },
+      { id: 'discover', label: tr('discover'), icon: 'ti-compass', group: 'navigation', isCore: true },
+      { id: 'trimmer', label: tr('trimmer'), icon: 'ti-cut', group: 'navigation', isCore: true },
+      { id: 'editor', label: tr('editor'), icon: 'ti-wand', group: 'navigation', isCore: true },
+      { id: 'sequencer', label: tr('sequencer'), icon: 'ti-playlist', group: 'navigation', isCore: true },
+      { id: 'youtube', label: tr('youtube'), icon: 'ti-brand-youtube', group: 'navigation', isCore: true },
+      { id: 'stats', label: tr('stats'), icon: 'ti-chart-bar', group: 'navigation', isCore: true },
+      { id: 'guide', label: tr('guide'), icon: 'ti-book', group: 'footer', isCore: true },
+      { id: 'options', label: tr('options'), icon: 'ti-settings', group: 'footer', isCore: true }
+    ]
+
+    // ✅ Ajouter les pages des plugins
+    const pluginPagesFormatted = pluginPages
+      .filter(p => p.visible !== false)
+      .map(p => ({
+        ...p,
+        isCore: false,
+        isPlugin: true
+      }))
+
+    return [...corePages, ...pluginPagesFormatted]
+  }, [tr, pluginPages])
+
   const visibleItems = useMemo(() => {
     console.log('🔄 Recalcul de visibleItems avec config:', sidebarConfig?.mode)
     
@@ -268,7 +300,7 @@ export default function Sidebar({
     })
 
     return { pinned, groups }
-  }, [sidebarConfig, lang, profiles])
+  }, [sidebarConfig, lang, profiles, allPages])
 
   const isItemActive = (itemId) => {
     if (itemId === 'home') return currentPage === 'home'
@@ -282,10 +314,17 @@ export default function Sidebar({
     if (itemId === 'library') return currentPage === 'library'
     if (itemId === 'mixer') return currentPage === 'mixer'
     if (itemId === 'stats') return currentPage === 'stats'
+    
+    // ✅ Vérifier si c'est une page plugin active
+    if (itemId && isPluginPage(itemId)) {
+      return currentPage === itemId
+    }
+    
     return false
   }
 
   const handleNavClick = (itemId) => {
+    // Pages core
     if (itemId === 'home') onChangePage('home')
     else if (itemId === 'discover') onChangePage('discover')
     else if (itemId === 'trimmer') onChangePage('trimmer')
@@ -297,11 +336,17 @@ export default function Sidebar({
     else if (itemId === 'library') onChangePage('library')
     else if (itemId === 'mixer') onChangePage('mixer')
     else if (itemId === 'stats') onChangePage('stats')
+    else {
+      // ✅ Page plugin ou autre
+      onChangePage(itemId)
+    }
   }
 
   // ✅ Rendre un élément de navigation standard
   const renderNavItem = (item) => {
     const isAction = ACTION_IDS.includes(item.id)
+    const isPlugin = item.isPlugin || false
+    
     return (
       <SidebarItem
         key={item.id}
@@ -310,6 +355,7 @@ export default function Sidebar({
         active={isItemActive(item.id)}
         onClick={() => handleNavClick(item.id)}
         isAction={isAction}
+        isPlugin={isPlugin}
       />
     )
   }
@@ -792,7 +838,18 @@ export default function Sidebar({
 
 // ─── COMPOSANT SidebarItem ──────────────────────────────────────────────────
 
-function SidebarItem({ icon, label, active, dot, muted, onClick, showDragHandle = false, isAction = false, isProfile = false }) {
+function SidebarItem({ 
+  icon, 
+  label, 
+  active, 
+  dot, 
+  muted, 
+  onClick, 
+  showDragHandle = false, 
+  isAction = false, 
+  isProfile = false,
+  isPlugin = false 
+}) {
   const isActive = active || false
   
   return (
@@ -823,6 +880,31 @@ function SidebarItem({ icon, label, active, dot, muted, onClick, showDragHandle 
       {dot && <span className="dot" />}
       {isAction && !isActive && !isProfile && (
         <span style={{ fontSize: 9, color: 'var(--accent)', opacity: 0.6 }}>⚡</span>
+      )}
+      {isPlugin && !isActive && (
+        <span style={{ 
+          fontSize: 8, 
+          color: 'var(--accent)',
+          background: 'var(--accent-light)',
+          padding: '1px 6px',
+          borderRadius: 10,
+          marginLeft: 'auto',
+          opacity: 0.7
+        }}>
+          🔌
+        </span>
+      )}
+      {isPlugin && isActive && (
+        <span style={{ 
+          fontSize: 8, 
+          color: 'white',
+          background: 'var(--accent)',
+          padding: '1px 6px',
+          borderRadius: 10,
+          marginLeft: 'auto'
+        }}>
+          Plugin
+        </span>
       )}
     </button>
   )

@@ -1,4 +1,3 @@
-// sounddeck/electron/preload.js
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -70,7 +69,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   youtubeDownload: (url, start, end, title) => ipcRenderer.invoke('youtube-download', url, start, end, title),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
-  // ─── SPOTIFY / SOUNDCLOUD ───────────────────────────────────────────────────
+  // ─── SPOTIFY / SOUNDCLOUD ───────────────────────────────────────────────
   spotifyTrackInfo: (trackId) => ipcRenderer.invoke('spotify-track-info', trackId),
   soundcloudTrackInfo: (url) => ipcRenderer.invoke('soundcloud-track-info', url),
   downloadPlatformTrack: (params) => ipcRenderer.invoke('download-platform-track', params),
@@ -84,9 +83,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   importBackup: () => ipcRenderer.invoke('import-backup'),
 
   // ─── SYSTÈME ─────────────────────────────────────────────────────────────
-  // ✅ Nouvelles APIs pour la détection système
   getSystemLanguage: () => ipcRenderer.invoke('get-system-language'),
   getSystemKeyboardLayout: () => ipcRenderer.invoke('get-system-keyboard-layout'),
+
+  // ─── PLUGINS ─────────────────────────────────────────────────────────────
+  getInstalledPlugins: () => ipcRenderer.invoke('get-installed-plugins'),
+  getPluginPath: (pluginId) => ipcRenderer.invoke('get-plugin-path', pluginId),
+  getPluginComponentPath: (pluginId, pageId) => ipcRenderer.invoke('get-plugin-component-path', pluginId, pageId),
+  installPlugin: (tempPath) => ipcRenderer.invoke('install-plugin', tempPath),
+  installPluginFromBuffer: (buffer, fileName) => ipcRenderer.invoke('install-plugin-from-buffer', buffer, fileName),
+  installPluginFromFile: (tempPath, fileName) => ipcRenderer.invoke('install-plugin-from-file', tempPath, fileName),
+  installPluginFromUrl: (tempPath, url) => ipcRenderer.invoke('install-plugin-from-url', tempPath, url),
+  uninstallPlugin: (pluginId) => ipcRenderer.invoke('uninstall-plugin', pluginId),
 
   // ─── DIVERS ──────────────────────────────────────────────────────────────
   isElectron: true,

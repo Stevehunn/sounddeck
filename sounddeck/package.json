@@ -12,7 +12,8 @@
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
-    "test:ci": "vitest run --coverage"
+    "test:ci": "vitest run --coverage",
+    "build:plugin": "node scripts/build-plugin.js"
   },
   "build": {
     "appId": "com.sounddeck.app",
