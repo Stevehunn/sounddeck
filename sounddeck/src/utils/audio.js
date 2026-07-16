@@ -6,17 +6,11 @@ const soundCache = {}
 // Cache pour les gains normalisés
 const gainCache = {}
 
-let audioMode = 'simple'
-
 // Référence au store pour accéder à l'état du mixeur
 let storeRef = null
 
 export function setStoreRef(store) {
   storeRef = store
-}
-
-export function setAudioMode(mode) {
-  audioMode = mode
 }
 
 // Construit une URL file:// correcte pour Windows et les chemins avec espaces
@@ -57,14 +51,11 @@ export async function analyzeGain(filePath, sampleCount = 200) {
     
     const rms = Math.sqrt(sumSquares / (channelData.length / step))
     
-    // ✅ Plage de cible élargie : 0.05 (-26dB) à 0.8 (-2dB)
-    // La valeur par défaut est 0.2 (-14dB) - plus raisonnable
     const defaultTarget = 0.2
     const targetRMS = gainCache.targetRMS || defaultTarget
     
-    // Limiter le gain pour éviter les distorsions
     const gain = rms > 0.001 ? targetRMS / rms : 1
-    const gainDb = 20 * Math.log10(Math.min(gain, 20)) // ✅ Limite augmentée à 20 (26dB)
+    const gainDb = 20 * Math.log10(Math.min(gain, 20))
     
     gainCache[filePath] = gainDb
     return gainDb
@@ -74,7 +65,7 @@ export async function analyzeGain(filePath, sampleCount = 200) {
   }
 }
 
-// ✅ Fonction pour définir la cible de normalisation
+// Fonction pour définir la cible de normalisation
 export function setNormalizationTarget(targetRMS) {
   gainCache.targetRMS = targetRMS
 }
@@ -232,8 +223,9 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
     }
   }
   
-  // Jouer aussi en local si playLocally est activé
-  if (playLocally) {
+  const shouldPlayLocally = playLocally || storeRef?.monitoringEnabled || false
+  
+  if (shouldPlayLocally) {
     try {
       const localHowl = new Howl({
         src: [fileUrl],
@@ -258,7 +250,6 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
       
       localHowl.play()
       
-      // Stocker le howl local dans le cache
       if (!Array.isArray(soundCache[sound.id])) {
         soundCache[sound.id] = [soundCache[sound.id]]
       }
@@ -277,21 +268,12 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
 export function playSound(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
   if (!sound?.path) return
   
-  const mode = storeRef?.audioMode || 'simple'
-  
-  // Mode simple - avec VB-Cable
-  if (mode === 'simple') {
-    const mixerEnabled = storeRef?.mixerEnabled || false
-    if (mixerEnabled && isMixerActive()) {
-      playSoundWithMixer(sound, globalVolume, loop, playLocally)
-      return
-    }
+  const mixerEnabled = storeRef?.mixerEnabled || false
+  if (mixerEnabled && isMixerActive()) {
+    playSoundWithMixer(sound, globalVolume, loop, playLocally)
+  } else {
     playSoundNormal(sound, audioDevice, globalVolume, loop, playLocally)
-    return
   }
-  
-  // Mode avancé - VoiceMeeter
-  playSoundNormal(sound, audioDevice, globalVolume, loop, playLocally)
 }
 
 // Version asynchrone de playSound avec normalisation

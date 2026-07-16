@@ -2,13 +2,6 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { DEFAULT_SOUNDS } from './defaultSounds'
 
-// Constantes des modes audio
-export const AUDIO_MODES = {
-  INTEGRATED: 'integrated',
-  SIMPLE: 'simple',
-  ADVANCED: 'advanced'
-}
-
 // ─── CONFIGURATION PAR DÉFAUT DE LA SIDEBAR ──────────────────────────────
 
 const DEFAULT_SIDEBAR_CONFIG = {
@@ -59,7 +52,6 @@ export function useStore() {
   const [normalizationTarget, setNormalizationTarget] = useState(0.1)
   const [startMinimized, setStartMinimized] = useState(false)
   const [launchAtStartup, setLaunchAtStartup] = useState(false)
-  const [audioMode, setAudioMode] = useState(AUDIO_MODES.INTEGRATED)
   const [virtualDriverInstalled, setVirtualDriverInstalled] = useState(false)
   const [virtualDeviceActive, setVirtualDeviceActive] = useState(false)
   const [mixerEnabled, setMixerEnabled] = useState(false)
@@ -73,6 +65,7 @@ export function useStore() {
   const [lowLatencyMode, setLowLatencyMode] = useState(false)
   const [compressOnImport, setCompressOnImport] = useState(false)
   const [compressionBitrate, setCompressionBitrate] = useState(128)
+  const [monitoringEnabled, setMonitoringEnabled] = useState(false)
 
   // ─── Étape 1 : Taille des cartes ──────────────────────────────────────────
   const [cardSize, setCardSize] = useState('medium')
@@ -104,8 +97,6 @@ export function useStore() {
   const [selectedClipId, setSelectedClipId] = useState(null)
 
   // ─── ZONE DE BOUCLE DE L'ÉDITEUR ──────────────────────────────────────────
-  // ✅ start === end signifie "aucune zone définie" (on ne veut rien afficher tant
-  // que l'utilisateur n'a pas glissé sur la bande dédiée pour en poser une)
   const [editorLoopRegion, setEditorLoopRegionState] = useState({ enabled: false, start: 0, end: 0 })
 
   const setEditorLoopRegion = useCallback((start, end) => {
@@ -163,10 +154,10 @@ export function useStore() {
         setStartMinimized(savedStartMinimized)
         setLaunchAtStartup(savedLaunchAtStartup)
 
-        const savedAudioMode = await window.electronAPI.storeGet('audioMode') || AUDIO_MODES.INTEGRATED
+        // ✅ Supprimer la référence à AUDIO_MODES
+        const savedAudioMode = await window.electronAPI.storeGet('audioMode') || 'integrated'
         const savedVirtualDriverInstalled = await window.electronAPI.storeGet('virtualDriverInstalled') || false
         const savedVirtualDeviceActive = await window.electronAPI.storeGet('virtualDeviceActive') ?? false
-        setAudioMode(savedAudioMode)
         setVirtualDriverInstalled(savedVirtualDriverInstalled)
         setVirtualDeviceActive(savedVirtualDeviceActive)
 
@@ -433,10 +424,6 @@ export function useStore() {
     await save('editorProject', updated)
   }, [editorProject, save])
 
-  // ✅ Fige l'état actuel dans l'historique SANS rien changer — à appeler une seule fois
-  // au tout début d'un geste continu (drag de déplacement/redimensionnement de clip), pour
-  // qu'ensuite chaque mise à jour intermédiaire du geste (skipHistory: true) ne pollue pas
-  // la pile d'annulation avec des dizaines d'états, un par pixel de souris déplacé.
   const pushEditorHistoryCheckpoint = useCallback(() => {
     editorUndoStack.current.push(editorProject)
     if (editorUndoStack.current.length > EDITOR_HISTORY_LIMIT) {
@@ -764,6 +751,23 @@ export function useStore() {
     return true
   }, [sounds, currentProfileId, soundOrder, save])
 
+  // ─── FONCTION MONITORING ──────────────────────────────────────────────────
+  const toggleMonitoring = useCallback(async () => {
+    const newState = !monitoringEnabled
+    setMonitoringEnabled(newState)
+    await save('monitoringEnabled', newState)
+    
+    try {
+      const { setMonitoring } = await import('../utils/audioMixer')
+      setMonitoring(newState)
+      console.log(`🎤 Monitoring ${newState ? 'activé' : 'désactivé'}`)
+    } catch (e) {
+      console.warn('Erreur mise à jour monitoring:', e)
+    }
+    
+    return newState
+  }, [monitoringEnabled, save])
+
   // ─── Compression audio ──────────────────────────────────────────────────────
   const updateCompressOnImport = useCallback(async (enabled) => {
     setCompressOnImport(enabled)
@@ -948,11 +952,6 @@ export function useStore() {
   }, [save])
 
   // ─── Audio Mode ──────────────────────────────────────────────────────────────
-  const updateAudioMode = useCallback(async (mode) => {
-    setAudioMode(mode)
-    await save('audioMode', mode)
-  }, [save])
-
   const updateVirtualDriverInstalled = useCallback(async (installed) => {
     setVirtualDriverInstalled(installed)
     await save('virtualDriverInstalled', installed)
@@ -980,12 +979,50 @@ export function useStore() {
     console.log('🧹 Cache des gains vidé')
   }, [])
 
-  // ─── Mixer ──────────────────────────────────────────────────────────────────
+  // ─── MIXEUR ──────────────────────────────────────────────────────────────────
   const updateMixerEnabled = useCallback(async (enabled) => {
-    console.log('💾 Sauvegarde mixerEnabled:', enabled)
-    setMixerEnabled(enabled)
-    await save('mixerEnabled', enabled)
-  }, [save])
+  console.log('💾 Sauvegarde mixerEnabled:', enabled)
+  setMixerEnabled(enabled)
+  await save('mixerEnabled', enabled)
+  
+  if (enabled) {
+    try {
+      const { initAudioMixer, resumeAudioContext, setStoreRef } = await import('../utils/audioMixer')
+      
+      setStoreRef({
+        playLocally: playLocally,
+        monitoringEnabled: monitoringEnabled,
+        audioDevice: audioDevice,
+        mixerSoundVolume: mixerSoundVolume,
+        localAudioDevice: localAudioDevice
+      })
+      
+      console.log('📊 Périphérique de sortie pour le mixeur:', audioDevice)
+      const mixedStream = await initAudioMixer(microphoneDevice || 'default', audioDevice || 'default')
+      
+      if (mixedStream) {
+        resumeAudioContext()
+        console.log('✅ Mixeur activé avec succès')
+        return { success: true, message: 'mixerActivated' }
+      } else {
+        console.warn('⚠️ Échec de l\'activation du mixeur')
+        setMixerEnabled(false)
+        await save('mixerEnabled', false)
+        return { success: false, message: 'mixerActivationError' }
+      }
+    } catch (e) {
+      console.error('Erreur activation mixeur:', e)
+      setMixerEnabled(false)
+      await save('mixerEnabled', false)
+      return { success: false, message: 'error', error: e.message }
+    }
+  } else {
+    const { stopMixer } = await import('../utils/audioMixer')
+    await stopMixer()
+    console.log('🔇 Mixeur désactivé')
+    return { success: true, message: 'mixerDeactivated' }
+  }
+}, [save, microphoneDevice, audioDevice, playLocally, monitoringEnabled, mixerSoundVolume, localAudioDevice])
 
   const updateMicrophoneDevice = useCallback(async (deviceId) => {
     setMicrophoneDevice(deviceId)
@@ -1422,9 +1459,6 @@ export function useStore() {
     await commitEditorProject(updated)
   }, [editorProject, commitEditorProject])
 
-  // ✅ knownDuration : la vraie durée du clip, calculée côté Editor.jsx (clipDurations) à partir
-  // du fichier audio réel. clip.duration n'est souvent qu'un défaut/placeholder — sans ça, le split
-  // échouait dès que le curseur dépassait le défaut de secours (3s).
   const splitClip = useCallback(async (trackId, clipId, atTime, knownDuration) => {
     const track = editorProject.tracks.find(t => t.id === trackId)
     if (!track) return null
@@ -1563,8 +1597,6 @@ export function useStore() {
     await commitEditorProject(updated)
   }, [editorProject, commitEditorProject])
 
-  // ✅ Poser/ajuster le fade in ou fade out d'un clip via les poignées visuelles
-  // (crée l'effet fadeIn/fadeOut s'il n'existe pas encore, sinon met juste à jour sa durée)
   const setClipFade = useCallback(async (trackId, clipId, edge, duration) => {
     const effectType = edge === 'in' ? 'fadeIn' : 'fadeOut'
     const track = editorProject.tracks.find(t => t.id === trackId)
@@ -1664,7 +1696,6 @@ export function useStore() {
     soundOrder,
     normalizationEnabled,
     normalizationTarget,
-    audioMode,
     virtualDriverInstalled,
     virtualDeviceActive,
     mixerEnabled,
@@ -1730,6 +1761,8 @@ export function useStore() {
     reorderSounds,
     updateSoundImage,
     updateSoundEmoji,
+    monitoringEnabled,
+    toggleMonitoring,
 
     // ─── Raccourcis ──────────────────────────────────────────────────────────
     setShortcut,
@@ -1753,7 +1786,6 @@ export function useStore() {
     updatePlayLocally,
     updatePreviewVolume,
     updateKeyboardLayout,
-    updateAudioMode,
     updateVirtualDriverInstalled,
     updateVirtualDeviceActive,
 

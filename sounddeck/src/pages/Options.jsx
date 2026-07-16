@@ -16,11 +16,12 @@ import useConfirm from '../hooks/useConfirm'
 const SECTIONS = [
   { id: 'appearance', icon: 'ti-palette', labelKey: 'optionsAppearance' },
   { id: 'audio', icon: 'ti-volume', labelKey: 'optionsAudio' },
+  { id: 'guide', icon: 'ti-book', labelKey: 'guideTitle' },
   { id: 'shortcuts', icon: 'ti-keyboard', labelKey: 'optionsShortcuts' },
   { id: 'soundManagement', icon: 'ti-music', labelKey: 'soundManagement' },
   { id: 'plugins', icon: 'ti-puzzle', labelKey: 'optionsPlugins' },
   { id: 'integrations', icon: 'ti-plug', labelKey: 'integrations' },
-  { id: 'performance', icon: 'ti-gauge', labelKey: 'performance' },
+  { id: 'advanced', icon: 'ti-gauge', labelKey: 'advancedOptions' },
   { id: 'backup', icon: 'ti-cloud', labelKey: 'optionsBackup' },
   { id: 'profiles', icon: 'ti-users', labelKey: 'optionsProfiles' },
 ]
@@ -51,6 +52,56 @@ const Section = forwardRef(({ title, icon, children, id }, ref) => {
 
 Section.displayName = 'Section'
 
+// ─── COMPOSANT POUR SECTION RÉDUCTIBLE ──────────────────────────────────
+
+function CollapsibleSection({ title, icon, children, defaultOpen = false }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen)
+  
+  return (
+    <div style={{
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-md)',
+      overflow: 'hidden',
+      marginTop: 6,
+      background: 'var(--bg-secondary)'
+    }}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+          padding: '10px 14px',
+          background: 'var(--bg-tertiary)',
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: 12,
+          fontWeight: 600,
+          color: 'var(--text-secondary)',
+          gap: 8
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <i className={`ti ${icon}`} style={{ color: 'var(--accent)' }} />
+          {title}
+          <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 400 }}>
+            {isOpen ? '▼' : '▶'}
+          </span>
+        </span>
+        <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 400 }}>
+          {isOpen ? 'Masquer' : 'Afficher'}
+        </span>
+      </button>
+      {isOpen && (
+        <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Options({ store, addToast, lang = 'fr' }) {
   const tr = useTranslation(lang)
   const { confirm, ConfirmWrapper } = useConfirm({ lang })
@@ -61,7 +112,8 @@ export default function Options({ store, addToast, lang = 'fr' }) {
   const [isInstallingDriver, setIsInstallingDriver] = useState(false)
   const [isMicrophoneTesting, setIsMicrophoneTesting] = useState(false)
   const [showPluginInstaller, setShowPluginInstaller] = useState(false)
-  const [plugins, setPlugins] = useState([]) // ✅ AJOUTÉ
+  const [plugins, setPlugins] = useState([])
+  const [advancedAudioOpen, setAdvancedAudioOpen] = useState(false)
   const micTestRef = useRef(null)
   const sectionRefs = useRef({})
   const observerRef = useRef(null)
@@ -500,31 +552,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             </div>
           </OptionRow>
 
-          <OptionRow label={tr('tutorialRestart')} sub={tr('tutorialRestartDesc')}>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button
-                className="btn-secondary btn-sm"
-                onClick={() => {
-                  localStorage.removeItem('sounddeck-tutorial-done')
-                  window.location.reload()
-                }}
-                style={{ fontSize: 12, minHeight: 34, padding: '6px 16px', borderRadius: 'var(--radius-md)' }}
-              >
-                <i className="ti ti-book" /> {tr('tutorialRestart')}
-              </button>
-              <button
-                className="btn-primary btn-sm"
-                onClick={() => {
-                  const event = new CustomEvent('open-advanced-tutorial')
-                  window.dispatchEvent(event)
-                }}
-                style={{ fontSize: 12, minHeight: 34, padding: '6px 16px', borderRadius: 'var(--radius-md)' }}
-              >
-                <i className="ti ti-rocket" /> {tr('tutorialAdvanced')}
-              </button>
-            </div>
-          </OptionRow>
-
           <OptionRow label={tr('sidebarCustomization')} sub={tr('sidebarCustomizationDesc')}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
@@ -578,7 +605,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         </Section>
 
         {/* ============================ */}
-        {/* SECTION 2 : AUDIO */}
+        {/* SECTION 2 : AUDIO - SIMPLIFIÉE */}
         {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['audio'] = el}
@@ -586,7 +613,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           title={tr('optionsAudio')} 
           icon="ti-volume"
         >
-          {/* Périphériques audio - en haut */}
+          {/* ─── PÉRIPHÉRIQUES DE SORTIE ────────────────────────────────────────── */}
           <OptionRow label={tr('outputDevice')} sub={tr('outputDeviceDesc')}>
             <select value={store.audioDevice} onChange={e => store.updateAudioDevice(e.target.value)}
               style={{ width: 220, fontSize: 12 }}>
@@ -599,6 +626,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             </select>
           </OptionRow>
 
+          {/* Périphérique local */}
           <OptionRow label={tr('localOutputDevice')} sub={tr('localOutputDeviceDesc')}>
             <select 
               value={store.localAudioDevice || 'default'} 
@@ -624,332 +652,313 @@ export default function Options({ store, addToast, lang = 'fr' }) {
 
           <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
 
-          {/* Mode audio - après les périphériques */}
-          <OptionRow label={tr('audioMode')} sub={tr('audioModeDesc')}>
-            <select value={store.audioMode || 'simple'} onChange={e => store.updateAudioMode(e.target.value)}
-              style={{ width: 180, fontSize: 12 }}>
-              <option value="simple">{tr('audioModeSimple')} ✅</option>
-              <option value="advanced">{tr('audioModeAdvanced')}</option>
-            </select>
+          {/* ─── PILOTE VIRTUEL (VB-CABLE) ────────────────────────────────────────── */}
+          <OptionRow label={tr('virtualDriver')} sub={tr('virtualDriverSub')}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {store.virtualDriverInstalled ? (
+                  <span style={{ color: 'var(--success)', fontSize: 13 }}>
+                    <i className="ti ti-check" /> ✅ {tr('virtualDriverDetected')}
+                  </span>
+                ) : (
+                  <button 
+                    className="btn-primary"
+                    onClick={handleInstallDriver}
+                    disabled={isInstallingDriver}
+                    style={{ fontSize: 12 }}
+                  >
+                    {isInstallingDriver ? (
+                      <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('installing')}</>
+                    ) : (
+                      <><i className="ti ti-download" /> {tr('installVirtualDriver')}</>
+                    )}
+                  </button>
+                )}
+                <button 
+                  className="btn-secondary" 
+                  onClick={handleDetectDevices} 
+                  disabled={isDetecting} 
+                  style={{ 
+                    fontSize: 12, 
+                    minHeight: 34, 
+                    padding: '6px 16px',
+                    borderRadius: 'var(--radius-md)'
+                  }}
+                >
+                  <i className={`ti ${isDetecting ? 'ti-loader' : 'ti-refresh'}`} 
+                    style={isDetecting ? { animation: 'spin 1s linear infinite' } : {}} />
+                  {isDetecting ? '...' : tr('detect')}
+                </button>
+              </div>
+              
+              {!store.virtualDriverInstalled && (
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', padding: '8px 12px', borderRadius: 6, lineHeight: 1.6 }}>
+                  <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
+                  {tr('virtualDriverInfo')}
+                </div>
+              )}
+              
+              {store.virtualDriverInstalled && (
+                <div style={{ fontSize: 11, color: 'var(--success)', background: 'rgba(29,158,117,0.1)', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--success)' }}>
+                  <i className="ti ti-check" style={{ marginRight: 4 }} />
+                  {tr('virtualDriverSuccess')}
+                  <br />
+                  <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
+                    💡 {tr('virtualDriverSelect')}
+                  </span>
+                </div>
+              )}
+            </div>
           </OptionRow>
 
-          {store.audioMode === 'simple' && (
+          <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
+
+          {/* ─── MIXEUR ────────────────────────────────────────────────────────────── */}
+          <OptionRow label={tr('mixerEnable')} sub={tr('mixerEnableDesc')}>
+            <Toggle value={store.mixerEnabled} onChange={async (val) => {
+              const result = await store.updateMixerEnabled(val)
+              if (result) {
+                if (result.success) {
+                  addToast(tr(result.message), 'success')
+                } else {
+                  addToast('❌ ' + (result.error || tr(result.message)), 'error')
+                }
+              }
+            }} />
+          </OptionRow>
+
+          {store.mixerEnabled && (
             <>
-              <OptionRow label={tr('virtualDriver')} sub={tr('virtualDriverSub')}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    {store.virtualDriverInstalled ? (
-                      <span style={{ color: 'var(--success)', fontSize: 13 }}>
-                        <i className="ti ti-check" /> ✅ {tr('virtualDriverDetected')}
-                      </span>
-                    ) : (
-                      <button 
-                        className="btn-primary"
-                        onClick={handleInstallDriver}
-                        disabled={isInstallingDriver}
-                        style={{ fontSize: 12 }}
-                      >
-                        {isInstallingDriver ? (
-                          <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('installing')}</>
-                        ) : (
-                          <><i className="ti ti-download" /> {tr('installVirtualDriver')}</>
-                        )}
-                      </button>
-                    )}
-                    <button 
-                      className="btn-secondary" 
-                      onClick={handleDetectDevices} 
-                      disabled={isDetecting} 
-                      style={{ 
-                        fontSize: 12, 
-                        minHeight: 34, 
-                        padding: '6px 16px',
-                        borderRadius: 'var(--radius-md)'
-                      }}
-                    >
-                      <i className={`ti ${isDetecting ? 'ti-loader' : 'ti-refresh'}`} 
-                        style={isDetecting ? { animation: 'spin 1s linear infinite' } : {}} />
-                      {isDetecting ? '...' : tr('detect')}
-                    </button>
-                  </div>
-                  
-                  {!store.virtualDriverInstalled && (
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', padding: '8px 12px', borderRadius: 6, lineHeight: 1.6 }}>
-                      <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
-                      {tr('virtualDriverInfo')}
-                    </div>
-                  )}
-                  
-                  {store.virtualDriverInstalled && (
-                    <div style={{ fontSize: 11, color: 'var(--success)', background: 'rgba(29,158,117,0.1)', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--success)' }}>
-                      <i className="ti ti-check" style={{ marginRight: 4 }} />
-                      {tr('virtualDriverSuccess')}
-                      <br />
-                    </div>
-                  )}
-
-                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', padding: '8px 12px', borderRadius: 6, lineHeight: 1.6, border: '1px solid var(--border)' }}>
-                    <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
-                    <strong>{tr('uninstallGuideTitle')}</strong>
-                    <br />
-                    {tr('uninstallGuideStep1')} → cherche <strong>"VB-CABLE"</strong> {tr('uninstallGuideStep2')}
-                    <br />
-                    <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
-                      {tr('uninstallGuideRestart')}
-                    </span>
-                  </div>
-                </div>
-              </OptionRow>
-
-              <OptionRow label={tr('mixerEnable')} sub={tr('mixerEnableDesc')}>
-                <Toggle value={store.mixerEnabled} onChange={async (val) => {
-                  await store.updateMixerEnabled(val)
-                  if (val) {
-                    try {
-                      const { initAudioMixer, resumeAudioContext, getMixerStats, connectMixerToOutput } = await import('../utils/audioMixer')
-                      const mixedStream = await initAudioMixer(store.microphoneDevice)
-                      const stats = getMixerStats()
-                      if (mixedStream && stats.isInitialized) {
-                        resumeAudioContext()
-                        connectMixerToOutput(store.audioDevice || 'default')
-                        addToast('✅ ' + tr('mixerActivated'), 'success')
-                      } else {
-                        addToast('❌ ' + tr('mixerActivationError'), 'error')
-                        store.updateMixerEnabled(false)
-                      }
-                    } catch (e) {
-                      console.error('Erreur activation mixeur:', e)
-                      addToast('❌ ' + tr('error') + ': ' + e.message, 'error')
-                      store.updateMixerEnabled(false)
-                    }
-                  } else {
-                    const { stopMixer } = await import('../utils/audioMixer')
-                    await stopMixer()
-                    addToast(tr('mixerDeactivated'), 'info')
+              {/* Microphone */}
+              <OptionRow label={tr('microphone')} sub={tr('microphoneSelect')}>
+                <select value={store.microphoneDevice} onChange={async (e) => {
+                  const deviceId = e.target.value
+                  await store.updateMicrophoneDeviceId(deviceId)
+                  try {
+                    const { changeMicrophone } = await import('../utils/audioMixer')
+                    await changeMicrophone(deviceId)
+                    addToast('✅ ' + tr('microphoneChanged'), 'success')
+                  } catch (err) {
+                    console.error('Erreur changement micro:', err)
                   }
-                }} />
+                }} style={{ width: 220, fontSize: 12 }}>
+                  <option value="default">{tr('microphoneDefault')}</option>
+                  {microphones.map(d => (
+                    <option key={d.deviceId} value={d.deviceId}>
+                      {d.label || `${tr('microphoneLabel')} ${d.deviceId.slice(0, 8)}`}
+                    </option>
+                  ))}
+                </select>
               </OptionRow>
 
-              {store.mixerEnabled && (
-                <>
-                  <OptionRow label={tr('microphone')} sub={tr('microphoneSelect')}>
-                    <select value={store.microphoneDevice} onChange={async (e) => {
-                      const deviceId = e.target.value
-                      await store.updateMicrophoneDeviceId(deviceId)
-                      try {
-                        const { changeMicrophone } = await import('../utils/audioMixer')
-                        await changeMicrophone(deviceId)
-                        addToast('✅ ' + tr('microphoneChanged'), 'success')
-                      } catch (err) {
-                        console.error('Erreur changement micro:', err)
-                      }
-                    }} style={{ width: 220, fontSize: 12 }}>
-                      <option value="default">{tr('microphoneDefault')}</option>
-                      {microphones.map(d => (
-                        <option key={d.deviceId} value={d.deviceId}>
-                          {d.label || `${tr('microphoneLabel')} ${d.deviceId.slice(0, 8)}`}
-                        </option>
-                      ))}
-                    </select>
-                  </OptionRow>
+              {/* Volume micro */}
+              <OptionRow label={tr('microphoneVolume')} sub={`${store.microphoneVolume}%`}>
+                <input type="range" min="0" max="100" value={store.microphoneVolume}
+                  onChange={async (e) => {
+                    const val = Number(e.target.value)
+                    await store.updateMicrophoneVolume(val)
+                    const { setMicrophoneVolume } = await import('../utils/audioMixer')
+                    setMicrophoneVolume(val / 100)
+                  }}
+                  style={{ width: 140, accentColor: 'var(--accent)' }} />
+              </OptionRow>
 
-                  <OptionRow label={tr('microphoneVolume')} sub={`${store.microphoneVolume}%`}>
-                    <input type="range" min="0" max="100" value={store.microphoneVolume}
-                      onChange={async (e) => {
-                        const val = Number(e.target.value)
-                        await store.updateMicrophoneVolume(val)
-                        const { setMicrophoneVolume } = await import('../utils/audioMixer')
-                        setMicrophoneVolume(val / 100)
-                      }}
-                      style={{ width: 140, accentColor: 'var(--accent)' }} />
-                  </OptionRow>
+              {/* Volume sons */}
+              <OptionRow label={tr('mixerSoundVolume')} sub={`${store.mixerSoundVolume}%`}>
+                <input type="range" min="0" max="100" value={store.mixerSoundVolume}
+                  onChange={async (e) => {
+                    const val = Number(e.target.value)
+                    await store.updateMixerSoundVolume(val)
+                    const { setSoundVolume } = await import('../utils/audioMixer')
+                    setSoundVolume(val / 100)
+                  }}
+                  style={{ width: 140, accentColor: 'var(--accent)' }} />
+              </OptionRow>
 
-                  <OptionRow label={tr('mixerSoundVolume')} sub={`${store.mixerSoundVolume}%`}>
-                    <input type="range" min="0" max="100" value={store.mixerSoundVolume}
-                      onChange={async (e) => {
-                        const val = Number(e.target.value)
-                        await store.updateMixerSoundVolume(val)
-                        const { setSoundVolume } = await import('../utils/audioMixer')
-                        setSoundVolume(val / 100)
-                      }}
-                      style={{ width: 140, accentColor: 'var(--accent)' }} />
-                  </OptionRow>
+              {/* Monitoring (s'entendre) */}
+              <OptionRow label="S'entendre" sub="Écouter son micro dans les haut-parleurs (volume réduit)">
+                <Toggle 
+                  value={store.monitoringEnabled || false} 
+                  onChange={async (val) => {
+                    await store.toggleMonitoring()
+                    addToast(val ? '🎤 Monitoring activé (vous vous entendez)' : '🔇 Monitoring désactivé', 'info')
+                  }} 
+                />
+              </OptionRow>
 
-                  <OptionRow label={tr('lowLatencyMode')} sub={tr('lowLatencyModeDesc')}>
-                    <Toggle 
-                      value={store.lowLatencyMode || false} 
-                      onChange={async (val) => {
-                        await store.updateLowLatencyMode(val)
-                        const { setLowLatencyMode } = await import('../utils/audioMixer')
-                        setLowLatencyMode(val)
-                        addToast(val ? tr('lowLatencyActivated') : tr('lowLatencyDeactivated'), 'info')
-                      }} 
-                    />
-                  </OptionRow>
+              {/* Test micro */}
+              <OptionRow label={tr('testMicrophone')} sub="">
+                <button 
+                  className="btn-secondary" 
+                  onClick={testMicrophone} 
+                  style={{ 
+                    fontSize: 12,
+                    minHeight: 34, 
+                    padding: '6px 16px',
+                    borderRadius: 'var(--radius-md)',
+                    borderColor: isMicrophoneTesting ? 'var(--success)' : undefined,
+                    background: isMicrophoneTesting ? 'rgba(29,158,117,0.15)' : undefined,
+                    color: isMicrophoneTesting ? 'var(--success)' : undefined
+                  }}
+                >
+                  <i className={`ti ${isMicrophoneTesting ? 'ti-microphone-2' : 'ti-mic'}`} 
+                    style={isMicrophoneTesting ? { animation: 'pulse 0.6s ease infinite' } : {}} />
+                  {isMicrophoneTesting ? 'Test en cours...' : tr('test')}
+                </button>
+              </OptionRow>
 
-                  <OptionRow label={tr('noiseSuppressionMode')} sub={tr('noiseSuppressionModeDesc')}>
-                    <select 
-                      value={store.noiseSuppressionMode || 'auto'} 
-                      onChange={async (e) => {
-                        const mode = e.target.value
-                        await store.updateNoiseSuppressionMode(mode)
-                        const { setNoiseSuppressionMode } = await import('../utils/audioMixer')
-                        setNoiseSuppressionMode(mode)
-                        addToast(tr('noiseSuppressionModeChanged').replace('{mode}', mode), 'info')
-                      }}
-                      style={{ width: 140, fontSize: 12 }}
-                    >
-                      <option value="auto">{tr('noiseSuppressionModeAuto')}</option>
-                      <option value="worklet">{tr('noiseSuppressionModeWorklet')}</option>
-                      <option value="filter">{tr('noiseSuppressionModeFilter')}</option>
-                      <option value="off">{tr('noiseSuppressionModeOff')}</option>
-                    </select>
-                  </OptionRow>
-
-                  <OptionRow label={tr('mixerStatus')} sub={tr('mixerStatusSub')}>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <span style={{ 
-                        fontSize: 11, 
-                        color: (() => {
-                          try {
-                            const { isMixerOperational } = require('../utils/audioMixer')
-                            return isMixerOperational() ? 'var(--success)' : 'var(--danger)'
-                          } catch { return 'var(--text-tertiary)' }
-                        })()
-                      }}>
-                        <span style={{ marginLeft: 4, fontSize: 11 }}>
-                          {(() => {
-                            try {
-                              const { isMixerOperational } = require('../utils/audioMixer')
-                              return isMixerOperational() ? tr('mixerOperational') : tr('mixerNotOperational')
-                            } catch { return '' }
-                          })()}
-                        </span>
-                      </span>
-                      <button 
-                        className="btn-secondary" 
-                        onClick={async () => {
-                          try {
-                            const { repairMixer, isMixerOperational } = await import('../utils/audioMixer')
-                            if (!isMixerOperational()) {
-                              const success = repairMixer()
-                              if (success) {
-                                addToast(tr('mixerRepaired'), 'success')
-                              } else {
-                                addToast(tr('mixerReset'), 'info')
-                                const { stopMixer, initAudioMixer, connectMixerToOutput, resumeAudioContext } = await import('../utils/audioMixer')
-                                await stopMixer()
-                                const stream = await initAudioMixer(store.microphoneDevice || 'default')
-                                if (stream) {
-                                  resumeAudioContext()
-                                  connectMixerToOutput(store.audioDevice || 'default')
-                                  addToast(tr('mixerResetSuccess'), 'success')
-                                }
-                              }
-                            } else {
-                              addToast(tr('mixerOperational'), 'success')
-                            }
-                          } catch (e) {
-                            addToast(tr('mixerRepairError').replace('{error}', e.message), 'error')
-                          }
-                        }} 
-                        style={{ 
-                          fontSize: 12, 
-                          minHeight: 34, 
-                          padding: '6px 16px',
-                          borderRadius: 'var(--radius-md)'
-                        }}
-                      >
-                        <i className="ti ti-wrench" /> {tr('mixerRepair')}
-                      </button>
-                    </div>
-                  </OptionRow>
-
-                  <OptionRow label={tr('testMicrophone')} sub="">
-                    <button 
-                      className="btn-secondary" 
-                      onClick={testMicrophone} 
-                      style={{ 
-                        fontSize: 12,
-                        minHeight: 34, 
-                        padding: '6px 16px',
-                        borderRadius: 'var(--radius-md)',
-                        borderColor: isMicrophoneTesting ? 'var(--success)' : undefined,
-                        background: isMicrophoneTesting ? 'rgba(29,158,117,0.15)' : undefined,
-                        color: isMicrophoneTesting ? 'var(--success)' : undefined
-                      }}
-                    >
-                      <i className={`ti ${isMicrophoneTesting ? 'ti-microphone-2' : 'ti-mic'}`} 
-                        style={isMicrophoneTesting ? { animation: 'pulse 0.6s ease infinite' } : {}} />
-                      {isMicrophoneTesting ? 'Test en cours...' : tr('test')}
-                    </button>
-                  </OptionRow>
-
-                  <OptionRow label={tr('reconnectFlow')} sub={tr('reconnectFlowDesc')}>
-                    <button 
-                      className="btn-secondary" 
-                      onClick={async () => {
-                        try {
-                          const { connectMixerToOutput, getMixerStats } = await import('../utils/audioMixer')
-                          const stats = getMixerStats()
-                          if (!stats.isInitialized) {
-                            addToast('❌ ' + tr('mixerNotInitialized'), 'error')
-                            return
-                          }
-                          const result = connectMixerToOutput(store.audioDevice || 'default')
-                          if (result) addToast('✅ ' + tr('flowReconnected'), 'success')
-                        } catch (e) {
-                          addToast('❌ ' + tr('error') + ': ' + e.message, 'error')
-                        }
-                      }} 
-                      style={{ 
-                        fontSize: 12, 
-                        minHeight: 34, 
-                        padding: '6px 16px',
-                        borderRadius: 'var(--radius-md)'
-                      }}
-                    >
-                      <i className="ti ti-plug" /> {tr('reconnect')}
-                    </button>
-                  </OptionRow>
-
-                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', padding: '8px 12px', borderRadius: 6, lineHeight: 1.6, border: '1px solid var(--success)' }}>
-                    <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--success)' }} />
-                    <strong>{tr('mixerActive')}</strong> : {tr('mixerActiveDesc')}
-                    <br />
-                    <span style={{ fontSize: 10 }}>
-                      {tr('mixerDiscordTip')}
-                    </span>
-                  </div>
-                </>
-              )}
+              {/* Statut mixeur */}
+              <div style={{ 
+                fontSize: 11, 
+                color: 'var(--text-tertiary)', 
+                background: 'var(--bg-tertiary)', 
+                padding: '8px 12px', 
+                borderRadius: 6, 
+                lineHeight: 1.6, 
+                border: `1px solid ${store.monitoringEnabled ? 'var(--warning)' : 'var(--success)'}` 
+              }}>
+                <i className="ti ti-info-circle" style={{ marginRight: 4, color: store.monitoringEnabled ? 'var(--warning)' : 'var(--success)' }} />
+                <strong>{tr('mixerActive')}</strong> : {tr('mixerActiveDesc')}
+                <br />
+                {store.monitoringEnabled && (
+                  <span style={{ color: 'var(--warning)', fontSize: 10 }}>
+                    ⚠️ Monitoring actif : vous entendez votre micro dans les haut-parleurs
+                  </span>
+                )}
+                <span style={{ fontSize: 10 }}>
+                  {tr('mixerDiscordTip')}
+                </span>
+              </div>
             </>
           )}
 
-          {store.audioMode === 'advanced' && (
-            <div style={{ padding: '10px 12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
+          {/* ─── SECTION AVANCÉE RÉDUCTIBLE ────────────────────────────────── */}
+          <CollapsibleSection 
+            title="Options audio avancées" 
+            icon="ti-settings"
+            defaultOpen={advancedAudioOpen}
+          >
+            {/* Mode basse latence */}
+            <OptionRow label={tr('lowLatencyMode')} sub={tr('lowLatencyModeDesc')}>
+              <Toggle 
+                value={store.lowLatencyMode || false} 
+                onChange={async (val) => {
+                  await store.updateLowLatencyMode(val)
+                  const { setLowLatencyMode } = await import('../utils/audioMixer')
+                  setLowLatencyMode(val)
+                  addToast(val ? tr('lowLatencyActivated') : tr('lowLatencyDeactivated'), 'info')
+                }} 
+              />
+            </OptionRow>
+
+            {/* Réduction de bruit */}
+            <OptionRow label={tr('noiseSuppressionMode')} sub={tr('noiseSuppressionModeDesc')}>
+              <select 
+                value={store.noiseSuppressionMode || 'auto'} 
+                onChange={async (e) => {
+                  const mode = e.target.value
+                  await store.updateNoiseSuppressionMode(mode)
+                  const { setNoiseSuppressionMode } = await import('../utils/audioMixer')
+                  setNoiseSuppressionMode(mode)
+                  addToast(tr('noiseSuppressionModeChanged').replace('{mode}', mode), 'info')
+                }}
+                style={{ width: 140, fontSize: 12 }}
+              >
+                <option value="auto">{tr('noiseSuppressionModeAuto')}</option>
+                <option value="worklet">{tr('noiseSuppressionModeWorklet')}</option>
+                <option value="filter">{tr('noiseSuppressionModeFilter')}</option>
+                <option value="off">{tr('noiseSuppressionModeOff')}</option>
+              </select>
+            </OptionRow>
+
+            {/* Mode avancé (VB-Cable + VoiceMeeter) */}
+            <div style={{ 
+              padding: '10px 12px', 
+              background: 'var(--bg-tertiary)', 
+              borderRadius: 'var(--radius-md)', 
+              fontSize: 12, 
+              color: 'var(--text-secondary)', 
+              lineHeight: 1.8, 
+              marginTop: 4 
+            }}>
               <i className="ti ti-info-circle" style={{ marginRight: 6, color: 'var(--accent)' }} />
-              <strong>{tr('advancedMode')}</strong> : {tr('advancedModeDesc')}
+              <strong>Mode Avancé</strong> : Utilise VB-Cable + VoiceMeeter Banana pour un mixage professionnel.
               <br />
               <button onClick={() => window.electronAPI?.openExternal('https://vb-audio.com/Cable/')}
                 style={{ color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer', marginTop: 4, display: 'inline-block', fontSize: 12, padding: 0 }}>
-                <i className="ti ti-download" /> {tr('downloadVBCable')}
+                <i className="ti ti-download" /> Télécharger VB-Cable
               </button>
               <br />
               <button onClick={() => window.electronAPI?.openExternal('https://vb-audio.com/Voicemeeter/banana.htm')}
                 style={{ color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer', marginTop: 2, display: 'inline-block', fontSize: 12, padding: 0 }}>
-                <i className="ti ti-download" /> {tr('downloadVoiceMeeter')}
+                <i className="ti ti-download" /> Télécharger VoiceMeeter
               </button>
               <br />
               <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                💡 {tr('advancedModeTip')}
+                💡 Consulte le guide Discord pour la configuration.
               </span>
             </div>
-          )}
+          </CollapsibleSection>
         </Section>
 
         {/* ============================ */}
-        {/* SECTION 3 : RACCOURCIS CLAVIER */}
+        {/* SECTION 3 : GUIDE */}
+        {/* ============================ */}
+        <Section 
+          ref={el => sectionRefs.current['guide'] = el}
+          id="guide"
+          title={tr('guideTitle')} 
+          icon="ti-book"
+        >
+          <OptionRow label={tr('tutorialRestart')} sub={tr('tutorialRestartDesc')}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                className="btn-secondary btn-sm"
+                onClick={() => {
+                  localStorage.removeItem('sounddeck-tutorial-done')
+                  window.location.reload()
+                }}
+                style={{ fontSize: 12, minHeight: 34, padding: '6px 16px', borderRadius: 'var(--radius-md)' }}
+              >
+                <i className="ti ti-book" /> {tr('tutorialRestart')}
+              </button>
+              <button
+                className="btn-primary btn-sm"
+                onClick={() => {
+                  const event = new CustomEvent('open-advanced-tutorial')
+                  window.dispatchEvent(event)
+                }}
+                style={{ fontSize: 12, minHeight: 34, padding: '6px 16px', borderRadius: 'var(--radius-md)' }}
+              >
+                <i className="ti ti-rocket" /> {tr('tutorialAdvanced')}
+              </button>
+            </div>
+          </OptionRow>
+
+          <div style={{ 
+            fontSize: 12, 
+            color: 'var(--text-tertiary)', 
+            background: 'var(--bg-tertiary)', 
+            padding: '12px 14px', 
+            borderRadius: 'var(--radius-md)', 
+            lineHeight: 1.6,
+            border: '1px solid var(--border)'
+          }}>
+            <i className="ti ti-info-circle" style={{ marginRight: 6, color: 'var(--accent)' }} />
+            <strong>Guides disponibles :</strong>
+            <br />
+            • <strong>Tutoriel de base</strong> : Revoyez les bases de SoundDeck étape par étape
+            <br />
+            • <strong>Tutoriel avancé</strong> : Découvrez toutes les fonctionnalités avancées
+            <br />
+            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+              💡 Des guides sont également disponibles sur chaque page de l'application.
+            </span>
+          </div>
+        </Section>
+
+        {/* ============================ */}
+        {/* SECTION 4 : RACCOURCIS CLAVIER */}
         {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['shortcuts'] = el}
@@ -1053,7 +1062,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         </Section>
 
         {/* ============================ */}
-        {/* SECTION 4 : GESTION DES SONS */}
+        {/* SECTION 5 : GESTION DES SONS */}
         {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['soundManagement'] = el}
@@ -1061,55 +1070,8 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           title={tr('soundManagement')} 
           icon="ti-music"
         >
-          <OptionRow label={tr('compressOnImport')} sub={tr('compressOnImportDesc')}>
-            <Toggle 
-              value={store.compressOnImport || false}
-              onChange={async (val) => {
-                await store.updateCompressOnImport(val)
-                addToast(val ? tr('compressOnImportEnabled') : tr('compressOnImportDisabled'), 'info')
-              }}
-            />
-          </OptionRow>
-
-          {store.compressOnImport && (
-            <OptionRow label={tr('compressionBitrate')} sub={tr('compressionBitrateDesc')}>
-              <select 
-                value={store.compressionBitrate || 128}
-                onChange={async (e) => {
-                  const val = Number(e.target.value)
-                  await store.updateCompressionBitrate(val)
-                }}
-                style={{ width: 140, fontSize: 12 }}
-              >
-                <option value="64">64 kbps</option>
-                <option value="96">96 kbps</option>
-                <option value="128">128 kbps (recommandé)</option>
-                <option value="192">192 kbps</option>
-                <option value="256">256 kbps</option>
-              </select>
-            </OptionRow>
-          )}
-
           <OptionRow label={tr('normalization')} sub={tr('normalizationDesc')}>
             <Toggle value={store.normalizationEnabled} onChange={store.updateNormalizationEnabled} />
-          </OptionRow>
-
-          <OptionRow label={tr('reanalyzeGains')} sub={tr('reanalyzeGainsDesc')}>
-            <button 
-              className="btn-secondary" 
-              onClick={async () => {
-                await store.resetGainCache?.()
-                addToast(tr('gainCacheCleared'), 'info')
-              }} 
-              style={{ 
-                fontSize: 12, 
-                minHeight: 34, 
-                padding: '6px 16px',
-                borderRadius: 'var(--radius-md)'
-              }}
-            >
-              <i className="ti ti-refresh" /> {tr('reanalyzeGains')}
-            </button>
           </OptionRow>
 
           {store.normalizationEnabled && (
@@ -1243,10 +1205,28 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               </div>
             </>
           )}
+
+          <OptionRow label={tr('reanalyzeGains')} sub={tr('reanalyzeGainsDesc')}>
+            <button 
+              className="btn-secondary" 
+              onClick={async () => {
+                await store.resetGainCache?.()
+                addToast(tr('gainCacheCleared'), 'info')
+              }} 
+              style={{ 
+                fontSize: 12, 
+                minHeight: 34, 
+                padding: '6px 16px',
+                borderRadius: 'var(--radius-md)'
+              }}
+            >
+              <i className="ti ti-refresh" /> {tr('reanalyzeGains')}
+            </button>
+          </OptionRow>
         </Section>
 
         {/* ============================ */}
-        {/* SECTION PLUGINS */}
+        {/* SECTION 6 : PLUGINS */}
         {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['plugins'] = el}
@@ -1376,7 +1356,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                     <button 
                       className="btn-ghost btn-sm"
                       onClick={() => {
-                        // Recharger le plugin
                         window.location.reload()
                       }}
                       style={{ 
@@ -1395,7 +1374,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                           const result = await window.electronAPI.uninstallPlugin?.(plugin.id)
                           if (result?.success) {
                             addToast(`Plugin "${plugin.name}" désinstallé`, 'info')
-                            // Recharger la page pour mettre à jour
                             window.location.reload()
                           } else {
                             addToast(`Erreur: ${result?.error || 'Échec de la désinstallation'}`, 'error')
@@ -1449,7 +1427,6 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               addToast={addToast}
               lang={lang}
               onInstall={(result) => {
-                // Recharger la liste des plugins
                 loadPlugins()
               }}
             />
@@ -1457,7 +1434,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         </Section>
 
         {/* ============================ */}
-        {/* SECTION 5 : INTÉGRATIONS */}
+        {/* SECTION 7 : INTÉGRATIONS */}
         {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['integrations'] = el}
@@ -1465,21 +1442,85 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           title={tr('integrations')} 
           icon="ti-plug"
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <OBSControl lang={lang} />
-            <TwitchAlerts store={store} addToast={addToast} lang={lang} />
-          </div>
+          <OBSControl lang={lang} />
         </Section>
 
         {/* ============================ */}
-        {/* SECTION 6 : PERFORMANCE & FEEDBACK */}
+        {/* SECTION 8 : AVANCÉ */}
         {/* ============================ */}
         <Section 
-          ref={el => sectionRefs.current['performance'] = el}
-          id="performance"
-          title={tr('performance')} 
+          ref={el => sectionRefs.current['advanced'] = el}
+          id="advanced"
+          title="Avancé" 
           icon="ti-gauge"
         >
+          {/* Compression à l'import */}
+          <OptionRow label={tr('compressOnImport')} sub={tr('compressOnImportDesc')}>
+            <Toggle 
+              value={store.compressOnImport || false}
+              onChange={async (val) => {
+                await store.updateCompressOnImport(val)
+                addToast(val ? tr('compressOnImportEnabled') : tr('compressOnImportDisabled'), 'info')
+              }}
+            />
+          </OptionRow>
+
+          {store.compressOnImport && (
+            <OptionRow label={tr('compressionBitrate')} sub={tr('compressionBitrateDesc')}>
+              <select 
+                value={store.compressionBitrate || 128}
+                onChange={async (e) => {
+                  const val = Number(e.target.value)
+                  await store.updateCompressionBitrate(val)
+                }}
+                style={{ width: 140, fontSize: 12 }}
+              >
+                <option value="64">64 kbps</option>
+                <option value="96">96 kbps</option>
+                <option value="128">128 kbps (recommandé)</option>
+                <option value="192">192 kbps</option>
+                <option value="256">256 kbps</option>
+              </select>
+            </OptionRow>
+          )}
+
+          <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
+
+          {/* Logs d'erreur */}
+          <OptionRow label={tr('errorLogs')} sub={tr('errorLogsDesc')}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button 
+                className="btn-secondary btn-sm"
+                onClick={async () => {
+                  const logs = await window.electronAPI.storeGet('errorLogs') || []
+                  if (logs.length === 0) {
+                    addToast('Aucun log d\'erreur', 'info')
+                  } else {
+                    const json = JSON.stringify(logs, null, 2)
+                    const blob = new Blob([json], { type: 'application/json' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `error-logs-${new Date().toISOString().slice(0,10)}.json`
+                    a.click()
+                    URL.revokeObjectURL(url)
+                  }
+                }}
+              >
+                <i className="ti ti-file-text" /> {tr('exportLogs')}
+              </button>
+              <button 
+                className="btn-danger btn-sm"
+                onClick={handleClearLogs}
+              >
+                <i className="ti ti-trash" /> {tr('clearLogs')}
+              </button>
+            </div>
+          </OptionRow>
+
+          <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
+
+          {/* Feedback */}
           <OptionRow label={tr('feedback')} sub={tr('feedbackDesc')}>
             <button
               className="btn-primary btn-sm"
@@ -1515,41 +1556,10 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               <i className="ti ti-message" /> {tr('feedbackSend')}
             </button>
           </OptionRow>
-
-          <OptionRow label={tr('errorLogs')} sub={tr('errorLogsDesc')}>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button 
-                className="btn-secondary btn-sm"
-                onClick={async () => {
-                  const logs = await window.electronAPI.storeGet('errorLogs') || []
-                  if (logs.length === 0) {
-                    addToast('Aucun log d\'erreur', 'info')
-                  } else {
-                    const json = JSON.stringify(logs, null, 2)
-                    const blob = new Blob([json], { type: 'application/json' })
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = `error-logs-${new Date().toISOString().slice(0,10)}.json`
-                    a.click()
-                    URL.revokeObjectURL(url)
-                  }
-                }}
-              >
-                <i className="ti ti-file-text" /> {tr('exportLogs')}
-              </button>
-              <button 
-                className="btn-danger btn-sm"
-                onClick={handleClearLogs}
-              >
-                <i className="ti ti-trash" /> {tr('clearLogs')}
-              </button>
-            </div>
-          </OptionRow>
         </Section>
 
         {/* ============================ */}
-        {/* SECTION 7 : SAUVEGARDE */}
+        {/* SECTION 9 : SAUVEGARDE */}
         {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['backup'] = el}
@@ -1557,6 +1567,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           title={tr('optionsBackup')} 
           icon="ti-cloud"
         >
+          {/* Auto backup */}
           <OptionRow label={tr('autoBackup')} sub={tr('autoBackupDesc')}>
             <Toggle 
               value={store.autoBackupEnabled || false}
@@ -1701,7 +1712,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         </Section>
 
         {/* ============================ */}
-        {/* SECTION 8 : PROFILS */}
+        {/* SECTION 10 : PROFILS */}
         {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['profiles'] = el}
