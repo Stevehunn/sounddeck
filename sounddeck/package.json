@@ -47,7 +47,8 @@
       "node_modules/@ffmpeg-installer/**",
       "node_modules/ffmpeg-static/**",
       "node_modules/archiver/**",
-      "node_modules/unzipper/**"
+      "node_modules/unzipper/**",
+      "node_modules/yt-dlp-exec/**"
     ],
     "win": {
       "target": [
@@ -90,8 +91,7 @@
     "react-dom": "^18.2.0",
     "tmi.js": "^1.8.5",
     "unzipper": "^0.10.14",
-    "uuid": "^14.0.0",
-    "yt-dlp-exec": "^1.0.2"
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
@@ -109,6 +109,7 @@
     "jsdom": "^29.1.1",
     "vite": "^8.0.16",
     "vitest": "^4.1.9",
-    "wait-on": "^7.0.1"
+    "wait-on": "^7.0.1",
+    "yt-dlp-exec": "^1.0.2"
   }
 }

@@ -1,14 +1,27 @@
 import { useState, useEffect } from 'react'
-import Waveform from '../components/Waveform'
-import { useTranslation } from '../i18n'
-import { detectPlatform, getSpotifyTrack, getSoundCloudTrack, sanitizeFilename } from '../utils/platformImport'
+import Waveform from '../../components/Waveform'
+import { useTranslation } from '../../i18n'
+import { detectPlatform, getSpotifyTrack, getSoundCloudTrack, sanitizeFilename } from '../../utils/platformImport'
 import { Howl } from 'howler'
-import useConfirm from '../hooks/useConfirm.jsx'
+import useConfirm from '../../hooks/useConfirm.jsx'
+import translations from './i18n'
 
 const EMOJIS = ['🎵','🎤','🎸','🎹','🥁','🎺','🎻','🎼','🔊','💥','😂','🔥']
 
 export default function YouTube({ store, addToast, lang = 'fr' }) {
-  const tr = useTranslation(lang)
+  // ✅ Utiliser les traductions globales + celles du plugin
+  const globalTr = useTranslation(lang)
+  
+  // ✅ Fonction qui fusionne les traductions globales et celles du plugin
+  const tr = (key) => {
+    // Chercher d'abord dans les traductions du plugin
+    if (translations[lang] && translations[lang][key]) {
+      return translations[lang][key]
+    }
+    // Sinon utiliser les traductions globales
+    return globalTr(key) || key
+  }
+
   const { confirm, ConfirmWrapper } = useConfirm({ lang })
   const [ytdlpStatus, setYtdlpStatus] = useState(null)
   const [downloading, setDownloading] = useState(false)
@@ -24,9 +37,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
   const [downloadedPath, setDownloadedPath] = useState(null)
   const [importing, setImporting] = useState(false)
   const [platform, setPlatform] = useState(null)
-  // ✅ Image personnalisée
   const [customImage, setCustomImage] = useState(null)
-  // ✅ Preview du son
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false)
   const [previewHowl, setPreviewHowl] = useState(null)
 
@@ -37,7 +48,6 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
     })
   }, [])
 
-  // ✅ Nettoyer le preview à la fermeture
   useEffect(() => {
     return () => {
       if (previewHowl) {
@@ -113,7 +123,6 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
           addToast(tr('ytFetchError') + (result.error || 'Erreur SoundCloud'), 'error')
         }
       } else {
-        // YouTube - utiliser le code existant
         result = await window.electronAPI.youtubeInfo(url.trim())
         if (result.success) {
           const info = {
@@ -142,7 +151,6 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
     setLoadingInfo(false)
   }
 
-  // ✅ TOGGLE PREVIEW
   const togglePreview = (filePath) => {
     if (!filePath) return
     
@@ -165,7 +173,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
         },
         onloaderror: (id, err) => {
           console.error('Erreur preview:', err)
-          addToast('❌ Impossible de lire le son', 'error')
+          addToast('❌ ' + tr('error'), 'error')
           setIsPreviewPlaying(false)
           setPreviewHowl(null)
         }
@@ -176,18 +184,17 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
       howl.play()
     } catch (e) {
       console.error('Erreur preview:', e)
-      addToast('❌ Impossible de lire le son', 'error')
+      addToast('❌ ' + tr('error'), 'error')
     }
   }
 
-  // ✅ CHARGER UNE IMAGE
   const handlePickImage = async () => {
     const imgPath = await window.electronAPI.openImageDialog()
     if (imgPath) {
       const result = await window.electronAPI.importImageFile(imgPath)
       if (result.success) {
         setCustomImage(result.path)
-        addToast('✅ Image ajoutée', 'success')
+        addToast(tr('ytImageAdded'), 'success')
       }
     }
   }
@@ -225,7 +232,6 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
           artist: videoInfo.uploader
         })
       } else {
-        // YouTube - utiliser le code existant
         result = await window.electronAPI.youtubeDownload(
           videoInfo?.url, start, end > 0 ? end : videoInfo?.duration || 0, videoInfo?.title
         )
@@ -238,7 +244,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
         setStep('save')
         addToast(tr('ytAudioReady'), 'success')
       } else {
-        addToast(tr('ytDownloadError') + (result?.error || 'Erreur inconnue'), 'error')
+        addToast(tr('ytDownloadError') + (result?.error || tr('ytDownloadErrorUnknown')), 'error')
       }
     } catch (e) {
       setImporting(false)
@@ -248,17 +254,17 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
   }
 
   const handleSave = async () => {
-      if (!soundName.trim() || !downloadedPath) return
-      
-      const existingSound = store.sounds.find(s => s.name.toLowerCase() === soundName.trim().toLowerCase())
-      if (existingSound) {
-        const confirmed = await confirm({
-          title: tr('soundExists'),
-          message: tr('soundExistsConfirm').replace('{name}', soundName.trim()),
-          type: 'warning'
-        })
-        if (!confirmed) return
-      }
+    if (!soundName.trim() || !downloadedPath) return
+    
+    const existingSound = store.sounds.find(s => s.name.toLowerCase() === soundName.trim().toLowerCase())
+    if (existingSound) {
+      const confirmed = await confirm({
+        title: tr('soundExists'),
+        message: tr('soundExistsConfirm').replace('{name}', soundName.trim()),
+        type: 'warning'
+      })
+      if (!confirmed) return
+    }
     
     await store.addSound({
       name: soundName.trim(),
@@ -512,7 +518,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
                     style={{ fontSize: 11, padding: '2px 10px', borderRadius: 'var(--radius-sm)' }}
                   >
                     <i className={`ti ${isPreviewPlaying ? 'ti-player-stop' : 'ti-player-play'}`} />
-                    {isPreviewPlaying ? 'Arrêter' : 'Écouter'}
+                    {isPreviewPlaying ? tr('stop') : tr('listen')}
                   </button>
                 </div>
                 <Waveform filePath={downloadedPath} height={60} />
@@ -533,17 +539,16 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
               />
             </div>
 
-            {/* ✅ Image personnalisée */}
             <div style={{ marginBottom: 14 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Image (optionnel)
+                {tr('image')}
               </label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {customImage && (
                   <img 
                     src={`file:///${customImage.replace(/\\/g, '/')}`} 
                     style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} 
-                    alt="Aperçu"
+                    alt={tr('preview')}
                   />
                 )}
                 <button 
@@ -551,7 +556,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
                   onClick={handlePickImage}
                   style={{ fontSize: 12, padding: '4px 12px', borderRadius: 'var(--radius-sm)' }}
                 >
-                  <i className="ti ti-photo" /> {customImage ? 'Changer' : 'Ajouter une image'}
+                  <i className="ti ti-photo" /> {customImage ? tr('ytImageChange') : tr('ytImageAdd')}
                 </button>
                 {customImage && (
                   <button 

@@ -1,0 +1,22 @@
+{
+  "id": "youtube",
+  "name": "YouTube Import",
+  "version": "1.0.0",
+  "author": "SoundDeck Team",
+  "description": "Import audio from YouTube, Spotify and SoundCloud",
+  "main": "index.js",
+  "pages": [
+    {
+      "id": "youtube",
+      "label": "YouTube",
+      "icon": "ti-brand-youtube",
+      "component": "YouTube.jsx",
+      "group": "navigation"
+    }
+  ],
+  "requires": ">=1.3.0",
+  "dependencies": {
+    "yt-dlp-exec": "^1.0.2",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0"
+  }
+}

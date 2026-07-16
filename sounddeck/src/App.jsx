@@ -6,7 +6,6 @@ import Options from './pages/Options'
 import Trimmer from './pages/Trimmer'
 import Editor from './pages/Editor'
 import Sequencer from './pages/Sequencer'
-import YouTube from './pages/YouTube'
 import Guide from './pages/Guide'
 import Stats from './pages/Stats'
 import Presentation from './pages/Presentation'
@@ -44,44 +43,58 @@ function AppContent() {
     error: pluginError 
   } = usePluginPage(isPluginPage(currentPage) ? currentPage : null)
 
-  // ✅ Charger le plugin MyInstants automatiquement au démarrage
+  // ✅ Charger les plugins automatiquement au démarrage
   useEffect(() => {
-    const loadMyInstantsPlugin = async () => {
+    const loadPlugins = async () => {
       // Attendre que le PluginManager soit initialisé
       if (!pluginsLoaded) return
       
-      // Vérifier si le plugin est déjà chargé
-      if (pluginManager.isPluginLoaded('myinstants')) {
-        console.log('✅ Plugin MyInstants déjà chargé')
-        return
+      // ─── 1. Plugin MyInstants ──────────────────────────────────────────────
+      if (!pluginManager.isPluginLoaded('myinstants')) {
+        try {
+          console.log('📦 Chargement automatique du plugin MyInstants...')
+          const pluginInfo = {
+            id: 'myinstants',
+            name: 'MyInstants Discovery',
+            version: '1.0.0',
+            path: './plugins/myinstants',
+            enabled: true
+          }
+          const result = await pluginManager.loadPlugin(pluginInfo)
+          if (result) {
+            console.log('✅ Plugin MyInstants chargé avec succès')
+          } else {
+            console.warn('⚠️ Échec du chargement du plugin MyInstants')
+          }
+        } catch (e) {
+          console.error('❌ Erreur lors du chargement du plugin MyInstants:', e)
+        }
       }
 
-      try {
-        console.log('📦 Chargement automatique du plugin MyInstants...')
-        
-        // Créer les informations du plugin
-        const pluginInfo = {
-          id: 'myinstants',
-          name: 'MyInstants Discovery',
-          version: '1.0.0',
-          path: './plugins/myinstants',
-          enabled: true
+      // ─── 2. Plugin YouTube ──────────────────────────────────────────────────
+      if (!pluginManager.isPluginLoaded('youtube')) {
+        try {
+          console.log('📦 Chargement automatique du plugin YouTube...')
+          const pluginInfo = {
+            id: 'youtube',
+            name: 'YouTube Import',
+            version: '1.0.0',
+            path: './plugins/youtube',
+            enabled: true
+          }
+          const result = await pluginManager.loadPlugin(pluginInfo)
+          if (result) {
+            console.log('✅ Plugin YouTube chargé avec succès')
+          } else {
+            console.warn('⚠️ Échec du chargement du plugin YouTube')
+          }
+        } catch (e) {
+          console.error('❌ Erreur lors du chargement du plugin YouTube:', e)
         }
-        
-        // Charger le plugin
-        const result = await pluginManager.loadPlugin(pluginInfo)
-        
-        if (result) {
-          console.log('✅ Plugin MyInstants chargé avec succès')
-        } else {
-          console.warn('⚠️ Échec du chargement du plugin MyInstants')
-        }
-      } catch (e) {
-        console.error('❌ Erreur lors du chargement du plugin MyInstants:', e)
       }
     }
 
-    loadMyInstantsPlugin()
+    loadPlugins()
   }, [pluginsLoaded, pluginManager])
 
   const soundsRef = useRef([])
@@ -427,9 +440,6 @@ function AppContent() {
     if (currentPage === 'sequencer') {
       return <Sequencer store={store} addToast={addToast} lang={store.lang} />
     }
-    if (currentPage === 'youtube') {
-      return <YouTube store={store} addToast={addToast} lang={store.lang} />
-    }
     if (currentPage === 'guide') {
       return <Guide key={store.lang} lang={store.lang} />
     }
@@ -437,7 +447,7 @@ function AppContent() {
       return <Stats store={store} lang={store.lang} />
     }
 
-    // ✅ Pages plugin
+    // ✅ Pages plugin (YouTube est maintenant ici)
     if (isPluginPage(currentPage)) {
       if (pluginLoading) {
         return (
