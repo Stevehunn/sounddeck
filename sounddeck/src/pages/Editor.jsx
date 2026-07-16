@@ -124,7 +124,11 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         for (const clip of track.clips) {
           if (clip.path && !waveformData[clip.id]) {
             try {
-              const data = await generateWaveformData(clip.path, 200)
+              // ✅ N'afficher que la portion du fichier qui correspond à ce clip
+              // (important pour un clip issu d'un split — sinon il affiche tout le fichier
+              // source compressé dans sa largeur, ce qui ressemble à une waveform dupliquée)
+              const sliceDuration = clipDurations[clip.id] || clip.duration || null
+              const data = await generateWaveformData(clip.path, 200, clip.offset || 0, sliceDuration)
               if (data) {
                 newWaveformData[clip.id] = data
               }
@@ -367,7 +371,11 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         if (!item.started && time >= item.startOffset) {
           try {
             item.howl.play()
-            const seekTime = Math.min(time - item.startOffset, item.duration)
+            // ✅ sourceOffset : point de départ dans le FICHIER AUDIO d'origine (posé par splitClip
+            // pour la 2e moitié d'un clip coupé). Sans ça, un clip issu d'un split rejouait le
+            // fichier depuis son tout début au lieu de continuer où le morceau précédent s'arrêtait.
+            const sourceOffset = item.clip.offset || 0
+            const seekTime = Math.min(time - item.startOffset, item.duration) + sourceOffset
             if (seekTime > 0) {
               item.howl.seek(seekTime)
             }
@@ -460,8 +468,9 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
           // Calculer la position dans le clip
           const clipStart = item.clip.start
           const clipDuration = clipDurations[item.clip.id] || item.clip.duration || 3
-          const seekInClip = Math.max(0, Math.min(clampedTime - clipStart, clipDuration))
-          if (seekInClip >= 0 && seekInClip <= clipDuration) {
+          const sourceOffset = item.clip.offset || 0
+          const seekInClip = Math.max(0, Math.min(clampedTime - clipStart, clipDuration)) + sourceOffset
+          if (seekInClip >= 0 && seekInClip <= clipDuration + sourceOffset) {
             try {
               item.howl.seek(seekInClip)
             } catch (e) {
@@ -515,6 +524,14 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     }
     const newClip = await store.splitClip(target.trackId, target.clip.id, currentTime, clipDurations[target.clip.id])
     if (newClip) {
+      // ✅ La 1ère moitié garde le même id que le clip d'origine : sa waveform en cache
+      // (celle du fichier entier, générée avant la coupe) est maintenant obsolète —
+      // on la retire pour qu'elle soit régénérée avec la bonne portion, plus courte.
+      setWaveformData(prev => {
+        const next = { ...prev }
+        delete next[target.clip.id]
+        return next
+      })
       setSelectedTrackId(target.trackId)
       setSelectedClipId(target.clip.id)
       addToast(tr('editorClipSplit'), 'success')
@@ -693,11 +710,12 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
           selectedTrackId={selectedTrackId}
           totalDuration={totalDuration}
           onClipSelect={handleClipSelect}
-          onClipMove={store.moveClip}
-          onClipUpdate={store.updateClip}
+          onClipMove={(trackId, clipId, newStart) => store.moveClip(trackId, clipId, newStart, null, { skipHistory: true })}
+          onClipUpdate={(trackId, clipId, updates) => store.updateClip(trackId, clipId, updates, { skipHistory: true })}
           onClipRemove={handleRemoveClip}
           onClipDuplicate={store.duplicateClip}
           onClipFade={(trackId, clipId, edge, duration) => store.setClipFade(trackId, clipId, edge, duration)}
+          onDragCheckpoint={store.pushEditorHistoryCheckpoint}
           onTrackRemove={handleRemoveTrack}
           onSeek={handleSeek}
           onTrackMute={(trackId, muted) => store.updateTrack(trackId, { muted })}

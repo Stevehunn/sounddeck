@@ -433,6 +433,20 @@ export function useStore() {
     await save('editorProject', updated)
   }, [editorProject, save])
 
+  // ✅ Fige l'état actuel dans l'historique SANS rien changer — à appeler une seule fois
+  // au tout début d'un geste continu (drag de déplacement/redimensionnement de clip), pour
+  // qu'ensuite chaque mise à jour intermédiaire du geste (skipHistory: true) ne pollue pas
+  // la pile d'annulation avec des dizaines d'états, un par pixel de souris déplacé.
+  const pushEditorHistoryCheckpoint = useCallback(() => {
+    editorUndoStack.current.push(editorProject)
+    if (editorUndoStack.current.length > EDITOR_HISTORY_LIMIT) {
+      editorUndoStack.current.shift()
+    }
+    editorRedoStack.current = []
+    setCanUndoEditor(true)
+    setCanRedoEditor(false)
+  }, [editorProject])
+
   const undoEditor = useCallback(async () => {
     const previous = editorUndoStack.current.pop()
     if (!previous) return
@@ -1300,7 +1314,7 @@ export function useStore() {
     return newClip
   }, [editorProject, commitEditorProject])
 
-  const updateClip = useCallback(async (trackId, clipId, updates) => {
+  const updateClip = useCallback(async (trackId, clipId, updates, options = {}) => {
     const updated = {
       ...editorProject,
       tracks: editorProject.tracks.map(track => {
@@ -1319,7 +1333,7 @@ export function useStore() {
       }),
       updatedAt: Date.now()
     }
-    await commitEditorProject(updated)
+    await commitEditorProject(updated, options)
   }, [editorProject, commitEditorProject])
 
   const removeClip = useCallback(async (trackId, clipId) => {
@@ -1339,7 +1353,7 @@ export function useStore() {
     await commitEditorProject(updated)
   }, [editorProject, commitEditorProject])
 
-  const moveClip = useCallback(async (trackId, clipId, newStart, newTrackId = null) => {
+  const moveClip = useCallback(async (trackId, clipId, newStart, newTrackId = null, options = {}) => {
     let clipToMove = null
     let sourceTrack = null
 
@@ -1377,7 +1391,7 @@ export function useStore() {
       tracks: finalTracks,
       updatedAt: Date.now()
     }
-    await commitEditorProject(updated)
+    await commitEditorProject(updated, options)
   }, [editorProject, commitEditorProject])
 
   const duplicateClip = useCallback(async (trackId, clipId) => {
@@ -1804,6 +1818,7 @@ export function useStore() {
     redoEditor,
     canUndoEditor,
     canRedoEditor,
+    pushEditorHistoryCheckpoint,
 
     // Zone de boucle
     editorLoopRegion,

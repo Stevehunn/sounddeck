@@ -18,6 +18,7 @@ export default function EditorClip({
   onDragStart,
   onFadeInChange,
   onFadeOutChange,
+  onDragCheckpoint,
   tr
 }) {
   const [isDragging, setIsDragging] = useState(false)
@@ -93,6 +94,7 @@ export default function EditorClip({
     if (e.button !== 0) return
     if (e.target.closest('.clip-actions')) return
 
+    onDragCheckpoint?.()
     setIsDragging(true)
     setDragStartX(e.clientX)
     onSelect()
@@ -116,6 +118,7 @@ export default function EditorClip({
   // Gestion du resize
   const handleResizeStart = (e, side) => {
     e.stopPropagation()
+    onDragCheckpoint?.()
     setIsResizing(true)
     setResizeSide(side)
     setDragStartX(e.clientX)

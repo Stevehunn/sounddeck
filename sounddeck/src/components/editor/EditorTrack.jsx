@@ -14,6 +14,7 @@ export default function EditorTrack({
   onClipRemove,
   onClipDuplicate,
   onClipFade,
+  onDragCheckpoint,
   onTrackRemove,
   waveformData,
   isPlaying,
@@ -357,6 +358,7 @@ export default function EditorTrack({
                 onDragStart={(e) => handleClipDragStart(e, clip.id)}
                 onFadeInChange={(duration) => onClipFade?.(track.id, clip.id, 'in', duration)}
                 onFadeOutChange={(duration) => onClipFade?.(track.id, clip.id, 'out', duration)}
+                onDragCheckpoint={onDragCheckpoint}
                 tr={tr}
               />
             </div>

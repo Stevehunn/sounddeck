@@ -12,6 +12,7 @@ export default function EditorTimeline({
   onClipRemove,
   onClipDuplicate,
   onClipFade,
+  onDragCheckpoint,
   onTrackRemove,
   onTrackMute,
   onTrackSolo,
@@ -483,6 +484,7 @@ export default function EditorTimeline({
               onClipRemove={onClipRemove}
               onClipDuplicate={onClipDuplicate}
               onClipFade={onClipFade}
+              onDragCheckpoint={onDragCheckpoint}
               onTrackRemove={onTrackRemove}
               waveformData={waveformData}
               isPlaying={isPlaying}
