@@ -64,7 +64,7 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
         const validCategories = parsed.filter(id => CATEGORIES[id])
         if (validCategories.length > 0) {
           setSelectedCategories(validCategories)
-          return
+          return validCategories
         }
       }
     } catch (e) {
@@ -72,6 +72,7 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
     }
     const defaults = DEFAULT_CATEGORIES.map(cat => cat.id)
     setSelectedCategories(defaults)
+    return defaults
   }, [])
 
   const saveCategoryPreferences = useCallback((categoryIds) => {
@@ -173,9 +174,9 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
     setCacheInfo(getCacheInfo())
   }, [lang, t, activeCategory, results.length])
 
-  // ─── PRÉCHARGEMENT DE TOUTES LES CATÉGORIES (UNE SEULE FOIS) ─────────────
+  // ─── PRÉCHARGEMENT DE TOUTES LES CATÉGORIES ──────────────────────────────
 
-  const preloadAllCategories = useCallback(async () => {
+  const preloadAllCategories = useCallback(async (priorityIds = null) => {
     // ✅ Si déjà en cours ou déjà terminé, ne rien faire
     if (isPreloading || isPreloadComplete) return
     
@@ -201,10 +202,15 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
     
     setPreloadStatus(t('myinstantsPreloading'))
     
-    // ✅ Ordre : catégories par défaut d'abord, puis le reste
-    const defaultIds = DEFAULT_CATEGORIES.map(cat => cat.id)
-    const otherIds = categoryIds.filter(id => !defaultIds.includes(id))
-    const sortedIds = [...defaultIds, ...otherIds]
+    // ✅ PRIORITÉ : Utiliser les IDs passés en paramètre, ou les catégories sélectionnées
+    let priorityList = priorityIds
+    if (!priorityList || priorityList.length === 0) {
+      // Si pas de priorité passée, utiliser les catégories sélectionnées
+      priorityList = getVisibleCategories().map(cat => cat.id)
+    }
+    
+    const otherIds = categoryIds.filter(id => !priorityList.includes(id))
+    const sortedIds = [...priorityList, ...otherIds]
 
     const loadOneCategory = async (id) => {
       if (preloadAbortRef.current) return false
@@ -284,18 +290,19 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
     setPreloadStatus(`✅ ${t('myinstantsAllCategoriesLoaded')}`)
     setCacheInfo(getCacheInfo())
     
-    // ✅ Charger la catégorie trending en premier
-    if (!preloadAbortRef.current) {
-      const cached = getCachedCategory('trending')
+    // ✅ Charger la première catégorie prioritaire
+    if (!preloadAbortRef.current && priorityList.length > 0) {
+      const firstCategory = priorityList[0]
+      const cached = getCachedCategory(firstCategory)
       if (cached && cached.length > 0) {
         setResults(cached)
-        setActiveCategory('trending')
-      } else if (sortedIds.length > 0) {
-        loadCategory(sortedIds[0])
+        setActiveCategory(firstCategory)
+      } else {
+        loadCategory(firstCategory)
       }
     }
     
-  }, [lang, isPreloading, isPreloadComplete, t, loadCategory])
+  }, [lang, isPreloading, isPreloadComplete, t, loadCategory, getVisibleCategories])
 
   // ─── RECHERCHE ─────────────────────────────────────────────────────────────
 
@@ -448,10 +455,7 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
     addToast(t('myinstantsCategoryEditorSaved'), 'success')
     setShowAllCategories(false)
     
-    // ✅ NE PAS VIDER LE CACHE - toutes les catégories sont déjà préchargées
-    // ✅ Ne pas recharger non plus, le cache est déjà plein
-    
-    // ✅ Mettre à jour l'état du cache (juste rafraîchir l'affichage)
+    // ✅ Mettre à jour l'état du cache
     setCacheInfo(getCacheInfo())
     
     // ✅ Charger la première catégorie sélectionnée depuis le cache
@@ -558,7 +562,6 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
                 key={cat.id}
                 onClick={() => {
                   setSearch('')
-                  // ✅ Utiliser le cache directement, pas de rechargement
                   const cached = getCachedCategory(cat.id)
                   if (cached && cached.length > 0) {
                     setResults(cached)
@@ -716,16 +719,24 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
 
   useEffect(() => {
     const init = async () => {
-      loadCategoryPreferences()
+      // ✅ Charger les préférences (et récupérer la liste des catégories sélectionnées)
+      const selected = loadCategoryPreferences()
       
-      // ✅ Charger la catégorie trending en premier pour l'affichage
-      await loadCategory('trending')
+      // ✅ Charger la première catégorie sélectionnée pour l'affichage
+      if (selected.length > 0) {
+        const firstCategory = selected[0]
+        await loadCategory(firstCategory)
+      } else {
+        await loadCategory('trending')
+      }
+      
       setCacheInfo(getCacheInfo())
       setIsInitialLoad(false)
       
-      // ✅ Précharger TOUTES les catégories en arrière-plan (UNE SEULE FOIS)
+      // ✅ Précharger TOUTES les catégories en arrière-plan
+      // On passe la liste des catégories sélectionnées en priorité
       setTimeout(() => {
-        preloadAllCategories()
+        preloadAllCategories(selected)
       }, 500)
     }
     
@@ -794,7 +805,7 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
         </div>
       </div>
 
-      {/* Barre de progression du préchargement (UNIQUEMENT pendant le premier chargement) */}
+      {/* Barre de progression du préchargement */}
       {isPreloading && (
         <div style={{
           padding: '4px 20px',

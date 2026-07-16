@@ -176,7 +176,7 @@ select {
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  border-radius: var(--radius-md); /* ✅ 10px comme les inputs et boutons */
+  border-radius: var(--radius-md);
   padding: var(--space-sm) var(--space-md);
   font-size: 13px;
   outline: none;
@@ -202,20 +202,18 @@ select option {
   color: var(--text-primary);
 }
 
-/* Select avec classe input-sm */
 select.input-sm {
   font-size: 12px;
   padding: 5px 8px;
   min-height: 28px;
-  border-radius: var(--radius-sm); /* ✅ 6px pour les petits selects */
+  border-radius: var(--radius-sm);
 }
 
-/* Select avec classe input-lg */
 select.input-lg {
   font-size: 15px;
   padding: 10px 14px;
   min-height: 40px;
-  border-radius: var(--radius-md); /* ✅ 10px */
+  border-radius: var(--radius-md);
 }
 
 /* Range inputs */
@@ -314,6 +312,8 @@ button {
   background: var(--accent);
   color: white;
   border-radius: var(--radius-md) !important;
+  padding: var(--space-sm) var(--space-lg); /* 8px 16px */
+  min-width: 100px;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -410,13 +410,6 @@ button {
   min-height: 28px;
   min-width: 28px;
   border-radius: var(--radius-sm) !important;
-}
-
-.btn-xl { 
-  font-size: 16px; 
-  padding: 14px 28px; 
-  min-height: 48px;
-  border-radius: var(--radius-md);
 }
 
 /* ─── BOUTON DE SUPPRESSION DE RECHERCHE ──────────────────────────────────── */
