@@ -1,6 +1,6 @@
 /**
  * Toutes les catégories disponibles sur MyInstants
- * Chaque catégorie utilise une clé de traduction
+ * default: true = affichée par défaut sur la page
  */
 export const CATEGORIES = {
   // ─── TENDANCES ET POPULAIRES ──────────────────────────────────────────────
@@ -11,7 +11,8 @@ export const CATEGORIES = {
     icon: 'ti-trending-up',
     mode: 'local',
     query: '',
-    color: '#ef4444'
+    color: '#ef4444',
+    default: true
   },
   best: {
     id: 'best',
@@ -20,7 +21,8 @@ export const CATEGORIES = {
     icon: 'ti-trophy',
     mode: 'multi',
     query: 'vine boom,bruh,airhorn,oof,sad trombone',
-    color: '#f59e0b'
+    color: '#f59e0b',
+    default: true
   },
   popular: {
     id: 'popular',
@@ -29,7 +31,8 @@ export const CATEGORIES = {
     icon: 'ti-star',
     mode: 'multi',
     query: 'meme,discord,notification,funny,laugh',
-    color: '#8b5cf6'
+    color: '#8b5cf6',
+    default: true
   },
 
   // ─── MEMES ET HUMOUR ──────────────────────────────────────────────────────
@@ -40,7 +43,8 @@ export const CATEGORIES = {
     icon: 'ti-mood-happy',
     mode: 'multi',
     query: 'memes,viral,funny,bruh,oof',
-    color: '#f43f5e'
+    color: '#f43f5e',
+    default: true
   },
   vines: {
     id: 'vines',
@@ -49,7 +53,8 @@ export const CATEGORIES = {
     icon: 'ti-video',
     mode: 'multi',
     query: 'vine boom,road work ahead,free shavacado,look at all those chickens',
-    color: '#22c55e'
+    color: '#22c55e',
+    default: false
   },
   reactions: {
     id: 'reactions',
@@ -58,7 +63,8 @@ export const CATEGORIES = {
     icon: 'ti-mood-surprised',
     mode: 'multi',
     query: 'bruh,laugh,crying,surprised,angry',
-    color: '#f97316'
+    color: '#f97316',
+    default: true
   },
   sounds: {
     id: 'sounds',
@@ -67,7 +73,8 @@ export const CATEGORIES = {
     icon: 'ti-speakerphone',
     mode: 'multi',
     query: 'airhorn,sad trombone,applause,doorbell,phone ring',
-    color: '#06b6d4'
+    color: '#06b6d4',
+    default: true
   },
 
   // ─── DISCORD ET STREAMING ─────────────────────────────────────────────────
@@ -78,7 +85,8 @@ export const CATEGORIES = {
     icon: 'ti-brand-discord',
     mode: 'multi',
     query: 'discord,ping,notification,streamer,meme',
-    color: '#5865F2'
+    color: '#5865F2',
+    default: true
   },
   twitch: {
     id: 'twitch',
@@ -87,7 +95,8 @@ export const CATEGORIES = {
     icon: 'ti-brand-twitch',
     mode: 'multi',
     query: 'twitch,streamer,raid,hype,pog',
-    color: '#9146FF'
+    color: '#9146FF',
+    default: false
   },
   streaming: {
     id: 'streaming',
@@ -96,7 +105,8 @@ export const CATEGORIES = {
     icon: 'ti-player-play',
     mode: 'multi',
     query: 'stream,alert,sub,follow,donation',
-    color: '#ec4899'
+    color: '#ec4899',
+    default: false
   },
   gaming: {
     id: 'gaming',
@@ -105,7 +115,8 @@ export const CATEGORIES = {
     icon: 'ti-controller',
     mode: 'multi',
     query: 'game,play,win,lose,multiplayer',
-    color: '#8b5cf6'
+    color: '#8b5cf6',
+    default: true
   },
 
   // ─── ANIME ET MANGA ──────────────────────────────────────────────────────
@@ -116,7 +127,8 @@ export const CATEGORIES = {
     icon: 'ti-mood-edit',
     mode: 'search',
     query: 'anime & manga',
-    color: '#ec4899'
+    color: '#ec4899',
+    default: false
   },
   anime_sounds: {
     id: 'anime_sounds',
@@ -125,7 +137,8 @@ export const CATEGORIES = {
     icon: 'ti-mood-smile',
     mode: 'multi',
     query: 'anime,otaku,waifu,manga,japanese',
-    color: '#f43f5e'
+    color: '#f43f5e',
+    default: false
   },
   naruto: {
     id: 'naruto',
@@ -134,7 +147,8 @@ export const CATEGORIES = {
     icon: 'ti-mood-smile',
     mode: 'multi',
     query: 'naruto,sasuke,kakashi,sharingan,rasengan',
-    color: '#f97316'
+    color: '#f97316',
+    default: false
   },
   one_piece: {
     id: 'one_piece',
@@ -143,7 +157,8 @@ export const CATEGORIES = {
     icon: 'ti-mood-smile',
     mode: 'multi',
     query: 'one piece,luffy,zoro,anime',
-    color: '#ef4444'
+    color: '#ef4444',
+    default: false
   },
   dragon_ball: {
     id: 'dragon_ball',
@@ -152,7 +167,8 @@ export const CATEGORIES = {
     icon: 'ti-mood-smile',
     mode: 'multi',
     query: 'dragon ball,goku,vegeta,kamehameha',
-    color: '#f59e0b'
+    color: '#f59e0b',
+    default: false
   },
 
   // ─── JEUX VIDÉO ───────────────────────────────────────────────────────────
@@ -163,7 +179,8 @@ export const CATEGORIES = {
     icon: 'ti-device-gamepad-2',
     mode: 'multi',
     query: 'games,gaming,mario,zelda,pokemon',
-    color: '#8b5cf6'
+    color: '#8b5cf6',
+    default: false
   },
   minecraft: {
     id: 'minecraft',
@@ -172,7 +189,8 @@ export const CATEGORIES = {
     icon: 'ti-cube',
     mode: 'multi',
     query: 'minecraft,steve,creeper,diamond,block',
-    color: '#22c55e'
+    color: '#22c55e',
+    default: false
   },
   fortnite: {
     id: 'fortnite',
@@ -181,7 +199,8 @@ export const CATEGORIES = {
     icon: 'ti-crosshair',
     mode: 'multi',
     query: 'fortnite,default dance,orange justice,take the l',
-    color: '#06b6d4'
+    color: '#06b6d4',
+    default: false
   },
   roblox: {
     id: 'roblox',
@@ -190,7 +209,8 @@ export const CATEGORIES = {
     icon: 'ti-cube',
     mode: 'multi',
     query: 'roblox,oof,noob,roblox death sound',
-    color: '#f43f5e'
+    color: '#f43f5e',
+    default: false
   },
   among_us: {
     id: 'among_us',
@@ -199,7 +219,8 @@ export const CATEGORIES = {
     icon: 'ti-user',
     mode: 'multi',
     query: 'among us,sus,vent,impostor,crewmate',
-    color: '#8b5cf6'
+    color: '#8b5cf6',
+    default: false
   },
 
   // ─── FILMS ET SÉRIES ──────────────────────────────────────────────────────
@@ -210,7 +231,8 @@ export const CATEGORIES = {
     icon: 'ti-movie',
     mode: 'multi',
     query: 'movies,star wars,marvel,harry potter,lord of the rings',
-    color: '#f59e0b'
+    color: '#f59e0b',
+    default: false
   },
   star_wars: {
     id: 'star_wars',
@@ -219,7 +241,8 @@ export const CATEGORIES = {
     icon: 'ti-swords',
     mode: 'multi',
     query: 'star wars,luke,vader,force,lightsaber',
-    color: '#f97316'
+    color: '#f97316',
+    default: false
   },
   marvel: {
     id: 'marvel',
@@ -228,7 +251,8 @@ export const CATEGORIES = {
     icon: 'ti-user',
     mode: 'multi',
     query: 'marvel,avengers,iron man,spiderman,thanos',
-    color: '#ef4444'
+    color: '#ef4444',
+    default: false
   },
   harry_potter: {
     id: 'harry_potter',
@@ -237,7 +261,8 @@ export const CATEGORIES = {
     icon: 'ti-magic-wand',
     mode: 'multi',
     query: 'harry potter,potter,hogwarts,magic',
-    color: '#f59e0b'
+    color: '#f59e0b',
+    default: false
   },
 
   // ─── MUSIQUE ──────────────────────────────────────────────────────────────
@@ -248,7 +273,8 @@ export const CATEGORIES = {
     icon: 'ti-music',
     mode: 'multi',
     query: 'music,song,beat,instrument,melody',
-    color: '#ec4899'
+    color: '#ec4899',
+    default: false
   },
   memes_music: {
     id: 'memes_music',
@@ -257,7 +283,8 @@ export const CATEGORIES = {
     icon: 'ti-headphones',
     mode: 'multi',
     query: 'meme music,soundtrack,epic,funny song',
-    color: '#22c55e'
+    color: '#22c55e',
+    default: false
   },
 
   // ─── SPORTS ───────────────────────────────────────────────────────────────
@@ -268,7 +295,8 @@ export const CATEGORIES = {
     icon: 'ti-trophy',
     mode: 'multi',
     query: 'sports,football,basketball,goal,score',
-    color: '#22c55e'
+    color: '#22c55e',
+    default: false
   },
   football: {
     id: 'football',
@@ -277,7 +305,8 @@ export const CATEGORIES = {
     icon: 'ti-ball-football',
     mode: 'multi',
     query: 'football,soccer,goal,messi,ronaldo',
-    color: '#22c55e'
+    color: '#22c55e',
+    default: false
   },
 
   // ─── POLITIQUE ─────────────────────────────────────────────────────────────
@@ -288,7 +317,8 @@ export const CATEGORIES = {
     icon: 'ti-building',
     mode: 'multi',
     query: 'politics,trump,biden,obama,macron',
-    color: '#3b82f6'
+    color: '#3b82f6',
+    default: false
   },
   french_politics: {
     id: 'french_politics',
@@ -297,7 +327,8 @@ export const CATEGORIES = {
     icon: 'ti-flag-3',
     mode: 'multi',
     query: 'macron,le pen,melanchon,philippe,attal',
-    color: '#3b82f6'
+    color: '#3b82f6',
+    default: false
   },
 
   // ─── DIVERS ──────────────────────────────────────────────────────────────
@@ -308,7 +339,8 @@ export const CATEGORIES = {
     icon: 'ti-paw',
     mode: 'multi',
     query: 'animals,cat,dog,bird,meow,bark',
-    color: '#22c55e'
+    color: '#22c55e',
+    default: false
   },
   cat: {
     id: 'cat',
@@ -317,7 +349,8 @@ export const CATEGORIES = {
     icon: 'ti-cat',
     mode: 'multi',
     query: 'cat,meow,kitty,cute cat',
-    color: '#f97316'
+    color: '#f97316',
+    default: false
   },
   dog: {
     id: 'dog',
@@ -326,7 +359,8 @@ export const CATEGORIES = {
     icon: 'ti-dog',
     mode: 'multi',
     query: 'dog,bark,woof,puppy',
-    color: '#8b5cf6'
+    color: '#8b5cf6',
+    default: false
   },
 
   // ─── SONS DE BASE ─────────────────────────────────────────────────────────
@@ -337,7 +371,8 @@ export const CATEGORIES = {
     icon: 'ti-bell',
     mode: 'multi',
     query: 'alarm,alert,notification,beep,ring',
-    color: '#ef4444'
+    color: '#ef4444',
+    default: false
   },
   alarms: {
     id: 'alarms',
@@ -346,7 +381,8 @@ export const CATEGORIES = {
     icon: 'ti-alert-triangle',
     mode: 'multi',
     query: 'alarm,siren,warning,emergency',
-    color: '#ef4444'
+    color: '#ef4444',
+    default: false
   },
   notifications: {
     id: 'notifications',
@@ -355,7 +391,8 @@ export const CATEGORIES = {
     icon: 'ti-message',
     mode: 'multi',
     query: 'notification,ping,message,ding',
-    color: '#06b6d4'
+    color: '#06b6d4',
+    default: false
   },
 
   // ─── EFFETS SONORES ──────────────────────────────────────────────────────
@@ -366,7 +403,8 @@ export const CATEGORIES = {
     icon: 'ti-wave-sine',
     mode: 'multi',
     query: 'sound effect,sfx,impact,hit,explosion',
-    color: '#8b5cf6'
+    color: '#8b5cf6',
+    default: false
   },
   impacts: {
     id: 'impacts',
@@ -375,7 +413,8 @@ export const CATEGORIES = {
     icon: 'ti-bolt',
     mode: 'multi',
     query: 'impact,hit,punch,smash,collision',
-    color: '#ef4444'
+    color: '#ef4444',
+    default: false
   },
   transitions: {
     id: 'transitions',
@@ -384,7 +423,8 @@ export const CATEGORIES = {
     icon: 'ti-switch',
     mode: 'multi',
     query: 'transition,whoosh,sweep,glide',
-    color: '#06b6d4'
+    color: '#06b6d4',
+    default: false
   },
 
   // ─── NOUVEAUTÉS ──────────────────────────────────────────────────────────
@@ -395,10 +435,14 @@ export const CATEGORIES = {
     icon: 'ti-sparkles',
     mode: 'trending',
     query: '',
-    color: '#22c55e'
+    color: '#22c55e',
+    default: false
   }
 }
 
 export const CATEGORIES_LIST = Object.values(CATEGORIES)
+
+// ✅ Liste des catégories par défaut
+export const DEFAULT_CATEGORIES = CATEGORIES_LIST.filter(cat => cat.default === true)
 
 export default CATEGORIES

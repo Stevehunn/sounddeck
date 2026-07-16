@@ -4,9 +4,9 @@
  */
 export default {
   fr: {
-    myinstantsTitle: 'Découverte MyInstants',
-    myinstantsSub: 'Sons disponibles sur MyInstants',
-    myinstantsSearch: 'Rechercher sur MyInstants...',
+    myinstantsTitle: 'Découverte',
+    myinstantsSub: 'Sons disponibles',
+    myinstantsSearch: 'Rechercher',
     myinstantsSearchPlaceholder: 'Rechercher un son...',
     myinstantsAddToLibrary: 'Ajouter à la bibliothèque',
     myinstantsPreview: 'Écouter',
@@ -77,11 +77,20 @@ export default {
     category_impacts: 'Impacts',
     category_transitions: 'Transitions',
     category_new: 'Nouveautés',
+    // Éditeur de catégories
+    myinstantsCategoryEditor: 'Personnaliser les catégories',
+    myinstantsCategoryEditorDesc: 'Choisissez les catégories affichées par défaut',
+    myinstantsCategoryEditorSave: 'Sauvegarder',
+    myinstantsCategoryEditorReset: 'Réinitialiser',
+    myinstantsCategoryEditorSelectAll: 'Tout sélectionner',
+    myinstantsCategoryEditorDeselectAll: 'Tout désélectionner',
+    myinstantsCategoryEditorSaved: '✅ Catégories sauvegardées !',
+    myinstantsCategoryEditorResetConfirm: 'Voulez-vous vraiment réinitialiser les catégories par défaut ?',
   },
   en: {
-    myinstantsTitle: 'MyInstants Discovery',
-    myinstantsSub: 'Sounds available on MyInstants',
-    myinstantsSearch: 'Search MyInstants...',
+    myinstantsTitle: 'Discovery',
+    myinstantsSub: 'Sounds available',
+    myinstantsSearch: 'Search',
     myinstantsSearchPlaceholder: 'Search a sound...',
     myinstantsAddToLibrary: 'Add to library',
     myinstantsPreview: 'Preview',
@@ -152,11 +161,21 @@ export default {
     category_impacts: 'Impacts',
     category_transitions: 'Transitions',
     category_new: 'New',
+
+    // Category editor
+    myinstantsCategoryEditor: 'Customize categories',
+    myinstantsCategoryEditorDesc: 'Choose which categories are shown by default',
+    myinstantsCategoryEditorSave: 'Save',
+    myinstantsCategoryEditorReset: 'Reset',
+    myinstantsCategoryEditorSelectAll: 'Select all',
+    myinstantsCategoryEditorDeselectAll: 'Deselect all',
+    myinstantsCategoryEditorSaved: '✅ Categories saved!',
+    myinstantsCategoryEditorResetConfirm: 'Do you really want to reset categories to default?',
   },
   es: {
-    myinstantsTitle: 'Descubrimiento MyInstants',
-    myinstantsSub: 'Sonidos disponibles en MyInstants',
-    myinstantsSearch: 'Buscar en MyInstants...',
+    myinstantsTitle: 'Descubrimiento',
+    myinstantsSub: 'Sonidos disponibles',
+    myinstantsSearch: 'Buscar',
     myinstantsSearchPlaceholder: 'Buscar un sonido...',
     myinstantsAddToLibrary: 'Añadir a la biblioteca',
     myinstantsPreview: 'Escuchar',
@@ -227,5 +246,15 @@ export default {
     category_impacts: 'Impactos',
     category_transitions: 'Transiciones',
     category_new: 'Nuevo',
+
+    // Editor de categorías
+    myinstantsCategoryEditor: 'Personalizar categorías',
+    myinstantsCategoryEditorDesc: 'Elige las categorías que se muestran por defecto',
+    myinstantsCategoryEditorSave: 'Guardar',
+    myinstantsCategoryEditorReset: 'Restablecer',
+    myinstantsCategoryEditorSelectAll: 'Seleccionar todo',
+    myinstantsCategoryEditorDeselectAll: 'Deseleccionar todo',
+    myinstantsCategoryEditorSaved: '✅ ¡Categorías guardadas!',
+    myinstantsCategoryEditorResetConfirm: '¿Realmente quieres restablecer las categorías por defecto?',
   }
 }
