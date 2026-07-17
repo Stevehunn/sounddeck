@@ -1216,6 +1216,49 @@ export const TRANSLATIONS = {
     audioDiscordGuideStep3Device: 'CABLE Output (VB-Audio Virtual Cable)',
     audioDiscordGuideStep3b: 'ou "SoundDeck Audio" si disponible',
     audioDiscordGuideLocalWarning: 'Mode Local actif : Discord n\'entendra pas les sons. Passez en mode Discord pour les partager.',
+
+    integrations: 'Intégrations',
+    advancedOptions: 'Options avancées',
+    advancedAudioOptions: 'Options audio avancées',
+
+    // Monitoring
+    monitoring: "S'entendre",
+    monitoringDesc: 'Écouter son micro dans les haut-parleurs (volume réduit)',
+    monitoringEnabled: '🎤 Monitoring activé (vous vous entendez)',
+    monitoringDisabled: '🔇 Monitoring désactivé',
+    monitoringWarning: 'Monitoring actif : vous entendez votre micro dans les haut-parleurs',
+
+    // Collapse
+    collapseHide: 'Masquer',
+    collapseShow: 'Afficher',
+
+    // Plugins
+    pluginsInstalledTitle: 'Plugins installés',
+    pluginsNoPluginsInstalled: 'Aucun plugin installé',
+    pluginsInstallDesc2: 'Installez des plugins pour ajouter des fonctionnalités à SoundDeck',
+    pluginsUnknownAuthor: 'Inconnu',
+    pluginsCount: 'plugin(s)',
+    pluginsWhereToFind: 'Où trouver des plugins ?',
+    pluginsDescription: 'Les plugins sont des fichiers .sdplugin (ZIP) contenant le code et les ressources nécessaires.',
+    pluginsCommunityTip: '💡 Vous pouvez créer vos propres plugins ou les télécharger depuis la communauté.',
+    pluginsReloadTooltip: 'Recharger le plugin',
+    pluginsUninstallTooltip: 'Désinstaller le plugin',
+
+    // Microphone test
+    micTestStopped: 'Test micro arrêté',
+    micTestInProgress: 'Test micro en cours (3 secondes)...',
+    micTestFinished: 'Test micro terminé',
+    micTesting: 'Test en cours...',
+
+    // Guide
+    guideAvailable: 'Guides disponibles :',
+    guideAvailableTip: 'Des guides sont également disponibles sur chaque page de l\'application.',
+
+    // Keyboard
+    keyboardLayoutChanged: 'Disposition changée',
+
+    // Error logs
+    noErrorLogs: 'Aucun log d\'erreur',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2416,6 +2459,49 @@ export const TRANSLATIONS = {
     audioDiscordGuideStep3Device: 'CABLE Output (VB-Audio Virtual Cable)',
     audioDiscordGuideStep3b: 'or "SoundDeck Audio" if available',
     audioDiscordGuideLocalWarning: 'Local mode active: Discord won\'t hear sounds. Switch to Discord mode to share them.',
+
+    integrations: 'Integrations',
+    advancedOptions: 'Advanced Options',
+    advancedAudioOptions: 'Advanced audio options',
+
+    // Monitoring
+    monitoring: "Self-hear",
+    monitoringDesc: 'Hear your microphone in speakers (reduced volume)',
+    monitoringEnabled: '🎤 Monitoring enabled (you hear yourself)',
+    monitoringDisabled: '🔇 Monitoring disabled',
+    monitoringWarning: 'Monitoring active: you hear your microphone in speakers',
+
+    // Collapse
+    collapseHide: 'Hide',
+    collapseShow: 'Show',
+
+    // Plugins
+    pluginsInstalledTitle: 'Installed plugins',
+    pluginsNoPluginsInstalled: 'No plugins installed',
+    pluginsInstallDesc2: 'Install plugins to add features to SoundDeck',
+    pluginsUnknownAuthor: 'Unknown',
+    pluginsCount: 'plugin(s)',
+    pluginsWhereToFind: 'Where to find plugins?',
+    pluginsDescription: 'Plugins are .sdplugin files (ZIP) containing the code and necessary resources.',
+    pluginsCommunityTip: '💡 You can create your own plugins or download them from the community.',
+    pluginsReloadTooltip: 'Reload plugin',
+    pluginsUninstallTooltip: 'Uninstall plugin',
+
+    // Microphone test
+    micTestStopped: 'Microphone test stopped',
+    micTestInProgress: 'Microphone test in progress (3 seconds)...',
+    micTestFinished: 'Microphone test finished',
+    micTesting: 'Testing...',
+
+    // Guide
+    guideAvailable: 'Available guides:',
+    guideAvailableTip: 'Guides are also available on every page of the application.',
+
+    // Keyboard
+    keyboardLayoutChanged: 'Layout changed',
+
+    // Error logs
+    noErrorLogs: 'No error logs',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -3585,6 +3671,49 @@ export const TRANSLATIONS = {
     audioDiscordGuideStep3Device: 'CABLE Output (VB-Audio Virtual Cable)',
     audioDiscordGuideStep3b: 'o "SoundDeck Audio" si está disponible',
     audioDiscordGuideLocalWarning: 'Modo Local activo: Discord no escuchará los sonidos. Cambia al modo Discord para compartirlos.',
+
+    integrations: 'Integraciones',
+    advancedOptions: 'Opciones avanzadas',
+    advancedAudioOptions: 'Opciones de audio avanzadas',
+
+    // Monitoring
+    monitoring: "Escucharse",
+    monitoringDesc: 'Escuchar tu micrófono en los altavoces (volumen reducido)',
+    monitoringEnabled: '🎤 Monitoreo activado (te escuchas a ti mismo)',
+    monitoringDisabled: '🔇 Monitoreo desactivado',
+    monitoringWarning: 'Monitoreo activo: escuchas tu micrófono en los altavoces',
+
+    // Collapse
+    collapseHide: 'Ocultar',
+    collapseShow: 'Mostrar',
+
+    // Plugins
+    pluginsInstalledTitle: 'Plugins instalados',
+    pluginsNoPluginsInstalled: 'No hay plugins instalados',
+    pluginsInstallDesc2: 'Instala plugins para añadir funciones a SoundDeck',
+    pluginsUnknownAuthor: 'Desconocido',
+    pluginsCount: 'plugin(s)',
+    pluginsWhereToFind: '¿Dónde encontrar plugins?',
+    pluginsDescription: 'Los plugins son archivos .sdplugin (ZIP) que contienen el código y los recursos necesarios.',
+    pluginsCommunityTip: '💡 Puedes crear tus propios plugins o descargarlos de la comunidad.',
+    pluginsReloadTooltip: 'Recargar plugin',
+    pluginsUninstallTooltip: 'Desinstalar plugin',
+
+    // Microphone test
+    micTestStopped: 'Prueba de micrófono detenida',
+    micTestInProgress: 'Prueba de micrófono en curso (3 segundos)...',
+    micTestFinished: 'Prueba de micrófono finalizada',
+    micTesting: 'Probando...',
+
+    // Guide
+    guideAvailable: 'Guías disponibles:',
+    guideAvailableTip: 'También hay guías disponibles en cada página de la aplicación.',
+
+    // Keyboard
+    keyboardLayoutChanged: 'Distribución cambiada',
+
+    // Error logs
+    noErrorLogs: 'Sin registros de error',
   },
 }
 

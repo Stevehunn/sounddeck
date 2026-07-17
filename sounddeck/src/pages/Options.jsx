@@ -56,6 +56,7 @@ Section.displayName = 'Section'
 
 function CollapsibleSection({ title, icon, children, defaultOpen = false }) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
+  const tr = useTranslation('fr')
   
   return (
     <div style={{
@@ -90,7 +91,7 @@ function CollapsibleSection({ title, icon, children, defaultOpen = false }) {
           </span>
         </span>
         <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 400 }}>
-          {isOpen ? 'Masquer' : 'Afficher'}
+          {isOpen ? tr('collapseHide') : tr('collapseShow')}
         </span>
       </button>
       {isOpen && (
@@ -232,6 +233,24 @@ export default function Options({ store, addToast, lang = 'fr' }) {
     }
   }, [])
 
+  useEffect(() => {
+    const syncMixer = async () => {
+      try {
+        const { isMixerActive, stopMixer } = await import('../utils/audioMixer')
+        const isActive = isMixerActive()
+        
+        if (!store.mixerEnabled && isActive) {
+          await stopMixer()
+          addToast('🔄 Mixeur resynchronisé', 'info')
+        }
+      } catch (e) {
+        // Silencieux
+      }
+    }
+    
+    syncMixer()
+  }, [])
+
   const scrollToSection = (sectionId) => {
     const ref = sectionRefs.current[sectionId]
     if (ref) {
@@ -312,13 +331,13 @@ export default function Options({ store, addToast, lang = 'fr' }) {
       micTestRef.current.stop()
       micTestRef.current = null
       setIsMicrophoneTesting(false)
-      addToast('🔇 Test micro arrêté', 'info')
+      addToast('🔇 ' + tr('micTestStopped'), 'info')
       return
     }
 
     try {
       setIsMicrophoneTesting(true)
-      addToast('🎤 Test micro en cours (3 secondes)...', 'info')
+      addToast('🎤 ' + tr('micTestInProgress'), 'info')
       
       const deviceId = store.microphoneDevice || 'default'
       const result = await testMicrophoneOnce(deviceId)
@@ -330,24 +349,24 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           context: result.context
         }
         
-        addToast(`✅ Micro "${result.deviceName}" fonctionne !`, 'success')
+        addToast(`✅ ${tr('microphoneConnected')}`, 'success')
         
         setTimeout(() => {
           if (micTestRef.current) {
             micTestRef.current.stop()
             micTestRef.current = null
             setIsMicrophoneTesting(false)
-            addToast('🔇 Test micro terminé', 'info')
+            addToast('🔇 ' + tr('micTestFinished'), 'info')
           }
         }, 3000)
         
       } else {
         setIsMicrophoneTesting(false)
-        addToast(`❌ Erreur: ${result.error || 'Micro non accessible'}`, 'error')
+        addToast(`❌ ${tr('microphoneTestError')}: ${result.error || tr('microphoneNotConnected')}`, 'error')
       }
     } catch (e) {
       setIsMicrophoneTesting(false)
-      addToast('❌ Erreur lors du test: ' + e.message, 'error')
+      addToast('❌ ' + tr('error') + ': ' + e.message, 'error')
     }
   }
 
@@ -374,6 +393,23 @@ export default function Options({ store, addToast, lang = 'fr' }) {
     await window.electronAPI.storeDelete('errorLogs')
     addToast(tr('logsCleared'), 'info')
   }, [confirm, tr, addToast])
+
+  const handlePluginUninstall = useCallback(async (plugin) => {
+    const confirmed = await confirm({
+      title: tr('pluginsUninstall'),
+      message: tr('pluginsUninstallConfirm').replace('{name}', plugin.name),
+      type: 'danger'
+    })
+    if (!confirmed) return
+    
+    const result = await window.electronAPI.uninstallPlugin?.(plugin.id)
+    if (result?.success) {
+      addToast(tr('pluginsUninstallSuccess').replace('{name}', plugin.name), 'info')
+      await loadPlugins()
+    } else {
+      addToast(tr('pluginsUninstallError') + ': ' + (result?.error || ''), 'error')
+    }
+  }, [confirm, tr, addToast, loadPlugins])
 
   // ─── RENDU ──────────────────────────────────────────────────────────────────
 
@@ -605,7 +641,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         </Section>
 
         {/* ============================ */}
-        {/* SECTION 2 : AUDIO - SIMPLIFIÉE */}
+        {/* SECTION 2 : AUDIO */}
         {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['audio'] = el}
@@ -727,6 +763,18 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             }} />
           </OptionRow>
 
+          <OptionRow label={tr('lowLatencyMode')} sub={tr('lowLatencyModeDesc')}>
+            <Toggle 
+              value={store.lowLatencyMode || false} 
+              onChange={async (val) => {
+                await store.updateLowLatencyMode(val)
+                const { setLowLatencyMode } = await import('../utils/audioMixer')
+                setLowLatencyMode(val)
+                addToast(val ? tr('lowLatencyActivated') : tr('lowLatencyDeactivated'), 'info')
+              }} 
+            />
+          </OptionRow>
+
           {store.mixerEnabled && (
             <>
               {/* Microphone */}
@@ -775,13 +823,13 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                   style={{ width: 140, accentColor: 'var(--accent)' }} />
               </OptionRow>
 
-              {/* Monitoring (s'entendre) */}
-              <OptionRow label="S'entendre" sub="Écouter son micro dans les haut-parleurs (volume réduit)">
+              {/* Monitoring */}
+              <OptionRow label={tr('monitoring')} sub={tr('monitoringDesc')}>
                 <Toggle 
                   value={store.monitoringEnabled || false} 
                   onChange={async (val) => {
                     await store.toggleMonitoring()
-                    addToast(val ? '🎤 Monitoring activé (vous vous entendez)' : '🔇 Monitoring désactivé', 'info')
+                    addToast(val ? tr('monitoringEnabled') : tr('monitoringDisabled'), 'info')
                   }} 
                 />
               </OptionRow>
@@ -803,7 +851,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 >
                   <i className={`ti ${isMicrophoneTesting ? 'ti-microphone-2' : 'ti-mic'}`} 
                     style={isMicrophoneTesting ? { animation: 'pulse 0.6s ease infinite' } : {}} />
-                  {isMicrophoneTesting ? 'Test en cours...' : tr('test')}
+                  {isMicrophoneTesting ? tr('micTesting') : tr('test')}
                 </button>
               </OptionRow>
 
@@ -822,7 +870,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 <br />
                 {store.monitoringEnabled && (
                   <span style={{ color: 'var(--warning)', fontSize: 10 }}>
-                    ⚠️ Monitoring actif : vous entendez votre micro dans les haut-parleurs
+                    ⚠️ {tr('monitoringWarning')}
                   </span>
                 )}
                 <span style={{ fontSize: 10 }}>
@@ -834,23 +882,10 @@ export default function Options({ store, addToast, lang = 'fr' }) {
 
           {/* ─── SECTION AVANCÉE RÉDUCTIBLE ────────────────────────────────── */}
           <CollapsibleSection 
-            title="Options audio avancées" 
+            title={tr('advancedAudioOptions')} 
             icon="ti-settings"
             defaultOpen={advancedAudioOpen}
           >
-            {/* Mode basse latence */}
-            <OptionRow label={tr('lowLatencyMode')} sub={tr('lowLatencyModeDesc')}>
-              <Toggle 
-                value={store.lowLatencyMode || false} 
-                onChange={async (val) => {
-                  await store.updateLowLatencyMode(val)
-                  const { setLowLatencyMode } = await import('../utils/audioMixer')
-                  setLowLatencyMode(val)
-                  addToast(val ? tr('lowLatencyActivated') : tr('lowLatencyDeactivated'), 'info')
-                }} 
-              />
-            </OptionRow>
-
             {/* Réduction de bruit */}
             <OptionRow label={tr('noiseSuppressionMode')} sub={tr('noiseSuppressionModeDesc')}>
               <select 
@@ -882,20 +917,20 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               marginTop: 4 
             }}>
               <i className="ti ti-info-circle" style={{ marginRight: 6, color: 'var(--accent)' }} />
-              <strong>Mode Avancé</strong> : Utilise VB-Cable + VoiceMeeter Banana pour un mixage professionnel.
+              <strong>{tr('advancedMode')}</strong> : {tr('advancedModeDesc')}
               <br />
               <button onClick={() => window.electronAPI?.openExternal('https://vb-audio.com/Cable/')}
                 style={{ color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer', marginTop: 4, display: 'inline-block', fontSize: 12, padding: 0 }}>
-                <i className="ti ti-download" /> Télécharger VB-Cable
+                <i className="ti ti-download" /> {tr('downloadVBCable')}
               </button>
               <br />
               <button onClick={() => window.electronAPI?.openExternal('https://vb-audio.com/Voicemeeter/banana.htm')}
                 style={{ color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer', marginTop: 2, display: 'inline-block', fontSize: 12, padding: 0 }}>
-                <i className="ti ti-download" /> Télécharger VoiceMeeter
+                <i className="ti ti-download" /> {tr('downloadVoiceMeeter')}
               </button>
               <br />
               <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                💡 Consulte le guide Discord pour la configuration.
+                💡 {tr('advancedModeTip')}
               </span>
             </div>
           </CollapsibleSection>
@@ -945,14 +980,14 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             border: '1px solid var(--border)'
           }}>
             <i className="ti ti-info-circle" style={{ marginRight: 6, color: 'var(--accent)' }} />
-            <strong>Guides disponibles :</strong>
+            <strong>{tr('guideAvailable')}</strong>
             <br />
-            • <strong>Tutoriel de base</strong> : Revoyez les bases de SoundDeck étape par étape
+            • <strong>{tr('tutorialRestart')}</strong> : {tr('tutorialRestartDesc')}
             <br />
-            • <strong>Tutoriel avancé</strong> : Découvrez toutes les fonctionnalités avancées
+            • <strong>{tr('tutorialAdvanced')}</strong> : {tr('tutorialAdvancedDesc')}
             <br />
             <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-              💡 Des guides sont également disponibles sur chaque page de l'application.
+              💡 {tr('guideAvailableTip')}
             </span>
           </div>
         </Section>
@@ -972,7 +1007,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               onChange={async (e) => {
                 const layout = e.target.value
                 await store.updateKeyboardLayout(layout)
-                addToast(`Disposition: ${layout === 'azerty' ? 'AZERTY' : 'QWERTY'}`, 'info')
+                addToast(`${tr('keyboardLayoutChanged')}: ${layout === 'azerty' ? 'AZERTY' : 'QWERTY'}`, 'info')
               }}
               style={{ width: 140, fontSize: 12 }}
             >
@@ -1268,8 +1303,8 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 display: 'flex',
                 justifyContent: 'space-between'
               }}>
-                <span>Plugins installés</span>
-                <span>{plugins.length} plugin(s)</span>
+                <span>{tr('pluginsInstalledTitle')}</span>
+                <span>{plugins.length} {tr('pluginsCount')}</span>
               </div>
 
               {plugins.length === 0 && (
@@ -1280,10 +1315,10 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                   fontSize: 13
                 }}>
                   <i className="ti ti-puzzle" style={{ fontSize: 24, display: 'block', marginBottom: 8 }} />
-                  Aucun plugin installé
+                  {tr('pluginsNoPluginsInstalled')}
                   <br />
                   <span style={{ fontSize: 11 }}>
-                    Installez des plugins pour ajouter des fonctionnalités à SoundDeck
+                    {tr('pluginsInstallDesc2')}
                   </span>
                 </div>
               )}
@@ -1332,11 +1367,11 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                         gap: 12,
                         alignItems: 'center'
                       }}>
-                        <span>par {plugin.author || 'Inconnu'}</span>
+                        <span>{tr('pluginsBy')} {plugin.author || tr('pluginsUnknownAuthor')}</span>
                         {plugin.pages > 0 && (
                           <span>
                             <i className="ti ti-files" style={{ fontSize: 10 }} />
-                            {plugin.pages} page(s)
+                            {plugin.pages} {tr('pluginsPages')}
                           </span>
                         )}
                         <span style={{ 
@@ -1346,7 +1381,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                           padding: '1px 8px',
                           borderRadius: 10
                         }}>
-                          <i className="ti ti-check" /> Activé
+                          <i className="ti ti-check" /> {tr('pluginsActivated')}
                         </span>
                       </div>
                     </div>
@@ -1363,29 +1398,19 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                         padding: '4px 8px',
                         color: 'var(--text-tertiary)'
                       }}
-                      title="Recharger le plugin"
+                      title={tr('pluginsReloadTooltip')}
                     >
                       <i className="ti ti-refresh" />
                     </button>
                     <button 
                       className="btn-danger btn-sm"
-                      onClick={async () => {
-                        if (confirm(`Voulez-vous vraiment désinstaller le plugin "${plugin.name}" ?`)) {
-                          const result = await window.electronAPI.uninstallPlugin?.(plugin.id)
-                          if (result?.success) {
-                            addToast(`Plugin "${plugin.name}" désinstallé`, 'info')
-                            window.location.reload()
-                          } else {
-                            addToast(`Erreur: ${result?.error || 'Échec de la désinstallation'}`, 'error')
-                          }
-                        }
-                      }}
+                      onClick={() => handlePluginUninstall(plugin)}
                       style={{ 
                         fontSize: 11, 
                         padding: '4px 8px',
                         color: 'var(--danger)'
                       }}
-                      title="Désinstaller le plugin"
+                      title={tr('pluginsUninstallTooltip')}
                     >
                       <i className="ti ti-trash" />
                     </button>
@@ -1405,17 +1430,12 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               border: '1px solid var(--border)'
             }}>
               <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
-              <strong>Où trouver des plugins ?</strong>
+              <strong>{tr('pluginsWhereToFind')}</strong>
               <br />
-              Les plugins sont des fichiers <code style={{ 
-                background: 'var(--bg-secondary)', 
-                padding: '1px 6px', 
-                borderRadius: 3,
-                fontSize: 10
-              }}>.sdplugin</code> qui ajoutent des fonctionnalités à SoundDeck.
+              {tr('pluginsDescription')}
               <br />
               <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
-                💡 Vous pouvez créer vos propres plugins ou les télécharger depuis la communauté.
+                {tr('pluginsCommunityTip')}
               </span>
             </div>
           </div>
@@ -1451,7 +1471,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         <Section 
           ref={el => sectionRefs.current['advanced'] = el}
           id="advanced"
-          title="Avancé" 
+          title={tr('advancedOptions')} 
           icon="ti-gauge"
         >
           {/* Compression à l'import */}
@@ -1477,7 +1497,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               >
                 <option value="64">64 kbps</option>
                 <option value="96">96 kbps</option>
-                <option value="128">128 kbps (recommandé)</option>
+                <option value="128">128 kbps {tr('compressionBitrateRecommended')}</option>
                 <option value="192">192 kbps</option>
                 <option value="256">256 kbps</option>
               </select>
@@ -1494,7 +1514,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 onClick={async () => {
                   const logs = await window.electronAPI.storeGet('errorLogs') || []
                   if (logs.length === 0) {
-                    addToast('Aucun log d\'erreur', 'info')
+                    addToast(tr('noErrorLogs'), 'info')
                   } else {
                     const json = JSON.stringify(logs, null, 2)
                     const blob = new Blob([json], { type: 'application/json' })

@@ -113,10 +113,17 @@ export function useStore() {
     setEditorLoopRegionState({ enabled: false, start: 0, end: 0 })
   }, [])
 
+  // ─── Sauvegarde automatique ───────────────────────────────────────────────────
+  const save = useCallback(async (key, value) => {
+    await window.electronAPI.storeSet(key, value)
+  }, [])
+
   // ─── CHARGEMENT INITIAL ──────────────────────────────────────────────────
 
   useEffect(() => {
     async function loadData() {
+      let savedMixerEnabled = false
+
       try {
         const savedProfiles = await window.electronAPI.storeGet('profiles') || []
         const savedSounds = (await window.electronAPI.storeGet('sounds') || []).map(s => {
@@ -154,14 +161,14 @@ export function useStore() {
         setStartMinimized(savedStartMinimized)
         setLaunchAtStartup(savedLaunchAtStartup)
 
-        // ✅ Supprimer la référence à AUDIO_MODES
         const savedAudioMode = await window.electronAPI.storeGet('audioMode') || 'integrated'
         const savedVirtualDriverInstalled = await window.electronAPI.storeGet('virtualDriverInstalled') || false
         const savedVirtualDeviceActive = await window.electronAPI.storeGet('virtualDeviceActive') ?? false
         setVirtualDriverInstalled(savedVirtualDriverInstalled)
         setVirtualDeviceActive(savedVirtualDeviceActive)
 
-        const savedMixerEnabled = await window.electronAPI.storeGet('mixerEnabled') ?? false
+        // ✅ STOCKER LA VALEUR DANS LA VARIABLE DÉCLARÉE PLUS HAUT
+        savedMixerEnabled = await window.electronAPI.storeGet('mixerEnabled') ?? false
         const savedMicrophoneDevice = await window.electronAPI.storeGet('microphoneDevice') || 'default'
         const savedMicrophoneVolume = await window.electronAPI.storeGet('microphoneVolume') ?? 80
         const savedMixerSoundVolume = await window.electronAPI.storeGet('mixerSoundVolume') ?? 100
@@ -392,15 +399,23 @@ export function useStore() {
         setProfiles([{ id: 'all', name: 'Tous les sons', isDefault: true }])
         setCurrentProfileId('all')
       } finally {
-        setLoading(false)
-      }
-    }
-    loadData()
-  }, [])
+        // ✅ VÉRIFICATION FINALE: Synchronisation du mixeur
+        try {
+        const { getMixerFullState, isMixerActive, stopMixer } = await import('../utils/audioMixer')
+        const fullState = getMixerFullState()
+        const isActive = isMixerActive()
+        
+        if (!savedMixerEnabled && isActive) {
+          await stopMixer()
+        } else if (savedMixerEnabled && !isActive) {
+          // On va laisser initMixerOnStartup le gérer
+        }
+      } catch (e) {}
 
-  // ─── Sauvegarde automatique ───────────────────────────────────────────────────
-  const save = useCallback(async (key, value) => {
-    await window.electronAPI.storeSet(key, value)
+      setLoading(false)
+    }
+  }
+  loadData()
   }, [])
 
   // ─── HISTORIQUE UNDO/REDO DE L'ÉDITEUR ──────────────────────────────────────
@@ -981,48 +996,44 @@ export function useStore() {
 
   // ─── MIXEUR ──────────────────────────────────────────────────────────────────
   const updateMixerEnabled = useCallback(async (enabled) => {
-  console.log('💾 Sauvegarde mixerEnabled:', enabled)
-  setMixerEnabled(enabled)
-  await save('mixerEnabled', enabled)
-  
-  if (enabled) {
-    try {
-      const { initAudioMixer, resumeAudioContext, setStoreRef } = await import('../utils/audioMixer')
-      
-      setStoreRef({
-        playLocally: playLocally,
-        monitoringEnabled: monitoringEnabled,
-        audioDevice: audioDevice,
-        mixerSoundVolume: mixerSoundVolume,
-        localAudioDevice: localAudioDevice
-      })
-      
-      console.log('📊 Périphérique de sortie pour le mixeur:', audioDevice)
-      const mixedStream = await initAudioMixer(microphoneDevice || 'default', audioDevice || 'default')
-      
-      if (mixedStream) {
-        resumeAudioContext()
-        console.log('✅ Mixeur activé avec succès')
-        return { success: true, message: 'mixerActivated' }
-      } else {
-        console.warn('⚠️ Échec de l\'activation du mixeur')
+    setMixerEnabled(enabled)
+    await save('mixerEnabled', enabled)
+    
+    if (enabled) {
+      try {
+        const { initAudioMixer, resumeAudioContext, setStoreRef } = await import('../utils/audioMixer')
+        
+        setStoreRef({
+          playLocally: playLocally,
+          monitoringEnabled: monitoringEnabled,
+          audioDevice: audioDevice,
+          mixerSoundVolume: mixerSoundVolume,
+          localAudioDevice: localAudioDevice,
+          mixerEnabled: true
+        })
+        
+        const mixedStream = await initAudioMixer(microphoneDevice || 'default', audioDevice || 'default')
+        
+        if (mixedStream) {
+          resumeAudioContext()
+          return { success: true, message: 'mixerActivated' }
+        } else {
+          setMixerEnabled(false)
+          await save('mixerEnabled', false)
+          return { success: false, message: 'mixerActivationError' }
+        }
+      } catch (e) {
+        console.error('Erreur activation mixeur:', e)
         setMixerEnabled(false)
         await save('mixerEnabled', false)
-        return { success: false, message: 'mixerActivationError' }
+        return { success: false, message: 'error', error: e.message }
       }
-    } catch (e) {
-      console.error('Erreur activation mixeur:', e)
-      setMixerEnabled(false)
-      await save('mixerEnabled', false)
-      return { success: false, message: 'error', error: e.message }
+    } else {
+      const { stopMixer } = await import('../utils/audioMixer')
+      await stopMixer()
+      return { success: true, message: 'mixerDeactivated' }
     }
-  } else {
-    const { stopMixer } = await import('../utils/audioMixer')
-    await stopMixer()
-    console.log('🔇 Mixeur désactivé')
-    return { success: true, message: 'mixerDeactivated' }
-  }
-}, [save, microphoneDevice, audioDevice, playLocally, monitoringEnabled, mixerSoundVolume, localAudioDevice])
+  }, [save, microphoneDevice, audioDevice, playLocally, monitoringEnabled, mixerSoundVolume, localAudioDevice])
 
   const updateMicrophoneDevice = useCallback(async (deviceId) => {
     setMicrophoneDevice(deviceId)
@@ -1054,81 +1065,71 @@ export function useStore() {
     await save('noiseSuppressionMode', mode)
   }, [save])
 
+  // Dans la fonction initMixerOnStartup - REMPLACER complètement
   const initMixerOnStartup = useCallback(async () => {
-    if (!mixerEnabled) {
-      console.log('ℹ️ Mixeur désactivé, pas d\'initialisation automatique')
-      return true
-    }
-
     try {
-      console.log('🎛️ Initialisation automatique du mixeur au démarrage...')
-      console.log('📊 État du mixeur au démarrage:', {
-        mixerEnabled,
-        microphoneDevice,
-        audioDevice,
-        noiseSuppressionMode
+      const { getMixerFullState, isMixerActive, stopMixer, initAudioMixer, resumeAudioContext, connectMixerToOutput, setNoiseSuppressionMode, setStoreRef } = await import('../utils/audioMixer')
+      
+      setStoreRef({
+        playLocally: playLocally,
+        monitoringEnabled: monitoringEnabled,
+        audioDevice: audioDevice,
+        mixerSoundVolume: mixerSoundVolume,
+        localAudioDevice: localAudioDevice,
+        mixerEnabled: mixerEnabled
       })
-
-      const {
-        initAudioMixer,
-        resumeAudioContext,
-        connectMixerToOutput,
-        setNoiseSuppressionMode,
-        isMixerOperational,
-        repairMixer
-      } = await import('../utils/audioMixer')
-
-      if (isMixerOperational()) {
-        console.log('✅ Mixeur déjà opérationnel')
+      
+      const fullState = getMixerFullState()
+      const isActive = isMixerActive()
+      
+      if (!mixerEnabled && isActive) {
+        await stopMixer()
         return true
       }
-
-      const repaired = repairMixer()
-      if (repaired && isMixerOperational()) {
-        console.log('✅ Mixeur réparé avec succès')
-        return true
-      }
-
-      const mixedStream = await initAudioMixer(microphoneDevice || 'default')
-
-      if (mixedStream) {
-        resumeAudioContext()
-        connectMixerToOutput(audioDevice || 'default')
-
-        if (noiseSuppressionMode && noiseSuppressionMode !== 'off') {
-          try {
-            setNoiseSuppressionMode(noiseSuppressionMode)
-            console.log(`🔇 Mode réduction de bruit appliqué: ${noiseSuppressionMode}`)
-          } catch (e) {
-            console.warn('⚠️ Erreur lors de l\'application du mode de réduction de bruit:', e)
+      
+      if (mixerEnabled && !isActive) {
+        const mixedStream = await initAudioMixer(microphoneDevice || 'default', audioDevice || 'default')
+        
+        if (mixedStream) {
+          resumeAudioContext()
+          connectMixerToOutput(audioDevice || 'default')
+          
+          if (noiseSuppressionMode && noiseSuppressionMode !== 'off') {
+            try {
+              setNoiseSuppressionMode(noiseSuppressionMode)
+            } catch (e) {}
           }
+          
+          return true
+        } else {
+          setMixerEnabled(false)
+          await save('mixerEnabled', false)
+          return false
         }
-
-        console.log('✅ Mixeur initialisé automatiquement avec succès')
-        return true
-      } else {
-        console.warn('⚠️ Échec de l\'initialisation automatique du mixeur')
-        setMixerEnabled(false)
-        await save('mixerEnabled', false)
-        return false
       }
+      
+      return true
+      
     } catch (e) {
-      console.error('❌ Erreur lors de l\'initialisation automatique du mixeur:', e)
+      try {
+        const { stopMixer } = await import('../utils/audioMixer')
+        await stopMixer()
+      } catch (_) {}
       setMixerEnabled(false)
       await save('mixerEnabled', false)
       return false
     }
-  }, [mixerEnabled, microphoneDevice, audioDevice, noiseSuppressionMode, save])
+  }, [mixerEnabled, microphoneDevice, audioDevice, noiseSuppressionMode, save, playLocally, monitoringEnabled, mixerSoundVolume, localAudioDevice])
 
-  const updateMicrophoneDeviceId = useCallback(async (deviceId) => {
-    if (deviceId && deviceId !== 'default') {
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices()
-        const audioInputs = devices.filter(d => d.kind === 'audioinput')
-        const deviceExists = audioInputs.some(d => d.deviceId === deviceId)
+    const updateMicrophoneDeviceId = useCallback(async (deviceId) => {
+      if (deviceId && deviceId !== 'default') {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices()
+          const audioInputs = devices.filter(d => d.kind === 'audioinput')
+          const deviceExists = audioInputs.some(d => d.deviceId === deviceId)
 
-        if (!deviceExists) {
-          console.warn(`⚠️ Périphérique ${deviceId} non trouvé, utilisation du périphérique par défaut`)
+          if (!deviceExists) {
+            console.warn(`⚠️ Périphérique ${deviceId} non trouvé, utilisation du périphérique par défaut`)
           deviceId = 'default'
         }
       } catch (e) {

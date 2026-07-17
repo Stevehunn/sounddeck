@@ -179,7 +179,7 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
   }
 }
 
-// ─── Mode Mixeur (VB-Cable) ────────────────────────────────────────────────
+// ─── Mode Mixeur (VB-Cable) - OPTIMISÉ ────────────────────────────────────
 
 async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true) {
   const soundVolumeDb = sound.volumeDb ?? sound.volume ?? 0
@@ -197,25 +197,21 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
     return
   }
   
+  // ✅ OPTIMISATION : Chargement avec préfetch
   const audioBuffer = await loadAudioBuffer(fileUrl)
   if (!audioBuffer) {
     console.warn('⚠️ Impossible de charger le son:', fileUrl)
     return
   }
   
-  // Jouer le son dans le mixeur (pour Discord)
+  // ✅ OPTIMISATION : Jouer le son avec un gain direct
   const source = playSoundInMixer(audioBuffer, volumeRatio)
   
   if (source) {
     soundCache[sound.id] = source
+    // ✅ OPTIMISATION : Utiliser la propriété loop du source
     if (loop) {
-      source.onended = () => {
-        if (storeRef?.loopEnabled) {
-          playSoundWithMixer(sound, globalVolume, loop, playLocally)
-        } else {
-          delete soundCache[sound.id]
-        }
-      }
+      source.loop = true
     } else {
       source.onended = () => {
         delete soundCache[sound.id]
@@ -223,6 +219,7 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
     }
   }
   
+  // ✅ Jouer aussi en local si playLocally est activé OU monitoring activé
   const shouldPlayLocally = playLocally || storeRef?.monitoringEnabled || false
   
   if (shouldPlayLocally) {
