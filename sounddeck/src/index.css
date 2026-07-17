@@ -1663,3 +1663,283 @@ body.focus-mode .sound-grid {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* ─── ÉDITEUR AVANCÉ ─────────────────────────────────────────────────────────── */
+
+/* En-tête de piste - réorganisation */
+.editor-track-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  padding: 4px 6px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+}
+
+.editor-track-header .drag-handle {
+  cursor: grab;
+  color: var(--text-tertiary);
+  writing-mode: vertical-lr;
+  padding: 0 2px;
+  user-select: none;
+  display: flex;
+  align-items: center;
+}
+
+.editor-track-header .drag-handle:active {
+  cursor: grabbing;
+}
+
+.editor-track-header .color-bar {
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+.editor-track-header .volume-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 50px;
+}
+
+.editor-track-header .volume-control input[type="range"] {
+  flex: 1;
+  accent-color: var(--text-tertiary);
+  height: 4px;
+  min-width: 30px;
+  cursor: pointer;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.editor-track-header .volume-control input[type="range"]::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+}
+
+.editor-track-header .track-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.editor-track-header .track-actions button {
+  width: 20px;
+  min-height: 16px;
+  padding: 1px 4px;
+  font-size: 8px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.editor-track-header .track-actions button:hover {
+  background: var(--bg-hover);
+}
+
+.editor-track-header .track-actions button.muted {
+  border-color: var(--danger);
+  background: rgba(224, 82, 82, 0.2);
+  color: var(--danger);
+}
+
+.editor-track-header .track-actions button.solo {
+  border-color: var(--success);
+  background: rgba(29, 158, 117, 0.2);
+  color: var(--success);
+}
+
+.editor-track-header .track-name {
+  font-size: 6px;
+  color: var(--text-tertiary);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40px;
+  margin-top: 1px;
+}
+
+/* Clips dans l'éditeur */
+.editor-clip-wrapper {
+  pointer-events: auto;
+  position: relative;
+}
+
+.editor-clip-wrapper .clip-actions {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  display: none;
+  gap: 2px;
+  z-index: 6;
+  flex-wrap: wrap;
+}
+
+.editor-clip-wrapper.selected .clip-actions {
+  display: flex;
+}
+
+.editor-clip-wrapper .clip-actions button {
+  padding: 1px 4px;
+  font-size: 9px;
+  border: none;
+  border-radius: 2px;
+  color: white;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.6);
+  transition: all 0.15s;
+}
+
+.editor-clip-wrapper .clip-actions button:hover {
+  transform: scale(1.1);
+}
+
+.editor-clip-wrapper .clip-actions button.danger {
+  background: rgba(224, 82, 82, 0.8);
+}
+
+.editor-clip-wrapper .clip-actions button.success {
+  background: rgba(29, 158, 117, 0.6);
+}
+
+.editor-clip-wrapper .clip-actions button.warning {
+  background: rgba(239, 159, 39, 0.6);
+}
+
+/* Badge effets sur les clips */
+.clip-effects-badge {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 7px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  background: rgba(124, 111, 247, 0.8);
+  color: white;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Indicateur de lecture du clip */
+.clip-playing-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 7;
+  pointer-events: none;
+  border-radius: var(--radius-sm);
+}
+
+.clip-playing-overlay .icon {
+  color: white;
+  font-size: 20px;
+}
+
+/* Waveform dans les clips */
+.clip-waveform {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.clip-waveform .bar {
+  flex: 1;
+  min-width: 1px;
+  border-radius: 1px;
+  opacity: 0.7;
+  margin-right: 0.5px;
+}
+
+/* Poignées de fade */
+.clip-fade-handle {
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  cursor: ew-resize;
+  z-index: 5;
+  transition: border-width 0.1s ease;
+}
+
+.clip-fade-handle.fade-in {
+  left: 0;
+  border-color: transparent transparent rgba(0, 0, 0, 0.4) transparent;
+}
+
+.clip-fade-handle.fade-out {
+  right: 0;
+  border-color: transparent rgba(0, 0, 0, 0.4) transparent transparent;
+}
+
+/* Poignées de resize */
+.clip-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  z-index: 5;
+}
+
+.clip-resize-handle.start {
+  left: -3px;
+}
+
+.clip-resize-handle.end {
+  right: -3px;
+}
+
+/* Nom du clip dans la timeline */
+.clip-name-label {
+  position: absolute;
+  bottom: 4px;
+  left: 6px;
+  right: 6px;
+  font-size: 9px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.clip-name-label.selected {
+  color: white;
+}
+
+.clip-name-label.unselected {
+  color: var(--text-secondary);
+}
+
+/* Durée du clip */
+.clip-duration-badge {
+  margin-left: 4px;
+  opacity: 0.7;
+}

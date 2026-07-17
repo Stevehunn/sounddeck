@@ -1,16 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useTranslation } from '../i18n'
+import { useTranslation } from '../../i18n'
 import { Howl } from 'howler'
-import EditorTimeline from '../components/editor/EditorTimeline'
-import EditorToolbar from '../components/editor/EditorToolbar'
-import EditorEffectsPanel from '../components/editor/EditorEffectsPanel'
-import { generateWaveformData } from '../utils/waveformGenerator'
+import EditorTimeline from './EditorTimeline'
+import EditorToolbar from './EditorToolbar'
+import EditorEffectsPanel from './EditorEffectsPanel'
+import EditorNormalize from './EditorNormalize'
+import EditorMasterVolume from './EditorMasterVolume'
+import { generateWaveformData } from '../../utils/waveformGenerator'
+import { normalizeClip, normalizeAll } from '../../utils/normalizeUtils'
 
-// Liste d'emojis pour l'export
 const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
 
 export default function Editor({ store, addToast, lang = 'fr' }) {
   const tr = useTranslation(lang)
+  
+  // ─── ÉTATS PRINCIPAUX ──────────────────────────────────────────────────────
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -21,8 +25,31 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
   const [waveformData, setWaveformData] = useState({})
   const [clipDurations, setClipDurations] = useState({})
   const [snapEnabled, setSnapEnabled] = useState(true)
+  const [autoPlayOnClick, setAutoPlayOnClick] = useState(false) // ✅ Option jouer au clic
   
-  // État pour le modal d'export
+  // ─── ÉTATS COPIER/COLLER ──────────────────────────────────────────────────
+  const [clipboard, setClipboard] = useState({ clips: [], trackId: null, copiedAt: null })
+  
+  // ─── ÉTATS MARQUEURS ──────────────────────────────────────────────────────
+  const [markers, setMarkers] = useState([])
+  
+  // ─── ÉTATS MÉTRONOME ──────────────────────────────────────────────────────
+  const [metronomeEnabled, setMetronomeEnabled] = useState(false)
+  const [metronomeBpm, setMetronomeBpm] = useState(120)
+  
+  // ─── ÉTATS NORMALISATION ──────────────────────────────────────────────────
+  const [isNormalizing, setIsNormalizing] = useState(false)
+  
+  // ─── ÉTATS MASTER VOLUME ──────────────────────────────────────────────────
+  const [masterVolume, setMasterVolume] = useState(100)
+  const [isMasterMuted, setIsMasterMuted] = useState(false)
+  const [peakMeter, setPeakMeter] = useState(0)
+  
+  // ─── ÉTATS PRÉVISUALISATION EFFETS ────────────────────────────────────────
+  const [isPreviewingEffect, setIsPreviewingEffect] = useState(false)
+  const previewHowlRef = useRef(null)
+  
+  // ─── ÉTATS EXPORT ──────────────────────────────────────────────────────────
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportName, setExportName] = useState('')
   const [exportEmoji, setExportEmoji] = useState('🔊')
@@ -30,8 +57,10 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
   const [exportProfiles, setExportProfiles] = useState(['all'])
   const [exportAddToLibrary, setExportAddToLibrary] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
-
-  // Références
+  const [exportFormat, setExportFormat] = useState('mp3')
+  const [exportBitrate, setExportBitrate] = useState(192)
+  
+  // ─── RÉFÉRENCES ────────────────────────────────────────────────────────────
   const audioRef = useRef(null)
   const animationRef = useRef(null)
   const projectRef = useRef(store.editorProject)
@@ -42,17 +71,35 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
   const loopRegionRef = useRef(store.editorLoopRegion)
   const playAllClipsRef = useRef(null)
 
-  // ✅ Garder une ref à jour de la zone de boucle (lue dans des closures d'animation)
+  // ─── SYNC DES REFS ────────────────────────────────────────────────────────
   useEffect(() => {
     loopRegionRef.current = store.editorLoopRegion
   }, [store.editorLoopRegion])
 
-  // Mettre à jour la référence du projet
   useEffect(() => {
     projectRef.current = store.editorProject
   }, [store.editorProject])
 
-  // ✅ Calculer la durée TOTALE dynamique en fonction des clips
+  // ─── PISTE PAR DÉFAUT ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const project = store.editorProject
+    if (project && project.id && project.tracks?.length === 0) {
+      const timer = setTimeout(async () => {
+        await store.addTrack()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [store.editorProject?.id, store.editorProject?.tracks?.length])
+
+  // ─── CHARGEMENT DES MARQUEURS ─────────────────────────────────────────────
+  useEffect(() => {
+    const savedMarkers = store.editorProject?.markers || []
+    if (savedMarkers.length > 0) {
+      setMarkers(savedMarkers)
+    }
+  }, [store.editorProject?.markers])
+
+  // ─── CALCUL DE LA DURÉE TOTALE ────────────────────────────────────────────
   useEffect(() => {
     const calculateTotalDuration = async () => {
       const project = store.editorProject
@@ -63,7 +110,6 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
 
       for (const track of project.tracks) {
         for (const clip of track.clips) {
-          // Si on n'a pas encore la durée du clip, on la charge
           if (!newClipDurations[clip.id] && clip.path) {
             try {
               const fileUrl = clip.path.startsWith('file://') 
@@ -78,24 +124,20 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
                   resolve(audio.duration)
                 })
                 audio.addEventListener('error', () => {
-                  resolve(3) // Durée par défaut en cas d'erreur
+                  resolve(3)
                 })
-                // Si le chargement prend trop de temps
                 setTimeout(() => resolve(3), 3000)
               })
               
               newClipDurations[clip.id] = duration
-              // Mettre à jour la durée du clip dans le store
               if (duration > 0 && clip.duration !== duration) {
                 store.updateClip(track.id, clip.id, { duration })
               }
             } catch (e) {
-              console.warn('Erreur chargement durée:', e)
               newClipDurations[clip.id] = clip.duration || 3
             }
           }
 
-          // Calculer la fin du clip
           const clipDuration = newClipDurations[clip.id] || clip.duration || 3
           const end = clip.start + clipDuration
           if (end > maxDuration) maxDuration = end
@@ -103,15 +145,13 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       }
 
       setClipDurations(newClipDurations)
-      // Ajouter 2 secondes de marge
-      const newTotal = Math.max(maxDuration + 2, 10)
-      setTotalDuration(newTotal)
+      setTotalDuration(Math.max(maxDuration + 2, 10))
     }
 
     calculateTotalDuration()
   }, [store.editorProject?.tracks])
 
-  // Charger les waveforms des clips
+  // ─── CHARGEMENT DES WAVEFORMS ─────────────────────────────────────────────
   useEffect(() => {
     const loadWaveforms = async () => {
       const project = store.editorProject
@@ -124,9 +164,6 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         for (const clip of track.clips) {
           if (clip.path && !waveformData[clip.id]) {
             try {
-              // ✅ N'afficher que la portion du fichier qui correspond à ce clip
-              // (important pour un clip issu d'un split — sinon il affiche tout le fichier
-              // source compressé dans sa largeur, ce qui ressemble à une waveform dupliquée)
               const sliceDuration = clipDurations[clip.id] || clip.duration || null
               const data = await generateWaveformData(clip.path, 200, clip.offset || 0, sliceDuration)
               if (data) {
@@ -146,7 +183,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     loadWaveforms()
   }, [store.editorProject?.tracks])
 
-  // Nettoyer l'animation et l'audio
+  // ─── NETTOYAGE ────────────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       if (animationRef.current) {
@@ -156,7 +193,6 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         audioRef.current.stop()
         audioRef.current.unload()
       }
-      // Nettoyer tous les howls
       allHowlsRef.current.forEach(item => {
         if (item.howl) {
           if (item.howl.playing()) item.howl.stop()
@@ -164,10 +200,15 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         }
       })
       allHowlsRef.current = []
+      if (previewHowlRef.current) {
+        previewHowlRef.current.stop()
+        previewHowlRef.current.unload()
+        previewHowlRef.current = null
+      }
     }
   }, [])
 
-  // Créer un projet automatiquement si inexistant
+  // ─── CRÉATION DU PROJET ──────────────────────────────────────────────────
   useEffect(() => {
     const project = store.editorProject
     if (!project || !project.id) {
@@ -175,8 +216,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     }
   }, [])
 
-  // ─── GESTION DU PROJET ──────────────────────────────────────────────────────
-
+  // ─── GESTION DU PROJET ────────────────────────────────────────────────────
   const handleAddTrack = async () => {
     await store.addTrack()
     addToast(tr('editorTrackAdded'), 'success')
@@ -207,12 +247,31 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       start = lastClip.start + lastClip.duration + 0.5
     }
 
-    // Durée par défaut : 3 secondes, sera mise à jour après chargement
     const clip = await store.addClipToTrack(trackId, soundId, start, 3)
     if (clip) {
       addToast(`"${sound.name}" ${tr('editorClipAdded')}`, 'success')
       setSelectedClipId(clip.id)
       setSelectedTrackId(trackId)
+    }
+  }
+
+  const handleAddClipFromFile = async (trackId, filePath) => {
+    try {
+      const exists = await window.electronAPI.fileExists?.(filePath)
+      if (!exists) {
+        addToast('Fichier introuvable', 'error')
+        return
+      }
+
+      const clip = await store.addClipFromFile(trackId, filePath)
+      if (clip) {
+        addToast(`"${clip.name}" ${tr('editorClipAdded')}`, 'success')
+        setSelectedClipId(clip.id)
+        setSelectedTrackId(trackId)
+      }
+    } catch (e) {
+      console.error('Erreur ajout fichier:', e)
+      addToast('Erreur lors de l\'import du fichier', 'error')
     }
   }
 
@@ -229,11 +288,128 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     setSelectedTrackId(trackId)
   }
 
-  // ─── LECTURE CORRIGÉE ──────────────────────────────────────────────────────
+  const handleRenameProject = async (newName) => {
+    try {
+      await store.updateEditorProjectName?.(newName)
+      addToast(`Projet renommé en "${newName}"`, 'success')
+    } catch (e) {
+      console.error('Erreur renommage:', e)
+    }
+  }
 
-  // ✅ Fonction pour arrêter complètement la lecture
+  // ─── COPIER/COLLER ────────────────────────────────────────────────────────
+  const handleCopyClip = useCallback((clipId, trackId) => {
+    const track = store.editorProject.tracks.find(t => t.id === trackId)
+    if (!track) return
+    
+    const clip = track.clips.find(c => c.id === clipId)
+    if (!clip) return
+
+    const { id, ...clipData } = clip
+    setClipboard({
+      clips: [{ ...clipData }],
+      trackId: trackId,
+      copiedAt: Date.now()
+    })
+    addToast(`"${clip.name}" ${tr('editorCopied')}`, 'info')
+  }, [store.editorProject, tr, addToast])
+
+  const handleCutClip = useCallback((clipId, trackId) => {
+    handleCopyClip(clipId, trackId)
+    handleRemoveClip(trackId, clipId)
+    addToast(tr('editorCutAction'), 'info')
+    setSelectedClipId(null)
+  }, [handleCopyClip, handleRemoveClip, tr, addToast])
+
+  const handlePasteClip = useCallback(async (targetTrackId) => {
+    if (clipboard.clips.length === 0) {
+      addToast(tr('editorClipboardEmpty'), 'info')
+      return
+    }
+
+    if (Date.now() - (clipboard.copiedAt || 0) > 300000) {
+      setClipboard({ clips: [], trackId: null, copiedAt: null })
+      addToast(tr('editorClipboardExpired'), 'info')
+      return
+    }
+
+    let trackId = targetTrackId || clipboard.trackId || selectedTrackId
+    if (!trackId) {
+      if (store.editorProject.tracks.length > 0) {
+        trackId = store.editorProject.tracks[0].id
+      } else {
+        addToast(tr('editorNoTracks'), 'error')
+        return
+      }
+    }
+
+    const track = store.editorProject.tracks.find(t => t.id === trackId)
+    let start = 0
+    if (track && track.clips.length > 0) {
+      const lastClip = track.clips.reduce((max, clip) => 
+        clip.start + (clipDurations[clip.id] || clip.duration || 3) > 
+        max.start + (clipDurations[max.id] || max.duration || 3) ? clip : max
+      )
+      start = lastClip.start + (clipDurations[lastClip.id] || lastClip.duration || 3) + 0.5
+    }
+
+    for (const clipData of clipboard.clips) {
+      const newClip = {
+        ...clipData,
+        id: `clip-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        start: start,
+        effects: clipData.effects?.map(e => ({
+          ...e,
+          id: `effect-${Date.now()}-${e.id || Math.random().toString(36).slice(2, 6)}`
+        })) || []
+      }
+      
+      const updated = {
+        ...store.editorProject,
+        tracks: store.editorProject.tracks.map(t => {
+          if (t.id === trackId) {
+            return { ...t, clips: [...t.clips, newClip] }
+          }
+          return t
+        }),
+        updatedAt: Date.now()
+      }
+      
+      await store.commitEditorProject(updated, { skipHistory: true })
+      start += (clipData.duration || 3) + 0.5
+    }
+
+    await store.pushEditorHistoryCheckpoint()
+    addToast(`${clipboard.clips.length} clip(s) ${tr('editorPasted')}`, 'success')
+    setSelectedTrackId(trackId)
+  }, [clipboard, selectedTrackId, store, clipDurations, tr, addToast])
+
+  // ─── RACCOURCIS CLAVIER ──────────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const tag = e.target.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedClipId && selectedTrackId) {
+        e.preventDefault()
+        handleCopyClip(selectedClipId, selectedTrackId)
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'x' && selectedClipId && selectedTrackId) {
+        e.preventDefault()
+        handleCutClip(selectedClipId, selectedTrackId)
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault()
+        handlePasteClip(selectedTrackId)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedClipId, selectedTrackId, handleCopyClip, handleCutClip, handlePasteClip])
+
+  // ─── LECTURE ──────────────────────────────────────────────────────────────
   const stopPlayback = useCallback(() => {
-    // Arrêter tous les howls
     allHowlsRef.current.forEach(item => {
       if (item.howl) {
         if (item.howl.playing()) item.howl.stop()
@@ -255,10 +431,8 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     isPlayingRef.current = false
   }, [])
 
-  // ✅ Fonction pour mettre en pause
   const pausePlayback = useCallback(() => {
     if (isPlayingRef.current) {
-      // Mettre en pause tous les howls
       allHowlsRef.current.forEach(item => {
         if (item.howl && item.howl.playing()) {
           item.howl.pause()
@@ -277,16 +451,6 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     }
   }, [currentTime])
 
-  // ✅ Fonction pour reprendre la lecture — relance simplement playAllClips à la position
-  // où on s'est arrêté (pausedTimeRef), au lieu de juste "play()" les howls existants
-  // qui ignoraient un éventuel déplacement du curseur pendant la pause.
-  const resumePlayback = useCallback(() => {
-    if (isPaused) {
-      playAllClipsRef.current?.(pausedTimeRef.current)
-    }
-  }, [isPaused])
-
-  // ✅ Lecture de tous les clips en parallèle (startAt permet de démarrer ailleurs qu'à 0, utilisé par la boucle)
   const playAllClips = useCallback((startAt = 0) => {
     const project = store.editorProject
     if (!project || project.tracks.length === 0) {
@@ -294,7 +458,6 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       return
     }
 
-    // Vérifier s'il y a des clips
     let hasClips = false
     project.tracks.forEach(track => {
       if (track.clips.length > 0) hasClips = true
@@ -305,9 +468,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       return
     }
 
-    // Arrêter toute lecture en cours
     stopPlayback()
-
     setIsPlaying(true)
     setIsPaused(false)
     isPlayingRef.current = true
@@ -315,18 +476,17 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     startTimeRef.current = Date.now() - startAt * 1000
     pausedTimeRef.current = 0
 
-    // Créer et démarrer tous les clips
     const howls = []
+    const masterVol = isMasterMuted ? 0 : masterVolume / 100
+
     project.tracks.forEach(track => {
       track.clips.forEach(clip => {
         const fileUrl = clip.path.startsWith('file://') 
           ? clip.path 
           : 'file:///' + clip.path.replace(/\\/g, '/')
 
-        // Récupérer la durée réelle du clip
         const clipDuration = clipDurations[clip.id] || clip.duration || 3
 
-        // Appliquer les effets
         let volume = 1.0
         let speed = 1.0
 
@@ -345,7 +505,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
 
         const howl = new Howl({
           src: [fileUrl],
-          volume: volume * (store.volume / 100),
+          volume: volume * (store.volume / 100) * masterVol,
           rate: speed,
           html5: true,
           onloaderror: (id, err) => {
@@ -365,15 +525,11 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
 
     allHowlsRef.current = howls
 
-    // Fonction pour démarrer les clips à leur moment
     const startClipsAtTime = (time) => {
       howls.forEach(item => {
         if (!item.started && time >= item.startOffset) {
           try {
             item.howl.play()
-            // ✅ sourceOffset : point de départ dans le FICHIER AUDIO d'origine (posé par splitClip
-            // pour la 2e moitié d'un clip coupé). Sans ça, un clip issu d'un split rejouait le
-            // fichier depuis son tout début au lieu de continuer où le morceau précédent s'arrêtait.
             const sourceOffset = item.clip.offset || 0
             const seekTime = Math.min(time - item.startOffset, item.duration) + sourceOffset
             if (seekTime > 0) {
@@ -387,35 +543,27 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       })
     }
 
-    // Animation de progression
     const updateProgress = () => {
-      if (!isPlayingRef.current) {
-        return
-      }
+      if (!isPlayingRef.current) return
 
       const elapsed = (Date.now() - startTimeRef.current) / 1000
-      const current = Math.min(elapsed, totalDuration)
+      let current = Math.min(elapsed, totalDuration)
 
-      // Démarrer les clips qui doivent commencer
-      startClipsAtTime(current)
-
-      // Mettre à jour le temps
-      setCurrentTime(current)
-
-      // Émettre l'événement pour la timeline
-      window.dispatchEvent(new CustomEvent('clip-progress', { 
-        detail: { current, duration: totalDuration } 
-      }))
-
-      // Zone de boucle : on relance la lecture au début de la boucle
+      // ✅ LOOP CORRIGÉE : Ne bloque pas la timeline
       const loop = loopRegionRef.current
       if (loop?.enabled && current >= loop.end) {
-        stopPlayback()
-        playAllClips(loop.start)
-        return
+        const loopDuration = loop.end - loop.start
+        if (loopDuration > 0.1) {
+          // Repositionner dans la loop
+          const offset = (current - loop.end) % loopDuration
+          current = loop.start + offset
+          startTimeRef.current = Date.now() - current * 1000
+        }
       }
 
-      // Vérifier si on a atteint la fin
+      startClipsAtTime(current)
+      setCurrentTime(current)
+
       if (current >= totalDuration) {
         stopPlayback()
         return
@@ -424,48 +572,44 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       animationRef.current = requestAnimationFrame(updateProgress)
     }
 
-    // Démarrer immédiatement les clips qui commencent à startAt
     startClipsAtTime(startAt)
     updateProgress()
-  }, [store.editorProject, store.volume, totalDuration, clipDurations, addToast, tr, stopPlayback])
+  }, [store.editorProject, store.volume, totalDuration, clipDurations, addToast, tr, stopPlayback, masterVolume, isMasterMuted])
 
-  // ✅ Garder une ref à jour vers playAllClips (utilisée par resumePlayback, défini plus haut dans le fichier)
+  const resumePlayback = useCallback(() => {
+    if (isPaused) {
+      playAllClipsRef.current?.(pausedTimeRef.current)
+    }
+  }, [isPaused])
+
   useEffect(() => {
     playAllClipsRef.current = playAllClips
   }, [playAllClips])
 
-  // ✅ Play/Pause principal
   const handlePlay = useCallback(() => {
     if (isPlaying) {
       pausePlayback()
     } else if (isPaused) {
       resumePlayback()
     } else {
-      // ✅ Si on a cliqué sur la timeline, démarrer depuis la position actuelle
       playAllClips(currentTime > 0 ? currentTime : 0)
     }
   }, [isPlaying, isPaused, currentTime, pausePlayback, resumePlayback, playAllClips])
 
-  // ✅ Stop/Retour au début
   const handleStop = useCallback(() => {
     stopPlayback()
     setCurrentTime(0)
   }, [stopPlayback])
 
-  // ✅ Fonction de recherche (seek)
   const handleSeek = useCallback((time) => {
     const clampedTime = Math.max(0, Math.min(totalDuration, time))
     setCurrentTime(clampedTime)
     
-    // ✅ Si on est en lecture, mettre à jour le temps de départ
     if (isPlaying) {
-      // Mettre à jour le temps de départ pour que la lecture continue depuis la nouvelle position
       startTimeRef.current = Date.now() - clampedTime * 1000
       
-      // Si on a des howls en cours, les mettre à jour
       allHowlsRef.current.forEach(item => {
         if (item.howl && item.howl.playing()) {
-          // Calculer la position dans le clip
           const clipStart = item.clip.start
           const clipDuration = clipDurations[item.clip.id] || item.clip.duration || 3
           const sourceOffset = item.clip.offset || 0
@@ -473,24 +617,18 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
           if (seekInClip >= 0 && seekInClip <= clipDuration + sourceOffset) {
             try {
               item.howl.seek(seekInClip)
-            } catch (e) {
-              console.warn('Erreur seek:', e)
-            }
+            } catch (e) {}
           }
         }
       })
     }
     
-    // ✅ Si on est en pause, mettre à jour le temps de pause
     if (isPaused) {
       pausedTimeRef.current = clampedTime
     }
   }, [totalDuration, isPlaying, isPaused, clipDurations])
 
-  // ✅ Trouve le clip qui se trouve réellement sous le curseur (currentTime), pas juste "sélectionné"
-  // — sélectionner un clip (clic) ne déplace pas le curseur, donc s'appuyer uniquement sur
-  // selectedClipId faisait échouer le split dès que le curseur n'était pas, par coïncidence,
-  // au même endroit que le clip cliqué.
+  // ─── SPLIT CORRIGÉ ────────────────────────────────────────────────────────
   const getClipUnderPlayhead = useCallback(() => {
     const project = store.editorProject
     if (!project) return null
@@ -500,14 +638,12 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       return currentTime > c.start + 0.05 && currentTime < c.start + dur - 0.05
     }
 
-    // Priorité à la piste/clip actuellement sélectionné, s'il est bien sous le curseur
     const selectedTrack = project.tracks.find(t => t.id === selectedTrackId)
     const selectedClip = selectedTrack?.clips.find(c => c.id === selectedClipId)
     if (selectedClip && isUnderPlayhead(selectedClip)) {
       return { trackId: selectedTrackId, clip: selectedClip }
     }
 
-    // Sinon, chercher sur toutes les pistes le clip qui couvre la position du curseur
     for (const track of project.tracks) {
       const found = track.clips.find(isUnderPlayhead)
       if (found) return { trackId: track.id, clip: found }
@@ -515,57 +651,226 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     return null
   }, [store.editorProject, selectedTrackId, selectedClipId, currentTime, clipDurations])
 
-  // ✅ Couper le clip sous le curseur en deux (raccourci "S")
   const handleSplit = useCallback(async () => {
     const target = getClipUnderPlayhead()
     if (!target) {
       addToast(tr('editorSplitNoClipHere'), 'info')
       return
     }
+    
     const newClip = await store.splitClip(target.trackId, target.clip.id, currentTime, clipDurations[target.clip.id])
+    
     if (newClip) {
-      // ✅ La 1ère moitié garde le même id que le clip d'origine : sa waveform en cache
-      // (celle du fichier entier, générée avant la coupe) est maintenant obsolète —
-      // on la retire pour qu'elle soit régénérée avec la bonne portion, plus courte.
-      setWaveformData(prev => {
-        const next = { ...prev }
-        delete next[target.clip.id]
-        return next
-      })
+      // Mettre à jour les durées
+      const updatedClipDurations = { ...clipDurations }
+      updatedClipDurations[target.clip.id] = currentTime - target.clip.start
+      setClipDurations(updatedClipDurations)
+      
+      // Charger la waveform pour le nouveau clip
+      try {
+        const sliceDuration = updatedClipDurations[newClip.id] || newClip.duration || null
+        const data = await generateWaveformData(newClip.path, 200, newClip.offset || 0, sliceDuration)
+        if (data) {
+          setWaveformData(prev => ({ ...prev, [newClip.id]: data }))
+        }
+      } catch (e) {
+        console.warn('Erreur génération waveform:', e)
+      }
+      
       setSelectedTrackId(target.trackId)
-      setSelectedClipId(target.clip.id)
+      setSelectedClipId(newClip.id)
       addToast(tr('editorClipSplit'), 'success')
     } else {
       addToast(tr('editorSplitOutOfRange'), 'info')
     }
   }, [getClipUnderPlayhead, currentTime, clipDurations, store, addToast, tr])
 
-  // ✅ Raccourcis clavier de l'éditeur
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      const tag = e.target.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return
+  // ─── SPLIT ET SÉPARER ─────────────────────────────────────────────────────
+  const handleSplitAndScatter = useCallback(async () => {
+    const target = getClipUnderPlayhead()
+    if (!target) return
 
-      if (e.key === ' ') {
-        e.preventDefault()
-        handlePlay()
-      } else if (e.key.toLowerCase() === 's') {
-        e.preventDefault()
-        handleSplit()
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedClipId && selectedTrackId) {
-          e.preventDefault()
-          handleRemoveClip(selectedTrackId, selectedClipId)
+    const newClip = await store.splitClip(target.trackId, target.clip.id, currentTime, clipDurations[target.clip.id])
+    
+    if (newClip) {
+      // Créer une nouvelle piste
+      await store.addTrack()
+      const newTrackId = store.editorProject.tracks[store.editorProject.tracks.length - 1].id
+      
+      // Déplacer le nouveau clip vers la nouvelle piste
+      await store.moveClip(target.trackId, newClip.id, 0, newTrackId, { skipHistory: true })
+      
+      // Mettre à jour les durées
+      const updatedClipDurations = { ...clipDurations }
+      updatedClipDurations[target.clip.id] = currentTime - target.clip.start
+      setClipDurations(updatedClipDurations)
+      
+      setSelectedTrackId(newTrackId)
+      setSelectedClipId(newClip.id)
+      addToast('Clip séparé et déplacé vers une nouvelle piste', 'success')
+    }
+  }, [getClipUnderPlayhead, currentTime, clipDurations, store, addToast])
+
+  // ─── ROGNER UN SON ────────────────────────────────────────────────────────
+  const handleTrimClip = useCallback(async (clipId, start, end) => {
+    const clip = store.editorProject.tracks
+      .flatMap(t => t.clips)
+      .find(c => c.id === clipId)
+    
+    if (!clip) return
+
+    try {
+      const result = await window.electronAPI.trimSoundFile(clip.path, start, end)
+      
+      if (result.success) {
+        await store.updateClipWithPath(clipId, result.path)
+        addToast(`"${clip.name}" rogné avec succès`, 'success')
+        
+        // Recharger la waveform
+        const data = await generateWaveformData(result.path, 200)
+        if (data) {
+          setWaveformData(prev => ({ ...prev, [clipId]: data }))
         }
+      } else {
+        addToast('Erreur lors du rognage', 'error')
       }
+    } catch (e) {
+      console.error('Erreur rognage:', e)
+      addToast('Erreur lors du rognage', 'error')
+    }
+  }, [store, addToast])
+
+  // ─── PRÉVISUALISATION EFFETS ─────────────────────────────────────────────
+  const handlePreviewEffects = useCallback((clip, processedBuffer) => {
+    if (previewHowlRef.current) {
+      previewHowlRef.current.stop()
+      previewHowlRef.current.unload()
+      previewHowlRef.current = null
     }
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handlePlay, handleSplit, selectedClipId, selectedTrackId])
+    if (!clip) return
 
-  // ─── EXPORT ──────────────────────────────────────────────────────────────────
+    setIsPreviewingEffect(true)
 
+    try {
+      const fileUrl = clip.path.startsWith('file://') 
+        ? clip.path 
+        : 'file:///' + clip.path.replace(/\\/g, '/')
+      
+      const howl = new Howl({
+        src: [fileUrl],
+        volume: (store.volume / 100) * (isMasterMuted ? 0 : masterVolume / 100),
+        html5: true,
+        onend: () => {
+          setIsPreviewingEffect(false)
+          previewHowlRef.current = null
+        },
+        onstop: () => {
+          setIsPreviewingEffect(false)
+          previewHowlRef.current = null
+        }
+      })
+      
+      previewHowlRef.current = howl
+      howl.play()
+    } catch (e) {
+      console.warn('Erreur prévisualisation:', e)
+      setIsPreviewingEffect(false)
+    }
+  }, [store.volume, masterVolume, isMasterMuted])
+
+  // ─── NORMALISATION ────────────────────────────────────────────────────────
+  const handleNormalizeClip = useCallback(async (clipId, targetPeak = 0.95) => {
+    const clip = store.editorProject.tracks
+      .flatMap(t => t.clips)
+      .find(c => c.id === clipId)
+    
+    if (!clip) return
+    
+    setIsNormalizing(true)
+    try {
+      const result = await normalizeClip(clip, targetPeak, store)
+      if (result) {
+        if (result.normalized) {
+          addToast(`"${clip.name}" ${tr('editorNormalized')} (gain: ${result.gain.toFixed(2)})`, 'success')
+        } else {
+          addToast(`"${clip.name}" ${tr('editorAlreadyNormalized')}`, 'info')
+        }
+      } else {
+        addToast(tr('editorNormalizeError'), 'error')
+      }
+    } catch (e) {
+      console.error('Erreur normalisation:', e)
+      addToast(tr('editorNormalizeError'), 'error')
+    } finally {
+      setIsNormalizing(false)
+    }
+  }, [store, tr, addToast])
+
+  const handleNormalizeAll = useCallback(async (scope = 'track', targetPeak = 0.95) => {
+    let clips = []
+    
+    if (scope === 'clip' && selectedClipId) {
+      const clip = store.editorProject.tracks
+        .flatMap(t => t.clips)
+        .find(c => c.id === selectedClipId)
+      if (clip) clips = [clip]
+    } else if (scope === 'track' && selectedTrackId) {
+      const track = store.editorProject.tracks.find(t => t.id === selectedTrackId)
+      if (track) clips = track.clips
+    } else {
+      clips = store.editorProject.tracks.flatMap(t => t.clips)
+    }
+    
+    if (clips.length === 0) {
+      addToast(tr('editorNoClipsToNormalize'), 'info')
+      return
+    }
+    
+    setIsNormalizing(true)
+    try {
+      const results = await normalizeAll(clips, targetPeak, store)
+      const normalized = results.filter(r => r.normalized)
+      if (normalized.length > 0) {
+        addToast(`${normalized.length} ${tr('editorClipsNormalized')}`, 'success')
+      } else {
+        addToast(tr('editorAlreadyNormalized'), 'info')
+      }
+    } catch (e) {
+      console.error('Erreur normalisation:', e)
+      addToast(tr('editorNormalizeError'), 'error')
+    } finally {
+      setIsNormalizing(false)
+    }
+  }, [store, selectedClipId, selectedTrackId, tr, addToast])
+
+  // ─── MARQUEURS ────────────────────────────────────────────────────────────
+  const handleAddMarker = useCallback((marker) => {
+    setMarkers(prev => [...prev, marker])
+    store.saveEditorMarkers?.([...markers, marker])
+  }, [markers])
+
+  const handleRemoveMarker = useCallback((markerId) => {
+    const newMarkers = markers.filter(m => m.id !== markerId)
+    setMarkers(newMarkers)
+    store.saveEditorMarkers?.(newMarkers)
+  }, [markers])
+
+  const handleMarkersChange = useCallback((updatedMarkers) => {
+    setMarkers(updatedMarkers)
+    store.saveEditorMarkers?.(updatedMarkers)
+  }, [store])
+
+  // ─── MÉTRONOME ────────────────────────────────────────────────────────────
+  const handleMetronomeToggle = useCallback((enabled) => {
+    setMetronomeEnabled(enabled)
+  }, [])
+
+  const handleMetronomeBpmChange = useCallback((bpm) => {
+    setMetronomeBpm(bpm)
+  }, [])
+
+  // ─── EXPORT ────────────────────────────────────────────────────────────────
   const handleExportClick = () => {
     const project = store.editorProject
     if (!project || project.tracks.length === 0 || project.tracks.every(t => t.clips.length === 0)) {
@@ -575,6 +880,8 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     setExportName(project.name || 'Mon mix')
     setExportEmoji('🔊')
     setExportProfiles(['all'])
+    setExportFormat('mp3')
+    setExportBitrate(192)
     setShowExportModal(true)
   }
 
@@ -598,7 +905,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       if (exportAddToLibrary) {
         const soundData = {
           name: exportName.trim(),
-          path: '/path/to/exported/file.mp3',
+          path: '/path/to/exported/file.' + exportFormat,
           image: exportImage || null,
           emoji: exportEmoji,
           profiles: exportProfiles
@@ -618,6 +925,8 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       setExportImage(null)
       setExportProfiles(['all'])
       setExportAddToLibrary(true)
+      setExportFormat('mp3')
+      setExportBitrate(192)
     }
   }
 
@@ -632,8 +941,24 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     }
   }
 
-  // ─── RENDU ──────────────────────────────────────────────────────────────────
+  // ─── MASTER VOLUME ────────────────────────────────────────────────────────
+  const handleMasterVolumeChange = useCallback((newVolume) => {
+    setMasterVolume(newVolume)
+  }, [])
 
+  const handleMasterMuteToggle = useCallback(() => {
+    setIsMasterMuted(prev => !prev)
+  }, [])
+
+  // ─── FORMATAGE ────────────────────────────────────────────────────────────
+  const formatTime = (seconds) => {
+    if (!seconds || isNaN(seconds)) return '0:00'
+    const m = Math.floor(seconds / 60)
+    const s = Math.floor(seconds % 60)
+    return `${m}:${s.toString().padStart(2, '0')}`
+  }
+
+  // ─── RENDU ─────────────────────────────────────────────────────────────────
   const selectedClip = selectedClipId 
     ? store.editorProject.tracks
         .flatMap(t => t.clips)
@@ -677,6 +1002,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         onExport={handleExportClick}
         onAddTrack={handleAddTrack}
         onAddClip={handleAddClip}
+        onAddClipFromFile={handleAddClipFromFile}
         tracks={project?.tracks || []}
         sounds={store.sounds}
         lang={lang}
@@ -700,6 +1026,11 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
           }
           store.toggleEditorLoop()
         }}
+        projectName={project?.name || 'Nouveau projet'}
+        onRenameProject={handleRenameProject}
+        isPreviewingEffect={isPreviewingEffect}
+        autoPlayOnClick={autoPlayOnClick}
+        onToggleAutoPlay={() => setAutoPlayOnClick(prev => !prev)}
       />
 
       {/* Timeline */}
@@ -710,11 +1041,20 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
           selectedTrackId={selectedTrackId}
           totalDuration={totalDuration}
           onClipSelect={handleClipSelect}
-          onClipMove={(trackId, clipId, newStart) => store.moveClip(trackId, clipId, newStart, null, { skipHistory: true })}
+          onClipMove={(trackId, clipId, newStart, newTrackId = null) => {
+            if (newTrackId && newTrackId !== trackId) {
+              store.moveClip(trackId, clipId, newStart, newTrackId, { skipHistory: true })
+            } else {
+              store.moveClip(trackId, clipId, newStart, null, { skipHistory: true })
+            }
+          }}
           onClipUpdate={(trackId, clipId, updates) => store.updateClip(trackId, clipId, updates, { skipHistory: true })}
           onClipRemove={handleRemoveClip}
           onClipDuplicate={store.duplicateClip}
           onClipFade={(trackId, clipId, edge, duration) => store.setClipFade(trackId, clipId, edge, duration)}
+          onClipCopy={handleCopyClip}
+          onClipCut={handleCutClip}
+          onClipPaste={handlePasteClip}
           onDragCheckpoint={store.pushEditorHistoryCheckpoint}
           onTrackRemove={handleRemoveTrack}
           onSeek={handleSeek}
@@ -729,12 +1069,21 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
           snapEnabled={snapEnabled}
           loopRegion={store.editorLoopRegion}
           onSetLoopRegion={store.setEditorLoopRegion}
+          markers={markers}
+          onAddMarker={handleAddMarker}
+          onRemoveMarker={handleRemoveMarker}
+          onMarkersChange={handleMarkersChange}
+          metronomeEnabled={metronomeEnabled}
+          metronomeBpm={metronomeBpm}
+          onMetronomeToggle={handleMetronomeToggle}
+          onMetronomeBpmChange={handleMetronomeBpmChange}
+          autoPlayOnClick={autoPlayOnClick}
           lang={lang}
           tr={tr}
         />
       </div>
 
-      {/* Panneau d'effets */}
+      {/* Panneau d'effets - contextuel */}
       {selectedClip && (
         <EditorEffectsPanel
           clip={selectedClip}
@@ -753,10 +1102,67 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
               store.updateClip(trackId, clipId, { effects })
             }
           }}
+          onClipUpdate={store.updateClip}
+          onPreview={handlePreviewEffects}
+          isPreviewing={isPreviewingEffect}
+          onNormalize={handleNormalizeClip}
+          onTrim={handleTrimClip}
           lang={lang}
           tr={tr}
         />
       )}
+
+      {/* Barre inférieure simplifiée */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '4px 16px',
+        borderTop: '1px solid var(--border)',
+        background: 'var(--bg-secondary)',
+        flexShrink: 0,
+        flexWrap: 'wrap',
+        gap: 8
+      }}>
+        {/* Normalisation */}
+        <EditorNormalize
+          clip={selectedClip}
+          onNormalize={handleNormalizeClip}
+          onNormalizeAll={handleNormalizeAll}
+          isNormalizing={isNormalizing}
+          tr={tr}
+        />
+
+        <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
+
+        {/* Master Volume */}
+        <EditorMasterVolume
+          volume={isMasterMuted ? 0 : masterVolume}
+          onVolumeChange={handleMasterVolumeChange}
+          isMuted={isMasterMuted}
+          onMuteToggle={handleMasterMuteToggle}
+          peakMeter={peakMeter}
+          tr={tr}
+        />
+
+        <div style={{
+          fontSize: 10,
+          color: 'var(--text-tertiary)',
+          display: 'flex',
+          gap: 12,
+          alignItems: 'center'
+        }}>
+          <span>
+            {tr('editorClips') || 'Clips'}: {store.editorProject.tracks.flatMap(t => t.clips).length}
+          </span>
+          <span>
+            {tr('editorTracks') || 'Pistes'}: {store.editorProject.tracks.length}
+          </span>
+          <span>
+            {tr('editorDuration') || 'Durée'}: {formatTime(totalDuration)}
+          </span>
+        </div>
+      </div>
 
       {/* Modal d'export */}
       {showExportModal && (
@@ -836,6 +1242,38 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
                       {e}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+                    {tr('editorExportFormat') || 'Format'}
+                  </label>
+                  <select
+                    value={exportFormat}
+                    onChange={e => setExportFormat(e.target.value)}
+                    style={{ width: '100%', fontSize: 12, padding: '6px 10px', borderRadius: 'var(--radius-sm)' }}
+                  >
+                    <option value="mp3">MP3</option>
+                    <option value="wav">WAV</option>
+                    <option value="ogg">OGG</option>
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+                    {tr('editorExportQuality') || 'Qualité'}
+                  </label>
+                  <select
+                    value={exportBitrate}
+                    onChange={e => setExportBitrate(Number(e.target.value))}
+                    style={{ width: '100%', fontSize: 12, padding: '6px 10px', borderRadius: 'var(--radius-sm)' }}
+                  >
+                    <option value="128">128 kbps</option>
+                    <option value="192">192 kbps</option>
+                    <option value="256">256 kbps</option>
+                    <option value="320">320 kbps</option>
+                  </select>
                 </div>
               </div>
 
@@ -964,6 +1402,60 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        .modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.6);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+        }
+        .modal {
+          background: var(--bg-primary);
+          border-radius: var(--radius-lg);
+          padding: 24px;
+          max-width: 90vw;
+          box-shadow: var(--shadow-xl);
+          border: 1px solid var(--border);
+        }
+        .modal-title {
+          font-size: 16px;
+          font-weight: 600;
+          margin-bottom: 16px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: var(--text-primary);
+        }
+        .modal-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-top: 16px;
+          padding-top: 12px;
+          border-top: 1px solid var(--border);
+        }
+        .btn-lg {
+          padding: 8px 20px;
+          font-size: 13px;
+          min-height: 40px;
+          border-radius: var(--radius-md);
+        }
+        .input-lg {
+          padding: 8px 12px;
+          font-size: 13px;
+          border-radius: var(--radius-md);
+          width: 100%;
+          background: var(--bg-tertiary);
+          border: 1px solid var(--border);
+          color: var(--text-primary);
+        }
+        .input-lg:focus {
+          outline: none;
+          border-color: var(--accent);
         }
       `}</style>
     </div>

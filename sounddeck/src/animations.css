@@ -151,3 +151,108 @@
 .toast.exit {
   animation: slideInRight 0.3s ease reverse forwards;
 }
+
+/* ─── ÉDITEUR AVANCÉ ─────────────────────────────────────────────────────────── */
+
+/* Animation de pulsation pour les clips en lecture */
+@keyframes clipPlayingPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.clip-playing-indicator {
+  animation: clipPlayingPulse 0.8s ease-in-out infinite;
+}
+
+/* Animation d'entrée des clips */
+@keyframes clipEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.clip-enter {
+  animation: clipEnter 0.15s ease forwards;
+}
+
+/* Animation de la barre de progression */
+@keyframes progressPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.progress-pulse {
+  animation: progressPulse 0.5s ease-in-out infinite;
+}
+
+/* Animation de snap (aimantation) */
+@keyframes snapFlash {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+.snap-flash {
+  animation: snapFlash 0.3s ease forwards;
+}
+
+/* Animation de la zone de boucle */
+@keyframes loopPulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.4; }
+}
+
+.loop-region {
+  animation: loopPulse 1.5s ease-in-out infinite;
+}
+
+/* Animation des marqueurs */
+@keyframes markerBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+.marker-highlight {
+  animation: markerBounce 0.5s ease forwards;
+}
+
+/* Transition de la timeline */
+.timeline-transition {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Surbrillance du drop */
+.drop-highlight {
+  animation: dropPulse 0.6s ease-in-out infinite;
+}
+
+@keyframes dropPulse {
+  0%, 100% { 
+    opacity: 0.8; 
+    transform: scale(1); 
+  }
+  50% { 
+    opacity: 1; 
+    transform: scale(1.02); 
+  }
+}
+
+/* Animation des effets */
+@keyframes effectFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.effect-enter {
+  animation: effectFadeIn 0.15s ease forwards;
+}

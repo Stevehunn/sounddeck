@@ -1647,11 +1647,41 @@ ipcMain.handle('show-window', () => {
   return true
 })
 
-// electron/main.js
+// ─── ADVANDED EDITOR ────────────────────────────────────────────────────────────
+ipcMain.handle('save-file-dialog', async (event, fileName, buffer) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Sauvegarder le fichier normalisé',
+    defaultPath: fileName,
+    filters: [{ name: 'Audio WAV', extensions: ['wav'] }]
+  })
+  
+  if (result.canceled) {
+    return { success: false }
+  }
+  
+  try {
+    const uint8Array = new Uint8Array(buffer)
+    fs.writeFileSync(result.filePath, uint8Array)
+    return { success: true, path: result.filePath }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
+
+ipcMain.handle('write-sound-file', async (event, filePath, data) => {
+  try {
+    const uint8Array = new Uint8Array(data)
+    fs.writeFileSync(filePath, uint8Array)
+    return { success: true, path: filePath }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
+
 
 // ─── HANDLERS POUR LES PLUGINS ───────────────────────────────────────────────
 
-// ✅ NOUVEAU HANDLER : Installation depuis un buffer
+// Installation depuis un buffer
 ipcMain.handle('install-plugin-from-buffer', async (event, buffer, fileName) => {
   console.log('📦 Installation depuis buffer, fichier:', fileName)
   console.log('📦 Taille du buffer:', buffer?.byteLength || 0)

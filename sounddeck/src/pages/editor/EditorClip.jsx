@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { Howl } from 'howler'
 
 export default function EditorClip({
   clip,
@@ -15,10 +16,13 @@ export default function EditorClip({
   onUpdate,
   onRemove,
   onDuplicate,
+  onCopy,
+  onCut,
   onDragStart,
   onFadeInChange,
   onFadeOutChange,
   onDragCheckpoint,
+  autoPlayOnClick = false,
   tr
 }) {
   const [isDragging, setIsDragging] = useState(false)
@@ -26,28 +30,38 @@ export default function EditorClip({
   const [isResizing, setIsResizing] = useState(false)
   const [resizeSide, setResizeSide] = useState(null)
   const [isHovered, setIsHovered] = useState(false)
-  const [fadeDrag, setFadeDrag] = useState(null) // { edge: 'in' | 'out', startX, startDuration }
+  const [fadeDrag, setFadeDrag] = useState(null)
   const [liveFadeIn, setLiveFadeIn] = useState(null)
   const [liveFadeOut, setLiveFadeOut] = useState(null)
   const dragValueRef = useRef(0)
   const clipRef = useRef(null)
+  
+  // ✅ Lecture preview
+  const [isClipPlaying, setIsClipPlaying] = useState(false)
+  const [playbackHowl, setPlaybackHowl] = useState(null)
 
-  // ✅ Utiliser la durée réelle du clip
   const duration = clipDuration || clip.duration || 3
   const left = clip.start * pixelsPerSecond
   const width = Math.max(duration * pixelsPerSecond, 10)
 
-  // Couleur du clip
   const hue = (index * 30 + 200) % 360
   const color = `hsl(${hue}, 70%, 50%)`
-  const colorLight = `hsl(${hue}, 70%, 65%)`
 
-  // ✅ Fades — durée en cours (valeur "live" pendant le drag, sinon celle stockée dans les effets)
   const fadeInEffect = clip.effects?.find(e => e.type === 'fadeIn')
   const fadeOutEffect = clip.effects?.find(e => e.type === 'fadeOut')
   const fadeInDuration = liveFadeIn != null ? liveFadeIn : (fadeInEffect?.enabled ? (fadeInEffect.params?.duration || 0) : 0)
   const fadeOutDuration = liveFadeOut != null ? liveFadeOut : (fadeOutEffect?.enabled ? (fadeOutEffect.params?.duration || 0) : 0)
   const maxFade = duration / 2
+
+  // Nettoyage du playback
+  useEffect(() => {
+    return () => {
+      if (playbackHowl) {
+        playbackHowl.stop()
+        playbackHowl.unload()
+      }
+    }
+  }, [playbackHowl])
 
   const handleFadeMouseDown = (e, edge) => {
     e.stopPropagation()
@@ -89,7 +103,66 @@ export default function EditorClip({
     }
   }, [fadeDrag, pixelsPerSecond, maxFade, onFadeInChange, onFadeOutChange])
 
-  // Gestion du drag
+  // ✅ Lecture preview
+  const playClipPreview = (e) => {
+    if (e) e.stopPropagation()
+    
+    if (playbackHowl && isClipPlaying) {
+      playbackHowl.stop()
+      playbackHowl.unload()
+      setPlaybackHowl(null)
+      setIsClipPlaying(false)
+      return
+    }
+
+    try {
+      const fileUrl = clip.path.startsWith('file://') 
+        ? clip.path 
+        : 'file:///' + clip.path.replace(/\\/g, '/')
+      
+      const howl = new Howl({
+        src: [fileUrl],
+        volume: 0.5,
+        html5: true,
+        onend: () => {
+          setIsClipPlaying(false)
+          setPlaybackHowl(null)
+        },
+        onstop: () => {
+          setIsClipPlaying(false)
+          setPlaybackHowl(null)
+        }
+      })
+      
+      setPlaybackHowl(howl)
+      setIsClipPlaying(true)
+      howl.play()
+    } catch (e) {
+      console.warn('Erreur lecture preview:', e)
+    }
+  }
+
+  // ✅ Clic sur le clip
+  const handleClipClick = (e) => {
+    if (e.target.closest('.clip-actions')) return
+    
+    // ✅ La sélection se fait toujours
+    onSelect()
+    
+    // ✅ La lecture ne se fait que si autoPlayOnClick est activé
+    if (autoPlayOnClick) {
+      // Si déjà en lecture, arrêter
+      if (playbackHowl && isClipPlaying) {
+        playbackHowl.stop()
+        playbackHowl.unload()
+        setPlaybackHowl(null)
+        setIsClipPlaying(false)
+        return
+      }
+      playClipPreview(e)
+    }
+  }
+
   const handleMouseDown = (e) => {
     if (e.button !== 0) return
     if (e.target.closest('.clip-actions')) return
@@ -115,7 +188,6 @@ export default function EditorClip({
     setIsDragging(false)
   }
 
-  // Gestion du resize
   const handleResizeStart = (e, side) => {
     e.stopPropagation()
     onDragCheckpoint?.()
@@ -149,7 +221,6 @@ export default function EditorClip({
     setResizeSide(null)
   }
 
-  // Effets globaux
   useEffect(() => {
     if (isDragging || isResizing) {
       document.addEventListener('mousemove', isDragging ? handleMouseMove : handleResizeMove)
@@ -163,11 +234,9 @@ export default function EditorClip({
     }
   }, [isDragging, isResizing])
 
-  // Effets appliqués au clip
   const effectBadges = clip.effects?.filter(e => e.enabled).map(e => e.type) || []
-
-  // Afficher la durée sur le clip si elle est significative
   const showDuration = duration > 5
+  const hasActiveEffects = clip.effects?.some(e => e.enabled) || false
 
   return (
     <div
@@ -189,6 +258,7 @@ export default function EditorClip({
         userSelect: 'none'
       }}
       onMouseDown={handleMouseDown}
+      onClick={handleClipClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -231,6 +301,23 @@ export default function EditorClip({
           </div>
         )}
       </div>
+
+      {/* Badge effets actifs */}
+      {hasActiveEffects && (
+        <div style={{
+          position: 'absolute',
+          top: 2,
+          left: 4,
+          fontSize: 7,
+          padding: '1px 4px',
+          borderRadius: 2,
+          background: 'rgba(124,111,247,0.8)',
+          color: 'white',
+          zIndex: 3
+        }}>
+          <i className="ti ti-wand" /> Effets
+        </div>
+      )}
 
       {/* Nom du clip */}
       <div style={{
@@ -296,10 +383,26 @@ export default function EditorClip({
         }} />
       )}
 
-      {/* Poignées de fade — visibles seulement au survol ou à la sélection */}
+      {/* ✅ Indicateur de preview en cours */}
+      {isClipPlaying && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(0,0,0,0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 7,
+          pointerEvents: 'none',
+          borderRadius: 'var(--radius-sm)'
+        }}>
+          <i className="ti ti-player-pause" style={{ color: 'white', fontSize: 20 }} />
+        </div>
+      )}
+
+      {/* Poignées de fade */}
       {(isHovered || isSelected || fadeDrag) && (
         <>
-          {/* Triangle de fade in (haut-gauche) */}
           <div
             onMouseDown={(e) => handleFadeMouseDown(e, 'in')}
             style={{
@@ -317,7 +420,6 @@ export default function EditorClip({
             }}
             title={tr('editorFadeIn')}
           />
-          {/* Triangle de fade out (haut-droite) */}
           <div
             onMouseDown={(e) => handleFadeMouseDown(e, 'out')}
             style={{
@@ -368,17 +470,35 @@ export default function EditorClip({
         </>
       )}
 
-      {/* Actions contextuelles au survol */}
+      {/* Actions contextuelles */}
       <div className="clip-actions" style={{
         position: 'absolute',
         top: 2,
         right: 4,
         display: isSelected ? 'flex' : 'none',
         gap: 2,
-        zIndex: 6
+        zIndex: 6,
+        flexWrap: 'wrap'
       }}>
+        {/* ✅ Bouton Play Preview */}
         <button
-          onClick={(e) => { e.stopPropagation(); onDuplicate() }}
+          onClick={(e) => { e.stopPropagation(); playClipPreview(e) }}
+          style={{
+            padding: '1px 4px',
+            fontSize: 9,
+            background: isClipPlaying ? 'rgba(239,159,39,0.8)' : 'rgba(0,0,0,0.6)',
+            border: 'none',
+            borderRadius: 2,
+            color: 'white',
+            cursor: 'pointer'
+          }}
+          title={isClipPlaying ? 'Arrêter preview' : 'Écouter le clip'}
+        >
+          <i className={`ti ${isClipPlaying ? 'ti-player-pause' : 'ti-player-play'}`} />
+        </button>
+
+        <button
+          onClick={(e) => { e.stopPropagation(); onCopy?.(clip.id) }}
           style={{
             padding: '1px 4px',
             fontSize: 9,
@@ -388,12 +508,13 @@ export default function EditorClip({
             color: 'white',
             cursor: 'pointer'
           }}
-          title={tr('editorDuplicateClip')}
+          title={tr('editorCopy') || 'Copier (Ctrl+C)'}
         >
           <i className="ti ti-copy" />
         </button>
+        
         <button
-          onClick={(e) => { e.stopPropagation(); onRemove() }}
+          onClick={(e) => { e.stopPropagation(); onCut?.(clip.id) }}
           style={{
             padding: '1px 4px',
             fontSize: 9,
@@ -403,7 +524,40 @@ export default function EditorClip({
             color: 'white',
             cursor: 'pointer'
           }}
-          title={tr('editorRemoveClip')}
+          title={tr('editorCut') || 'Couper (Ctrl+X)'}
+        >
+          <i className="ti ti-scissors" />
+        </button>
+
+        {/* ✅ Dupliquer avec icône inversée */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onDuplicate() }}
+          style={{
+            padding: '1px 4px',
+            fontSize: 9,
+            background: 'rgba(29,158,117,0.6)',
+            border: 'none',
+            borderRadius: 2,
+            color: 'white',
+            cursor: 'pointer'
+          }}
+          title={tr('editorDuplicateClip')}
+        >
+          <i className="ti ti-copy" style={{ transform: 'scaleX(-1)' }} />
+        </button>
+
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove() }}
+          style={{
+            padding: '1px 4px',
+            fontSize: 9,
+            background: 'rgba(224,82,82,0.8)',
+            border: 'none',
+            borderRadius: 2,
+            color: 'white',
+            cursor: 'pointer'
+          }}
+          title={tr('editorRemoveClip') || 'Supprimer (Delete)'}
         >
           <i className="ti ti-trash" />
         </button>

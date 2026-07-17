@@ -14,6 +14,8 @@ export default function EditorTrack({
   onClipRemove,
   onClipDuplicate,
   onClipFade,
+  onClipCopy,
+  onClipCut,
   onDragCheckpoint,
   onTrackRemove,
   waveformData,
@@ -24,6 +26,7 @@ export default function EditorTrack({
   onTrackSolo,
   onTrackVolume,
   onTrackReorder,
+  autoPlayOnClick = false,
   lang,
   tr
 }) {
@@ -36,7 +39,6 @@ export default function EditorTrack({
   const trackHeight = 80
   const trackColor = `hsl(${(trackIndex * 30 + 200) % 360}, 60%, 40%)`
 
-  // Synchroniser l'état interne avec le track
   useEffect(() => {
     setIsMuted(track.muted || false)
   }, [track.muted])
@@ -53,7 +55,6 @@ export default function EditorTrack({
     e.stopPropagation()
   }
 
-  // ✅ Gestion du mute - CORRIGÉE
   const handleMuteToggle = (e) => {
     e.stopPropagation()
     const newMuted = !isMuted
@@ -63,7 +64,6 @@ export default function EditorTrack({
     }
   }
 
-  // ✅ Gestion du solo - CORRIGÉE (ne mute plus une propriété locale sans effet)
   const handleSoloToggle = (e) => {
     e.stopPropagation()
     const newSolo = !isSolo
@@ -73,7 +73,6 @@ export default function EditorTrack({
     }
   }
 
-  // ✅ Fader de volume vertical
   const handleVolumeChange = (e) => {
     e.stopPropagation()
     const newVolume = parseInt(e.target.value, 10)
@@ -83,7 +82,7 @@ export default function EditorTrack({
     }
   }
 
-  // ✅ Réorganisation des pistes par glisser-déposer (poignée dédiée)
+  // ✅ Drag & drop UNIQUEMENT vertical - la poignée est séparée
   const handleTrackDragStart = (e) => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('application/x-sounddeck-track-index', String(trackIndex))
@@ -162,13 +161,8 @@ export default function EditorTrack({
       onDragOver={handleDragOver}
       onClick={handleTrackClick}
     >
-      {/* En-tête de piste */}
+      {/* En-tête de piste - Version refactorisée */}
       <div
-        draggable
-        onDragStart={handleTrackDragStart}
-        onDragOver={handleTrackDragOver}
-        onDragLeave={handleTrackDragLeave}
-        onDrop={handleTrackDrop}
         style={{
           position: 'absolute',
           left: -190,
@@ -185,139 +179,166 @@ export default function EditorTrack({
           zIndex: 2,
           pointerEvents: 'auto'
         }}
+        onDragOver={handleTrackDragOver}
+        onDragLeave={handleTrackDragLeave}
+        onDrop={handleTrackDrop}
       >
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          color: 'var(--text-tertiary)',
-          cursor: 'grab',
-          flexShrink: 0
-        }} title={tr('editorReorderTrack')}>
+        {/* ✅ Poignée de drag UNIQUEMENT verticale */}
+        <div
+          draggable
+          onDragStart={handleTrackDragStart}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            cursor: 'grab',
+            flexShrink: 0,
+            padding: '0 2px',
+            writingMode: 'vertical-lr',
+            userSelect: 'none'
+          }}
+          title={tr('editorReorderTrack')}
+        >
           <i className="ti ti-grip-vertical" style={{ fontSize: 14 }} />
         </div>
 
+        {/* ✅ Barre de couleur verticale */}
+        <div style={{
+          width: 3,
+          height: '100%',
+          background: trackColor,
+          borderRadius: 2,
+          flexShrink: 0,
+          marginRight: 4
+        }} />
+
+        {/* ✅ Volume horizontal - beaucoup plus facile à utiliser */}
         <div style={{
           display: 'flex',
-          flexDirection: 'column',
           alignItems: 'center',
-          gap: 3,
-          flexShrink: 0
+          gap: 4,
+          flex: 1,
+          minWidth: 50
         }}>
-          <span style={{ fontSize: 9, color: 'var(--text-tertiary)', fontFamily: 'monospace' }}>
-            {volume}
-          </span>
+          <i className="ti ti-volume" style={{ fontSize: 11, color: 'var(--text-tertiary)' }} />
           <input
             type="range"
             min={0}
             max={150}
             value={volume}
             onChange={handleVolumeChange}
-            onMouseDown={e => e.stopPropagation()}
             onClick={e => e.stopPropagation()}
+            onMouseDown={e => e.stopPropagation()}
             title={tr('editorTrackVolume')}
             style={{
-              writingMode: 'vertical-lr',
-              direction: 'rtl',
-              width: 4,
-              height: 42,
-              accentColor: 'var(--text-tertiary)'
+              flex: 1,
+              accentColor: 'var(--text-tertiary)',
+              height: 4,
+              minWidth: 30,
+              cursor: 'pointer'
             }}
           />
-          <i className="ti ti-volume" style={{ fontSize: 11, color: 'var(--text-tertiary)' }} />
+          <span style={{ fontSize: 9, color: 'var(--text-tertiary)', fontFamily: 'monospace', minWidth: 24 }}>
+            {volume}
+          </span>
         </div>
 
+        {/* Boutons Mute/Solo/Supprimer + Nom */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: 4,
-          flex: 1,
-          minWidth: 0
+          gap: 2,
+          flexShrink: 0,
+          alignItems: 'center'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{
-              width: 4,
-              height: 16,
-              borderRadius: 2,
-              background: trackColor,
-              flexShrink: 0
-            }} />
-            <span style={{
-              fontSize: 11,
-              fontWeight: 600,
-              flex: 1,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}>
-              {track.name}
-            </span>
-          </div>
+          <button
+            className={`btn-sm ${isMuted ? 'btn-danger' : 'btn-secondary'}`}
+            onClick={handleMuteToggle}
+            style={{
+              padding: '1px 4px',
+              fontSize: 8,
+              minHeight: 16,
+              borderRadius: 'var(--radius-sm)',
+              border: isMuted ? '1px solid var(--danger)' : '1px solid var(--border)',
+              background: isMuted ? 'rgba(224,82,82,0.2)' : 'var(--bg-tertiary)',
+              color: isMuted ? 'var(--danger)' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+              width: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            title={isMuted ? tr('editorUnmute') : tr('editorMute')}
+          >
+            <i className={`ti ${isMuted ? 'ti-volume-off' : 'ti-volume'}`} style={{ fontSize: 10 }} />
+          </button>
 
-          <div style={{ display: 'flex', gap: 4 }}>
-            <button
-              className={`btn-sm ${isMuted ? 'btn-danger' : 'btn-secondary'}`}
-              onClick={handleMuteToggle}
-              style={{
-                padding: '2px 6px',
-                fontSize: 10,
-                minHeight: 20,
-                borderRadius: 'var(--radius-sm)',
-                border: isMuted ? '1px solid var(--danger)' : '1px solid var(--border)',
-                background: isMuted ? 'rgba(224,82,82,0.2)' : 'var(--bg-tertiary)',
-                color: isMuted ? 'var(--danger)' : 'var(--text-secondary)',
-                cursor: 'pointer',
-                transition: 'all 0.15s'
-              }}
-              title={isMuted ? tr('editorUnmute') : tr('editorMute')}
-            >
-              <i className={`ti ${isMuted ? 'ti-volume-off' : 'ti-volume'}`} />
-            </button>
+          <button
+            className={`btn-sm ${isSolo ? 'btn-success' : 'btn-secondary'}`}
+            onClick={handleSoloToggle}
+            style={{
+              padding: '1px 4px',
+              fontSize: 8,
+              minHeight: 16,
+              borderRadius: 'var(--radius-sm)',
+              border: isSolo ? '1px solid var(--success)' : '1px solid var(--border)',
+              background: isSolo ? 'rgba(29,158,117,0.2)' : 'var(--bg-tertiary)',
+              color: isSolo ? 'var(--success)' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+              width: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            title={isSolo ? tr('editorUnsolo') : tr('editorSolo')}
+          >
+            <i className="ti ti-headphones" style={{ fontSize: 10 }} />
+          </button>
 
-            <button
-              className={`btn-sm ${isSolo ? 'btn-success' : 'btn-secondary'}`}
-              onClick={handleSoloToggle}
-              style={{
-                padding: '2px 6px',
-                fontSize: 10,
-                minHeight: 20,
-                borderRadius: 'var(--radius-sm)',
-                border: isSolo ? '1px solid var(--success)' : '1px solid var(--border)',
-                background: isSolo ? 'rgba(29,158,117,0.2)' : 'var(--bg-tertiary)',
-                color: isSolo ? 'var(--success)' : 'var(--text-secondary)',
-                cursor: 'pointer',
-                transition: 'all 0.15s'
-              }}
-              title={isSolo ? tr('editorUnsolo') : tr('editorSolo')}
-            >
-              <i className="ti ti-headphones" />
-            </button>
-
-            <button
-              className="btn-ghost btn-sm"
-              onClick={(e) => {
-                e.stopPropagation()
-                onTrackRemove(track.id)
-              }}
-              style={{
-                padding: '2px 4px',
-                fontSize: 10,
-                color: 'var(--text-tertiary)',
-                borderRadius: 'var(--radius-sm)',
-                transition: 'all 0.15s'
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.color = 'var(--danger)'
-                e.currentTarget.style.background = 'rgba(224,82,82,0.1)'
+          <button
+            className="btn-ghost btn-sm"
+            onClick={(e) => {
+              e.stopPropagation()
+              onTrackRemove(track.id)
+            }}
+            style={{
+              padding: '1px 4px',
+              fontSize: 8,
+              color: 'var(--text-tertiary)',
+              borderRadius: 'var(--radius-sm)',
+              transition: 'all 0.15s',
+              width: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = 'var(--danger)'
+              e.currentTarget.style.background = 'rgba(224,82,82,0.1)'
             }}
             onMouseLeave={e => {
               e.currentTarget.style.color = 'var(--text-tertiary)'
               e.currentTarget.style.background = 'transparent'
             }}
-              title={tr('editorRemoveTrack')}
-            >
-              <i className="ti ti-x" />
-            </button>
-          </div>
+            title={tr('editorRemoveTrack')}
+          >
+            <i className="ti ti-x" style={{ fontSize: 10 }} />
+          </button>
+
+          {/* Nom de la piste en bas */}
+          <span style={{
+            fontSize: 6,
+            color: 'var(--text-tertiary)',
+            textAlign: 'center',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            maxWidth: 40,
+            marginTop: 1
+          }}>
+            {track.name}
+          </span>
         </div>
       </div>
 
@@ -355,10 +376,13 @@ export default function EditorTrack({
                 onUpdate={(updates) => onClipUpdate(track.id, clip.id, updates)}
                 onRemove={() => onClipRemove(track.id, clip.id)}
                 onDuplicate={() => onClipDuplicate(track.id, clip.id)}
+                onCopy={() => onClipCopy?.(clip.id, track.id)}
+                onCut={() => onClipCut?.(clip.id, track.id)}
                 onDragStart={(e) => handleClipDragStart(e, clip.id)}
                 onFadeInChange={(duration) => onClipFade?.(track.id, clip.id, 'in', duration)}
                 onFadeOutChange={(duration) => onClipFade?.(track.id, clip.id, 'out', duration)}
                 onDragCheckpoint={onDragCheckpoint}
+                autoPlayOnClick={autoPlayOnClick}
                 tr={tr}
               />
             </div>

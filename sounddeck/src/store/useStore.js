@@ -1646,6 +1646,63 @@ export function useStore() {
     console.log('Export du projet vers la bibliothèque:', name)
   }, [])
 
+  // ─── RENOMMER LE PROJET ──────────────────────────────────────────────────────
+
+  const updateEditorProjectName = useCallback(async (newName) => {
+    if (!newName.trim()) return false
+    
+    const updated = {
+      ...editorProject,
+      name: newName.trim(),
+      updatedAt: Date.now()
+    }
+    setEditorProject(updated)
+    await save('editorProject', updated)
+    return true
+  }, [editorProject, save])
+
+  // ─── SAUVEGARDE DES MARQUEURS ──────────────────────────────────────────────
+
+  const saveEditorMarkers = useCallback(async (markers) => {
+    const updated = {
+      ...editorProject,
+      markers: markers || [],
+      updatedAt: Date.now()
+    }
+    setEditorProject(updated)
+    await save('editorProject', updated)
+  }, [editorProject, save])
+
+  // ─── NORMALISATION ──────────────────────────────────────────────────────────
+
+  const updateClipWithPath = useCallback(async (clipId, newPath) => {
+    const project = editorProject
+    let updated = false
+    
+    const newTracks = project.tracks.map(track => {
+      const clips = track.clips.map(clip => {
+        if (clip.id === clipId) {
+          updated = true
+          return { ...clip, path: newPath.replace(/\\/g, '/') }
+        }
+        return clip
+      })
+      return { ...track, clips }
+    })
+    
+    if (updated) {
+      const updatedProject = {
+        ...project,
+        tracks: newTracks,
+        updatedAt: Date.now()
+      }
+      setEditorProject(updatedProject)
+      await save('editorProject', updatedProject)
+      return true
+    }
+    return false
+  }, [editorProject, save])
+
   // ─── Sons ordonnés selon le profil ──────────────────────────────────────────
   const orderedSounds = useMemo(() => {
     const profileId = currentProfileId || 'all'
@@ -1845,6 +1902,9 @@ export function useStore() {
     updateEffectParam,
     setClipFade,
     exportProjectToLibrary,
+    updateEditorProjectName,
+    saveEditorMarkers,
+    updateClipWithPath,
 
     // Undo/Redo
     undoEditor,

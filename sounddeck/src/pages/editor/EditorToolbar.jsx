@@ -10,6 +10,7 @@ export default function EditorToolbar({
   onExport,
   onAddTrack,
   onAddClip,
+  onAddClipFromFile,
   tracks,
   sounds,
   lang,
@@ -25,12 +26,27 @@ export default function EditorToolbar({
   onSplit,
   canSplit,
   loopEnabled,
-  onToggleLoop
+  onToggleLoop,
+  projectName,
+  onRenameProject,
+  isPreviewingEffect,
+  autoPlayOnClick,
+  onToggleAutoPlay
 }) {
   const [showAddClip, setShowAddClip] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [selectedTrackId, setSelectedTrackId] = useState('')
   const [selectedSoundId, setSelectedSoundId] = useState('')
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [newProjectName, setNewProjectName] = useState(projectName || 'Nouveau projet')
+  const [importTrackId, setImportTrackId] = useState('')
+  const [pendingFile, setPendingFile] = useState(null)
   const dropdownRef = useRef(null)
+  const fileInputRef = useRef(null)
+
+  useEffect(() => {
+    setNewProjectName(projectName || 'Nouveau projet')
+  }, [projectName])
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -81,6 +97,105 @@ export default function EditorToolbar({
     }
   }
 
+  const handleAddFileClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileSelect = async (e) => {
+    const files = e.target.files
+    if (files.length === 0) return
+
+    const file = files[0]
+    let filePath = file.path || file.webkitRelativePath
+    
+    if (!filePath) {
+      try {
+        const result = await window.electronAPI.openFileDialog()
+        if (result && result.length > 0) {
+          filePath = result[0]
+        } else {
+          if (fileInputRef.current) fileInputRef.current.value = ''
+          return
+        }
+      } catch (err) {
+        console.error('Erreur import fichier:', err)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        return
+      }
+    }
+
+    if (tracks.length === 0) {
+      alert(tr('editorNoTracks'))
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
+    // Si une piste est déjà sélectionnée, l'utiliser directement
+    let trackId = selectedTrackId
+    if (trackId && tracks.some(t => t.id === trackId)) {
+      try {
+        await onAddClipFromFile(trackId, filePath)
+      } catch (err) {
+        console.error('Erreur import fichier:', err)
+        alert('Erreur lors de l\'import du fichier')
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+      return
+    }
+
+    // Si une seule piste existe, l'utiliser
+    if (tracks.length === 1) {
+      try {
+        await onAddClipFromFile(tracks[0].id, filePath)
+        setSelectedTrackId(tracks[0].id)
+      } catch (err) {
+        console.error('Erreur import fichier:', err)
+        alert('Erreur lors de l\'import du fichier')
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+      return
+    }
+
+    // Si plusieurs pistes, montrer le modal de sélection
+    setPendingFile(filePath)
+    setImportTrackId(tracks[0].id)
+    setShowImportModal(true)
+    
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const confirmImportWithTrack = async () => {
+    if (!importTrackId) {
+      alert(tr('editorSelectTrack'))
+      return
+    }
+    
+    try {
+      await onAddClipFromFile(importTrackId, pendingFile)
+      setSelectedTrackId(importTrackId)
+    } catch (err) {
+      console.error('Erreur import fichier:', err)
+      alert('Erreur lors de l\'import du fichier')
+    } finally {
+      setShowImportModal(false)
+      setPendingFile(null)
+      setImportTrackId('')
+    }
+  }
+
+  const handleRenameProject = () => {
+    if (isRenaming) {
+      if (newProjectName.trim()) {
+        onRenameProject?.(newProjectName.trim())
+      }
+      setIsRenaming(false)
+    } else {
+      setIsRenaming(true)
+    }
+  }
+
   const getButtonState = () => {
     if (isPlaying) return { icon: 'ti-player-pause', label: tr('editorPause'), color: 'var(--warning)' }
     if (isPaused) return { icon: 'ti-player-play', label: tr('editorResume'), color: 'var(--accent)' }
@@ -102,9 +217,62 @@ export default function EditorToolbar({
       flexShrink: 0,
       position: 'relative'
     }}>
+      {/* Nom du projet */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 120 }}>
+        {isRenaming ? (
+          <input
+            type="text"
+            value={newProjectName}
+            onChange={(e) => setNewProjectName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleRenameProject()
+              if (e.key === 'Escape') {
+                setIsRenaming(false)
+                setNewProjectName(projectName || 'Nouveau projet')
+              }
+            }}
+            onBlur={() => {
+              if (newProjectName.trim()) {
+                onRenameProject?.(newProjectName.trim())
+              }
+              setIsRenaming(false)
+            }}
+            autoFocus
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              background: 'var(--bg-tertiary)',
+              border: '1px solid var(--accent)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '4px 8px',
+              width: 150,
+              color: 'var(--text-primary)'
+            }}
+          />
+        ) : (
+          <span
+            onClick={handleRenameProject}
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              color: 'var(--text-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
+            }}
+            title="Cliquer pour renommer"
+          >
+            <i className="ti ti-pencil" style={{ fontSize: 12, color: 'var(--text-tertiary)', opacity: 0.6 }} />
+            {projectName || 'Nouveau projet'}
+          </span>
+        )}
+      </div>
+
+      <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
+
       {/* Contrôles de lecture */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        {/* Bouton Play/Pause */}
         <button
           className="btn-primary btn-sm"
           onClick={onPlay}
@@ -124,7 +292,6 @@ export default function EditorToolbar({
           <i className={`ti ${buttonState.icon}`} />
         </button>
 
-        {/* Bouton Stop */}
         <button
           className="btn-secondary btn-sm"
           onClick={onStop}
@@ -142,7 +309,6 @@ export default function EditorToolbar({
           <i className="ti ti-player-stop-filled" />
         </button>
 
-        {/* Undo / Redo */}
         <button
           className="btn-secondary btn-sm"
           onClick={onUndo}
@@ -178,7 +344,6 @@ export default function EditorToolbar({
           <i className="ti ti-arrow-forward-up" />
         </button>
 
-        {/* Aimant (snap) */}
         <button
           className={snapEnabled ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
           onClick={onToggleSnap}
@@ -195,7 +360,6 @@ export default function EditorToolbar({
           <i className="ti ti-magnet" />
         </button>
 
-        {/* Couper au curseur */}
         <button
           className="btn-secondary btn-sm"
           onClick={onSplit}
@@ -206,7 +370,6 @@ export default function EditorToolbar({
           <i className="ti ti-cut" /> {tr('editorSplit')}
         </button>
 
-        {/* Boucle */}
         <button
           className={loopEnabled ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
           onClick={onToggleLoop}
@@ -216,7 +379,6 @@ export default function EditorToolbar({
           <i className="ti ti-repeat" /> {tr('editorLoop')}
         </button>
 
-        {/* Temps */}
         <span style={{ 
           fontSize: 12, 
           fontFamily: 'monospace', 
@@ -227,7 +389,6 @@ export default function EditorToolbar({
           {formatTime(currentTime)} / {formatTime(totalDuration)}
         </span>
 
-        {/* Indicateur d'état */}
         {isPlaying && (
           <span style={{
             fontSize: 10,
@@ -260,12 +421,43 @@ export default function EditorToolbar({
             {tr('editorPaused')}
           </span>
         )}
+        {isPreviewingEffect && (
+          <span style={{
+            fontSize: 10,
+            color: 'var(--accent)',
+            background: 'rgba(124,111,247,0.15)',
+            padding: '2px 8px',
+            borderRadius: 10,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4
+          }}>
+            <span style={{ 
+              width: 6, 
+              height: 6, 
+              borderRadius: '50%', 
+              background: 'var(--accent)',
+              animation: 'pulse 0.5s ease-in-out infinite'
+            }} />
+            {tr('editorPreviewEffects') || 'Prévisualisation des effets'}
+          </span>
+        )}
       </div>
 
       <div style={{ flex: 1 }} />
 
       {/* Boutons d'action */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <button
+          className={autoPlayOnClick ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+          onClick={onToggleAutoPlay}
+          style={{ fontSize: 10, padding: '2px 8px', minHeight: 24 }}
+          title={tr('editorAutoPlay') || 'Jouer au clic'}
+        >
+          <i className="ti ti-player-play" />
+          {autoPlayOnClick ? 'Auto' : 'Manuel'}
+        </button>
+
         <button
           className="btn-secondary btn-sm"
           onClick={onAddTrack}
@@ -285,6 +477,24 @@ export default function EditorToolbar({
         </button>
 
         <button
+          className="btn-secondary btn-sm"
+          onClick={handleAddFileClick}
+          style={{ fontSize: 12 }}
+          disabled={isLoading}
+        >
+          <i className="ti ti-file-import" /> {tr('editorAddFile') || 'Importer un fichier'}
+        </button>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="audio/*"
+          style={{ display: 'none' }}
+          onChange={handleFileSelect}
+          multiple={false}
+        />
+
+        <button
           className="btn-primary btn-sm"
           onClick={onExport}
           style={{ fontSize: 12 }}
@@ -298,7 +508,7 @@ export default function EditorToolbar({
         </button>
       </div>
 
-      {/* Dropdown pour ajouter un clip */}
+      {/* Dropdown pour ajouter un clip depuis SoundDeck */}
       {showAddClip && (
         <div
           ref={dropdownRef}
@@ -398,6 +608,73 @@ export default function EditorToolbar({
               {tr('editorAddTrackHint')}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal d'importation de fichier avec sélection de piste */}
+      {showImportModal && (
+        <div className="modal-overlay" onClick={() => {
+          setShowImportModal(false)
+          setPendingFile(null)
+        }}>
+          <div className="modal" style={{ width: 400 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">
+              <i className="ti ti-file-import" style={{ color: 'var(--accent)' }} />
+              {tr('editorImportToTrack') || 'Importer dans la piste...'}
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{
+                fontSize: 12,
+                color: 'var(--text-secondary)',
+                display: 'block',
+                marginBottom: 4
+              }}>
+                {tr('editorSelectTrack')}
+              </label>
+              <select
+                value={importTrackId}
+                onChange={e => setImportTrackId(e.target.value)}
+                style={{ width: '100%', fontSize: 12 }}
+              >
+                {tracks.map(track => (
+                  <option key={track.id} value={track.id}>
+                    {track.name} ({track.clips.length} clips)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{
+              fontSize: 11,
+              color: 'var(--text-tertiary)',
+              padding: '4px 8px',
+              background: 'var(--bg-tertiary)',
+              borderRadius: 'var(--radius-sm)',
+              marginBottom: 12
+            }}>
+              <i className="ti ti-file" style={{ marginRight: 4 }} />
+              {pendingFile ? pendingFile.split('/').pop() : 'Fichier sélectionné'}
+            </div>
+
+            <div className="modal-actions">
+              <button
+                className="btn-secondary btn-sm"
+                onClick={() => {
+                  setShowImportModal(false)
+                  setPendingFile(null)
+                }}
+              >
+                {tr('cancel')}
+              </button>
+              <button
+                className="btn-primary btn-sm"
+                onClick={confirmImportWithTrack}
+              >
+                <i className="ti ti-plus" /> {tr('add')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

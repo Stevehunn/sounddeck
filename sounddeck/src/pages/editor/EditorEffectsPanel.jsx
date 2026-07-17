@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import TrimModal from './TrimModal'
 
 const EFFECT_TYPES = [
   { id: 'volume', label: 'Volume', icon: 'ti-volume', params: ['value'] },
@@ -47,10 +48,71 @@ export default function EditorEffectsPanel({
   onEffectRemove,
   onEffectUpdate,
   onEffectToggle,
+  onClipUpdate,
+  onPreview,
+  isPreviewing,
+  onNormalize,
+  onTrim,
   lang,
   tr
 }) {
   const [showAddEffect, setShowAddEffect] = useState(false)
+  const [showTrimModal, setShowTrimModal] = useState(false)
+  const previewTimeoutRef = useRef(null)
+
+  const previewEffects = useCallback(async () => {
+    if (!clip || !clip.path) return
+    
+    if (previewTimeoutRef.current) {
+      clearTimeout(previewTimeoutRef.current)
+      previewTimeoutRef.current = null
+    }
+
+    const hasActiveEffects = clip.effects?.some(e => e.enabled) || false
+    if (!hasActiveEffects) {
+      onPreview?.(clip, null)
+      return
+    }
+
+    try {
+      onPreview?.(clip, null)
+    } catch (e) {
+      console.warn('Erreur prévisualisation effets:', e)
+      onPreview?.(clip, null)
+    }
+  }, [clip, onPreview])
+
+  const schedulePreview = useCallback(() => {
+    if (previewTimeoutRef.current) {
+      clearTimeout(previewTimeoutRef.current)
+    }
+    previewTimeoutRef.current = setTimeout(() => {
+      previewEffects()
+    }, 300)
+  }, [previewEffects])
+
+  useEffect(() => {
+    if (clip && clip.effects) {
+      schedulePreview()
+    }
+    return () => {
+      if (previewTimeoutRef.current) {
+        clearTimeout(previewTimeoutRef.current)
+      }
+    }
+  }, [clip?.effects, clip?.id, schedulePreview])
+
+  const handleParamChange = (effectId, param, value) => {
+    onEffectUpdate(trackId, clip.id, effectId, param, value)
+  }
+
+  const handleEffectToggle = (effectId, enabled) => {
+    onEffectToggle(trackId, clip.id, effectId, enabled)
+  }
+
+  const handleEffectRemove = (effectId) => {
+    onEffectRemove(trackId, clip.id, effectId)
+  }
 
   if (!clip) return null
 
@@ -64,8 +126,14 @@ export default function EditorEffectsPanel({
     setShowAddEffect(false)
   }
 
-  const handleParamChange = (effectId, param, value) => {
-    onEffectUpdate(trackId, clip.id, effectId, param, value)
+  // ✅ Rognage - Ouvre le modal
+  const handleTrimClick = () => {
+    setShowTrimModal(true)
+  }
+
+  const handleTrimConfirm = (clipId, start, end) => {
+    onTrim?.(clipId, start, end)
+    setShowTrimModal(false)
   }
 
   return (
@@ -100,6 +168,28 @@ export default function EditorEffectsPanel({
         </div>
 
         <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            className="btn-secondary btn-sm"
+            onClick={handleTrimClick}
+            style={{ fontSize: 11 }}
+            title={tr('editorTrim') || 'Rogner le son'}
+          >
+            <i className="ti ti-cut" /> {tr('editorTrim') || 'Rogner'}
+          </button>
+
+          <button
+            className="btn-secondary btn-sm"
+            onClick={() => {
+              if (confirm(tr('editorNormalizeConfirm') || 'Normaliser le volume de ce clip ?')) {
+                onNormalize?.(clip.id)
+              }
+            }}
+            style={{ fontSize: 11 }}
+            title={tr('editorNormalizeClip') || 'Normaliser le volume'}
+          >
+            <i className="ti ti-wave" /> {tr('editorNormalize') || 'Normaliser'}
+          </button>
+
           <button
             className="btn-secondary btn-sm"
             onClick={() => setShowAddEffect(!showAddEffect)}
@@ -143,7 +233,7 @@ export default function EditorEffectsPanel({
                 <div style={{ display: 'flex', gap: 4 }}>
                   <button
                     className="btn-ghost btn-sm"
-                    onClick={() => onEffectToggle(trackId, clip.id, effect.id, !effect.enabled)}
+                    onClick={() => handleEffectToggle(effect.id, !effect.enabled)}
                     style={{
                       padding: '1px 4px',
                       fontSize: 10,
@@ -154,7 +244,7 @@ export default function EditorEffectsPanel({
                   </button>
                   <button
                     className="btn-ghost btn-sm"
-                    onClick={() => onEffectRemove(trackId, clip.id, effect.id)}
+                    onClick={() => handleEffectRemove(effect.id)}
                     style={{
                       padding: '1px 4px',
                       fontSize: 10,
@@ -245,6 +335,35 @@ export default function EditorEffectsPanel({
             </button>
           ))}
         </div>
+      )}
+
+      {/* Indicateur de prévisualisation */}
+      {isPreviewing && (
+        <div style={{
+          marginTop: 8,
+          padding: '4px 10px',
+          borderRadius: 'var(--radius-sm)',
+          background: 'rgba(124,111,247,0.1)',
+          border: '1px solid var(--accent)',
+          fontSize: 10,
+          color: 'var(--accent)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6
+        }}>
+          <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
+          {tr('editorEffectPreview') || 'Aperçu des effets...'}
+        </div>
+      )}
+
+      {/* Modal de rognage */}
+      {showTrimModal && (
+        <TrimModal
+          clip={clip}
+          onConfirm={handleTrimConfirm}
+          onCancel={() => setShowTrimModal(false)}
+          tr={tr}
+        />
       )}
     </div>
   )

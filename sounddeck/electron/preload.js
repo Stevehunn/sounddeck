@@ -98,6 +98,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ─── DIVERS ──────────────────────────────────────────────────────────────
   isElectron: true,
+
+  // ─── ADVANDED EDITOR ────────────────────────────────────────────────────────────
+  saveFileDialog: (fileName, buffer) => ipcRenderer.invoke('save-file-dialog', fileName, buffer),
+  writeSoundFile: (filePath, data) => ipcRenderer.invoke('write-sound-file', filePath, data),
 })
 
 // Exposer également via window pour accès direct dans les event handlers
