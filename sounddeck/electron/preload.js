@@ -92,16 +92,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPluginComponentPath: (pluginId, pageId) => ipcRenderer.invoke('get-plugin-component-path', pluginId, pageId),
   installPlugin: (tempPath) => ipcRenderer.invoke('install-plugin', tempPath),
   installPluginFromBuffer: (buffer, fileName) => ipcRenderer.invoke('install-plugin-from-buffer', buffer, fileName),
-  installPluginFromFile: (tempPath, fileName) => ipcRenderer.invoke('install-plugin-from-file', tempPath, fileName),
-  installPluginFromUrl: (tempPath, url) => ipcRenderer.invoke('install-plugin-from-url', tempPath, url),
   uninstallPlugin: (pluginId) => ipcRenderer.invoke('uninstall-plugin', pluginId),
+
+  // ─── ADVANCED EDITOR ────────────────────────────────────────────────────
+  saveFileDialog: (fileName, buffer) => ipcRenderer.invoke('save-file-dialog', fileName, buffer),
+  writeSoundFile: (filePath, data) => ipcRenderer.invoke('write-sound-file', filePath, data),
+  exportAudioFile: (data, fileName, format) => ipcRenderer.invoke('export-audio-file', { data, fileName, format }),
+  convertAudio: (inputPath, outputPath, format, bitrate) => ipcRenderer.invoke('convert-audio', inputPath, outputPath, format, bitrate),
 
   // ─── DIVERS ──────────────────────────────────────────────────────────────
   isElectron: true,
-
-  // ─── ADVANDED EDITOR ────────────────────────────────────────────────────────────
-  saveFileDialog: (fileName, buffer) => ipcRenderer.invoke('save-file-dialog', fileName, buffer),
-  writeSoundFile: (filePath, data) => ipcRenderer.invoke('write-sound-file', filePath, data),
 })
 
 // Exposer également via window pour accès direct dans les event handlers

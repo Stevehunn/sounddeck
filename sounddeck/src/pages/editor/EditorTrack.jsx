@@ -19,6 +19,7 @@ export default function EditorTrack({
   onDragCheckpoint,
   onTrackRemove,
   waveformData,
+  onWaveformUpdate,
   isPlaying,
   currentTime,
   clipDurations,
@@ -370,6 +371,7 @@ export default function EditorTrack({
                 isSelected={selectedClipId === clip.id}
                 isPlaying={isPlaying && selectedClipId === clip.id}
                 waveformData={waveformData[clip.id] || null}
+                onWaveformUpdate={onWaveformUpdate}
                 clipDuration={clipDuration}
                 onSelect={() => onClipSelect(clip.id, track.id)}
                 onMove={(newStart) => onClipMove(track.id, clip.id, newStart)}

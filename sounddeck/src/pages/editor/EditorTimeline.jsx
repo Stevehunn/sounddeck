@@ -26,6 +26,7 @@ export default function EditorTimeline({
   onTrackReorder,
   onMarkersChange,
   waveformData,
+  onWaveformUpdate,
   currentTime,
   isPlaying,
   clipDurations,
@@ -554,6 +555,7 @@ export default function EditorTimeline({
                 onDragCheckpoint={onDragCheckpoint}
                 onTrackRemove={onTrackRemove}
                 waveformData={waveformData}
+                onWaveformUpdate={onWaveformUpdate}
                 isPlaying={isPlaying}
                 currentTime={currentTime}
                 clipDurations={clipDurations}

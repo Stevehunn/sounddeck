@@ -1646,6 +1646,12 @@ export function useStore() {
     console.log('Export du projet vers la bibliothèque:', name)
   }, [])
 
+  const updateEditorProject = useCallback(async (project) => {
+    setEditorProject(project)
+    await save('editorProject', project)
+    return project
+  }, [save])
+
   // ─── RENOMMER LE PROJET ──────────────────────────────────────────────────────
 
   const updateEditorProjectName = useCallback(async (newName) => {
@@ -1905,6 +1911,9 @@ export function useStore() {
     updateEditorProjectName,
     saveEditorMarkers,
     updateClipWithPath,
+    commitEditorProject,
+    setEditorProject,
+    updateEditorProject,
 
     // Undo/Redo
     undoEditor,

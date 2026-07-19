@@ -1,0 +1,362 @@
+/**
+ * Mixdown réel - Fusionne tous les clips en un seul fichier audio
+ * Version compatible navigateur (utilise les APIs Electron)
+ */
+
+/**
+ * Mixe tous les clips d'un projet en un seul buffer audio
+ */
+export async function mixdownProject(project, clipDurations, sampleRate = 44100, onProgress) {
+  if (!project || !project.tracks || project.tracks.length === 0) {
+    throw new Error('Projet vide')
+  }
+
+  let totalDuration = 0
+  const clipsWithInfo = []
+
+  for (const track of project.tracks) {
+    for (const clip of track.clips) {
+      const duration = clipDurations[clip.id] || clip.duration || 3
+      const end = clip.start + duration
+      if (end > totalDuration) totalDuration = end
+      
+      clipsWithInfo.push({
+        ...clip,
+        trackId: track.id,
+        duration: duration,
+        end: end,
+        trackVolume: track.volume || 1,
+        trackMuted: track.muted || false,
+        trackSolo: track.solo || false
+      })
+    }
+  }
+
+  totalDuration += 0.1
+
+  if (clipsWithInfo.length === 0) {
+    throw new Error('Aucun clip à mixer')
+  }
+
+  const offlineContext = new OfflineAudioContext(
+    2,
+    Math.ceil(totalDuration * sampleRate),
+    sampleRate
+  )
+
+  const hasSolo = clipsWithInfo.some(c => c.trackSolo)
+  const soloTrackIds = hasSolo 
+    ? clipsWithInfo.filter(c => c.trackSolo).map(c => c.trackId)
+    : []
+
+  const trackGains = {}
+  for (const clip of clipsWithInfo) {
+    if (!trackGains[clip.trackId]) {
+      trackGains[clip.trackId] = {
+        volume: clip.trackVolume || 1,
+        muted: clip.trackMuted || false,
+        solo: clip.trackSolo || false
+      }
+    }
+  }
+
+  let processed = 0
+  const totalClips = clipsWithInfo.length
+
+  // Importer les effets dynamiquement
+  let applyEffectsToBufferFn = null
+  try {
+    const effectsModule = await import('./realTimeEffects')
+    applyEffectsToBufferFn = effectsModule.applyEffectsToBuffer
+  } catch (e) {
+    console.warn('⚠️ realTimeEffects non disponible, les effets ne seront pas appliqués')
+  }
+
+  const mixPromises = clipsWithInfo.map(async (clipInfo) => {
+    if (hasSolo && !soloTrackIds.includes(clipInfo.trackId)) {
+      processed++
+      if (onProgress) onProgress(processed / totalClips)
+      return null
+    }
+
+    if (trackGains[clipInfo.trackId]?.muted) {
+      processed++
+      if (onProgress) onProgress(processed / totalClips)
+      return null
+    }
+
+    try {
+      const fileUrl = clipInfo.path.startsWith('file://') 
+        ? clipInfo.path 
+        : 'file:///' + clipInfo.path.replace(/\\/g, '/')
+      
+      const response = await fetch(fileUrl)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      const arrayBuffer = await response.arrayBuffer()
+      const audioBuffer = await offlineContext.decodeAudioData(arrayBuffer)
+
+      let processedBuffer = audioBuffer
+      if (clipInfo.effects && clipInfo.effects.length > 0 && applyEffectsToBufferFn) {
+        try {
+          processedBuffer = applyEffectsToBufferFn(audioBuffer, clipInfo.effects, sampleRate, true)
+        } catch (e) {
+          console.warn(`Erreur application effets sur "${clipInfo.name}":`, e)
+        }
+      }
+
+      const source = offlineContext.createBufferSource()
+      source.buffer = processedBuffer
+
+      const clipGain = offlineContext.createGain()
+      
+      const clipVolumeDb = clipInfo.volumeDb || clipInfo.volume || 0
+      const clipVolumeLinear = Math.pow(10, clipVolumeDb / 20)
+      const trackVolume = trackGains[clipInfo.trackId]?.volume || 1
+      const masterVolume = 0.9
+      const finalVolume = Math.min(1, clipVolumeLinear * trackVolume * masterVolume)
+      clipGain.gain.value = finalVolume
+
+      source.connect(clipGain)
+      clipGain.connect(offlineContext.destination)
+
+      const startTime = clipInfo.start || 0
+      const duration = clipInfo.duration || 3
+      const offset = clipInfo.offset || 0
+      source.start(startTime, offset, duration)
+
+      processed++
+      if (onProgress) onProgress(processed / totalClips)
+
+      return source
+
+    } catch (e) {
+      console.warn(`⚠️ Erreur lors du mixage du clip "${clipInfo.name}":`, e.message)
+      processed++
+      if (onProgress) onProgress(processed / totalClips)
+      return null
+    }
+  })
+
+  await Promise.allSettled(mixPromises)
+
+  let renderedBuffer
+  try {
+    renderedBuffer = await offlineContext.startRendering()
+  } catch (e) {
+    console.error('Erreur lors du rendu:', e)
+    throw new Error('Erreur lors du rendu audio')
+  }
+
+  return renderedBuffer
+}
+
+/**
+ * Convertit un AudioBuffer en WAV (ArrayBuffer)
+ */
+function audioBufferToWav(buffer) {
+  const numChannels = buffer.numberOfChannels
+  const sampleRate = buffer.sampleRate
+  const format = 1
+  const bitDepth = 16
+  const bytesPerSample = bitDepth / 8
+  const blockAlign = numChannels * bytesPerSample
+  
+  const samples = buffer.length
+  const dataSize = samples * numChannels * bytesPerSample
+  const headerSize = 44
+  const totalSize = headerSize + dataSize
+  
+  const wav = new ArrayBuffer(totalSize)
+  const view = new DataView(wav)
+  
+  writeString(view, 0, 'RIFF')
+  view.setUint32(4, totalSize - 8, true)
+  writeString(view, 8, 'WAVE')
+  
+  writeString(view, 12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, format, true)
+  view.setUint16(22, numChannels, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * blockAlign, true)
+  view.setUint16(32, blockAlign, true)
+  view.setUint16(34, bitDepth, true)
+  
+  writeString(view, 36, 'data')
+  view.setUint32(40, dataSize, true)
+  
+  const offset = 44
+  const dataView = new DataView(wav, offset)
+  
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel)
+    let idx = channel * bytesPerSample
+    
+    for (let i = 0; i < samples; i++) {
+      const sample = Math.max(-1, Math.min(1, channelData[i]))
+      const int16 = sample < 0 ? sample * 0x8000 : sample * 0x7FFF
+      dataView.setInt16(idx + i * blockAlign, int16, true)
+    }
+  }
+  
+  return wav
+}
+
+function writeString(view, offset, string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i))
+  }
+}
+
+/**
+ * Sauvegarde un fichier audio via l'API Electron
+ */
+async function saveAudioFileViaElectron(data, outputPath) {
+  // Convertir ArrayBuffer en Uint8Array
+  const uint8Array = new Uint8Array(data)
+  
+  // Utiliser l'API Electron pour écrire le fichier
+  // On va utiliser writeDroppedFile ou une API équivalente
+  const fileName = outputPath.split('/').pop() || outputPath.split('\\').pop() || 'exported.wav'
+  
+  // Essayer d'utiliser writeSoundFile si disponible
+  try {
+    const result = await window.electronAPI.writeSoundFile?.(outputPath, Array.from(uint8Array))
+    if (result?.success) {
+      return { success: true, path: outputPath }
+    }
+  } catch (e) {
+    console.warn('writeSoundFile non disponible:', e)
+  }
+  
+  // Fallback: utiliser l'API de téléchargement
+  try {
+    const blob = new Blob([data], { type: 'audio/wav' })
+    const url = URL.createObjectURL(blob)
+    
+    // Utiliser l'API downloadSoundUrl
+    const result = await window.electronAPI.downloadSoundUrl?.(url, fileName)
+    if (result?.success) {
+      return { success: true, path: result.path }
+    }
+  } catch (e) {
+    console.warn('downloadSoundUrl non disponible:', e)
+  }
+  
+  // Dernier fallback: créer un lien de téléchargement
+  try {
+    const blob = new Blob([data], { type: 'audio/wav' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 10000)
+    return { success: true, path: 'download://' + fileName, downloaded: true }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+}
+
+/**
+ * Exporte le mixdown vers un fichier audio
+ */
+export async function exportMixdown(buffer, format = 'mp3', bitrate = 192, outputPath, onProgress) {
+  try {
+    if (onProgress) onProgress(0.1)
+    
+    const wavData = audioBufferToWav(buffer)
+    if (onProgress) onProgress(0.2)
+    
+    // Si format WAV, sauvegarder directement
+    if (format === 'wav') {
+      const result = await saveAudioFileViaElectron(wavData, outputPath)
+      if (onProgress) onProgress(1)
+      return result
+    }
+
+    // Pour MP3 ou OGG, on essaie d'utiliser ffmpeg via Electron
+    try {
+      // Créer un fichier WAV temporaire
+      const tempPath = outputPath + '.temp.wav'
+      const saveResult = await saveAudioFileViaElectron(wavData, tempPath)
+      
+      if (!saveResult.success) {
+        // Fallback: sauvegarder en WAV
+        const fallbackPath = outputPath.replace(/\.(mp3|ogg)$/, '.wav')
+        const result = await saveAudioFileViaElectron(wavData, fallbackPath)
+        if (onProgress) onProgress(1)
+        return { 
+          success: true, 
+          path: fallbackPath, 
+          format: 'wav',
+          warning: 'Conversion impossible, export en WAV' 
+        }
+      }
+
+      if (onProgress) onProgress(0.4)
+
+      // Essayer d'utiliser ffmpeg via Electron
+      const result = await window.electronAPI.convertAudio?.(tempPath, outputPath, format, bitrate)
+      
+      if (onProgress) onProgress(0.9)
+
+      // Nettoyer le fichier temporaire
+      try {
+        await window.electronAPI.deleteSoundFile?.(tempPath)
+      } catch (e) {}
+
+      if (result?.success) {
+        if (onProgress) onProgress(1)
+        return { 
+          success: true, 
+          path: outputPath, 
+          format: format,
+          size: result.size || 0
+        }
+      }
+
+      // Fallback: sauvegarder en WAV
+      const fallbackPath = outputPath.replace(/\.(mp3|ogg)$/, '.wav')
+      const fallbackResult = await saveAudioFileViaElectron(wavData, fallbackPath)
+      if (onProgress) onProgress(1)
+      return { 
+        success: true, 
+        path: fallbackPath, 
+        format: 'wav',
+        warning: 'Conversion impossible, export en WAV' 
+      }
+
+    } catch (e) {
+      console.warn('⚠️ Erreur conversion:', e.message)
+      
+      // Fallback: sauvegarder en WAV
+      const fallbackPath = outputPath.replace(/\.(mp3|ogg)$/, '.wav')
+      const result = await saveAudioFileViaElectron(wavData, fallbackPath)
+      if (onProgress) onProgress(1)
+      return { 
+        success: true, 
+        path: fallbackPath, 
+        format: 'wav',
+        warning: 'Erreur conversion, export en WAV' 
+      }
+    }
+
+  } catch (e) {
+    console.error('❌ Erreur export:', e)
+    return { 
+      success: false, 
+      error: e.message 
+    }
+  }
+}
+
+export default {
+  mixdownProject,
+  exportMixdown,
+  audioBufferToWav
+}

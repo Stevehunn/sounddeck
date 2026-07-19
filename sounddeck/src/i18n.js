@@ -128,6 +128,16 @@ export const TRANSLATIONS = {
     editorSplitAndScatter: 'Séparer',
     editorImportToTrack: 'Importer dans la piste...',
 
+    // ─── MARQUEURS ──────────────────────────────────────────────────────────────
+    editorDeleteMarker: 'Supprimer le marqueur',
+    editorDeleteMarkerConfirm: 'Supprimer le marqueur "{name}" ?',
+    editorDeleteMarkerMessage: 'Êtes-vous sûr de vouloir supprimer le marqueur "{name}" ? Cette action est irréversible.',
+    editorDeleteAllMarkers: 'Supprimer tous les marqueurs ?',
+    editorDeleteAllMarkersMessage: 'Êtes-vous sûr de vouloir supprimer tous les marqueurs ? Cette action est irréversible.',
+    editorMarkerDeleted: 'Marqueur supprimé',
+    editorAllMarkersDeleted: 'Tous les marqueurs supprimés',
+    editorDelete: 'Supprimer',
+
     // ─── LIBRARY ────────────────────────────────────────────────────────────────
     library: 'Bibliothèque',
     libraryTitle: 'Bibliothèque de sons',
@@ -1435,6 +1445,16 @@ export const TRANSLATIONS = {
     editorSplitAndScatter: 'Split & Scatter',
     editorImportToTrack: 'Import to track...',
 
+    // ─── MARKERS ──────────────────────────────────────────────────────────────
+    editorDeleteMarker: 'Delete marker',
+    editorDeleteMarkerConfirm: 'Delete marker "{name}" ?',
+    editorDeleteMarkerMessage: 'Are you sure you want to delete the marker "{name}" ? This action is irreversible.',
+    editorDeleteAllMarkers: 'Delete all markers ?',
+    editorDeleteAllMarkersMessage: 'Are you sure you want to delete all markers ? This action is irreversible.',
+    editorMarkerDeleted: 'Marker deleted',
+    editorAllMarkersDeleted: 'All markers deleted',
+    editorDelete: 'Delete',
+
     // ─── PLUGINS ────────────────────────────────────────────────────────────────
     optionsPlugins: 'Plugins',
     pluginsInstall: 'Install a plugin',
@@ -2728,6 +2748,16 @@ export const TRANSLATIONS = {
     editorTrim: 'Recortar',
     editorSplitAndScatter: 'Separar',
     editorImportToTrack: 'Importar a la pista...',
+
+    // ─── MARCADORES ──────────────────────────────────────────────────────────────
+    editorDeleteMarker: 'Eliminar marcador',
+    editorDeleteMarkerConfirm: '¿Eliminar el marcador "{name}" ?',
+    editorDeleteMarkerMessage: '¿Estás seguro de que quieres eliminar el marcador "{name}" ? Esta acción es irreversible.',
+    editorDeleteAllMarkers: '¿Eliminar todos los marcadores ?',
+    editorDeleteAllMarkersMessage: '¿Estás seguro de que quieres eliminar todos los marcadores ? Esta acción es irreversible.',
+    editorMarkerDeleted: 'Marcador eliminado',
+    editorAllMarkersDeleted: 'Todos los marcadores eliminados',
+    editorDelete: 'Eliminar',
 
     // ─── SIDEBAR EDITOR ────────────────────────────────────────────────────────
     sidebarCustomization: 'Personalizar barra lateral',

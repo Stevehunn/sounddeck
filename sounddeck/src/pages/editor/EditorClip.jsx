@@ -22,6 +22,7 @@ export default function EditorClip({
   onFadeInChange,
   onFadeOutChange,
   onDragCheckpoint,
+  onWaveformUpdate,
   autoPlayOnClick = false,
   tr
 }) {
@@ -36,7 +37,7 @@ export default function EditorClip({
   const dragValueRef = useRef(0)
   const clipRef = useRef(null)
   
-  // ✅ Lecture preview
+  // Lecture preview
   const [isClipPlaying, setIsClipPlaying] = useState(false)
   const [playbackHowl, setPlaybackHowl] = useState(null)
 
@@ -62,6 +63,16 @@ export default function EditorClip({
       }
     }
   }, [playbackHowl])
+
+  // ✅ Regénérer le waveform quand le clip est modifié
+  useEffect(() => {
+    if (clip.path && onWaveformUpdate) {
+      const timer = setTimeout(() => {
+        onWaveformUpdate(clip.id, clip.path, clip.offset || 0, clip.duration || null)
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [clip.path, clip.duration, clip.offset, clip.id, onWaveformUpdate])
 
   const handleFadeMouseDown = (e, edge) => {
     e.stopPropagation()
@@ -103,7 +114,7 @@ export default function EditorClip({
     }
   }, [fadeDrag, pixelsPerSecond, maxFade, onFadeInChange, onFadeOutChange])
 
-  // ✅ Lecture preview
+  // Lecture preview
   const playClipPreview = (e) => {
     if (e) e.stopPropagation()
     
@@ -142,16 +153,16 @@ export default function EditorClip({
     }
   }
 
-  // ✅ Clic sur le clip
+  // Clic sur le clip
   const handleClipClick = (e) => {
+    // ✅ Ne pas déclencher si on clique sur un bouton d'action
     if (e.target.closest('.clip-actions')) return
     
-    // ✅ La sélection se fait toujours
+    // ✅ Sélection toujours effectuée
     onSelect()
     
-    // ✅ La lecture ne se fait que si autoPlayOnClick est activé
+    // ✅ Lecture uniquement en mode Auto
     if (autoPlayOnClick) {
-      // Si déjà en lecture, arrêter
       if (playbackHowl && isClipPlaying) {
         playbackHowl.stop()
         playbackHowl.unload()
@@ -313,9 +324,12 @@ export default function EditorClip({
           borderRadius: 2,
           background: 'rgba(124,111,247,0.8)',
           color: 'white',
-          zIndex: 3
+          zIndex: 3,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2
         }}>
-          <i className="ti ti-wand" /> Effets
+          <i className="ti ti-wand" style={{ fontSize: 8 }} /> Effets
         </div>
       )}
 
@@ -369,7 +383,7 @@ export default function EditorClip({
         </div>
       )}
 
-      {/* Indicateur de lecture */}
+      {/* Indicateur de lecture du projet */}
       {isPlaying && (
         <div style={{
           position: 'absolute',
@@ -383,7 +397,7 @@ export default function EditorClip({
         }} />
       )}
 
-      {/* ✅ Indicateur de preview en cours */}
+      {/* Indicateur de preview en cours */}
       {isClipPlaying && (
         <div style={{
           position: 'absolute',
@@ -480,7 +494,7 @@ export default function EditorClip({
         zIndex: 6,
         flexWrap: 'wrap'
       }}>
-        {/* ✅ Bouton Play Preview */}
+        {/* Bouton Play Preview */}
         <button
           onClick={(e) => { e.stopPropagation(); playClipPreview(e) }}
           style={{
@@ -529,7 +543,7 @@ export default function EditorClip({
           <i className="ti ti-scissors" />
         </button>
 
-        {/* ✅ Dupliquer avec icône inversée */}
+        {/* Dupliquer avec icône inversée */}
         <button
           onClick={(e) => { e.stopPropagation(); onDuplicate() }}
           style={{

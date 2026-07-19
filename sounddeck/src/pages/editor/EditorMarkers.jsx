@@ -9,6 +9,7 @@ export default function EditorMarkers({
   onRemoveMarker,
   onSeek,
   onMarkersChange,
+  addToast,
   tr,
   lang
 }) {
@@ -18,7 +19,10 @@ export default function EditorMarkers({
   const [draggingMarker, setDraggingMarker] = useState(null)
   const [dragStartX, setDragStartX] = useState(0)
   const [dragStartTime, setDragStartTime] = useState(0)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [markerToDelete, setMarkerToDelete] = useState(null)
   const containerRef = useRef(null)
+  const inputRef = useRef(null)
 
   const handleAddMarker = useCallback(() => {
     const name = newMarkerName.trim() || `Marqueur ${markers.length + 1}`
@@ -89,6 +93,34 @@ export default function EditorMarkers({
     }
   }, [draggingMarker, handleMarkerMove, handleMarkerMouseUp])
 
+  // Gestion de la confirmation de suppression
+  const handleDeleteClick = useCallback((marker, e) => {
+    e.stopPropagation()
+    setMarkerToDelete(marker)
+    setShowDeleteConfirm(true)
+  }, [])
+
+  const handleDeleteConfirm = useCallback(() => {
+    if (markerToDelete) {
+      onRemoveMarker?.(markerToDelete.id)
+      addToast?.(tr('editorMarkerDeleted'), 'info')
+    }
+    setShowDeleteConfirm(false)
+    setMarkerToDelete(null)
+  }, [markerToDelete, onRemoveMarker, addToast, tr])
+
+  const handleDeleteCancel = useCallback(() => {
+    setShowDeleteConfirm(false)
+    setMarkerToDelete(null)
+  }, [])
+
+  const handleDeleteAll = useCallback(() => {
+    markers.forEach(m => onRemoveMarker?.(m.id))
+    setShowDeleteConfirm(false)
+    setMarkerToDelete(null)
+    addToast?.(tr('editorAllMarkersDeleted'), 'info')
+  }, [markers, onRemoveMarker, addToast, tr])
+
   // Raccourci clavier pour ajouter un marqueur
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -101,18 +133,27 @@ export default function EditorMarkers({
           color: getMarkerColor(markers.length)
         })
       }
-      // Supprimer le marqueur sous le curseur avec Delete
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const markerUnderCursor = markers.find(m => Math.abs(m.time - currentTime) < 0.5)
         if (markerUnderCursor) {
-          onRemoveMarker?.(markerUnderCursor.id)
+          setMarkerToDelete(markerUnderCursor)
+          setShowDeleteConfirm(true)
         }
       }
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentTime, markers.length, onAddMarker, onRemoveMarker, markers])
+  }, [currentTime, markers.length, onAddMarker, markers])
+
+  // Focus sur l'input quand le modal d'ajout s'ouvre
+  useEffect(() => {
+    if (isAdding && inputRef.current) {
+      setTimeout(() => {
+        inputRef.current.focus()
+      }, 100)
+    }
+  }, [isAdding])
 
   const navigateToMarker = useCallback((time) => {
     onSeek?.(time)
@@ -167,6 +208,7 @@ export default function EditorMarkers({
         const position = marker.time * pixelsPerSecond
         const isNear = Math.abs(marker.time - currentTime) < 0.5
         const isDragging = draggingMarker?.id === marker.id
+        const isHovered = hoveredMarkerId === marker.id
         
         return (
           <div
@@ -181,7 +223,7 @@ export default function EditorMarkers({
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              opacity: (hoveredMarkerId === marker.id || isNear || isDragging) ? 1 : 0.6,
+              opacity: (isHovered || isNear || isDragging) ? 1 : 0.6,
               transition: 'opacity 0.2s ease'
             }}
             onMouseEnter={() => setHoveredMarkerId(marker.id)}
@@ -202,26 +244,71 @@ export default function EditorMarkers({
               }}
             />
             
-            {/* Nom du marqueur */}
+            {/* Nom du marqueur avec bouton supprimer à droite */}
             <div
               style={{
-                fontSize: 9,
-                color: 'var(--text-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                marginTop: 2,
                 background: 'var(--bg-secondary)',
-                padding: '1px 6px',
                 borderRadius: 3,
                 border: `1px solid ${marker.color || '#f44336'}`,
-                whiteSpace: 'nowrap',
-                marginTop: 2,
-                maxWidth: 80,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
+                padding: '1px 4px',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                cursor: 'grab'
+                maxWidth: 120
               }}
-              title={`${marker.name} (${formatTime(marker.time)}) - Glisser pour déplacer`}
             >
-              {marker.name}
+              <span
+                style={{
+                  fontSize: 9,
+                  color: 'var(--text-secondary)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  cursor: 'grab',
+                  flex: 1
+                }}
+                title={`${marker.name} (${formatTime(marker.time)}) - Glisser pour déplacer`}
+              >
+                {marker.name}
+              </span>
+
+              {/* Bouton supprimer - à droite du nom */}
+              <button
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: '50%',
+                  background: isHovered || isNear ? 'rgba(224,82,82,0.8)' : 'transparent',
+                  border: 'none',
+                  color: isHovered || isNear ? 'white' : 'transparent',
+                  cursor: 'pointer',
+                  fontSize: 8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease'
+                }}
+                onClick={(e) => handleDeleteClick(marker, e)}
+                title={tr('editorRemoveMarker') || 'Supprimer le marqueur'}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'var(--danger)'
+                  e.currentTarget.style.color = 'white'
+                  e.currentTarget.style.transform = 'scale(1.15)'
+                }}
+                onMouseLeave={e => {
+                  if (!isHovered && !isNear) {
+                    e.currentTarget.style.background = 'transparent'
+                    e.currentTarget.style.color = 'transparent'
+                  }
+                  e.currentTarget.style.transform = 'scale(1)'
+                }}
+              >
+                <i className="ti ti-x" style={{ fontSize: 8 }} />
+              </button>
             </div>
 
             {/* Ligne verticale du marqueur */}
@@ -239,43 +326,6 @@ export default function EditorMarkers({
                 transition: 'opacity 0.2s ease'
               }}
             />
-
-            {/* Bouton supprimer au survol ou si proche */}
-            {(hoveredMarkerId === marker.id || isNear) && (
-              <button
-                style={{
-                  position: 'absolute',
-                  top: -10,
-                  right: -18,
-                  width: 18,
-                  height: 18,
-                  borderRadius: '50%',
-                  background: 'var(--danger)',
-                  border: 'none',
-                  color: 'white',
-                  cursor: 'pointer',
-                  fontSize: 10,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: 0,
-                  zIndex: 25,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-                  transition: 'transform 0.15s ease'
-                }}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (confirm(`Supprimer le marqueur "${marker.name}" ?`)) {
-                    onRemoveMarker?.(marker.id)
-                  }
-                }}
-                title={tr('editorRemoveMarker') || 'Supprimer le marqueur'}
-                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.2)'}
-                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-              >
-                <i className="ti ti-x" />
-              </button>
-            )}
           </div>
         )
       })}
@@ -329,24 +379,22 @@ export default function EditorMarkers({
 
         <button
           className="btn-ghost btn-sm"
-          onClick={() => setIsAdding(!isAdding)}
+          onClick={() => setIsAdding(true)}
           style={{ fontSize: 10, padding: '2px 6px', color: 'var(--text-secondary)' }}
           title={tr('editorAddMarker') || 'Ajouter un marqueur (Ctrl+M)'}
         >
           <i className="ti ti-plus" />
         </button>
         
-        {/* Bouton pour supprimer tous les marqueurs */}
         {markers.length > 0 && (
           <button
             className="btn-ghost btn-sm"
             onClick={() => {
-              if (confirm('Supprimer tous les marqueurs ?')) {
-                markers.forEach(m => onRemoveMarker?.(m.id))
-              }
+              setMarkerToDelete(null)
+              setShowDeleteConfirm(true)
             }}
             style={{ fontSize: 10, padding: '2px 6px', color: 'var(--text-tertiary)' }}
-            title="Supprimer tous les marqueurs"
+            title={tr('editorDeleteAllMarkers') || 'Supprimer tous les marqueurs'}
           >
             <i className="ti ti-trash" />
           </button>
@@ -355,56 +403,111 @@ export default function EditorMarkers({
 
       {/* Modal d'ajout de marqueur avec nom */}
       {isAdding && (
-        <div style={{
-          position: 'absolute',
-          bottom: -50,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'var(--bg-secondary)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-md)',
-          padding: 8,
-          zIndex: 40,
-          display: 'flex',
-          gap: 6,
-          alignItems: 'center',
-          boxShadow: 'var(--shadow-lg)',
-          animation: 'fadeIn 0.15s ease'
+        <div className="modal-overlay" onClick={() => {
+          setIsAdding(false)
+          setNewMarkerName('')
         }}>
-          <input
-            type="text"
-            value={newMarkerName}
-            onChange={e => setNewMarkerName(e.target.value)}
-            placeholder={tr('editorMarkerName') || 'Nom du marqueur'}
-            style={{
-              fontSize: 11,
-              padding: '4px 8px',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border)',
-              background: 'var(--bg-tertiary)',
-              color: 'var(--text-primary)',
-              minWidth: 120
-            }}
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleAddMarker()
-              if (e.key === 'Escape') setIsAdding(false)
-            }}
-          />
-          <button
-            className="btn-primary btn-sm"
-            onClick={handleAddMarker}
-            style={{ fontSize: 11, padding: '4px 10px' }}
-          >
-            {tr('add')}
-          </button>
-          <button
-            className="btn-secondary btn-sm"
-            onClick={() => setIsAdding(false)}
-            style={{ fontSize: 11, padding: '4px 10px' }}
-          >
-            {tr('cancel')}
-          </button>
+          <div className="modal" style={{ width: 380 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">
+              <i className="ti ti-bookmark" style={{ color: 'var(--accent)' }} />
+              {tr('editorAddMarker') || 'Ajouter un marqueur'}
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+                {tr('editorMarkerName') || 'Nom du marqueur'}
+              </label>
+              <input
+                ref={inputRef}
+                type="text"
+                value={newMarkerName}
+                onChange={e => setNewMarkerName(e.target.value)}
+                placeholder={tr('editorMarkerName') || 'Nom du marqueur'}
+                className="input-lg"
+                style={{ fontSize: 13 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAddMarker()
+                  if (e.key === 'Escape') {
+                    setIsAdding(false)
+                    setNewMarkerName('')
+                  }
+                }}
+              />
+            </div>
+
+            <div className="modal-actions">
+              <button
+                className="btn-secondary btn-lg"
+                onClick={() => {
+                  setIsAdding(false)
+                  setNewMarkerName('')
+                }}
+              >
+                {tr('cancel') || 'Annuler'}
+              </button>
+              <button
+                className="btn-primary btn-lg"
+                onClick={handleAddMarker}
+                disabled={!newMarkerName.trim()}
+              >
+                <i className="ti ti-check" /> {tr('add')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmation de suppression - style standard */}
+      {showDeleteConfirm && (
+        <div className="modal-overlay" onClick={handleDeleteCancel}>
+          <div className="modal" style={{ width: 400 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">
+              <i className="ti ti-trash" style={{ color: 'var(--danger)' }} />
+              {markerToDelete 
+                ? tr('editorDeleteMarkerConfirm').replace('{name}', markerToDelete.name)
+                : tr('editorDeleteAllMarkers')}
+            </div>
+
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
+              {markerToDelete 
+                ? tr('editorDeleteMarkerMessage').replace('{name}', markerToDelete.name)
+                : tr('editorDeleteAllMarkersMessage')}
+            </div>
+
+            <div className="modal-actions">
+              <button
+                className="btn-secondary btn-lg"
+                onClick={handleDeleteCancel}
+              >
+                {tr('cancel') || 'Annuler'}
+              </button>
+              <button
+                className="btn-danger btn-lg"
+                onClick={markerToDelete ? handleDeleteConfirm : handleDeleteAll}
+                style={{
+                  background: 'var(--danger)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '8px 20px',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.opacity = '0.8'
+                  e.currentTarget.style.transform = 'scale(1.02)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.opacity = '1'
+                  e.currentTarget.style.transform = 'scale(1)'
+                }}
+              >
+                <i className="ti ti-trash" style={{ marginRight: 6 }} />
+                {tr('editorDelete') || 'Supprimer'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

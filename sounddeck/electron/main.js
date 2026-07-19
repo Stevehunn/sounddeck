@@ -12,6 +12,8 @@ const PLUGINS_DIR = path.join(app.getPath('userData'), 'plugins')
 
 const store = new Store()
 
+// ─── SINGLE INSTANCE ──────────────────────────────────────────────────────────
+
 const gotTheLock = app.requestSingleInstanceLock()
 
 if (!gotTheLock) {
@@ -28,7 +30,8 @@ app.on('second-instance', () => {
   }
 })
 
-// Ajouter un état pour les raccourcis globaux
+// ─── VARIABLES GLOBALES ─────────────────────────────────────────────────────
+
 let globalShortcutsEnabled = store.get('globalShortcutsEnabled', true)
 let registeredShortcuts = []
 let mainWindow = null
@@ -37,6 +40,7 @@ let trayInstance = null
 let isQuitting = false
 let closeToTray = store.get('closeToTray', true)
 let pendingQuit = false
+let currentToggleWindowShortcut = 'CommandOrControl+Shift+S'
 
 const isDev = !app.isPackaged
 
@@ -46,7 +50,6 @@ Menu.setApplicationMenu(null)
 const soundsDir = path.join(app.getPath('userData'), 'sounds')
 if (!fs.existsSync(soundsDir)) fs.mkdirSync(soundsDir, { recursive: true })
 
-// Vérifier si l'app doit démarrer en arrière-plan
 const shouldStartMinimized = store.get('startMinimized', false)
 
 const TRENDING_URLS = {
@@ -56,6 +59,7 @@ const TRENDING_URLS = {
 }
 
 // ─── TRAY LABELS ──────────────────────────────────────────────────────────────
+
 const TRAY_LABELS = {
   fr: {
     open: 'Ouvrir SoundDeck',
@@ -86,7 +90,7 @@ const TRAY_LABELS = {
   }
 }
 
-// ─── FONCTIONS POUR LE TRAY ──────────────────────────────────────────────────
+// ─── FONCTIONS TRAY ──────────────────────────────────────────────────────────
 
 function getCurrentTrayLanguage() {
   return store.get('lang', 'fr')
@@ -142,7 +146,6 @@ function buildTrayMenu(lang) {
 }
 
 function createTray(lang = 'fr') {
-  // ✅ Empêcher la création de plusieurs icônes
   if (trayInstance) {
     console.log('ℹ️ Une icône du tray existe déjà')
     return
@@ -167,7 +170,7 @@ function createTray(lang = 'fr') {
 
   const trayIcon = icon.resize({ width: 16, height: 16 })
   tray = new Tray(trayIcon)
-  trayInstance = tray // ← STOCKER L'INSTANCE
+  trayInstance = tray
   tray.setToolTip('SoundDeck - Soundboard')
 
   const contextMenu = buildTrayMenu(lang)
@@ -186,13 +189,11 @@ function createTray(lang = 'fr') {
   })
 }
 
-// ─── RÉOUVERTURE CENTRALISÉE DE LA FENÊTRE ──────────────────────────────────
 function showMainWindow() {
   if (mainWindow) {
     const wasHidden = !mainWindow.isVisible()
 
     if (wasHidden) {
-      // ✅ Vraie réouverture depuis le tray : on annule une éventuelle popup
       mainWindow.webContents.send('hide-quit-confirm')
     }
 
@@ -203,12 +204,12 @@ function showMainWindow() {
   }
 }
 
-// ─── DÉTECTION DE LA LANGUE SYSTÈME ──────────────────────────────────────
+// ─── SYSTÈME ──────────────────────────────────────────────────────────────────
 
 function getSystemLanguage() {
   try {
-    const locale = app.getLocale() // 'fr', 'en', 'es', 'fr-FR', etc.
-    const lang = locale.split('-')[0] // Prendre seulement la partie langue
+    const locale = app.getLocale()
+    const lang = locale.split('-')[0]
     const supported = ['fr', 'en', 'es']
     return supported.includes(lang) ? lang : 'fr'
   } catch (e) {
@@ -217,45 +218,30 @@ function getSystemLanguage() {
   }
 }
 
-// ─── DÉTECTION DU LAYOUT CLAVIER ──────────────────────────────────────────
-
 function getSystemKeyboardLayout() {
   if (process.platform !== 'win32') {
-    // Sur macOS/Linux, on utilise une approche différente
     return 'qwerty'
   }
 
   try {
     const { execSync } = require('child_process')
     
-    // Méthode: Lire la langue d'installation du système via le registre
     try {
-      // Récupérer la langue d'installation de Windows
       const result = execSync(
         'reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout\\DosKeybCodes" /v "0000040c" 2>nul || echo NOT_FOUND',
         { encoding: 'utf8', timeout: 3000 }
       )
-      
-      // Si la clé 0000040c (français) existe, c'est probablement AZERTY
       if (result.includes('0000040c')) {
         return 'azerty'
       }
-    } catch (e) {
-      // La clé n'existe pas, on continue
-    }
+    } catch (e) {}
 
-    // Méthode alternative: Lire la langue système
     try {
       const result = execSync(
         'wmic os get locale /value',
         { encoding: 'utf8', timeout: 3000 }
       )
-      
-      // Locale 040c = Français (France) -> AZERTY
-      // 080c = Français (Belgique) -> AZERTY
-      // 100c = Français (Suisse) -> AZERTY
       const azertyLocales = ['040c', '080c', '100c']
-      
       const match = result.match(/Locale=([0-9a-fA-F]+)/)
       if (match) {
         const locale = match[1].toLowerCase()
@@ -267,7 +253,6 @@ function getSystemKeyboardLayout() {
       console.warn('⚠️ Erreur détection locale:', e.message)
     }
 
-    // Fallback: utiliser la langue système
     const lang = getSystemLanguage()
     const azertyCountries = ['fr', 'be', 'ch']
     return azertyCountries.includes(lang) ? 'azerty' : 'qwerty'
@@ -278,7 +263,23 @@ function getSystemKeyboardLayout() {
   }
 }
 
-// ─── IPC HANDLERS POUR LE TRAY ──────────────────────────────────────────────
+// ─── HANDLERS DE STORE ──────────────────────────────────────────────────────
+
+ipcMain.handle('store-get', (event, key) => {
+  return store.get(key)
+})
+
+ipcMain.handle('store-set', (event, key, value) => {
+  store.set(key, value)
+  return true
+})
+
+ipcMain.handle('store-delete', (event, key) => {
+  store.delete(key)
+  return true
+})
+
+// ─── IPC HANDLERS TRAY ─────────────────────────────────────────────────────
 
 ipcMain.handle('update-tray-language', (event, lang) => {
   if (tray) {
@@ -293,26 +294,676 @@ ipcMain.handle('store-set-lang', (event, lang) => {
   return true
 })
 
-// ─── GESTION DU PILOTE VIRTUAL AUDIO (VB-Cable) ────────────────────────────
+ipcMain.handle('get-start-minimized', () => {
+  return store.get('startMinimized', false)
+})
 
-// Vérifier si le pilote VB-Cable est installé
+ipcMain.handle('set-start-minimized', (event, value) => {
+  store.set('startMinimized', value)
+  return true
+})
+
+ipcMain.handle('get-launch-at-startup', () => {
+  return store.get('launchAtStartup', false)
+})
+
+ipcMain.handle('set-launch-at-startup', (event, value) => {
+  setLaunchAtStartup(value)
+  return true
+})
+
+ipcMain.handle('quit-app', () => {
+  isQuitting = true
+  app.quit()
+  return true
+})
+
+ipcMain.handle('hide-window', () => {
+  if (mainWindow) {
+    mainWindow.hide()
+  }
+  return true
+})
+
+ipcMain.handle('show-window', () => {
+  showMainWindow()
+  return true
+})
+
+ipcMain.handle('confirm-quit', (event, action, remember) => {
+  console.log('🔍 confirm-quit appelé avec:', { action, remember })
+
+  if (action === 'quit') {
+    if (remember) {
+      closeToTray = false
+      store.set('closeToTray', false)
+      console.log('💾 closeToTray sauvegardé:', false)
+    }
+    pendingQuit = true
+    isQuitting = true
+    app.quit()
+    return 'quit'
+  } else if (action === 'minimize') {
+    if (remember) {
+      closeToTray = true
+      store.set('closeToTray', true)
+      console.log('💾 closeToTray sauvegardé:', true)
+    }
+    
+    if (mainWindow) {
+      mainWindow.webContents.send('hide-quit-confirm')
+      setTimeout(() => {
+        console.log('🔴 [MAIN] Minimisation de la fenêtre après délai')
+        mainWindow.hide()
+      }, 500)
+    }
+    return 'minimize'
+  } else {
+    return 'cancel'
+  }
+})
+
+// ─── RACCOURCIS GLOBAUX ────────────────────────────────────────────────────
+
+function safeRegister(accelerator, callback) {
+  if (!accelerator) return false
+  try {
+    const isFn = /^F\d+$/.test(accelerator)
+    const hasMod = accelerator.includes('+')
+    if (!isFn && !hasMod) {
+      const ok = globalShortcut.register(accelerator, callback)
+      if (ok) registeredShortcuts.push(accelerator)
+      return ok
+    }
+    const ok = globalShortcut.register(accelerator, callback)
+    if (ok) registeredShortcuts.push(accelerator)
+    return ok
+  } catch (e) {
+    console.warn('Raccourci non supporté:', accelerator, e.message)
+    return false
+  }
+}
+
+function unregisterAllShortcuts() {
+  registeredShortcuts.forEach(acc => {
+    try {
+      globalShortcut.unregister(acc)
+    } catch (e) {}
+  })
+  registeredShortcuts = []
+  console.log('🔇 Tous les raccourcis désenregistrés')
+}
+
+function registerShortcuts() {
+  if (!globalShortcutsEnabled) {
+    console.log('🔇 Raccourcis globaux désactivés')
+    return
+  }
+
+  const shortcuts = store.get('shortcuts', {})
+  Object.entries(shortcuts).forEach(([soundId, accelerator]) => {
+    if (!accelerator) return
+    safeRegister(accelerator, () => {
+      mainWindow?.webContents.send('play-sound', soundId)
+    })
+  })
+
+  const profileShortcut = store.get('profileShortcut', '')
+  if (profileShortcut) {
+    safeRegister(profileShortcut, () => {
+      mainWindow?.webContents.send('switch-profile')
+    })
+  }
+
+  const loopShortcut = store.get('loopShortcut', '')
+  if (loopShortcut) {
+    safeRegister(loopShortcut, () => {
+      mainWindow?.webContents.send('toggle-loop')
+    })
+  }
+
+  const stopAllShortcut = store.get('stopAllShortcut', '')
+  if (stopAllShortcut) {
+    safeRegister(stopAllShortcut, () => {
+      mainWindow?.webContents.send('stop-all-sounds')
+    })
+  }
+
+  const presentationShortcut = store.get('presentationShortcut', '')
+  if (presentationShortcut) {
+    safeRegister(presentationShortcut, () => {
+      mainWindow?.webContents.send('toggle-presentation')
+    })
+  }
+
+  console.log('✅ Raccourcis globaux activés')
+}
+
+function reregisterShortcuts() {
+  unregisterAllShortcuts()
+
+  if (globalShortcutsEnabled) {
+    registerShortcuts()
+  }
+
+  if (mainWindow) {
+    mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
+  }
+}
+
+function toggleGlobalShortcuts() {
+  globalShortcutsEnabled = !globalShortcutsEnabled
+  store.set('globalShortcutsEnabled', globalShortcutsEnabled)
+
+  if (globalShortcutsEnabled) {
+    registerShortcuts()
+  } else {
+    unregisterAllShortcuts()
+  }
+
+  if (tray) {
+    const currentLang = getCurrentTrayLanguage()
+    const contextMenu = buildTrayMenu(currentLang)
+    tray.setContextMenu(contextMenu)
+  }
+
+  if (mainWindow) {
+    mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
+  }
+
+  return globalShortcutsEnabled
+}
+
+function registerToggleShortcut() {
+  const toggleAccelerator = store.get('toggleShortcutsAccelerator', 'CommandOrControl+Shift+K')
+  if (!toggleAccelerator) return
+
+  try {
+    globalShortcut.unregister(toggleAccelerator)
+
+    const ok = globalShortcut.register(toggleAccelerator, () => {
+      globalShortcutsEnabled = !globalShortcutsEnabled
+      store.set('globalShortcutsEnabled', globalShortcutsEnabled)
+
+      if (globalShortcutsEnabled) {
+        registerShortcuts()
+      } else {
+        unregisterAllShortcuts()
+      }
+
+      if (mainWindow) {
+        mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
+      }
+
+      if (tray) {
+        const currentLang = getCurrentTrayLanguage()
+        const contextMenu = buildTrayMenu(currentLang)
+        tray.setContextMenu(contextMenu)
+      }
+
+      const state = globalShortcutsEnabled ? 'activés' : 'désactivés'
+      console.log(`🔇 Raccourcis ${state}`)
+    })
+
+    if (ok) {
+      console.log('✅ Raccourci toggle enregistré:', toggleAccelerator)
+    } else {
+      console.warn('⚠️ Impossible d\'enregistrer le raccourci toggle:', toggleAccelerator)
+    }
+  } catch (e) {
+    console.warn('Erreur enregistrement toggle:', e.message)
+  }
+}
+
+function registerToggleWindowShortcut(shortcut) {
+  if (!shortcut) {
+    shortcut = currentToggleWindowShortcut
+  }
+  
+  try {
+    globalShortcut.unregister(currentToggleWindowShortcut)
+  } catch (e) {}
+  
+  if (!shortcut) {
+    console.log('ℹ️ Raccourci toggle fenêtre désactivé')
+    return
+  }
+  
+  try {
+    const ok = globalShortcut.register(shortcut, () => {
+      if (mainWindow) {
+        if (mainWindow.isVisible()) {
+          mainWindow.hide()
+        } else {
+          showMainWindow()
+        }
+      } else {
+        createWindow()
+      }
+    })
+    
+    if (ok) {
+      currentToggleWindowShortcut = shortcut
+      console.log(`✅ Raccourci pour toggle la fenêtre enregistré: ${shortcut}`)
+    } else {
+      console.warn(`⚠️ Impossible d'enregistrer le raccourci: ${shortcut}`)
+    }
+  } catch (e) {
+    console.warn('Erreur enregistrement toggle fenêtre:', e.message)
+  }
+}
+
+function cleanupOrphanShortcuts() {
+  console.log('🧹 Nettoyage des raccourcis orphelins...')
+  const shortcuts = store.get('shortcuts', {})
+  const sounds = store.get('sounds', [])
+  const soundIds = new Set(sounds.map(s => s.id))
+  let hasChanges = false
+
+  Object.keys(shortcuts).forEach(id => {
+    if (!soundIds.has(id)) {
+      console.log(`🗑️ Suppression du raccourci orphelin pour l'ID: ${id}`)
+      delete shortcuts[id]
+      hasChanges = true
+    }
+  })
+
+  if (hasChanges) {
+    store.set('shortcuts', shortcuts)
+    console.log('✅ Raccourcis orphelins nettoyés')
+    reregisterShortcuts()
+  } else {
+    console.log('✅ Aucun raccourci orphelin trouvé')
+  }
+}
+
+function setLaunchAtStartup(enabled) {
+  store.set('launchAtStartup', enabled)
+
+  if (process.platform !== 'win32') return
+
+  if (!app.isPackaged) {
+    console.log('🛠️ Mode développement : création du raccourci désactivée')
+    return
+  }
+
+  const targetPath = process.execPath
+  const workingDir = path.dirname(targetPath)
+  const startupFolder = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
+  const startupShortcutPath = path.join(startupFolder, 'SoundDeck.lnk')
+
+  console.log('🎯 setLaunchAtStartup - enabled:', enabled)
+  console.log('🎯 targetPath:', targetPath)
+
+  if (enabled) {
+    const searchPaths = [
+      path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+      'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs',
+      path.join(app.getPath('desktop')),
+      'C:\\Users\\Public\\Desktop',
+    ]
+    
+    for (const folder of searchPaths) {
+      if (!fs.existsSync(folder)) continue
+      const files = fs.readdirSync(folder)
+      for (const file of files) {
+        if (file.toLowerCase().includes('sounddeck') && file.endsWith('.lnk')) {
+          const fullPath = path.join(folder, file)
+          try {
+            fs.unlinkSync(fullPath)
+            console.log(`🗑️ Supprimé: ${fullPath}`)
+          } catch (e) {}
+        }
+      }
+    }
+  }
+
+  if (!fs.existsSync(startupFolder)) {
+    try {
+      fs.mkdirSync(startupFolder, { recursive: true })
+    } catch (e) {
+      console.error('❌ Erreur création dossier Startup:', e)
+      return
+    }
+  }
+
+  if (enabled) {
+    const tempDir = app.getPath('temp')
+    const ps1Path = path.join(tempDir, `create_shortcut_${Date.now()}.ps1`)
+    
+    const ps1Content = `
+$WshShell = New-Object -ComObject WScript.Shell
+$Shortcut = $WshShell.CreateShortcut("${startupShortcutPath.replace(/\\/g, '\\\\')}")
+$Shortcut.TargetPath = "${targetPath.replace(/\\/g, '\\\\')}"
+$Shortcut.WorkingDirectory = "${workingDir.replace(/\\/g, '\\\\')}"
+$Shortcut.Save()
+`
+    
+    fs.writeFileSync(ps1Path, ps1Content, 'utf8')
+    
+    const cmd = `powershell -ExecutionPolicy Bypass -File "${ps1Path}"`
+    
+    exec(cmd, { maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+      try {
+        if (fs.existsSync(ps1Path)) fs.unlinkSync(ps1Path)
+      } catch (e) {}
+      
+      if (error) {
+        console.error('❌ Erreur création raccourci:', error.message)
+        return
+      }
+      
+      if (fs.existsSync(startupShortcutPath)) {
+        console.log('✅ Raccourci démarrage créé')
+      }
+    })
+  }
+}
+
+function findAllSoundDeckShortcuts() {
+  console.log('═══════════════════════════════════════════════')
+  console.log('🔍 RECHERCHE DE TOUS LES RACCOURCIS SOUNDDECK')
+  console.log('═══════════════════════════════════════════════')
+  
+  const searchPaths = [
+    path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup'),
+    'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup',
+    path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+    'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs',
+    path.join(app.getPath('desktop')),
+    'C:\\Users\\Public\\Desktop',
+    path.dirname(process.execPath),
+  ]
+  
+  for (const folder of searchPaths) {
+    if (!fs.existsSync(folder)) continue
+    
+    const files = fs.readdirSync(folder)
+    const shortcuts = files.filter(f => f.toLowerCase().includes('sounddeck') && f.endsWith('.lnk'))
+    
+    if (shortcuts.length > 0) {
+      console.log(`📁 ${folder}:`)
+      for (const file of shortcuts) {
+        const fullPath = path.join(folder, file)
+        console.log(`   📄 ${file}`)
+        
+        try {
+          const checkCmd = `powershell -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('${fullPath.replace(/\\/g, '\\\\')}');Write-Host 'Cible:' $s.TargetPath; Write-Host 'Args:' $s.Arguments"`
+          exec(checkCmd, (err, stdout) => {
+            if (!err) console.log(`      ${stdout.trim()}`)
+          })
+        } catch (e) {}
+      }
+    }
+  }
+  console.log('═══════════════════════════════════════════════')
+}
+
+// ─── IPC HANDLERS RACCOURCIS ──────────────────────────────────────────────
+
+ipcMain.handle('toggle-global-shortcuts', () => {
+  return toggleGlobalShortcuts()
+})
+
+ipcMain.handle('get-global-shortcuts-state', () => {
+  return globalShortcutsEnabled
+})
+
+ipcMain.handle('update-shortcuts', (event, shortcuts) => {
+  store.set('shortcuts', shortcuts)
+  reregisterShortcuts()
+  return true
+})
+
+ipcMain.handle('update-profile-shortcut', (event, accelerator) => {
+  store.set('profileShortcut', accelerator)
+  reregisterShortcuts()
+  return true
+})
+
+ipcMain.handle('update-presentation-shortcut', (event, accelerator) => {
+  store.set('presentationShortcut', accelerator)
+  reregisterShortcuts()
+  return true
+})
+
+ipcMain.handle('update-stop-all-shortcut', (event, accelerator) => {
+  store.set('stopAllShortcut', accelerator)
+  reregisterShortcuts()
+  return true
+})
+
+ipcMain.handle('update-loop-shortcut', (event, accelerator) => {
+  store.set('loopShortcut', accelerator)
+  reregisterShortcuts()
+  return true
+})
+
+ipcMain.handle('update-toggle-shortcuts-accelerator', (event, accelerator) => {
+  store.set('toggleShortcutsAccelerator', accelerator)
+  reregisterShortcuts()
+  return true
+})
+
+ipcMain.handle('update-toggle-window-shortcut', (event, accelerator) => {
+  registerToggleWindowShortcut(accelerator)
+  return true
+})
+
+// ─── HANDLERS PLUGINS ──────────────────────────────────────────────────────
+
+ipcMain.handle('get-installed-plugins', async () => {
+  console.log('📋 Récupération des plugins installés')
+  const plugins = []
+  
+  if (!fs.existsSync(PLUGINS_DIR)) {
+    console.log('📁 Dossier plugins inexistant')
+    return plugins
+  }
+  
+  const folders = fs.readdirSync(PLUGINS_DIR)
+  console.log('📁 Dossiers trouvés:', folders)
+  
+  for (const folder of folders) {
+    const manifestPath = path.join(PLUGINS_DIR, folder, 'plugin.json')
+    if (fs.existsSync(manifestPath)) {
+      try {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'))
+        plugins.push({
+          ...manifest,
+          path: path.join(PLUGINS_DIR, folder),
+          enabled: true,
+          pages: manifest.pages?.length || 0
+        })
+        console.log(`✅ Plugin chargé: ${manifest.name || manifest.id}`)
+      } catch (e) {
+        console.warn(`⚠️ Plugin invalide dans ${folder}:`, e.message)
+      }
+    }
+  }
+  
+  console.log(`📋 ${plugins.length} plugins trouvés`)
+  return plugins
+})
+
+ipcMain.handle('get-plugin-path', async (event, pluginId) => {
+  const pluginDir = path.join(PLUGINS_DIR, pluginId)
+  const indexJs = path.join(pluginDir, 'index.js')
+  if (fs.existsSync(indexJs)) {
+    return indexJs
+  }
+  return null
+})
+
+ipcMain.handle('get-plugin-component-path', async (event, pluginId, pageId) => {
+  const pluginDir = path.join(PLUGINS_DIR, pluginId)
+  const componentPath = path.join(pluginDir, 'pages', `${pageId}.jsx`)
+  if (fs.existsSync(componentPath)) {
+    return componentPath
+  }
+  return null
+})
+
+ipcMain.handle('install-plugin', async (event, tempPath) => {
+  console.log('📦 install-plugin appelé avec tempPath:', tempPath)
+  
+  try {
+    if (tempPath.startsWith('blob:')) {
+      console.error('❌ Les URLs blob ne sont pas supportées depuis le main process')
+      return { success: false, error: 'Format blob non supporté, utilisez install-plugin-from-buffer' }
+    }
+
+    if (!fs.existsSync(tempPath)) {
+      return { success: false, error: `Fichier introuvable: ${tempPath}` }
+    }
+
+    const zip = new AdmZip(tempPath)
+    const manifestEntry = zip.getEntry('plugin.json')
+    
+    if (!manifestEntry) {
+      return { success: false, error: 'plugin.json manquant dans l\'archive' }
+    }
+    
+    const manifest = JSON.parse(manifestEntry.getData().toString('utf-8'))
+    
+    if (!manifest.id) {
+      return { success: false, error: 'id manquant dans plugin.json' }
+    }
+    
+    const pluginId = manifest.id.replace(/[^a-zA-Z0-9_-]/g, '')
+    const pluginDir = path.join(PLUGINS_DIR, pluginId)
+    
+    if (fs.existsSync(pluginDir)) {
+      fs.rmSync(pluginDir, { recursive: true, force: true })
+    }
+    
+    zip.extractAllTo(pluginDir, true)
+    
+    return {
+      success: true,
+      id: pluginId,
+      name: manifest.name || manifest.id,
+      version: manifest.version || '1.0.0'
+    }
+    
+  } catch (e) {
+    console.error('❌ Erreur installation plugin:', e)
+    return { success: false, error: e.message }
+  }
+})
+
+ipcMain.handle('install-plugin-from-buffer', async (event, buffer, fileName) => {
+  console.log('📦 Installation depuis buffer, fichier:', fileName)
+  console.log('📦 Taille du buffer:', buffer?.byteLength || 0)
+
+  try {
+    if (!buffer || buffer.byteLength === 0) {
+      console.error('❌ Buffer vide')
+      return { success: false, error: 'Fichier vide' }
+    }
+
+    const tempDir = app.getPath('temp')
+    const tempFile = path.join(tempDir, `plugin_${Date.now()}_${fileName || 'plugin.zip'}`)
+    console.log('📁 Fichier temporaire:', tempFile)
+
+    const bufferObj = Buffer.from(buffer)
+    fs.writeFileSync(tempFile, bufferObj)
+    console.log('✅ Fichier temporaire écrit, taille:', bufferObj.length)
+
+    try {
+      const zip = new AdmZip(tempFile)
+      const entries = zip.getEntries()
+      console.log('📦 Entrées du ZIP:', entries.map(e => e.entryName))
+
+      const manifestEntry = zip.getEntry('plugin.json')
+      if (!manifestEntry) {
+        console.error('❌ plugin.json manquant')
+        fs.unlinkSync(tempFile)
+        return { success: false, error: 'plugin.json manquant dans l\'archive' }
+      }
+
+      const manifest = JSON.parse(manifestEntry.getData().toString('utf-8'))
+      console.log('📄 Manifeste:', manifest)
+
+      if (!manifest.id) {
+        console.error('❌ id manquant dans plugin.json')
+        fs.unlinkSync(tempFile)
+        return { success: false, error: 'id manquant dans plugin.json' }
+      }
+
+      const pluginId = manifest.id.replace(/[^a-zA-Z0-9_-]/g, '')
+      console.log('🔑 ID du plugin:', pluginId)
+
+      const pluginDir = path.join(PLUGINS_DIR, pluginId)
+      console.log('📁 Dossier du plugin:', pluginDir)
+
+      if (fs.existsSync(pluginDir)) {
+        console.log('🗑️ Suppression de l\'ancienne version')
+        fs.rmSync(pluginDir, { recursive: true, force: true })
+      }
+
+      zip.extractAllTo(pluginDir, true)
+      console.log('✅ Archive extraite')
+
+      fs.unlinkSync(tempFile)
+      console.log('🧹 Fichier temporaire supprimé')
+
+      console.log(`✅ Plugin "${manifest.name || manifest.id}" installé avec succès`)
+
+      return {
+        success: true,
+        id: pluginId,
+        name: manifest.name || manifest.id,
+        version: manifest.version || '1.0.0'
+      }
+
+    } catch (zipError) {
+      console.error('❌ Erreur lecture ZIP:', zipError)
+      try { fs.unlinkSync(tempFile) } catch (e) {}
+      return { success: false, error: 'Fichier ZIP invalide: ' + zipError.message }
+    }
+
+  } catch (e) {
+    console.error('❌ Erreur installation plugin:', e)
+    return {
+      success: false,
+      error: e.message
+    }
+  }
+})
+
+ipcMain.handle('uninstall-plugin', async (event, pluginId) => {
+  console.log('🗑️ Désinstallation du plugin:', pluginId)
+  const pluginDir = path.join(PLUGINS_DIR, pluginId)
+  if (fs.existsSync(pluginDir)) {
+    try {
+      fs.rmSync(pluginDir, { recursive: true, force: true })
+      console.log('✅ Plugin désinstallé')
+      return { success: true }
+    } catch (e) {
+      console.error('❌ Erreur désinstallation:', e)
+      return { success: false, error: e.message }
+    }
+  }
+  console.log('❌ Plugin non trouvé')
+  return { success: false, error: 'Plugin non trouvé' }
+})
+
+// ─── HANDLERS PILOTE AUDIO ─────────────────────────────────────────────────
+
 function isVirtualDriverInstalled() {
   return store.get('virtualDriverInstalled', false)
 }
 
-// Chemin vers l'installateur VB-Cable dans les ressources
 function getDriverResourcePath() {
   const possiblePaths = []
 
   if (isDev) {
     possiblePaths.push(
-      // Chercher d'abord l'EXE
       path.join(__dirname, '../resources/drivers/VBCABLE_Setup_x64.exe'),
       path.join(__dirname, '../resources/drivers/VBCABLE_Setup.exe'),
-      // Puis les ZIP
       path.join(__dirname, '../resources/drivers/VBCABLE_Driver_Pack.zip'),
       path.join(__dirname, '../resources/drivers/VBCABLE_Driver_Pack45.zip'),
-      // Autres chemins
       path.join(__dirname, '../../resources/drivers/VBCABLE_Setup_x64.exe'),
       path.join(process.cwd(), 'resources/drivers/VBCABLE_Setup_x64.exe'),
       path.join(process.cwd(), 'drivers/VBCABLE_Setup_x64.exe'),
@@ -341,7 +992,6 @@ function getDriverResourcePath() {
   return possiblePaths[0]
 }
 
-// Télécharger VB-Cable depuis le site officiel
 async function downloadVBCable() {
   return new Promise((resolve, reject) => {
     const https = require('https')
@@ -357,7 +1007,6 @@ async function downloadVBCable() {
       }
     }, (res) => {
       if ([301, 302, 303, 307].includes(res.statusCode) && res.headers.location) {
-        // Redirection - on suit
         const redirectUrl = res.headers.location.startsWith('http')
           ? res.headers.location
           : `https://vb-audio.com${res.headers.location}`
@@ -406,233 +1055,9 @@ function downloadVBCableFromUrl(url, destPath) {
   })
 }
 
-function checkVBCableInstalled() {
-  return new Promise((resolve) => {
-    exec('pnputil /enum-drivers | findstr /i "vb-audio"', { timeout: 5000 }, (err, stdout) => {
-      if (stdout && stdout.toLowerCase().includes('vb-audio')) {
-        resolve(true)
-        return
-      }
-      exec('powershell -Command "Get-PnpDevice -FriendlyName *CABLE* | Select-Object FriendlyName"',
-        { timeout: 5000 }, (err2, stdout2) => {
-          if (stdout2 && stdout2.toLowerCase().includes('cable')) {
-            resolve(true)
-            return
-          }
-          exec('reg query "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall" /s /f "VB-CABLE"',
-            { timeout: 5000 }, (err3, stdout3) => {
-              resolve(stdout3 && stdout3.toLowerCase().includes('vb-cable'))
-            })
-        })
-    })
-  })
-}
-
-// Installer VB-Cable
-async function installVirtualDriver() {
-  console.log('🚀 Début installation VB-Cable...')
-
-  if (isVirtualDriverInstalled()) {
-    console.log('⚠️ Pilote déjà installé')
-    return { success: false, error: 'Pilote déjà installé' }
-  }
-
-  if (process.platform !== 'win32') {
-    console.log('⚠️ Plateforme non supportée:', process.platform)
-    return { success: false, error: 'Plateforme non supportée (Windows uniquement)' }
-  }
-
-  try {
-    // 1. Chercher l'installateur localement (ZIP ou EXE)
-    let installerPath = getDriverResourcePath()
-    let downloaded = false
-    let isZip = false
-
-    // Vérifier si c'est un ZIP ou un EXE
-    if (fs.existsSync(installerPath) && installerPath.endsWith('.zip')) {
-      isZip = true
-      console.log('📦 Fichier ZIP détecté, extraction en cours...')
-
-      // Extraire le ZIP dans un dossier temporaire
-      const extractPath = path.join(app.getPath('temp'), `vbcable_${Date.now()}`)
-      fs.mkdirSync(extractPath, { recursive: true })
-
-      const AdmZip = require('adm-zip')
-      const zip = new AdmZip(installerPath)
-      zip.extractAllTo(extractPath, true)
-      console.log('✅ Extraction terminée dans:', extractPath)
-
-      // Chercher l'exe dans le dossier extrait
-      const files = fs.readdirSync(extractPath)
-      console.log('📁 Fichiers extraits:', files)
-
-      // Chercher VBCABLE_Setup_x64.exe ou VBCABLE_Setup.exe
-      let exeFile = files.find(f => f.match(/VBCABLE_Setup.*\.exe/i))
-      if (!exeFile) {
-        // Chercher dans les sous-dossiers
-        for (const file of files) {
-          const fullPath = path.join(extractPath, file)
-          if (fs.statSync(fullPath).isDirectory()) {
-            const subFiles = fs.readdirSync(fullPath)
-            const found = subFiles.find(f => f.match(/VBCABLE_Setup.*\.exe/i))
-            if (found) {
-              exeFile = path.join(file, found)
-              break
-            }
-          }
-        }
-      }
-
-      if (!exeFile) {
-        fs.rmSync(extractPath, { recursive: true, force: true })
-        return { success: false, error: 'VBCABLE_Setup.exe non trouvé dans le ZIP' }
-      }
-
-      installerPath = path.join(extractPath, exeFile)
-      console.log('✅ Installateur trouvé:', installerPath)
-
-      // Nettoyer le dossier après installation
-      setTimeout(() => {
-        try {
-          fs.rmSync(extractPath, { recursive: true, force: true })
-          console.log('🧹 Dossier temporaire nettoyé')
-        } catch (e) {
-          console.warn('⚠️ Erreur nettoyage:', e.message)
-        }
-      }, 10000)
-
-    } else if (!fs.existsSync(installerPath)) {
-      // 2. Si pas trouvé, télécharger le ZIP
-      console.log('📥 Installateur non trouvé localement, téléchargement...')
-      try {
-        installerPath = await downloadVBCableZip()
-        downloaded = true
-        isZip = true
-        console.log('✅ Téléchargement réussi:', installerPath)
-
-        // Extraire le ZIP téléchargé
-        const extractPath = path.join(app.getPath('temp'), `vbcable_${Date.now()}`)
-        fs.mkdirSync(extractPath, { recursive: true })
-
-        const AdmZip = require('adm-zip')
-        const zip = new AdmZip(installerPath)
-        zip.extractAllTo(extractPath, true)
-        console.log('✅ Extraction terminée dans:', extractPath)
-
-        // Chercher l'exe
-        const files = fs.readdirSync(extractPath)
-        let exeFile = files.find(f => f.match(/VBCABLE_Setup.*\.exe/i))
-        if (!exeFile) {
-          for (const file of files) {
-            const fullPath = path.join(extractPath, file)
-            if (fs.statSync(fullPath).isDirectory()) {
-              const subFiles = fs.readdirSync(fullPath)
-              const found = subFiles.find(f => f.match(/VBCABLE_Setup.*\.exe/i))
-              if (found) {
-                exeFile = path.join(file, found)
-                break
-              }
-            }
-          }
-        }
-
-        if (!exeFile) {
-          fs.rmSync(extractPath, { recursive: true, force: true })
-          return { success: false, error: 'VBCABLE_Setup.exe non trouvé dans le ZIP' }
-        }
-
-        installerPath = path.join(extractPath, exeFile)
-        console.log('✅ Installateur trouvé:', installerPath)
-
-        // Nettoyer plus tard
-        setTimeout(() => {
-          try {
-            fs.rmSync(extractPath, { recursive: true, force: true })
-          } catch (e) {}
-        }, 10000)
-
-      } catch (e) {
-        console.error('❌ Erreur téléchargement:', e)
-        return { success: false, error: 'Impossible de télécharger VB-Cable: ' + e.message }
-      }
-    }
-
-    // 3. Installer avec élévation de privilèges (RunAs)
-    console.log('🔧 Installation de VB-Cable avec droits administrateur...')
-    console.log('📁 Installateur:', installerPath)
-
-    // Utiliser PowerShell avec Start-Process -Verb RunAs pour lancer en tant qu'admin
-    // Les options /VERYSILENT /SUPPRESSMSGBOXES /NORESTART fonctionnent avec l'admin
-    const psScript = `Start-Process -FilePath "${installerPath}" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Verb RunAs -Wait`
-    const cmd = `powershell -Command "${psScript}"`
-    console.log('🔧 Commande PowerShell:', cmd)
-
-    return new Promise((resolve) => {
-      exec(cmd, {
-        timeout: 120000,
-        shell: 'cmd.exe',
-        windowsHide: false
-      }, (error, stdout, stderr) => {
-        if (stdout) console.log('📤 stdout:', stdout)
-        if (stderr) console.error('📤 stderr:', stderr)
-
-        if (error) {
-          console.error('❌ Erreur installation:', error)
-          // Code 5 = Access denied / besoin de redémarrage
-          // Code 4294967295 = erreur générique souvent due à l'UAC
-          if (error.code === 5 || error.code === 4294967295) {
-            // On vérifie si le pilote est quand même installé
-            setTimeout(() => {
-              checkVBCableInstalled().then((installed) => {
-                if (installed) {
-                  store.set('virtualDriverInstalled', true)
-                  store.set('virtualDriverInstalledAt', Date.now())
-                  console.log('✅ VB-Cable installé avec succès (vérifié)')
-                  resolve({ success: true })
-                } else {
-                  console.log('⚠️ Installation peut nécessiter un redémarrage')
-                  store.set('virtualDriverInstalled', true)
-                  store.set('virtualDriverInstalledAt', Date.now())
-                  resolve({ success: true, warning: 'Installation réussie. Un redémarrage peut être nécessaire pour que le périphérique soit détecté.' })
-                }
-              })
-            }, 3000)
-            return
-          }
-          resolve({ success: false, error: error.message })
-          return
-        }
-
-        // Vérifier si l'installation a réussi
-        setTimeout(() => {
-          checkVBCableInstalled().then((installed) => {
-            if (installed) {
-              store.set('virtualDriverInstalled', true)
-              store.set('virtualDriverInstalledAt', Date.now())
-              console.log('✅ VB-Cable installé avec succès')
-              resolve({ success: true })
-            } else {
-              console.warn('⚠️ VB-Cable non détecté après installation')
-              store.set('virtualDriverInstalled', true)
-              store.set('virtualDriverInstalledAt', Date.now())
-              resolve({ success: true, warning: 'Installation réussie mais redémarrage peut être nécessaire' })
-            }
-          })
-        }, 3000)
-      })
-    })
-
-  } catch (e) {
-    console.error('❌ Erreur installation VB-Cable:', e)
-    return { success: false, error: e.message }
-  }
-}
-
-// Télécharger le ZIP de VB-Cable
 async function downloadVBCableZip() {
   return new Promise((resolve, reject) => {
     const https = require('https')
-    // ✅ URL CORRECTE du ZIP officiel
     const url = 'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip'
     const destPath = path.join(app.getPath('temp'), 'VBCABLE_Driver_Pack45.zip')
 
@@ -669,7 +1094,209 @@ async function downloadVBCableZip() {
   })
 }
 
-// Désinstaller VB-Cable - Version avec recherche PowerShell
+function checkVBCableInstalled() {
+  return new Promise((resolve) => {
+    exec('pnputil /enum-drivers | findstr /i "vb-audio"', { timeout: 5000 }, (err, stdout) => {
+      if (stdout && stdout.toLowerCase().includes('vb-audio')) {
+        resolve(true)
+        return
+      }
+      exec('powershell -Command "Get-PnpDevice -FriendlyName *CABLE* | Select-Object FriendlyName"',
+        { timeout: 5000 }, (err2, stdout2) => {
+          if (stdout2 && stdout2.toLowerCase().includes('cable')) {
+            resolve(true)
+            return
+          }
+          exec('reg query "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall" /s /f "VB-CABLE"',
+            { timeout: 5000 }, (err3, stdout3) => {
+              resolve(stdout3 && stdout3.toLowerCase().includes('vb-cable'))
+            })
+        })
+    })
+  })
+}
+
+async function installVirtualDriver() {
+  console.log('🚀 Début installation VB-Cable...')
+
+  if (isVirtualDriverInstalled()) {
+    console.log('⚠️ Pilote déjà installé')
+    return { success: false, error: 'Pilote déjà installé' }
+  }
+
+  if (process.platform !== 'win32') {
+    console.log('⚠️ Plateforme non supportée:', process.platform)
+    return { success: false, error: 'Plateforme non supportée (Windows uniquement)' }
+  }
+
+  try {
+    let installerPath = getDriverResourcePath()
+    let downloaded = false
+    let isZip = false
+
+    if (fs.existsSync(installerPath) && installerPath.endsWith('.zip')) {
+      isZip = true
+      console.log('📦 Fichier ZIP détecté, extraction en cours...')
+
+      const extractPath = path.join(app.getPath('temp'), `vbcable_${Date.now()}`)
+      fs.mkdirSync(extractPath, { recursive: true })
+
+      const AdmZip = require('adm-zip')
+      const zip = new AdmZip(installerPath)
+      zip.extractAllTo(extractPath, true)
+      console.log('✅ Extraction terminée dans:', extractPath)
+
+      const files = fs.readdirSync(extractPath)
+      console.log('📁 Fichiers extraits:', files)
+
+      let exeFile = files.find(f => f.match(/VBCABLE_Setup.*\.exe/i))
+      if (!exeFile) {
+        for (const file of files) {
+          const fullPath = path.join(extractPath, file)
+          if (fs.statSync(fullPath).isDirectory()) {
+            const subFiles = fs.readdirSync(fullPath)
+            const found = subFiles.find(f => f.match(/VBCABLE_Setup.*\.exe/i))
+            if (found) {
+              exeFile = path.join(file, found)
+              break
+            }
+          }
+        }
+      }
+
+      if (!exeFile) {
+        fs.rmSync(extractPath, { recursive: true, force: true })
+        return { success: false, error: 'VBCABLE_Setup.exe non trouvé dans le ZIP' }
+      }
+
+      installerPath = path.join(extractPath, exeFile)
+      console.log('✅ Installateur trouvé:', installerPath)
+
+      setTimeout(() => {
+        try {
+          fs.rmSync(extractPath, { recursive: true, force: true })
+          console.log('🧹 Dossier temporaire nettoyé')
+        } catch (e) {
+          console.warn('⚠️ Erreur nettoyage:', e.message)
+        }
+      }, 10000)
+
+    } else if (!fs.existsSync(installerPath)) {
+      console.log('📥 Installateur non trouvé localement, téléchargement...')
+      try {
+        installerPath = await downloadVBCableZip()
+        downloaded = true
+        isZip = true
+        console.log('✅ Téléchargement réussi:', installerPath)
+
+        const extractPath = path.join(app.getPath('temp'), `vbcable_${Date.now()}`)
+        fs.mkdirSync(extractPath, { recursive: true })
+
+        const AdmZip = require('adm-zip')
+        const zip = new AdmZip(installerPath)
+        zip.extractAllTo(extractPath, true)
+        console.log('✅ Extraction terminée dans:', extractPath)
+
+        const files = fs.readdirSync(extractPath)
+        let exeFile = files.find(f => f.match(/VBCABLE_Setup.*\.exe/i))
+        if (!exeFile) {
+          for (const file of files) {
+            const fullPath = path.join(extractPath, file)
+            if (fs.statSync(fullPath).isDirectory()) {
+              const subFiles = fs.readdirSync(fullPath)
+              const found = subFiles.find(f => f.match(/VBCABLE_Setup.*\.exe/i))
+              if (found) {
+                exeFile = path.join(file, found)
+                break
+              }
+            }
+          }
+        }
+
+        if (!exeFile) {
+          fs.rmSync(extractPath, { recursive: true, force: true })
+          return { success: false, error: 'VBCABLE_Setup.exe non trouvé dans le ZIP' }
+        }
+
+        installerPath = path.join(extractPath, exeFile)
+        console.log('✅ Installateur trouvé:', installerPath)
+
+        setTimeout(() => {
+          try {
+            fs.rmSync(extractPath, { recursive: true, force: true })
+          } catch (e) {}
+        }, 10000)
+
+      } catch (e) {
+        console.error('❌ Erreur téléchargement:', e)
+        return { success: false, error: 'Impossible de télécharger VB-Cable: ' + e.message }
+      }
+    }
+
+    console.log('🔧 Installation de VB-Cable avec droits administrateur...')
+    console.log('📁 Installateur:', installerPath)
+
+    const psScript = `Start-Process -FilePath "${installerPath}" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Verb RunAs -Wait`
+    const cmd = `powershell -Command "${psScript}"`
+    console.log('🔧 Commande PowerShell:', cmd)
+
+    return new Promise((resolve) => {
+      exec(cmd, {
+        timeout: 120000,
+        shell: 'cmd.exe',
+        windowsHide: false
+      }, (error, stdout, stderr) => {
+        if (stdout) console.log('📤 stdout:', stdout)
+        if (stderr) console.error('📤 stderr:', stderr)
+
+        if (error) {
+          console.error('❌ Erreur installation:', error)
+          if (error.code === 5 || error.code === 4294967295) {
+            setTimeout(() => {
+              checkVBCableInstalled().then((installed) => {
+                if (installed) {
+                  store.set('virtualDriverInstalled', true)
+                  store.set('virtualDriverInstalledAt', Date.now())
+                  console.log('✅ VB-Cable installé avec succès (vérifié)')
+                  resolve({ success: true })
+                } else {
+                  console.log('⚠️ Installation peut nécessiter un redémarrage')
+                  store.set('virtualDriverInstalled', true)
+                  store.set('virtualDriverInstalledAt', Date.now())
+                  resolve({ success: true, warning: 'Installation réussie. Un redémarrage peut être nécessaire pour que le périphérique soit détecté.' })
+                }
+              })
+            }, 3000)
+            return
+          }
+          resolve({ success: false, error: error.message })
+          return
+        }
+
+        setTimeout(() => {
+          checkVBCableInstalled().then((installed) => {
+            if (installed) {
+              store.set('virtualDriverInstalled', true)
+              store.set('virtualDriverInstalledAt', Date.now())
+              console.log('✅ VB-Cable installé avec succès')
+              resolve({ success: true })
+            } else {
+              console.warn('⚠️ VB-Cable non détecté après installation')
+              store.set('virtualDriverInstalled', true)
+              store.set('virtualDriverInstalledAt', Date.now())
+              resolve({ success: true, warning: 'Installation réussie mais redémarrage peut être nécessaire' })
+            }
+          })
+        }, 3000)
+      })
+    })
+
+  } catch (e) {
+    console.error('❌ Erreur installation VB-Cable:', e)
+    return { success: false, error: e.message }
+  }
+}
+
 function uninstallVirtualDriver() {
   return new Promise((resolve) => {
     if (process.platform !== 'win32') {
@@ -679,7 +1306,6 @@ function uninstallVirtualDriver() {
 
     console.log('🗑️ Début désinstallation VB-Cable...')
 
-    // Méthode 1: Essayer via le désinstallateur officiel
     const uninstallerPaths = [
       'C:\\Program Files\\VB-CABLE\\uninstall.exe',
       'C:\\Program Files\\VB-CABLE\\unins000.exe',
@@ -711,32 +1337,25 @@ function uninstallVirtualDriver() {
       return
     }
 
-    // Méthode 2: Recherche via PowerShell
     uninstallViaPowerShell(resolve)
   })
 }
 
-// Fonction auxiliaire pour désinstaller via PowerShell
 function uninstallViaPowerShell(resolve) {
   console.log('🔧 Recherche du driver VB-Cable via PowerShell...')
 
-  // Script PowerShell qui liste TOUS les drivers installés et cherche VB-Cable
   const psScript = `
     $ErrorActionPreference = "SilentlyContinue"
 
-    # Récupérer tous les drivers
     $drivers = pnputil /enum-drivers
 
-    # Chercher les drivers qui contiennent "cable" ou "vb" ou "vbaudio"
     $found = $drivers | Select-String -Pattern "(?i)(cable|vb[-_]?audio|vbaudio)"
 
     if ($found) {
-      # Extraire le nom du fichier .inf (oem*.inf)
       $infFile = ($found.Line -match 'oem\\d+\\.inf').Matches.Value
       if ($infFile) {
         Write-Host "FOUND:$infFile"
       } else {
-        # Chercher autrement
         foreach ($line in $found.Line) {
           $match = [regex]::Match($line, 'oem\\d+\\.inf', 'IgnoreCase')
           if ($match.Success) {
@@ -746,12 +1365,10 @@ function uninstallViaPowerShell(resolve) {
         }
       }
     } else {
-      # Chercher dans les périphériques audio
       $devices = Get-PnpDevice -Class AudioEndpoint -ErrorAction SilentlyContinue
       foreach ($device in $devices) {
         if ($device.FriendlyName -match "cable|vb") {
           Write-Host "DEVICE:$($device.FriendlyName)"
-          # Récupérer l'instance ID pour trouver le driver
           $instanceId = $device.InstanceId
           Write-Host "INSTANCE:$instanceId"
         }
@@ -765,12 +1382,10 @@ function uninstallViaPowerShell(resolve) {
 
     if (err) {
       console.error('❌ Erreur PowerShell:', err)
-      // Dernière tentative: chercher manuellement dans tous les drivers
       uninstallViaManualSearch(resolve)
       return
     }
 
-    // Analyser la sortie pour trouver le nom du driver
     const lines = stdout.split('\n')
     let infFile = null
 
@@ -794,7 +1409,6 @@ function uninstallViaPowerShell(resolve) {
         }
       })
     } else {
-      // Si on a trouvé un périphérique mais pas le driver
       if (stdout.includes('DEVICE:')) {
         console.log('🔧 Périphérique VB-Cable trouvé, tentative de suppression...')
         const removeDeviceScript = `
@@ -817,11 +1431,9 @@ function uninstallViaPowerShell(resolve) {
   })
 }
 
-// Fonction auxiliaire pour recherche manuelle
 function uninstallViaManualSearch(resolve) {
   console.log('🔧 Recherche manuelle dans tous les drivers...')
 
-  // Lister TOUS les drivers
   exec('pnputil /enum-drivers', { timeout: 15000 }, (enumErr, enumStdout) => {
     if (enumErr) {
       console.error('❌ Erreur énumération:', enumErr)
@@ -832,17 +1444,14 @@ function uninstallViaManualSearch(resolve) {
     const lines = enumStdout.split('\n')
     let foundInf = null
 
-    // Parcourir chaque ligne et chercher des indices
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].toLowerCase()
 
-      // Chercher des mots-clés dans la ligne
       if (line.includes('cable') ||
           line.includes('vb-audio') ||
           line.includes('vbaudio') ||
           (line.includes('vb') && line.includes('audio'))) {
 
-        // Chercher le nom du fichier .inf dans cette ligne ou les lignes suivantes
         for (let j = Math.max(0, i - 2); j < Math.min(lines.length, i + 3); j++) {
           const match = lines[j].match(/(oem\d+\.inf)/i)
           if (match) {
@@ -861,8 +1470,6 @@ function uninstallViaManualSearch(resolve) {
       exec(`pnputil /delete-driver ${foundInf} /force`, { timeout: 10000 }, (delErr) => {
         if (delErr) {
           console.warn('⚠️ Erreur suppression:', delErr.message)
-          // Dernière chance: essayer avec PowerShell élevé
-          console.log('🔧 Dernière tentative avec élévation de privilèges...')
           uninstallViaPowerShellElevated(resolve)
         } else {
           store.delete('virtualDriverInstalled')
@@ -877,7 +1484,6 @@ function uninstallViaManualSearch(resolve) {
   })
 }
 
-// Fonction auxiliaire pour désinstaller via PowerShell avec élévation - Version avec désactivation
 function uninstallViaPowerShellElevated(resolve) {
   console.log('🔧 Tentative de désinstallation avec élévation de privilèges...')
 
@@ -891,17 +1497,14 @@ Write-Host "=========================================="
 Write-Host "Desinstallation de VB-Cable"
 Write-Host "=========================================="
 
-# 1. Desactiver les peripheriques
 Write-Host ""
 Write-Host "[1] Desactivation des peripheriques..."
 
-# Desactiver CABLE Input/Output
 Get-PnpDevice -FriendlyName "*CABLE*" -ErrorAction SilentlyContinue | ForEach-Object {
   Write-Host "  Desactivation de: $($_.FriendlyName)"
   $_.FriendlyName | Disable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
 }
 
-# Desactiver VB-Audio Virtual Cable
 Get-PnpDevice -FriendlyName "*VB-Audio*" -ErrorAction SilentlyContinue | ForEach-Object {
   Write-Host "  Desactivation de: $($_.FriendlyName)"
   $_.FriendlyName | Disable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
@@ -909,11 +1512,9 @@ Get-PnpDevice -FriendlyName "*VB-Audio*" -ErrorAction SilentlyContinue | ForEach
 
 Start-Sleep -Seconds 2
 
-# 2. Trouver et supprimer le driver
 Write-Host ""
 Write-Host "[2] Recherche et suppression du driver..."
 
-# Rechercher le driver specifique
 $foundInf = $null
 $drivers = pnputil /enum-drivers
 
@@ -938,11 +1539,9 @@ if ($foundInf) {
     Write-Host ""
     Write-Host "[3] Suppression du driver: $foundInf"
 
-    # Essayer la suppression
     $result = pnputil /delete-driver $foundInf /force 2>&1
     Write-Host "  Resultat: $result"
 
-    # Verifier si le driver a ete supprime
     Write-Host ""
     Write-Host "[4] Verification..."
     $check = pnputil /enum-drivers | Select-String -Pattern "vbmmecable"
@@ -991,15 +1590,12 @@ Read-Host "Appuyez sur Entree pour fermer"
   })
 }
 
-// Vérifier le statut du pilote
 function getVirtualDriverStatus() {
   return {
     installed: isVirtualDriverInstalled(),
     platform: process.platform
   }
 }
-
-// ─── IPC HANDLERS POUR LE PILOTE ─────────────────────────────────────────────
 
 ipcMain.handle('install-virtual-driver', async () => {
   return await installVirtualDriver()
@@ -1013,908 +1609,8 @@ ipcMain.handle('get-virtual-driver-status', () => {
   return getVirtualDriverStatus()
 })
 
-// ─── CREATE WINDOW ────────────────────────────────────────────────────────────
+// ─── HANDLERS FICHIERS ──────────────────────────────────────────────────────
 
-function createWindow() {
-  const iconPath = path.join(__dirname, '../public/icon.ico')
-
-  console.log('🔍 DIAGNOSTIC createWindow:')
-  console.log('📌 __dirname:', __dirname)
-  console.log('📌 app.isPackaged:', app.isPackaged)
-  console.log('📌 app.getAppPath():', app.getAppPath())
-
-  mainWindow = new BrowserWindow({
-    width: 1100, height: 700, minWidth: 800, minHeight: 500,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      webSecurity: false,
-      allowRunningInsecureContent: false,
-      experimentalFeatures: true
-    },
-    backgroundColor: '#111113',
-    show: !shouldStartMinimized,
-    autoHideMenuBar: true,
-    frame: true,
-    ...(fs.existsSync(iconPath) ? { icon: iconPath } : {})
-  })
-
-  if (isDev) {
-    mainWindow.loadURL('http://localhost:5173')
-    mainWindow.webContents.openDevTools()
-  } else {
-    // ✅ CORRECTION : Chemin correct pour l'app packagée
-    // Dans une app packagée, les fichiers sont dans app.asar
-    // mais le dossier dist est extrait à la racine
-    
-    // ✅ Essayer plusieurs chemins
-    let indexPath = path.join(app.getAppPath(), 'dist', 'index.html')
-    
-    // ✅ Si le fichier n'existe pas dans app.asar, essayer à la racine
-    if (!fs.existsSync(indexPath)) {
-      // Pour une app installée, les fichiers sont parfois extraits
-      const resourcePath = path.join(process.resourcesPath, 'app', 'dist', 'index.html')
-      if (fs.existsSync(resourcePath)) {
-        indexPath = resourcePath
-      } else {
-        // Dernière chance : dans le dossier de l'exe
-        const exePath = path.join(path.dirname(app.getPath('exe')), 'resources', 'app', 'dist', 'index.html')
-        if (fs.existsSync(exePath)) {
-          indexPath = exePath
-        }
-      }
-    }
-    
-    console.log('📄 Chargement de:', indexPath)
-    console.log('📄 Fichier existe:', fs.existsSync(indexPath))
-    
-    // ✅ Si le fichier n'existe pas, afficher une erreur et quitter
-    if (!fs.existsSync(indexPath)) {
-      console.error('❌ ERREUR: index.html introuvable !')
-      dialog.showErrorBox('Erreur de chargement', 
-        'Impossible de trouver index.html.\n\n' +
-        'Chemin recherché: ' + indexPath + '\n\n' +
-        'Vérifiez que le build est correct.'
-      )
-      app.quit()
-      return
-    }
-    
-    mainWindow.loadFile(indexPath)
-  }
-
-  mainWindow.once('ready-to-show', () => {
-    createTray('fr')
-    if (!shouldStartMinimized) {
-      mainWindow.show()
-    }
-  })
-
-  mainWindow.on('closed', () => { mainWindow = null })
-
-  mainWindow.webContents.on('will-navigate', (e, url) => {
-    if (url !== mainWindow.webContents.getURL()) e.preventDefault()
-  })
-
-  mainWindow.webContents.session.on('will-download', (e) => {
-    e.preventDefault()
-  })
-
-  mainWindow.on('close', (e) => {
-    console.log(`🔴 [MAIN] close event - isQuitting: ${isQuitting}, pendingQuit: ${pendingQuit}, closeToTray: ${closeToTray}`)
-    
-    if (isQuitting || pendingQuit) {
-      console.log(`🔴 [MAIN] Quitting, pas de popup`)
-      return
-    }
-
-    if (closeToTray === false) {
-      console.log(`🔴 [MAIN] closeToTray === false, quit direct`)
-      isQuitting = true
-      app.quit()
-      return
-    }
-
-    e.preventDefault()
-    console.log(`🔴 [MAIN] Envoi de show-quit-confirm`)
-    mainWindow.webContents.send('show-quit-confirm')
-  })
-}
-
-// ─── Gestion du démarrage automatique ────────────────────────────────────────
-function setLaunchAtStartup(enabled) {
-  store.set('launchAtStartup', enabled)
-
-  if (process.platform !== 'win32') return
-
-  // ✅ Si on est en développement, NE PAS créer de raccourci de démarrage
-  // pour éviter le problème de la double fenêtre Electron
-  if (!app.isPackaged) {
-    console.log('🛠️ Mode développement : création du raccourci désactivée')
-    return
-  }
-
-  const targetPath = process.execPath
-  const workingDir = path.dirname(targetPath)
-  const startupFolder = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
-  const startupShortcutPath = path.join(startupFolder, 'SoundDeck.lnk')
-
-  console.log('🎯 setLaunchAtStartup - enabled:', enabled)
-  console.log('🎯 targetPath:', targetPath)
-
-  // ✅ SUPPRIMER TOUS LES RACCOURCIS SOUNDDECK AVANT DE CRÉER LE BON
-  if (enabled) {
-    // Rechercher et supprimer tous les raccourcis SoundDeck
-    const searchPaths = [
-      path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
-      'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs',
-      path.join(app.getPath('desktop')),
-      'C:\\Users\\Public\\Desktop',
-    ]
-    
-    for (const folder of searchPaths) {
-      if (!fs.existsSync(folder)) continue
-      const files = fs.readdirSync(folder)
-      for (const file of files) {
-        if (file.toLowerCase().includes('sounddeck') && file.endsWith('.lnk')) {
-          const fullPath = path.join(folder, file)
-          try {
-            fs.unlinkSync(fullPath)
-            console.log(`🗑️ Supprimé: ${fullPath}`)
-          } catch (e) {}
-        }
-      }
-    }
-  }
-
-  if (!fs.existsSync(startupFolder)) {
-    try {
-      fs.mkdirSync(startupFolder, { recursive: true })
-    } catch (e) {
-      console.error('❌ Erreur création dossier Startup:', e)
-      return
-    }
-  }
-
-  if (enabled) {
-    // Créer le bon raccourci dans Startup
-    const tempDir = app.getPath('temp')
-    const ps1Path = path.join(tempDir, `create_shortcut_${Date.now()}.ps1`)
-    
-    const ps1Content = `
-$WshShell = New-Object -ComObject WScript.Shell
-$Shortcut = $WshShell.CreateShortcut("${startupShortcutPath.replace(/\\/g, '\\\\')}")
-$Shortcut.TargetPath = "${targetPath.replace(/\\/g, '\\\\')}"
-$Shortcut.WorkingDirectory = "${workingDir.replace(/\\/g, '\\\\')}"
-$Shortcut.Save()
-`
-    
-    fs.writeFileSync(ps1Path, ps1Content, 'utf8')
-    
-    const cmd = `powershell -ExecutionPolicy Bypass -File "${ps1Path}"`
-    
-    exec(cmd, { maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
-      try {
-        if (fs.existsSync(ps1Path)) fs.unlinkSync(ps1Path)
-      } catch (e) {}
-      
-      if (error) {
-        console.error('❌ Erreur création raccourci:', error.message)
-        return
-      }
-      
-      if (fs.existsSync(startupShortcutPath)) {
-        console.log('✅ Raccourci démarrage créé')
-      }
-    })
-  }
-}
-
-// ─── DIAGNOSTIC COMPLET DES RACCOURCIS ──────────────────────────────────────
-function findAllSoundDeckShortcuts() {
-  console.log('═══════════════════════════════════════════════')
-  console.log('🔍 RECHERCHE DE TOUS LES RACCOURCIS SOUNDDECK')
-  console.log('═══════════════════════════════════════════════')
-  
-  const searchPaths = [
-    // Startup utilisateur
-    path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup'),
-    // Startup tous les utilisateurs
-    'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup',
-    // Menu Démarrer utilisateur
-    path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
-    // Menu Démarrer tous les utilisateurs
-    'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs',
-    // Bureau utilisateur
-    path.join(app.getPath('desktop')),
-    // Bureau public
-    'C:\\Users\\Public\\Desktop',
-    // Dossier d'installation
-    path.dirname(process.execPath),
-  ]
-  
-  for (const folder of searchPaths) {
-    if (!fs.existsSync(folder)) continue
-    
-    const files = fs.readdirSync(folder)
-    const shortcuts = files.filter(f => f.toLowerCase().includes('sounddeck') && f.endsWith('.lnk'))
-    
-    if (shortcuts.length > 0) {
-      console.log(`📁 ${folder}:`)
-      for (const file of shortcuts) {
-        const fullPath = path.join(folder, file)
-        console.log(`   📄 ${file}`)
-        
-        // Lire la cible du raccourci
-        try {
-          const checkCmd = `powershell -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('${fullPath.replace(/\\/g, '\\\\')}');Write-Host 'Cible:' $s.TargetPath; Write-Host 'Args:' $s.Arguments"`
-          exec(checkCmd, (err, stdout) => {
-            if (!err) console.log(`      ${stdout.trim()}`)
-          })
-        } catch (e) {}
-      }
-    }
-  }
-  console.log('═══════════════════════════════════════════════')
-}
-
-// Appeler cette fonction au démarrage
-app.whenReady().then
-
-// ─── App ──────────────────────────────────────────────────────────────────────
-
-app.whenReady().then(async () => {
-  cleanupOrphanShortcuts()
-  
-  // ✅ Détecter et sauvegarder la langue système si jamais définie
-  const systemLang = getSystemLanguage()
-  const savedLang = store.get('lang')
-  if (!savedLang) {
-    store.set('lang', systemLang)
-    console.log(`🌐 Langue système détectée: ${systemLang}`)
-  }
-
-  // ✅ Détecter et sauvegarder le layout clavier système si jamais défini
-  const systemLayout = getSystemKeyboardLayout()
-  const savedLayout = store.get('keyboardLayout')
-  if (!savedLayout) {
-    store.set('keyboardLayout', systemLayout)
-    console.log(`⌨️ Layout clavier système détecté: ${systemLayout}`)
-  }
-
-  createTray('fr')
-  createWindow()
-  registerShortcuts()
-  registerToggleShortcut()
-  
-  // Charger le raccourci depuis le store
-  try {
-    const store = new Store()
-    const savedShortcut = store.get('toggleWindowShortcut')
-    if (savedShortcut) {
-      currentToggleWindowShortcut = savedShortcut
-      registerToggleWindowShortcut(savedShortcut)
-    } else {
-      registerToggleWindowShortcut('CommandOrControl+Shift+S')
-    }
-  } catch (e) {
-    console.warn('Erreur chargement raccourci toggle fenêtre:', e)
-    registerToggleWindowShortcut('CommandOrControl+Shift+S')
-  }
-  
-  findAllSoundDeckShortcuts()
-  
-  console.log('🔍 DIAGNOSTIC DES CHEMINS:')
-  console.log('process.execPath:', process.execPath)
-  console.log('app.getPath("exe"):', app.getPath('exe'))
-  console.log('app.isPackaged:', app.isPackaged)
-  console.log('__dirname:', __dirname)
-  console.log('app.getAppPath():', app.getAppPath())
-  
-  // ✅ CRÉER LE VRAI RACCOURCI SI L'OPTION EST ACTIVÉE
-  const isLaunchAtStartup = store.get('launchAtStartup', false)
-  console.log('📌 launchAtStartup dans le store:', isLaunchAtStartup)
-  
-  if (isLaunchAtStartup) {
-    console.log('🔧 Création du raccourci de démarrage...')
-    setLaunchAtStartup(true)
-  }
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
-})
-
-app.on('window-all-closed', () => {
-  if (!isQuitting) {
-    if (process.platform !== 'darwin') {
-      return
-    }
-  }
-  if (isQuitting) {
-    globalShortcut.unregisterAll()
-    registeredShortcuts = []
-    app.quit()
-  }
-})
-
-app.on('before-quit', () => {
-  isQuitting = true
-  
-  // ✅ Nettoyer l'icône du tray
-  if (trayInstance) {
-    try {
-      trayInstance.destroy()
-      trayInstance = null
-      tray = null
-      console.log('🧹 Icône du tray nettoyée')
-    } catch (e) {
-      console.warn('⚠️ Erreur lors du nettoyage du tray:', e)
-    }
-  }
-})
-
-app.on('window-all-closed', () => {
-  if (!isQuitting) {
-    if (process.platform !== 'darwin') {
-      return
-    }
-  }
-  if (isQuitting) {
-    globalShortcut.unregisterAll()
-    registeredShortcuts = []
-    app.quit()
-  }
-})
-
-app.on('before-quit', () => {
-  isQuitting = true
-
-  // ✅ Nettoyer l'icône du tray
-  if (trayInstance) {
-    try {
-      trayInstance.destroy()
-      trayInstance = null
-      tray = null
-      console.log('🧹 Icône du tray nettoyée')
-    } catch (e) {
-      console.warn('⚠️ Erreur lors du nettoyage du tray:', e)
-    }
-  }
-})
-
-// ─── Raccourcis ───────────────────────────────────────────────────────────────
-function safeRegister(accelerator, callback) {
-  if (!accelerator) return false
-  try {
-    const isFn = /^F\d+$/.test(accelerator)
-    const hasMod = accelerator.includes('+')
-    if (!isFn && !hasMod) {
-      const ok = globalShortcut.register(accelerator, callback)
-      if (ok) registeredShortcuts.push(accelerator)
-      return ok
-    }
-    const ok = globalShortcut.register(accelerator, callback)
-    if (ok) registeredShortcuts.push(accelerator)
-    return ok
-  } catch (e) {
-    console.warn('Raccourci non supporté:', accelerator, e.message)
-    return false
-  }
-}
-
-function registerToggleShortcut() {
-  const toggleAccelerator = store.get('toggleShortcutsAccelerator', 'CommandOrControl+Shift+K')
-  if (!toggleAccelerator) return
-
-  try {
-    globalShortcut.unregister(toggleAccelerator)
-
-    const ok = globalShortcut.register(toggleAccelerator, () => {
-      globalShortcutsEnabled = !globalShortcutsEnabled
-      store.set('globalShortcutsEnabled', globalShortcutsEnabled)
-
-      if (globalShortcutsEnabled) {
-        registerShortcuts()
-      } else {
-        unregisterAllShortcuts()
-      }
-
-      if (mainWindow) {
-        mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
-      }
-
-      if (tray) {
-        const currentLang = getCurrentTrayLanguage()
-        const contextMenu = buildTrayMenu(currentLang)
-        tray.setContextMenu(contextMenu)
-      }
-
-      const state = globalShortcutsEnabled ? 'activés' : 'désactivés'
-      console.log(`🔇 Raccourcis ${state}`)
-    })
-
-    console.log('✅ Raccourci toggle enregistré:', toggleAccelerator)
-    console.log('📊 État des raccourcis globaux:', globalShortcutsEnabled)
-
-    if (ok) {
-      console.log('✅ Raccourci toggle enregistré:', toggleAccelerator)
-    } else {
-      console.warn('⚠️ Impossible d\'enregistrer le raccourci toggle:', toggleAccelerator)
-    }
-  } catch (e) {
-    console.warn('Erreur enregistrement toggle:', e.message)
-  }
-}
-
-function unregisterAllShortcuts() {
-  registeredShortcuts.forEach(acc => {
-    try {
-      globalShortcut.unregister(acc)
-    } catch (e) {}
-  })
-  registeredShortcuts = []
-  console.log('🔇 Tous les raccourcis désenregistrés')
-}
-
-function reregisterShortcuts() {
-  unregisterAllShortcuts()
-
-  if (globalShortcutsEnabled) {
-    registerShortcuts()
-  }
-
-  if (mainWindow) {
-    mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
-  }
-}
-
-function toggleGlobalShortcuts() {
-  globalShortcutsEnabled = !globalShortcutsEnabled
-  store.set('globalShortcutsEnabled', globalShortcutsEnabled)
-
-  if (globalShortcutsEnabled) {
-    registerShortcuts()
-  } else {
-    unregisterAllShortcuts()
-  }
-
-  if (tray) {
-    const currentLang = getCurrentTrayLanguage()
-    const contextMenu = buildTrayMenu(currentLang)
-    tray.setContextMenu(contextMenu)
-  }
-
-  if (mainWindow) {
-    mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
-  }
-
-  return globalShortcutsEnabled
-}
-
-function registerShortcuts() {
-  if (!globalShortcutsEnabled) {
-    console.log('🔇 Raccourcis globaux désactivés')
-    return
-  }
-
-  const shortcuts = store.get('shortcuts', {})
-  Object.entries(shortcuts).forEach(([soundId, accelerator]) => {
-    if (!accelerator) return
-    safeRegister(accelerator, () => {
-      mainWindow?.webContents.send('play-sound', soundId)
-    })
-  })
-
-  const profileShortcut = store.get('profileShortcut', '')
-  if (profileShortcut) {
-    safeRegister(profileShortcut, () => {
-      mainWindow?.webContents.send('switch-profile')
-    })
-  }
-
-  const loopShortcut = store.get('loopShortcut', '')
-  if (loopShortcut) {
-    safeRegister(loopShortcut, () => {
-      mainWindow?.webContents.send('toggle-loop')
-    })
-  }
-
-  const stopAllShortcut = store.get('stopAllShortcut', '')
-  if (stopAllShortcut) {
-    safeRegister(stopAllShortcut, () => {
-      mainWindow?.webContents.send('stop-all-sounds')
-    })
-  }
-
-  const presentationShortcut = store.get('presentationShortcut', '')
-  if (presentationShortcut) {
-    safeRegister(presentationShortcut, () => {
-      mainWindow?.webContents.send('toggle-presentation')
-    })
-  }
-
-  console.log('✅ Raccourcis globaux activés')
-}
-
-// ─── Nettoyage des raccourcis orphelins ──────────────────────────────────────
-function cleanupOrphanShortcuts() {
-  console.log('🧹 Nettoyage des raccourcis orphelins...')
-  const shortcuts = store.get('shortcuts', {})
-  const sounds = store.get('sounds', [])
-  const soundIds = new Set(sounds.map(s => s.id))
-  let hasChanges = false
-
-  Object.keys(shortcuts).forEach(id => {
-    if (!soundIds.has(id)) {
-      console.log(`🗑️ Suppression du raccourci orphelin pour l'ID: ${id}`)
-      delete shortcuts[id]
-      hasChanges = true
-    }
-  })
-
-  if (hasChanges) {
-    store.set('shortcuts', shortcuts)
-    console.log('✅ Raccourcis orphelins nettoyés')
-    // Mettre à jour les raccourcis enregistrés
-    reregisterShortcuts()
-  } else {
-    console.log('✅ Aucun raccourci orphelin trouvé')
-  }
-}
-
-// ─── IPC Handlers pour le toggle ────────────────────────────────────────────
-ipcMain.handle('toggle-global-shortcuts', () => {
-  return toggleGlobalShortcuts()
-})
-
-ipcMain.handle('get-global-shortcuts-state', () => {
-  return globalShortcutsEnabled
-})
-
-// ─── IPC Handlers pour le tray ─────────────────────────────────────────────
-ipcMain.handle('get-start-minimized', () => {
-  return store.get('startMinimized', false)
-})
-
-ipcMain.handle('set-start-minimized', (event, value) => {
-  store.set('startMinimized', value)
-  return true
-})
-
-ipcMain.handle('get-launch-at-startup', () => {
-  return store.get('launchAtStartup', false)
-})
-
-ipcMain.handle('set-launch-at-startup', (event, value) => {
-  setLaunchAtStartup(value)
-  return true
-})
-
-ipcMain.handle('quit-app', () => {
-  isQuitting = true
-  app.quit()
-  return true
-})
-
-ipcMain.handle('confirm-quit', (event, action, remember) => {
-  console.log('🔍 confirm-quit appelé avec:', { action, remember })
-
-  if (action === 'quit') {
-    if (remember) {
-      closeToTray = false
-      store.set('closeToTray', false)
-      console.log('💾 closeToTray sauvegardé:', false)
-    }
-    pendingQuit = true
-    isQuitting = true
-    app.quit()
-    return 'quit'
-  } else if (action === 'minimize') {
-    if (remember) {
-      closeToTray = true
-      store.set('closeToTray', true)
-      console.log('💾 closeToTray sauvegardé:', true)
-    }
-    
-    // ✅ Fermer la popup immédiatement
-    if (mainWindow) {
-      mainWindow.webContents.send('hide-quit-confirm')
-      
-      // ✅ Attendre 500ms avant de cacher la fenêtre
-      // pour que la popup ait le temps de se fermer proprement
-      setTimeout(() => {
-        console.log('🔴 [MAIN] Minimisation de la fenêtre après délai')
-        mainWindow.hide()
-      }, 500)
-    }
-    return 'minimize'
-  } else {
-    return 'cancel'
-  }
-})
-
-ipcMain.handle('hide-window', () => {
-  if (mainWindow) {
-    mainWindow.hide()
-  }
-  return true
-})
-
-ipcMain.handle('show-window', () => {
-  showMainWindow()
-  return true
-})
-
-// ─── ADVANDED EDITOR ────────────────────────────────────────────────────────────
-ipcMain.handle('save-file-dialog', async (event, fileName, buffer) => {
-  const result = await dialog.showSaveDialog(mainWindow, {
-    title: 'Sauvegarder le fichier normalisé',
-    defaultPath: fileName,
-    filters: [{ name: 'Audio WAV', extensions: ['wav'] }]
-  })
-  
-  if (result.canceled) {
-    return { success: false }
-  }
-  
-  try {
-    const uint8Array = new Uint8Array(buffer)
-    fs.writeFileSync(result.filePath, uint8Array)
-    return { success: true, path: result.filePath }
-  } catch (e) {
-    return { success: false, error: e.message }
-  }
-})
-
-ipcMain.handle('write-sound-file', async (event, filePath, data) => {
-  try {
-    const uint8Array = new Uint8Array(data)
-    fs.writeFileSync(filePath, uint8Array)
-    return { success: true, path: filePath }
-  } catch (e) {
-    return { success: false, error: e.message }
-  }
-})
-
-
-// ─── HANDLERS POUR LES PLUGINS ───────────────────────────────────────────────
-
-// Installation depuis un buffer
-ipcMain.handle('install-plugin-from-buffer', async (event, buffer, fileName) => {
-  console.log('📦 Installation depuis buffer, fichier:', fileName)
-  console.log('📦 Taille du buffer:', buffer?.byteLength || 0)
-
-  try {
-    if (!buffer || buffer.byteLength === 0) {
-      console.error('❌ Buffer vide')
-      return { success: false, error: 'Fichier vide' }
-    }
-
-    // Sauvegarder le buffer dans un fichier temporaire
-    const tempDir = app.getPath('temp')
-    const tempFile = path.join(tempDir, `plugin_${Date.now()}_${fileName || 'plugin.zip'}`)
-    console.log('📁 Fichier temporaire:', tempFile)
-
-    // Écrire le buffer dans un fichier
-    const bufferObj = Buffer.from(buffer)
-    fs.writeFileSync(tempFile, bufferObj)
-    console.log('✅ Fichier temporaire écrit, taille:', bufferObj.length)
-
-    // Vérifier que le fichier est un ZIP valide
-    try {
-      const zip = new AdmZip(tempFile)
-      const entries = zip.getEntries()
-      console.log('📦 Entrées du ZIP:', entries.map(e => e.entryName))
-
-      const manifestEntry = zip.getEntry('plugin.json')
-      if (!manifestEntry) {
-        console.error('❌ plugin.json manquant')
-        fs.unlinkSync(tempFile)
-        return { success: false, error: 'plugin.json manquant dans l\'archive' }
-      }
-
-      const manifest = JSON.parse(manifestEntry.getData().toString('utf-8'))
-      console.log('📄 Manifeste:', manifest)
-
-      if (!manifest.id) {
-        console.error('❌ id manquant dans plugin.json')
-        fs.unlinkSync(tempFile)
-        return { success: false, error: 'id manquant dans plugin.json' }
-      }
-
-      const pluginId = manifest.id.replace(/[^a-zA-Z0-9_-]/g, '')
-      console.log('🔑 ID du plugin:', pluginId)
-
-      const pluginDir = path.join(PLUGINS_DIR, pluginId)
-      console.log('📁 Dossier du plugin:', pluginDir)
-
-      // Supprimer l'ancienne version
-      if (fs.existsSync(pluginDir)) {
-        console.log('🗑️ Suppression de l\'ancienne version')
-        fs.rmSync(pluginDir, { recursive: true, force: true })
-      }
-
-      // Extraire l'archive
-      zip.extractAllTo(pluginDir, true)
-      console.log('✅ Archive extraite')
-
-      // Nettoyer le fichier temporaire
-      fs.unlinkSync(tempFile)
-      console.log('🧹 Fichier temporaire supprimé')
-
-      console.log(`✅ Plugin "${manifest.name || manifest.id}" installé avec succès`)
-
-      return {
-        success: true,
-        id: pluginId,
-        name: manifest.name || manifest.id,
-        version: manifest.version || '1.0.0'
-      }
-
-    } catch (zipError) {
-      console.error('❌ Erreur lecture ZIP:', zipError)
-      try { fs.unlinkSync(tempFile) } catch (e) {}
-      return { success: false, error: 'Fichier ZIP invalide: ' + zipError.message }
-    }
-
-  } catch (e) {
-    console.error('❌ Erreur installation plugin:', e)
-    return {
-      success: false,
-      error: e.message
-    }
-  }
-})
-
-// ✅ Garder les anciens handlers pour compatibilité
-ipcMain.handle('install-plugin', async (event, tempPath) => {
-  console.log('📦 install-plugin appelé avec tempPath:', tempPath)
-  
-  try {
-    // Si c'est une URL blob, on ne peut pas fetch depuis le main process
-    // On essaie de lire le fichier si c'est un chemin local
-    if (tempPath.startsWith('blob:')) {
-      console.error('❌ Les URLs blob ne sont pas supportées depuis le main process')
-      return { success: false, error: 'Format blob non supporté, utilisez install-plugin-from-buffer' }
-    }
-
-    if (!fs.existsSync(tempPath)) {
-      return { success: false, error: `Fichier introuvable: ${tempPath}` }
-    }
-
-    const zip = new AdmZip(tempPath)
-    const manifestEntry = zip.getEntry('plugin.json')
-    
-    if (!manifestEntry) {
-      return { success: false, error: 'plugin.json manquant dans l\'archive' }
-    }
-    
-    const manifest = JSON.parse(manifestEntry.getData().toString('utf-8'))
-    
-    if (!manifest.id) {
-      return { success: false, error: 'id manquant dans plugin.json' }
-    }
-    
-    const pluginId = manifest.id.replace(/[^a-zA-Z0-9_-]/g, '')
-    const pluginDir = path.join(PLUGINS_DIR, pluginId)
-    
-    if (fs.existsSync(pluginDir)) {
-      fs.rmSync(pluginDir, { recursive: true, force: true })
-    }
-    
-    zip.extractAllTo(pluginDir, true)
-    
-    return {
-      success: true,
-      id: pluginId,
-      name: manifest.name || manifest.id,
-      version: manifest.version || '1.0.0'
-    }
-    
-  } catch (e) {
-    console.error('❌ Erreur installation plugin:', e)
-    return { success: false, error: e.message }
-  }
-})
-
-// Récupérer la liste des plugins installés
-ipcMain.handle('get-installed-plugins', async () => {
-  console.log('📋 Récupération des plugins installés')
-  const plugins = []
-  
-  if (!fs.existsSync(PLUGINS_DIR)) {
-    console.log('📁 Dossier plugins inexistant')
-    return plugins
-  }
-  
-  const folders = fs.readdirSync(PLUGINS_DIR)
-  console.log('📁 Dossiers trouvés:', folders)
-  
-  for (const folder of folders) {
-    const manifestPath = path.join(PLUGINS_DIR, folder, 'plugin.json')
-    if (fs.existsSync(manifestPath)) {
-      try {
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'))
-        plugins.push({
-          ...manifest,
-          path: path.join(PLUGINS_DIR, folder),
-          enabled: true,
-          pages: manifest.pages?.length || 0
-        })
-        console.log(`✅ Plugin chargé: ${manifest.name || manifest.id}`)
-      } catch (e) {
-        console.warn(`⚠️ Plugin invalide dans ${folder}:`, e.message)
-      }
-    }
-  }
-  
-  console.log(`📋 ${plugins.length} plugins trouvés`)
-  return plugins
-})
-
-// Désinstaller un plugin
-ipcMain.handle('uninstall-plugin', async (event, pluginId) => {
-  console.log('🗑️ Désinstallation du plugin:', pluginId)
-  const pluginDir = path.join(PLUGINS_DIR, pluginId)
-  if (fs.existsSync(pluginDir)) {
-    try {
-      fs.rmSync(pluginDir, { recursive: true, force: true })
-      console.log('✅ Plugin désinstallé')
-      return { success: true }
-    } catch (e) {
-      console.error('❌ Erreur désinstallation:', e)
-      return { success: false, error: e.message }
-    }
-  }
-  console.log('❌ Plugin non trouvé')
-  return { success: false, error: 'Plugin non trouvé' }
-})
-
-// ─── Mise à jour des raccourcis ─────────────────────────────────────────────
-ipcMain.handle('update-shortcuts', (event, shortcuts) => {
-  store.set('shortcuts', shortcuts)
-  reregisterShortcuts()
-  return true
-})
-
-ipcMain.handle('update-profile-shortcut', (event, accelerator) => {
-  store.set('profileShortcut', accelerator)
-  reregisterShortcuts()
-  return true
-})
-
-ipcMain.handle('update-presentation-shortcut', (event, accelerator) => {
-  store.set('presentationShortcut', accelerator)
-  reregisterShortcuts()
-  return true
-})
-
-ipcMain.handle('update-stop-all-shortcut', (event, accelerator) => {
-  store.set('stopAllShortcut', accelerator)
-  reregisterShortcuts()
-  return true
-})
-
-ipcMain.handle('update-loop-shortcut', (event, accelerator) => {
-  store.set('loopShortcut', accelerator)
-  reregisterShortcuts()
-  return true
-})
-
-ipcMain.handle('update-toggle-shortcuts-accelerator', (event, accelerator) => {
-  store.set('toggleShortcutsAccelerator', accelerator)
-  reregisterShortcuts()
-  return true
-})
-
-ipcMain.handle('update-toggle-window-shortcut', (event, accelerator) => {
-  registerToggleWindowShortcut(accelerator)
-  return true
-})
-
-// ─── Fichiers ─────────────────────────────────────────────────────────────────
 ipcMain.handle('open-file-dialog', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Importer des sons',
@@ -2061,7 +1757,6 @@ ipcMain.handle('download-sound-url', async (event, rawUrl, fileName) => {
   return doRequest(url, destPath)
 })
 
-// Trim audio via fluent-ffmpeg + @ffmpeg-installer/ffmpeg
 ipcMain.handle('trim-sound-file', async (event, filePath, startSec, endSec) => {
   try {
     let ffmpegPath = null
@@ -2080,7 +1775,7 @@ ipcMain.handle('trim-sound-file', async (event, filePath, startSec, endSec) => {
         console.log('ffmpeg via static:', ffmpegPath)
       } catch (e2) {
         console.warn('ffmpeg-static non disponible:', e2.message)
-        ffmpegPath = 'ffmpeg' // fallback
+        ffmpegPath = 'ffmpeg'
       }
     }
 
@@ -2144,223 +1839,11 @@ ipcMain.handle('delete-sound-file', async (event, filePath) => {
 
 ipcMain.handle('get-sounds-dir', () => soundsDir)
 
-ipcMain.handle('cleanup-orphan-shortcuts', () => {
-  cleanupOrphanShortcuts()
-  return true
+ipcMain.handle('file-exists', (event, filePath) => {
+  try { return fs.existsSync(filePath) }
+  catch (e) { return false }
 })
 
-ipcMain.handle('get-system-language', () => {
-  return getSystemLanguage()
-})
-
-ipcMain.handle('get-system-keyboard-layout', () => {
-  return getSystemKeyboardLayout()
-})
-
-// ─── Scraper myinstants ───────────────────────────────────────────────────────
-
-const https = require('https')
-
-function fetchPage(url) {
-  return new Promise((resolve) => {
-    https.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8'
-      }
-    }, (res) => {
-      if ([301,302,303,307].includes(res.statusCode) && res.headers.location) {
-        fetchPage(res.headers.location).then(resolve)
-        return
-      }
-      let data = ''
-      res.on('data', chunk => data += chunk)
-      res.on('end', () => resolve({ ok: true, html: data, status: res.statusCode }))
-    }).on('error', (e) => resolve({ ok: false, error: e.message }))
-  })
-}
-
-function parseSoundList(html) {
-  const sounds = []
-  const seen = new Set()
-
-  console.log('parseSoundList HTML extrait:', html.substring(0, 500))
-  console.log('parseSoundList HTML longueur:', html.length)
-
-  const patterns = [
-    /href="https?:\/\/(?:www\.)?myinstants\.com\/(?:fr\/)?instant\/([a-zA-Z0-9_-]+)\/?"\s*[^>]*>\s*([^<]{1,80})<\/a>/g,
-    /href="\/fr\/instant\/([a-zA-Z0-9_-]+)\/?"\s*[^>]*>\s*([^<]{1,80})<\/a>/g,
-    /href="\/instant\/([a-zA-Z0-9_-]+)\/?"\s*[^>]*>\s*([^<]{1,80})<\/a>/g,
-  ]
-
-  const slugToName = {}
-  const allSlugs = []
-
-  for (const pattern of patterns) {
-    const matches = [...html.matchAll(pattern)]
-    for (const m of matches) {
-      const slug = m[1]
-      const name = m[2]?.trim()
-      if (slug && !seen.has(slug) && slug.length > 0 && slug.length < 80) {
-        const ignore = ['favorites', 'recent', 'trending', 'search', 'categories',
-                        'new', 'profile', 'settings', 'uploaded', 'best_of_all_time',
-                        'report', 'add', 'embed']
-        if (ignore.some(i => slug.includes(i))) continue
-        seen.add(slug)
-        allSlugs.push(slug)
-        if (name && name.length > 0 && !name.startsWith('!') && !name.includes('svg')) {
-          slugToName[slug] = name
-        }
-      }
-    }
-  }
-
-  console.log(`parseSoundList: ${allSlugs.length} slugs uniques trouvés`)
-  console.log('Premiers slugs:', allSlugs.slice(0, 5))
-
-  const soundUrlRegex = /play\('(media\/sounds\/[^']+)'\)/g
-  const directUrls = [...html.matchAll(soundUrlRegex)].map(m =>
-    `https://www.myinstants.com/${m[1]}`
-  )
-  console.log(`parseSoundList: ${directUrls.length} URLs directes trouvées`)
-
-  for (let i = 0; i < Math.min(allSlugs.length, 40); i++) {
-    const slug = allSlugs[i]
-    const rawName = slugToName[slug] || slug.replace(/-\d+$/, '').replace(/-/g, ' ')
-    const name = rawName.charAt(0).toUpperCase() + rawName.slice(1)
-    const url = directUrls[i] || null
-
-    sounds.push({
-      id: `mi_${slug}_${Date.now()}`,
-      name,
-      slug,
-      url,
-      emoji: getEmojiForName(name)
-    })
-  }
-
-  return sounds
-}
-
-async function resolveInstantUrl(slug) {
-  const url = `https://www.myinstants.com/fr/instant/${slug}/`
-  const result = await fetchPage(url)
-  if (!result.ok) return null
-
-  const ogAudio = result.html.match(/meta-og:audio:\s*(https?:\/\/[^\s\n]+)/)
-  if (ogAudio) return ogAudio[1].trim()
-
-  const audioMatch = result.html.match(/href="(\/media\/sounds\/[^"]+\.mp3)"/)
-  if (audioMatch) return `https://www.myinstants.com${audioMatch[1]}`
-
-  return null
-}
-
-// Handler principal : liste + recherche + catégories
-ipcMain.handle('fetch-myinstants', async (event, query, mode = 'search', lang = 'fr') => {
-  try {
-    let sounds = []
-
-    const langData = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0]
-    const country = langData.country || 'fr'
-
-    if (mode === 'multi') {
-      const terms = query.split(',').map(t => t.trim()).filter(Boolean)
-      for (const term of terms.slice(0, 4)) {
-        const r = await fetchPage(`https://www.myinstants.com/fr/search/?name=${encodeURIComponent(term)}`)
-        if (r.ok) {
-          const found = parseSoundList(r.html)
-          sounds.push(...found)
-        }
-        await new Promise(r => setTimeout(r, 200))
-      }
-      const seen = new Set()
-      sounds = sounds.filter(s => {
-        if (seen.has(s.slug)) return false
-        seen.add(s.slug)
-        return true
-      })
-    } else if (mode === 'local') {
-      // ✅ Si query est une URL complète (pour le mode local), l'utiliser directement
-      let url = query
-      if (!url.startsWith('http')) {
-        url = TRENDING_URLS[country] || TRENDING_URLS['fr']
-      }
-      console.log('fetch-myinstants local:', url)
-      const result = await fetchPage(url)
-      if (!result.ok) return { success: false, error: result.error, sounds: [] }
-      sounds = parseSoundList(result.html)
-    } else {
-      let url
-      if (mode === 'trending') {
-        // ✅ 'trending' utilise aussi les URLs index/{country}/
-        url = TRENDING_URLS[country] || TRENDING_URLS['fr']
-      } else if (mode === 'category') {
-        url = `https://www.myinstants.com/fr/categories/${encodeURIComponent(query)}/`
-      } else {
-        const q = query && query.trim() ? query : 'meme'
-        url = `https://www.myinstants.com/fr/search/?name=${encodeURIComponent(q)}`
-      }
-
-      console.log('fetch-myinstants:', mode, url)
-      const result = await fetchPage(url)
-      if (!result.ok) return { success: false, error: result.error, sounds: [] }
-      sounds = parseSoundList(result.html)
-    }
-
-    if (!sounds.length) {
-      return { success: false, error: 'Aucun son trouvé', sounds: [] }
-    }
-
-    const needsResolve = sounds.filter(s => !s.url && s.slug)
-    console.log(`Résolution de ${needsResolve.length} URLs via pages détail...`)
-
-    if (needsResolve.length > 0) {
-      const toResolve = needsResolve.slice(0, 20)
-      for (let i = 0; i < toResolve.length; i += 3) {
-        const batch = toResolve.slice(i, i + 3)
-        await Promise.all(batch.map(async (sound) => {
-          const resolvedUrl = await resolveInstantUrl(sound.slug)
-          if (resolvedUrl) sound.url = resolvedUrl
-        }))
-        if (i + 3 < toResolve.length) {
-          await new Promise(r => setTimeout(r, 300))
-        }
-      }
-
-      const resolved = sounds.filter(s => s.url).length
-      console.log(`URLs résolues : ${resolved}/${sounds.length}`)
-    }
-
-    sounds = sounds.filter(s => s.url)
-
-    console.log(`fetch-myinstants: ${sounds.length} sons trouvés`)
-    return { success: true, sounds }
-
-  } catch (e) {
-    console.error('fetch-myinstants error:', e.message)
-    return { success: false, error: e.message, sounds: [] }
-  }
-})
-
-function getEmojiForName(name) {
-  const n = name.toLowerCase()
-  if (n.includes('boom') || n.includes('explo')) return '💥'
-  if (n.includes('sad') || n.includes('trombone')) return '🎺'
-  if (n.includes('air') || n.includes('horn')) return '📣'
-  if (n.includes('laugh') || n.includes('lol') || n.includes('bruh')) return '😂'
-  if (n.includes('win') || n.includes('yes') || n.includes('epic')) return '🏆'
-  if (n.includes('oof') || n.includes('rip') || n.includes('fail')) return '😬'
-  if (n.includes('scream') || n.includes('aah') || n.includes('wtf')) return '😱'
-  if (n.includes('bell') || n.includes('ding')) return '🔔'
-  if (n.includes('drum') || n.includes('ba dum')) return '🥁'
-  if (n.includes('cat') || n.includes('meow')) return '🐱'
-  if (n.includes('noot') || n.includes('penguin')) return '🐧'
-  return '🔊'
-}
-
-// ─── Écriture d'un fichier droppé ─────────────────────────────────────────────
 ipcMain.handle('write-dropped-file', async (event, fileName, arrayBuffer) => {
   try {
     const safeName = fileName.replace(/[^a-zA-Z0-9._\- ]/g, '_')
@@ -2376,7 +1859,96 @@ ipcMain.handle('write-dropped-file', async (event, fileName, arrayBuffer) => {
   }
 })
 
-// ─── Export / Import ─────────────────────────────────────────────────────────
+ipcMain.handle('write-sound-file', async (event, filePath, data) => {
+  try {
+    const uint8Array = new Uint8Array(data)
+    fs.writeFileSync(filePath, uint8Array)
+    return { success: true, path: filePath }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
+
+ipcMain.handle('export-audio-file', async (event, { data, fileName, format }) => {
+  try {
+    const soundsDir = path.join(app.getPath('userData'), 'sounds')
+    if (!fs.existsSync(soundsDir)) {
+      fs.mkdirSync(soundsDir, { recursive: true })
+    }
+    
+    const outputPath = path.join(soundsDir, fileName)
+    const buffer = Buffer.from(data)
+    fs.writeFileSync(outputPath, buffer)
+    
+    return { success: true, path: outputPath.replace(/\\/g, '/') }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
+
+ipcMain.handle('convert-audio', async (event, inputPath, outputPath, format, bitrate) => {
+  try {
+    let ffmpegPath = null
+    try {
+      const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg')
+      ffmpegPath = ffmpegInstaller.path
+    } catch (e) {
+      try {
+        const ffmpegStatic = require('ffmpeg-static')
+        ffmpegPath = ffmpegStatic
+      } catch (e2) {
+        ffmpegPath = 'ffmpeg'
+      }
+    }
+
+    const codec = format === 'mp3' ? 'libmp3lame' : 'libvorbis'
+    const args = [
+      '-i', inputPath,
+      '-acodec', codec,
+      '-b:a', `${bitrate}k`,
+      '-y',
+      outputPath
+    ]
+
+    const { execFile } = require('child_process')
+    await new Promise((resolve, reject) => {
+      execFile(ffmpegPath, args, { timeout: 60000 }, (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(error.message || stderr))
+        } else {
+          resolve()
+        }
+      })
+    })
+
+    const stats = fs.statSync(outputPath)
+    return { success: true, size: stats.size }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
+
+ipcMain.handle('save-file-dialog', async (event, fileName, buffer) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Sauvegarder le fichier normalisé',
+    defaultPath: fileName,
+    filters: [{ name: 'Audio WAV', extensions: ['wav'] }]
+  })
+  
+  if (result.canceled) {
+    return { success: false }
+  }
+  
+  try {
+    const uint8Array = new Uint8Array(buffer)
+    fs.writeFileSync(result.filePath, uint8Array)
+    return { success: true, path: result.filePath }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
+
+// ─── HANDLERS EXPORT / IMPORT ─────────────────────────────────────────────
 
 function buildConfig() {
   return {
@@ -2411,7 +1983,6 @@ function applyConfig(config) {
   if (config.audioDevice) store.set('audioDevice', config.audioDevice)
 }
 
-// ── Mode 1 : Config seule (JSON) ─────────────────────────────────────────────
 ipcMain.handle('export-config', async () => {
   const result = await dialog.showSaveDialog(mainWindow, {
     title: 'Exporter la configuration',
@@ -2427,7 +1998,6 @@ ipcMain.handle('export-config', async () => {
   } catch (e) { return { success: false, error: e.message } }
 })
 
-// ── Mode 2 : Archive complète (ZIP config + sons) ────────────────────────────
 ipcMain.handle('export-full', async (event) => {
   const result = await dialog.showSaveDialog(mainWindow, {
     title: 'Exporter archive complète',
@@ -2486,7 +2056,6 @@ ipcMain.handle('export-full', async (event) => {
   }
 })
 
-// ── Mode 3 : Sons uniquement (ZIP) ───────────────────────────────────────────
 ipcMain.handle('export-sounds-only', async () => {
   const result = await dialog.showSaveDialog(mainWindow, {
     title: 'Exporter les sons',
@@ -2523,7 +2092,6 @@ ipcMain.handle('export-sounds-only', async () => {
   } catch (e) { return { success: false, error: e.message } }
 })
 
-// ── Import universel (JSON ou ZIP) ───────────────────────────────────────────
 ipcMain.handle('import-backup', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Importer une sauvegarde',
@@ -2648,12 +2216,376 @@ ipcMain.handle('import-backup', async () => {
   return { success: false, error: 'Format non supporté' }
 })
 
-// ─── Ouvrir un lien externe ────────────────────────────────────────────────────
-ipcMain.handle('open-external', (event, url) => {
-  shell.openExternal(url)
+ipcMain.handle('export-profile', async (event, profileId) => {
+  const profiles = store.get('profiles', [])
+  const sounds = store.get('sounds', [])
+  const shortcuts = store.get('shortcuts', {})
+
+  const profile = profileId === 'all'
+    ? { id: 'all', name: 'All Sounds', isDefault: true }
+    : profiles.find(p => p.id === profileId)
+
+  if (!profile) return { success: false, error: 'Profile not found' }
+
+  const profileSounds = profileId === 'all'
+    ? sounds
+    : sounds.filter(s => s.profiles?.includes(profileId))
+
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: `Export profile "${profile.name}"`,
+    defaultPath: `sounddeck-profile-${profile.name.replace(/[^a-zA-Z0-9]/g, '_')}-${new Date().toISOString().slice(0,10)}.zip`,
+    filters: [{ name: 'SoundDeck Profile', extensions: ['zip'] }]
+  })
+  if (result.canceled) return { success: false }
+
+  try {
+    const archiver = require('archiver')
+    const output = fs.createWriteStream(result.filePath)
+    const archive = archiver('zip', { zlib: { level: 6 } })
+
+    const profileData = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      profile,
+      sounds: profileSounds.map(s => ({
+        ...s,
+        zipPath: fs.existsSync(s.path || '') ? `sounds/${path.basename(s.path)}` : null,
+        imageZipPath: s.image && fs.existsSync(s.image || '') ? `images/${path.basename(s.image)}` : null,
+        shortcut: shortcuts[s.id] || null
+      }))
+    }
+
+    await new Promise((resolve, reject) => {
+      output.on('close', resolve)
+      archive.on('error', reject)
+      archive.pipe(output)
+
+      archive.append(JSON.stringify(profileData, null, 2), { name: 'profile.json' })
+
+      let addedSounds = 0
+      for (const sound of profileSounds) {
+        if (sound.path && fs.existsSync(sound.path)) {
+          archive.file(sound.path, { name: `sounds/${path.basename(sound.path)}` })
+          addedSounds++
+        }
+        if (sound.image && fs.existsSync(sound.image)) {
+          archive.file(sound.image, { name: `images/${path.basename(sound.image)}` })
+        }
+      }
+
+      archive.finalize()
+      console.log(`Export profil "${profile.name}": ${addedSounds} sons`)
+    })
+
+    const sizeMb = (fs.statSync(result.filePath).size / 1024 / 1024).toFixed(1)
+    return { success: true, path: result.filePath, sizeMb, soundCount: profileSounds.length }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
 })
 
-// ─── YouTube import via yt-dlp ───────────────────────────────────────────────
+ipcMain.handle('import-profile', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Import a profile',
+    filters: [{ name: 'SoundDeck Profile', extensions: ['zip'] }],
+    properties: ['openFile']
+  })
+  if (result.canceled) return { success: false }
+
+  try {
+    const unzipper = require('unzipper')
+    const tmpDir = path.join(app.getPath('temp'), `sounddeck_profile_${Date.now()}`)
+    fs.mkdirSync(tmpDir, { recursive: true })
+
+    await new Promise((resolve, reject) => {
+      fs.createReadStream(result.filePaths[0])
+        .pipe(unzipper.Extract({ path: tmpDir }))
+        .on('close', resolve)
+        .on('error', reject)
+    })
+
+    const profileJsonPath = path.join(tmpDir, 'profile.json')
+    if (!fs.existsSync(profileJsonPath)) {
+      return { success: false, error: 'Invalid profile file' }
+    }
+
+    const profileData = JSON.parse(fs.readFileSync(profileJsonPath, 'utf-8'))
+    const { profile, sounds: importedSounds } = profileData
+
+    const { v4: uuidv4 } = require('uuid')
+    const newProfileId = uuidv4()
+    const newProfile = {
+      ...profile,
+      id: newProfileId,
+      name: profile.name + (profile.id === 'all' ? ' (imported)' : ''),
+      isDefault: false
+    }
+
+    const imagesDir = path.join(app.getPath('userData'), 'images')
+    if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true })
+
+    const existingSounds = store.get('sounds', [])
+    const newSounds = []
+    const newShortcuts = { ...store.get('shortcuts', {}) }
+
+    for (const sound of importedSounds) {
+      const newSoundId = uuidv4()
+      let newPath = sound.path
+      let newImage = sound.image || null
+
+      if (sound.zipPath) {
+        const srcSound = path.join(tmpDir, sound.zipPath)
+        if (fs.existsSync(srcSound)) {
+          const destSound = path.join(soundsDir, `imported_${Date.now()}_${path.basename(srcSound)}`)
+          fs.copyFileSync(srcSound, destSound)
+          newPath = destSound.replace(/\\/g, '/')
+        }
+      }
+
+      if (sound.imageZipPath) {
+        const srcImg = path.join(tmpDir, sound.imageZipPath)
+        if (fs.existsSync(srcImg)) {
+          const destImg = path.join(imagesDir, `imported_${Date.now()}_${path.basename(srcImg)}`)
+          fs.copyFileSync(srcImg, destImg)
+          newImage = destImg.replace(/\\/g, '/')
+        }
+      }
+
+      if (sound.shortcut) newShortcuts[newSoundId] = sound.shortcut
+
+      newSounds.push({
+        id: newSoundId,
+        name: sound.name,
+        path: newPath,
+        image: newImage,
+        emoji: sound.emoji || '🔊',
+        favorite: sound.favorite || false,
+        profiles: [newProfileId],
+        volume: sound.volume || 100,
+        playCount: 0,
+        createdAt: Date.now()
+      })
+    }
+
+    const existingProfiles = store.get('profiles', [])
+    store.set('profiles', [...existingProfiles, newProfile])
+    store.set('sounds', [...existingSounds, ...newSounds])
+    store.set('shortcuts', newShortcuts)
+
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+
+    return {
+      success: true,
+      profileName: newProfile.name,
+      soundCount: newSounds.length
+    }
+  } catch (e) {
+    console.error('import-profile error:', e)
+    return { success: false, error: e.message }
+  }
+})
+
+// ─── HANDLERS MYINSTANTS ──────────────────────────────────────────────────
+
+const https = require('https')
+
+function fetchPage(url) {
+  return new Promise((resolve) => {
+    https.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8'
+      }
+    }, (res) => {
+      if ([301,302,303,307].includes(res.statusCode) && res.headers.location) {
+        fetchPage(res.headers.location).then(resolve)
+        return
+      }
+      let data = ''
+      res.on('data', chunk => data += chunk)
+      res.on('end', () => resolve({ ok: true, html: data, status: res.statusCode }))
+    }).on('error', (e) => resolve({ ok: false, error: e.message }))
+  })
+}
+
+function parseSoundList(html) {
+  const sounds = []
+  const seen = new Set()
+
+  console.log('parseSoundList HTML extrait:', html.substring(0, 500))
+  console.log('parseSoundList HTML longueur:', html.length)
+
+  const patterns = [
+    /href="https?:\/\/(?:www\.)?myinstants\.com\/(?:fr\/)?instant\/([a-zA-Z0-9_-]+)\/?"\s*[^>]*>\s*([^<]{1,80})<\/a>/g,
+    /href="\/fr\/instant\/([a-zA-Z0-9_-]+)\/?"\s*[^>]*>\s*([^<]{1,80})<\/a>/g,
+    /href="\/instant\/([a-zA-Z0-9_-]+)\/?"\s*[^>]*>\s*([^<]{1,80})<\/a>/g,
+  ]
+
+  const slugToName = {}
+  const allSlugs = []
+
+  for (const pattern of patterns) {
+    const matches = [...html.matchAll(pattern)]
+    for (const m of matches) {
+      const slug = m[1]
+      const name = m[2]?.trim()
+      if (slug && !seen.has(slug) && slug.length > 0 && slug.length < 80) {
+        const ignore = ['favorites', 'recent', 'trending', 'search', 'categories',
+                        'new', 'profile', 'settings', 'uploaded', 'best_of_all_time',
+                        'report', 'add', 'embed']
+        if (ignore.some(i => slug.includes(i))) continue
+        seen.add(slug)
+        allSlugs.push(slug)
+        if (name && name.length > 0 && !name.startsWith('!') && !name.includes('svg')) {
+          slugToName[slug] = name
+        }
+      }
+    }
+  }
+
+  console.log(`parseSoundList: ${allSlugs.length} slugs uniques trouvés`)
+  console.log('Premiers slugs:', allSlugs.slice(0, 5))
+
+  const soundUrlRegex = /play\('(media\/sounds\/[^']+)'\)/g
+  const directUrls = [...html.matchAll(soundUrlRegex)].map(m =>
+    `https://www.myinstants.com/${m[1]}`
+  )
+  console.log(`parseSoundList: ${directUrls.length} URLs directes trouvées`)
+
+  for (let i = 0; i < Math.min(allSlugs.length, 40); i++) {
+    const slug = allSlugs[i]
+    const rawName = slugToName[slug] || slug.replace(/-\d+$/, '').replace(/-/g, ' ')
+    const name = rawName.charAt(0).toUpperCase() + rawName.slice(1)
+    const url = directUrls[i] || null
+
+    sounds.push({
+      id: `mi_${slug}_${Date.now()}`,
+      name,
+      slug,
+      url,
+      emoji: getEmojiForName(name)
+    })
+  }
+
+  return sounds
+}
+
+async function resolveInstantUrl(slug) {
+  const url = `https://www.myinstants.com/fr/instant/${slug}/`
+  const result = await fetchPage(url)
+  if (!result.ok) return null
+
+  const ogAudio = result.html.match(/meta-og:audio:\s*(https?:\/\/[^\s\n]+)/)
+  if (ogAudio) return ogAudio[1].trim()
+
+  const audioMatch = result.html.match(/href="(\/media\/sounds\/[^"]+\.mp3)"/)
+  if (audioMatch) return `https://www.myinstants.com${audioMatch[1]}`
+
+  return null
+}
+
+function getEmojiForName(name) {
+  const n = name.toLowerCase()
+  if (n.includes('boom') || n.includes('explo')) return '💥'
+  if (n.includes('sad') || n.includes('trombone')) return '🎺'
+  if (n.includes('air') || n.includes('horn')) return '📣'
+  if (n.includes('laugh') || n.includes('lol') || n.includes('bruh')) return '😂'
+  if (n.includes('win') || n.includes('yes') || n.includes('epic')) return '🏆'
+  if (n.includes('oof') || n.includes('rip') || n.includes('fail')) return '😬'
+  if (n.includes('scream') || n.includes('aah') || n.includes('wtf')) return '😱'
+  if (n.includes('bell') || n.includes('ding')) return '🔔'
+  if (n.includes('drum') || n.includes('ba dum')) return '🥁'
+  if (n.includes('cat') || n.includes('meow')) return '🐱'
+  if (n.includes('noot') || n.includes('penguin')) return '🐧'
+  return '🔊'
+}
+
+ipcMain.handle('fetch-myinstants', async (event, query, mode = 'search', lang = 'fr') => {
+  try {
+    let sounds = []
+
+    const langData = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0]
+    const country = langData.country || 'fr'
+
+    if (mode === 'multi') {
+      const terms = query.split(',').map(t => t.trim()).filter(Boolean)
+      for (const term of terms.slice(0, 4)) {
+        const r = await fetchPage(`https://www.myinstants.com/fr/search/?name=${encodeURIComponent(term)}`)
+        if (r.ok) {
+          const found = parseSoundList(r.html)
+          sounds.push(...found)
+        }
+        await new Promise(r => setTimeout(r, 200))
+      }
+      const seen = new Set()
+      sounds = sounds.filter(s => {
+        if (seen.has(s.slug)) return false
+        seen.add(s.slug)
+        return true
+      })
+    } else if (mode === 'local') {
+      let url = query
+      if (!url.startsWith('http')) {
+        url = TRENDING_URLS[country] || TRENDING_URLS['fr']
+      }
+      console.log('fetch-myinstants local:', url)
+      const result = await fetchPage(url)
+      if (!result.ok) return { success: false, error: result.error, sounds: [] }
+      sounds = parseSoundList(result.html)
+    } else {
+      let url
+      if (mode === 'trending') {
+        url = TRENDING_URLS[country] || TRENDING_URLS['fr']
+      } else if (mode === 'category') {
+        url = `https://www.myinstants.com/fr/categories/${encodeURIComponent(query)}/`
+      } else {
+        const q = query && query.trim() ? query : 'meme'
+        url = `https://www.myinstants.com/fr/search/?name=${encodeURIComponent(q)}`
+      }
+
+      console.log('fetch-myinstants:', mode, url)
+      const result = await fetchPage(url)
+      if (!result.ok) return { success: false, error: result.error, sounds: [] }
+      sounds = parseSoundList(result.html)
+    }
+
+    if (!sounds.length) {
+      return { success: false, error: 'Aucun son trouvé', sounds: [] }
+    }
+
+    const needsResolve = sounds.filter(s => !s.url && s.slug)
+    console.log(`Résolution de ${needsResolve.length} URLs via pages détail...`)
+
+    if (needsResolve.length > 0) {
+      const toResolve = needsResolve.slice(0, 20)
+      for (let i = 0; i < toResolve.length; i += 3) {
+        const batch = toResolve.slice(i, i + 3)
+        await Promise.all(batch.map(async (sound) => {
+          const resolvedUrl = await resolveInstantUrl(sound.slug)
+          if (resolvedUrl) sound.url = resolvedUrl
+        }))
+        if (i + 3 < toResolve.length) {
+          await new Promise(r => setTimeout(r, 300))
+        }
+      }
+
+      const resolved = sounds.filter(s => s.url).length
+      console.log(`URLs résolues : ${resolved}/${sounds.length}`)
+    }
+
+    sounds = sounds.filter(s => s.url)
+
+    console.log(`fetch-myinstants: ${sounds.length} sons trouvés`)
+    return { success: true, sounds }
+
+  } catch (e) {
+    console.error('fetch-myinstants error:', e.message)
+    return { success: false, error: e.message, sounds: [] }
+  }
+})
+
+// ─── HANDLERS YOUTUBE ──────────────────────────────────────────────────────
 
 const YTDLP_DIR = path.join(app.getPath('userData'), 'bin')
 const YTDLP_PATH = path.join(YTDLP_DIR, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp')
@@ -2832,21 +2764,11 @@ function formatYtTime(seconds) {
   return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`
 }
 
-// ─── SPOTIFY / SOUNDCLOUD ───────────────────────────────────────────────────
+// ─── HANDLERS SPOTIFY / SOUNDCLOUD ────────────────────────────────────────
 
 ipcMain.handle('spotify-track-info', async (event, trackId) => {
   try {
-    // Pour Spotify, on utilise une API tierce ou on simule
-    // car yt-dlp ne peut pas récupérer les infos à cause du DRM
-    
-    // Option 1: Utiliser l'API Spotify (nécessite un token)
-    // Option 2: Utiliser une API tierce comme SpotiPy
-    // Option 3: Simuler et laisser l'utilisateur entrer les infos
-    
     console.log('🎵 Récupération infos Spotify pour:', trackId)
-    
-    // Simuler une réponse avec un titre générique
-    // Dans la vraie vie, on pourrait utiliser l'API Spotify
     return {
       success: true,
       title: `Morceau Spotify (${trackId.slice(0, 8)})`,
@@ -2908,35 +2830,30 @@ ipcMain.handle('download-platform-track', async (event, { platform, url, outputP
       fs.mkdirSync(dir, { recursive: true })
     }
     
-    // ✅ Utiliser un dossier temporaire
     const tempDir = path.join(app.getPath('temp'), 'sounddeck_downloads')
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true })
     }
     
-    // ✅ Nettoyer les fichiers temporaires anciens
     try {
       const oldFiles = fs.readdirSync(tempDir)
       const now = Date.now()
       for (const file of oldFiles) {
         const filePath = path.join(tempDir, file)
         const stats = fs.statSync(filePath)
-        if (now - stats.mtimeMs > 3600000) { // plus d'1 heure
+        if (now - stats.mtimeMs > 3600000) {
           fs.unlinkSync(filePath)
           console.log(`🧹 Ancien fichier temporaire supprimé: ${file}`)
         }
       }
     } catch (e) {}
     
-    // ✅ NOM UNIQUE
     const uniqueId = Date.now() + '_' + Math.random().toString(36).slice(2, 8)
     const tempOutputPath = path.join(tempDir, `temp_${uniqueId}.mp3`)
     
     let downloadUrl = url
     
-    // Pour Spotify ou recherche YouTube
     if (platform === 'spotify' || platform === 'youtube_search') {
-      // ✅ Utiliser une recherche YouTube avec des mots-clés plus précis
       const searchTerms = [title, artist, 'audio'].filter(Boolean).join(' ')
       const searchQuery = encodeURIComponent(searchTerms)
       downloadUrl = `ytsearch1:${searchQuery}`
@@ -2946,7 +2863,6 @@ ipcMain.handle('download-platform-track', async (event, { platform, url, outputP
     console.log(`📥 Téléchargement via yt-dlp-exec:`, downloadUrl)
     console.log(`📁 Fichier temporaire: ${tempOutputPath}`)
     
-    // ✅ Trouver ffmpeg
     let ffmpegPath = null
     try {
       const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg')
@@ -2963,7 +2879,6 @@ ipcMain.handle('download-platform-track', async (event, { platform, url, outputP
       }
     }
     
-    // ✅ Supprimer les fichiers temporaires existants
     try {
       if (fs.existsSync(tempOutputPath)) {
         fs.unlinkSync(tempOutputPath)
@@ -2972,10 +2887,8 @@ ipcMain.handle('download-platform-track', async (event, { platform, url, outputP
     } catch (e) {}
     
     try {
-      // ✅ Utiliser execFile directement avec plus de contrôle
       const { execFile } = require('child_process')
       
-      // Trouver yt-dlp
       let ytdlpPath = 'yt-dlp'
       try {
         require('child_process').execSync('yt-dlp --version', { stdio: 'ignore' })
@@ -3004,7 +2917,6 @@ ipcMain.handle('download-platform-track', async (event, { platform, url, outputP
         console.log('🔧 Utilisation de ffmpeg:', ffmpegPath)
       }
       
-      // ✅ Ajouter un timeout plus long
       const timeout = 120000
       
       console.log(`🔧 Commande: ${ytdlpPath} ${args.join(' ')}`)
@@ -3012,7 +2924,7 @@ ipcMain.handle('download-platform-track', async (event, { platform, url, outputP
       await new Promise((resolve, reject) => {
         const child = execFile(ytdlpPath, args, { 
           timeout: timeout,
-          maxBuffer: 1024 * 1024 * 10 // 10MB
+          maxBuffer: 1024 * 1024 * 10
         }, (error, stdout, stderr) => {
           if (error) {
             console.error('❌ Erreur yt-dlp:', error.message)
@@ -3031,13 +2943,11 @@ ipcMain.handle('download-platform-track', async (event, { platform, url, outputP
         })
       })
       
-      // ✅ Vérifier le fichier après téléchargement
       await new Promise(resolve => setTimeout(resolve, 1000))
       
       if (fs.existsSync(tempOutputPath)) {
         const stats = fs.statSync(tempOutputPath)
         if (stats.size > 1000) {
-          // ✅ Renommer vers la destination finale
           if (fs.existsSync(outputPath)) {
             try { fs.unlinkSync(outputPath) } catch (e) {}
           }
@@ -3051,7 +2961,6 @@ ipcMain.handle('download-platform-track', async (event, { platform, url, outputP
         console.warn(`⚠️ Fichier temporaire non trouvé: ${tempOutputPath}`)
       }
       
-      // ✅ Chercher dans le dossier temporaire
       const files = fs.readdirSync(tempDir)
       const mp3Files = files
         .filter(f => f.endsWith('.mp3') && f.startsWith('temp_'))
@@ -3082,227 +2991,209 @@ ipcMain.handle('download-platform-track', async (event, { platform, url, outputP
   }
 })
 
-// ─── Raccourci pour montrer/cacher la fenêtre ─────────────────────────────────
-let currentToggleWindowShortcut = 'CommandOrControl+Shift+S'
+ipcMain.handle('open-external', (event, url) => {
+  shell.openExternal(url)
+})
 
-function registerToggleWindowShortcut(shortcut) {
-  // Si shortcut n'est pas fourni, utiliser celui du store ou la valeur par défaut
-  if (!shortcut) {
-    shortcut = currentToggleWindowShortcut
-  }
-  
-  // Désenregistrer l'ancien
-  try {
-    globalShortcut.unregister(currentToggleWindowShortcut)
-  } catch (e) {}
-  
-  if (!shortcut) {
-    console.log('ℹ️ Raccourci toggle fenêtre désactivé')
-    return
-  }
-  
-  try {
-    const ok = globalShortcut.register(shortcut, () => {
-      if (mainWindow) {
-        if (mainWindow.isVisible()) {
-          mainWindow.hide()
-        } else {
-          showMainWindow()
-        }
-      } else {
-        createWindow()
-      }
-    })
+ipcMain.handle('cleanup-orphan-shortcuts', () => {
+  cleanupOrphanShortcuts()
+  return true
+})
+
+ipcMain.handle('get-system-language', () => {
+  return getSystemLanguage()
+})
+
+ipcMain.handle('get-system-keyboard-layout', () => {
+  return getSystemKeyboardLayout()
+})
+
+// ─── CREATE WINDOW ──────────────────────────────────────────────────────────
+
+function createWindow() {
+  const iconPath = path.join(__dirname, '../public/icon.ico')
+
+  console.log('🔍 DIAGNOSTIC createWindow:')
+  console.log('📌 __dirname:', __dirname)
+  console.log('📌 app.isPackaged:', app.isPackaged)
+  console.log('📌 app.getAppPath():', app.getAppPath())
+
+  mainWindow = new BrowserWindow({
+    width: 1100,
+    height: 700,
+    minWidth: 800,
+    minHeight: 500,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: false,
+      allowRunningInsecureContent: false,
+      experimentalFeatures: true
+    },
+    backgroundColor: '#111113',
+    show: !shouldStartMinimized,
+    autoHideMenuBar: true,
+    frame: true,
+    ...(fs.existsSync(iconPath) ? { icon: iconPath } : {})
+  })
+
+  if (isDev) {
+    mainWindow.loadURL('http://localhost:5173')
+    mainWindow.webContents.openDevTools()
+  } else {
+    let indexPath = path.join(app.getAppPath(), 'dist', 'index.html')
     
-    if (ok) {
-      currentToggleWindowShortcut = shortcut
-      console.log(`✅ Raccourci pour toggle la fenêtre enregistré: ${shortcut}`)
-    } else {
-      console.warn(`⚠️ Impossible d'enregistrer le raccourci: ${shortcut}`)
+    if (!fs.existsSync(indexPath)) {
+      const resourcePath = path.join(process.resourcesPath, 'app', 'dist', 'index.html')
+      if (fs.existsSync(resourcePath)) {
+        indexPath = resourcePath
+      } else {
+        const exePath = path.join(path.dirname(app.getPath('exe')), 'resources', 'app', 'dist', 'index.html')
+        if (fs.existsSync(exePath)) {
+          indexPath = exePath
+        }
+      }
     }
-  } catch (e) {
-    console.warn('Erreur enregistrement toggle fenêtre:', e.message)
+    
+    console.log('📄 Chargement de:', indexPath)
+    console.log('📄 Fichier existe:', fs.existsSync(indexPath))
+    
+    if (!fs.existsSync(indexPath)) {
+      console.error('❌ ERREUR: index.html introuvable !')
+      dialog.showErrorBox('Erreur de chargement', 
+        'Impossible de trouver index.html.\n\n' +
+        'Chemin recherché: ' + indexPath + '\n\n' +
+        'Vérifiez que le build est correct.'
+      )
+      app.quit()
+      return
+    }
+    
+    mainWindow.loadFile(indexPath)
   }
+
+  mainWindow.once('ready-to-show', () => {
+    createTray('fr')
+    if (!shouldStartMinimized) {
+      mainWindow.show()
+    }
+  })
+
+  mainWindow.on('closed', () => { mainWindow = null })
+
+  mainWindow.webContents.on('will-navigate', (e, url) => {
+    if (url !== mainWindow.webContents.getURL()) e.preventDefault()
+  })
+
+  mainWindow.webContents.session.on('will-download', (e) => {
+    e.preventDefault()
+  })
+
+  mainWindow.on('close', (e) => {
+    console.log(`🔴 [MAIN] close event - isQuitting: ${isQuitting}, pendingQuit: ${pendingQuit}, closeToTray: ${closeToTray}`)
+    
+    if (isQuitting || pendingQuit) {
+      console.log(`🔴 [MAIN] Quitting, pas de popup`)
+      return
+    }
+
+    if (closeToTray === false) {
+      console.log(`🔴 [MAIN] closeToTray === false, quit direct`)
+      isQuitting = true
+      app.quit()
+      return
+    }
+
+    e.preventDefault()
+    console.log(`🔴 [MAIN] Envoi de show-quit-confirm`)
+    mainWindow.webContents.send('show-quit-confirm')
+  })
 }
 
-// ─── Partage de profil ───────────────────────────────────────────────────────
+// ─── APP ─────────────────────────────────────────────────────────────────────
 
-ipcMain.handle('export-profile', async (event, profileId) => {
-  const profiles = store.get('profiles', [])
-  const sounds = store.get('sounds', [])
-  const shortcuts = store.get('shortcuts', {})
+app.whenReady().then(async () => {
+  cleanupOrphanShortcuts()
+  
+  const systemLang = getSystemLanguage()
+  const savedLang = store.get('lang')
+  if (!savedLang) {
+    store.set('lang', systemLang)
+    console.log(`🌐 Langue système détectée: ${systemLang}`)
+  }
 
-  const profile = profileId === 'all'
-    ? { id: 'all', name: 'All Sounds', isDefault: true }
-    : profiles.find(p => p.id === profileId)
+  const systemLayout = getSystemKeyboardLayout()
+  const savedLayout = store.get('keyboardLayout')
+  if (!savedLayout) {
+    store.set('keyboardLayout', systemLayout)
+    console.log(`⌨️ Layout clavier système détecté: ${systemLayout}`)
+  }
 
-  if (!profile) return { success: false, error: 'Profile not found' }
-
-  const profileSounds = profileId === 'all'
-    ? sounds
-    : sounds.filter(s => s.profiles?.includes(profileId))
-
-  const result = await dialog.showSaveDialog(mainWindow, {
-    title: `Export profile "${profile.name}"`,
-    defaultPath: `sounddeck-profile-${profile.name.replace(/[^a-zA-Z0-9]/g, '_')}-${new Date().toISOString().slice(0,10)}.zip`,
-    filters: [{ name: 'SoundDeck Profile', extensions: ['zip'] }]
-  })
-  if (result.canceled) return { success: false }
-
+  createTray('fr')
+  createWindow()
+  registerShortcuts()
+  registerToggleShortcut()
+  
   try {
-    const archiver = require('archiver')
-    const output = fs.createWriteStream(result.filePath)
-    const archive = archiver('zip', { zlib: { level: 6 } })
-
-    const profileData = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      profile,
-      sounds: profileSounds.map(s => ({
-        ...s,
-        zipPath: fs.existsSync(s.path || '') ? `sounds/${path.basename(s.path)}` : null,
-        imageZipPath: s.image && fs.existsSync(s.image || '') ? `images/${path.basename(s.image)}` : null,
-        shortcut: shortcuts[s.id] || null
-      }))
+    const savedShortcut = store.get('toggleWindowShortcut')
+    if (savedShortcut) {
+      currentToggleWindowShortcut = savedShortcut
+      registerToggleWindowShortcut(savedShortcut)
+    } else {
+      registerToggleWindowShortcut('CommandOrControl+Shift+S')
     }
-
-    await new Promise((resolve, reject) => {
-      output.on('close', resolve)
-      archive.on('error', reject)
-      archive.pipe(output)
-
-      archive.append(JSON.stringify(profileData, null, 2), { name: 'profile.json' })
-
-      let addedSounds = 0
-      for (const sound of profileSounds) {
-        if (sound.path && fs.existsSync(sound.path)) {
-          archive.file(sound.path, { name: `sounds/${path.basename(sound.path)}` })
-          addedSounds++
-        }
-        if (sound.image && fs.existsSync(sound.image)) {
-          archive.file(sound.image, { name: `images/${path.basename(sound.image)}` })
-        }
-      }
-
-      archive.finalize()
-      console.log(`Export profil "${profile.name}": ${addedSounds} sons`)
-    })
-
-    const sizeMb = (fs.statSync(result.filePath).size / 1024 / 1024).toFixed(1)
-    return { success: true, path: result.filePath, sizeMb, soundCount: profileSounds.length }
   } catch (e) {
-    return { success: false, error: e.message }
+    console.warn('Erreur chargement raccourci toggle fenêtre:', e)
+    registerToggleWindowShortcut('CommandOrControl+Shift+S')
+  }
+  
+  findAllSoundDeckShortcuts()
+  
+  console.log('🔍 DIAGNOSTIC DES CHEMINS:')
+  console.log('process.execPath:', process.execPath)
+  console.log('app.getPath("exe"):', app.getPath('exe'))
+  console.log('app.isPackaged:', app.isPackaged)
+  console.log('__dirname:', __dirname)
+  console.log('app.getAppPath():', app.getAppPath())
+  
+  const isLaunchAtStartup = store.get('launchAtStartup', false)
+  console.log('📌 launchAtStartup dans le store:', isLaunchAtStartup)
+  
+  if (isLaunchAtStartup) {
+    console.log('🔧 Création du raccourci de démarrage...')
+    setLaunchAtStartup(true)
+  }
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  })
+})
+
+app.on('window-all-closed', () => {
+  if (!isQuitting) {
+    if (process.platform !== 'darwin') {
+      return
+    }
+  }
+  if (isQuitting) {
+    globalShortcut.unregisterAll()
+    registeredShortcuts = []
+    app.quit()
   }
 })
 
-ipcMain.handle('import-profile', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Import a profile',
-    filters: [{ name: 'SoundDeck Profile', extensions: ['zip'] }],
-    properties: ['openFile']
-  })
-  if (result.canceled) return { success: false }
-
-  try {
-    const unzipper = require('unzipper')
-    const tmpDir = path.join(app.getPath('temp'), `sounddeck_profile_${Date.now()}`)
-    fs.mkdirSync(tmpDir, { recursive: true })
-
-    await new Promise((resolve, reject) => {
-      fs.createReadStream(result.filePaths[0])
-        .pipe(unzipper.Extract({ path: tmpDir }))
-        .on('close', resolve)
-        .on('error', reject)
-    })
-
-    const profileJsonPath = path.join(tmpDir, 'profile.json')
-    if (!fs.existsSync(profileJsonPath)) {
-      return { success: false, error: 'Invalid profile file' }
+app.on('before-quit', () => {
+  isQuitting = true
+  
+  if (trayInstance) {
+    try {
+      trayInstance.destroy()
+      trayInstance = null
+      tray = null
+      console.log('🧹 Icône du tray nettoyée')
+    } catch (e) {
+      console.warn('⚠️ Erreur lors du nettoyage du tray:', e)
     }
-
-    const profileData = JSON.parse(fs.readFileSync(profileJsonPath, 'utf-8'))
-    const { profile, sounds: importedSounds } = profileData
-
-    const { v4: uuidv4 } = require('uuid')
-    const newProfileId = uuidv4()
-    const newProfile = {
-      ...profile,
-      id: newProfileId,
-      name: profile.name + (profile.id === 'all' ? ' (imported)' : ''),
-      isDefault: false
-    }
-
-    const imagesDir = path.join(app.getPath('userData'), 'images')
-    if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true })
-
-    const existingSounds = store.get('sounds', [])
-    const newSounds = []
-    const newShortcuts = { ...store.get('shortcuts', {}) }
-
-    for (const sound of importedSounds) {
-      const newSoundId = uuidv4()
-      let newPath = sound.path
-      let newImage = sound.image || null
-
-      if (sound.zipPath) {
-        const srcSound = path.join(tmpDir, sound.zipPath)
-        if (fs.existsSync(srcSound)) {
-          const destSound = path.join(soundsDir, `imported_${Date.now()}_${path.basename(srcSound)}`)
-          fs.copyFileSync(srcSound, destSound)
-          newPath = destSound.replace(/\\/g, '/')
-        }
-      }
-
-      if (sound.imageZipPath) {
-        const srcImg = path.join(tmpDir, sound.imageZipPath)
-        if (fs.existsSync(srcImg)) {
-          const destImg = path.join(imagesDir, `imported_${Date.now()}_${path.basename(srcImg)}`)
-          fs.copyFileSync(srcImg, destImg)
-          newImage = destImg.replace(/\\/g, '/')
-        }
-      }
-
-      if (sound.shortcut) newShortcuts[newSoundId] = sound.shortcut
-
-      newSounds.push({
-        id: newSoundId,
-        name: sound.name,
-        path: newPath,
-        image: newImage,
-        emoji: sound.emoji || '🔊',
-        favorite: sound.favorite || false,
-        profiles: [newProfileId],
-        volume: sound.volume || 100,
-        playCount: 0,
-        createdAt: Date.now()
-      })
-    }
-
-    const existingProfiles = store.get('profiles', [])
-    store.set('profiles', [...existingProfiles, newProfile])
-    store.set('sounds', [...existingSounds, ...newSounds])
-    store.set('shortcuts', newShortcuts)
-
-    fs.rmSync(tmpDir, { recursive: true, force: true })
-
-    return {
-      success: true,
-      profileName: newProfile.name,
-      soundCount: newSounds.length
-    }
-  } catch (e) {
-    console.error('import-profile error:', e)
-    return { success: false, error: e.message }
   }
 })
-
-// ─── Vérifier existence fichier ──────────────────────────────────────────────
-ipcMain.handle('file-exists', (event, filePath) => {
-  try { return fs.existsSync(filePath) }
-  catch (e) { return false }
-})
-
-// ─── Store ────────────────────────────────────────────────────────────────────
-ipcMain.handle('store-get', (event, key) => store.get(key))
-ipcMain.handle('store-set', (event, key, value) => { store.set(key, value); return true })
-ipcMain.handle('store-delete', (event, key) => { store.delete(key); return true })

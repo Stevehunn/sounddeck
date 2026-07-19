@@ -8,6 +8,7 @@ import EditorNormalize from './EditorNormalize'
 import EditorMasterVolume from './EditorMasterVolume'
 import { generateWaveformData } from '../../utils/waveformGenerator'
 import { normalizeClip, normalizeAll } from '../../utils/normalizeUtils'
+import { mixdownProject, exportMixdown } from '../../utils/mixdown'
 
 const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
 
@@ -25,7 +26,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
   const [waveformData, setWaveformData] = useState({})
   const [clipDurations, setClipDurations] = useState({})
   const [snapEnabled, setSnapEnabled] = useState(true)
-  const [autoPlayOnClick, setAutoPlayOnClick] = useState(false) // ✅ Option jouer au clic
+  const [autoPlayOnClick, setAutoPlayOnClick] = useState(false)
   
   // ─── ÉTATS COPIER/COLLER ──────────────────────────────────────────────────
   const [clipboard, setClipboard] = useState({ clips: [], trackId: null, copiedAt: null })
@@ -297,6 +298,18 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     }
   }
 
+  // ─── WAVEFORM DYNAMIQUE ──────────────────────────────────────────────────
+  const handleWaveformUpdate = useCallback(async (clipId, filePath, offset, duration) => {
+    try {
+      const data = await generateWaveformData(filePath, 200, offset || 0, duration || null, false)
+      if (data) {
+        setWaveformData(prev => ({ ...prev, [clipId]: data }))
+      }
+    } catch (e) {
+      console.warn('Erreur mise à jour waveform:', e)
+    }
+  }, [])
+
   // ─── COPIER/COLLER ────────────────────────────────────────────────────────
   const handleCopyClip = useCallback((clipId, trackId) => {
     const track = store.editorProject.tracks.find(t => t.id === trackId)
@@ -353,35 +366,44 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       start = lastClip.start + (clipDurations[lastClip.id] || lastClip.duration || 3) + 0.5
     }
 
-    for (const clipData of clipboard.clips) {
-      const newClip = {
-        ...clipData,
-        id: `clip-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        start: start,
-        effects: clipData.effects?.map(e => ({
-          ...e,
-          id: `effect-${Date.now()}-${e.id || Math.random().toString(36).slice(2, 6)}`
-        })) || []
+    const project = store.editorProject
+    const newTracks = project.tracks.map(t => {
+      if (t.id === trackId) {
+        const newClips = clipboard.clips.map(clipData => ({
+          ...clipData,
+          id: `clip-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          start: start,
+          effects: clipData.effects?.map(e => ({
+            ...e,
+            id: `effect-${Date.now()}-${e.id || Math.random().toString(36).slice(2, 6)}`
+          })) || []
+        }))
+        let currentStart = start
+        newClips.forEach(c => {
+          c.start = currentStart
+          currentStart += (c.duration || 3) + 0.5
+        })
+        return { ...t, clips: [...t.clips, ...newClips] }
       }
-      
-      const updated = {
-        ...store.editorProject,
-        tracks: store.editorProject.tracks.map(t => {
-          if (t.id === trackId) {
-            return { ...t, clips: [...t.clips, newClip] }
-          }
-          return t
-        }),
-        updatedAt: Date.now()
-      }
-      
-      await store.commitEditorProject(updated, { skipHistory: true })
-      start += (clipData.duration || 3) + 0.5
+      return t
+    })
+
+    const updatedProject = {
+      ...project,
+      tracks: newTracks,
+      updatedAt: Date.now()
     }
 
-    await store.pushEditorHistoryCheckpoint()
-    addToast(`${clipboard.clips.length} clip(s) ${tr('editorPasted')}`, 'success')
-    setSelectedTrackId(trackId)
+    // ✅ Utiliser commitEditorProject qui existe déjà
+    try {
+      await store.commitEditorProject(updatedProject, { skipHistory: true })
+      await store.pushEditorHistoryCheckpoint()
+      addToast(`${clipboard.clips.length} clip(s) ${tr('editorPasted')}`, 'success')
+      setSelectedTrackId(trackId)
+    } catch (e) {
+      console.error('Erreur lors du collage:', e)
+      addToast('Erreur lors du collage: ' + e.message, 'error')
+    }
   }, [clipboard, selectedTrackId, store, clipDurations, tr, addToast])
 
   // ─── RACCOURCIS CLAVIER ──────────────────────────────────────────────────
@@ -549,12 +571,10 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       const elapsed = (Date.now() - startTimeRef.current) / 1000
       let current = Math.min(elapsed, totalDuration)
 
-      // ✅ LOOP CORRIGÉE : Ne bloque pas la timeline
       const loop = loopRegionRef.current
       if (loop?.enabled && current >= loop.end) {
         const loopDuration = loop.end - loop.start
         if (loopDuration > 0.1) {
-          // Repositionner dans la loop
           const offset = (current - loop.end) % loopDuration
           current = loop.start + offset
           startTimeRef.current = Date.now() - current * 1000
@@ -628,7 +648,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     }
   }, [totalDuration, isPlaying, isPaused, clipDurations])
 
-  // ─── SPLIT CORRIGÉ ────────────────────────────────────────────────────────
+  // ─── SPLIT ─────────────────────────────────────────────────────────────────
   const getClipUnderPlayhead = useCallback(() => {
     const project = store.editorProject
     if (!project) return null
@@ -661,15 +681,14 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     const newClip = await store.splitClip(target.trackId, target.clip.id, currentTime, clipDurations[target.clip.id])
     
     if (newClip) {
-      // Mettre à jour les durées
       const updatedClipDurations = { ...clipDurations }
       updatedClipDurations[target.clip.id] = currentTime - target.clip.start
       setClipDurations(updatedClipDurations)
       
-      // Charger la waveform pour le nouveau clip
+      // ✅ Régénérer le waveform du nouveau clip
       try {
         const sliceDuration = updatedClipDurations[newClip.id] || newClip.duration || null
-        const data = await generateWaveformData(newClip.path, 200, newClip.offset || 0, sliceDuration)
+        const data = await generateWaveformData(newClip.path, 200, newClip.offset || 0, sliceDuration, false)
         if (data) {
           setWaveformData(prev => ({ ...prev, [newClip.id]: data }))
         }
@@ -693,17 +712,22 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     const newClip = await store.splitClip(target.trackId, target.clip.id, currentTime, clipDurations[target.clip.id])
     
     if (newClip) {
-      // Créer une nouvelle piste
       await store.addTrack()
       const newTrackId = store.editorProject.tracks[store.editorProject.tracks.length - 1].id
       
-      // Déplacer le nouveau clip vers la nouvelle piste
       await store.moveClip(target.trackId, newClip.id, 0, newTrackId, { skipHistory: true })
       
-      // Mettre à jour les durées
       const updatedClipDurations = { ...clipDurations }
       updatedClipDurations[target.clip.id] = currentTime - target.clip.start
       setClipDurations(updatedClipDurations)
+      
+      // Régénérer le waveform du nouveau clip
+      try {
+        const data = await generateWaveformData(newClip.path, 200, newClip.offset || 0, null, false)
+        if (data) {
+          setWaveformData(prev => ({ ...prev, [newClip.id]: data }))
+        }
+      } catch (e) {}
       
       setSelectedTrackId(newTrackId)
       setSelectedClipId(newClip.id)
@@ -726,8 +750,8 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         await store.updateClipWithPath(clipId, result.path)
         addToast(`"${clip.name}" rogné avec succès`, 'success')
         
-        // Recharger la waveform
-        const data = await generateWaveformData(result.path, 200)
+        // Régénérer le waveform
+        const data = await generateWaveformData(result.path, 200, 0, end - start, false)
         if (data) {
           setWaveformData(prev => ({ ...prev, [clipId]: data }))
         }
@@ -793,6 +817,11 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       if (result) {
         if (result.normalized) {
           addToast(`"${clip.name}" ${tr('editorNormalized')} (gain: ${result.gain.toFixed(2)})`, 'success')
+          // Régénérer le waveform après normalisation
+          const data = await generateWaveformData(result.newPath || clip.path, 200, 0, null, false)
+          if (data) {
+            setWaveformData(prev => ({ ...prev, [clipId]: data }))
+          }
         } else {
           addToast(`"${clip.name}" ${tr('editorAlreadyNormalized')}`, 'info')
         }
@@ -870,7 +899,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     setMetronomeBpm(bpm)
   }, [])
 
-  // ─── EXPORT ────────────────────────────────────────────────────────────────
+  // ─── EXPORT RÉEL ──────────────────────────────────────────────────────────
   const handleExportClick = () => {
     const project = store.editorProject
     if (!project || project.tracks.length === 0 || project.tracks.every(t => t.clips.length === 0)) {
@@ -900,21 +929,60 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     setShowExportModal(false)
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      addToast('🎛️ Mixage en cours...', 'info')
+      
+      const project = store.editorProject
+      const buffer = await mixdownProject(
+        project,
+        clipDurations,
+        44100,
+        (progress) => {
+          console.log(`Mixage: ${Math.round(progress * 100)}%`)
+        }
+      )
+
+      if (!buffer) {
+        throw new Error('Erreur lors du mixage')
+      }
+
+      addToast(`📦 Export en ${exportFormat.toUpperCase()}...`, 'info')
+
+      const safeName = exportName.trim().replace(/[^a-zA-Z0-9_-]/g, '_')
+      const fileName = `${safeName}.${exportFormat}`
+      
+      const soundsDir = await window.electronAPI.getSoundsDir()
+      const outputPath = `${soundsDir}/${fileName}`
+
+      const result = await exportMixdown(
+        buffer,
+        exportFormat,
+        exportBitrate,
+        outputPath,
+        (progress) => {
+          console.log(`Export: ${Math.round(progress * 100)}%`)
+        }
+      )
+
+      if (!result.success) {
+        throw new Error(result.error || 'Erreur lors de l\'export')
+      }
 
       if (exportAddToLibrary) {
         const soundData = {
           name: exportName.trim(),
-          path: '/path/to/exported/file.' + exportFormat,
+          path: result.path,
           image: exportImage || null,
           emoji: exportEmoji,
           profiles: exportProfiles
         }
         await store.addSound(soundData)
-        addToast(`"${exportName.trim()}" ${tr('editorExportSuccess')}`, 'success')
+        
+        const sizeStr = result.size ? `${(result.size / 1024 / 1024).toFixed(1)} MB` : ''
+        addToast(`"${exportName.trim()}" exporté avec succès ! ${sizeStr}`, 'success')
       } else {
-        addToast(tr('editorExportFileOnlySuccess'), 'success')
+        addToast(`Fichier exporté : ${fileName}`, 'success')
       }
+
     } catch (e) {
       console.error('Export error:', e)
       addToast(tr('editorExportError') + ': ' + e.message, 'error')
@@ -1077,13 +1145,14 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
           metronomeBpm={metronomeBpm}
           onMetronomeToggle={handleMetronomeToggle}
           onMetronomeBpmChange={handleMetronomeBpmChange}
+          onWaveformUpdate={handleWaveformUpdate}
           autoPlayOnClick={autoPlayOnClick}
           lang={lang}
           tr={tr}
         />
       </div>
 
-      {/* Panneau d'effets - contextuel */}
+      {/* Panneau d'effets */}
       {selectedClip && (
         <EditorEffectsPanel
           clip={selectedClip}
@@ -1112,7 +1181,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         />
       )}
 
-      {/* Barre inférieure simplifiée */}
+      {/* Barre inférieure */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -1124,7 +1193,6 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         flexWrap: 'wrap',
         gap: 8
       }}>
-        {/* Normalisation */}
         <EditorNormalize
           clip={selectedClip}
           onNormalize={handleNormalizeClip}
@@ -1135,7 +1203,6 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
 
         <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
 
-        {/* Master Volume */}
         <EditorMasterVolume
           volume={isMasterMuted ? 0 : masterVolume}
           onVolumeChange={handleMasterVolumeChange}

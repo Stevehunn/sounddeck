@@ -1,16 +1,34 @@
+/**
+ * Applique les effets en temps réel sur un buffer audio source
+ * Utilisé pour la prévisualisation des effets pendant l'édition
+ * ET pour l'export réel
+ */
+
+// Cache des buffers traités
 const effectCache = new Map()
 
-export function applyEffectsToBuffer(audioBuffer, effects, sampleRate = 44100) {
+/**
+ * Applique tous les effets d'un clip sur son buffer audio
+ * @param {AudioBuffer} audioBuffer - Buffer source
+ * @param {Array} effects - Liste des effets du clip
+ * @param {number} sampleRate - Taux d'échantillonnage
+ * @param {boolean} normalize - Normaliser le résultat
+ * @returns {AudioBuffer} Buffer avec effets appliqués
+ */
+export function applyEffectsToBuffer(audioBuffer, effects, sampleRate = 44100, normalize = true) {
   if (!audioBuffer || !effects || effects.length === 0) return audioBuffer
   
   let result = audioBuffer
   
+  // Filtrer les effets actifs
   const activeEffects = effects.filter(e => e.enabled)
   if (activeEffects.length === 0) return result
   
+  // Créer un AudioContext pour le traitement
   const ctx = new (window.AudioContext || window.webkitAudioContext)()
   
   try {
+    // Appliquer les effets dans l'ordre (ordre défini par l'utilisateur)
     for (const effect of activeEffects) {
       switch (effect.type) {
         case 'volume':
@@ -39,7 +57,11 @@ export function applyEffectsToBuffer(audioBuffer, effects, sampleRate = 44100) {
       }
     }
     
-    result = normalizeBuffer(result, ctx)
+    // Normaliser pour éviter l'écrêtage
+    if (normalize) {
+      result = normalizeBuffer(result, ctx)
+    }
+    
     return result
     
   } catch (e) {
@@ -51,6 +73,8 @@ export function applyEffectsToBuffer(audioBuffer, effects, sampleRate = 44100) {
     }
   }
 }
+
+// ─── EFFETS INDIVIDUELS ──────────────────────────────────────────────────────
 
 function applyVolumeEffect(buffer, volume, ctx) {
   if (volume === 1) return buffer
@@ -76,7 +100,7 @@ function applyFadeInEffect(buffer, duration, ctx) {
   const sampleRate = buffer.sampleRate
   const fadeSamples = Math.floor(duration * sampleRate)
   const channels = buffer.numberOfChannels
-  const length = buffer.length  
+  const length = buffer.length
   const newBuffer = ctx.createBuffer(channels, length, sampleRate)
   
   for (let channel = 0; channel < channels; channel++) {
@@ -85,6 +109,7 @@ function applyFadeInEffect(buffer, duration, ctx) {
     for (let i = 0; i < length; i++) {
       if (i < fadeSamples) {
         const ratio = i / fadeSamples
+        // Courbe de fade in exponentielle (plus naturelle)
         newData[i] = data[i] * (ratio * ratio)
       } else {
         newData[i] = data[i]
@@ -111,6 +136,7 @@ function applyFadeOutEffect(buffer, duration, ctx) {
     for (let i = 0; i < length; i++) {
       if (i >= start) {
         const ratio = (i - start) / fadeSamples
+        // Courbe de fade out exponentielle (plus naturelle)
         newData[i] = data[i] * (1 - ratio * ratio)
       } else {
         newData[i] = data[i]
@@ -136,6 +162,7 @@ function applyPitchEffect(buffer, semitones, ctx) {
     const data = buffer.getChannelData(channel)
     const newData = newBuffer.getChannelData(channel)
     
+    // Interpolation linéaire pour éviter les artéfacts
     for (let i = 0; i < newLength; i++) {
       const srcIndex = i / speed
       const srcIndexFloor = Math.floor(srcIndex)
@@ -177,7 +204,7 @@ function applySpeedEffect(buffer, speed, ctx) {
 }
 
 function applyEchoEffect(buffer, delay, decay, mix, ctx) {
-  if (delay <= 0) return buffer
+  if (delay <= 0 || mix <= 0) return buffer
   
   const sampleRate = buffer.sampleRate
   const delaySamples = Math.floor(delay * sampleRate)
@@ -189,10 +216,12 @@ function applyEchoEffect(buffer, delay, decay, mix, ctx) {
     const data = buffer.getChannelData(channel)
     const newData = newBuffer.getChannelData(channel)
     
+    // Copier le signal original avec le mix
     for (let i = 0; i < data.length; i++) {
       newData[i] += data[i] * (1 - mix)
     }
     
+    // Ajouter l'écho
     for (let i = 0; i < data.length; i++) {
       if (i + delaySamples < newData.length) {
         newData[i + delaySamples] += data[i] * mix * decay
@@ -204,7 +233,7 @@ function applyEchoEffect(buffer, delay, decay, mix, ctx) {
 }
 
 function applyReverbEffect(buffer, roomSize, mix, ctx) {
-  if (roomSize <= 0) return buffer
+  if (roomSize <= 0 || mix <= 0) return buffer
   
   const sampleRate = buffer.sampleRate
   const reverbLength = Math.floor(roomSize * sampleRate * 1.5)
@@ -212,6 +241,7 @@ function applyReverbEffect(buffer, roomSize, mix, ctx) {
   const newLength = buffer.length + reverbLength
   const newBuffer = ctx.createBuffer(channels, newLength, sampleRate)
   
+  // Créer une réponse impulsionnelle stochastique
   const irBuffer = ctx.createBuffer(1, reverbLength, sampleRate)
   const irData = irBuffer.getChannelData(0)
   for (let i = 0; i < reverbLength; i++) {
@@ -223,15 +253,16 @@ function applyReverbEffect(buffer, roomSize, mix, ctx) {
     const data = buffer.getChannelData(channel)
     const newData = newBuffer.getChannelData(channel)
     
+    // Signal original avec le mix
     for (let i = 0; i < data.length; i++) {
       newData[i] += data[i] * (1 - mix)
     }
     
+    // Réverbération - convolution simple
+    const maxJ = Math.min(reverbLength, newData.length - i)
     for (let i = 0; i < data.length; i++) {
-      for (let j = 0; j < Math.min(reverbLength, newData.length - i); j++) {
-        if (j < reverbLength) {
-          newData[i + j] += data[i] * irData[j] * mix
-        }
+      for (let j = 0; j < maxJ; j++) {
+        newData[i + j] += data[i] * irData[j] * mix
       }
     }
   }
@@ -253,7 +284,7 @@ function normalizeBuffer(buffer, ctx) {
   }
   
   if (maxPeak === 0) return buffer
-  if (maxPeak < 0.95) return buffer
+  if (maxPeak < 0.9) return buffer // Pas besoin de normaliser si déjà bon
   
   const gain = 0.95 / maxPeak
   
@@ -269,6 +300,8 @@ function normalizeBuffer(buffer, ctx) {
   return newBuffer
 }
 
+// ─── CACHE ──────────────────────────────────────────────────────────────────
+
 export function getCachedEffectBuffer(clipId, version = 0) {
   const key = `${clipId}_${version}`
   return effectCache.get(key) || null
@@ -277,6 +310,7 @@ export function getCachedEffectBuffer(clipId, version = 0) {
 export function setCachedEffectBuffer(clipId, buffer, version = 0) {
   const key = `${clipId}_${version}`
   effectCache.set(key, buffer)
+  // Limiter la taille du cache
   if (effectCache.size > 100) {
     const keys = Array.from(effectCache.keys())
     for (let i = 0; i < keys.length - 50; i++) {
