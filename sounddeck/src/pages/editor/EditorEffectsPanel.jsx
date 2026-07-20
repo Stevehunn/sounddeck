@@ -54,7 +54,8 @@ export default function EditorEffectsPanel({
   onNormalize,
   onTrim,
   lang,
-  tr
+  tr,
+  autoPlayOnClick = false
 }) {
   const [showAddEffect, setShowAddEffect] = useState(false)
   const [showTrimModal, setShowTrimModal] = useState(false)
@@ -92,7 +93,7 @@ export default function EditorEffectsPanel({
   }, [previewEffects])
 
   useEffect(() => {
-    if (clip && clip.effects) {
+    if (clip && clip.effects && autoPlayOnClick === true) {
       schedulePreview()
     }
     return () => {
@@ -100,7 +101,7 @@ export default function EditorEffectsPanel({
         clearTimeout(previewTimeoutRef.current)
       }
     }
-  }, [clip?.effects, clip?.id, schedulePreview])
+  }, [clip?.effects, clip?.id, schedulePreview, autoPlayOnClick])
 
   const handleParamChange = (effectId, param, value) => {
     onEffectUpdate(trackId, clip.id, effectId, param, value)
@@ -126,7 +127,6 @@ export default function EditorEffectsPanel({
     setShowAddEffect(false)
   }
 
-  // ✅ Rognage - Ouvre le modal
   const handleTrimClick = () => {
     setShowTrimModal(true)
   }
@@ -164,6 +164,16 @@ export default function EditorEffectsPanel({
             borderRadius: 10
           }}>
             {clip.effects?.filter(e => e.enabled).length || 0} {tr('editorEffectsActive')}
+          </span>
+          <span style={{
+            fontSize: 9,
+            color: autoPlayOnClick ? 'var(--success)' : 'var(--text-tertiary)',
+            background: autoPlayOnClick ? 'rgba(29,158,117,0.1)' : 'var(--bg-tertiary)',
+            padding: '1px 8px',
+            borderRadius: 10,
+            border: `1px solid ${autoPlayOnClick ? 'var(--success)' : 'var(--border)'}`
+          }}>
+            {autoPlayOnClick ? '🔊 ' + tr('editorAuto') : '🔇 ' + tr('editorManual')}
           </span>
         </div>
 

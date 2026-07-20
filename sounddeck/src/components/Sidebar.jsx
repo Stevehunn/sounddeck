@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, memo } from 'react'
 import { useTranslation } from '../i18n'
 
 // IDs des éléments qui sont toujours des actions
@@ -52,7 +52,9 @@ const DEFAULT_ICONS = {
   stats: 'ti-chart-bar',
 }
 
-export default function Sidebar({
+// ─── COMPOSANT PRINCIPAL AVEC MEMO ──────────────────────────────────────────
+
+const Sidebar = memo(function Sidebar({
   profiles,
   currentProfileId,
   currentPage,
@@ -71,7 +73,6 @@ export default function Sidebar({
   sidebarConfig,
   sidebarEditMode,
   sidebarVersion = 0,
-  // ✅ NOUVEAUX PROPS POUR LES PLUGINS
   pluginPages = [],
   isPluginPage = () => false,
 }) {
@@ -83,6 +84,10 @@ export default function Sidebar({
 
   const [draggedProfileId, setDraggedProfileId] = useState(null)
   const [dragOverProfileId, setDragOverProfileId] = useState(null)
+
+  // ─── REFS POUR STOCKER LES VALEURS STABLES ──────────────────────────────
+  const stableVisibleItemsRef = useRef({ pinned: [], groups: {} })
+  const [visibleItems, setVisibleItems] = useState({ pinned: [], groups: {} })
 
   // ─── Raccourcis ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -99,23 +104,76 @@ export default function Sidebar({
     }
   }, [])
 
-  // ─── Debug ──────────────────────────────────────────────────────────────────
+  // ─── CALCUL DES visibleItems UNIQUEMENT QUAND LES DONNÉES CHANGENT VRAIMENT ─
   useEffect(() => {
-    console.log('🔄 Sidebar re-rendue avec version:', sidebarVersion)
-    console.log('📋 Sidebar config:', sidebarConfig)
-    console.log('📋 Profils disponibles:', profiles.map(p => p.id))
-    console.log('📋 Pages plugins:', pluginPages.map(p => p.id))
-    
-    if (sidebarConfig?.items) {
-      const groups = {}
-      sidebarConfig.items.forEach(item => {
-        const key = item.pinned ? 'pinned' : item.group
-        if (!groups[key]) groups[key] = []
-        groups[key].push(item.id)
-      })
-      console.log('📊 Groupes dans la config:', groups)
+    if (!sidebarConfig || !sidebarConfig.items) {
+      const empty = { pinned: [], groups: {} }
+      if (JSON.stringify(stableVisibleItemsRef.current) !== JSON.stringify(empty)) {
+        stableVisibleItemsRef.current = empty
+        setVisibleItems(empty)
+      }
+      return
     }
-  }, [sidebarVersion, sidebarConfig, profiles, pluginPages])
+
+    const updatedItems = sidebarConfig.items.map(item => ({
+      ...item,
+      label: getItemLabel(item),
+      icon: getItemIcon(item),
+      group: getItemGroup(item),
+    }))
+
+    const visible = updatedItems.filter(item => item.visible !== false)
+    const pinned = visible.filter(item => item.pinned === true)
+    const others = visible.filter(item => item.pinned !== true)
+
+    const groups = {}
+    others.forEach(item => {
+      const groupKey = item.group || 'other'
+      if (!groups[groupKey]) groups[groupKey] = []
+      groups[groupKey].push(item)
+    })
+
+    const newVisibleItems = { pinned, groups }
+    const currentJson = JSON.stringify(stableVisibleItemsRef.current)
+    const newJson = JSON.stringify(newVisibleItems)
+
+    if (currentJson !== newJson) {
+      stableVisibleItemsRef.current = newVisibleItems
+      setVisibleItems(newVisibleItems)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sidebarConfig, lang, profiles, pluginPages])
+
+  // ─── Fonctions utilitaires ──────────────────────────────────────────────────
+  const getItemLabel = (item) => {
+    const defaultLabels = getDefaultLabels(tr)
+    
+    if (item.id && item.id.startsWith('profile-')) {
+      const profileId = item.id.replace('profile-', '')
+      const profile = profiles.find(p => p.id === profileId)
+      return profile?.name || item.label || profileId
+    }
+    
+    if (item.id && defaultLabels[item.id]) {
+      return defaultLabels[item.id]
+    }
+    
+    return item.label || item.id
+  }
+
+  const getItemIcon = (item) => {
+    if (item.id && DEFAULT_ICONS[item.id]) {
+      return DEFAULT_ICONS[item.id]
+    }
+    return item.icon || 'ti-circle'
+  }
+
+  const getItemGroup = (item) => {
+    if (item.id && DEFAULT_GROUPS[item.id]) {
+      return DEFAULT_GROUPS[item.id]
+    }
+    return item.group || 'other'
+  }
 
   // ─── Profils ──────────────────────────────────────────────────────────────────
   const handleCreateProfile = async () => {
@@ -200,47 +258,8 @@ export default function Sidebar({
     setDragOverProfileId(null)
   }
 
-  // ─── CONFIGURATION DE LA SIDEBAR ────────────────────────────────────────────
-
-  // ✅ Fonction pour obtenir les labels traduits d'un item
-  const getItemLabel = (item) => {
-    const defaultLabels = getDefaultLabels(tr)
-    
-    // Si c'est un profil, utiliser le nom du profil
-    if (item.id && item.id.startsWith('profile-')) {
-      const profileId = item.id.replace('profile-', '')
-      const profile = profiles.find(p => p.id === profileId)
-      return profile?.name || item.label || profileId
-    }
-    
-    // Si c'est un élément avec un label traduit
-    if (item.id && defaultLabels[item.id]) {
-      return defaultLabels[item.id]
-    }
-    
-    // Fallback: utiliser le label existant
-    return item.label || item.id
-  }
-
-  // ✅ Fonction pour obtenir l'icône d'un item
-  const getItemIcon = (item) => {
-    if (item.id && DEFAULT_ICONS[item.id]) {
-      return DEFAULT_ICONS[item.id]
-    }
-    return item.icon || 'ti-circle'
-  }
-
-  // ✅ Fonction pour obtenir le groupe d'un item
-  const getItemGroup = (item) => {
-    if (item.id && DEFAULT_GROUPS[item.id]) {
-      return DEFAULT_GROUPS[item.id]
-    }
-    return item.group || 'other'
-  }
-
-  // ✅ Fusionner les pages core + plugins pour la sidebar
+  // ─── Pages ──────────────────────────────────────────────────────────────────
   const allPages = useMemo(() => {
-    // Pages core de la sidebar
     const corePages = [
       { id: 'home', label: tr('mySounds'), icon: 'ti-home', group: 'navigation', isCore: true },
       { id: 'library', label: tr('library'), icon: 'ti-library', isCore: true, group: 'navigation' },
@@ -254,8 +273,7 @@ export default function Sidebar({
       { id: 'options', label: tr('options'), icon: 'ti-settings', group: 'footer', isCore: true }
     ]
 
-    // ✅ Ajouter les pages des plugins
-    const pluginPagesFormatted = pluginPages
+    const pluginPagesFormatted = (pluginPages || [])
       .filter(p => p.visible !== false)
       .map(p => ({
         ...p,
@@ -265,42 +283,6 @@ export default function Sidebar({
 
     return [...corePages, ...pluginPagesFormatted]
   }, [tr, pluginPages])
-
-  const visibleItems = useMemo(() => {
-    console.log('🔄 Recalcul de visibleItems avec config:', sidebarConfig?.mode)
-    
-    if (!sidebarConfig || !sidebarConfig.items) {
-      return { pinned: [], groups: {} }
-    }
-
-    // Mettre à jour les labels et icônes des items avec les traductions
-    const updatedItems = sidebarConfig.items.map(item => ({
-      ...item,
-      label: getItemLabel(item),
-      icon: getItemIcon(item),
-      group: getItemGroup(item),
-    }))
-
-    const visible = updatedItems.filter(item => item.visible !== false)
-
-    const pinned = visible.filter(item => item.pinned === true)
-    const others = visible.filter(item => item.pinned !== true)
-
-    const groups = {}
-    others.forEach(item => {
-      const groupKey = item.group || 'other'
-      if (!groups[groupKey]) groups[groupKey] = []
-      groups[groupKey].push(item)
-    })
-
-    console.log('📊 visibleItems calculé:', { 
-      pinned: pinned.length, 
-      groups: Object.keys(groups),
-      actions: groups.actions?.length || 0
-    })
-
-    return { pinned, groups }
-  }, [sidebarConfig, lang, profiles, allPages])
 
   const isItemActive = (itemId) => {
     if (itemId === 'home') return currentPage === 'home'
@@ -315,7 +297,6 @@ export default function Sidebar({
     if (itemId === 'mixer') return currentPage === 'mixer'
     if (itemId === 'stats') return currentPage === 'stats'
     
-    // ✅ Vérifier si c'est une page plugin active
     if (itemId && isPluginPage(itemId)) {
       return currentPage === itemId
     }
@@ -324,7 +305,6 @@ export default function Sidebar({
   }
 
   const handleNavClick = (itemId) => {
-    // Pages core
     if (itemId === 'home') onChangePage('home')
     else if (itemId === 'discover') onChangePage('discover')
     else if (itemId === 'trimmer') onChangePage('trimmer')
@@ -337,7 +317,6 @@ export default function Sidebar({
     else if (itemId === 'mixer') onChangePage('mixer')
     else if (itemId === 'stats') onChangePage('stats')
     else {
-      // ✅ Page plugin ou autre
       onChangePage(itemId)
     }
   }
@@ -425,8 +404,6 @@ export default function Sidebar({
 
   // ✅ Rendre un élément d'action
   const renderActionItem = (item) => {
-    console.log('🎯 renderActionItem appelé pour:', item.id, 'groupe:', item.group)
-    
     if (item.id === 'loop') {
       return (
         <button key={item.id} onClick={onToggleLoop} style={{
@@ -518,24 +495,20 @@ export default function Sidebar({
 
   const sectionOrder = sidebarConfig?.sectionOrder || ['pinned', 'profiles', 'navigation', 'actions', 'footer']
   
-  // S'assurer que 'footer' est toujours en dernier
   let orderedSections = [...sectionOrder]
   const footerIdx = orderedSections.indexOf('footer')
   if (footerIdx !== -1 && footerIdx < orderedSections.length - 1) {
     const [footer] = orderedSections.splice(footerIdx, 1)
     orderedSections.push(footer)
   }
-  // S'assurer que 'pinned' est toujours en premier
   const pinnedIdx = orderedSections.indexOf('pinned')
   if (pinnedIdx > 0) {
     const [pinned] = orderedSections.splice(pinnedIdx, 1)
     orderedSections.unshift(pinned)
   }
 
-  // ✅ Récupérer les sections fixes (celles que l'utilisateur a choisies)
   const userFixedSections = sidebarConfig?.fixedSections || []
 
-  // Filtrer les sections qui ont du contenu
   const sectionsWithContent = orderedSections.filter(section => {
     if (section === 'pinned') {
       return visibleItems.pinned.length > 0
@@ -543,28 +516,20 @@ export default function Sidebar({
     return visibleItems.groups?.[section]?.length > 0
   })
 
-  // Séparer les sections avec contenu
   const footerSection = 'footer'
 
-  // ✅ Garder l'ordre original des sections fixes (selon sectionOrder)
   const fixedSectionsList = userFixedSections.filter(s => 
     s !== 'footer' && sectionsWithContent.includes(s)
   )
 
-  // ✅ Limiter à 2 sections fixes maximum et conserver l'ordre
   const maxFixedSections = 2
   const limitedFixedSections = fixedSectionsList.slice(0, maxFixedSections)
 
-  // ✅ Les sections scrollables = toutes les sections avec contenu SAUF footer ET SAUF les sections fixes
   const scrollableSections = sectionsWithContent.filter(s => 
     s !== footerSection && !limitedFixedSections.includes(s)
   )
 
-  console.log('📋 Sections scrollables:', scrollableSections)
-  console.log('📋 Sections fixes:', limitedFixedSections)
-  console.log('📋 Footer:', footerSection)
-
-  // ✅ Fonction pour rendre une section générique (navigation, footer, etc.)
+  // ✅ Fonction pour rendre une section générique
   const renderGenericSection = (sectionKey, title) => {
     const items = visibleItems.groups[sectionKey] || []
     if (items.length === 0) return null
@@ -722,7 +687,7 @@ export default function Sidebar({
     return null
   }
 
-  // ✅ Rendu du footer (toujours en bas)
+  // ✅ Rendu du footer
   const renderFooter = () => {
     const footerItems = visibleItems.groups.footer || []
     if (footerItems.length === 0) return null
@@ -739,11 +704,10 @@ export default function Sidebar({
     )
   }
 
-  // ✅ Rendu des sections fixes (au-dessus du footer) - DANS L'ORDRE ORIGINAL
+  // ✅ Rendu des sections fixes
   const renderFixedSections = () => {
     if (limitedFixedSections.length === 0) return null
     
-    // ✅ Trier les sections fixes selon l'ordre original
     const sortedFixedSections = [...limitedFixedSections].sort((a, b) => {
       return sectionsWithContent.indexOf(a) - sectionsWithContent.indexOf(b)
     })
@@ -775,7 +739,7 @@ export default function Sidebar({
       flexShrink: 0,
       height: '100vh'
     }}>
-      {/* Logo - toujours en haut */}
+      {/* Logo */}
       <div style={{
         padding: '16px 16px 12px',
         display: 'flex',
@@ -788,7 +752,7 @@ export default function Sidebar({
         <span style={{ fontWeight: 600, fontSize: 15 }}>SoundDeck</span>
       </div>
 
-      {/* Volume maître - toujours visible */}
+      {/* Volume maître */}
       <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -822,19 +786,34 @@ export default function Sidebar({
         </button>
       </div>
 
-      {/* ✅ Contenu scrollable */}
+      {/* Contenu scrollable */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
         {scrollableSections.map(sectionKey => renderSection(sectionKey))}
       </div>
 
-      {/* ✅ Sections fixes (au-dessus du footer) - DANS L'ORDRE ORIGINAL */}
+      {/* Sections fixes */}
       {renderFixedSections()}
 
-      {/* ✅ Footer - toujours en bas */}
+      {/* Footer */}
       {renderFooter()}
     </aside>
   )
-}
+}, (prevProps, nextProps) => {
+  // ✅ Comparaison personnalisée pour éviter les re-rendus inutiles
+  return (
+    prevProps.sidebarVersion === nextProps.sidebarVersion &&
+    prevProps.currentPage === nextProps.currentPage &&
+    prevProps.currentProfileId === nextProps.currentProfileId &&
+    prevProps.loopEnabled === nextProps.loopEnabled &&
+    prevProps.volume === nextProps.volume &&
+    prevProps.lang === nextProps.lang &&
+    JSON.stringify(prevProps.profiles) === JSON.stringify(nextProps.profiles) &&
+    JSON.stringify(prevProps.sidebarConfig) === JSON.stringify(nextProps.sidebarConfig) &&
+    JSON.stringify(prevProps.pluginPages) === JSON.stringify(nextProps.pluginPages)
+  )
+})
+
+export default Sidebar
 
 // ─── COMPOSANT SidebarItem ──────────────────────────────────────────────────
 

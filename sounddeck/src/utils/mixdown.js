@@ -1,16 +1,23 @@
 /**
  * Mixdown réel - Fusionne tous les clips en un seul fichier audio
- * Version compatible navigateur (utilise les APIs Electron)
  */
 
 /**
  * Mixe tous les clips d'un projet en un seul buffer audio
+ * @param {Object} project - Le projet avec ses pistes et clips
+ * @param {Object} clipDurations - Durées des clips
+ * @param {number} sampleRate - Taux d'échantillonnage (44100 par défaut)
+ * @param {Function} onProgress - Callback de progression
+ * @param {number} exportStart - Début de l'export (secondes)
+ * @param {number|null} exportEnd - Fin de l'export (secondes, null = tout)
+ * @returns {Promise<AudioBuffer>} Le buffer audio mixé
  */
-export async function mixdownProject(project, clipDurations, sampleRate = 44100, onProgress) {
+export async function mixdownProject(project, clipDurations, sampleRate = 44100, onProgress, exportStart = 0, exportEnd = null) {
   if (!project || !project.tracks || project.tracks.length === 0) {
     throw new Error('Projet vide')
   }
 
+  // 1. Calculer la durée totale et filtrer les clips
   let totalDuration = 0
   const clipsWithInfo = []
 
@@ -18,7 +25,16 @@ export async function mixdownProject(project, clipDurations, sampleRate = 44100,
     for (const clip of track.clips) {
       const duration = clipDurations[clip.id] || clip.duration || 3
       const end = clip.start + duration
-      if (end > totalDuration) totalDuration = end
+      
+      // Filtrer les clips qui sont dans la zone d'export
+      if (exportEnd !== null) {
+        if (clip.start > exportEnd || end < exportStart) {
+          continue
+        }
+      }
+      
+      const endTime = exportEnd !== null ? Math.min(end, exportEnd) : end
+      if (endTime > totalDuration) totalDuration = endTime
       
       clipsWithInfo.push({
         ...clip,
@@ -32,10 +48,15 @@ export async function mixdownProject(project, clipDurations, sampleRate = 44100,
     }
   }
 
-  totalDuration += 0.1
+  // Ajuster la durée totale
+  if (exportEnd !== null && exportEnd > totalDuration) {
+    totalDuration = exportEnd
+  } else {
+    totalDuration += 0.1
+  }
 
   if (clipsWithInfo.length === 0) {
-    throw new Error('Aucun clip à mixer')
+    throw new Error('Aucun clip à mixer dans la sélection')
   }
 
   const offlineContext = new OfflineAudioContext(
@@ -63,7 +84,6 @@ export async function mixdownProject(project, clipDurations, sampleRate = 44100,
   let processed = 0
   const totalClips = clipsWithInfo.length
 
-  // Importer les effets dynamiquement
   let applyEffectsToBufferFn = null
   try {
     const effectsModule = await import('./realTimeEffects')
@@ -121,10 +141,27 @@ export async function mixdownProject(project, clipDurations, sampleRate = 44100,
       source.connect(clipGain)
       clipGain.connect(offlineContext.destination)
 
-      const startTime = clipInfo.start || 0
+      // Ajuster le début si on a un offset d'export
+      const startTime = Math.max(0, clipInfo.start - exportStart)
       const duration = clipInfo.duration || 3
       const offset = clipInfo.offset || 0
-      source.start(startTime, offset, duration)
+      
+      // Si le clip commence avant exportStart, ajuster l'offset
+      let adjustedOffset = offset
+      let adjustedDuration = duration
+      if (clipInfo.start < exportStart) {
+        adjustedOffset = offset + (exportStart - clipInfo.start)
+        adjustedDuration = duration - (exportStart - clipInfo.start)
+      }
+      
+      // Si le clip dépasse exportEnd, ajuster la durée
+      if (exportEnd !== null && clipInfo.start + duration > exportEnd) {
+        adjustedDuration = exportEnd - Math.max(clipInfo.start, exportStart)
+      }
+      
+      if (adjustedDuration > 0) {
+        source.start(startTime, adjustedOffset, adjustedDuration)
+      }
 
       processed++
       if (onProgress) onProgress(processed / totalClips)
@@ -150,6 +187,141 @@ export async function mixdownProject(project, clipDurations, sampleRate = 44100,
   }
 
   return renderedBuffer
+}
+
+/**
+ * Exporte le mixdown vers un fichier audio
+ * @param {AudioBuffer} buffer - Le buffer audio mixé
+ * @param {string} format - 'mp3', 'wav', 'ogg'
+ * @param {number} bitrate - Qualité (kbps)
+ * @param {string} outputPath - Chemin de sortie
+ * @param {Function} onProgress - Callback de progression
+ * @returns {Promise<Object>} Résultat de l'export
+ */
+export async function exportMixdown(buffer, format = 'mp3', bitrate = 192, outputPath, onProgress) {
+  try {
+    if (onProgress) onProgress(0.1)
+    
+    const wavData = audioBufferToWav(buffer)
+    if (onProgress) onProgress(0.2)
+    
+    if (format === 'wav') {
+      const result = await saveAudioFileViaElectron(wavData, outputPath)
+      if (onProgress) onProgress(1)
+      return result
+    }
+
+    try {
+      const tempPath = outputPath + '.temp.wav'
+      const saveResult = await saveAudioFileViaElectron(wavData, tempPath)
+      
+      if (!saveResult.success) {
+        const fallbackPath = outputPath.replace(/\.(mp3|ogg)$/, '.wav')
+        const result = await saveAudioFileViaElectron(wavData, fallbackPath)
+        if (onProgress) onProgress(1)
+        return { 
+          success: true, 
+          path: fallbackPath, 
+          format: 'wav',
+          warning: 'Conversion impossible, export en WAV' 
+        }
+      }
+
+      if (onProgress) onProgress(0.4)
+
+      const result = await window.electronAPI.convertAudio?.(tempPath, outputPath, format, bitrate)
+      
+      if (onProgress) onProgress(0.9)
+
+      try {
+        await window.electronAPI.deleteSoundFile?.(tempPath)
+      } catch (e) {}
+
+      if (result?.success) {
+        if (onProgress) onProgress(1)
+        return { 
+          success: true, 
+          path: outputPath, 
+          format: format,
+          size: result.size || 0
+        }
+      }
+
+      const fallbackPath = outputPath.replace(/\.(mp3|ogg)$/, '.wav')
+      const fallbackResult = await saveAudioFileViaElectron(wavData, fallbackPath)
+      if (onProgress) onProgress(1)
+      return { 
+        success: true, 
+        path: fallbackPath, 
+        format: 'wav',
+        warning: 'Conversion impossible, export en WAV' 
+      }
+
+    } catch (e) {
+      console.warn('⚠️ Erreur conversion:', e.message)
+      
+      const fallbackPath = outputPath.replace(/\.(mp3|ogg)$/, '.wav')
+      const result = await saveAudioFileViaElectron(wavData, fallbackPath)
+      if (onProgress) onProgress(1)
+      return { 
+        success: true, 
+        path: fallbackPath, 
+        format: 'wav',
+        warning: 'Erreur conversion, export en WAV' 
+      }
+    }
+
+  } catch (e) {
+    console.error('❌ Erreur export:', e)
+    return { 
+      success: false, 
+      error: e.message 
+    }
+  }
+}
+
+/**
+ * Sauvegarde un fichier audio via l'API Electron
+ */
+async function saveAudioFileViaElectron(data, outputPath) {
+  const uint8Array = new Uint8Array(data)
+  const fileName = outputPath.split('/').pop() || outputPath.split('\\').pop() || 'exported.wav'
+  
+  try {
+    const result = await window.electronAPI.writeSoundFile?.(outputPath, Array.from(uint8Array))
+    if (result?.success) {
+      return { success: true, path: outputPath }
+    }
+  } catch (e) {
+    console.warn('writeSoundFile non disponible:', e)
+  }
+  
+  try {
+    const blob = new Blob([data], { type: 'audio/wav' })
+    const url = URL.createObjectURL(blob)
+    
+    const result = await window.electronAPI.downloadSoundUrl?.(url, fileName)
+    if (result?.success) {
+      return { success: true, path: result.path }
+    }
+  } catch (e) {
+    console.warn('downloadSoundUrl non disponible:', e)
+  }
+  
+  try {
+    const blob = new Blob([data], { type: 'audio/wav' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 10000)
+    return { success: true, path: 'download://' + fileName, downloaded: true }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
 }
 
 /**
@@ -207,151 +379,6 @@ function audioBufferToWav(buffer) {
 function writeString(view, offset, string) {
   for (let i = 0; i < string.length; i++) {
     view.setUint8(offset + i, string.charCodeAt(i))
-  }
-}
-
-/**
- * Sauvegarde un fichier audio via l'API Electron
- */
-async function saveAudioFileViaElectron(data, outputPath) {
-  // Convertir ArrayBuffer en Uint8Array
-  const uint8Array = new Uint8Array(data)
-  
-  // Utiliser l'API Electron pour écrire le fichier
-  // On va utiliser writeDroppedFile ou une API équivalente
-  const fileName = outputPath.split('/').pop() || outputPath.split('\\').pop() || 'exported.wav'
-  
-  // Essayer d'utiliser writeSoundFile si disponible
-  try {
-    const result = await window.electronAPI.writeSoundFile?.(outputPath, Array.from(uint8Array))
-    if (result?.success) {
-      return { success: true, path: outputPath }
-    }
-  } catch (e) {
-    console.warn('writeSoundFile non disponible:', e)
-  }
-  
-  // Fallback: utiliser l'API de téléchargement
-  try {
-    const blob = new Blob([data], { type: 'audio/wav' })
-    const url = URL.createObjectURL(blob)
-    
-    // Utiliser l'API downloadSoundUrl
-    const result = await window.electronAPI.downloadSoundUrl?.(url, fileName)
-    if (result?.success) {
-      return { success: true, path: result.path }
-    }
-  } catch (e) {
-    console.warn('downloadSoundUrl non disponible:', e)
-  }
-  
-  // Dernier fallback: créer un lien de téléchargement
-  try {
-    const blob = new Blob([data], { type: 'audio/wav' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = fileName
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(url), 10000)
-    return { success: true, path: 'download://' + fileName, downloaded: true }
-  } catch (e) {
-    return { success: false, error: e.message }
-  }
-}
-
-/**
- * Exporte le mixdown vers un fichier audio
- */
-export async function exportMixdown(buffer, format = 'mp3', bitrate = 192, outputPath, onProgress) {
-  try {
-    if (onProgress) onProgress(0.1)
-    
-    const wavData = audioBufferToWav(buffer)
-    if (onProgress) onProgress(0.2)
-    
-    // Si format WAV, sauvegarder directement
-    if (format === 'wav') {
-      const result = await saveAudioFileViaElectron(wavData, outputPath)
-      if (onProgress) onProgress(1)
-      return result
-    }
-
-    // Pour MP3 ou OGG, on essaie d'utiliser ffmpeg via Electron
-    try {
-      // Créer un fichier WAV temporaire
-      const tempPath = outputPath + '.temp.wav'
-      const saveResult = await saveAudioFileViaElectron(wavData, tempPath)
-      
-      if (!saveResult.success) {
-        // Fallback: sauvegarder en WAV
-        const fallbackPath = outputPath.replace(/\.(mp3|ogg)$/, '.wav')
-        const result = await saveAudioFileViaElectron(wavData, fallbackPath)
-        if (onProgress) onProgress(1)
-        return { 
-          success: true, 
-          path: fallbackPath, 
-          format: 'wav',
-          warning: 'Conversion impossible, export en WAV' 
-        }
-      }
-
-      if (onProgress) onProgress(0.4)
-
-      // Essayer d'utiliser ffmpeg via Electron
-      const result = await window.electronAPI.convertAudio?.(tempPath, outputPath, format, bitrate)
-      
-      if (onProgress) onProgress(0.9)
-
-      // Nettoyer le fichier temporaire
-      try {
-        await window.electronAPI.deleteSoundFile?.(tempPath)
-      } catch (e) {}
-
-      if (result?.success) {
-        if (onProgress) onProgress(1)
-        return { 
-          success: true, 
-          path: outputPath, 
-          format: format,
-          size: result.size || 0
-        }
-      }
-
-      // Fallback: sauvegarder en WAV
-      const fallbackPath = outputPath.replace(/\.(mp3|ogg)$/, '.wav')
-      const fallbackResult = await saveAudioFileViaElectron(wavData, fallbackPath)
-      if (onProgress) onProgress(1)
-      return { 
-        success: true, 
-        path: fallbackPath, 
-        format: 'wav',
-        warning: 'Conversion impossible, export en WAV' 
-      }
-
-    } catch (e) {
-      console.warn('⚠️ Erreur conversion:', e.message)
-      
-      // Fallback: sauvegarder en WAV
-      const fallbackPath = outputPath.replace(/\.(mp3|ogg)$/, '.wav')
-      const result = await saveAudioFileViaElectron(wavData, fallbackPath)
-      if (onProgress) onProgress(1)
-      return { 
-        success: true, 
-        path: fallbackPath, 
-        format: 'wav',
-        warning: 'Erreur conversion, export en WAV' 
-      }
-    }
-
-  } catch (e) {
-    console.error('❌ Erreur export:', e)
-    return { 
-      success: false, 
-      error: e.message 
-    }
   }
 }
 

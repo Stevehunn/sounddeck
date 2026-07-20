@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import EditorMetronome from './EditorMetronome'
 
 export default function EditorToolbar({
   isPlaying,
@@ -31,7 +32,16 @@ export default function EditorToolbar({
   onRenameProject,
   isPreviewingEffect,
   autoPlayOnClick,
-  onToggleAutoPlay
+  onToggleAutoPlay,
+  autoCrossfade,
+  onToggleCrossfade,
+  isDirty,
+  isAutoSaving,
+  // ✅ NOUVELLES PROPS POUR LE MÉTRONOME
+  metronomeEnabled,
+  metronomeBpm,
+  onMetronomeToggle,
+  onMetronomeBpmChange
 }) {
   const [showAddClip, setShowAddClip] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
@@ -130,35 +140,32 @@ export default function EditorToolbar({
       return
     }
 
-    // Si une piste est déjà sélectionnée, l'utiliser directement
     let trackId = selectedTrackId
     if (trackId && tracks.some(t => t.id === trackId)) {
       try {
         await onAddClipFromFile(trackId, filePath)
       } catch (err) {
         console.error('Erreur import fichier:', err)
-        alert('Erreur lors de l\'import du fichier')
+        alert(tr('editorFileImportError'))
       } finally {
         if (fileInputRef.current) fileInputRef.current.value = ''
       }
       return
     }
 
-    // Si une seule piste existe, l'utiliser
     if (tracks.length === 1) {
       try {
         await onAddClipFromFile(tracks[0].id, filePath)
         setSelectedTrackId(tracks[0].id)
       } catch (err) {
         console.error('Erreur import fichier:', err)
-        alert('Erreur lors de l\'import du fichier')
+        alert(tr('editorFileImportError'))
       } finally {
         if (fileInputRef.current) fileInputRef.current.value = ''
       }
       return
     }
 
-    // Si plusieurs pistes, montrer le modal de sélection
     setPendingFile(filePath)
     setImportTrackId(tracks[0].id)
     setShowImportModal(true)
@@ -177,7 +184,7 @@ export default function EditorToolbar({
       setSelectedTrackId(importTrackId)
     } catch (err) {
       console.error('Erreur import fichier:', err)
-      alert('Erreur lors de l\'import du fichier')
+      alert(tr('editorFileImportError'))
     } finally {
       setShowImportModal(false)
       setPendingFile(null)
@@ -223,7 +230,7 @@ export default function EditorToolbar({
           <input
             type="text"
             value={newProjectName}
-            onChange={(e) => setNewProjectName(e.target.value)}
+            onChange={e => setNewProjectName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleRenameProject()
               if (e.key === 'Escape') {
@@ -250,22 +257,47 @@ export default function EditorToolbar({
             }}
           />
         ) : (
-          <span
-            onClick={handleRenameProject}
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              color: 'var(--text-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4
-            }}
-            title="Cliquer pour renommer"
-          >
-            <i className="ti ti-pencil" style={{ fontSize: 12, color: 'var(--text-tertiary)', opacity: 0.6 }} />
-            {projectName || 'Nouveau projet'}
-          </span>
+          <>
+            <span
+              onClick={handleRenameProject}
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                color: 'var(--text-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4
+              }}
+              title={tr('editorClickToRename')}
+            >
+              <i className="ti ti-pencil" style={{ fontSize: 12, color: 'var(--text-tertiary)', opacity: 0.6 }} />
+              {projectName || 'Nouveau projet'}
+            </span>
+            {isAutoSaving ? (
+              <span style={{
+                fontSize: 9,
+                color: 'var(--text-tertiary)',
+                animation: 'pulse 1s ease-in-out infinite'
+              }}>
+                <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('editorSaving') || 'Sauvegarde...'}
+              </span>
+            ) : isDirty ? (
+              <span style={{
+                fontSize: 9,
+                color: 'var(--warning)'
+              }}>
+                ● {tr('editorDirty') || 'Modifié'}
+              </span>
+            ) : (
+              <span style={{
+                fontSize: 9,
+                color: 'var(--success)'
+              }}>
+                ✓ {tr('editorSaved') || 'Sauvegardé'}
+              </span>
+            )}
+          </>
         )}
       </div>
 
@@ -379,6 +411,16 @@ export default function EditorToolbar({
           <i className="ti ti-repeat" /> {tr('editorLoop')}
         </button>
 
+        <button
+          className={autoCrossfade ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+          onClick={onToggleCrossfade}
+          style={{ fontSize: 10, padding: '2px 8px', minHeight: 24 }}
+          title={tr('editorAutoCrossfade') || 'Crossfade automatique'}
+        >
+          <i className="ti ti-transition-right" />
+          {autoCrossfade ? 'Crossfade ON' : 'Crossfade OFF'}
+        </button>
+
         <span style={{ 
           fontSize: 12, 
           fontFamily: 'monospace', 
@@ -445,6 +487,18 @@ export default function EditorToolbar({
       </div>
 
       <div style={{ flex: 1 }} />
+
+      {/* ✅ MÉTRONOME - AJOUTÉ ICI */}
+      <EditorMetronome
+        bpm={metronomeBpm}
+        onBpmChange={onMetronomeBpmChange}
+        isPlaying={isPlaying}
+        currentTime={currentTime}
+        totalDuration={totalDuration}
+        enabled={metronomeEnabled}
+        onToggle={onMetronomeToggle}
+        tr={tr}
+      />
 
       {/* Boutons d'action */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

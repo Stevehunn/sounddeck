@@ -28,6 +28,7 @@ export default function EditorClip({
 }) {
   const [isDragging, setIsDragging] = useState(false)
   const [dragStartX, setDragStartX] = useState(0)
+  const [dragStartY, setDragStartY] = useState(0)
   const [isResizing, setIsResizing] = useState(false)
   const [resizeSide, setResizeSide] = useState(null)
   const [isHovered, setIsHovered] = useState(false)
@@ -36,6 +37,14 @@ export default function EditorClip({
   const [liveFadeOut, setLiveFadeOut] = useState(null)
   const dragValueRef = useRef(0)
   const clipRef = useRef(null)
+  
+  // ✅ REFS POUR LE DRAG
+  const hasDraggedRef = useRef(false)
+  const mouseDownPosRef = useRef({ x: 0, y: 0 })
+  const isDraggingRef = useRef(false)
+  const isClickRef = useRef(false)
+  const clickHandledRef = useRef(false)
+  const shouldPlayRef = useRef(false) // ✅ NOUVEAU : pour savoir si on doit jouer le son
   
   // Lecture preview
   const [isClipPlaying, setIsClipPlaying] = useState(false)
@@ -64,7 +73,7 @@ export default function EditorClip({
     }
   }, [playbackHowl])
 
-  // ✅ Regénérer le waveform quand le clip est modifié
+  // Regénérer le waveform quand le clip est modifié
   useEffect(() => {
     if (clip.path && onWaveformUpdate) {
       const timer = setTimeout(() => {
@@ -114,7 +123,7 @@ export default function EditorClip({
     }
   }, [fadeDrag, pixelsPerSecond, maxFade, onFadeInChange, onFadeOutChange])
 
-  // Lecture preview
+  // ✅ Lecture preview - UNIQUEMENT via le bouton
   const playClipPreview = (e) => {
     if (e) e.stopPropagation()
     
@@ -153,39 +162,40 @@ export default function EditorClip({
     }
   }
 
-  // Clic sur le clip
-  const handleClipClick = (e) => {
-    // ✅ Ne pas déclencher si on clique sur un bouton d'action
-    if (e.target.closest('.clip-actions')) return
-    
-    // ✅ Sélection toujours effectuée
-    onSelect()
-    
-    // ✅ Lecture uniquement en mode Auto
-    if (autoPlayOnClick) {
-      if (playbackHowl && isClipPlaying) {
-        playbackHowl.stop()
-        playbackHowl.unload()
-        setPlaybackHowl(null)
-        setIsClipPlaying(false)
-        return
-      }
-      playClipPreview(e)
-    }
-  }
-
+  // ✅ GESTION DES ÉVÉNEMENTS SOURIS - SIMPLIFIÉE
   const handleMouseDown = (e) => {
     if (e.button !== 0) return
     if (e.target.closest('.clip-actions')) return
 
+    // ✅ Réinitialiser toutes les refs
+    mouseDownPosRef.current = { x: e.clientX, y: e.clientY }
+    hasDraggedRef.current = false
+    isDraggingRef.current = true
+    isClickRef.current = true
+    clickHandledRef.current = false
+    shouldPlayRef.current = false
+    
     onDragCheckpoint?.()
     setIsDragging(true)
     setDragStartX(e.clientX)
+    setDragStartY(e.clientY)
+    
+    // ✅ Sélectionner le clip (NE JAMAIS JOUER ICI)
     onSelect()
   }
 
   const handleMouseMove = (e) => {
-    if (!isDragging) return
+    if (!isDraggingRef.current) return
+
+    const dx = Math.abs(e.clientX - mouseDownPosRef.current.x)
+    const dy = Math.abs(e.clientY - mouseDownPosRef.current.y)
+    
+    // ✅ Si le curseur a bougé de plus de 5px, c'est un drag
+    if (dx > 5 || dy > 5) {
+      hasDraggedRef.current = true
+      isClickRef.current = false
+      shouldPlayRef.current = false
+    }
 
     const deltaX = e.clientX - dragStartX
     const deltaSeconds = deltaX / pixelsPerSecond
@@ -193,10 +203,78 @@ export default function EditorClip({
 
     onMove(newStart)
     setDragStartX(e.clientX)
+    setDragStartY(e.clientY)
   }
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e) => {
     setIsDragging(false)
+    isDraggingRef.current = false
+    
+    // ✅ Si c'était un drag, on annule TOUT
+    if (hasDraggedRef.current) {
+      hasDraggedRef.current = false
+      isClickRef.current = false
+      shouldPlayRef.current = false
+      return
+    }
+    
+    // ✅ Vérifier que c'est un clic (pas de drag)
+    const dx = Math.abs(e.clientX - mouseDownPosRef.current.x)
+    const dy = Math.abs(e.clientY - mouseDownPosRef.current.y)
+    
+    if (dx < 5 && dy < 5 && isClickRef.current && !clickHandledRef.current) {
+      clickHandledRef.current = true
+      
+      // ✅ Vérifier si on doit jouer le son (uniquement si autoPlayOnClick est true)
+      if (autoPlayOnClick === true) {
+        shouldPlayRef.current = true
+        // ✅ Jouer le son après un court délai pour éviter les conflits
+        setTimeout(() => {
+          if (shouldPlayRef.current && !hasDraggedRef.current) {
+            handleClipClick(e)
+          }
+          shouldPlayRef.current = false
+        }, 20)
+      } else {
+        // ✅ Mode manuel : NE PAS jouer le son
+        // On fait juste un appel à handleClipClick avec autoPlayOnClick = false
+        handleClipClick(e)
+      }
+    }
+    
+    hasDraggedRef.current = false
+    isClickRef.current = false
+  }
+
+  // ✅ CLIC SUR LE CLIP - FINALE
+  const handleClipClick = (e) => {
+    // ✅ Si on est en train de draguer, ignorer
+    if (isDraggingRef.current || hasDraggedRef.current) {
+      return
+    }
+    
+    if (e?.target?.closest?.('.clip-actions')) return
+    
+    // ✅ Sélectionner le clip (déjà fait, mais sécurité)
+    onSelect()
+    
+    // ✅ SI autoPlayOnClick EST FALSE, NE RIEN FAIRE D'AUTRE
+    if (autoPlayOnClick !== true) {
+      return
+    }
+    
+    // ✅ Ici, autoPlayOnClick est true
+    // Gérer le toggle lecture/arrêt
+    if (playbackHowl && isClipPlaying) {
+      playbackHowl.stop()
+      playbackHowl.unload()
+      setPlaybackHowl(null)
+      setIsClipPlaying(false)
+      return
+    }
+    
+    // ✅ Jouer le clip
+    playClipPreview(e)
   }
 
   const handleResizeStart = (e, side) => {
@@ -232,18 +310,29 @@ export default function EditorClip({
     setResizeSide(null)
   }
 
+  // ✅ Effets pour les événements globaux
   useEffect(() => {
-    if (isDragging || isResizing) {
-      document.addEventListener('mousemove', isDragging ? handleMouseMove : handleResizeMove)
-      document.addEventListener('mouseup', isDragging ? handleMouseUp : handleResizeUp)
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
     }
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isDragging])
+
+  // ✅ Effets pour le resize
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleResizeMove)
+      document.addEventListener('mouseup', handleResizeUp)
+    }
+    return () => {
       document.removeEventListener('mousemove', handleResizeMove)
       document.removeEventListener('mouseup', handleResizeUp)
     }
-  }, [isDragging, isResizing])
+  }, [isResizing])
 
   const effectBadges = clip.effects?.filter(e => e.enabled).map(e => e.type) || []
   const showDuration = duration > 5
@@ -266,10 +355,10 @@ export default function EditorClip({
         boxShadow: isSelected ? `0 0 20px ${color}44` : 'none',
         zIndex: isSelected ? 3 : 1,
         overflow: 'hidden',
-        userSelect: 'none'
+        userSelect: 'none',
+        pointerEvents: isDragging ? 'none' : 'auto'
       }}
       onMouseDown={handleMouseDown}
-      onClick={handleClipClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -494,7 +583,6 @@ export default function EditorClip({
         zIndex: 6,
         flexWrap: 'wrap'
       }}>
-        {/* Bouton Play Preview */}
         <button
           onClick={(e) => { e.stopPropagation(); playClipPreview(e) }}
           style={{
@@ -506,7 +594,7 @@ export default function EditorClip({
             color: 'white',
             cursor: 'pointer'
           }}
-          title={isClipPlaying ? 'Arrêter preview' : 'Écouter le clip'}
+          title={isClipPlaying ? tr('editorStopPreview') : tr('editorListenClip')}
         >
           <i className={`ti ${isClipPlaying ? 'ti-player-pause' : 'ti-player-play'}`} />
         </button>
@@ -543,7 +631,6 @@ export default function EditorClip({
           <i className="ti ti-scissors" />
         </button>
 
-        {/* Dupliquer avec icône inversée */}
         <button
           onClick={(e) => { e.stopPropagation(); onDuplicate() }}
           style={{

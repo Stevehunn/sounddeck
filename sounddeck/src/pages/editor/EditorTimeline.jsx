@@ -42,6 +42,8 @@ export default function EditorTimeline({
   onMetronomeToggle,
   onMetronomeBpmChange,
   autoPlayOnClick = false,
+  autoCrossfade = false,
+  addToast,
   lang,
   tr
 }) {
@@ -409,6 +411,7 @@ export default function EditorTimeline({
             onRemoveMarker={onRemoveMarker}
             onSeek={onSeek}
             onMarkersChange={onMarkersChange}
+            addToast={addToast}
             tr={tr}
             lang={lang}
           />
@@ -564,6 +567,7 @@ export default function EditorTimeline({
                 onTrackVolume={onTrackVolume}
                 onTrackReorder={onTrackReorder}
                 autoPlayOnClick={autoPlayOnClick}
+                autoCrossfade={autoCrossfade}
                 lang={lang}
                 tr={tr}
               />
@@ -636,7 +640,7 @@ export default function EditorTimeline({
             <i className="ti ti-refresh" /> 100%
           </button>
 
-          {/* ✅ Zoom automatique pour tout voir */}
+          {/* Zoom automatique pour tout voir */}
           <button
             className="btn-ghost btn-sm"
             onClick={() => {
@@ -661,30 +665,6 @@ export default function EditorTimeline({
           }}>
             {formatTime(totalDuration)}
           </span>
-        </div>
-
-        {/* Métronome */}
-        <div style={{
-          position: 'sticky',
-          bottom: 50,
-          right: 16,
-          display: 'flex',
-          justifyContent: 'flex-end',
-          zIndex: 15,
-          pointerEvents: 'none'
-        }}>
-          <div style={{ pointerEvents: 'auto' }}>
-            <EditorMetronome
-              bpm={metronomeBpm}
-              onBpmChange={onMetronomeBpmChange}
-              isPlaying={isPlaying}
-              currentTime={currentTime}
-              totalDuration={totalDuration}
-              enabled={metronomeEnabled}
-              onToggle={onMetronomeToggle}
-              tr={tr}
-            />
-          </div>
         </div>
 
         {/* Feedback visuel du snap */}

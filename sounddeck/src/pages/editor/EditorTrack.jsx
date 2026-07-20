@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import EditorClip from './EditorClip'
 
 export default function EditorTrack({
@@ -28,6 +28,7 @@ export default function EditorTrack({
   onTrackVolume,
   onTrackReorder,
   autoPlayOnClick = false,
+  autoCrossfade = false,
   lang,
   tr
 }) {
@@ -36,6 +37,12 @@ export default function EditorTrack({
   const [volume, setVolume] = useState(track.volume != null ? Math.round(track.volume * 100) : 100)
   const [isDragging, setIsDragging] = useState(false)
   const [isDragOverTrack, setIsDragOverTrack] = useState(false)
+  const [isDraggingClip, setIsDraggingClip] = useState(false)
+  
+  // ✅ REFS POUR ÉVITER LES BOUCLES
+  const isCrossfadingRef = useRef(false)
+  const lastOverlapsRef = useRef('')
+  const updateTimeoutRef = useRef(null)
 
   const trackHeight = 80
   const trackColor = `hsl(${(trackIndex * 30 + 200) % 360}, 60%, 40%)`
@@ -52,10 +59,99 @@ export default function EditorTrack({
     setVolume(track.volume != null ? Math.round(track.volume * 100) : 100)
   }, [track.volume])
 
+  // ─── CROSSFADE AUTOMATIQUE ──────────────────────────────────────────────
+  const checkOverlaps = useCallback(() => {
+    if (!autoCrossfade || isCrossfadingRef.current) return
+    if (isDraggingClip || isDragging) return
+
+    const sortedClips = [...track.clips].sort((a, b) => a.start - b.start)
+    
+    let hasOverlap = false
+    let overlapData = []
+    
+    for (let i = 0; i < sortedClips.length - 1; i++) {
+      const current = sortedClips[i]
+      const next = sortedClips[i + 1]
+      const currentEnd = current.start + (clipDurations[current.id] || current.duration || 3)
+      
+      if (currentEnd > next.start) {
+        const overlap = Math.min(currentEnd - next.start, 0.1)
+        if (overlap > 0.01) {
+          hasOverlap = true
+          overlapData.push({ current: current.id, next: next.id, overlap })
+        }
+      }
+    }
+
+    if (!hasOverlap) return
+
+    const overlapsKey = overlapData.map(d => `${d.current}-${d.next}-${d.overlap.toFixed(3)}`).join('|')
+    if (lastOverlapsRef.current === overlapsKey) return
+    lastOverlapsRef.current = overlapsKey
+
+    isCrossfadingRef.current = true
+
+    try {
+      for (const data of overlapData) {
+        const currentClip = track.clips.find(c => c.id === data.current)
+        const nextClip = track.clips.find(c => c.id === data.next)
+        
+        if (!currentClip || !nextClip) continue
+
+        const hasFadeOut = currentClip.effects?.some(e => e.type === 'fadeOut' && e.enabled)
+        const hasFadeIn = nextClip.effects?.some(e => e.type === 'fadeIn' && e.enabled)
+
+        if (!hasFadeOut && onClipFade) {
+          onClipFade(track.id, currentClip.id, 'out', data.overlap)
+        }
+        if (!hasFadeIn && onClipFade) {
+          onClipFade(track.id, nextClip.id, 'in', data.overlap)
+        }
+      }
+    } catch (e) {
+      console.warn('Erreur crossfade:', e)
+    } finally {
+      setTimeout(() => {
+        isCrossfadingRef.current = false
+      }, 100)
+    }
+  }, [track.clips, track.id, clipDurations, autoCrossfade, onClipFade, isDraggingClip, isDragging])
+
+  const debouncedCheckOverlaps = useCallback(() => {
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current)
+    }
+    updateTimeoutRef.current = setTimeout(() => {
+      checkOverlaps()
+      updateTimeoutRef.current = null
+    }, 50)
+  }, [checkOverlaps])
+
+  // ─── HANDLERS ──────────────────────────────────────────────────────────────
+
+  const handleClipUpdate = useCallback((clipId, updates) => {
+    if (onClipUpdate) {
+      onClipUpdate(track.id, clipId, updates)
+    }
+    if (!isDraggingClip) {
+      debouncedCheckOverlaps()
+    }
+  }, [onClipUpdate, track.id, isDraggingClip, debouncedCheckOverlaps])
+
+  const handleClipMove = useCallback((clipId, newStart) => {
+    if (onClipMove) {
+      onClipMove(track.id, clipId, newStart)
+    }
+    if (!isDraggingClip) {
+      debouncedCheckOverlaps()
+    }
+  }, [onClipMove, track.id, isDraggingClip, debouncedCheckOverlaps])
+  
   const handleTrackClick = (e) => {
     e.stopPropagation()
   }
 
+  // ✅ MUTE - Couper le son de la piste
   const handleMuteToggle = (e) => {
     e.stopPropagation()
     const newMuted = !isMuted
@@ -65,6 +161,7 @@ export default function EditorTrack({
     }
   }
 
+  // ✅ SOLO - Isoler la piste
   const handleSoloToggle = (e) => {
     e.stopPropagation()
     const newSolo = !isSolo
@@ -74,16 +171,20 @@ export default function EditorTrack({
     }
   }
 
+  // ✅ VOLUME - CORRIGÉ (0 à 100)
   const handleVolumeChange = (e) => {
     e.stopPropagation()
-    const newVolume = parseInt(e.target.value, 10)
-    setVolume(newVolume)
+    const displayValue = parseFloat(e.target.value) // 0-100
+    const normalizedValue = displayValue / 100 // 0-1
+    
+    setVolume(displayValue)
     if (onTrackVolume) {
-      onTrackVolume(track.id, newVolume / 100)
+      onTrackVolume(track.id, normalizedValue)
     }
   }
 
-  // ✅ Drag & drop UNIQUEMENT vertical - la poignée est séparée
+  // ─── DRAG & DROP ──────────────────────────────────────────────────────────
+  
   const handleTrackDragStart = (e) => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('application/x-sounddeck-track-index', String(trackIndex))
@@ -112,6 +213,7 @@ export default function EditorTrack({
   }
 
   const handleClipDragStart = (e, clipId) => {
+    setIsDraggingClip(true)
     setIsDragging(true)
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', JSON.stringify({
@@ -122,7 +224,14 @@ export default function EditorTrack({
   }
 
   const handleDrop = (e) => {
+    setIsDraggingClip(false)
     setIsDragging(false)
+    
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current)
+      updateTimeoutRef.current = null
+    }
+    
     try {
       const data = JSON.parse(e.dataTransfer.getData('text/plain'))
       const rect = e.currentTarget.getBoundingClientRect()
@@ -132,7 +241,10 @@ export default function EditorTrack({
       if (data.clipId && data.trackId) {
         const clip = track.clips.find(c => c.id === data.clipId)
         if (clip) {
-          onClipMove(data.trackId, data.clipId, newStart)
+          handleClipMove(data.clipId, newStart)
+          setTimeout(() => {
+            checkOverlaps()
+          }, 100)
         }
       }
     } catch (err) {
@@ -162,7 +274,7 @@ export default function EditorTrack({
       onDragOver={handleDragOver}
       onClick={handleTrackClick}
     >
-      {/* En-tête de piste - Version refactorisée */}
+      {/* En-tête de piste */}
       <div
         style={{
           position: 'absolute',
@@ -184,7 +296,7 @@ export default function EditorTrack({
         onDragLeave={handleTrackDragLeave}
         onDrop={handleTrackDrop}
       >
-        {/* ✅ Poignée de drag UNIQUEMENT verticale */}
+        {/* Poignée de drag */}
         <div
           draggable
           onDragStart={handleTrackDragStart}
@@ -202,7 +314,7 @@ export default function EditorTrack({
           <i className="ti ti-grip-vertical" style={{ fontSize: 14 }} />
         </div>
 
-        {/* ✅ Barre de couleur verticale */}
+        {/* Barre de couleur */}
         <div style={{
           width: 3,
           height: '100%',
@@ -212,7 +324,7 @@ export default function EditorTrack({
           marginRight: 4
         }} />
 
-        {/* ✅ Volume horizontal - beaucoup plus facile à utiliser */}
+        {/* Volume slider - CORRIGÉ (0 à 100) */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -224,7 +336,7 @@ export default function EditorTrack({
           <input
             type="range"
             min={0}
-            max={150}
+            max={100}
             value={volume}
             onChange={handleVolumeChange}
             onClick={e => e.stopPropagation()}
@@ -239,11 +351,11 @@ export default function EditorTrack({
             }}
           />
           <span style={{ fontSize: 9, color: 'var(--text-tertiary)', fontFamily: 'monospace', minWidth: 24 }}>
-            {volume}
+            {volume}%
           </span>
         </div>
 
-        {/* Boutons Mute/Solo/Supprimer + Nom */}
+        {/* Boutons d'action */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
@@ -251,6 +363,7 @@ export default function EditorTrack({
           flexShrink: 0,
           alignItems: 'center'
         }}>
+          {/* ✅ Bouton Mute (Couper le son) */}
           <button
             className={`btn-sm ${isMuted ? 'btn-danger' : 'btn-secondary'}`}
             onClick={handleMuteToggle}
@@ -269,11 +382,12 @@ export default function EditorTrack({
               alignItems: 'center',
               justifyContent: 'center'
             }}
-            title={isMuted ? tr('editorUnmute') : tr('editorMute')}
+            title={isMuted ? tr('editorUnmute') || 'Réactiver le son' : tr('editorMute') || 'Couper le son'}
           >
             <i className={`ti ${isMuted ? 'ti-volume-off' : 'ti-volume'}`} style={{ fontSize: 10 }} />
           </button>
 
+          {/* ✅ Bouton Solo (Isoler la piste) */}
           <button
             className={`btn-sm ${isSolo ? 'btn-success' : 'btn-secondary'}`}
             onClick={handleSoloToggle}
@@ -292,11 +406,12 @@ export default function EditorTrack({
               alignItems: 'center',
               justifyContent: 'center'
             }}
-            title={isSolo ? tr('editorUnsolo') : tr('editorSolo')}
+            title={isSolo ? tr('editorUnsolo') || 'Désactiver solo' : tr('editorSolo') || 'Solo (isoler la piste)'}
           >
             <i className="ti ti-headphones" style={{ fontSize: 10 }} />
           </button>
 
+          {/* ✅ Bouton Supprimer la piste (icône poubelle) */}
           <button
             className="btn-ghost btn-sm"
             onClick={(e) => {
@@ -312,7 +427,9 @@ export default function EditorTrack({
               width: 20,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              border: 'none',
+              background: 'transparent'
             }}
             onMouseEnter={e => {
               e.currentTarget.style.color = 'var(--danger)'
@@ -322,12 +439,12 @@ export default function EditorTrack({
               e.currentTarget.style.color = 'var(--text-tertiary)'
               e.currentTarget.style.background = 'transparent'
             }}
-            title={tr('editorRemoveTrack')}
+            title={tr('editorRemoveTrack') || 'Supprimer la piste'}
           >
-            <i className="ti ti-x" style={{ fontSize: 10 }} />
+            <i className="ti ti-trash" style={{ fontSize: 10 }} />
           </button>
 
-          {/* Nom de la piste en bas */}
+          {/* Nom de la piste */}
           <span style={{
             fontSize: 6,
             color: 'var(--text-tertiary)',
@@ -374,8 +491,8 @@ export default function EditorTrack({
                 onWaveformUpdate={onWaveformUpdate}
                 clipDuration={clipDuration}
                 onSelect={() => onClipSelect(clip.id, track.id)}
-                onMove={(newStart) => onClipMove(track.id, clip.id, newStart)}
-                onUpdate={(updates) => onClipUpdate(track.id, clip.id, updates)}
+                onMove={(newStart) => handleClipMove(clip.id, newStart)}
+                onUpdate={(updates) => handleClipUpdate(clip.id, updates)}
                 onRemove={() => onClipRemove(track.id, clip.id)}
                 onDuplicate={() => onClipDuplicate(track.id, clip.id)}
                 onCopy={() => onClipCopy?.(clip.id, track.id)}
