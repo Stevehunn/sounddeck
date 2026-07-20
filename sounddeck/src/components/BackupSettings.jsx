@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useLanguage } from '../context/LanguageContext'
+import { useLanguage } from '../context/LanguageContext' // ✅ Bon import
 import {
   getBackupList,
   restoreBackup,
@@ -12,7 +12,7 @@ import useConfirm from '../hooks/useConfirm.jsx'
 
 export default function BackupSettings({ store, addToast, lang = 'fr' }) {
   const { t, currentLang } = useLanguage()
-  const { confirm, ConfirmWrapper } = useConfirm({ lang })
+  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
   const [backups, setBackups] = useState([])
   const [isLoading, setIsLoading] = useState(false)
 

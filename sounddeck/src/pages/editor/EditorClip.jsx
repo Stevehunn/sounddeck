@@ -44,11 +44,14 @@ export default function EditorClip({
   const isDraggingRef = useRef(false)
   const isClickRef = useRef(false)
   const clickHandledRef = useRef(false)
-  const shouldPlayRef = useRef(false) // ✅ NOUVEAU : pour savoir si on doit jouer le son
+  const shouldPlayRef = useRef(false)
   
   // Lecture preview
   const [isClipPlaying, setIsClipPlaying] = useState(false)
   const [playbackHowl, setPlaybackHowl] = useState(null)
+  
+  // ✅ REF POUR ÉVITER LES DOUBLES LECTURES
+  const playTimeoutRef = useRef(null)
 
   const duration = clipDuration || clip.duration || 3
   const left = clip.start * pixelsPerSecond
@@ -69,6 +72,9 @@ export default function EditorClip({
       if (playbackHowl) {
         playbackHowl.stop()
         playbackHowl.unload()
+      }
+      if (playTimeoutRef.current) {
+        clearTimeout(playTimeoutRef.current)
       }
     }
   }, [playbackHowl])
@@ -175,6 +181,12 @@ export default function EditorClip({
     clickHandledRef.current = false
     shouldPlayRef.current = false
     
+    // ✅ Annuler tout timeout de lecture en attente
+    if (playTimeoutRef.current) {
+      clearTimeout(playTimeoutRef.current)
+      playTimeoutRef.current = null
+    }
+    
     onDragCheckpoint?.()
     setIsDragging(true)
     setDragStartX(e.clientX)
@@ -195,6 +207,12 @@ export default function EditorClip({
       hasDraggedRef.current = true
       isClickRef.current = false
       shouldPlayRef.current = false
+      
+      // ✅ Annuler le timeout de lecture si un drag commence
+      if (playTimeoutRef.current) {
+        clearTimeout(playTimeoutRef.current)
+        playTimeoutRef.current = null
+      }
     }
 
     const deltaX = e.clientX - dragStartX
@@ -215,6 +233,12 @@ export default function EditorClip({
       hasDraggedRef.current = false
       isClickRef.current = false
       shouldPlayRef.current = false
+      
+      // ✅ Annuler le timeout de lecture
+      if (playTimeoutRef.current) {
+        clearTimeout(playTimeoutRef.current)
+        playTimeoutRef.current = null
+      }
       return
     }
     
@@ -227,14 +251,21 @@ export default function EditorClip({
       
       // ✅ Vérifier si on doit jouer le son (uniquement si autoPlayOnClick est true)
       if (autoPlayOnClick === true) {
-        shouldPlayRef.current = true
+        // ✅ Annuler tout timeout existant
+        if (playTimeoutRef.current) {
+          clearTimeout(playTimeoutRef.current)
+          playTimeoutRef.current = null
+        }
+        
         // ✅ Jouer le son après un court délai pour éviter les conflits
-        setTimeout(() => {
-          if (shouldPlayRef.current && !hasDraggedRef.current) {
+        playTimeoutRef.current = setTimeout(() => {
+          // ✅ Vérifier qu'on n'a pas dragué entre temps
+          if (shouldPlayRef.current && !hasDraggedRef.current && !isDraggingRef.current) {
             handleClipClick(e)
           }
           shouldPlayRef.current = false
-        }, 20)
+          playTimeoutRef.current = null
+        }, 50)
       } else {
         // ✅ Mode manuel : NE PAS jouer le son
         // On fait juste un appel à handleClipClick avec autoPlayOnClick = false
@@ -255,26 +286,32 @@ export default function EditorClip({
     
     if (e?.target?.closest?.('.clip-actions')) return
     
-    // ✅ Sélectionner le clip (déjà fait, mais sécurité)
-    onSelect()
-    
     // ✅ SI autoPlayOnClick EST FALSE, NE RIEN FAIRE D'AUTRE
     if (autoPlayOnClick !== true) {
       return
     }
     
     // ✅ Ici, autoPlayOnClick est true
-    // Gérer le toggle lecture/arrêt
+    // ✅ Vérifier qu'on n'a pas déjà un son en cours de lecture
     if (playbackHowl && isClipPlaying) {
+      // Si le son est déjà en train de jouer, on l'arrête
       playbackHowl.stop()
       playbackHowl.unload()
       setPlaybackHowl(null)
       setIsClipPlaying(false)
+      
+      // ✅ Annuler le timeout
+      if (playTimeoutRef.current) {
+        clearTimeout(playTimeoutRef.current)
+        playTimeoutRef.current = null
+      }
       return
     }
     
-    // ✅ Jouer le clip
-    playClipPreview(e)
+    // ✅ Jouer le clip (avec vérification supplémentaire)
+    if (!isClipPlaying && !playTimeoutRef.current) {
+      playClipPreview(e)
+    }
   }
 
   const handleResizeStart = (e, side) => {

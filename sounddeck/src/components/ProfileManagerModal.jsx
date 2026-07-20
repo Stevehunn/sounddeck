@@ -9,9 +9,9 @@ export default function ProfileManagerModal({
   store, 
   onClose, 
   addToast
-}) { // ✅ Supprimer le paramètre lang
+}) {
   const { t, currentLang } = useLanguage()
-  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang }) // ✅ Utiliser currentLang
+  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
   const [selectedSounds, setSelectedSounds] = useState(new Set())
   const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)

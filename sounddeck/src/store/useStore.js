@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import { DEFAULT_SOUNDS } from './defaultSounds'
 
 // ─── CONFIGURATION PAR DÉFAUT DE LA SIDEBAR ──────────────────────────────
 
@@ -242,30 +241,7 @@ export function useStore() {
 
         setProfiles(allProfiles)
 
-        // ✅ AJOUT DES SONS PAR DÉFAUT SI AUCUN SON N'EXISTE
         let finalSounds = savedSounds
-        if (savedSounds.length === 0) {
-          console.log('🔊 Aucun son trouvé, ajout des sons par défaut...')
-          
-          const defaultSoundsWithPaths = DEFAULT_SOUNDS.map((sound, index) => ({
-            id: `default_${sound.id || index}`,
-            name: sound.name,
-            emoji: sound.emoji,
-            path: `default-sounds/${sound.file}`,
-            profiles: ['all'],
-            favorites: [],
-            tags: sound.tags || [],
-            volume: 0,
-            volumeDb: 0,
-            playCount: 0,
-            createdAt: Date.now() + index,
-            isDefault: true
-          }))
-          
-          finalSounds = defaultSoundsWithPaths
-          await save('sounds', finalSounds)
-        }
-        
         setSounds(finalSounds)
         setShortcuts(savedShortcuts)
 

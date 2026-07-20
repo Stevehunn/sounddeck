@@ -57,7 +57,7 @@ Section.displayName = 'Section'
 
 function CollapsibleSection({ title, icon, children, defaultOpen = false }) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
-  const { t } = useLanguage() // ✅ Utiliser useLanguage
+  const { t } = useLanguage()
   
   return (
     <div style={{
@@ -103,6 +103,7 @@ function CollapsibleSection({ title, icon, children, defaultOpen = false }) {
     </div>
   )
 }
+
 
 export default function Options({ store, addToast }) { // ❌ Supprimer le paramètre lang
   const { t, currentLang, changeLanguage, version: langVersion } = useLanguage()
@@ -1800,6 +1801,7 @@ export default function Options({ store, addToast }) { // ❌ Supprimer le param
 }
 
 function OptionRow({ label, sub, children }) {
+  const { t } = useLanguage()
   return (
     <div className="option-row">
       <div>

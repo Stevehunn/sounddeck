@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, memo } from 'react'
-import { useLanguage } from '../context/LanguageContext' // ✅ Nouvel import
+import { useLanguage } from '../context/LanguageContext'
 
 // IDs des éléments qui sont toujours des actions
 const ACTION_IDS = ['loop', 'shortcuts', 'presentation']
@@ -75,7 +75,7 @@ const Sidebar = memo(function Sidebar({
   pluginPages = [],
   isPluginPage = () => false,
 }) {
-  const { t } = useLanguage() // ✅ Utiliser useLanguage
+  const { t } = useLanguage()
   const [newProfileName, setNewProfileName] = useState('')
   const [showNewProfile, setShowNewProfile] = useState(false)
   const [shortcutsEnabled, setShortcutsEnabled] = useState(true)
@@ -861,6 +861,8 @@ function SidebarItem({
   isProfile = false,
   isPlugin = false 
 }) {
+  // ✅ Utiliser useLanguage pour les traductions si nécessaire
+  const { t } = useLanguage()
   const isActive = active || false
   
   return (

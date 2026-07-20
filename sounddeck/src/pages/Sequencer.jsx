@@ -38,6 +38,11 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
     setShowNewPlaylist(false)
   }
 
+  const cancelCreatePlaylist = () => {
+    setNewPlaylistName('')
+    setShowNewPlaylist(false)
+  }
+
   const deletePlaylist = async (id) => {
     const confirmed = await confirm({
       title: t('deletePlaylist'),
@@ -67,18 +72,74 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
             <i className="ti ti-playlist" style={{ color: 'var(--accent)' }} /> {t('sequencerTitle')}
           </div>
+          
+          {/* ✅ Création de playlist améliorée avec bouton annuler */}
           {showNewPlaylist ? (
-            <div style={{ display: 'flex', gap: 4 }}>
-              <input autoFocus value={newPlaylistName} onChange={e => setNewPlaylistName(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') createPlaylist(); if (e.key === 'Escape') setShowNewPlaylist(false) }}
-                placeholder={t('playlistName')} className="input-sm" style={{ flex: 1 }} />
-              <button className="btn-primary btn-sm" onClick={createPlaylist} style={{ borderRadius: 'var(--radius-sm)' }}>
-                <i className="ti ti-check" />
-              </button>
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: 6,
+              padding: '6px 0'
+            }}>
+              <input 
+                autoFocus 
+                value={newPlaylistName} 
+                onChange={e => setNewPlaylistName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') createPlaylist()
+                  if (e.key === 'Escape') cancelCreatePlaylist()
+                }}
+                placeholder={t('playlistName')} 
+                className="input-sm" 
+                style={{ 
+                  flex: 1,
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: 12,
+                  minHeight: 32
+                }} 
+              />
+              <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                <button 
+                  className="btn-secondary btn-sm" 
+                  onClick={cancelCreatePlaylist}
+                  style={{ 
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: 11,
+                    padding: '4px 12px',
+                    minHeight: 28
+                  }}
+                >
+                  <i className="ti ti-x" /> {t('cancel')}
+                </button>
+                <button 
+                  className="btn-primary btn-sm" 
+                  onClick={createPlaylist}
+                  disabled={!newPlaylistName.trim()}
+                  style={{ 
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: 11,
+                    padding: '4px 12px',
+                    minHeight: 28,
+                    opacity: newPlaylistName.trim() ? 1 : 0.5
+                  }}
+                >
+                  <i className="ti ti-check" /> {t('add')}
+                </button>
+              </div>
             </div>
           ) : (
-            <button className="btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center', borderRadius: 'var(--radius-sm)' }}
-              onClick={() => setShowNewPlaylist(true)}>
+            <button 
+              className="btn-primary btn-sm" 
+              style={{ 
+                width: '100%', 
+                justifyContent: 'center', 
+                borderRadius: 'var(--radius-sm)',
+                fontSize: 12,
+                padding: '6px 12px',
+                minHeight: 34
+              }}
+              onClick={() => setShowNewPlaylist(true)}
+            >
               <i className="ti ti-plus" /> {t('newPlaylist')}
             </button>
           )}
@@ -277,7 +338,6 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
   const handleDragStart = (e, idx) => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', String(idx))
-    // Ajouter un délai pour l'effet visuel
     setTimeout(() => {
       if (e.target) {
         e.target.style.opacity = '0.4'

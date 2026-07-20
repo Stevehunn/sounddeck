@@ -201,9 +201,25 @@ export class PluginManager {
 
   /**
    * Récupère toutes les pages (core + plugins)
+   * @param {Function} translateFn - Fonction de traduction
+   * @returns {Array} Liste des pages
    */
-  getAllPages() {
-    const corePages = this._getCorePages()
+  getAllPages(translateFn) {
+    // Si aucune fonction de traduction n'est fournie, on utilise une fonction d'identité
+    const t = translateFn || ((key) => key)
+    
+    const corePages = [
+      { id: 'home', label: t('mySounds'), icon: 'ti-home', isCore: true, group: 'navigation' },
+      { id: 'discover', label: t('discover'), icon: 'ti-compass', isCore: true, group: 'navigation' },
+      { id: 'trimmer', label: t('trimmer'), icon: 'ti-cut', isCore: true, group: 'navigation' },
+      { id: 'editor', label: t('editor'), icon: 'ti-wand', isCore: true, group: 'navigation' },
+      { id: 'sequencer', label: t('sequencer'), icon: 'ti-playlist', isCore: true, group: 'navigation' },
+      { id: 'youtube', label: t('youtube'), icon: 'ti-brand-youtube', isCore: true, group: 'navigation' },
+      { id: 'stats', label: t('stats'), icon: 'ti-chart-bar', isCore: true, group: 'navigation' },
+      { id: 'guide', label: t('guide'), icon: 'ti-book', isCore: true, group: 'footer' },
+      { id: 'options', label: t('options'), icon: 'ti-settings', isCore: true, group: 'footer' }
+    ]
+
     const pluginPages = Array.from(this.pages.values()).map(p => ({
       ...p,
       isCore: false,
@@ -214,23 +230,6 @@ export class PluginManager {
     const storePages = this._getStorePages()
 
     return [...corePages, ...pluginPages, ...storePages]
-  }
-
-  /**
-   * Récupère les pages core (intégrées à l'application)
-   */
-  _getCorePages() {
-    return [
-      { id: 'home', label: 'Mes sons', icon: 'ti-home', isCore: true, group: 'navigation' },
-      { id: 'discover', label: 'Découverte', icon: 'ti-compass', isCore: true, group: 'navigation' },
-      { id: 'trimmer', label: 'Rogner', icon: 'ti-cut', isCore: true, group: 'navigation' },
-      { id: 'editor', label: 'Éditeur', icon: 'ti-wand', isCore: true, group: 'navigation' },
-      { id: 'sequencer', label: 'Séquenceur', icon: 'ti-playlist', isCore: true, group: 'navigation' },
-      { id: 'youtube', label: 'YouTube', icon: 'ti-brand-youtube', isCore: true, group: 'navigation' },
-      { id: 'stats', label: 'Statistiques', icon: 'ti-chart-bar', isCore: true, group: 'navigation' },
-      { id: 'guide', label: 'Guide Discord', icon: 'ti-book', isCore: true, group: 'footer' },
-      { id: 'options', label: 'Options', icon: 'ti-settings', isCore: true, group: 'footer' }
-    ]
   }
 
   /**

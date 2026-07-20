@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { pluginManager } from './PluginManager'
+import { useLanguage } from '../context/LanguageContext'
 
 const PluginContext = createContext(null)
 
@@ -8,6 +9,7 @@ export function PluginProvider({ children, store }) {
   const [plugins, setPlugins] = useState([])
   const [pages, setPages] = useState([])
   const [error, setError] = useState(null)
+  const { t } = useLanguage()
 
   // Initialisation du PluginManager
   useEffect(() => {
@@ -15,7 +17,8 @@ export function PluginProvider({ children, store }) {
       try {
         await pluginManager.initialize(store)
         setPlugins(pluginManager.getLoadedPlugins())
-        setPages(pluginManager.getAllPages())
+        // ✅ Passer la fonction de traduction à getAllPages
+        setPages(pluginManager.getAllPages(t))
         setLoaded(true)
       } catch (e) {
         console.error('❌ Erreur initialisation PluginProvider:', e)
@@ -24,13 +27,14 @@ export function PluginProvider({ children, store }) {
       }
     }
     init()
-  }, [store])
+  }, [store, t])
 
   // Rafraîchir la liste des plugins et pages
   const refresh = useCallback(() => {
     setPlugins(pluginManager.getLoadedPlugins())
-    setPages(pluginManager.getAllPages())
-  }, [])
+    // ✅ Passer la fonction de traduction à getAllPages
+    setPages(pluginManager.getAllPages(t))
+  }, [t])
 
   // Charger un plugin
   const loadPlugin = useCallback(async (pluginInfo) => {

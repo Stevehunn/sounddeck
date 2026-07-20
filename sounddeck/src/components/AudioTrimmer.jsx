@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useLanguage } from '../context/LanguageContext'
 
 export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
+  const { t } = useLanguage()
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [playing, setPlaying] = useState(false)
@@ -236,6 +238,7 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
 
 // Waveform simulée avec des barres pseudo-aléatoires mais déterministes
 function WaveformBars({ duration }) {
+  const { t } = useLanguage()
   const bars = 80
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', gap: 1, padding: '4px 2px', pointerEvents: 'none' }}>
