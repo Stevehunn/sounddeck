@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 
 const SYMBOL_TO_BASE_KEY = {
   '!': '1', '@': '2', '#': '3', '$': '4', '%': '5',
@@ -66,7 +66,7 @@ function getPhysicalKey(displayKey, layout) {
 }
 
 export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang = 'fr' }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   
   const [filters, setFilters] = useState({
     ctrl: false,
@@ -200,7 +200,7 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
 
   const getFilterStatus = () => {
     const active = Object.entries(filters).filter(([_, active]) => active).map(([mod]) => modLabels[mod])
-    if (active.length === 0) return tr('noFilter')
+    if (active.length === 0) return t('noFilter')
     return active.join(' + ')
   }
 
@@ -233,12 +233,12 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
         flexWrap: 'wrap'
       }}>
         <i className="ti ti-keyboard" /> 
-        {tr('keyboardVisualizerTitle')}
+        {t('keyboardVisualizerTitle')}
         <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 400 }}>
           {hasActiveFilters ? (
-            `${activeShortcuts} / ${totalShortcuts} ${tr('withFilter')} ${getFilterStatus()}`
+            `${activeShortcuts} / ${totalShortcuts} ${t('withFilter')} ${getFilterStatus()}`
           ) : (
-            `${soloShortcuts.length} ${tr('soloKeys')} / ${totalShortcuts} ${tr('shortcutsTotal')}`
+            `${soloShortcuts.length} ${t('soloKeys')} / ${totalShortcuts} ${t('shortcutsTotal')}`
           )}
         </span>
         <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 500 }}>
@@ -251,12 +251,12 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
         )}
         {!hasActiveFilters && !hasSoloShortcuts && totalShortcuts > 0 && (
           <span style={{ fontSize: 9, color: 'var(--warning)', background: 'rgba(239,159,39,0.1)', padding: '2px 8px', borderRadius: 10 }}>
-            ⚠️ {tr('noSoloKeys')}
+            ⚠️ {t('noSoloKeys')}
           </span>
         )}
         {totalShortcuts === 0 && (
           <span style={{ fontSize: 9, color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: 10 }}>
-            {tr('noShortcutsDefined')}
+            {t('noShortcutsDefined')}
           </span>
         )}
       </div>
@@ -331,7 +331,7 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
               fontFamily: 'inherit'
             }}
           >
-            <i className="ti ti-x" /> {tr('reset')}
+            <i className="ti ti-x" /> {t('reset')}
           </button>
         )}
       </div>
@@ -363,7 +363,7 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
                     cursor: 'default',
                     lineHeight: 1.1
                   }}
-                  title={active ? `${tr('shortcutUsedWith')} ${getFilterStatus()}` : ''}
+                  title={active ? `${t('shortcutUsedWith')} ${getFilterStatus()}` : ''}
                 >
                   <span>{key}</span>
                   {active && (
@@ -441,11 +441,11 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
       }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <div style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--accent-light)', border: '1px solid var(--accent)' }} />
-          {tr('keyActive')}
+          {t('keyActive')}
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <div style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }} />
-          {tr('keyInactive')}
+          {t('keyInactive')}
         </span>
         {hasActiveFilters && (
           <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--accent)' }}>
@@ -456,7 +456,7 @@ export default function KeyboardVisualizer({ shortcuts, layout = 'qwerty', lang 
         {!hasActiveFilters && (
           <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-tertiary)' }}>
             <i className="ti ti-info-circle" style={{ fontSize: 12 }} />
-            {tr('keysWithoutModifier')}
+            {t('keysWithoutModifier')}
           </span>
         )}
         <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-tertiary)' }}>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 
 const TUTORIAL_STEPS = [
   {
@@ -41,7 +41,7 @@ const TUTORIAL_STEPS = [
 ]
 
 export default function Tutorial({ onComplete, lang = 'fr' }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   const [step, setStep] = useState(0)
   const [position, setPosition] = useState({ top: '50%', left: '50%' })
   const [isReady, setIsReady] = useState(true)
@@ -198,14 +198,14 @@ export default function Tutorial({ onComplete, lang = 'fr' }) {
             onClick={handleSkip}
             style={{ fontSize: 12, padding: '6px 16px', borderRadius: 'var(--radius-sm)' }}
           >
-            {tr('tutorialSkip') || 'Passer'}
+            {t('tutorialSkip') || 'Passer'}
           </button>
           <button
             className="btn-primary btn-sm"
             onClick={handleNext}
             style={{ fontSize: 12, padding: '6px 16px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: 4 }}
           >
-            {isLastStep ? (tr('tutorialFinish') || 'Terminer') : (tr('tutorialNext') || 'Suivant')}
+            {isLastStep ? (t('tutorialFinish') || 'Terminer') : (t('tutorialNext') || 'Suivant')}
             <i className={`ti ${isLastStep ? 'ti-check' : 'ti-arrow-right'}`} />
           </button>
         </div>

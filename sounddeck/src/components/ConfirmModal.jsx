@@ -1,4 +1,4 @@
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 
 export default function ConfirmModal({ 
   title, 
@@ -10,7 +10,7 @@ export default function ConfirmModal({
   type = 'danger',
   lang = 'fr'
 }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   
   const colors = {
     danger: {
@@ -58,7 +58,7 @@ export default function ConfirmModal({
               padding: '8px 20px' 
             }}
           >
-            <i className="ti ti-x" /> {cancelText || tr('cancel')}
+            <i className="ti ti-x" /> {cancelText || t('cancel')}
           </button>
           <button 
             className="btn-danger btn-lg" 
@@ -81,7 +81,7 @@ export default function ConfirmModal({
               e.currentTarget.style.transform = 'scale(1)'
             }}
           >
-            <i className="ti ti-check" /> {confirmText || tr('confirm')}
+            <i className="ti ti-check" /> {confirmText || t('confirm')}
           </button>
         </div>
       </div>

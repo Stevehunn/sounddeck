@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 
 // Mapping des touches par position physique (QWERTY → AZERTY)
 // Clé = position physique (QWERTY), Valeur = affichage AZERTY
@@ -155,7 +155,7 @@ export default function ShortcutRecorder({
   lang = 'fr',
   layout = 'qwerty'
 }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   const [recording, setRecording] = useState(false)
   const [preview, setPreview] = useState('')
   const inputRef = useRef(null)
@@ -182,13 +182,13 @@ export default function ShortcutRecorder({
       if (e.altKey) parts.push('Alt')
       if (e.shiftKey) parts.push(layout === 'azerty' ? 'Maj' : 'Shift')
       if (parts.length) setPreview(parts.join('+') + '+...')
-      else if (requireMod) setPreview(tr('shortcutNeedMod'))
-      else setPreview(tr('shortcutPressKey'))
+      else if (requireMod) setPreview(t('shortcutNeedMod'))
+      else setPreview(t('shortcutPressKey'))
     }
   }
 
-  const hint = requireMod ? tr('shortcutHintMod') : tr('shortcutHintAny')
-  const displayPlaceholder = placeholder === '+ Raccourci' ? tr('shortcutPlaceholder') : placeholder
+  const hint = requireMod ? t('shortcutHintMod') : t('shortcutHintAny')
+  const displayPlaceholder = placeholder === '+ Raccourci' ? t('shortcutPlaceholder') : placeholder
   
   // Afficher la valeur avec la disposition correcte
   const displayValue = value ? displayShortcut(value, layout) : ''
@@ -204,7 +204,7 @@ export default function ShortcutRecorder({
           borderRadius: 4, padding: compact ? '3px 6px' : '5px 10px',
           color: 'var(--accent)', cursor: 'pointer', minWidth: compact ? 0 : 160, whiteSpace: 'nowrap'
         }} onClick={() => { setRecording(false); setPreview('') }}>
-          {preview || (compact ? tr('shortcutPressCompact') : tr('shortcutPressKey'))}
+          {preview || (compact ? t('shortcutPressCompact') : t('shortcutPressKey'))}
         </div>
       </div>
     )

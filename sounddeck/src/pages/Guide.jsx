@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 
-export default function Guide({ lang = 'fr' }) {
-  const tr = useTranslation(lang)
+export default function Guide() { // ✅ Supprimer le paramètre lang
+  const { t, currentLang } = useLanguage()
   const [activeStep, setActiveStep] = useState('install')
   const [renderKey, setRenderKey] = useState(0)
 
   useEffect(() => {
     setRenderKey(prev => prev + 1)
     setActiveStep('install')
-  }, [lang])
+  }, [currentLang])
 
   const steps = [
     { id: 'install', icon: '📦', titleKey: 'guideStep1Title', color: '#7C6FF7', contentKey: 'step1' },
@@ -26,66 +26,60 @@ export default function Guide({ lang = 'fr' }) {
       case 'install':
         return (
           <div>
-            <p style={{ marginBottom: 12 }}>{tr('guideToolsRequired')}</p>
+            <p style={{ marginBottom: 12 }}>{t('guideToolsRequired')}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <DownloadCard
                 icon="🔌"
                 name="VB-Audio Virtual Cable"
-                desc={tr('guideVBCableDesc')}
+                desc={t('guideVBCableDesc')}
                 url="https://vb-audio.com/Cable/"
-                instructions={tr('guideVBCableInstructions')}
-                lang={lang}
+                instructions={t('guideVBCableInstructions')}
               />
               <DownloadCard
                 icon="🎚️"
                 name="VoiceMeeter Banana"
-                desc={tr('guideVoiceMeeterDesc')}
+                desc={t('guideVoiceMeeterDesc')}
                 url="https://vb-audio.com/Voicemeeter/banana.htm"
-                instructions={tr('guideVoiceMeeterInstructions')}
-                lang={lang}
+                instructions={t('guideVoiceMeeterInstructions')}
               />
             </div>
-            <InfoBox type="warning" text={tr('guideRestartWarning')} lang={lang} />
+            <InfoBox type="warning" text={t('guideRestartWarning')} />
           </div>
         )
       case 'voicemeeter':
         return (
           <div>
-            <p style={{ marginBottom: 14 }}>{tr('guideStep2Desc')}</p>
+            <p style={{ marginBottom: 14 }}>{t('guideStep2Desc')}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
               <ConfigStep
                 number="1"
-                title={tr('guideStep2Input1')}
-                desc={tr('guideStep2Input1Desc')}
+                title={t('guideStep2Input1')}
+                desc={t('guideStep2Input1Desc')}
                 icon="🎙️"
-                lang={lang}
               />
               <ConfigStep
                 number="2"
-                title={tr('guideStep2Input2')}
-                desc={tr('guideStep2Input2Desc')}
+                title={t('guideStep2Input2')}
+                desc={t('guideStep2Input2Desc')}
                 icon="🔌"
-                lang={lang}
               />
               <ConfigStep
                 number="3"
-                title={tr('guideStep2B1')}
-                desc={tr('guideStep2B1Desc')}
+                title={t('guideStep2B1')}
+                desc={t('guideStep2B1Desc')}
                 icon="🔘"
-                lang={lang}
               />
               <ConfigStep
                 number="4"
-                title={tr('guideStep2A1')}
-                desc={tr('guideStep2A1Desc')}
+                title={t('guideStep2A1')}
+                desc={t('guideStep2A1Desc')}
                 icon="🎧"
-                lang={lang}
               />
             </div>
             <div className="guide-flow">
-              <div style={{ color: 'var(--text-tertiary)', marginBottom: 6, fontSize: 11, fontFamily: 'inherit' }}>{tr('guideAudioFlow')}</div>
+              <div style={{ color: 'var(--text-tertiary)', marginBottom: 6, fontSize: 11, fontFamily: 'inherit' }}>{t('guideAudioFlow')}</div>
               <div style={{ color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: 12, lineHeight: 2 }}>
-                <span style={{ color: '#2f81f7' }}>{tr('guideYourMic')}</span> ──────────────────────────┐<br/>
+                <span style={{ color: '#2f81f7' }}>{t('guideYourMic')}</span> ──────────────────────────┐<br/>
                 {'                                    '}<span style={{ color: 'var(--accent)' }}>▼</span><br/>
                 {'                            '}<span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>VoiceMeeter Banana</span><br/>
                 <span style={{ color: '#23c55e' }}>SoundDeck</span> ──▶ CABLE Input ──▶ CABLE Output ──┘<br/>
@@ -102,67 +96,62 @@ export default function Guide({ lang = 'fr' }) {
       case 'sounddeck':
         return (
           <div>
-            <p style={{ marginBottom: 14 }}>{tr('guideStep3Desc')}</p>
+            <p style={{ marginBottom: 14 }}>{t('guideStep3Desc')}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <ConfigStep
                 number="1"
-                title={tr('guideStep3Output')}
-                desc={tr('guideStep3OutputDesc')}
+                title={t('guideStep3Output')}
+                desc={t('guideStep3OutputDesc')}
                 icon="🔌"
                 highlight
-                lang={lang}
               />
               <ConfigStep
                 number="2"
-                title={tr('guideStep3Local')}
-                desc={tr('guideStep3LocalDesc')}
+                title={t('guideStep3Local')}
+                desc={t('guideStep3LocalDesc')}
                 icon="🎧"
-                lang={lang}
               />
             </div>
-            <InfoBox type="info" text={tr('guideStep3Info')} lang={lang} />
+            <InfoBox type="info" text={t('guideStep3Info')} />
           </div>
         )
       case 'discord':
         return (
           <div>
-            <p style={{ marginBottom: 14 }}>{tr('guideStep4Desc')}</p>
+            <p style={{ marginBottom: 14 }}>{t('guideStep4Desc')}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
               <ConfigStep
                 number="1"
-                title={tr('guideStep4Input')}
-                desc={tr('guideStep4InputDesc')}
+                title={t('guideStep4Input')}
+                desc={t('guideStep4InputDesc')}
                 icon="🎙️"
                 highlight
-                lang={lang}
               />
               <ConfigStep
                 number="2"
-                title={tr('guideStep4Output')}
-                desc={tr('guideStep4OutputDesc')}
+                title={t('guideStep4Output')}
+                desc={t('guideStep4OutputDesc')}
                 icon="🎧"
-                lang={lang}
               />
               <ConfigStep
                 number="3"
-                title={tr('guideStep4Noise')}
-                desc={tr('guideStep4NoiseDesc')}
+                title={t('guideStep4Noise')}
+                desc={t('guideStep4NoiseDesc')}
                 icon="🔇"
-                lang={lang}
               />
             </div>
-            <InfoBox type="success" text={tr('guideStep4Success')} lang={lang} />
+            <InfoBox type="success" text={t('guideStep4Success')} />
           </div>
         )
       case 'tips':
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <TipCard icon="🚀" title={tr('guideTipStartup')} desc={tr('guideTipStartupDesc')} lang={lang} />
-            <TipCard icon="🔊" title={tr('guideTipVolume')} desc={tr('guideTipVolumeDesc')} lang={lang} />
-            <TipCard icon="🔁" title={tr('guideTipEcho')} desc={tr('guideTipEchoDesc')} lang={lang} />
-            <TipCard icon="❌" title={tr('guideTipDiscord')} desc={tr('guideTipDiscordDesc')} lang={lang} />
-            <TipCard icon="🔌" title={tr('guideTipCable')} desc={tr('guideTipCableDesc')} lang={lang} />
-            <TipCard icon="🎚️" title={tr('guideTipNoSound')} desc={tr('guideTipNoSoundDesc')} lang={lang} />
+            <TipCard icon="🚀" title={t('guideTipStartup')} desc={t('guideTipStartupDesc')} />
+            <TipCard icon="🔊" title={t('guideTipVolume')} desc={t('guideTipVolumeDesc')} />
+            <TipCard icon="🔁" title={t('guideTipEcho')} desc={t('guideTipEchoDesc')} />
+            <TipCard icon="❌" title={t('guideTipDiscord')} desc={t('guideTipDiscordDesc')} />
+            <TipCard icon="🔌" title={t('guideTipCable')} desc={t('guideTipCableDesc')} />
+            <TipCard icon="🎚️" title={t('guideTipNoSound')} desc={t('guideTipNoSoundDesc')} />
           </div>
         )
       default:
@@ -177,9 +166,9 @@ export default function Guide({ lang = 'fr' }) {
         <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
             <i className="ti ti-book" style={{ color: 'var(--accent)' }} />
-            {tr('guideTitle')}
+            {t('guideTitle')}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{tr('guideSub')}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{t('guideSub')}</div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
           {steps.map((step) => (
@@ -192,22 +181,22 @@ export default function Guide({ lang = 'fr' }) {
               </div>
               <div className="label">
                 <div style={{ fontSize: 11, fontWeight: 600, color: activeStep === step.id ? step.color : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {tr(step.titleKey)}
+                  {t(step.titleKey)}
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {tr(step.titleKey).split('—')[1]?.trim()}
+                  {t(step.titleKey).split('—')[1]?.trim()}
                 </div>
               </div>
             </button>
           ))}
         </div>
         <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.6 }}>
-          <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>{tr('quickRecap')}</div>
-          <div>{tr('guideRecap1')}</div>
-          <div>{tr('guideRecap2')}</div>
-          <div>{tr('guideRecap3')}</div>
-          <div>{tr('guideRecap4')}</div>
-          <div>{tr('guideRecap5')}</div>
+          <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>{t('quickRecap')}</div>
+          <div>{t('guideRecap1')}</div>
+          <div>{t('guideRecap2')}</div>
+          <div>{t('guideRecap3')}</div>
+          <div>{t('guideRecap4')}</div>
+          <div>{t('guideRecap5')}</div>
         </div>
       </div>
 
@@ -228,9 +217,9 @@ export default function Guide({ lang = 'fr' }) {
             {active?.icon}
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>{active ? tr(active.titleKey) : ''}</div>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>{active ? t(active.titleKey) : ''}</div>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
-              {tr('guideStepOf')} {steps.findIndex(s => s.id === activeStep) + 1} / {steps.length}
+              {t('guideStepOf')} {steps.findIndex(s => s.id === activeStep) + 1} / {steps.length}
             </div>
           </div>
 
@@ -244,7 +233,7 @@ export default function Guide({ lang = 'fr' }) {
               }}
               style={{ fontSize: 11, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
             >
-              <i className="ti ti-book" /> {tr('tutorialRestart')}
+              <i className="ti ti-book" /> {t('tutorialRestart')}
             </button>
             <button
               className="btn-primary btn-sm"
@@ -254,7 +243,7 @@ export default function Guide({ lang = 'fr' }) {
               }}
               style={{ fontSize: 11, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
             >
-              <i className="ti ti-rocket" /> {tr('tutorialAdvanced')}
+              <i className="ti ti-rocket" /> {t('tutorialAdvanced')}
             </button>
           </div>
 
@@ -265,21 +254,21 @@ export default function Guide({ lang = 'fr' }) {
               onClick={() => { const idx = steps.findIndex(s => s.id === activeStep); if (idx > 0) setActiveStep(steps[idx - 1].id) }}
               style={{ fontSize: 11, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
             >
-              <i className="ti ti-arrow-left" /> {tr('guidePrev')}
+              <i className="ti ti-arrow-left" /> {t('guidePrev')}
             </button>
             <button className="btn-primary btn-sm"
               disabled={activeStep === steps[steps.length - 1].id}
               onClick={() => { const idx = steps.findIndex(s => s.id === activeStep); if (idx < steps.length - 1) setActiveStep(steps[idx + 1].id) }}
               style={{ fontSize: 11, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
             >
-              {tr('guideNext')} <i className="ti ti-arrow-right" />
+              {t('guideNext')} <i className="ti ti-arrow-right" />
             </button>
           </div>
         </div>
 
         {/* Contenu */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px', fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.7 }}>
-          <div className="fade-in" key={activeStep + lang + renderKey}>
+          <div className="fade-in" key={activeStep + currentLang + renderKey}>
             {renderContent()}
           </div>
         </div>
@@ -290,8 +279,8 @@ export default function Guide({ lang = 'fr' }) {
 
 // ─── SOUS-COMPOSANTS ──────────────────────────────────────────────────────────
 
-function DownloadCard({ icon, name, desc, url, instructions, lang }) {
-  const tr = useTranslation(lang || 'fr')
+function DownloadCard({ icon, name, desc, url, instructions }) {
+  const { t } = useLanguage()
   const handleOpen = () => {
     if (window.electronAPI?.openExternal) window.electronAPI.openExternal(url)
     else window.open(url, '_blank')
@@ -306,15 +295,14 @@ function DownloadCard({ icon, name, desc, url, instructions, lang }) {
           <i className="ti ti-info-circle" style={{ marginRight: 4 }} />{instructions}
         </div>
         <button onClick={handleOpen} className="btn-secondary btn-sm">
-          <i className="ti ti-download" /> {tr('download')}
+          <i className="ti ti-download" /> {t('download')}
         </button>
       </div>
     </div>
   )
 }
 
-function ConfigStep({ number, title, desc, icon, highlight, lang }) {
-  const tr = useTranslation(lang || 'fr')
+function ConfigStep({ number, title, desc, icon, highlight }) {
   return (
     <div 
       className={`option-row ${highlight ? 'config-step-highlight' : ''}`} 
@@ -363,8 +351,7 @@ function ConfigStep({ number, title, desc, icon, highlight, lang }) {
   )
 }
 
-function TipCard({ icon, title, desc, lang }) {
-  const tr = useTranslation(lang || 'fr')
+function TipCard({ icon, title, desc }) {
   return (
     <div className="option-row" style={{ padding: '10px 14px' }}>
       <div style={{ fontSize: 20, flexShrink: 0 }}>{icon}</div>
@@ -376,8 +363,7 @@ function TipCard({ icon, title, desc, lang }) {
   )
 }
 
-function InfoBox({ type, text, lang }) {
-  const tr = useTranslation(lang || 'fr')
+function InfoBox({ type, text }) {
   const styles = {
     info:    { bg: 'var(--accent-light)', border: 'var(--accent)', icon: 'ti-info-circle', color: 'var(--accent)' },
     warning: { bg: 'rgba(239,159,39,0.1)', border: 'var(--warning)', icon: 'ti-alert-triangle', color: 'var(--warning)' },

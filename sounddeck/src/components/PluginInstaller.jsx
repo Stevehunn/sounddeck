@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 
 export default function PluginInstaller({ onClose, addToast, lang, onInstall }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   const [url, setUrl] = useState('')
   const [installing, setInstalling] = useState(false)
   const [progress, setProgress] = useState(0)

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useTranslation } from '../../i18n'
+import { useLanguage } from '../../context/LanguageContext'
 import { Howl } from 'howler'
 import EditorTimeline from './EditorTimeline'
 import EditorToolbar from './EditorToolbar'
@@ -12,8 +12,8 @@ import { mixdownProject, exportMixdown } from '../../utils/mixdown'
 
 const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
 
-export default function Editor({ store, addToast, lang = 'fr' }) {
-  const tr = useTranslation(lang)
+export default function Editor({ store, addToast }) { // ✅ Supprimer le paramètre lang
+  const { t, currentLang } = useLanguage() // ✅ Utiliser t au lieu de tr
   
   // ─── ÉTATS PRINCIPAUX ──────────────────────────────────────────────────────
   const [isPlaying, setIsPlaying] = useState(false)
@@ -324,7 +324,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
   // ─── GESTION DU PROJET ────────────────────────────────────────────────────
   const handleAddTrack = async () => {
     await store.addTrack()
-    addToast(tr('editorTrackAdded'), 'success')
+    addToast(t('editorTrackAdded'), 'success')
     setProjectVersion(prev => prev + 1)
   }
 
@@ -334,14 +334,14 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       setSelectedTrackId(null)
       setSelectedClipId(null)
     }
-    addToast(tr('editorTrackRemoved'), 'info')
+    addToast(t('editorTrackRemoved'), 'info')
     setProjectVersion(prev => prev + 1)
   }
 
   const handleAddClip = async (trackId, soundId) => {
     const sound = store.sounds.find(s => s.id === soundId)
     if (!sound) {
-      addToast(tr('editorSoundNotFound'), 'error')
+      addToast(t('editorSoundNotFound'), 'error')
       return
     }
 
@@ -356,7 +356,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
 
     const clip = await store.addClipToTrack(trackId, soundId, start, 3)
     if (clip) {
-      addToast(`"${sound.name}" ${tr('editorClipAdded')}`, 'success')
+      addToast(`"${sound.name}" ${t('editorClipAdded')}`, 'success')
       setSelectedClipId(clip.id)
       setSelectedTrackId(trackId)
       setProjectVersion(prev => prev + 1)
@@ -367,20 +367,20 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     try {
       const exists = await window.electronAPI.fileExists?.(filePath)
       if (!exists) {
-        addToast(tr('editorFileNotFound'), 'error')
+        addToast(t('editorFileNotFound'), 'error')
         return
       }
 
       const clip = await store.addClipFromFile(trackId, filePath)
       if (clip) {
-        addToast(`"${clip.name}" ${tr('editorClipAdded')}`, 'success')
+        addToast(`"${clip.name}" ${t('editorClipAdded')}`, 'success')
         setSelectedClipId(clip.id)
         setSelectedTrackId(trackId)
         setProjectVersion(prev => prev + 1)
       }
     } catch (e) {
       console.error('Erreur ajout fichier:', e)
-      addToast(tr('editorFileImportError'), 'error')
+      addToast(t('editorFileImportError'), 'error')
     }
   }
 
@@ -389,7 +389,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     if (selectedClipId === clipId) {
       setSelectedClipId(null)
     }
-    addToast(tr('editorClipRemoved'), 'info')
+    addToast(t('editorClipRemoved'), 'info')
     setProjectVersion(prev => prev + 1)
   }
 
@@ -401,7 +401,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
   const handleRenameProject = async (newName) => {
     try {
       await store.updateEditorProjectName?.(newName)
-      addToast(tr('editorProjectRenamed').replace('{name}', newName), 'success')
+      addToast(t('editorProjectRenamed').replace('{name}', newName), 'success')
     } catch (e) {
       console.error('Erreur renommage:', e)
     }
@@ -433,25 +433,25 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       trackId: trackId,
       copiedAt: Date.now()
     })
-    addToast(`"${clip.name}" ${tr('editorCopied')}`, 'info')
-  }, [store.editorProject, tr, addToast])
+    addToast(`"${clip.name}" ${t('editorCopied')}`, 'info')
+  }, [store.editorProject, t, addToast])
 
   const handleCutClip = useCallback((clipId, trackId) => {
     handleCopyClip(clipId, trackId)
     handleRemoveClip(trackId, clipId)
-    addToast(tr('editorCutAction'), 'info')
+    addToast(t('editorCutAction'), 'info')
     setSelectedClipId(null)
-  }, [handleCopyClip, handleRemoveClip, tr, addToast])
+  }, [handleCopyClip, handleRemoveClip, t, addToast])
 
   const handlePasteClip = useCallback(async (targetTrackId) => {
     if (clipboard.clips.length === 0) {
-      addToast(tr('editorClipboardEmpty'), 'info')
+      addToast(t('editorClipboardEmpty'), 'info')
       return
     }
 
     if (Date.now() - (clipboard.copiedAt || 0) > 300000) {
       setClipboard({ clips: [], trackId: null, copiedAt: null })
-      addToast(tr('editorClipboardExpired'), 'info')
+      addToast(t('editorClipboardExpired'), 'info')
       return
     }
 
@@ -460,7 +460,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       if (store.editorProject.tracks.length > 0) {
         trackId = store.editorProject.tracks[0].id
       } else {
-        addToast(tr('editorNoTracks'), 'error')
+        addToast(t('editorNoTracks'), 'error')
         return
       }
     }
@@ -506,14 +506,14 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     try {
       await store.commitEditorProject(updatedProject, { skipHistory: true })
       await store.pushEditorHistoryCheckpoint()
-      addToast(`${clipboard.clips.length} clip(s) ${tr('editorPasted')}`, 'success')
+      addToast(`${clipboard.clips.length} clip(s) ${t('editorPasted')}`, 'success')
       setSelectedTrackId(trackId)
       setProjectVersion(prev => prev + 1)
     } catch (e) {
       console.error('Erreur lors du collage:', e)
-      addToast(tr('editorPasteError') + ': ' + e.message, 'error')
+      addToast(t('editorPasteError') + ': ' + e.message, 'error')
     }
-  }, [clipboard, selectedTrackId, store, clipDurations, tr, addToast])
+  }, [clipboard, selectedTrackId, store, clipDurations, t, addToast])
 
   // ─── RACCOURCIS CLAVIER ──────────────────────────────────────────────────
   useEffect(() => {
@@ -616,7 +616,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
   const playAllClips = useCallback((startAt = 0) => {
     const project = store.editorProject
     if (!project || project.tracks.length === 0) {
-      addToast(tr('editorNoTracks'), 'info')
+      addToast(t('editorNoTracks'), 'info')
       return
     }
 
@@ -626,7 +626,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     })
 
     if (!hasClips) {
-      addToast(tr('editorNoClips'), 'info')
+      addToast(t('editorNoClips'), 'info')
       return
     }
 
@@ -788,7 +788,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
 
     startClipsAtTime(startAt)
     updateProgress()
-  }, [store.editorProject, store.volume, totalDuration, clipDurations, addToast, tr, stopPlayback, masterVolume, isMasterMuted])
+  }, [store.editorProject, store.volume, totalDuration, clipDurations, addToast, t, stopPlayback, masterVolume, isMasterMuted])
 
   const resumePlayback = useCallback(() => {
     if (isPaused) {
@@ -868,7 +868,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
   const handleSplit = useCallback(async () => {
     const target = getClipUnderPlayhead()
     if (!target) {
-      addToast(tr('editorSplitNoClipHere'), 'info')
+      addToast(t('editorSplitNoClipHere'), 'info')
       return
     }
     
@@ -891,12 +891,12 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       
       setSelectedTrackId(target.trackId)
       setSelectedClipId(newClip.id)
-      addToast(tr('editorClipSplit'), 'success')
+      addToast(t('editorClipSplit'), 'success')
       setProjectVersion(prev => prev + 1)
     } else {
-      addToast(tr('editorSplitOutOfRange'), 'info')
+      addToast(t('editorSplitOutOfRange'), 'info')
     }
-  }, [getClipUnderPlayhead, currentTime, clipDurations, store, addToast, tr])
+  }, [getClipUnderPlayhead, currentTime, clipDurations, store, addToast, t])
 
   // ─── SPLIT ET SÉPARER ─────────────────────────────────────────────────────
   const handleSplitAndScatter = useCallback(async () => {
@@ -924,10 +924,10 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       
       setSelectedTrackId(newTrackId)
       setSelectedClipId(newClip.id)
-      addToast(tr('editorSplitAndScatterSuccess'), 'success')
+      addToast(t('editorSplitAndScatterSuccess'), 'success')
       setProjectVersion(prev => prev + 1)
     }
-  }, [getClipUnderPlayhead, currentTime, clipDurations, store, addToast])
+  }, [getClipUnderPlayhead, currentTime, clipDurations, store, addToast, t])
 
   // ─── ROGNER UN SON ────────────────────────────────────────────────────────
   const handleTrimClip = useCallback(async (clipId, start, end) => {
@@ -942,7 +942,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       
       if (result.success) {
         await store.updateClipWithPath(clipId, result.path)
-        addToast(`"${clip.name}" ${tr('editorTrimSuccess')}`, 'success')
+        addToast(`"${clip.name}" ${t('editorTrimSuccess')}`, 'success')
         
         const data = await generateWaveformData(result.path, 200, 0, end - start, false)
         if (data) {
@@ -950,13 +950,13 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         }
         setProjectVersion(prev => prev + 1)
       } else {
-        addToast(tr('editorTrimError'), 'error')
+        addToast(t('editorTrimError'), 'error')
       }
     } catch (e) {
       console.error('Erreur rognage:', e)
-      addToast(tr('editorTrimError'), 'error')
+      addToast(t('editorTrimError'), 'error')
     }
-  }, [store, addToast, tr])
+  }, [store, addToast, t])
 
   // ─── PRÉVISUALISATION EFFETS ─────────────────────────────────────────────
   const handlePreviewEffects = useCallback((clip, processedBuffer) => {
@@ -1010,24 +1010,24 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       const result = await normalizeClip(clip, targetPeak, store)
       if (result) {
         if (result.normalized) {
-          addToast(`"${clip.name}" ${tr('editorNormalized')} (gain: ${result.gain.toFixed(2)})`, 'success')
+          addToast(`"${clip.name}" ${t('editorNormalized')} (gain: ${result.gain.toFixed(2)})`, 'success')
           const data = await generateWaveformData(result.newPath || clip.path, 200, 0, null, false)
           if (data) {
             setWaveformData(prev => ({ ...prev, [clipId]: data }))
           }
         } else {
-          addToast(`"${clip.name}" ${tr('editorAlreadyNormalized')}`, 'info')
+          addToast(`"${clip.name}" ${t('editorAlreadyNormalized')}`, 'info')
         }
       } else {
-        addToast(tr('editorNormalizeError'), 'error')
+        addToast(t('editorNormalizeError'), 'error')
       }
     } catch (e) {
       console.error('Erreur normalisation:', e)
-      addToast(tr('editorNormalizeError'), 'error')
+      addToast(t('editorNormalizeError'), 'error')
     } finally {
       setIsNormalizing(false)
     }
-  }, [store, tr, addToast])
+  }, [store, t, addToast])
 
   const handleNormalizeAll = useCallback(async (scope = 'track', targetPeak = 0.95) => {
     let clips = []
@@ -1045,7 +1045,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
     }
     
     if (clips.length === 0) {
-      addToast(tr('editorNoClipsToNormalize'), 'info')
+      addToast(t('editorNoClipsToNormalize'), 'info')
       return
     }
     
@@ -1054,17 +1054,17 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       const results = await normalizeAll(clips, targetPeak, store)
       const normalized = results.filter(r => r.normalized)
       if (normalized.length > 0) {
-        addToast(`${normalized.length} ${tr('editorClipsNormalized')}`, 'success')
+        addToast(`${normalized.length} ${t('editorClipsNormalized')}`, 'success')
       } else {
-        addToast(tr('editorAlreadyNormalized'), 'info')
+        addToast(t('editorAlreadyNormalized'), 'info')
       }
     } catch (e) {
       console.error('Erreur normalisation:', e)
-      addToast(tr('editorNormalizeError'), 'error')
+      addToast(t('editorNormalizeError'), 'error')
     } finally {
       setIsNormalizing(false)
     }
-  }, [store, selectedClipId, selectedTrackId, tr, addToast])
+  }, [store, selectedClipId, selectedTrackId, t, addToast])
 
   // ─── MARQUEURS ────────────────────────────────────────────────────────────
   const handleAddMarker = useCallback((marker) => {
@@ -1096,7 +1096,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
   const handleExportClick = () => {
     const project = store.editorProject
     if (!project || project.tracks.length === 0 || project.tracks.every(t => t.clips.length === 0)) {
-      addToast(tr('editorNothingToExport'), 'info')
+      addToast(t('editorNothingToExport'), 'info')
       return
     }
     setExportName(project.name || 'Mon mix')
@@ -1109,12 +1109,12 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
 
   const handleExportConfirm = async () => {
     if (!exportName.trim()) {
-      addToast(tr('editorExportNameRequired'), 'error')
+      addToast(t('editorExportNameRequired'), 'error')
       return
     }
 
     if (exportAddToLibrary && exportProfiles.length === 0) {
-      addToast(tr('editorExportProfileRequired'), 'error')
+      addToast(t('editorExportProfileRequired'), 'error')
       return
     }
 
@@ -1127,7 +1127,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       const exportEnd = loop?.enabled ? loop.end : null
       
       if (loop?.enabled) {
-        addToast(`${tr('editorExportSelection')} ${exportStart.toFixed(1)}s - ${exportEnd.toFixed(1)}s`, 'info')
+        addToast(`${t('editorExportSelection')} ${exportStart.toFixed(1)}s - ${exportEnd.toFixed(1)}s`, 'info')
       } else {
         addToast('🎛️ Mixage en cours...', 'info')
       }
@@ -1181,14 +1181,14 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         await store.addSound(soundData)
         
         const sizeStr = result.size ? `${(result.size / 1024 / 1024).toFixed(1)} MB` : ''
-        addToast(`"${exportName.trim()}" ${tr('editorExportSuccess')} ${sizeStr}`, 'success')
+        addToast(`"${exportName.trim()}" ${t('editorExportSuccess')} ${sizeStr}`, 'success')
       } else {
-        addToast(`${tr('editorExportFile')} : ${fileName}`, 'success')
+        addToast(`${t('editorExportFile')} : ${fileName}`, 'success')
       }
 
     } catch (e) {
       console.error('Export error:', e)
-      addToast(tr('editorExportError') + ': ' + e.message, 'error')
+      addToast(t('editorExportError') + ': ' + e.message, 'error')
     } finally {
       setIsExporting(false)
       setExportName('')
@@ -1207,7 +1207,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
       const result = await window.electronAPI.importImageFile(imgPath)
       if (result.success) {
         setExportImage(result.path)
-        addToast(tr('editorExportImageAdded'), 'success')
+        addToast(t('editorExportImageAdded'), 'success')
       }
     }
   }
@@ -1249,7 +1249,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         gap: 12
       }}>
         <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
-        <span>{tr('editorLoading')}</span>
+        <span>{t('editorLoading')}</span>
       </div>
     )
   }
@@ -1276,8 +1276,8 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         onAddClipFromFile={handleAddClipFromFile}
         tracks={project?.tracks || []}
         sounds={store.sounds}
-        lang={lang}
-        tr={tr}
+        lang={currentLang}
+        tr={t}
         isLoading={isLoading}
         isExporting={isExporting}
         onUndo={store.undoEditor}
@@ -1292,7 +1292,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
         onToggleLoop={() => {
           const loop = store.editorLoopRegion
           if (loop.end <= loop.start) {
-            addToast(tr('editorLoopNoRegion'), 'info')
+            addToast(t('editorLoopNoRegion'), 'info')
             return
           }
           store.toggleEditorLoop()
@@ -1379,8 +1379,8 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
           autoPlayOnClick={autoPlayOnClick}
           autoCrossfade={autoCrossfade}
           addToast={addToast}
-          lang={lang}
-          tr={tr}
+          lang={currentLang}
+          tr={t}
         />
       </div>
 
@@ -1418,8 +1418,8 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
           isPreviewing={isPreviewingEffect}
           onNormalize={handleNormalizeClip}
           onTrim={handleTrimClip}
-          lang={lang}
-          tr={tr}
+          lang={currentLang}
+          tr={t}
           autoPlayOnClick={autoPlayOnClick}
         />
       )}
@@ -1441,7 +1441,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
           onNormalize={handleNormalizeClip}
           onNormalizeAll={handleNormalizeAll}
           isNormalizing={isNormalizing}
-          tr={tr}
+          tr={t}
         />
 
         <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
@@ -1452,7 +1452,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
           isMuted={isMasterMuted}
           onMuteToggle={handleMasterMuteToggle}
           peakMeter={peakMeter}
-          tr={tr}
+          tr={t}
         />
 
         <div style={{
@@ -1463,13 +1463,13 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
           alignItems: 'center'
         }}>
           <span>
-            {tr('editorClips') || 'Clips'}: {store.editorProject.tracks.flatMap(t => t.clips).length}
+            {t('editorClips')}: {store.editorProject.tracks.flatMap(t => t.clips).length}
           </span>
           <span>
-            {tr('editorTracks') || 'Pistes'}: {store.editorProject.tracks.length}
+            {t('editorTracks')}: {store.editorProject.tracks.length}
           </span>
           <span>
-            {tr('editorDuration') || 'Durée'}: {formatTime(totalDuration)}
+            {t('editorDuration')}: {formatTime(totalDuration)}
           </span>
         </div>
       </div>
@@ -1480,18 +1480,18 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
           <div className="modal" style={{ width: 460, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">
               <i className="ti ti-package-export" style={{ color: 'var(--accent)' }} />
-              {tr('editorExportTitle')}
+              {t('editorExportTitle')}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-                  {tr('soundName')} *
+                  {t('soundName')} *
                 </label>
                 <input
                   value={exportName}
                   onChange={e => setExportName(e.target.value)}
-                  placeholder={tr('editorExportNamePlaceholder')}
+                  placeholder={t('editorExportNamePlaceholder')}
                   className="input-lg"
                   style={{ fontSize: 13, borderRadius: 'var(--radius-md)' }}
                   autoFocus
@@ -1500,7 +1500,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
 
               <div>
                 <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-                  {tr('image')}
+                  {t('image')}
                 </label>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   {exportImage && (
@@ -1515,7 +1515,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
                     onClick={handlePickImage}
                     style={{ fontSize: 12, padding: '4px 12px', borderRadius: 'var(--radius-sm)' }}
                   >
-                    <i className="ti ti-photo" /> {exportImage ? tr('editorImageChange') : tr('editorImageChoose')}
+                    <i className="ti ti-photo" /> {exportImage ? t('editorImageChange') : t('editorImageChoose')}
                   </button>
                   {exportImage && (
                     <button 
@@ -1531,7 +1531,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
 
               <div>
                 <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-                  {tr('editorEmojiLabel')}
+                  {t('editorEmojiLabel')}
                 </label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {EMOJIS.map(e => (
@@ -1558,7 +1558,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-                    {tr('editorExportFormat') || 'Format'}
+                    {t('editorExportFormat') || 'Format'}
                   </label>
                   <select
                     value={exportFormat}
@@ -1572,7 +1572,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-                    {tr('editorExportQuality') || 'Qualité'}
+                    {t('editorExportQuality') || 'Qualité'}
                   </label>
                   <select
                     value={exportBitrate}
@@ -1604,14 +1604,14 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
                   style={{ accentColor: 'var(--accent)', width: 'auto' }}
                 />
                 <label htmlFor="exportAddToLibrary" style={{ fontSize: 13, cursor: 'pointer', flex: 1 }}>
-                  {tr('editorAddToLibrary')}
+                  {t('editorAddToLibrary')}
                 </label>
               </div>
 
               {exportAddToLibrary && (
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-                    {tr('editorProfilesLabel')} *
+                    {t('editorProfilesLabel')} *
                   </label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {store.profiles.map(p => (
@@ -1642,7 +1642,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
                           style={{ accentColor: 'var(--accent)', width: 'auto' }}
                         />
                         <i className={`ti ${p.isDefault ? 'ti-stack' : 'ti-user'}`} style={{ color: 'var(--text-secondary)' }} />
-                        {p.id === 'all' ? tr('allSounds') : p.name}
+                        {p.id === 'all' ? t('allSounds') : p.name}
                       </label>
                     ))}
                   </div>
@@ -1658,7 +1658,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
                 lineHeight: 1.6
               }}>
                 <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
-                {tr('editorExportNote')}
+                {t('editorExportNote')}
               </div>
             </div>
 
@@ -1669,7 +1669,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
                 disabled={isExporting}
                 style={{ borderRadius: 'var(--radius-md)' }}
               >
-                {tr('cancel')}
+                {t('cancel')}
               </button>
               <button
                 className="btn-primary btn-lg"
@@ -1678,9 +1678,9 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
                 style={{ borderRadius: 'var(--radius-md)' }}
               >
                 {isExporting ? (
-                  <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('editorExporting')}</>
+                  <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('editorExporting')}</>
                 ) : (
-                  <><i className="ti ti-check" /> {tr('editorExport')}</>
+                  <><i className="ti ti-check" /> {t('editorExport')}</>
                 )}
               </button>
             </div>
@@ -1704,7 +1704,7 @@ export default function Editor({ store, addToast, lang = 'fr' }) {
           gap: 12
         }}>
           <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite', fontSize: 20 }} />
-          <span>{tr('editorLoading')}</span>
+          <span>{t('editorLoading')}</span>
         </div>
       )}
 

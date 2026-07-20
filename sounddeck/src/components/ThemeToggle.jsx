@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 
 export default function ThemeToggle({ currentTheme, onThemeChange, lang = 'fr' }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   const [autoTheme, setAutoTheme] = useState(false)
   const [currentHour, setCurrentHour] = useState(new Date().getHours())
 
@@ -67,7 +67,7 @@ export default function ThemeToggle({ currentTheme, onThemeChange, lang = 'fr' }
         }}
       >
         <span style={{ fontSize: 16 }}>{timeEmoji}</span>
-        {autoTheme ? tr('themeAutoOn') : tr('themeAutoOff')}
+        {autoTheme ? t('themeAutoOn') : t('themeAutoOff')}
         {autoTheme && (
           <span style={{
             fontSize: 9,

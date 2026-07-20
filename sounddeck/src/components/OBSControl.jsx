@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 import {
   connectOBS,
   disconnectOBS,
@@ -12,7 +12,7 @@ import {
 } from '../utils/obsIntegration'
 
 export default function OBSControl({ lang = 'fr' }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   const [isConnected, setIsConnected] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
@@ -42,18 +42,18 @@ export default function OBSControl({ lang = 'fr' }) {
 
   const handleConnect = async () => {
     setIsLoading(true)
-    setStatus(tr('connecting'))
+    setStatus(t('connecting'))
     
     try {
       const result = await connectOBS({ host, port, password })
       if (result.success) {
         setIsConnected(true)
-        setStatus(tr('obsConnected'))
+        setStatus(t('obsConnected'))
       } else {
-        setStatus(tr('obsConnectionError') + ': ' + result.error)
+        setStatus(t('obsConnectionError') + ': ' + result.error)
       }
     } catch (e) {
-      setStatus(tr('obsConnectionError') + ': ' + e.message)
+      setStatus(t('obsConnectionError') + ': ' + e.message)
     }
     
     setIsLoading(false)
@@ -65,7 +65,7 @@ export default function OBSControl({ lang = 'fr' }) {
       setIsConnected(false)
       setIsRecording(false)
       setIsStreaming(false)
-      setStatus(tr('obsDisconnected'))
+      setStatus(t('obsDisconnected'))
     } catch (e) {
       setStatus('Erreur: ' + e.message)
     }
@@ -76,7 +76,7 @@ export default function OBSControl({ lang = 'fr' }) {
       try {
         await stopOBSRecording()
         setIsRecording(false)
-        setStatus(tr('obsRecordingStopped'))
+        setStatus(t('obsRecordingStopped'))
       } catch (e) {
         setStatus('Erreur: ' + e.message)
       }
@@ -84,7 +84,7 @@ export default function OBSControl({ lang = 'fr' }) {
       try {
         await startOBSRecording()
         setIsRecording(true)
-        setStatus(tr('obsRecordingStarted'))
+        setStatus(t('obsRecordingStarted'))
       } catch (e) {
         setStatus('Erreur: ' + e.message)
       }
@@ -96,7 +96,7 @@ export default function OBSControl({ lang = 'fr' }) {
       try {
         await stopOBSStreaming()
         setIsStreaming(false)
-        setStatus(tr('obsStreamingStopped'))
+        setStatus(t('obsStreamingStopped'))
       } catch (e) {
         setStatus('Erreur: ' + e.message)
       }
@@ -104,7 +104,7 @@ export default function OBSControl({ lang = 'fr' }) {
       try {
         await startOBSStreaming()
         setIsStreaming(true)
-        setStatus(tr('obsStreamingStarted'))
+        setStatus(t('obsStreamingStarted'))
       } catch (e) {
         setStatus('Erreur: ' + e.message)
       }
@@ -142,7 +142,7 @@ export default function OBSControl({ lang = 'fr' }) {
             padding: '2px 8px',
             borderRadius: 10
           }}>
-            {isConnected ? tr('connected') : tr('disconnected')}
+            {isConnected ? t('connected') : t('disconnected')}
           </span>
         </div>
 
@@ -166,14 +166,14 @@ export default function OBSControl({ lang = 'fr' }) {
             <input
               value={host}
               onChange={e => setHost(e.target.value)}
-              placeholder={tr('obsHost')}
+              placeholder={t('obsHost')}
               className="input-sm"
               style={{ flex: 1 }}
             />
             <input
               value={port}
               onChange={e => setPort(Number(e.target.value))}
-              placeholder={tr('obsPort')}
+              placeholder={t('obsPort')}
               className="input-sm"
               style={{ width: 80 }}
             />
@@ -181,7 +181,7 @@ export default function OBSControl({ lang = 'fr' }) {
           <input
             value={password}
             onChange={e => setPassword(e.target.value)}
-            placeholder={tr('obsPassword')}
+            placeholder={t('obsPassword')}
             type="password"
             className="input-sm"
           />
@@ -196,9 +196,9 @@ export default function OBSControl({ lang = 'fr' }) {
           style={{ width: '100%', justifyContent: 'center' }}
         >
           {isLoading ? (
-            <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('connecting')}</>
+            <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('connecting')}</>
           ) : (
-            <><i className="ti ti-plug" /> {tr('obsConnect')}</>
+            <><i className="ti ti-plug" /> {t('obsConnect')}</>
           )}
         </button>
       ) : (
@@ -215,7 +215,7 @@ export default function OBSControl({ lang = 'fr' }) {
           >
             <i className={`ti ${isRecording ? 'ti-player-stop-filled' : 'ti-circle-filled'}`}
                style={{ color: isRecording ? 'var(--danger)' : 'var(--danger)' }} />
-            {isRecording ? tr('obsStopRecording') : tr('obsStartRecording')}
+            {isRecording ? t('obsStopRecording') : t('obsStartRecording')}
           </button>
 
           <button
@@ -229,7 +229,7 @@ export default function OBSControl({ lang = 'fr' }) {
             }}
           >
             <i className={`ti ${isStreaming ? 'ti-player-stop-filled' : 'ti-player-play-filled'}`} />
-            {isStreaming ? tr('obsStopStreaming') : tr('obsStartStreaming')}
+            {isStreaming ? t('obsStopStreaming') : t('obsStartStreaming')}
           </button>
 
           <button
@@ -237,7 +237,7 @@ export default function OBSControl({ lang = 'fr' }) {
             onClick={handleDisconnect}
             style={{ fontSize: 11, color: 'var(--text-tertiary)' }}
           >
-            <i className="ti ti-x" /> {tr('disconnect')}
+            <i className="ti ti-x" /> {t('disconnect')}
           </button>
         </div>
       )}

@@ -1,23 +1,23 @@
 import { useState, useEffect, useMemo, useRef, memo } from 'react'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext' // ✅ Nouvel import
 
 // IDs des éléments qui sont toujours des actions
 const ACTION_IDS = ['loop', 'shortcuts', 'presentation']
 
 // Map des labels par défaut pour les éléments (traductions)
-const getDefaultLabels = (tr) => ({
-  home: tr('mySounds'),
-  discover: tr('discover'),
-  trimmer: tr('trimmer'),
-  editor: tr('editor'),
-  sequencer: tr('sequencer'),
-  youtube: tr('youtube'),
-  loop: tr('loop'),
-  shortcuts: tr('shortcuts'),
-  presentation: tr('presentation'),
-  guide: tr('guide'),
-  options: tr('options'),
-  stats: tr('stats'),
+const getDefaultLabels = (t) => ({
+  home: t('mySounds'),
+  discover: t('discover'),
+  trimmer: t('trimmer'),
+  editor: t('editor'),
+  sequencer: t('sequencer'),
+  youtube: t('youtube'),
+  loop: t('loop'),
+  shortcuts: t('shortcuts'),
+  presentation: t('presentation'),
+  guide: t('guide'),
+  options: t('options'),
+  stats: t('stats'),
 })
 
 // Map des groupes par défaut pour les éléments
@@ -67,7 +67,6 @@ const Sidebar = memo(function Sidebar({
   onVolumeChange,
   onStopAll,
   onPresentation,
-  lang,
   addToast,
   onReorderProfiles,
   sidebarConfig,
@@ -76,11 +75,10 @@ const Sidebar = memo(function Sidebar({
   pluginPages = [],
   isPluginPage = () => false,
 }) {
-
+  const { t } = useLanguage() // ✅ Utiliser useLanguage
   const [newProfileName, setNewProfileName] = useState('')
   const [showNewProfile, setShowNewProfile] = useState(false)
   const [shortcutsEnabled, setShortcutsEnabled] = useState(true)
-  const tr = useTranslation(lang)
 
   const [draggedProfileId, setDraggedProfileId] = useState(null)
   const [dragOverProfileId, setDragOverProfileId] = useState(null)
@@ -115,9 +113,11 @@ const Sidebar = memo(function Sidebar({
       return
     }
 
+    const defaultLabels = getDefaultLabels(t)
+
     const updatedItems = sidebarConfig.items.map(item => ({
       ...item,
-      label: getItemLabel(item),
+      label: getItemLabel(item, defaultLabels),
       icon: getItemIcon(item),
       group: getItemGroup(item),
     }))
@@ -142,12 +142,10 @@ const Sidebar = memo(function Sidebar({
       setVisibleItems(newVisibleItems)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sidebarConfig, lang, profiles, pluginPages])
+  }, [sidebarConfig, t, profiles, pluginPages])
 
   // ─── Fonctions utilitaires ──────────────────────────────────────────────────
-  const getItemLabel = (item) => {
-    const defaultLabels = getDefaultLabels(tr)
-    
+  const getItemLabel = (item, defaultLabels) => {
     if (item.id && item.id.startsWith('profile-')) {
       const profileId = item.id.replace('profile-', '')
       const profile = profiles.find(p => p.id === profileId)
@@ -181,14 +179,14 @@ const Sidebar = memo(function Sidebar({
     await onCreateProfile(newProfileName.trim())
     setNewProfileName('')
     setShowNewProfile(false)
-    addToast(`Profil "${newProfileName.trim()}" créé`, 'success')
+    addToast(`${t('newProfile')} "${newProfileName.trim()}" ${t('created')}`, 'success')
   }
 
   const handleToggleShortcuts = async () => {
     try {
       const newState = await window.electronAPI.toggleGlobalShortcuts()
       setShortcutsEnabled(newState)
-      addToast(newState ? 'Raccourcis activés' : 'Raccourcis désactivés', 'info')
+      addToast(newState ? t('shortcutsActivated') : t('shortcutsDeactivated'), 'info')
     } catch (e) {
       console.error('Erreur toggle shortcuts:', e)
     }
@@ -251,7 +249,7 @@ const Sidebar = memo(function Sidebar({
 
     const success = await onReorderProfiles(startIndex, endIndex)
     if (success) {
-      addToast('Profil déplacé', 'success')
+      addToast(t('profileMoved'), 'success')
     }
 
     setDraggedProfileId(null)
@@ -261,16 +259,16 @@ const Sidebar = memo(function Sidebar({
   // ─── Pages ──────────────────────────────────────────────────────────────────
   const allPages = useMemo(() => {
     const corePages = [
-      { id: 'home', label: tr('mySounds'), icon: 'ti-home', group: 'navigation', isCore: true },
-      { id: 'library', label: tr('library'), icon: 'ti-library', isCore: true, group: 'navigation' },
-      { id: 'discover', label: tr('discover'), icon: 'ti-compass', group: 'navigation', isCore: true },
-      { id: 'trimmer', label: tr('trimmer'), icon: 'ti-cut', group: 'navigation', isCore: true },
-      { id: 'editor', label: tr('editor'), icon: 'ti-wand', group: 'navigation', isCore: true },
-      { id: 'sequencer', label: tr('sequencer'), icon: 'ti-playlist', group: 'navigation', isCore: true },
-      { id: 'youtube', label: tr('youtube'), icon: 'ti-brand-youtube', group: 'navigation', isCore: true },
-      { id: 'stats', label: tr('stats'), icon: 'ti-chart-bar', group: 'navigation', isCore: true },
-      { id: 'guide', label: tr('guide'), icon: 'ti-book', group: 'footer', isCore: true },
-      { id: 'options', label: tr('options'), icon: 'ti-settings', group: 'footer', isCore: true }
+      { id: 'home', label: t('mySounds'), icon: 'ti-home', group: 'navigation', isCore: true },
+      { id: 'library', label: t('library'), icon: 'ti-library', isCore: true, group: 'navigation' },
+      { id: 'discover', label: t('discover'), icon: 'ti-compass', group: 'navigation', isCore: true },
+      { id: 'trimmer', label: t('trimmer'), icon: 'ti-cut', group: 'navigation', isCore: true },
+      { id: 'editor', label: t('editor'), icon: 'ti-wand', group: 'navigation', isCore: true },
+      { id: 'sequencer', label: t('sequencer'), icon: 'ti-playlist', group: 'navigation', isCore: true },
+      { id: 'youtube', label: t('youtube'), icon: 'ti-brand-youtube', group: 'navigation', isCore: true },
+      { id: 'stats', label: t('stats'), icon: 'ti-chart-bar', group: 'navigation', isCore: true },
+      { id: 'guide', label: t('guide'), icon: 'ti-book', group: 'footer', isCore: true },
+      { id: 'options', label: t('options'), icon: 'ti-settings', group: 'footer', isCore: true }
     ]
 
     const pluginPagesFormatted = (pluginPages || [])
@@ -282,7 +280,7 @@ const Sidebar = memo(function Sidebar({
       }))
 
     return [...corePages, ...pluginPagesFormatted]
-  }, [tr, pluginPages])
+  }, [t, pluginPages])
 
   const isItemActive = (itemId) => {
     if (itemId === 'home') return currentPage === 'home'
@@ -349,7 +347,7 @@ const Sidebar = memo(function Sidebar({
         <SidebarItem
           key={profile.id}
           icon="ti-stack"
-          label={tr('allSounds')}
+          label={t('allSounds')}
           active={currentProfileId === profile.id && currentPage === 'home'}
           dot={currentProfileId === profile.id}
           onClick={() => { onSwitchProfile(profile.id); onChangePage('home') }}
@@ -422,7 +420,7 @@ const Sidebar = memo(function Sidebar({
           transition: 'all 0.15s'
         }}>
           <i className="ti ti-repeat" style={{ fontSize: 15 }} />
-          <span style={{ flex: 1, textAlign: 'left' }}>{tr('loop')}</span>
+          <span style={{ flex: 1, textAlign: 'left' }}>{t('loop')}</span>
           <span style={{
             fontSize: 10,
             padding: '1px 6px',
@@ -453,7 +451,7 @@ const Sidebar = memo(function Sidebar({
           transition: 'all 0.15s'
         }}>
           <i className={`ti ${shortcutsEnabled ? 'ti-keyboard' : 'ti-keyboard-off'}`} style={{ fontSize: 15 }} />
-          <span style={{ flex: 1, textAlign: 'left' }}>{tr('shortcuts')}</span>
+          <span style={{ flex: 1, textAlign: 'left' }}>{t('shortcuts')}</span>
           <span style={{
             fontSize: 10,
             padding: '1px 6px',
@@ -483,7 +481,7 @@ const Sidebar = memo(function Sidebar({
           transition: 'all 0.15s'
         }}>
           <i className="ti ti-layout-grid" style={{ fontSize: 15 }} />
-          <span style={{ flex: 1, textAlign: 'left' }}>{tr('presentation')}</span>
+          <span style={{ flex: 1, textAlign: 'left' }}>{t('presentation')}</span>
           <i className="ti ti-arrow-right" style={{ fontSize: 12 }} />
         </button>
       )
@@ -578,7 +576,7 @@ const Sidebar = memo(function Sidebar({
               alignItems: 'center',
               gap: 4
             }}>
-              <i className="ti ti-pinned" style={{ fontSize: 12 }} /> {tr('pinned')}
+              <i className="ti ti-pinned" style={{ fontSize: 12 }} /> {t('pinned')}
             </div>
           </div>
           {visibleItems.pinned.map(item => {
@@ -613,13 +611,18 @@ const Sidebar = memo(function Sidebar({
               letterSpacing: '0.06em',
               fontWeight: 500
             }}>
-              {tr('profiles')}
+              {t('profiles')}
             </div>
           </div>
           {!allPinned && renderProfileItem(profiles.find(p => p.id === 'all'))}
           {nonPinnedProfiles.map(profile => renderProfileItem(profile, true))}
           {showNewProfile ? (
-            <div style={{ padding: '4px 12px', display: 'flex', gap: 4 }}> 
+            <div style={{ 
+              padding: '4px 8px', 
+              display: 'flex', 
+              gap: 4,
+              alignItems: 'center'
+            }}> 
               <input
                 autoFocus
                 value={newProfileName}
@@ -628,20 +631,50 @@ const Sidebar = memo(function Sidebar({
                   if (e.key === 'Enter') handleCreateProfile()
                   if (e.key === 'Escape') setShowNewProfile(false)
                 }}
-                placeholder={tr('newProfile')}
-                style={{ fontSize: 12, padding: '5px 8px', flex: 1 }}
+                placeholder={t('newProfile')}
+                className="input-sm"
+                style={{ 
+                  flex: 1,
+                  minHeight: 28,
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: 12
+                }}
               />
-              <button className="btn-primary btn-sm" onClick={handleCreateProfile}>
-                <i className="ti ti-check" />
+              <button 
+                className="btn-primary btn-sm"
+                onClick={handleCreateProfile}
+                style={{ 
+                  minHeight: 28,
+                  minWidth: 28,
+                  padding: '4px 8px',
+                  borderRadius: 'var(--radius-sm)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <i className="ti ti-check" style={{ fontSize: 14 }} />
               </button>
-              <button className="btn-secondary btn-sm" onClick={() => setShowNewProfile(false)}>
-                <i className="ti ti-x" />
+              <button 
+                className="btn-secondary btn-sm"
+                onClick={() => setShowNewProfile(false)}
+                style={{ 
+                  minHeight: 28,
+                  minWidth: 28,
+                  padding: '4px 8px',
+                  borderRadius: 'var(--radius-sm)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <i className="ti ti-x" style={{ fontSize: 14 }} />
               </button>
             </div>
           ) : (
             <SidebarItem
               icon="ti-plus"
-              label={tr('newProfile')}
+              label={t('newProfile')}
               muted
               onClick={() => setShowNewProfile(true)}
             />
@@ -651,7 +684,7 @@ const Sidebar = memo(function Sidebar({
     }
 
     if (sectionKey === 'navigation') {
-      return renderGenericSection('navigation', tr('navigation'))
+      return renderGenericSection('navigation', t('navigation'))
     }
 
     if (sectionKey === 'actions') {
@@ -674,7 +707,7 @@ const Sidebar = memo(function Sidebar({
               letterSpacing: '0.06em',
               fontWeight: 500
             }}>
-              ⚡ Actions
+              ⚡ {t('actions')}
             </div>
           </div>
           <div style={{ margin: '0 8px' }}>
@@ -758,7 +791,7 @@ const Sidebar = memo(function Sidebar({
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <i className={`ti ${volume === 0 ? 'ti-volume-off' : volume < 50 ? 'ti-volume-2' : 'ti-volume'}`}
               style={{ fontSize: 14, color: 'var(--text-tertiary)' }} />
-            <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 500 }}>{tr('volume')}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 500 }}>{t('volume')}</span>
           </div>
           <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>{volume}%</span>
         </div>
@@ -782,7 +815,7 @@ const Sidebar = memo(function Sidebar({
           fontWeight: 500,
           transition: 'all 0.15s'
         }}>
-          <i className="ti ti-player-stop-filled" /> {tr('stopAll')}
+          <i className="ti ti-player-stop-filled" /> {t('stopAll')}
         </button>
       </div>
 
@@ -806,7 +839,6 @@ const Sidebar = memo(function Sidebar({
     prevProps.currentProfileId === nextProps.currentProfileId &&
     prevProps.loopEnabled === nextProps.loopEnabled &&
     prevProps.volume === nextProps.volume &&
-    prevProps.lang === nextProps.lang &&
     JSON.stringify(prevProps.profiles) === JSON.stringify(nextProps.profiles) &&
     JSON.stringify(prevProps.sidebarConfig) === JSON.stringify(nextProps.sidebarConfig) &&
     JSON.stringify(prevProps.pluginPages) === JSON.stringify(nextProps.pluginPages)

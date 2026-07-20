@@ -1,5 +1,6 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useStore } from './store/useStore'
+import { useLanguage } from './context/LanguageContext'
 import Sidebar from './components/Sidebar'
 import Home from './pages/Home'
 import Options from './pages/Options'
@@ -24,6 +25,7 @@ import { usePluginPage } from './core/hooks/usePluginPage'
 // ─── COMPOSANT PRINCIPAL AVEC PLUGINS ────────────────────────────────────────
 function AppContent() {
   const store = useStore()
+  const { t, currentLang, changeLanguage, version: langVersion } = useLanguage()
   const [currentPage, setCurrentPage] = useState('home')
   const [presentationMode, setPresentationMode] = useState(false)
   const [toasts, setToasts] = useState([])
@@ -46,7 +48,6 @@ function AppContent() {
   // ✅ Charger les plugins automatiquement au démarrage
   useEffect(() => {
     const loadPlugins = async () => {
-      // Attendre que le PluginManager soit initialisé
       if (!pluginsLoaded) return
       
       // ─── 1. Plugin MyInstants ──────────────────────────────────────────────
@@ -196,7 +197,6 @@ function AppContent() {
 
   // ✅ Gestion de la popup
   useEffect(() => {
-    // ✅ Bloquer la popup pendant 1 seconde
     const blockPopup = () => {
       console.log('🚫 [BLOCK] Blocage de la popup')
       isPopupBlockedRef.current = true
@@ -212,7 +212,6 @@ function AppContent() {
       }, 1000)
     }
 
-    // ✅ Afficher la popup
     const handleShowQuitConfirm = () => {
       console.log(`📌 SHOW_QUIT_CONFIRM - blocked: ${isPopupBlockedRef.current}`)
       
@@ -230,16 +229,12 @@ function AppContent() {
       setShowQuitConfirm(true)
     }
 
-    // ✅ Cacher la popup
     const handleHideQuitConfirm = () => {
       console.log('🔇 hide-quit-confirm reçu')
       setShowQuitConfirm(false)
-      
-      // ✅ Bloquer la popup pour éviter qu'elle ne réapparaisse
       blockPopup()
     }
 
-    // ✅ Enregistrer les listeners
     window.electronAPI?.onShowQuitConfirm?.(handleShowQuitConfirm)
     window.electronAPI?.onHideQuitConfirm?.(handleHideQuitConfirm)
 
@@ -255,7 +250,6 @@ function AppContent() {
     }
   }, [])
 
-  // ✅ Debug de l'état de la popup
   useEffect(() => {
     if (showQuitConfirm) {
       console.log(`💬 showQuitConfirm = true`)
@@ -303,9 +297,9 @@ function AppContent() {
   // Mettre à jour le menu du tray quand la langue change
   useEffect(() => {
     if (window.electronAPI?.updateTrayLanguage) {
-      window.electronAPI.updateTrayLanguage(store.lang)
+      window.electronAPI.updateTrayLanguage(currentLang)
     }
-  }, [store.lang])
+  }, [currentLang])
 
   // ✅ Initialiser le mixeur au démarrage si activé
   useEffect(() => {
@@ -347,7 +341,7 @@ function AppContent() {
       }
       checkMixer()
     }
-  }, [store.lang, store.loading, store.mixerEnabled, mixerInitialized])
+  }, [currentLang, store.loading, store.mixerEnabled, mixerInitialized])
 
   // ✅ Vérifier le périphérique micro au démarrage
   useEffect(() => {
@@ -387,18 +381,18 @@ function AppContent() {
     window.electronAPI.onSwitchProfile(async () => {
       if (switchToNextProfileRef.current) {
         await switchToNextProfileRef.current()
-        addToastRef.current?.('Profil changé', 'info')
+        addToastRef.current?.(t('toastProfileChanged'), 'info')
       }
     })
 
     window.electronAPI.onToggleLoop(async () => {
       if (toggleLoopRef.current) toggleLoopRef.current()
-      addToastRef.current?.('Loop ' + (store.loopEnabled ? 'désactivé' : 'activé'), 'info')
+      addToastRef.current?.(store.loopEnabled ? t('toastLoopOff') : t('toastLoopOn'), 'info')
     })
 
     window.electronAPI.onStopAllSounds(() => {
       stopAllSounds()
-      addToastRef.current?.('Tous les sons arrêtés', 'info')
+      addToastRef.current?.(t('toastAllStopped'), 'info')
     })
 
     window.electronAPI.onTogglePresentation(() => {
@@ -412,42 +406,41 @@ function AppContent() {
       window.electronAPI.removeAllListeners('stop-all-sounds')
       window.electronAPI.removeAllListeners('toggle-presentation')
     }
-  }, [store.loopEnabled, store.mixerEnabled])
+  }, [store.loopEnabled, store.mixerEnabled, t])
 
-  const addToast = (message, type = 'info') => {
+  // ✅ Fonction addToast
+  const addToast = useCallback((message, type = 'info') => {
     const id = crypto.randomUUID ? crypto.randomUUID() : Date.now() + '_' + Math.random()
     setToasts(prev => [...prev, { id, message, type }])
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000)
-  }
+  }, [])
 
-  useEffect(() => { addToastRef.current = addToast }, [])
+  useEffect(() => { addToastRef.current = addToast }, [addToast])
 
-  // ✅ RENDU DES PAGES (avec support plugins)
+  // ✅ RENDU DES PAGES
   const renderPage = () => {
-    // Pages core
     if (currentPage === 'home') {
-      return <Home store={store} addToast={addToast} loopEnabled={store.loopEnabled} lang={store.lang} />
+      return <Home key={`home-${currentLang}`} store={store} addToast={addToast} loopEnabled={store.loopEnabled} />
     }
     if (currentPage === 'options') {
-      return <Options store={store} addToast={addToast} lang={store.lang} />
+      return <Options key={`options-${currentLang}`} store={store} addToast={addToast} />
     }
     if (currentPage === 'trimmer') {
-      return <Trimmer store={store} addToast={addToast} lang={store.lang} />
+      return <Trimmer key={`trimmer-${currentLang}`} store={store} addToast={addToast} />
     }
     if (currentPage === 'editor') {
-      return <Editor store={store} addToast={addToast} lang={store.lang} />
+      return <Editor key={`editor-${currentLang}`} store={store} addToast={addToast} />
     }
     if (currentPage === 'sequencer') {
-      return <Sequencer store={store} addToast={addToast} lang={store.lang} />
+      return <Sequencer key={`sequencer-${currentLang}`} store={store} addToast={addToast} />
     }
     if (currentPage === 'guide') {
-      return <Guide key={store.lang} lang={store.lang} />
+      return <Guide key={`guide-${currentLang}`} />
     }
     if (currentPage === 'stats') {
-      return <Stats store={store} lang={store.lang} />
+      return <Stats key={`stats-${currentLang}`} store={store} />
     }
 
-    // ✅ Pages plugin (YouTube est maintenant ici)
     if (isPluginPage(currentPage)) {
       if (pluginLoading) {
         return (
@@ -460,7 +453,7 @@ function AppContent() {
             gap: 12
           }}>
             <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
-            <span>Chargement du plugin...</span>
+            <span>{t('appLoading')}</span>
           </div>
         )
       }
@@ -479,20 +472,20 @@ function AppContent() {
             textAlign: 'center'
           }}>
             <i className="ti ti-alert-triangle" style={{ fontSize: 32 }} />
-            <div style={{ fontSize: 16, fontWeight: 600 }}>Erreur de chargement</div>
+            <div style={{ fontSize: 16, fontWeight: 600 }}>{t('error')}</div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{pluginError}</div>
             <button 
               className="btn-secondary btn-sm" 
               onClick={() => setCurrentPage('home')}
             >
-              Retour à l'accueil
+              {t('close')}
             </button>
           </div>
         )
       }
       
       if (PluginComponent) {
-        return <PluginComponent store={store} addToast={addToast} lang={store.lang} />
+        return <PluginComponent key={`plugin-${currentPage}-${currentLang}`} store={store} addToast={addToast} />
       }
       
       return (
@@ -506,18 +499,17 @@ function AppContent() {
           gap: 12
         }}>
           <i className="ti ti-puzzle" style={{ fontSize: 32 }} />
-          <div style={{ fontSize: 16 }}>Plugin non trouvé</div>
+          <div style={{ fontSize: 16 }}>{t('optionsPlugins')}</div>
           <button 
             className="btn-secondary btn-sm" 
             onClick={() => setCurrentPage('home')}
           >
-            Retour à l'accueil
+            {t('close')}
           </button>
         </div>
       )
     }
 
-    // Page non trouvée
     return (
       <div style={{
         display: 'flex',
@@ -529,7 +521,7 @@ function AppContent() {
         gap: 12
       }}>
         <i className="ti ti-404" style={{ fontSize: 32 }} />
-        <div style={{ fontSize: 16 }}>Page non trouvée</div>
+        <div style={{ fontSize: 16 }}>404</div>
       </div>
     )
   }
@@ -543,7 +535,7 @@ function AppContent() {
         color: 'var(--text-secondary)', flexDirection: 'column', gap: 12
       }}>
         <i className="ti ti-speakerphone" style={{ fontSize: 32, color: 'var(--accent)' }} />
-        <span>Chargement de SoundDeck...</span>
+        <span>{t('appLoading')}</span>
       </div>
     )
   }
@@ -556,7 +548,7 @@ function AppContent() {
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg-primary)' }}>
       <Sidebar
-        key={store.sidebarVersion}
+        key={`sidebar-${store.sidebarVersion}-${currentLang}`}  // ✅ Ajout de currentLang
         profiles={store.profiles}
         currentProfileId={store.currentProfileId}
         currentPage={currentPage}
@@ -567,15 +559,13 @@ function AppContent() {
         loopEnabled={store.loopEnabled}
         volume={store.volume}
         onVolumeChange={store.updateVolume}
-        onStopAll={() => { stopAllSounds(); addToast('Tous les sons arrêtés', 'info') }}
+        onStopAll={() => { stopAllSounds(); addToast(t('toastAllStopped'), 'info') }}
         onPresentation={() => setPresentationMode(true)}
-        lang={store.lang}
         addToast={addToast}
         onReorderProfiles={store.reorderProfiles}
         sidebarConfig={store.sidebarConfig}
         sidebarEditMode={store.sidebarEditMode}
         sidebarVersion={store.sidebarVersion}
-        // ✅ Passage des pages plugins
         pluginPages={pages}
         isPluginPage={isPluginPage}
       />
@@ -588,30 +578,30 @@ function AppContent() {
 
       {presentationMode && (
         <Presentation
+          key={`presentation-${currentLang}`}
           store={store}
           onExit={() => setPresentationMode(false)}
-          lang={store.lang}
         />
       )}
 
       {showQuitConfirm && (
         <QuitConfirm 
+          key={`quitconfirm-${currentLang}`}
           onClose={() => setShowQuitConfirm(false)} 
-          lang={store.lang} 
         />
       )}
 
       {showTutorial && (
         <Tutorial 
+          key={`tutorial-${currentLang}`}
           onComplete={() => setShowTutorial(false)} 
-          lang={store.lang} 
         />
       )}
 
       {showAdvancedTutorial && (
         <TutorialAdvanced 
+          key={`tutorialadvanced-${currentLang}`}
           onComplete={() => setShowAdvancedTutorial(false)} 
-          lang={store.lang} 
         />
       )}
 

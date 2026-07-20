@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react'
-import { LANGUAGES, t } from '../i18n'
+import { LANGUAGES } from '../i18n' // ✅ Plus que les données brutes
+import { useLanguage } from '../context/LanguageContext' // ✅ Nouvel import
 
 export default function WelcomeScreen({ onComplete }) {
+  const { t, currentLang, changeLanguage } = useLanguage() // ✅ Utiliser useLanguage
   const [selectedLang, setSelectedLang] = useState('fr')
   const [keyboardLayout, setKeyboardLayout] = useState('qwerty')
   const [loading, setLoading] = useState(true)
-  const [renderKey, setRenderKey] = useState(0) // ✅ Pour forcer le re-rendu
-
-  // ✅ Fonction de traduction qui utilise la langue sélectionnée
-  const tr = (key) => t(selectedLang, key)
 
   useEffect(() => {
     const getSystemValues = async () => {
@@ -16,6 +14,10 @@ export default function WelcomeScreen({ onComplete }) {
         const systemLang = await window.electronAPI.getSystemLanguage?.()
         if (systemLang) {
           setSelectedLang(systemLang)
+          // ✅ Mettre à jour le contexte si la langue système est différente
+          if (systemLang !== currentLang) {
+            await changeLanguage(systemLang)
+          }
         }
         
         const systemLayout = await window.electronAPI.getSystemKeyboardLayout?.()
@@ -31,20 +33,15 @@ export default function WelcomeScreen({ onComplete }) {
     getSystemValues()
   }, [])
 
-  // ✅ Forcer le re-rendu lorsque la langue change
-  useEffect(() => {
-    setRenderKey(prev => prev + 1)
-  }, [selectedLang])
-
   const handleConfirm = async () => {
     try {
-        await window.electronAPI.storeSet('lang', selectedLang)
+        // ✅ Utiliser changeLanguage pour mettre à jour le contexte
+        await changeLanguage(selectedLang)
         await window.electronAPI.storeSet('keyboardLayout', keyboardLayout)
         await window.electronAPI.storeSet('hasLaunchedBefore', true)
         await window.electronAPI.updateTrayLanguage?.(selectedLang)
         
-        // ✅ Recharger l'application pour que la langue soit prise en compte
-        // et pour que l'écran de bienvenue disparaisse
+        // ✅ Recharger l'application pour que l'écran de bienvenue disparaisse
         window.location.reload()
         
         // Si le reload ne fonctionne pas, on appelle onComplete
@@ -70,7 +67,7 @@ export default function WelcomeScreen({ onComplete }) {
   }
 
   return (
-    <div key={renderKey} style={{ // ✅ key pour forcer le re-rendu du conteneur
+    <div style={{
       height: '100vh',
       display: 'flex',
       alignItems: 'center',
@@ -91,14 +88,14 @@ export default function WelcomeScreen({ onComplete }) {
           <i className="ti ti-speakerphone" style={{ fontSize: 48, color: 'var(--accent)' }} />
           <h1 style={{ marginTop: 12, fontSize: 24, fontWeight: 700 }}>SoundDeck</h1>
           <p style={{ color: 'var(--text-secondary)', marginTop: 4 }}>
-            {tr('welcomeTitle')}
+            {t('welcomeTitle')}
           </p>
         </div>
 
         {/* Langue */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
-            🌐 {tr('welcomeLanguage')}
+            🌐 {t('welcomeLanguage')}
           </label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {LANGUAGES.map(l => (
@@ -106,8 +103,6 @@ export default function WelcomeScreen({ onComplete }) {
                 key={l.code}
                 onClick={() => {
                   setSelectedLang(l.code)
-                  // ✅ Force le re-rendu immédiatement
-                  setRenderKey(prev => prev + 1)
                 }}
                 style={{
                   padding: '8px 16px',
@@ -134,7 +129,7 @@ export default function WelcomeScreen({ onComplete }) {
         {/* Layout clavier */}
         <div style={{ marginBottom: 24 }}>
           <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
-            ⌨️ {tr('welcomeKeyboard')}
+            ⌨️ {t('welcomeKeyboard')}
           </label>
           <div style={{ display: 'flex', gap: 8 }}>
             {['qwerty', 'azerty'].map(layout => (
@@ -166,11 +161,11 @@ export default function WelcomeScreen({ onComplete }) {
           className="btn-primary btn-xl"
           style={{ width: '100%', justifyContent: 'center', minHeight: 48 }}
         >
-          <i className="ti ti-arrow-right" /> {tr('welcomeContinue')}
+          <i className="ti ti-arrow-right" /> {t('welcomeContinue')}
         </button>
 
         <p style={{ fontSize: 11, color: 'var(--text-tertiary)', textAlign: 'center', marginTop: 12 }}>
-          {tr('welcomeNote')}
+          {t('welcomeNote')}
         </p>
 
         {/* ✅ Bouton de débogage - visible uniquement en développement */}

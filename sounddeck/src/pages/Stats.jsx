@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 
-export default function Stats({ store, lang = 'fr' }) {
-  const tr = useTranslation(lang)
+export default function Stats({ store }) {
+  const { t, currentLang } = useLanguage()
   const [timeRange, setTimeRange] = useState('all') // 'all', 'week', 'month'
 
   const stats = useMemo(() => {
@@ -17,32 +17,26 @@ export default function Stats({ store, lang = 'fr' }) {
     const sounds = store.sounds || []
     const totalSounds = sounds.length
     
-    // Sons joués
     const playedSounds = sounds.filter(s => s.playCount > 0)
     const totalPlays = sounds.reduce((sum, s) => sum + (s.playCount || 0), 0)
     
-    // Sons joués dans la période
     const recentSounds = filterDate > 0 
       ? sounds.filter(s => (s.lastPlayed || 0) > filterDate)
       : sounds
     const recentPlays = recentSounds.reduce((sum, s) => sum + (s.playCount || 0), 0)
 
-    // Top sons
     const topSounds = [...sounds]
       .sort((a, b) => (b.playCount || 0) - (a.playCount || 0))
       .slice(0, 10)
 
-    // Profils
     const profiles = store.profiles || []
     const profileCount = profiles.filter(p => p.id !== 'all').length
     
-    // Sons par profil
     const soundsByProfile = profiles.map(p => ({
       ...p,
       count: sounds.filter(s => s.profiles?.includes(p.id)).length
     }))
 
-    // Tags
     const tags = store.tags || {}
     const allTags = Object.values(tags).flat()
     const uniqueTags = [...new Set(allTags)]
@@ -63,7 +57,18 @@ export default function Stats({ store, lang = 'fr' }) {
 
   const formatDate = (timestamp) => {
     if (!timestamp) return '-'
-    return new Date(timestamp).toLocaleDateString()
+    return new Date(timestamp).toLocaleDateString(currentLang, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
+  const getProfileName = (profile) => {
+    if (profile.id === 'all') {
+      return t('allSounds')
+    }
+    return profile.name
   }
 
   const StatCard = ({ icon, label, value, sub, color = 'var(--accent)' }) => (
@@ -89,7 +94,7 @@ export default function Stats({ store, lang = 'fr' }) {
       display: 'flex', 
       flexDirection: 'column', 
       height: '100%', 
-      overflow: 'hidden', // ✅ Empêche le débordement du conteneur principal
+      overflow: 'hidden',
     }}>
       {/* Header - Fixe */}
       <div style={{
@@ -104,10 +109,10 @@ export default function Stats({ store, lang = 'fr' }) {
         <div>
           <div style={{ fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
             <i className="ti ti-chart-bar" style={{ color: 'var(--accent)' }} />
-            {tr('statsTitle')}
+            {t('statsTitle')}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-            {tr('statsSub')}
+            {t('statsSub')}
           </div>
         </div>
 
@@ -127,7 +132,7 @@ export default function Stats({ store, lang = 'fr' }) {
                 transition: 'all 0.15s'
               }}
             >
-              {range === 'all' ? tr('statsAll') : range === 'week' ? tr('statsWeek') : tr('statsMonth')}
+              {range === 'all' ? t('statsAll') : range === 'week' ? t('statsWeek') : t('statsMonth')}
             </button>
           ))}
         </div>
@@ -136,7 +141,7 @@ export default function Stats({ store, lang = 'fr' }) {
       {/* Contenu scrollable */}
       <div style={{
         flex: 1,
-        overflowY: 'auto', // ✅ Permet le défilement
+        overflowY: 'auto',
         padding: '20px',
       }}>
         {/* Stats Cards */}
@@ -148,36 +153,36 @@ export default function Stats({ store, lang = 'fr' }) {
         }}>
           <StatCard 
             icon="ti-music" 
-            label={tr('statsTotalSounds')} 
+            label={t('statsTotalSounds')} 
             value={stats.totalSounds} 
           />
           <StatCard 
             icon="ti-player-play" 
-            label={tr('statsTotalPlays')} 
+            label={t('statsTotalPlays')} 
             value={stats.totalPlays} 
-            sub={`${stats.recentPlays} ${tr('statsRecent')}`}
+            sub={`${stats.recentPlays} ${t('statsRecent')}`}
             color="var(--success)"
           />
           <StatCard 
             icon="ti-users" 
-            label={tr('statsProfiles')} 
+            label={t('statsProfiles')} 
             value={stats.profileCount} 
           />
           <StatCard 
             icon="ti-tag" 
-            label={tr('statsTags')} 
+            label={t('statsTags')} 
             value={stats.tagCount} 
             color="var(--warning)"
           />
           <StatCard 
             icon="ti-star" 
-            label={tr('statsFavorites')} 
+            label={t('statsFavorites')} 
             value={stats.favoriteCount} 
             color="var(--warning)"
           />
           <StatCard 
             icon="ti-user-check" 
-            label={tr('statsPlayedSounds')} 
+            label={t('statsPlayedSounds')} 
             value={`${stats.playedSounds}/${stats.totalSounds}`} 
           />
         </div>
@@ -200,7 +205,7 @@ export default function Stats({ store, lang = 'fr' }) {
               gap: 6
             }}>
               <i className="ti ti-trophy" style={{ color: 'var(--warning)' }} />
-              {tr('statsTopSounds')}
+              {t('statsTopSounds')}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {stats.topSounds.map((sound, index) => (
@@ -226,7 +231,7 @@ export default function Stats({ store, lang = 'fr' }) {
                   </span>
                   <span style={{ fontSize: 12, flex: 1 }}>{sound.name}</span>
                   <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                    {sound.playCount || 0} {tr('plays')}
+                    {sound.playCount || 0} {t('plays')}
                   </span>
                   {sound.lastPlayed && (
                     <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
@@ -257,7 +262,7 @@ export default function Stats({ store, lang = 'fr' }) {
               gap: 6
             }}>
               <i className="ti ti-pie-chart" style={{ color: 'var(--accent)' }} />
-              {tr('statsSoundsByProfile')}
+              {t('statsSoundsByProfile')}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {stats.soundsByProfile.map(profile => (
@@ -273,7 +278,9 @@ export default function Stats({ store, lang = 'fr' }) {
                     gap: 6
                   }}
                 >
-                  <span style={{ fontSize: 12 }}>{profile.name}</span>
+                  <span style={{ fontSize: 12 }}>
+                    {getProfileName(profile)} {/* ✅ Utiliser la fonction de traduction */}
+                  </span>
                   <span style={{
                     fontSize: 10,
                     background: 'var(--accent-light)',

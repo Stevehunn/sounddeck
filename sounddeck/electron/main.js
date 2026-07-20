@@ -2477,7 +2477,7 @@ async function resolveInstantUrl(slug) {
   if (!result.ok) return null
 
   const ogAudio = result.html.match(/meta-og:audio:\s*(https?:\/\/[^\s\n]+)/)
-  if (ogAudio) return ogAudio[1].trim()
+  if (ogAudio) return ogAudio[0].trim()
 
   const audioMatch = result.html.match(/href="(\/media\/sounds\/[^"]+\.mp3)"/)
   if (audioMatch) return `https://www.myinstants.com${audioMatch[1]}`

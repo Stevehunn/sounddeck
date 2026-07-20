@@ -6,7 +6,8 @@ import OBSControl from '../components/OBSControl'
 import TwitchAlerts from '../components/TwitchAlerts'
 import BackupSettings from '../components/BackupSettings'
 import PluginInstaller from '../components/PluginInstaller'
-import { LANGUAGES, useTranslation } from '../i18n'
+import { LANGUAGES } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 import { getMicrophoneStatus, getMixerStats, testMicrophoneOnce, connectMixerToOutput } from '../utils/audioMixer'
 import KeyboardVisualizer from '../components/KeyboardVisualizer'
 import FeedbackModal from '../components/FeedbackModal'
@@ -56,7 +57,7 @@ Section.displayName = 'Section'
 
 function CollapsibleSection({ title, icon, children, defaultOpen = false }) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
-  const tr = useTranslation('fr')
+  const { t } = useLanguage() // ✅ Utiliser useLanguage
   
   return (
     <div style={{
@@ -91,7 +92,7 @@ function CollapsibleSection({ title, icon, children, defaultOpen = false }) {
           </span>
         </span>
         <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 400 }}>
-          {isOpen ? tr('collapseHide') : tr('collapseShow')}
+          {isOpen ? t('collapseHide') : t('collapseShow')}
         </span>
       </button>
       {isOpen && (
@@ -103,9 +104,10 @@ function CollapsibleSection({ title, icon, children, defaultOpen = false }) {
   )
 }
 
-export default function Options({ store, addToast, lang = 'fr' }) {
-  const tr = useTranslation(lang)
-  const { confirm, ConfirmWrapper } = useConfirm({ lang })
+export default function Options({ store, addToast }) { // ❌ Supprimer le paramètre lang
+  const { t, currentLang, changeLanguage, version: langVersion } = useLanguage()
+  const [langVersionState, setLangVersion] = useState(0)
+  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
   const [activeSection, setActiveSection] = useState('appearance')
   const [audioDevices, setAudioDevices] = useState([])
   const [isDetecting, setIsDetecting] = useState(false)
@@ -163,7 +165,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         
         if (hasVirtualDevice && !store.virtualDriverInstalled) {
           store.updateVirtualDriverInstalled?.(true)
-          addToast('🔊 ' + tr('virtualDriverDetected'), 'success')
+          addToast('🔊 ' + t('virtualDriverDetected'), 'success')
         } else if (!hasVirtualDevice && store.virtualDriverInstalled) {
           store.updateVirtualDriverInstalled?.(false)
         }
@@ -268,13 +270,13 @@ export default function Options({ store, addToast, lang = 'fr' }) {
   const handleInstallDriver = async () => {
     setIsInstallingDriver(true)
     try {
-      addToast('📦 ' + tr('downloadingDriver'), 'info')
+      addToast('📦 ' + t('downloadingDriver'), 'info')
       const result = await window.electronAPI.installVirtualDriver()
       if (result.success) {
         if (result.warning) {
           addToast('⚠️ ' + result.warning, 'info')
         } else {
-          addToast('✅ ' + tr('driverInstalled'), 'success')
+          addToast('✅ ' + t('driverInstalled'), 'success')
         }
         setTimeout(async () => {
           const devices = await navigator.mediaDevices.enumerateDevices()
@@ -289,10 +291,10 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           }
         }, 3000)
       } else {
-        addToast('❌ ' + tr('installError') + ': ' + (result.error || tr('unknown')), 'error')
+        addToast('❌ ' + t('installError') + ': ' + (result.error || t('unknown')), 'error')
       }
     } catch (e) {
-      addToast('❌ ' + tr('error') + ': ' + e.message, 'error')
+      addToast('❌ ' + t('error') + ': ' + e.message, 'error')
     }
     setIsInstallingDriver(false)
   }
@@ -315,13 +317,13 @@ export default function Options({ store, addToast, lang = 'fr' }) {
       
       if (hasVirtualDevice) {
         store.updateVirtualDriverInstalled?.(true)
-        addToast('✅ ' + tr('virtualDriverDetected'), 'success')
+        addToast('✅ ' + t('virtualDriverDetected'), 'success')
       } else {
         store.updateVirtualDriverInstalled?.(false)
-        addToast(tr('virtualDriverNotDetected'), 'info')
+        addToast(t('virtualDriverNotDetected'), 'info')
       }
     } catch (e) {
-      addToast(tr('detectError'), 'error')
+      addToast(t('detectError'), 'error')
     }
     setIsDetecting(false)
   }
@@ -331,13 +333,13 @@ export default function Options({ store, addToast, lang = 'fr' }) {
       micTestRef.current.stop()
       micTestRef.current = null
       setIsMicrophoneTesting(false)
-      addToast('🔇 ' + tr('micTestStopped'), 'info')
+      addToast('🔇 ' + t('micTestStopped'), 'info')
       return
     }
 
     try {
       setIsMicrophoneTesting(true)
-      addToast('🎤 ' + tr('micTestInProgress'), 'info')
+      addToast('🎤 ' + t('micTestInProgress'), 'info')
       
       const deviceId = store.microphoneDevice || 'default'
       const result = await testMicrophoneOnce(deviceId)
@@ -349,67 +351,67 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           context: result.context
         }
         
-        addToast(`✅ ${tr('microphoneConnected')}`, 'success')
+        addToast(`✅ ${t('microphoneConnected')}`, 'success')
         
         setTimeout(() => {
           if (micTestRef.current) {
             micTestRef.current.stop()
             micTestRef.current = null
             setIsMicrophoneTesting(false)
-            addToast('🔇 ' + tr('micTestFinished'), 'info')
+            addToast('🔇 ' + t('micTestFinished'), 'info')
           }
         }, 3000)
         
       } else {
         setIsMicrophoneTesting(false)
-        addToast(`❌ ${tr('microphoneTestError')}: ${result.error || tr('microphoneNotConnected')}`, 'error')
+        addToast(`❌ ${t('microphoneTestError')}: ${result.error || t('microphoneNotConnected')}`, 'error')
       }
     } catch (e) {
       setIsMicrophoneTesting(false)
-      addToast('❌ ' + tr('error') + ': ' + e.message, 'error')
+      addToast('❌ ' + t('error') + ': ' + e.message, 'error')
     }
   }
 
   const handleResetSidebar = useCallback(async () => {
     const confirmed = await confirm({
-      title: tr('sidebarEditorReset'),
-      message: tr('sidebarEditorResetConfirm'),
+      title: t('sidebarEditorReset'),
+      message: t('sidebarEditorResetConfirm'),
       type: 'warning'
     })
     if (!confirmed) return
     
     await store.resetSidebarConfig()
-    addToast(tr('sidebarEditorResetSuccess'), 'success')
-  }, [store, tr, addToast, confirm])
+    addToast(t('sidebarEditorResetSuccess'), 'success')
+  }, [store, t, addToast, confirm])
 
   const handleClearLogs = useCallback(async () => {
     const confirmed = await confirm({
-      title: tr('clearLogs'),
-      message: tr('clearLogsConfirm'),
+      title: t('clearLogs'),
+      message: t('clearLogsConfirm'),
       type: 'danger'
     })
     if (!confirmed) return
     
     await window.electronAPI.storeDelete('errorLogs')
-    addToast(tr('logsCleared'), 'info')
-  }, [confirm, tr, addToast])
+    addToast(t('logsCleared'), 'info')
+  }, [confirm, t, addToast])
 
   const handlePluginUninstall = useCallback(async (plugin) => {
     const confirmed = await confirm({
-      title: tr('pluginsUninstall'),
-      message: tr('pluginsUninstallConfirm').replace('{name}', plugin.name),
+      title: t('pluginsUninstall'),
+      message: t('pluginsUninstallConfirm').replace('{name}', plugin.name),
       type: 'danger'
     })
     if (!confirmed) return
     
     const result = await window.electronAPI.uninstallPlugin?.(plugin.id)
     if (result?.success) {
-      addToast(tr('pluginsUninstallSuccess').replace('{name}', plugin.name), 'info')
+      addToast(t('pluginsUninstallSuccess').replace('{name}', plugin.name), 'info')
       await loadPlugins()
     } else {
-      addToast(tr('pluginsUninstallError') + ': ' + (result?.error || ''), 'error')
+      addToast(t('pluginsUninstallError') + ': ' + (result?.error || ''), 'error')
     }
-  }, [confirm, tr, addToast, loadPlugins])
+  }, [confirm, t, addToast, loadPlugins])
 
   // ─── RENDU ──────────────────────────────────────────────────────────────────
 
@@ -424,7 +426,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
       }}>
         <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 8 }}>
           <i className="ti ti-settings" style={{ color: 'var(--accent)', marginRight: 6 }} />
-          {tr('optionsTitle')}
+          {t('optionsTitle')}
         </div>
         
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -460,7 +462,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               }}
             >
               <i className={`ti ${section.icon}`} style={{ fontSize: 13 }} />
-              {tr(section.labelKey)}
+              {t(section.labelKey)}
             </button>
           ))}
         </div>
@@ -473,42 +475,50 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         <Section 
           ref={el => sectionRefs.current['appearance'] = el}
           id="appearance"
-          title={tr('optionsAppearance')} 
+          title={t('optionsAppearance')} 
           icon="ti-palette"
         >
-          <OptionRow label={tr('language')}>
+          <OptionRow label={t('language')}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {LANGUAGES.map(l => (
-                <button key={l.code} onClick={() => store.updateLang(l.code)}
+                <button key={l.code} 
+                  onClick={async () => {
+                    // ✅ Utiliser changeLanguage du contexte
+                    await changeLanguage(l.code)
+                    // ✅ Mettre à jour le store
+                    await store.updateLang(l.code)
+                    // ✅ Forcer le re-render
+                    setLangVersion(prev => prev + 1)
+                  }}
                   style={{
                     padding: '5px 10px',
                     borderRadius: 8,
                     cursor: 'pointer',
                     fontSize: 12,
-                    border: `2px solid ${store.lang === l.code ? 'var(--accent)' : 'var(--border)'}`,
-                    background: store.lang === l.code ? 'var(--accent-light)' : 'var(--bg-tertiary)',
-                    color: store.lang === l.code ? 'var(--accent)' : 'var(--text-secondary)',
+                    border: `2px solid ${currentLang === l.code ? 'var(--accent)' : 'var(--border)'}`,
+                    background: currentLang === l.code ? 'var(--accent-light)' : 'var(--bg-tertiary)',
+                    color: currentLang === l.code ? 'var(--accent)' : 'var(--text-secondary)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 5,
-                    fontWeight: store.lang === l.code ? 600 : 400
+                    fontWeight: currentLang === l.code ? 600 : 400
                   }}
                 >
                   <span style={{ fontSize: 16 }}>{l.flag}</span>
                   {l.label}
-                  {store.lang === l.code && <i className="ti ti-check" style={{ fontSize: 11 }} />}
+                  {currentLang === l.code && <i className="ti ti-check" style={{ fontSize: 11 }} />}
                 </button>
               ))}
             </div>
           </OptionRow>
 
-          <OptionRow label={tr('theme')}>
+          <OptionRow label={t('theme')}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {[
-                { val: 'dark', label: tr('themeDark'), color: '#7C6FF7' },
-                { val: 'light', label: tr('themeLight'), color: '#534AB7' },
-                { val: 'dark-blue', label: tr('themeBlue'), color: '#2f81f7' },
-                { val: 'custom', label: tr('themeCustom'), color: '#a855f7' },
+                { val: 'dark', label: t('themeDark'), color: '#7C6FF7' },
+                { val: 'light', label: t('themeLight'), color: '#534AB7' },
+                { val: 'dark-blue', label: t('themeBlue'), color: '#2f81f7' },
+                { val: 'custom', label: t('themeCustom'), color: '#a855f7' },
               ].map(({ val, label, color }) => (
                 <button key={val} onClick={() => store.updateTheme(val)}
                   style={{
@@ -538,17 +548,17 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               current={store.customTheme}
               onSave={async (colors) => {
                 await store.updateCustomTheme(colors)
-                addToast(tr('toastCustomThemeApplied'), 'success')
+                addToast(t('toastCustomThemeApplied'), 'success')
               }}
             />
           )}
 
-          <OptionRow label={tr('cardSize')} sub={tr('cardSizeDesc')}>
+          <OptionRow label={t('cardSize')} sub={t('cardSizeDesc')}>
             <div style={{ display: 'flex', gap: 6 }}>
               {[
-                { val: 'small', label: tr('cardSizeSmall'), icon: 'ti-layout-grid' },
-                { val: 'medium', label: tr('cardSizeMedium'), icon: 'ti-layout-grid' },
-                { val: 'large', label: tr('cardSizeLarge'), icon: 'ti-layout-grid' },
+                { val: 'small', label: t('cardSizeSmall'), icon: 'ti-layout-grid' },
+                { val: 'medium', label: t('cardSizeMedium'), icon: 'ti-layout-grid' },
+                { val: 'large', label: t('cardSizeLarge'), icon: 'ti-layout-grid' },
               ].map(({ val, label, icon }) => (
                 <button
                   key={val}
@@ -588,12 +598,12 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             </div>
           </OptionRow>
 
-          <OptionRow label={tr('sidebarCustomization')} sub={tr('sidebarCustomizationDesc')}>
+          <OptionRow label={t('sidebarCustomization')} sub={t('sidebarCustomizationDesc')}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                 {store.sidebarConfig?.mode === 'custom' 
-                  ? `🎨 ${tr('sidebarCustomized')}` 
-                  : `📋 ${tr('sidebarDefault')}`}
+                  ? `🎨 ${t('sidebarCustomized')}` 
+                  : `📋 ${t('sidebarDefault')}`}
               </span>
               <button
                 className="btn-secondary btn-sm"
@@ -609,7 +619,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 }}
               >
                 <i className={`ti ${store.sidebarEditMode ? 'ti-edit' : 'ti-edit'}`} />
-                {store.sidebarEditMode ? tr('sidebarEditorClose') : tr('sidebarEditorOpen')}
+                {store.sidebarEditMode ? t('sidebarEditorClose') : t('sidebarEditorOpen')}
               </button>
               {store.sidebarConfig?.mode === 'custom' && (
                 <button
@@ -617,7 +627,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                   onClick={handleResetSidebar}
                   style={{ fontSize: 12, color: 'var(--text-tertiary)' }}
                 >
-                  <i className="ti ti-refresh" /> {tr('sidebarEditorReset')}
+                  <i className="ti ti-refresh" /> {t('sidebarEditorReset')}
                 </button>
               )}
             </div>
@@ -630,7 +640,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               onSave={async (config) => {
                 await store.updateSidebarConfig(config)
                 store.toggleSidebarEditMode()
-                addToast(tr('sidebarEditorSaved'), 'success')
+                addToast(t('sidebarEditorSaved'), 'success')
               }}
               onCancel={store.toggleSidebarEditMode}
               onReset={handleResetSidebar}
@@ -646,55 +656,55 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         <Section 
           ref={el => sectionRefs.current['audio'] = el}
           id="audio"
-          title={tr('optionsAudio')} 
+          title={t('optionsAudio')} 
           icon="ti-volume"
         >
           {/* ─── PÉRIPHÉRIQUES DE SORTIE ────────────────────────────────────────── */}
-          <OptionRow label={tr('outputDevice')} sub={tr('outputDeviceDesc')}>
+          <OptionRow label={t('outputDevice')} sub={t('outputDeviceDesc')}>
             <select value={store.audioDevice} onChange={e => store.updateAudioDevice(e.target.value)}
               style={{ width: 220, fontSize: 12 }}>
-              <option value="default">{tr('outputDeviceDefault')}</option>
+              <option value="default">{t('outputDeviceDefault')}</option>
               {audioDevices.map(d => (
                 <option key={d.deviceId} value={d.deviceId}>
-                  {d.label || `${tr('outputDeviceLabel')} ${d.deviceId.slice(0, 8)}`}
+                  {d.label || `${t('outputDeviceLabel')} ${d.deviceId.slice(0, 8)}`}
                 </option>
               ))}
             </select>
           </OptionRow>
 
           {/* Périphérique local */}
-          <OptionRow label={tr('localOutputDevice')} sub={tr('localOutputDeviceDesc')}>
+          <OptionRow label={t('localOutputDevice')} sub={t('localOutputDeviceDesc')}>
             <select 
               value={store.localAudioDevice || 'default'} 
               onChange={async (e) => {
                 const deviceId = e.target.value
                 await store.updateLocalAudioDevice(deviceId)
-                addToast(tr('localOutputDeviceChanged').replace('{device}', deviceId === 'default' ? tr('localOutputDeviceDefault') : deviceId), 'info')
+                addToast(t('localOutputDeviceChanged').replace('{device}', deviceId === 'default' ? t('localOutputDeviceDefault') : deviceId), 'info')
               }}
               style={{ width: 220, fontSize: 12 }}
             >
-              <option value="default">{tr('localOutputDeviceDefault')}</option>
+              <option value="default">{t('localOutputDeviceDefault')}</option>
               {audioDevices.map(d => (
                 <option key={d.deviceId} value={d.deviceId}>
-                  {d.label || `${tr('outputDeviceLabel')} ${d.deviceId.slice(0, 8)}`}
+                  {d.label || `${t('outputDeviceLabel')} ${d.deviceId.slice(0, 8)}`}
                 </option>
               ))}
             </select>
           </OptionRow>
 
-          <OptionRow label={tr('playLocally')} sub={tr('playLocallyDesc')}>
+          <OptionRow label={t('playLocally')} sub={t('playLocallyDesc')}>
             <Toggle value={store.playLocally} onChange={store.updatePlayLocally} />
           </OptionRow>
 
           <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
 
           {/* ─── PILOTE VIRTUEL (VB-CABLE) ────────────────────────────────────────── */}
-          <OptionRow label={tr('virtualDriver')} sub={tr('virtualDriverSub')}>
+          <OptionRow label={t('virtualDriver')} sub={t('virtualDriverSub')}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {store.virtualDriverInstalled ? (
                   <span style={{ color: 'var(--success)', fontSize: 13 }}>
-                    <i className="ti ti-check" /> ✅ {tr('virtualDriverDetected')}
+                    <i className="ti ti-check" /> ✅ {t('virtualDriverDetected')}
                   </span>
                 ) : (
                   <button 
@@ -704,9 +714,9 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                     style={{ fontSize: 12 }}
                   >
                     {isInstallingDriver ? (
-                      <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('installing')}</>
+                      <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('installing')}</>
                     ) : (
-                      <><i className="ti ti-download" /> {tr('installVirtualDriver')}</>
+                      <><i className="ti ti-download" /> {t('installVirtualDriver')}</>
                     )}
                   </button>
                 )}
@@ -723,24 +733,24 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 >
                   <i className={`ti ${isDetecting ? 'ti-loader' : 'ti-refresh'}`} 
                     style={isDetecting ? { animation: 'spin 1s linear infinite' } : {}} />
-                  {isDetecting ? '...' : tr('detect')}
+                  {isDetecting ? '...' : t('detect')}
                 </button>
               </div>
               
               {!store.virtualDriverInstalled && (
                 <div style={{ fontSize: 11, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', padding: '8px 12px', borderRadius: 6, lineHeight: 1.6 }}>
                   <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
-                  {tr('virtualDriverInfo')}
+                  {t('virtualDriverInfo')}
                 </div>
               )}
               
               {store.virtualDriverInstalled && (
                 <div style={{ fontSize: 11, color: 'var(--success)', background: 'rgba(29,158,117,0.1)', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--success)' }}>
                   <i className="ti ti-check" style={{ marginRight: 4 }} />
-                  {tr('virtualDriverSuccess')}
+                  {t('virtualDriverSuccess')}
                   <br />
                   <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
-                    💡 {tr('virtualDriverSelect')}
+                    💡 {t('virtualDriverSelect')}
                   </span>
                 </div>
               )}
@@ -750,27 +760,27 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
 
           {/* ─── MIXEUR ────────────────────────────────────────────────────────────── */}
-          <OptionRow label={tr('mixerEnable')} sub={tr('mixerEnableDesc')}>
+          <OptionRow label={t('mixerEnable')} sub={t('mixerEnableDesc')}>
             <Toggle value={store.mixerEnabled} onChange={async (val) => {
               const result = await store.updateMixerEnabled(val)
               if (result) {
                 if (result.success) {
-                  addToast(tr(result.message), 'success')
+                  addToast(t(result.message), 'success')
                 } else {
-                  addToast('❌ ' + (result.error || tr(result.message)), 'error')
+                  addToast('❌ ' + (result.error || t(result.message)), 'error')
                 }
               }
             }} />
           </OptionRow>
 
-          <OptionRow label={tr('lowLatencyMode')} sub={tr('lowLatencyModeDesc')}>
+          <OptionRow label={t('lowLatencyMode')} sub={t('lowLatencyModeDesc')}>
             <Toggle 
               value={store.lowLatencyMode || false} 
               onChange={async (val) => {
                 await store.updateLowLatencyMode(val)
                 const { setLowLatencyMode } = await import('../utils/audioMixer')
                 setLowLatencyMode(val)
-                addToast(val ? tr('lowLatencyActivated') : tr('lowLatencyDeactivated'), 'info')
+                addToast(val ? t('lowLatencyActivated') : t('lowLatencyDeactivated'), 'info')
               }} 
             />
           </OptionRow>
@@ -778,29 +788,29 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           {store.mixerEnabled && (
             <>
               {/* Microphone */}
-              <OptionRow label={tr('microphone')} sub={tr('microphoneSelect')}>
+              <OptionRow label={t('microphone')} sub={t('microphoneSelect')}>
                 <select value={store.microphoneDevice} onChange={async (e) => {
                   const deviceId = e.target.value
                   await store.updateMicrophoneDeviceId(deviceId)
                   try {
                     const { changeMicrophone } = await import('../utils/audioMixer')
                     await changeMicrophone(deviceId)
-                    addToast('✅ ' + tr('microphoneChanged'), 'success')
+                    addToast('✅ ' + t('microphoneChanged'), 'success')
                   } catch (err) {
                     console.error('Erreur changement micro:', err)
                   }
                 }} style={{ width: 220, fontSize: 12 }}>
-                  <option value="default">{tr('microphoneDefault')}</option>
+                  <option value="default">{t('microphoneDefault')}</option>
                   {microphones.map(d => (
                     <option key={d.deviceId} value={d.deviceId}>
-                      {d.label || `${tr('microphoneLabel')} ${d.deviceId.slice(0, 8)}`}
+                      {d.label || `${t('microphoneLabel')} ${d.deviceId.slice(0, 8)}`}
                     </option>
                   ))}
                 </select>
               </OptionRow>
 
               {/* Volume micro */}
-              <OptionRow label={tr('microphoneVolume')} sub={`${store.microphoneVolume}%`}>
+              <OptionRow label={t('microphoneVolume')} sub={`${store.microphoneVolume}%`}>
                 <input type="range" min="0" max="100" value={store.microphoneVolume}
                   onChange={async (e) => {
                     const val = Number(e.target.value)
@@ -812,7 +822,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               </OptionRow>
 
               {/* Volume sons */}
-              <OptionRow label={tr('mixerSoundVolume')} sub={`${store.mixerSoundVolume}%`}>
+              <OptionRow label={t('mixerSoundVolume')} sub={`${store.mixerSoundVolume}%`}>
                 <input type="range" min="0" max="100" value={store.mixerSoundVolume}
                   onChange={async (e) => {
                     const val = Number(e.target.value)
@@ -824,18 +834,18 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               </OptionRow>
 
               {/* Monitoring */}
-              <OptionRow label={tr('monitoring')} sub={tr('monitoringDesc')}>
+              <OptionRow label={t('monitoring')} sub={t('monitoringDesc')}>
                 <Toggle 
                   value={store.monitoringEnabled || false} 
                   onChange={async (val) => {
                     await store.toggleMonitoring()
-                    addToast(val ? tr('monitoringEnabled') : tr('monitoringDisabled'), 'info')
+                    addToast(val ? t('monitoringEnabled') : t('monitoringDisabled'), 'info')
                   }} 
                 />
               </OptionRow>
 
               {/* Test micro */}
-              <OptionRow label={tr('testMicrophone')} sub="">
+              <OptionRow label={t('testMicrophone')} sub="">
                 <button 
                   className="btn-secondary" 
                   onClick={testMicrophone} 
@@ -851,7 +861,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 >
                   <i className={`ti ${isMicrophoneTesting ? 'ti-microphone-2' : 'ti-mic'}`} 
                     style={isMicrophoneTesting ? { animation: 'pulse 0.6s ease infinite' } : {}} />
-                  {isMicrophoneTesting ? tr('micTesting') : tr('test')}
+                  {isMicrophoneTesting ? t('micTesting') : t('test')}
                 </button>
               </OptionRow>
 
@@ -866,15 +876,15 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 border: `1px solid ${store.monitoringEnabled ? 'var(--warning)' : 'var(--success)'}` 
               }}>
                 <i className="ti ti-info-circle" style={{ marginRight: 4, color: store.monitoringEnabled ? 'var(--warning)' : 'var(--success)' }} />
-                <strong>{tr('mixerActive')}</strong> : {tr('mixerActiveDesc')}
+                <strong>{t('mixerActive')}</strong> : {t('mixerActiveDesc')}
                 <br />
                 {store.monitoringEnabled && (
                   <span style={{ color: 'var(--warning)', fontSize: 10 }}>
-                    ⚠️ {tr('monitoringWarning')}
+                    ⚠️ {t('monitoringWarning')}
                   </span>
                 )}
                 <span style={{ fontSize: 10 }}>
-                  {tr('mixerDiscordTip')}
+                  {t('mixerDiscordTip')}
                 </span>
               </div>
             </>
@@ -882,12 +892,12 @@ export default function Options({ store, addToast, lang = 'fr' }) {
 
           {/* ─── SECTION AVANCÉE RÉDUCTIBLE ────────────────────────────────── */}
           <CollapsibleSection 
-            title={tr('advancedAudioOptions')} 
+            title={t('advancedAudioOptions')} 
             icon="ti-settings"
             defaultOpen={advancedAudioOpen}
           >
             {/* Réduction de bruit */}
-            <OptionRow label={tr('noiseSuppressionMode')} sub={tr('noiseSuppressionModeDesc')}>
+            <OptionRow label={t('noiseSuppressionMode')} sub={t('noiseSuppressionModeDesc')}>
               <select 
                 value={store.noiseSuppressionMode || 'auto'} 
                 onChange={async (e) => {
@@ -895,14 +905,14 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                   await store.updateNoiseSuppressionMode(mode)
                   const { setNoiseSuppressionMode } = await import('../utils/audioMixer')
                   setNoiseSuppressionMode(mode)
-                  addToast(tr('noiseSuppressionModeChanged').replace('{mode}', mode), 'info')
+                  addToast(t('noiseSuppressionModeChanged').replace('{mode}', mode), 'info')
                 }}
                 style={{ width: 140, fontSize: 12 }}
               >
-                <option value="auto">{tr('noiseSuppressionModeAuto')}</option>
-                <option value="worklet">{tr('noiseSuppressionModeWorklet')}</option>
-                <option value="filter">{tr('noiseSuppressionModeFilter')}</option>
-                <option value="off">{tr('noiseSuppressionModeOff')}</option>
+                <option value="auto">{t('noiseSuppressionModeAuto')}</option>
+                <option value="worklet">{t('noiseSuppressionModeWorklet')}</option>
+                <option value="filter">{t('noiseSuppressionModeFilter')}</option>
+                <option value="off">{t('noiseSuppressionModeOff')}</option>
               </select>
             </OptionRow>
 
@@ -917,20 +927,20 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               marginTop: 4 
             }}>
               <i className="ti ti-info-circle" style={{ marginRight: 6, color: 'var(--accent)' }} />
-              <strong>{tr('advancedMode')}</strong> : {tr('advancedModeDesc')}
+              <strong>{t('advancedMode')}</strong> : {t('advancedModeDesc')}
               <br />
               <button onClick={() => window.electronAPI?.openExternal('https://vb-audio.com/Cable/')}
                 style={{ color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer', marginTop: 4, display: 'inline-block', fontSize: 12, padding: 0 }}>
-                <i className="ti ti-download" /> {tr('downloadVBCable')}
+                <i className="ti ti-download" /> {t('downloadVBCable')}
               </button>
               <br />
               <button onClick={() => window.electronAPI?.openExternal('https://vb-audio.com/Voicemeeter/banana.htm')}
                 style={{ color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer', marginTop: 2, display: 'inline-block', fontSize: 12, padding: 0 }}>
-                <i className="ti ti-download" /> {tr('downloadVoiceMeeter')}
+                <i className="ti ti-download" /> {t('downloadVoiceMeeter')}
               </button>
               <br />
               <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                💡 {tr('advancedModeTip')}
+                💡 {t('advancedModeTip')}
               </span>
             </div>
           </CollapsibleSection>
@@ -942,10 +952,10 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         <Section 
           ref={el => sectionRefs.current['guide'] = el}
           id="guide"
-          title={tr('guideTitle')} 
+          title={t('guideTitle')} 
           icon="ti-book"
         >
-          <OptionRow label={tr('tutorialRestart')} sub={tr('tutorialRestartDesc')}>
+          <OptionRow label={t('tutorialRestart')} sub={t('tutorialRestartDesc')}>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 className="btn-secondary btn-sm"
@@ -955,7 +965,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 }}
                 style={{ fontSize: 12, minHeight: 34, padding: '6px 16px', borderRadius: 'var(--radius-md)' }}
               >
-                <i className="ti ti-book" /> {tr('tutorialRestart')}
+                <i className="ti ti-book" /> {t('tutorialRestart')}
               </button>
               <button
                 className="btn-primary btn-sm"
@@ -965,7 +975,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 }}
                 style={{ fontSize: 12, minHeight: 34, padding: '6px 16px', borderRadius: 'var(--radius-md)' }}
               >
-                <i className="ti ti-rocket" /> {tr('tutorialAdvanced')}
+                <i className="ti ti-rocket" /> {t('tutorialAdvanced')}
               </button>
             </div>
           </OptionRow>
@@ -980,14 +990,14 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             border: '1px solid var(--border)'
           }}>
             <i className="ti ti-info-circle" style={{ marginRight: 6, color: 'var(--accent)' }} />
-            <strong>{tr('guideAvailable')}</strong>
+            <strong>{t('guideAvailable')}</strong>
             <br />
-            • <strong>{tr('tutorialRestart')}</strong> : {tr('tutorialRestartDesc')}
+            • <strong>{t('tutorialRestart')}</strong> : {t('tutorialRestartDesc')}
             <br />
-            • <strong>{tr('tutorialAdvanced')}</strong> : {tr('tutorialAdvancedDesc')}
+            • <strong>{t('tutorialAdvanced')}</strong> : {t('tutorialAdvancedDesc')}
             <br />
             <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-              💡 {tr('guideAvailableTip')}
+              💡 {t('guideAvailableTip')}
             </span>
           </div>
         </Section>
@@ -998,16 +1008,16 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         <Section 
           ref={el => sectionRefs.current['shortcuts'] = el}
           id="shortcuts"
-          title={tr('optionsShortcuts')} 
+          title={t('optionsShortcuts')} 
           icon="ti-keyboard"
         >
-          <OptionRow label={tr('keyboardLayout')} sub={tr('keyboardLayoutDesc')}>
+          <OptionRow label={t('keyboardLayout')} sub={t('keyboardLayoutDesc')}>
             <select 
               value={store.keyboardLayout || 'qwerty'} 
               onChange={async (e) => {
                 const layout = e.target.value
                 await store.updateKeyboardLayout(layout)
-                addToast(`${tr('keyboardLayoutChanged')}: ${layout === 'azerty' ? 'AZERTY' : 'QWERTY'}`, 'info')
+                addToast(`${t('keyboardLayoutChanged')}: ${layout === 'azerty' ? 'AZERTY' : 'QWERTY'}`, 'info')
               }}
               style={{ width: 140, fontSize: 12 }}
             >
@@ -1022,69 +1032,69 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             lang={store.lang}
           />
 
-          <OptionRow label={tr('switchProfile')} sub={tr('switchProfileDesc')}>
+          <OptionRow label={t('switchProfile')} sub={t('switchProfileDesc')}>
             <ShortcutRecorder
               value={store.profileShortcut}
-              onSave={async (acc) => { await store.updateProfileShortcut(acc); addToast(`${tr('toastShortcutSet')} ${acc}`, 'success') }}
+              onSave={async (acc) => { await store.updateProfileShortcut(acc); addToast(`${t('toastShortcutSet')} ${acc}`, 'success') }}
               onClear={() => store.updateProfileShortcut('')}
               requireMod
               layout={store.keyboardLayout || 'qwerty'}
             />
           </OptionRow>
-          <OptionRow label={tr('toggleLoop')} sub={tr('toggleLoopDesc')}>
+          <OptionRow label={t('toggleLoop')} sub={t('toggleLoopDesc')}>
             <ShortcutRecorder
               value={store.loopShortcut}
-              onSave={async (acc) => { await store.updateLoopShortcut(acc); addToast(`${tr('toastShortcutLoop')} ${acc}`, 'success') }}
+              onSave={async (acc) => { await store.updateLoopShortcut(acc); addToast(`${t('toastShortcutLoop')} ${acc}`, 'success') }}
               onClear={() => store.updateLoopShortcut('')}
               requireMod
               layout={store.keyboardLayout || 'qwerty'}
             />
           </OptionRow>
-          <OptionRow label={tr('stopAllShortcut')} sub={tr('stopAllDesc')}>
+          <OptionRow label={t('stopAllShortcut')} sub={t('stopAllDesc')}>
             <ShortcutRecorder
               value={store.stopAllShortcut}
-              onSave={async (acc) => { await store.updateStopAllShortcut(acc); addToast(`${tr('toastShortcutStop')} ${acc}`, 'success') }}
+              onSave={async (acc) => { await store.updateStopAllShortcut(acc); addToast(`${t('toastShortcutStop')} ${acc}`, 'success') }}
               onClear={() => store.updateStopAllShortcut('')}
               requireMod
               layout={store.keyboardLayout || 'qwerty'}
             />
           </OptionRow>
-          <OptionRow label={tr('presentationShortcut')} sub={tr('presentationDesc')}>
+          <OptionRow label={t('presentationShortcut')} sub={t('presentationDesc')}>
             <ShortcutRecorder
               value={store.presentationShortcut}
-              onSave={async (acc) => { await store.updatePresentationShortcut(acc); addToast(`${tr('toastShortcutPresentation')} ${acc}`, 'success') }}
+              onSave={async (acc) => { await store.updatePresentationShortcut(acc); addToast(`${t('toastShortcutPresentation')} ${acc}`, 'success') }}
               onClear={() => store.updatePresentationShortcut('')}
               requireMod
               layout={store.keyboardLayout || 'qwerty'}
             />
           </OptionRow>
           
-          <OptionRow label={tr('toggleShortcuts')} sub={tr('toggleShortcutsDesc')}>
+          <OptionRow label={t('toggleShortcuts')} sub={t('toggleShortcutsDesc')}>
             <ShortcutRecorder
               value={store.toggleShortcutsAccelerator || 'CommandOrControl+Shift+K'}
               onSave={async (acc) => { 
                 await store.updateToggleShortcutsAccelerator(acc)
-                addToast(`${tr('toggleShortcutSet')} ${acc}`, 'success')
+                addToast(`${t('toggleShortcutSet')} ${acc}`, 'success')
               }}
               onClear={() => {
                 store.updateToggleShortcutsAccelerator('')
-                addToast(tr('toggleShortcutRemoved'), 'info')
+                addToast(t('toggleShortcutRemoved'), 'info')
               }}
               requireMod
               layout={store.keyboardLayout || 'qwerty'}
             />
           </OptionRow>
 
-          <OptionRow label={tr('toggleWindowShortcut')} sub={tr('toggleWindowShortcutDesc')}>
+          <OptionRow label={t('toggleWindowShortcut')} sub={t('toggleWindowShortcutDesc')}>
             <ShortcutRecorder
               value={store.toggleWindowShortcut || 'CommandOrControl+Shift+S'}
               onSave={async (acc) => { 
                 await store.updateToggleWindowShortcut(acc)
-                addToast(`${tr('toggleWindowShortcutSet')} ${acc}`, 'success')
+                addToast(`${t('toggleWindowShortcutSet')} ${acc}`, 'success')
               }}
               onClear={() => {
                 store.updateToggleWindowShortcut('')
-                addToast(tr('toggleWindowShortcutRemoved'), 'info')
+                addToast(t('toggleWindowShortcutRemoved'), 'info')
               }}
               requireMod
               layout={store.keyboardLayout || 'qwerty'}
@@ -1092,7 +1102,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           </OptionRow>
 
           <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
-            {tr('shortcutsPerSoundNote')}
+            {t('shortcutsPerSoundNote')}
           </div>
         </Section>
 
@@ -1102,16 +1112,16 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         <Section 
           ref={el => sectionRefs.current['soundManagement'] = el}
           id="soundManagement"
-          title={tr('soundManagement')} 
+          title={t('soundManagement')} 
           icon="ti-music"
         >
-          <OptionRow label={tr('normalization')} sub={tr('normalizationDesc')}>
+          <OptionRow label={t('normalization')} sub={t('normalizationDesc')}>
             <Toggle value={store.normalizationEnabled} onChange={store.updateNormalizationEnabled} />
           </OptionRow>
 
           {store.normalizationEnabled && (
             <>
-              <OptionRow label={tr('normalizationTarget')} sub={tr('normalizationTargetDesc')}>
+              <OptionRow label={t('normalizationTarget')} sub={t('normalizationTargetDesc')}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
                   <input 
                     type="range" 
@@ -1151,9 +1161,9 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                   color: 'var(--text-tertiary)',
                   marginBottom: 4
                 }}>
-                  <span>{tr('normalizationLabelLow')}</span>
-                  <span>{tr('normalizationLabelMedium')}</span>
-                  <span>{tr('normalizationLabelHigh')}</span>
+                  <span>{t('normalizationLabelLow')}</span>
+                  <span>{t('normalizationLabelMedium')}</span>
+                  <span>{t('normalizationLabelHigh')}</span>
                 </div>
                 <div style={{ 
                   display: 'flex', 
@@ -1199,7 +1209,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                     zIndex: 2,
                     whiteSpace: 'nowrap'
                   }}>
-                    {tr('normalizationDefaultLabel')}
+                    {t('normalizationDefaultLabel')}
                   </div>
                 </div>
                 <div style={{ 
@@ -1232,21 +1242,21 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 lineHeight: 1.6
               }}>
                 <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
-                <strong>{tr('normalizationAdvice')}</strong> 
-                {store.normalizationTarget < 0.15 && ` ${tr('normalizationAdviceLow')}`}
-                {store.normalizationTarget >= 0.15 && store.normalizationTarget < 0.3 && ` ${tr('normalizationAdviceMedium')}`}
-                {store.normalizationTarget >= 0.3 && store.normalizationTarget < 0.6 && ` ${tr('normalizationAdviceModerate')}`}
-                {store.normalizationTarget >= 0.6 && ` ${tr('normalizationAdviceHigh')}`}
+                <strong>{t('normalizationAdvice')}</strong> 
+                {store.normalizationTarget < 0.15 && ` ${t('normalizationAdviceLow')}`}
+                {store.normalizationTarget >= 0.15 && store.normalizationTarget < 0.3 && ` ${t('normalizationAdviceMedium')}`}
+                {store.normalizationTarget >= 0.3 && store.normalizationTarget < 0.6 && ` ${t('normalizationAdviceModerate')}`}
+                {store.normalizationTarget >= 0.6 && ` ${t('normalizationAdviceHigh')}`}
               </div>
             </>
           )}
 
-          <OptionRow label={tr('reanalyzeGains')} sub={tr('reanalyzeGainsDesc')}>
+          <OptionRow label={t('reanalyzeGains')} sub={t('reanalyzeGainsDesc')}>
             <button 
               className="btn-secondary" 
               onClick={async () => {
                 await store.resetGainCache?.()
-                addToast(tr('gainCacheCleared'), 'info')
+                addToast(t('gainCacheCleared'), 'info')
               }} 
               style={{ 
                 fontSize: 12, 
@@ -1255,7 +1265,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 borderRadius: 'var(--radius-md)'
               }}
             >
-              <i className="ti ti-refresh" /> {tr('reanalyzeGains')}
+              <i className="ti ti-refresh" /> {t('reanalyzeGains')}
             </button>
           </OptionRow>
         </Section>
@@ -1266,22 +1276,22 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         <Section 
           ref={el => sectionRefs.current['plugins'] = el}
           id="plugins"
-          title={tr('optionsPlugins')} 
+          title={t('optionsPlugins')} 
           icon="ti-puzzle"
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {/* Bouton d'installation */}
             <div className="option-row" style={{ padding: '12px 14px' }}>
               <div>
-                <div className="label">{tr('pluginsInstall')}</div>
-                <div className="sub">{tr('pluginsInstallDesc')}</div>
+                <div className="label">{t('pluginsInstall')}</div>
+                <div className="sub">{t('pluginsInstallDesc')}</div>
               </div>
               <button 
                 className="btn-primary btn-sm"
                 onClick={() => setShowPluginInstaller(true)}
                 style={{ minHeight: 34, padding: '6px 16px' }}
               >
-                <i className="ti ti-plus" /> {tr('pluginsInstallBtn')}
+                <i className="ti ti-plus" /> {t('pluginsInstallBtn')}
               </button>
             </div>
 
@@ -1303,8 +1313,8 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 display: 'flex',
                 justifyContent: 'space-between'
               }}>
-                <span>{tr('pluginsInstalledTitle')}</span>
-                <span>{plugins.length} {tr('pluginsCount')}</span>
+                <span>{t('pluginsInstalledTitle')}</span>
+                <span>{plugins.length} {t('pluginsCount')}</span>
               </div>
 
               {plugins.length === 0 && (
@@ -1315,10 +1325,10 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                   fontSize: 13
                 }}>
                   <i className="ti ti-puzzle" style={{ fontSize: 24, display: 'block', marginBottom: 8 }} />
-                  {tr('pluginsNoPluginsInstalled')}
+                  {t('pluginsNoPluginsInstalled')}
                   <br />
                   <span style={{ fontSize: 11 }}>
-                    {tr('pluginsInstallDesc2')}
+                    {t('pluginsInstallDesc2')}
                   </span>
                 </div>
               )}
@@ -1367,11 +1377,11 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                         gap: 12,
                         alignItems: 'center'
                       }}>
-                        <span>{tr('pluginsBy')} {plugin.author || tr('pluginsUnknownAuthor')}</span>
+                        <span>{t('pluginsBy')} {plugin.author || t('pluginsUnknownAuthor')}</span>
                         {plugin.pages > 0 && (
                           <span>
                             <i className="ti ti-files" style={{ fontSize: 10 }} />
-                            {plugin.pages} {tr('pluginsPages')}
+                            {plugin.pages} {t('pluginsPages')}
                           </span>
                         )}
                         <span style={{ 
@@ -1381,7 +1391,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                           padding: '1px 8px',
                           borderRadius: 10
                         }}>
-                          <i className="ti ti-check" /> {tr('pluginsActivated')}
+                          <i className="ti ti-check" /> {t('pluginsActivated')}
                         </span>
                       </div>
                     </div>
@@ -1398,7 +1408,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                         padding: '4px 8px',
                         color: 'var(--text-tertiary)'
                       }}
-                      title={tr('pluginsReloadTooltip')}
+                      title={t('pluginsReloadTooltip')}
                     >
                       <i className="ti ti-refresh" />
                     </button>
@@ -1410,7 +1420,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                         padding: '4px 8px',
                         color: 'var(--danger)'
                       }}
-                      title={tr('pluginsUninstallTooltip')}
+                      title={t('pluginsUninstallTooltip')}
                     >
                       <i className="ti ti-trash" />
                     </button>
@@ -1430,12 +1440,12 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               border: '1px solid var(--border)'
             }}>
               <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
-              <strong>{tr('pluginsWhereToFind')}</strong>
+              <strong>{t('pluginsWhereToFind')}</strong>
               <br />
-              {tr('pluginsDescription')}
+              {t('pluginsDescription')}
               <br />
               <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
-                {tr('pluginsCommunityTip')}
+                {t('pluginsCommunityTip')}
               </span>
             </div>
           </div>
@@ -1445,7 +1455,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             <PluginInstaller
               onClose={() => setShowPluginInstaller(false)}
               addToast={addToast}
-              lang={lang}
+              lang={currentLang}
               onInstall={(result) => {
                 loadPlugins()
               }}
@@ -1459,10 +1469,10 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         <Section 
           ref={el => sectionRefs.current['integrations'] = el}
           id="integrations"
-          title={tr('integrations')} 
+          title={t('integrations')} 
           icon="ti-plug"
         >
-          <OBSControl lang={lang} />
+          <OBSControl lang={currentLang} />
         </Section>
 
         {/* ============================ */}
@@ -1471,22 +1481,22 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         <Section 
           ref={el => sectionRefs.current['advanced'] = el}
           id="advanced"
-          title={tr('advancedOptions')} 
+          title={t('advancedOptions')} 
           icon="ti-gauge"
         >
           {/* Compression à l'import */}
-          <OptionRow label={tr('compressOnImport')} sub={tr('compressOnImportDesc')}>
+          <OptionRow label={t('compressOnImport')} sub={t('compressOnImportDesc')}>
             <Toggle 
               value={store.compressOnImport || false}
               onChange={async (val) => {
                 await store.updateCompressOnImport(val)
-                addToast(val ? tr('compressOnImportEnabled') : tr('compressOnImportDisabled'), 'info')
+                addToast(val ? t('compressOnImportEnabled') : t('compressOnImportDisabled'), 'info')
               }}
             />
           </OptionRow>
 
           {store.compressOnImport && (
-            <OptionRow label={tr('compressionBitrate')} sub={tr('compressionBitrateDesc')}>
+            <OptionRow label={t('compressionBitrate')} sub={t('compressionBitrateDesc')}>
               <select 
                 value={store.compressionBitrate || 128}
                 onChange={async (e) => {
@@ -1497,7 +1507,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               >
                 <option value="64">64 kbps</option>
                 <option value="96">96 kbps</option>
-                <option value="128">128 kbps {tr('compressionBitrateRecommended')}</option>
+                <option value="128">128 kbps {t('compressionBitrateRecommended')}</option>
                 <option value="192">192 kbps</option>
                 <option value="256">256 kbps</option>
               </select>
@@ -1507,14 +1517,14 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
 
           {/* Logs d'erreur */}
-          <OptionRow label={tr('errorLogs')} sub={tr('errorLogsDesc')}>
+          <OptionRow label={t('errorLogs')} sub={t('errorLogsDesc')}>
             <div style={{ display: 'flex', gap: 6 }}>
               <button 
                 className="btn-secondary btn-sm"
                 onClick={async () => {
                   const logs = await window.electronAPI.storeGet('errorLogs') || []
                   if (logs.length === 0) {
-                    addToast(tr('noErrorLogs'), 'info')
+                    addToast(t('noErrorLogs'), 'info')
                   } else {
                     const json = JSON.stringify(logs, null, 2)
                     const blob = new Blob([json], { type: 'application/json' })
@@ -1527,13 +1537,13 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                   }
                 }}
               >
-                <i className="ti ti-file-text" /> {tr('exportLogs')}
+                <i className="ti ti-file-text" /> {t('exportLogs')}
               </button>
               <button 
                 className="btn-danger btn-sm"
                 onClick={handleClearLogs}
               >
-                <i className="ti ti-trash" /> {tr('clearLogs')}
+                <i className="ti ti-trash" /> {t('clearLogs')}
               </button>
             </div>
           </OptionRow>
@@ -1541,7 +1551,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
           <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
 
           {/* Feedback */}
-          <OptionRow label={tr('feedback')} sub={tr('feedbackDesc')}>
+          <OptionRow label={t('feedback')} sub={t('feedbackDesc')}>
             <button
               className="btn-primary btn-sm"
               onClick={() => {
@@ -1560,7 +1570,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                         root.unmount()
                         container.remove()
                       }}
-                      lang={lang}
+                      lang={currentLang}
                       store={store}
                       onSubmit={async (feedback) => {
                         console.log('📤 Feedback reçu:', feedback)
@@ -1573,7 +1583,7 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               }}
               style={{ fontSize: 12, minHeight: 34 }}
             >
-              <i className="ti ti-message" /> {tr('feedbackSend')}
+              <i className="ti ti-message" /> {t('feedbackSend')}
             </button>
           </OptionRow>
         </Section>
@@ -1584,11 +1594,11 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         <Section 
           ref={el => sectionRefs.current['backup'] = el}
           id="backup"
-          title={tr('optionsBackup')} 
+          title={t('optionsBackup')} 
           icon="ti-cloud"
         >
           {/* Auto backup */}
-          <OptionRow label={tr('autoBackup')} sub={tr('autoBackupDesc')}>
+          <OptionRow label={t('autoBackup')} sub={t('autoBackupDesc')}>
             <Toggle 
               value={store.autoBackupEnabled || false}
               onChange={async (val) => {
@@ -1596,17 +1606,17 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                 if (val) {
                   const { initBackupManager } = await import('../utils/backupManager')
                   initBackupManager(store)
-                  addToast(tr('autoBackupEnabled'), 'success')
+                  addToast(t('autoBackupEnabled'), 'success')
                 } else {
                   const { stopAutoBackup } = await import('../utils/backupManager')
                   stopAutoBackup()
-                  addToast(tr('autoBackupDisabled'), 'info')
+                  addToast(t('autoBackupDisabled'), 'info')
                 }
               }}
             />
           </OptionRow>
 
-          <OptionRow label={tr('backupInterval')} sub={tr('backupIntervalDesc')}>
+          <OptionRow label={t('backupInterval')} sub={t('backupIntervalDesc')}>
             <select 
               value={store.backupInterval || 5}
               onChange={async (e) => {
@@ -1617,22 +1627,22 @@ export default function Options({ store, addToast, lang = 'fr' }) {
                   stopAutoBackup()
                   startAutoBackup(store)
                 }
-                addToast(`${tr('backupIntervalChanged')} ${val} ${tr('minutes')}`, 'info')
+                addToast(`${t('backupIntervalChanged')} ${val} ${t('minutes')}`, 'info')
               }}
               style={{ width: 120, fontSize: 12 }}
             >
-              <option value="1">1 {tr('minute')}</option>
-              <option value="5">5 {tr('minutes')}</option>
-              <option value="15">15 {tr('minutes')}</option>
-              <option value="30">30 {tr('minutes')}</option>
-              <option value="60">60 {tr('minutes')}</option>
+              <option value="1">1 {t('minute')}</option>
+              <option value="5">5 {t('minutes')}</option>
+              <option value="15">15 {t('minutes')}</option>
+              <option value="30">30 {t('minutes')}</option>
+              <option value="60">60 {t('minutes')}</option>
             </select>
           </OptionRow>
 
-          <BackupSettings store={store} addToast={addToast} lang={lang} />
+          <BackupSettings store={store} addToast={addToast} lang={currentLang} />
 
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, marginTop: 16, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {tr('exportSectionLabel')}
+            {t('exportSectionLabel')}
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
@@ -1640,19 +1650,19 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             <div className="option-row" style={{ padding: '12px 14px', flexWrap: 'wrap', gap: 8 }}>
               <div style={{ fontSize: 20, flexShrink: 0 }}>📄</div>
               <div style={{ flex: 1, padding: '0 14px', minWidth: 150 }}>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{tr('configOnly')}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{tr('configOnlyDesc')}</div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{t('configOnly')}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{t('configOnlyDesc')}</div>
               </div>
               <button 
                 className="btn-secondary" 
                 style={{ flexShrink: 0, fontSize: 12, padding: '6px 16px', minHeight: 34, borderRadius: 'var(--radius-md)' }}
                 onClick={async () => {
                   const r = await window.electronAPI.exportConfig()
-                  if (r.success) addToast(tr('toastConfigExported'), 'success')
-                  else if (r.error) addToast(`${tr('error')} ${r.error}`, 'error')
+                  if (r.success) addToast(t('toastConfigExported'), 'success')
+                  else if (r.error) addToast(`${t('error')} ${r.error}`, 'error')
                 }}
               >
-                <i className="ti ti-download" /> {tr('exportLabel')}
+                <i className="ti ti-download" /> {t('exportLabel')}
               </button>
             </div>
 
@@ -1660,20 +1670,20 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             <div className="option-row" style={{ padding: '12px 14px', flexWrap: 'wrap', gap: 8 }}>
               <div style={{ fontSize: 20, flexShrink: 0 }}>📦</div>
               <div style={{ flex: 1, padding: '0 14px', minWidth: 150 }}>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{tr('fullArchive')}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{tr('fullArchiveDesc')}</div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{t('fullArchive')}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{t('fullArchiveDesc')}</div>
               </div>
               <button 
                 className="btn-primary" 
                 style={{ flexShrink: 0, fontSize: 12, padding: '6px 16px', minHeight: 34, borderRadius: 'var(--radius-md)' }}
                 onClick={async () => {
-                  addToast(tr('toastArchiveCreating'), 'info')
+                  addToast(t('toastArchiveCreating'), 'info')
                   const r = await window.electronAPI.exportFull()
-                  if (r.success) addToast(`${tr('archiveCreated')} · ${r.sizeMb} Mo ✓`, 'success')
-                  else if (r.error) addToast(`${tr('error')} ${r.error}`, 'error')
+                  if (r.success) addToast(`${t('archiveCreated')} · ${r.sizeMb} Mo ✓`, 'success')
+                  else if (r.error) addToast(`${t('error')} ${r.error}`, 'error')
                 }}
               >
-                <i className="ti ti-package" /> {tr('exportLabel')}
+                <i className="ti ti-package" /> {t('exportLabel')}
               </button>
             </div>
 
@@ -1681,33 +1691,33 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             <div className="option-row" style={{ padding: '12px 14px', flexWrap: 'wrap', gap: 8 }}>
               <div style={{ fontSize: 20, flexShrink: 0 }}>🎵</div>
               <div style={{ flex: 1, padding: '0 14px', minWidth: 150 }}>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{tr('soundsOnly')}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{tr('soundsOnlyDesc')}</div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{t('soundsOnly')}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{t('soundsOnlyDesc')}</div>
               </div>
               <button 
                 className="btn-secondary" 
                 style={{ flexShrink: 0, fontSize: 12, padding: '6px 16px', minHeight: 34, borderRadius: 'var(--radius-md)' }}
                 onClick={async () => {
-                  addToast(tr('toastSoundsCompressing'), 'info')
+                  addToast(t('toastSoundsCompressing'), 'info')
                   const r = await window.electronAPI.exportSoundsOnly()
-                  if (r.success) addToast(`${r.sizeMb} Mo ${tr('exported')} ✓`, 'success')
-                  else if (r.error) addToast(`${tr('error')} ${r.error}`, 'error')
+                  if (r.success) addToast(`${r.sizeMb} Mo ${t('exported')} ✓`, 'success')
+                  else if (r.error) addToast(`${t('error')} ${r.error}`, 'error')
                 }}
               >
-                <i className="ti ti-music" /> {tr('exportLabel')}
+                <i className="ti ti-music" /> {t('exportLabel')}
               </button>
             </div>
           </div>
 
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {tr('importSectionLabel')}
+            {t('importSectionLabel')}
           </div>
           
           <div className="option-row" style={{ padding: '12px 14px', flexWrap: 'wrap', gap: 8 }}>
             <div style={{ fontSize: 20, flexShrink: 0 }}>📥</div>
             <div style={{ flex: 1, padding: '0 14px', minWidth: 150 }}>
-              <div style={{ fontSize: 13, fontWeight: 500 }}>{tr('importBackup')}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{tr('importBackupDesc')}</div>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{t('importBackup')}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{t('importBackupDesc')}</div>
             </div>
             <button 
               className="btn-primary" 
@@ -1715,19 +1725,19 @@ export default function Options({ store, addToast, lang = 'fr' }) {
               onClick={async () => {
                 const r = await window.electronAPI.importBackup()
                 if (r.success) {
-                  if (r.type === 'json') addToast(`${tr('configImported')} ✓ — ${tr('restartRequired')}`, r.missing > 0 ? 'info' : 'success')
-                  else if (r.type === 'full') addToast(`${tr('archiveImported')} · ${r.importedSounds} ${tr('sounds')} ✓ — ${tr('restartRequired')}`, 'success')
-                  else if (r.type === 'sounds-only') addToast(`${r.importedSounds} ${tr('sounds')} ${tr('imported')} ✓`, 'success')
-                } else if (r.error) addToast(`${tr('error')} ${r.error}`, 'error')
+                  if (r.type === 'json') addToast(`${t('configImported')} ✓ — ${t('restartRequired')}`, r.missing > 0 ? 'info' : 'success')
+                  else if (r.type === 'full') addToast(`${t('archiveImported')} · ${r.importedSounds} ${t('sounds')} ✓ — ${t('restartRequired')}`, 'success')
+                  else if (r.type === 'sounds-only') addToast(`${r.importedSounds} ${t('sounds')} ${t('imported')} ✓`, 'success')
+                } else if (r.error) addToast(`${t('error')} ${r.error}`, 'error')
               }}
             >
-              <i className="ti ti-upload" /> {tr('importLabel')}
+              <i className="ti ti-upload" /> {t('importLabel')}
             </button>
           </div>
 
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 8, lineHeight: 1.6 }}>
             <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
-            {tr('restartNote')}
+            {t('restartNote')}
           </div>
         </Section>
 
@@ -1737,33 +1747,33 @@ export default function Options({ store, addToast, lang = 'fr' }) {
         <Section 
           ref={el => sectionRefs.current['profiles'] = el}
           id="profiles"
-          title={tr('optionsProfiles')} 
+          title={t('optionsProfiles')} 
           icon="ti-users"
         >
           {store.profiles.map(p => (
             <div key={p.id} className="option-row" style={{ padding: '10px 14px' }}>
               <i className={`ti ${p.isDefault ? 'ti-stack' : 'ti-user'}`} style={{ color: 'var(--text-secondary)' }} />
-              <span style={{ flex: 1, fontSize: 13, padding: '0 10px' }}>{p.id === 'all' ? tr('allSounds') : p.name}</span>
+              <span style={{ flex: 1, fontSize: 13, padding: '0 10px' }}>{p.id === 'all' ? t('allSounds') : p.name}</span>
               <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginRight: 8 }}>
-                {store.sounds.filter(s => s.profiles?.includes(p.id)).length} {tr('sounds')}
+                {store.sounds.filter(s => s.profiles?.includes(p.id)).length} {t('sounds')}
               </span>
               <button
                 className="btn-secondary btn-sm"
                 style={{ padding: '4px 12px', minHeight: 28 }}
                 onClick={async () => {
-                  addToast(tr('toastProfileExporting'), 'info')
+                  addToast(t('toastProfileExporting'), 'info')
                   const r = await window.electronAPI.exportProfile(p.id)
-                  if (r.success) addToast(`${tr('profileExported')} "${p.name}" · ${r.soundCount} ${tr('sounds')} · ${r.sizeMb} Mo`, 'success')
-                  else if (r.error) addToast(`${tr('error')} ${r.error}`, 'error')
+                  if (r.success) addToast(`${t('profileExported')} "${p.name}" · ${r.soundCount} ${t('sounds')} · ${r.sizeMb} Mo`, 'success')
+                  else if (r.error) addToast(`${t('error')} ${r.error}`, 'error')
                 }}
               >
-                <i className="ti ti-package-export" /> {tr('exportProfile')}
+                <i className="ti ti-package-export" /> {t('exportProfile')}
               </button>
               {!p.isDefault && (
                 <button 
                   className="btn-danger btn-sm" 
                   style={{ padding: '4px 8px', minHeight: 28 }}
-                  onClick={async () => { await store.deleteProfile(p.id); addToast(tr('profileDeleted'), 'info') }}
+                  onClick={async () => { await store.deleteProfile(p.id); addToast(t('profileDeleted'), 'info') }}
                 >
                   <i className="ti ti-trash" />
                 </button>
@@ -1775,11 +1785,11 @@ export default function Options({ store, addToast, lang = 'fr' }) {
             style={{ width: '100%', justifyContent: 'center', marginTop: 4, fontSize: 12, padding: '6px 12px', minHeight: 34 }}
             onClick={async () => {
               const r = await window.electronAPI.importProfile()
-              if (r.success) addToast(`${tr('profileImported')} "${r.profileName}" · ${r.soundCount} ${tr('sounds')} ✓ — ${tr('restartRequired')}`, 'success')
-              else if (r.error) addToast(`${tr('error')} ${r.error}`, 'error')
+              if (r.success) addToast(`${t('profileImported')} "${r.profileName}" · ${r.soundCount} ${t('sounds')} ✓ — ${t('restartRequired')}`, 'success')
+              else if (r.error) addToast(`${t('error')} ${r.error}`, 'error')
             }}
           >
-            <i className="ti ti-package-import" /> {tr('importProfile')}
+            <i className="ti ti-package-import" /> {t('importProfile')}
           </button>
         </Section>
 

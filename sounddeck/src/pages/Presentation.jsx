@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { playSound, stopSound, isPlaying, getSoundProgress } from '../utils/audio'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 
 export default function Presentation({ store, onExit, lang = 'fr' }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   const [playingId, setPlayingId] = useState(null)
   const [search, setSearch] = useState('')
 
@@ -53,17 +53,17 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
         <i className="ti ti-speakerphone" style={{ fontSize: 22, color: 'var(--accent)' }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 700, fontSize: 16 }}>
-            {tr('presentationTitle')} — {currentProfile?.id === 'all' ? tr('allSounds') : currentProfile?.name || tr('mySounds')}
+            {t('presentationTitle')} — {currentProfile?.id === 'all' ? t('allSounds') : currentProfile?.name || t('mySounds')}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-            {filtered.length} {tr('sounds')} · {tr('exitTip')} <kbd>Esc</kbd>
+            {filtered.length} {t('sounds')} · {t('exitTip')} <kbd>Esc</kbd>
           </div>
         </div>
 
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder={tr('presentationSearch')}
+          placeholder={t('presentationSearch')}
           style={{ width: 200, fontSize: 13 }}
           autoFocus
         />
@@ -71,25 +71,25 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {loopEnabled && (
             <div className="presentation-badge success">
-              <i className="ti ti-repeat" /> {tr('presentationLoopOn')}
+              <i className="ti ti-repeat" /> {t('presentationLoopOn')}
             </div>
           )}
           {playingId && (
             <div className="presentation-badge accent">
-              <i className="ti ti-volume" style={{ animation: 'pulse 1s ease infinite' }} /> {tr('presentationPlaying')}
+              <i className="ti ti-volume" style={{ animation: 'pulse 1s ease infinite' }} /> {t('presentationPlaying')}
             </div>
           )}
         </div>
 
         <button className="btn-secondary btn-lg" onClick={onExit} style={{ minWidth: 120 }}>
-          <i className="ti ti-x" /> {tr('presentationExit')}
+          <i className="ti ti-x" /> {t('presentationExit')}
         </button>
       </div>
 
       {favoriteSounds.length > 0 && !search && (
         <div className="presentation-favorites">
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--warning)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <i className="ti ti-star-filled" /> {tr('favorites')}
+            <i className="ti ti-star-filled" /> {t('favorites')}
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {favoriteSounds.map(s => (
@@ -111,7 +111,7 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px 24px' }}>
         {filtered.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', marginTop: 60, fontSize: 14 }}>
-            {tr('noSounds')}
+            {t('noSounds')}
           </div>
         )}
         <div style={{ 
@@ -169,7 +169,7 @@ function formatShortcut(shortcut) {
 }
 
 function PresentationCard({ sound, shortcut, playing, onPlay, size, lang }) {
-  const tr = useTranslation(lang || 'fr')
+  const { t, currentLang } = useLanguage()
   const [imgError, setImgError] = useState(false)
   const [progress, setProgress] = useState(null)
 

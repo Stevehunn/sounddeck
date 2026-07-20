@@ -1,5 +1,4 @@
 import MyInstantsDiscover from './Discover'
-import translations from './i18n'
 
 const MyInstantsPlugin = {
   id: 'myinstants',
@@ -8,7 +7,6 @@ const MyInstantsPlugin = {
   author: 'SoundDeck Team',
   description: 'Recherche et ajout de sons depuis MyInstants',
 
-  // Pages ajoutées par le plugin
   pages: [
     {
       id: 'discover',
@@ -22,15 +20,13 @@ const MyInstantsPlugin = {
     }
   ],
 
-  // Traductions
-  i18n: translations,
+  // ✅ Le plugin n'a plus besoin de ses propres traductions
+  // car il utilise le contexte global
 
-  // Initialisation du plugin
   init(store, manager) {
     console.log('🔍 Plugin MyInstants initialisé')
   },
 
-  // Nettoyage
   destroy() {
     console.log('🗑️ Plugin MyInstants déchargé')
   }

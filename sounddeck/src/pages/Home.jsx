@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import SoundCard from '../components/SoundCard'
 import AudioTrimmer from '../components/AudioTrimmer'
 import ProfileManagerModal from '../components/ProfileManagerModal'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 import { playSound, stopAllSounds, stopSound } from '../utils/audio'
 import { compressAudio, formatSize } from '../utils/audioConverter'
 import useConfirm from '../hooks/useConfirm.jsx'
@@ -10,7 +10,7 @@ import useConfirm from '../hooks/useConfirm.jsx'
 const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
 
 export default function Home({ store, addToast, loopEnabled, lang = 'fr', globalSearch = '' }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   const { confirm, ConfirmWrapper } = useConfirm({ lang })
   const playLocally = store.playLocally
   const [showAll, setShowAll] = useState(false)
@@ -191,7 +191,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
     setDragOverIndex(null)
     setIsDragging(false)
     setDragSource(null)
-    addToast(tr('soundMoved'), 'success')
+    addToast(t('soundMoved'), 'success')
   }
 
   const handleMainDrop = async (e, dropIndex) => {
@@ -221,7 +221,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
     setDragOverIndex(null)
     setIsDragging(false)
     setDragSource(null)
-    addToast(tr('soundMoved'), 'success')
+    addToast(t('soundMoved'), 'success')
   }
 
   // ─── Import ──────────────────────────────────────────────────────────────
@@ -284,8 +284,8 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
     
     if (count > 0) {
       const msg = compressOnImport 
-        ? `${count} ${tr('sounds')} ${tr('importedAndCompressed')}`
-        : `${count} ${tr('sounds')} ${tr('imported')}`
+        ? `${count} ${t('sounds')} ${t('importedAndCompressed')}`
+        : `${count} ${t('sounds')} ${t('imported')}`
       addToast(msg, 'success')
     }
     setShowImport(false)
@@ -309,7 +309,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
       : dtItems.filter(i => i.kind === 'file').map(i => i.getAsFile()).filter(Boolean)
 
     if (!allFiles.length) {
-      addToast(tr('noFileDetected'), 'error')
+      addToast(t('noFileDetected'), 'error')
       return
     }
 
@@ -325,7 +325,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
 
     if (!audioFiles.length) {
       const names = allFiles.map(f => f.name).join(', ')
-      addToast(`${tr('unsupportedFormat')} : ${names}`, 'error')
+      addToast(`${t('unsupportedFormat')} : ${names}`, 'error')
       return
     }
 
@@ -343,7 +343,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
           const arrayBuffer = await new Promise((resolve, reject) => {
             const reader = new FileReader()
             reader.onload = (e) => resolve(e.target.result)
-            reader.onerror = () => reject(new Error(tr('readError')))
+            reader.onerror = () => reject(new Error(t('readError')))
             reader.readAsArrayBuffer(file)
           })
           result = await window.electronAPI.writeDroppedFile(file.name, arrayBuffer)
@@ -380,11 +380,11 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
           })
           imported++
         } else {
-          addToast(`${tr('errorFor')} ${file.name} : ${result?.error || tr('unknown')}`, 'error')
+          addToast(`${t('errorFor')} ${file.name} : ${result?.error || t('unknown')}`, 'error')
         }
       } catch (err) {
         console.error('Drop import error:', err)
-        addToast(`${tr('cannotImport')} ${file.name}`, 'error')
+        addToast(`${t('cannotImport')} ${file.name}`, 'error')
       }
     }
 
@@ -392,8 +392,8 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
     if (imported > 0) {
       setImportSuccess(imported)
       const msg = compressOnImport
-        ? `${imported} ${tr('sounds')} ${tr('importedAndCompressed')}`
-        : `${imported} ${tr('sounds')} ${tr('importedSuccessfully')}`
+        ? `${imported} ${t('sounds')} ${t('importedAndCompressed')}`
+        : `${imported} ${t('sounds')} ${t('importedSuccessfully')}`
       addToast(msg, 'success')
       setTimeout(() => setImportSuccess(0), 3000)
     }
@@ -406,36 +406,36 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 150 }}>
-            <div style={{ fontWeight: 600, fontSize: 15 }}>{currentProfile?.id === 'all' ? tr('allSounds') : currentProfile?.name}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{currentSounds.length} {tr('sounds')}</div>
+            <div style={{ fontWeight: 600, fontSize: 15 }}>{currentProfile?.id === 'all' ? t('allSounds') : currentProfile?.name}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{currentSounds.length} {t('sounds')}</div>
             {searchTerm && (
               <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>
-                <i className="ti ti-search" style={{ fontSize: 10 }} /> {tr('resultsFor')} "{searchTerm}" ({filtered.length})
+                <i className="ti ti-search" style={{ fontSize: 10 }} /> {t('resultsFor')} "{searchTerm}" ({filtered.length})
               </div>
             )}
           </div>
           <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="input-sm" style={{ width: 'auto', minWidth: 120 }}>
-            <option value="custom">{tr('sortCustom')}</option>
-            <option value="default">{tr('sortDefault')}</option>
-            <option value="popular">{tr('sortPopular')}</option>
-            <option value="recent">{tr('sortRecent')}</option>
-            <option value="alpha">{tr('sortAlpha')}</option>
+            <option value="custom">{t('sortCustom')}</option>
+            <option value="default">{t('sortDefault')}</option>
+            <option value="popular">{t('sortPopular')}</option>
+            <option value="recent">{t('sortRecent')}</option>
+            <option value="alpha">{t('sortAlpha')}</option>
           </select>
           <input 
             value={localSearch} 
             onChange={e => setLocalSearch(e.target.value)} 
-            placeholder={tr('search')} 
+            placeholder={t('search')} 
             className="input-sm"
             style={{ width: 160, minWidth: 120 }} 
           />
           
           <button className="btn-primary btn-sm" onClick={() => setShowImport(true)} style={{ minHeight: 34 }}>
-            <i className="ti ti-plus" /> {tr('addSound')}
+            <i className="ti ti-plus" /> {t('addSound')}
           </button>
           
           {currentProfileId !== 'all' && (
             <button className="btn-secondary btn-sm" onClick={() => setShowProfileManager(true)} style={{ minHeight: 34 }}>
-              <i className="ti ti-settings" /> {tr('manageProfile')}
+              <i className="ti ti-settings" /> {t('manageProfile')}
             </button>
           )}
         </div>
@@ -450,7 +450,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
           {dragOver && (
             <div className="drop-overlay">
               <i className="ti ti-music-plus" style={{ fontSize: 48, color: 'var(--accent)' }} />
-              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--accent)' }}>{tr('dropToImport')}</div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--accent)' }}>{t('dropToImport')}</div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>MP3, WAV, OGG, FLAC, M4A</div>
             </div>
           )}
@@ -458,9 +458,9 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
           {importing && (
             <div className="import-overlay">
               <i className="ti ti-loader" style={{ fontSize: 40, color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>{tr('importing')}</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>{t('importing')}</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
-                {totalFiles > 0 ? `${importProgress} / ${totalFiles} fichiers` : tr('importingFiles')}
+                {totalFiles > 0 ? `${importProgress} / ${totalFiles} fichiers` : t('importingFiles')}
               </div>
               {totalFiles > 0 && (
                 <div style={{ width: 200, height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 2, overflow: 'hidden' }}>
@@ -482,7 +482,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
                 <i className="ti ti-check" style={{ fontSize: 32, color: 'white' }} />
               </div>
               <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--success)' }}>
-                {importSuccess} {tr('sounds')} {tr('added')} !
+                {importSuccess} {t('sounds')} {t('added')} !
               </div>
             </div>
           )}
@@ -490,13 +490,13 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
           {filtered.length === 0 && soundsOutsideProfile.length === 0 && !importing && (
             <div className="drop-zone" onClick={() => setShowImport(true)} style={{ cursor: 'pointer' }}>
               <i className="ti ti-music-plus" style={{ fontSize: 32, display: 'block', marginBottom: 8 }} />
-              <div style={{ fontWeight: 500, marginBottom: 4 }}>{tr('noSoundsForProfile')}</div>
-              <div style={{ fontSize: 12 }}>{tr('dropHere')}</div>
+              <div style={{ fontWeight: 500, marginBottom: 4 }}>{t('noSoundsForProfile')}</div>
+              <div style={{ fontSize: 12 }}>{t('dropHere')}</div>
             </div>
           )}
 
           {favoriteSoundsForProfile.length > 0 && (
-            <Section title={tr('favorites')} icon="ti-star-filled" iconColor="var(--warning)" count={favoriteSoundsForProfile.length}>
+            <Section title={t('favorites')} icon="ti-star-filled" iconColor="var(--warning)" count={favoriteSoundsForProfile.length}>
               <SoundGrid 
                 sounds={favoriteSoundsForProfile} 
                 shortcuts={shortcuts} 
@@ -521,7 +521,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
           )}
 
           {filtered.length > 0 && (
-            <Section title={tr('profileSounds')} icon="ti-music" count={filtered.length}>
+            <Section title={t('profileSounds')} icon="ti-music" count={filtered.length}>
               <SoundGrid 
                 sounds={displayed} 
                 shortcuts={shortcuts} 
@@ -545,29 +545,29 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
               {filtered.length > itemsPerPage && (
                 <button className="btn-secondary btn-sm" onClick={() => setShowAll(!showAll)} style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}>
                   <i className={`ti ${showAll ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
-                  {showAll ? tr('showLess') : `${tr('showMore')} ${filtered.length - itemsPerPage}`}
+                  {showAll ? t('showLess') : `${t('showMore')} ${filtered.length - itemsPerPage}`}
                 </button>
               )}
             </Section>
           )}
 
           {soundsOutsideProfile.length > 0 && (
-            <Section title={tr('otherSounds')} icon="ti-circle-plus" iconColor="var(--text-tertiary)" count={soundsOutsideProfile.length} muted>
+            <Section title={t('otherSounds')} icon="ti-circle-plus" iconColor="var(--text-tertiary)" count={soundsOutsideProfile.length} muted>
               <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>
-                {tr('clickToAdd')}
+                {t('clickToAdd')}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
                 {displayedOther.map(s => (
                   <OutsideCard key={s.id} sound={s} onAdd={async () => {
                     await store.addSoundToProfile(s.id, currentProfileId)
-                    addToast(`"${s.name}" ${tr('addedToProfile')}`, 'success')
+                    addToast(`"${s.name}" ${t('addedToProfile')}`, 'success')
                   }} lang={lang} />
                 ))}
               </div>
               {soundsOutsideProfile.length > itemsPerPage && (
                 <button className="btn-secondary btn-sm" onClick={() => setShowAllOther(!showAllOther)} style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}>
                   <i className={`ti ${showAllOther ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
-                  {showAllOther ? tr('showLess') : `${tr('showMore')} ${soundsOutsideProfile.length - itemsPerPage}`}
+                  {showAllOther ? t('showLess') : `${t('showMore')} ${soundsOutsideProfile.length - itemsPerPage}`}
                 </button>
               )}
             </Section>
@@ -611,7 +611,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
                 emoji: emoji || '🔊', 
                 profiles: [currentProfileId] 
               })
-              addToast(`"${name}" ${tr('added')}`, 'success')
+              addToast(`"${name}" ${t('added')}`, 'success')
               setShowImport(false)
             }}
             onUrlImport={async (url, name) => {
@@ -637,8 +637,8 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
               
               if (result.success) {
                 await store.addSound({ name, path: result.path, emoji: '🔊', profiles: [currentProfileId] })
-                addToast(`"${name}" ${tr('downloaded')}`, 'success')
-              } else addToast(`${tr('error')} : ${result.error}`, 'error')
+                addToast(`"${name}" ${t('downloaded')}`, 'success')
+              } else addToast(`${t('error')} : ${result.error}`, 'error')
               setShowImport(false)
             }}
             lang={lang}
@@ -688,7 +688,7 @@ function Section({ title, icon, iconColor, count, muted, children }) {
 }
 
 function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLocally, store, addToast, lang, gridRef, draggable, onDragStart, onDragEnd, onDragOver, onDrop, draggedSoundId, dragOverIndex, dropTarget }) {
-  const tr = useTranslation(lang || 'fr')
+  const { t, currentLang } = useLanguage()
   const cardSize = store.cardSize || 'medium'
   
   const cardSizes = {
@@ -748,18 +748,18 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLo
               onSetShortcut={store.setShortcut}
               onVolumeChange={store.updateSoundVolume}
               onPlay={store.incrementPlayCount}
-              onRemoveFromProfile={async (id) => { await store.removeSoundFromProfile(id, store.currentProfileId); addToast(tr('removedFromProfile'), 'info') }}
-              onDelete={async (id) => { await store.deleteSound(id); addToast(tr('deleted'), 'info') }}
+              onRemoveFromProfile={async (id) => { await store.removeSoundFromProfile(id, store.currentProfileId); addToast(t('removedFromProfile'), 'info') }}
+              onDelete={async (id) => { await store.deleteSound(id); addToast(t('deleted'), 'info') }}
               onRename={(id, name) => store.updateSound(id, { name })}
               onChangeImage={store.updateSoundImage}
               onChangeEmoji={store.updateSoundEmoji}
               onAddTag={async (id, tag) => {
                 await store.addTagToSound(id, tag)
-                addToast(`${tr('tagAdded')}: #${tag}`, 'success')
+                addToast(`${t('tagAdded')}: #${tag}`, 'success')
               }}
               onRemoveTag={async (id, tag) => {
                 await store.removeTagFromSound(id, tag)
-                addToast(`${tr('tagRemoved')}: #${tag}`, 'info')
+                addToast(`${t('tagRemoved')}: #${tag}`, 'info')
               }}
               tags={store.tags[s.id] || []}
               draggable={draggable}
@@ -777,7 +777,7 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLo
 }
 
 function OutsideCard({ sound, onAdd, lang }) {
-  const tr = useTranslation(lang || 'fr')
+  const { t, currentLang } = useLanguage()
   const imageUrl = sound.image
     ? (sound.image.startsWith('file://') ? sound.image : `file:///${sound.image.replace(/\\/g, '/')}`)
     : null
@@ -788,14 +788,14 @@ function OutsideCard({ sound, onAdd, lang }) {
       </div>
       <div style={{ fontSize: 11, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 6 }}>{sound.name}</div>
       <button onClick={onAdd} className="btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center' }}>
-        <i className="ti ti-circle-plus" /> {tr('addToProfile')}
+        <i className="ti ti-circle-plus" /> {t('addToProfile')}
       </button>
     </div>
   )
 }
 
 function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onUrlImport, onManualAdd, store, lang }) {
-  const tr = useTranslation(lang || 'fr')
+  const { t, currentLang } = useLanguage()
   const [tab, setTab] = useState('file')
   const [url, setUrl] = useState('')
   const [urlName, setUrlName] = useState('')
@@ -830,15 +830,15 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
   }
 
   const tabs = [
-    ['file', 'ti-upload', tr('tabDrop')],
-    ['manual', 'ti-settings', tr('tabManual')],
-    ['url', 'ti-link', tr('tabUrl')],
+    ['file', 'ti-upload', t('tabDrop')],
+    ['manual', 'ti-settings', t('tabManual')],
+    ['url', 'ti-link', t('tabUrl')],
   ]
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ width: 480 }} onClick={e => e.stopPropagation()}>
-        <div className="modal-title"><i className="ti ti-music-plus" style={{ color: 'var(--accent)' }} /> {tr('addSoundTitle')}</div>
+        <div className="modal-title"><i className="ti ti-music-plus" style={{ color: 'var(--accent)' }} /> {t('addSoundTitle')}</div>
 
         <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: 'var(--bg-tertiary)', borderRadius: 8, padding: 4 }}>
           {tabs.map(([id, icon, label]) => (
@@ -865,11 +865,11 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
             >
               <i className="ti ti-upload" style={{ fontSize: 36, display: 'block', marginBottom: 10 }} />
               <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 14, color: dragOver ? 'var(--accent)' : 'var(--text-primary)' }}>
-                {dragOver ? tr('releaseToImport') : tr('dropFiles')}
+                {dragOver ? t('releaseToImport') : t('dropFiles')}
               </div>
               <div style={{ fontSize: 12, marginBottom: 12 }}>MP3, WAV, OGG, FLAC, M4A</div>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: 'var(--bg-tertiary)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--text-secondary)' }}>
-                <i className="ti ti-folder-open" /> {tr('orBrowse')}
+                <i className="ti ti-folder-open" /> {t('orBrowse')}
               </div>
             </div>
 
@@ -889,14 +889,14 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
                 />
                 <label style={{ fontSize: 12, cursor: 'pointer' }}>
                   <i className="ti ti-file-zip" style={{ marginRight: 4 }} />
-                  {tr('compressOnImport')}
+                  {t('compressOnImport')}
                 </label>
               </div>
               
               {compressOnImport && (
                 <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                    {tr('compressionBitrate')}:
+                    {t('compressionBitrate')}:
                   </span>
                   <select
                     value={compressionBitrate}
@@ -910,14 +910,14 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
                     <option value="256">256 kbps</option>
                   </select>
                   <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
-                    ({tr('compressOnImportDesc')})
+                    ({t('compressOnImportDesc')})
                   </span>
                 </div>
               )}
             </div>
 
             <div className="modal-actions">
-              <button className="btn-secondary btn-lg" onClick={onClose}>{tr('close')}</button>
+              <button className="btn-secondary btn-lg" onClick={onClose}>{t('close')}</button>
             </div>
           </>
         )}
@@ -925,39 +925,39 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
         {tab === 'manual' && !showTrimmer && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{tr('soundName')}</label>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{t('soundName')}</label>
               <input value={manualName} onChange={e => setManualName(e.target.value)} placeholder="Ex: Airhorn" />
             </div>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{tr('audioFile')}</label>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{t('audioFile')}</label>
               <div style={{ display: 'flex', gap: 8 }}>
-                <input readOnly value={manualFile ? manualFile.name : ''} placeholder={tr('noFile')} style={{ flex: 1 }} />
-                <button className="btn-secondary btn-sm" onClick={handlePickFile}><i className="ti ti-folder-open" /> {tr('browse')}</button>
+                <input readOnly value={manualFile ? manualFile.name : ''} placeholder={t('noFile')} style={{ flex: 1 }} />
+                <button className="btn-secondary btn-sm" onClick={handlePickFile}><i className="ti ti-folder-open" /> {t('browse')}</button>
               </div>
             </div>
 
             {manualFile && (
               <button className="btn-secondary btn-sm" onClick={() => setShowTrimmer(true)} style={{ justifyContent: 'center' }}>
-                <i className="ti ti-cut" /> {tr('trimAudio')}
+                <i className="ti ti-cut" /> {t('trimAudio')}
               </button>
             )}
 
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{tr('image')}</label>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{t('image')}</label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {manualImage && (
                   <img src={`file:///${manualImage.replace(/\\/g, '/')}`}
                     style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
                 )}
-                <input readOnly value={manualImage ? tr('imageSelected') : ''} placeholder={tr('noImage')} style={{ flex: 1 }} />
-                <button className="btn-secondary btn-sm" onClick={handlePickImage}><i className="ti ti-photo" /> {tr('image')}</button>
+                <input readOnly value={manualImage ? t('imageSelected') : ''} placeholder={t('noImage')} style={{ flex: 1 }} />
+                <button className="btn-secondary btn-sm" onClick={handlePickImage}><i className="ti ti-photo" /> {t('image')}</button>
                 {manualImage && <button className="btn-ghost btn-sm" onClick={() => setManualImage(null)}><i className="ti ti-x" /></button>}
               </div>
             </div>
 
             {!manualImage && (
               <div>
-                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{tr('emojiLabel')}</label>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('emojiLabel')}</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {EMOJIS.map(e => (
                     <button key={e} onClick={() => setManualEmoji(e)}
@@ -984,14 +984,14 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
                 />
                 <label style={{ fontSize: 12, cursor: 'pointer' }}>
                   <i className="ti ti-file-zip" style={{ marginRight: 4 }} />
-                  {tr('compressOnImport')}
+                  {t('compressOnImport')}
                 </label>
               </div>
               
               {compressOnImport && (
                 <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                    {tr('compressionBitrate')}:
+                    {t('compressionBitrate')}:
                   </span>
                   <select
                     value={compressionBitrate}
@@ -1009,9 +1009,9 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
             </div>
 
             <div className="modal-actions">
-              <button className="btn-secondary btn-lg" onClick={onClose}>{tr('cancel')}</button>
+              <button className="btn-secondary btn-lg" onClick={onClose}>{t('cancel')}</button>
               <button className="btn-primary btn-lg" onClick={() => handleManualAdd(null)} disabled={!manualFile || !manualName}>
-                <i className="ti ti-check" /> {tr('add')}
+                <i className="ti ti-check" /> {t('add')}
               </button>
             </div>
           </div>
@@ -1033,12 +1033,12 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
         {tab === 'url' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{tr('soundName')}</label>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{t('soundName')}</label>
               <input value={urlName} onChange={e => setUrlName(e.target.value)} placeholder="Ex: Airhorn" />
             </div>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{tr('urlLabel')}</label>
-              <input value={url} onChange={e => setUrl(e.target.value)} placeholder={tr('urlPlaceholder')} />
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{t('urlLabel')}</label>
+              <input value={url} onChange={e => setUrl(e.target.value)} placeholder={t('urlPlaceholder')} />
             </div>
 
             <div style={{
@@ -1056,14 +1056,14 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
                 />
                 <label style={{ fontSize: 12, cursor: 'pointer' }}>
                   <i className="ti ti-file-zip" style={{ marginRight: 4 }} />
-                  {tr('compressOnImport')}
+                  {t('compressOnImport')}
                 </label>
               </div>
               
               {compressOnImport && (
                 <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                    {tr('compressionBitrate')}:
+                    {t('compressionBitrate')}:
                   </span>
                   <select
                     value={compressionBitrate}
@@ -1082,13 +1082,13 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
 
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', borderRadius: 6, padding: '8px 10px', lineHeight: 1.6 }}>
               <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
-              <strong>{tr('supportedLinks')} :</strong> {tr('urlInfo')}<br/>
-              <strong>⚠️ Google Drive :</strong> {tr('urlWarning')}
+              <strong>{t('supportedLinks')} :</strong> {t('urlInfo')}<br/>
+              <strong>⚠️ Google Drive :</strong> {t('urlWarning')}
             </div>
             <div className="modal-actions">
-              <button className="btn-secondary btn-lg" onClick={onClose}>{tr('cancel')}</button>
+              <button className="btn-secondary btn-lg" onClick={onClose}>{t('cancel')}</button>
               <button className="btn-primary btn-lg" onClick={() => url && urlName && onUrlImport(url, urlName)} disabled={!url || !urlName}>
-                <i className="ti ti-download" /> {tr('download')}
+                <i className="ti ti-download" /> {t('download')}
               </button>
             </div>
           </div>

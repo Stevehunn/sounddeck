@@ -1,28 +1,15 @@
 import { useState, useEffect } from 'react'
 import Waveform from '../../components/Waveform'
-import { useTranslation } from '../../i18n'
+import { useLanguage } from '../../context/LanguageContext'
 import { detectPlatform, getSpotifyTrack, getSoundCloudTrack, sanitizeFilename } from '../../utils/platformImport'
 import { Howl } from 'howler'
 import useConfirm from '../../hooks/useConfirm.jsx'
-import translations from './i18n'
 
 const EMOJIS = ['🎵','🎤','🎸','🎹','🥁','🎺','🎻','🎼','🔊','💥','😂','🔥']
 
-export default function YouTube({ store, addToast, lang = 'fr' }) {
-  // ✅ Utiliser les traductions globales + celles du plugin
-  const globalTr = useTranslation(lang)
-  
-  // ✅ Fonction qui fusionne les traductions globales et celles du plugin
-  const tr = (key) => {
-    // Chercher d'abord dans les traductions du plugin
-    if (translations[lang] && translations[lang][key]) {
-      return translations[lang][key]
-    }
-    // Sinon utiliser les traductions globales
-    return globalTr(key) || key
-  }
-
-  const { confirm, ConfirmWrapper } = useConfirm({ lang })
+export default function YouTube({ store, addToast }) {
+  const { t, currentLang } = useLanguage()
+  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
   const [ytdlpStatus, setYtdlpStatus] = useState(null)
   const [downloading, setDownloading] = useState(false)
   const [url, setUrl] = useState('')
@@ -59,14 +46,14 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
 
   const handleInstallYtdlp = async () => {
     setDownloading(true)
-    addToast(tr('ytdlpDownloading'), 'info')
+    addToast(t('ytdlpDownloading'), 'info')
     const r = await window.electronAPI.downloadYtdlp()
     setDownloading(false)
     if (r.success) {
       setYtdlpStatus('available')
-      addToast(tr('ytdlpInstalled'), 'success')
+      addToast(t('ytdlpInstalled'), 'success')
     } else {
-      addToast(tr('ytdlpInstallError') + r.error, 'error')
+      addToast(t('ytdlpInstallError') + r.error, 'error')
     }
   }
 
@@ -98,9 +85,9 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
           setSoundName(info.title?.slice(0, 50) || '')
           setEnd(info.duration || 0)
           setStep('trim')
-          addToast(`✅ ${tr('platformDetected').replace('{platform}', 'Spotify')}`, 'success')
+          addToast(`✅ ${t('platformDetected').replace('{platform}', 'Spotify')}`, 'success')
         } else {
-          addToast(tr('ytFetchError') + (result.error || 'Erreur Spotify'), 'error')
+          addToast(t('ytFetchError') + (result.error || 'Erreur Spotify'), 'error')
         }
       } else if (detected === 'soundcloud') {
         result = await getSoundCloudTrack(url.trim())
@@ -118,9 +105,9 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
           setSoundName(info.title?.slice(0, 50) || '')
           setEnd(info.duration || 0)
           setStep('trim')
-          addToast(`✅ ${tr('platformDetected').replace('{platform}', 'SoundCloud')}`, 'success')
+          addToast(`✅ ${t('platformDetected').replace('{platform}', 'SoundCloud')}`, 'success')
         } else {
-          addToast(tr('ytFetchError') + (result.error || 'Erreur SoundCloud'), 'error')
+          addToast(t('ytFetchError') + (result.error || 'Erreur SoundCloud'), 'error')
         }
       } else {
         result = await window.electronAPI.youtubeInfo(url.trim())
@@ -138,14 +125,14 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
           setSoundName(info.title?.slice(0, 50) || '')
           setEnd(info.duration || 0)
           setStep('trim')
-          addToast(`✅ ${tr('platformDetected').replace('{platform}', 'YouTube')}`, 'success')
+          addToast(`✅ ${t('platformDetected').replace('{platform}', 'YouTube')}`, 'success')
         } else {
-          addToast(tr('ytFetchError') + (result.error || 'Erreur YouTube'), 'error')
+          addToast(t('ytFetchError') + (result.error || 'Erreur YouTube'), 'error')
         }
       }
     } catch (e) {
       console.error('Erreur fetch info:', e)
-      addToast(tr('ytFetchError') + e.message, 'error')
+      addToast(t('ytFetchError') + e.message, 'error')
     }
     
     setLoadingInfo(false)
@@ -173,7 +160,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
         },
         onloaderror: (id, err) => {
           console.error('Erreur preview:', err)
-          addToast('❌ ' + tr('error'), 'error')
+          addToast('❌ ' + t('error'), 'error')
           setIsPreviewPlaying(false)
           setPreviewHowl(null)
         }
@@ -184,7 +171,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
       howl.play()
     } catch (e) {
       console.error('Erreur preview:', e)
-      addToast('❌ ' + tr('error'), 'error')
+      addToast('❌ ' + t('error'), 'error')
     }
   }
 
@@ -194,14 +181,14 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
       const result = await window.electronAPI.importImageFile(imgPath)
       if (result.success) {
         setCustomImage(result.path)
-        addToast(tr('ytImageAdded'), 'success')
+        addToast(t('ytImageAdded'), 'success')
       }
     }
   }
 
   const handleDownloadAudio = async () => {
     setImporting(true)
-    addToast(tr('ytAudioDownloading'), 'info')
+    addToast(t('ytAudioDownloading'), 'info')
     
     try {
       let result
@@ -242,14 +229,14 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
       if (result && result.success) {
         setDownloadedPath(result.path)
         setStep('save')
-        addToast(tr('ytAudioReady'), 'success')
+        addToast(t('ytAudioReady'), 'success')
       } else {
-        addToast(tr('ytDownloadError') + (result?.error || tr('ytDownloadErrorUnknown')), 'error')
+        addToast(t('ytDownloadError') + (result?.error || t('ytDownloadErrorUnknown')), 'error')
       }
     } catch (e) {
       setImporting(false)
       console.error('Erreur téléchargement:', e)
-      addToast(tr('ytDownloadError') + e.message, 'error')
+      addToast(t('ytDownloadError') + e.message, 'error')
     }
   }
 
@@ -259,8 +246,8 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
     const existingSound = store.sounds.find(s => s.name.toLowerCase() === soundName.trim().toLowerCase())
     if (existingSound) {
       const confirmed = await confirm({
-        title: tr('soundExists'),
-        message: tr('soundExistsConfirm').replace('{name}', soundName.trim()),
+        title: t('soundExists'),
+        message: t('soundExistsConfirm').replace('{name}', soundName.trim()),
         type: 'warning'
       })
       if (!confirmed) return
@@ -273,7 +260,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
       image: customImage || null,
       profiles: targetProfiles
     })
-    addToast(`"${soundName.trim()}" ${tr('ytSoundAdded')}`, 'success')
+    addToast(`"${soundName.trim()}" ${t('ytSoundAdded')}`, 'success')
     setUrl(''); setVideoInfo(null); setDownloadedPath(null)
     setStep('url'); setSoundName(''); setStart(0); setEnd(0)
     setTargetProfiles(['all'])
@@ -298,7 +285,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
     return (
       <div className="flex-center" style={{ flex: 1, gap: 10, color: 'var(--text-tertiary)' }}>
         <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
-        {tr('ytdlpChecking')}
+        {t('ytdlpChecking')}
         <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
       </div>
     )
@@ -307,13 +294,13 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
   if (ytdlpStatus === 'missing') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-        <PageHeader title={tr('youtubeTitle')} sub={tr('youtubeSub')} />
+        <PageHeader title={t('youtubeTitle')} sub={t('youtubeSub')} />
         <div className="flex-center" style={{ flex: 1, padding: 40 }}>
           <div style={{ maxWidth: 480, textAlign: 'center' }}>
             <div style={{ fontSize: 56, marginBottom: 16 }}>📦</div>
-            <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>{tr('ytdlpRequired')}</div>
+            <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>{t('ytdlpRequired')}</div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 24, lineHeight: 1.7 }}>
-              {tr('ytdlpDesc')}
+              {t('ytdlpDesc')}
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 20 }}>
               <button 
@@ -323,13 +310,13 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
                 style={{ borderRadius: 'var(--radius-md)', padding: '10px 24px' }}
               >
                 {downloading
-                  ? <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('installing')}</>
-                  : <><i className="ti ti-download" /> {tr('installYtdlp')}</>}
+                  ? <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('installing')}</>
+                  : <><i className="ti ti-download" /> {t('installYtdlp')}</>}
               </button>
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-tertiary)', padding: '10px 14px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', lineHeight: 1.6, textAlign: 'left' }}>
               <i className="ti ti-info-circle" style={{ marginRight: 6, color: 'var(--accent)' }} />
-              {tr('ytdlpManual')}
+              {t('ytdlpManual')}
             </div>
           </div>
         </div>
@@ -342,19 +329,19 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
   if (step === 'url') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-        <PageHeader title={tr('youtubeTitle')} sub={tr('pasteUrl')} />
+        <PageHeader title={t('youtubeTitle')} sub={t('pasteUrl')} />
         <div className="flex-center" style={{ flex: 1, padding: 40 }}>
           <div style={{ width: '100%', maxWidth: 560 }}>
             <div style={{ fontSize: 56, textAlign: 'center', marginBottom: 20 }}>▶️</div>
             <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 16, textAlign: 'center' }}>
-              {tr('pasteUrl')}
+              {t('pasteUrl')}
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
               <input
                 value={url}
                 onChange={e => setUrl(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleFetchInfo()}
-                placeholder={tr('ytUrlPlaceholder')}
+                placeholder={t('ytUrlPlaceholder')}
                 className="input-lg"
                 style={{ flex: 1, fontSize: 13, borderRadius: 'var(--radius-md)' }}
                 autoFocus
@@ -366,13 +353,13 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
                 style={{ flexShrink: 0, borderRadius: 'var(--radius-md)', minWidth: 120 }}
               >
                 {loadingInfo
-                  ? <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('loading2')}</>
-                  : <><i className="ti ti-search" /> {tr('load')}</>}
+                  ? <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('loading2')}</>
+                  : <><i className="ti ti-search" /> {t('load')}</>}
               </button>
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.6, padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
               <i className="ti ti-shield-check" style={{ marginRight: 4, color: 'var(--success)' }} />
-              {tr('ytUrlNote')}
+              {t('ytUrlNote')}
             </div>
           </div>
         </div>
@@ -385,8 +372,8 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <PageHeader
-          title={tr('selectPortion')}
-          sub={`${tr('youtubeTitle')} : ${videoInfo?.title?.slice(0, 60) || '...'}`}
+          title={t('selectPortion')}
+          sub={`${t('youtubeTitle')} : ${videoInfo?.title?.slice(0, 60) || '...'}`}
           onBack={() => setStep('url')}
         />
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
@@ -398,7 +385,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
                 <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{videoInfo.title}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 6 }}>{videoInfo.uploader}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>                  
-                  <i className="ti ti-clock" /> {tr('ytTrimTotalDuration')} {fmt(videoInfo.duration)}
+                  <i className="ti ti-clock" /> {t('ytTrimTotalDuration')} {fmt(videoInfo.duration)}
                 </div>
               </div>
             </div>
@@ -406,20 +393,20 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
 
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {tr('ytTrimTitle')}
+              {t('ytTrimTitle')}
             </div>
             <div style={{ padding: '12px 16px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{tr('ytTrimDuration')} <strong style={{ color: 'var(--accent)' }}>{fmt(end - start)}</strong></span>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t('ytTrimDuration')} <strong style={{ color: 'var(--accent)' }}>{fmt(end - start)}</strong></span>
                 <button className="btn-ghost btn-sm" onClick={() => { setStart(0); setEnd(videoInfo?.duration || 0) }} style={{ borderRadius: 'var(--radius-sm)' }}>
-                  <i className="ti ti-refresh" /> {tr('ytTrimSelectAll')}
+                  <i className="ti ti-refresh" /> {t('ytTrimSelectAll')}
                 </button>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-                    {tr('start')} : {fmt(start)}
+                    {t('start')} : {fmt(start)}
                   </label>
                   <input type="range" min="0" max={videoInfo?.duration || 0} step="0.5"
                     value={start} onChange={e => setStart(Math.min(Number(e.target.value), end - 1))}
@@ -427,7 +414,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
                 </div>
                 <div>
                   <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-                    {tr('end')} : {fmt(end)}
+                    {t('end')} : {fmt(end)}
                   </label>
                   <input type="range" min="0" max={videoInfo?.duration || 0} step="0.5"
                     value={end} onChange={e => setEnd(Math.max(Number(e.target.value), start + 1))}
@@ -438,7 +425,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{tr('ytPreciseStart')}</label>
+                <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{t('ytPreciseStart')}</label>
                 <input 
                   type="number" 
                   min="0" 
@@ -451,7 +438,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
                 />
               </div>
               <div>
-                <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{tr('ytPreciseEnd')}</label>
+                <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{t('ytPreciseEnd')}</label>
                 <input 
                   type="number" 
                   min="0" 
@@ -472,7 +459,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
               onClick={() => setStep('url')} 
               style={{ borderRadius: 'var(--radius-md)', minWidth: 120 }}
             >
-              <i className="ti ti-arrow-left" /> {tr('ytBack')}
+              <i className="ti ti-arrow-left" /> {t('ytBack')}
             </button>
             <button 
               className="btn-primary btn-lg" 
@@ -481,8 +468,8 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
               style={{ borderRadius: 'var(--radius-md)', minWidth: 180 }}
             >
               {importing
-                ? <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('ytDownloading')}</>
-                : <><i className="ti ti-download" /> {tr('downloadAudio')}</>}
+                ? <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('ytDownloading')}</>
+                : <><i className="ti ti-download" /> {t('downloadAudio')}</>}
             </button>
           </div>
         </div>
@@ -494,15 +481,15 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
   if (step === 'save') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-        <PageHeader title={tr('configSound')} sub={tr('ytSaveSubtitle')} onBack={() => setStep('trim')} />
+        <PageHeader title={t('configSound')} sub={t('ytSaveSubtitle')} onBack={() => setStep('trim')} />
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
           <div style={{ maxWidth: 560, margin: '0 auto' }}>
 
             <div className="option-row" style={{ borderColor: 'var(--success)', marginBottom: 20, padding: '12px 16px', background: 'rgba(29,158,117,0.1)', borderRadius: 'var(--radius-md)' }}>
               <i className="ti ti-check" style={{ color: 'var(--success)', fontSize: 20 }} />
               <div style={{ flex: 1, padding: '0 8px' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--success)' }}>{tr('ytSuccessTitle')}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{tr('ytSuccessSource')} {videoInfo?.title?.slice(0, 50)}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--success)' }}>{t('ytSuccessTitle')}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{t('ytSuccessSource')} {videoInfo?.title?.slice(0, 50)}</div>
               </div>
             </div>
 
@@ -510,7 +497,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
               <div style={{ marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {tr('editorPreview')}
+                    {t('editorPreview')}
                   </div>
                   <button
                     onClick={() => togglePreview(downloadedPath)}
@@ -518,7 +505,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
                     style={{ fontSize: 11, padding: '2px 10px', borderRadius: 'var(--radius-sm)' }}
                   >
                     <i className={`ti ${isPreviewPlaying ? 'ti-player-stop' : 'ti-player-play'}`} />
-                    {isPreviewPlaying ? tr('stop') : tr('listen')}
+                    {isPreviewPlaying ? t('stop') : t('listen')}
                   </button>
                 </div>
                 <Waveform filePath={downloadedPath} height={60} />
@@ -527,12 +514,12 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
 
             <div style={{ marginBottom: 14 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {tr('soundName')}
+                {t('soundName')}
               </label>
               <input 
                 value={soundName} 
                 onChange={e => setSoundName(e.target.value)}
-                placeholder={tr('ytSoundNamePlaceholder')} 
+                placeholder={t('ytSoundNamePlaceholder')} 
                 className="input-lg"
                 style={{ fontSize: 13, borderRadius: 'var(--radius-md)' }}
                 autoFocus 
@@ -541,14 +528,14 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
 
             <div style={{ marginBottom: 14 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {tr('image')}
+                {t('image')}
               </label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {customImage && (
                   <img 
                     src={`file:///${customImage.replace(/\\/g, '/')}`} 
                     style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} 
-                    alt={tr('preview')}
+                    alt={t('preview')}
                   />
                 )}
                 <button 
@@ -556,7 +543,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
                   onClick={handlePickImage}
                   style={{ fontSize: 12, padding: '4px 12px', borderRadius: 'var(--radius-sm)' }}
                 >
-                  <i className="ti ti-photo" /> {customImage ? tr('ytImageChange') : tr('ytImageAdd')}
+                  <i className="ti ti-photo" /> {customImage ? t('ytImageChange') : t('ytImageAdd')}
                 </button>
                 {customImage && (
                   <button 
@@ -572,7 +559,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
 
             <div style={{ marginBottom: 14 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {tr('editorEmojiLabel')}
+                {t('editorEmojiLabel')}
               </label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {EMOJIS.map(e => (
@@ -591,7 +578,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
 
             <div style={{ marginBottom: 24 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {tr('ytProfilesLabel')}
+                {t('ytProfilesLabel')}
               </label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {store.profiles.map(p => (
@@ -619,7 +606,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
                 onClick={() => setStep('trim')} 
                 style={{ borderRadius: 'var(--radius-md)', minWidth: 120 }}
               >
-                <i className="ti ti-arrow-left" /> {tr('ytBack')}
+                <i className="ti ti-arrow-left" /> {t('ytBack')}
               </button>
               <button 
                 className="btn-primary btn-lg" 
@@ -627,7 +614,7 @@ export default function YouTube({ store, addToast, lang = 'fr' }) {
                 disabled={!soundName.trim() || !downloadedPath} 
                 style={{ borderRadius: 'var(--radius-md)', minWidth: 200 }}
               >
-                <i className="ti ti-check" /> {tr('addToLibrary')}
+                <i className="ti ti-check" /> {t('addToLibrary')}
               </button>
             </div>
           </div>

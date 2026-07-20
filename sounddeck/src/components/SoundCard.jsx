@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { playSound, stopSound, isPlaying, getSoundProgress } from '../utils/audio'
 import ShortcutRecorder from './ShortcutRecorder'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 
 function fmtTime(s) {
   if (!s || isNaN(s)) return '0:00'
@@ -49,7 +49,7 @@ export default function SoundCard({
   onRemoveTag,
   size = 'medium'
 }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   const [playing, setPlaying] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showVolume, setShowVolume] = useState(false)
@@ -593,7 +593,7 @@ export default function SoundCard({
         {sound.playCount > 0 && (
           <div style={{ fontSize: 8, color: 'var(--text-tertiary)', textAlign: 'center', marginTop: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
             <i className="ti ti-player-play" style={{ fontSize: 8 }} />
-            {sound.playCount} {tr('playCount')}
+            {sound.playCount} {t('playCount')}
           </div>
         )}
       </div>
@@ -721,7 +721,7 @@ export default function SoundCard({
 
 // VolumePanel
 function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragStart, onDragEnd, soundName, position }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   const [localVolume, setLocalVolume] = useState(volume)
   
   useEffect(() => {
@@ -805,7 +805,7 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-              {tr('menuVolume')}
+              {t('menuVolume')}
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {soundName || ''}
@@ -885,7 +885,7 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
           borderRadius: 10,
           fontSize: 9
         }}>
-          ▸ 0 dB {tr('volumeDefault')}
+          ▸ 0 dB {t('volumeDefault')}
         </span>
         <span>+24 dB</span>
       </div>
@@ -922,10 +922,10 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
               e.currentTarget.style.background = 'var(--bg-tertiary)'
             }
           }}
-          title={tr('volumeReset')}
+          title={t('volumeReset')}
         >
           <i className="ti ti-refresh" style={{ fontSize: 14 }} />
-          <span>{tr('reset')}</span>
+          <span>{t('reset')}</span>
         </button>
 
         <button 
@@ -933,7 +933,7 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
           className="btn-primary"
           style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
         >
-          <i className="ti ti-check" /> {tr('volumePanelClose')}
+          <i className="ti ti-check" /> {t('volumePanelClose')}
         </button>
       </div>
 
@@ -963,7 +963,7 @@ function ContextMenuPortal({
   lang = 'fr',
   onHeightMeasured
 }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   const menuRef = useRef(null)
 
   // Mesurer la hauteur réelle du menu après le rendu
@@ -1047,33 +1047,33 @@ function ContextMenuPortal({
     >
       <MenuItem 
         icon={sound.favorite ? 'ti-star' : 'ti-star-filled'} 
-        label={sound.favorite ? tr('menuFavoriteRemove') : tr('menuFavoriteAdd')} 
+        label={sound.favorite ? t('menuFavoriteRemove') : t('menuFavoriteAdd')} 
         onClick={() => handleAction(onToggleFavorite)}
         lang={lang}
       />
       <MenuItem 
         icon="ti-pencil" 
-        label={tr('menuRename')} 
+        label={t('menuRename')} 
         onClick={() => handleAction(onRename)}
         lang={lang}
       />
       <MenuItem 
         icon="ti-volume" 
-        label={tr('menuVolume')} 
+        label={t('menuVolume')} 
         onClick={() => handleAction(onVolumeOpen)}
         lang={lang}
       />
       
       <MenuItem 
         icon="ti-photo" 
-        label={tr('menuChangeImage')} 
+        label={t('menuChangeImage')} 
         onClick={() => handleAction(onChangeImage)}
         lang={lang}
       />
       
       <MenuItem 
         icon="ti-mood-smile" 
-        label={tr('menuChangeEmoji')} 
+        label={t('menuChangeEmoji')} 
         onClick={() => handleAction(onChangeEmoji)}
         lang={lang}
       />
@@ -1083,7 +1083,7 @@ function ContextMenuPortal({
           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
           <MenuItem 
             icon="ti-folder-minus" 
-            label={tr('menuRemoveFromProfile')} 
+            label={t('menuRemoveFromProfile')} 
             onClick={() => handleAction(onRemoveFromProfile)}
             warning 
             lang={lang}
@@ -1093,7 +1093,7 @@ function ContextMenuPortal({
       <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
       <MenuItem 
         icon="ti-trash" 
-        label={tr('menuDelete')} 
+        label={t('menuDelete')} 
         onClick={() => handleAction(onDelete)}
         danger 
         lang={lang}

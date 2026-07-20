@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 import useConfirm from '../hooks/useConfirm.jsx'
 
 export default function ProfileManagerModal({ 
@@ -8,11 +8,10 @@ export default function ProfileManagerModal({
   sounds, 
   store, 
   onClose, 
-  addToast,
-  lang = 'fr'
-}) {
-  const tr = useTranslation(lang)
-  const { confirm, ConfirmWrapper } = useConfirm({ lang })
+  addToast
+}) { // ✅ Supprimer le paramètre lang
+  const { t, currentLang } = useLanguage()
+  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang }) // ✅ Utiliser currentLang
   const [selectedSounds, setSelectedSounds] = useState(new Set())
   const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -53,22 +52,22 @@ export default function ProfileManagerModal({
     setShowConfirmDelete(false)
     setIsDeleting(false)
     
-    addToast(`${removedCount} son(s) retiré(s) du profil "${profileName}"`, 'success')
+    addToast(`${removedCount} ${t('profileManagerSoundsRemoved')} "${profileName}"`, 'success')
     onClose()
   }
 
   const handleDeleteProfile = async () => {
     if (sounds.length > 0) {
       const confirmed = await confirm({
-        title: tr('profileManagerDeleteConfirm'),
-        message: tr('profileManagerDeleteMessage').replace('{name}', profileName).replace('{count}', sounds.length),
+        title: t('profileManagerDeleteConfirm'),
+        message: t('profileManagerDeleteMessage').replace('{name}', profileName).replace('{count}', sounds.length),
         type: 'danger'
       })
       if (!confirmed) return
     }
     
     await store.deleteProfile(profileId)
-    addToast(`Profil "${profileName}" supprimé`, 'info')
+    addToast(`${t('profileManagerProfileDeleted')} "${profileName}"`, 'info')
     onClose()
   }
 
@@ -80,10 +79,10 @@ export default function ProfileManagerModal({
           <div className="modal-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <i className="ti ti-users" style={{ color: 'var(--accent)' }} />
-              Gérer le profil : <strong>{profileName}</strong>
+              {t('profileManagerTitle')} : <strong>{profileName}</strong>
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-              {sounds.length} son(s)
+              {sounds.length} {t('sounds')}
             </div>
           </div>
 
@@ -103,7 +102,7 @@ export default function ProfileManagerModal({
               style={{ fontSize: 12, padding: '4px 12px', borderRadius: 'var(--radius-sm)' }}
             >
               <i className={`ti ${selectedSounds.size === sounds.length ? 'ti-checkbox' : 'ti-checkbox'}`} />
-              {selectedSounds.size === sounds.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+              {selectedSounds.size === sounds.length ? t('profileManagerDeselectAll') : t('profileManagerSelectAll')}
             </button>
             
             <button 
@@ -118,7 +117,7 @@ export default function ProfileManagerModal({
               }}
             >
               <i className="ti ti-folder-minus" />
-              Retirer sélection ({selectedSounds.size})
+              {t('profileManagerRemoveSelected')} ({selectedSounds.size})
             </button>
 
             <div style={{ flex: 1 }} />
@@ -129,7 +128,7 @@ export default function ProfileManagerModal({
               style={{ fontSize: 12, padding: '4px 12px', borderRadius: 'var(--radius-sm)' }}
             >
               <i className="ti ti-trash" />
-              Supprimer le profil
+              {t('profileManagerDeleteProfile')}
             </button>
           </div>
 
@@ -149,7 +148,7 @@ export default function ProfileManagerModal({
                 fontSize: 13
               }}>
                 <i className="ti ti-music" style={{ fontSize: 24, display: 'block', marginBottom: 8 }} />
-                Ce profil ne contient aucun son.
+                {t('profileManagerNoSounds')}
               </div>
             ) : (
               sounds.map(sound => {
@@ -212,7 +211,7 @@ export default function ProfileManagerModal({
                       </div>
                       {sound.favorites?.includes(profileId) && (
                         <div style={{ fontSize: 10, color: 'var(--warning)' }}>
-                          <i className="ti ti-star-filled" style={{ fontSize: 9 }} /> Favori
+                          <i className="ti ti-star-filled" style={{ fontSize: 9 }} /> {t('profileManagerFavorite')}
                         </div>
                       )}
                     </div>
@@ -237,7 +236,7 @@ export default function ProfileManagerModal({
 
           <div className="modal-actions" style={{ marginTop: 0 }}>
             <button className="btn-secondary btn-lg" onClick={onClose} style={{ borderRadius: 'var(--radius-md)', minHeight: 40, padding: '8px 20px' }}>
-              <i className="ti ti-x" /> {tr('close')}
+              <i className="ti ti-x" /> {t('close')}
             </button>
           </div>
 
@@ -246,26 +245,26 @@ export default function ProfileManagerModal({
               <div className="modal fade-in" style={{ width: 400 }} onClick={e => e.stopPropagation()}>
                 <div className="modal-title" style={{ color: 'var(--warning)' }}>
                   <i className="ti ti-alert-triangle" style={{ color: 'var(--warning)', marginRight: 8 }} />
-                  Confirmer la suppression
+                  {t('profileManagerConfirmRemove')}
                 </div>
                 
                 <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.6 }}>
-                  Vous êtes sur le point de retirer <strong>{selectedSounds.size}</strong> son(s) du profil <strong>"{profileName}"</strong>.
+                  {t('profileManagerConfirmMessage').replace('{count}', selectedSounds.size).replace('{name}', profileName)}
                   <br /><br />
                   <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
-                    Ces sons resteront dans votre bibliothèque et pourront être réajoutés plus tard.
+                    {t('profileManagerConfirmSub')}
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                   <button className="btn-secondary btn-lg" onClick={() => setShowConfirmDelete(false)} disabled={isDeleting} style={{ borderRadius: 'var(--radius-md)', minHeight: 40 }}>
-                    Annuler
+                    {t('cancel')}
                   </button>
                   <button className="btn-danger btn-lg" onClick={confirmRemove} disabled={isDeleting} style={{ borderRadius: 'var(--radius-md)', minHeight: 40 }}>
                     {isDeleting ? (
-                      <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> Suppression...</>
+                      <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('profileManagerDeleting') || 'Suppression...'}</>
                     ) : (
-                      <><i className="ti ti-check" /> Confirmer</>
+                      <><i className="ti ti-check" /> {t('confirm')}</>
                     )}
                   </button>
                 </div>

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 import { playSound } from '../utils/audio'
 
 export default function TwitchAlerts({ store, addToast, lang = 'fr' }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   const [alerts, setAlerts] = useState([])
   const [isEnabled, setIsEnabled] = useState(true)
 
@@ -80,7 +80,7 @@ export default function TwitchAlerts({ store, addToast, lang = 'fr' }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <i className="ti ti-brand-twitch" style={{ color: 'var(--accent)' }} />
           <span style={{ fontWeight: 600, fontSize: 13 }}>
-            {tr('twitchAlerts')}
+            {t('twitchAlerts')}
           </span>
           <span style={{
             fontSize: 10,
@@ -89,7 +89,7 @@ export default function TwitchAlerts({ store, addToast, lang = 'fr' }) {
             padding: '2px 8px',
             borderRadius: 10
           }}>
-            {isEnabled ? tr('enabled') : tr('disabled')}
+            {isEnabled ? t('enabled') : t('disabled')}
           </span>
         </div>
 
@@ -132,7 +132,7 @@ export default function TwitchAlerts({ store, addToast, lang = 'fr' }) {
             color: 'var(--text-tertiary)',
             fontSize: 12
           }}>
-            {tr('noAlerts')}
+            {t('noAlerts')}
           </div>
         )}
 
@@ -189,7 +189,7 @@ export default function TwitchAlerts({ store, addToast, lang = 'fr' }) {
         color: 'var(--text-tertiary)',
         textAlign: 'center'
       }}>
-        {tr('twitchAlertsDesc')}
+        {t('twitchAlertsDesc')}
       </div>
     </div>
   )

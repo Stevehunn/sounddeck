@@ -1,5 +1,4 @@
 import YouTube from './YouTube'
-import translations from './i18n'
 
 const YouTubePlugin = {
   id: 'youtube',
@@ -8,7 +7,6 @@ const YouTubePlugin = {
   author: 'SoundDeck Team',
   description: 'Import audio from YouTube, Spotify and SoundCloud',
 
-  // Pages ajoutées par le plugin
   pages: [
     {
       id: 'youtube',
@@ -22,15 +20,13 @@ const YouTubePlugin = {
     }
   ],
 
-  // Traductions
-  i18n: translations,
+  // ✅ Le plugin n'a plus besoin de ses propres traductions
+  // car il utilise le contexte global
 
-  // Initialisation du plugin
   init(store, manager) {
     console.log('▶️ Plugin YouTube initialisé')
   },
 
-  // Nettoyage
   destroy() {
     console.log('🗑️ Plugin YouTube déchargé')
   }

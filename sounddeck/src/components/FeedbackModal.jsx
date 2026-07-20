@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 
 const FEEDBACK_TYPES = [
   { id: 'bug', labelKey: 'feedbackBug', icon: 'ti-bug' },
@@ -9,7 +9,7 @@ const FEEDBACK_TYPES = [
 ]
 
 export default function FeedbackModal({ onClose, lang = 'fr', onSubmit, store }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   const [type, setType] = useState('bug')
   const [message, setMessage] = useState('')
   const [email, setEmail] = useState('')
@@ -21,7 +21,7 @@ export default function FeedbackModal({ onClose, lang = 'fr', onSubmit, store })
 
   const handleSubmit = async () => {
     if (!message.trim()) {
-      setError(tr('feedbackMessageRequired'))
+      setError(t('feedbackMessageRequired'))
       return
     }
 
@@ -79,7 +79,7 @@ export default function FeedbackModal({ onClose, lang = 'fr', onSubmit, store })
 
     } catch (e) {
       console.error('Erreur envoi feedback:', e)
-      setError(tr('feedbackError') + ': ' + e.message)
+      setError(t('feedbackError') + ': ' + e.message)
     } finally {
       setIsSubmitting(false)
     }
@@ -135,10 +135,10 @@ ${feedback.logs ? `## Logs\n\`\`\`json\n${JSON.stringify(feedback.logs.slice(0, 
               <i className="ti ti-check" style={{ fontSize: 32, color: 'white' }} />
             </div>
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
-              {tr('feedbackThankYou')}
+              {t('feedbackThankYou')}
             </div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-              {tr('feedbackThankYouDesc')}
+              {t('feedbackThankYouDesc')}
             </div>
           </div>
         </div>
@@ -153,14 +153,14 @@ ${feedback.logs ? `## Logs\n\`\`\`json\n${JSON.stringify(feedback.logs.slice(0, 
       <div className="modal" style={{ width: 460, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
         <div className="modal-title" id="modal-title">
           <i className="ti ti-message" style={{ color: 'var(--accent)' }} />
-          {tr('feedbackTitle')}
+          {t('feedbackTitle')}
         </div>
 
         <div id="modal-desc" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Type de feedback */}
           <div>
             <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
-              {tr('feedbackType')}
+              {t('feedbackType')}
             </label>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {FEEDBACK_TYPES.map(t => (
@@ -190,12 +190,12 @@ ${feedback.logs ? `## Logs\n\`\`\`json\n${JSON.stringify(feedback.logs.slice(0, 
           {/* Message */}
           <div>
             <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
-              {tr('feedbackMessage')} *
+              {t('feedbackMessage')} *
             </label>
             <textarea
               value={message}
               onChange={e => setMessage(e.target.value)}
-              placeholder={tr('feedbackPlaceholder')}
+              placeholder={t('feedbackPlaceholder')}
               rows={4}
               className="input-lg"
               style={{ borderRadius: 'var(--radius-md)', resize: 'vertical', minHeight: 80 }}
@@ -206,7 +206,7 @@ ${feedback.logs ? `## Logs\n\`\`\`json\n${JSON.stringify(feedback.logs.slice(0, 
           {/* Email */}
           <div>
             <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
-              {tr('feedbackEmail')} <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>({tr('feedbackEmailOptional')})</span>
+              {t('feedbackEmail')} <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>({t('feedbackEmailOptional')})</span>
             </label>
             <input
               value={email}
@@ -226,11 +226,11 @@ ${feedback.logs ? `## Logs\n\`\`\`json\n${JSON.stringify(feedback.logs.slice(0, 
                 checked={includeLogs}
                 onChange={e => setIncludeLogs(e.target.checked)}
                 style={{ width: 'auto', accentColor: 'var(--accent)' }}
-                aria-label={tr('feedbackIncludeLogs')}
+                aria-label={t('feedbackIncludeLogs')}
               />
               <span style={{ fontSize: 12 }}>
                 <i className="ti ti-file-text" style={{ marginRight: 4 }} />
-                {tr('feedbackIncludeLogs')}
+                {t('feedbackIncludeLogs')}
               </span>
             </label>
 
@@ -240,11 +240,11 @@ ${feedback.logs ? `## Logs\n\`\`\`json\n${JSON.stringify(feedback.logs.slice(0, 
                 checked={includeScreenshot}
                 onChange={e => setIncludeScreenshot(e.target.checked)}
                 style={{ width: 'auto', accentColor: 'var(--accent)' }}
-                aria-label={tr('feedbackIncludeScreenshot')}
+                aria-label={t('feedbackIncludeScreenshot')}
               />
               <span style={{ fontSize: 12 }}>
                 <i className="ti ti-camera" style={{ marginRight: 4 }} />
-                {tr('feedbackIncludeScreenshot')}
+                {t('feedbackIncludeScreenshot')}
               </span>
             </label>
           </div>
@@ -271,21 +271,21 @@ ${feedback.logs ? `## Logs\n\`\`\`json\n${JSON.stringify(feedback.logs.slice(0, 
             onClick={onClose} 
             disabled={isSubmitting} 
             style={{ borderRadius: 'var(--radius-md)' }}
-            aria-label={tr('cancel')}
+            aria-label={t('cancel')}
           >
-            {tr('cancel')}
+            {t('cancel')}
           </button>
           <button
             className="btn-primary btn-lg"
             onClick={handleSubmit}
             disabled={isSubmitting || !message.trim()}
             style={{ borderRadius: 'var(--radius-md)' }}
-            aria-label={tr('feedbackSend')}
+            aria-label={t('feedbackSend')}
           >
             {isSubmitting ? (
-              <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('feedbackSending')}</>
+              <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('feedbackSending')}</>
             ) : (
-              <><i className="ti ti-send" /> {tr('feedbackSend')}</>
+              <><i className="ti ti-send" /> {t('feedbackSend')}</>
             )}
           </button>
         </div>

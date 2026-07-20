@@ -1,34 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Howl } from 'howler'
 import { CATEGORIES, CATEGORIES_LIST, DEFAULT_CATEGORIES } from './categories'
-import translations from './i18n'
+import { useLanguage } from '../../context/LanguageContext'
 
-// ─── CACHE DES CATÉGORIES ──────────────────────────────────────────────────────
-const categoryCache = new Map()
-
-function getCachedCategory(categoryId) {
-  return categoryCache.get(categoryId) || null
-}
-
-function setCachedCategory(categoryId, sounds) {
-  categoryCache.set(categoryId, sounds)
-}
-
-function getCacheInfo() {
-  const info = {}
-  for (const [key, value] of categoryCache) {
-    info[key] = { count: value.length, cached: true }
-  }
-  return info
-}
-
-export default function MyInstantsDiscover({ store, addToast, lang }) {
-  const t = useCallback((key) => {
-    const trans = translations[lang] || translations.fr
-    return trans[key] || key
-  }, [lang])
-
-  // ─── ÉTATS ──────────────────────────────────────────────────────────────────
+export default function MyInstantsDiscover({ store, addToast }) {
+  const { t, currentLang } = useLanguage()
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState([])
@@ -132,14 +108,14 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
 
       let result
       if (mode === 'local' || mode === 'trending') {
-        result = await fetchWithTimeout(window.electronAPI.fetchMyinstants('', mode === 'local' ? 'local' : 'trending', lang))
+        result = await fetchWithTimeout(window.electronAPI.fetchMyinstants('', mode === 'local' ? 'local' : 'trending', currentLang))
       } else if (mode === 'multi') {
         const terms = query.split(',').map(t => t.trim()).filter(Boolean)
         const allResults = []
         const seen = new Set()
         const limitedTerms = terms.slice(0, 3)
         for (const term of limitedTerms) {
-          const r = await fetchWithTimeout(window.electronAPI.fetchMyinstants(term, 'search', lang))
+          const r = await fetchWithTimeout(window.electronAPI.fetchMyinstants(term, 'search', currentLang))
           if (r.success) {
             for (const sound of r.sounds) {
               if (!seen.has(sound.slug)) {
@@ -151,7 +127,7 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
         }
         result = { success: true, sounds: allResults }
       } else {
-        result = await fetchWithTimeout(window.electronAPI.fetchMyinstants(query, 'search', lang))
+        result = await fetchWithTimeout(window.electronAPI.fetchMyinstants(query, 'search', currentLang))
       }
 
       if (result.success) {
@@ -172,17 +148,15 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
     
     setLoading(false)
     setCacheInfo(getCacheInfo())
-  }, [lang, t, activeCategory, results.length])
+  }, [currentLang, t, activeCategory, results.length])
 
   // ─── PRÉCHARGEMENT DE TOUTES LES CATÉGORIES ──────────────────────────────
 
   const preloadAllCategories = useCallback(async (priorityIds = null) => {
-    // ✅ Si déjà en cours ou déjà terminé, ne rien faire
     if (isPreloading || isPreloadComplete) return
     
     const categoryIds = CATEGORIES_LIST.map(cat => cat.id)
     
-    // Vérifier si toutes sont déjà en cache
     const allCached = categoryIds.every(id => {
       const cached = getCachedCategory(id)
       return cached && cached.length > 0
@@ -202,10 +176,8 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
     
     setPreloadStatus(t('myinstantsPreloading'))
     
-    // ✅ PRIORITÉ : Utiliser les IDs passés en paramètre, ou les catégories sélectionnées
     let priorityList = priorityIds
     if (!priorityList || priorityList.length === 0) {
-      // Si pas de priorité passée, utiliser les catégories sélectionnées
       priorityList = getVisibleCategories().map(cat => cat.id)
     }
     
@@ -229,7 +201,7 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
         let result
         if (config.mode === 'local' || config.mode === 'trending') {
           result = await Promise.race([
-            window.electronAPI.fetchMyinstants('', config.mode === 'local' ? 'local' : 'trending', lang),
+            window.electronAPI.fetchMyinstants('', config.mode === 'local' ? 'local' : 'trending', currentLang),
             timeoutPromise
           ])
         } else if (config.mode === 'multi') {
@@ -238,7 +210,7 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
           const seen = new Set()
           for (const term of terms) {
             const r = await Promise.race([
-              window.electronAPI.fetchMyinstants(term, 'search', lang),
+              window.electronAPI.fetchMyinstants(term, 'search', currentLang),
               timeoutPromise
             ])
             if (r.success) {
@@ -253,7 +225,7 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
           result = { success: true, sounds: allResults }
         } else {
           result = await Promise.race([
-            window.electronAPI.fetchMyinstants(config.query, 'search', lang),
+            window.electronAPI.fetchMyinstants(config.query, 'search', currentLang),
             timeoutPromise
           ])
         }
@@ -269,7 +241,6 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
       }
     }
 
-    // Charger en parallèle par lots de 3
     const batchSize = 3
     for (let i = 0; i < sortedIds.length; i += batchSize) {
       if (preloadAbortRef.current) break
@@ -290,7 +261,6 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
     setPreloadStatus(`✅ ${t('myinstantsAllCategoriesLoaded')}`)
     setCacheInfo(getCacheInfo())
     
-    // ✅ Charger la première catégorie prioritaire
     if (!preloadAbortRef.current && priorityList.length > 0) {
       const firstCategory = priorityList[0]
       const cached = getCachedCategory(firstCategory)
@@ -302,7 +272,7 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
       }
     }
     
-  }, [lang, isPreloading, isPreloadComplete, t, loadCategory, getVisibleCategories])
+  }, [currentLang, isPreloading, isPreloadComplete, t, loadCategory, getVisibleCategories])
 
   // ─── RECHERCHE ─────────────────────────────────────────────────────────────
 
@@ -317,7 +287,7 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
     setResults([])
 
     try {
-      const result = await window.electronAPI.fetchMyinstants(search.trim(), 'search', lang)
+      const result = await window.electronAPI.fetchMyinstants(search.trim(), 'search', currentLang)
       if (result.success) {
         setResults(result.sounds || [])
         if (result.sounds.length === 0) {
@@ -331,7 +301,7 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
       setError(e.message || t('myinstantsError'))
     }
     setLoading(false)
-  }, [search, lang, t, activeCategory, loadCategory])
+  }, [search, currentLang, t, activeCategory, loadCategory])
 
   // ─── VÉRIFICATION SI UN SON EST DÉJÀ DANS LA BIBLIOTHÈQUE ──────────────
 
@@ -449,16 +419,12 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
       return
     }
     
-    // ✅ Sauvegarder les préférences
     saveCategoryPreferences(tempSelectedCategories)
     setShowCategoryEditor(false)
     addToast(t('myinstantsCategoryEditorSaved'), 'success')
     setShowAllCategories(false)
-    
-    // ✅ Mettre à jour l'état du cache
     setCacheInfo(getCacheInfo())
     
-    // ✅ Charger la première catégorie sélectionnée depuis le cache
     if (tempSelectedCategories.length > 0) {
       const firstCategory = tempSelectedCategories[0]
       const cached = getCachedCategory(firstCategory)
@@ -467,7 +433,6 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
         setActiveCategory(firstCategory)
         setError('')
       } else {
-        // Si pour une raison quelconque la catégorie n'est pas en cache, la charger
         loadCategory(firstCategory, true)
       }
     }
@@ -502,7 +467,7 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
           fontSize: 12
         }}>
           <i className="ti ti-category" style={{ marginRight: 4 }} />
-          Aucune catégorie sélectionnée
+          {t('myinstantsNoCategories') || 'Aucune catégorie sélectionnée'}
         </div>
       )
     }
@@ -531,7 +496,7 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
               onClick={openCategoryEditor}
               style={{ fontSize: 10, color: 'var(--text-tertiary)' }}
             >
-              <i className="ti ti-edit" /> Personnaliser
+              <i className="ti ti-edit" /> {t('myinstantsCategoryEditor')}
             </button>
             {visibleCategories.length > 8 && (
               <button
@@ -704,7 +669,7 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
 
           <div className="modal-actions" style={{ marginTop: 16 }}>
             <button className="btn-secondary btn-lg" onClick={closeCategoryEditor}>
-              <i className="ti ti-x" /> Annuler
+              <i className="ti ti-x" /> {t('myinstantsCategoryEditorCancel') || 'Annuler'}
             </button>
             <button className="btn-primary btn-lg" onClick={saveCategoryEditor}>
               <i className="ti ti-check" /> {t('myinstantsCategoryEditorSave')}
@@ -719,10 +684,8 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
 
   useEffect(() => {
     const init = async () => {
-      // ✅ Charger les préférences (et récupérer la liste des catégories sélectionnées)
       const selected = loadCategoryPreferences()
       
-      // ✅ Charger la première catégorie sélectionnée pour l'affichage
       if (selected.length > 0) {
         const firstCategory = selected[0]
         await loadCategory(firstCategory)
@@ -733,8 +696,6 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
       setCacheInfo(getCacheInfo())
       setIsInitialLoad(false)
       
-      // ✅ Précharger TOUTES les catégories en arrière-plan
-      // On passe la liste des catégories sélectionnées en priorité
       setTimeout(() => {
         preloadAllCategories(selected)
       }, 500)
@@ -750,7 +711,7 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
         previewHowlRef.current = null
       }
     }
-  }, []) // ✅ Dépendances vides - ne s'exécute qu'une fois
+  }, [])
 
   // ─── RENDU PRINCIPAL ──────────────────────────────────────────────────────
 
@@ -1137,7 +1098,7 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
             </div>
             <div className="modal-actions" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
               <button className="btn-secondary btn-lg" onClick={() => setShowProfileModal(null)} style={{ borderRadius: 'var(--radius-md)', minHeight: 40, padding: '8px 20px' }}>
-                <i className="ti ti-x" /> {t('myinstantsStop')}
+                <i className="ti ti-x" /> {t('myinstantsCancel') || 'Annuler'}
               </button>
               <button className="btn-primary btn-lg" onClick={confirmAddSound} style={{ borderRadius: 'var(--radius-md)', minHeight: 40, padding: '8px 20px' }}>
                 <i className="ti ti-download" /> {t('myinstantsAdd')}
@@ -1162,4 +1123,24 @@ export default function MyInstantsDiscover({ store, addToast, lang }) {
       `}</style>
     </div>
   )
+}
+
+// ─── FONCTIONS DE CACHE ──────────────────────────────────────────────────
+
+const categoryCache = new Map()
+
+function getCachedCategory(categoryId) {
+  return categoryCache.get(categoryId) || null
+}
+
+function setCachedCategory(categoryId, sounds) {
+  categoryCache.set(categoryId, sounds)
+}
+
+function getCacheInfo() {
+  const info = {}
+  for (const [key, value] of categoryCache) {
+    info[key] = { count: value.length, cached: true }
+  }
+  return info
 }

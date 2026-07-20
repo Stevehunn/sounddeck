@@ -1,12 +1,12 @@
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 
 export default function CardSizeSelector({ value, onChange, lang = 'fr' }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   
   const sizes = [
-    { val: 'small', label: tr('cardSizeSmall'), icon: 'ti-layout-grid' },
-    { val: 'medium', label: tr('cardSizeMedium'), icon: 'ti-layout-grid' },
-    { val: 'large', label: tr('cardSizeLarge'), icon: 'ti-layout-grid' },
+    { val: 'small', label: t('cardSizeSmall'), icon: 'ti-layout-grid' },
+    { val: 'medium', label: t('cardSizeMedium'), icon: 'ti-layout-grid' },
+    { val: 'large', label: t('cardSizeLarge'), icon: 'ti-layout-grid' },
   ]
   
   return (

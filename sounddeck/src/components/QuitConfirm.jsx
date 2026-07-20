@@ -1,8 +1,8 @@
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 import { useState } from 'react'
 
 export default function QuitConfirm({ onClose, lang = 'fr' }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   const [remember, setRemember] = useState(false)
   const [processing, setProcessing] = useState(false)
 
@@ -34,11 +34,11 @@ export default function QuitConfirm({ onClose, lang = 'fr' }) {
       <div className="modal" style={{ width: 420 }} onClick={e => e.stopPropagation()}>
         <div className="modal-title" style={{ color: 'var(--warning)' }}>
           <i className="ti ti-alert-triangle" style={{ color: 'var(--warning)', marginRight: 8 }} />
-          {tr('quitConfirmTitle')}
+          {t('quitConfirmTitle')}
         </div>
         
         <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
-          {tr('quitConfirmMessage')}
+          {t('quitConfirmMessage')}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -54,7 +54,7 @@ export default function QuitConfirm({ onClose, lang = 'fr' }) {
               minHeight: 48
             }}
           >
-            <i className="ti ti-power" /> {tr('quitConfirmQuit')}
+            <i className="ti ti-power" /> {t('quitConfirmQuit')}
           </button>
           
           <button 
@@ -63,7 +63,7 @@ export default function QuitConfirm({ onClose, lang = 'fr' }) {
             disabled={processing}
             style={{ width: '100%', justifyContent: 'center', minHeight: 48 }}
           >
-            <i className="ti ti-arrow-bar-to-bottom" /> {tr('quitConfirmMinimize')}
+            <i className="ti ti-arrow-bar-to-bottom" /> {t('quitConfirmMinimize')}
           </button>
           
           <button 
@@ -72,7 +72,7 @@ export default function QuitConfirm({ onClose, lang = 'fr' }) {
             disabled={processing}
             style={{ width: '100%', justifyContent: 'center', minHeight: 34 }}
           >
-            {tr('quitConfirmCancel')}
+            {t('quitConfirmCancel')}
           </button>
         </div>
 
@@ -92,7 +92,7 @@ export default function QuitConfirm({ onClose, lang = 'fr' }) {
             style={{ width: 'auto', accentColor: 'var(--accent)' }}
           />
           <label htmlFor="rememberChoice" style={{ fontSize: 12, color: 'var(--text-tertiary)', cursor: 'pointer' }}>
-            {tr('quitConfirmRemember')}
+            {t('quitConfirmRemember')}
           </label>
         </div>
       </div>

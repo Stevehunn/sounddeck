@@ -884,6 +884,14 @@ export function useStore() {
     setLang(newLang)
     await save('lang', newLang)
     await window.electronAPI.storeSetLang?.(newLang)
+    
+    // ✅ Mettre à jour le contexte de langue
+    try {
+      const { useLanguage } = await import('../context/LanguageContext')
+      // Le contexte sera mis à jour via le Provider
+    } catch (e) {
+      console.warn('Erreur mise à jour contexte langue:', e)
+    }
   }, [save])
 
   const updateTheme = useCallback(async (newTheme) => {

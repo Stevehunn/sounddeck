@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 import {
   getBackupList,
   restoreBackup,
@@ -11,7 +11,7 @@ import {
 import useConfirm from '../hooks/useConfirm.jsx'
 
 export default function BackupSettings({ store, addToast, lang = 'fr' }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   const { confirm, ConfirmWrapper } = useConfirm({ lang })
   const [backups, setBackups] = useState([])
   const [isLoading, setIsLoading] = useState(false)
@@ -40,8 +40,8 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
 
   const handleRestore = async (index) => {
     const confirmed = await confirm({
-      title: tr('restoreBackup'),
-      message: tr('restoreBackupConfirm'),
+      title: t('restoreBackup'),
+      message: t('restoreBackupConfirm'),
       type: 'warning'
     })
     if (!confirmed) return
@@ -105,7 +105,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <i className="ti ti-cloud" style={{ color: 'var(--accent)' }} />
             <span style={{ fontWeight: 600, fontSize: 13 }}>
-              {tr('backupSettings')}
+              {t('backupSettings')}
             </span>
             <span style={{
               fontSize: 10,
@@ -114,7 +114,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
               padding: '2px 8px',
               borderRadius: 10
             }}>
-              {backups.length} {tr('backups')}
+              {backups.length} {t('backups')}
             </span>
           </div>
 
@@ -126,9 +126,9 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
               style={{ fontSize: 12, padding: '4px 12px' }}
             >
               {isLoading ? (
-                <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('saving')}</>
+                <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('saving')}</>
               ) : (
-                <><i className="ti ti-cloud-upload" /> {tr('backupNow')}</>
+                <><i className="ti ti-cloud-upload" /> {t('backupNow')}</>
               )}
             </button>
           </div>
@@ -140,14 +140,14 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
             onClick={handleExport}
             style={{ fontSize: 12, padding: '4px 12px' }}
           >
-            <i className="ti ti-download" /> {tr('exportBackups')}
+            <i className="ti ti-download" /> {t('exportBackups')}
           </button>
           <button
             className="btn-secondary btn-sm"
             onClick={handleImport}
             style={{ fontSize: 12, padding: '4px 12px' }}
           >
-            <i className="ti ti-upload" /> {tr('importBackups')}
+            <i className="ti ti-upload" /> {t('importBackups')}
           </button>
         </div>
 
@@ -165,7 +165,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
               color: 'var(--text-tertiary)',
               fontSize: 12
             }}>
-              {tr('noBackups')}
+              {t('noBackups')}
             </div>
           )}
 
@@ -197,7 +197,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
                 onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
                 onMouseLeave={e => e.currentTarget.style.color = 'var(--text-tertiary)'}
               >
-                <i className="ti ti-refresh" /> {tr('restore')}
+                <i className="ti ti-refresh" /> {t('restore')}
               </button>
             </div>
           ))}

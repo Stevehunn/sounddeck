@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { useTranslation } from '../i18n'
+import { useLanguage } from '../context/LanguageContext'
 import useConfirm from '../hooks/useConfirm.jsx'
 
 // Configuration par défaut - sections ordonnées (Profils en premier)
@@ -61,7 +61,7 @@ export default function SidebarEditor({
   profiles = [],
   lang = 'fr'
 }) {
-  const tr = useTranslation(lang)
+  const { t, currentLang } = useLanguage()
   const { confirm, ConfirmWrapper } = useConfirm({ lang })
   const [items, setItems] = useState([])
   const [sectionOrder, setSectionOrder] = useState(DEFAULT_SECTION_ORDER)
@@ -119,7 +119,7 @@ export default function SidebarEditor({
     log('📦 Éléments existants:', existingItems.length)
     
     const userProfiles = profiles || []
-    const allProfile = { id: 'all', name: tr('allSounds'), isDefault: true }
+    const allProfile = { id: 'all', name: t('allSounds'), isDefault: true }
     const allProfiles = [allProfile, ...userProfiles]
     log('👤 Profils reçus:', allProfiles.map(p => p.id))
 
@@ -668,11 +668,11 @@ export default function SidebarEditor({
           gap: 4,
           opacity: canLock || canUnlock ? 1 : 0.3
         }}
-        title={isFixed ? tr('unlockSection') : tr('lockSection')}
+        title={isFixed ? t('unlockSection') : t('lockSection')}
       >
         <i className={`ti ${isFixed ? 'ti-lock' : 'ti-lock-open'}`} />
         <span style={{ fontSize: 8 }}>
-          {isFixed ? tr('fixed') : tr('unfixed')}
+          {isFixed ? t('fixed') : t('unfixed')}
         </span>
       </button>
     )
@@ -838,7 +838,7 @@ export default function SidebarEditor({
                   fontSize: 13,
                   transition: 'all 0.15s'
                 }}
-                title={item.pinned ? tr('sidebarEditorUnpin') : tr('sidebarEditorPin')}
+                title={item.pinned ? t('sidebarEditorUnpin') : t('sidebarEditorPin')}
               >
                 <i className={`ti ${item.pinned ? 'ti-pinned' : 'ti-pin'}`} />
               </button>
@@ -856,7 +856,7 @@ export default function SidebarEditor({
                     fontSize: 13,
                     transition: 'all 0.15s'
                   }}
-                  title={isVisible ? tr('sidebarEditorHide') : tr('sidebarEditorShow')}
+                  title={isVisible ? t('sidebarEditorHide') : t('sidebarEditorShow')}
                 >
                   <i className={`ti ${isVisible ? 'ti-eye' : 'ti-eye-off'}`} />
                 </button>
@@ -911,7 +911,7 @@ export default function SidebarEditor({
                   fontSize: 13,
                   transition: 'all 0.15s'
                 }}
-                title={item.pinned ? tr('sidebarEditorUnpin') : tr('sidebarEditorPin')}
+                title={item.pinned ? t('sidebarEditorUnpin') : t('sidebarEditorPin')}
               >
                 <i className={`ti ${item.pinned ? 'ti-pinned' : 'ti-pin'}`} />
               </button>
@@ -945,10 +945,10 @@ export default function SidebarEditor({
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <i className="ti ti-layout-sidebar" style={{ color: 'var(--accent)' }} />
             <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--accent)' }}>
-              {tr('sidebarEditorTitle')}
+              {t('sidebarEditorTitle')}
             </span>
             <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-              {tr('sidebarEditorSub')}
+              {t('sidebarEditorSub')}
             </span>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -957,21 +957,21 @@ export default function SidebarEditor({
               onClick={onReset}
               style={{ fontSize: 12, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
             >
-              <i className="ti ti-refresh" /> {tr('sidebarEditorReset')}
+              <i className="ti ti-refresh" /> {t('sidebarEditorReset')}
             </button>
             <button
               className="btn-secondary btn-sm"
               onClick={onCancel}
               style={{ fontSize: 12, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
             >
-              <i className="ti ti-x" /> {tr('cancel')}
+              <i className="ti ti-x" /> {t('cancel')}
             </button>
             <button
               className="btn-primary btn-sm"
               onClick={handleSave}
               style={{ fontSize: 12, padding: '4px 12px', borderRadius: 'var(--radius-sm)' }}
             >
-              <i className="ti ti-check" /> {tr('sidebarEditorSave')}
+              <i className="ti ti-check" /> {t('sidebarEditorSave')}
             </button>
           </div>
         </div>
@@ -986,20 +986,20 @@ export default function SidebarEditor({
           fontSize: 11,
           color: 'var(--text-tertiary)'
         }}>
-          <span><span style={{ opacity: 0.4 }}>☰</span> {tr('sidebarEditorDragHint')}</span>
-          <span><i className="ti ti-eye" /> {tr('sidebarEditorShowHide')}</span>
-          <span><i className="ti ti-pinned" /> {tr('sidebarEditorPin')}</span>
+          <span><span style={{ opacity: 0.4 }}>☰</span> {t('sidebarEditorDragHint')}</span>
+          <span><i className="ti ti-eye" /> {t('sidebarEditorShowHide')}</span>
+          <span><i className="ti ti-pinned" /> {t('sidebarEditorPin')}</span>
           <span style={{ color: 'var(--text-tertiary)', fontSize: 10 }}>
-            💡 {tr('sidebarEditorPinnedNote')}
+            💡 {t('sidebarEditorPinnedNote')}
           </span>
           <span style={{ color: 'var(--accent)', fontSize: 10 }}>
-            <i className="ti ti-arrows-sort" /> {tr('sidebarEditorDragGroupHint')}
+            <i className="ti ti-arrows-sort" /> {t('sidebarEditorDragGroupHint')}
           </span>
           <span style={{ color: 'var(--warning)', fontSize: 10 }}>
             📌 Le footer reste toujours en bas
           </span>
           <span style={{ color: 'var(--accent)', fontSize: 10 }}>
-            🔒 {tr('sidebarEditorFixedHint')} ({fixedSections.length}/2)
+            🔒 {t('sidebarEditorFixedHint')} ({fixedSections.length}/2)
           </span>
         </div>
 
@@ -1116,7 +1116,7 @@ export default function SidebarEditor({
                         fontWeight: 400,
                         textTransform: 'none'
                       }}>
-                        {tr('sidebarEditorPinnedItems')}
+                        {t('sidebarEditorPinnedItems')}
                       </span>
                     )}
                     {isFooter && (
@@ -1149,7 +1149,7 @@ export default function SidebarEditor({
                         fontWeight: 400,
                         textTransform: 'none'
                       }}>
-                        🔒 {tr('fixed')}
+                        🔒 {t('fixed')}
                       </span>
                     )}
                     <span style={{

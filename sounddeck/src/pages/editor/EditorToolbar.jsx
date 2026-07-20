@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import EditorMetronome from './EditorMetronome'
+import { useLanguage } from '../../context/LanguageContext'
 
 export default function EditorToolbar({
   isPlaying,
@@ -14,8 +15,6 @@ export default function EditorToolbar({
   onAddClipFromFile,
   tracks,
   sounds,
-  lang,
-  tr,
   isLoading,
   isExporting,
   onUndo,
@@ -37,12 +36,13 @@ export default function EditorToolbar({
   onToggleCrossfade,
   isDirty,
   isAutoSaving,
-  // ✅ NOUVELLES PROPS POUR LE MÉTRONOME
   metronomeEnabled,
   metronomeBpm,
   onMetronomeToggle,
   onMetronomeBpmChange
 }) {
+  // ✅ Utiliser useLanguage
+  const { t, currentLang } = useLanguage()
   const [showAddClip, setShowAddClip] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [selectedTrackId, setSelectedTrackId] = useState('')
@@ -83,12 +83,12 @@ export default function EditorToolbar({
     }
 
     if (!trackId) {
-      alert(tr('editorNoTracks'))
+      alert(t('editorNoTracks'))
       return
     }
 
     if (!selectedSoundId) {
-      alert(tr('editorSelectSound'))
+      alert(t('editorSelectSound'))
       return
     }
 
@@ -135,7 +135,7 @@ export default function EditorToolbar({
     }
 
     if (tracks.length === 0) {
-      alert(tr('editorNoTracks'))
+      alert(t('editorNoTracks'))
       if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
@@ -146,7 +146,7 @@ export default function EditorToolbar({
         await onAddClipFromFile(trackId, filePath)
       } catch (err) {
         console.error('Erreur import fichier:', err)
-        alert(tr('editorFileImportError'))
+        alert(t('editorFileImportError'))
       } finally {
         if (fileInputRef.current) fileInputRef.current.value = ''
       }
@@ -159,7 +159,7 @@ export default function EditorToolbar({
         setSelectedTrackId(tracks[0].id)
       } catch (err) {
         console.error('Erreur import fichier:', err)
-        alert(tr('editorFileImportError'))
+        alert(t('editorFileImportError'))
       } finally {
         if (fileInputRef.current) fileInputRef.current.value = ''
       }
@@ -175,7 +175,7 @@ export default function EditorToolbar({
 
   const confirmImportWithTrack = async () => {
     if (!importTrackId) {
-      alert(tr('editorSelectTrack'))
+      alert(t('editorSelectTrack'))
       return
     }
     
@@ -184,7 +184,7 @@ export default function EditorToolbar({
       setSelectedTrackId(importTrackId)
     } catch (err) {
       console.error('Erreur import fichier:', err)
-      alert(tr('editorFileImportError'))
+      alert(t('editorFileImportError'))
     } finally {
       setShowImportModal(false)
       setPendingFile(null)
@@ -204,10 +204,10 @@ export default function EditorToolbar({
   }
 
   const getButtonState = () => {
-    if (isPlaying) return { icon: 'ti-player-pause', label: tr('editorPause'), color: 'var(--warning)' }
-    if (isPaused) return { icon: 'ti-player-play', label: tr('editorResume'), color: 'var(--accent)' }
-    if (currentTime > 0) return { icon: 'ti-player-play', label: tr('editorPlayFromStart'), color: 'var(--accent)' }
-    return { icon: 'ti-player-play', label: tr('editorPlay'), color: 'var(--accent)' }
+    if (isPlaying) return { icon: 'ti-player-pause', label: t('editorPause'), color: 'var(--warning)' }
+    if (isPaused) return { icon: 'ti-player-play', label: t('editorResume'), color: 'var(--accent)' }
+    if (currentTime > 0) return { icon: 'ti-player-play', label: t('editorPlayFromStart'), color: 'var(--accent)' }
+    return { icon: 'ti-player-play', label: t('editorPlay'), color: 'var(--accent)' }
   }
 
   const buttonState = getButtonState()
@@ -269,7 +269,7 @@ export default function EditorToolbar({
                 alignItems: 'center',
                 gap: 4
               }}
-              title={tr('editorClickToRename')}
+              title={t('editorClickToRename')}
             >
               <i className="ti ti-pencil" style={{ fontSize: 12, color: 'var(--text-tertiary)', opacity: 0.6 }} />
               {projectName || 'Nouveau projet'}
@@ -280,21 +280,21 @@ export default function EditorToolbar({
                 color: 'var(--text-tertiary)',
                 animation: 'pulse 1s ease-in-out infinite'
               }}>
-                <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('editorSaving') || 'Sauvegarde...'}
+                <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('editorSaving') || 'Sauvegarde...'}
               </span>
             ) : isDirty ? (
               <span style={{
                 fontSize: 9,
                 color: 'var(--warning)'
               }}>
-                ● {tr('editorDirty') || 'Modifié'}
+                ● {t('editorDirty') || 'Modifié'}
               </span>
             ) : (
               <span style={{
                 fontSize: 9,
                 color: 'var(--success)'
               }}>
-                ✓ {tr('editorSaved') || 'Sauvegardé'}
+                ✓ {t('editorSaved') || 'Sauvegardé'}
               </span>
             )}
           </>
@@ -336,7 +336,7 @@ export default function EditorToolbar({
             alignItems: 'center',
             justifyContent: 'center'
           }}
-          title={tr('editorStop')}
+          title={t('editorStop')}
         >
           <i className="ti ti-player-stop-filled" />
         </button>
@@ -354,7 +354,7 @@ export default function EditorToolbar({
             justifyContent: 'center',
             opacity: canUndo ? 1 : 0.4
           }}
-          title={tr('editorUndo')}
+          title={t('editorUndo')}
         >
           <i className="ti ti-arrow-back-up" />
         </button>
@@ -371,7 +371,7 @@ export default function EditorToolbar({
             justifyContent: 'center',
             opacity: canRedo ? 1 : 0.4
           }}
-          title={tr('editorRedo')}
+          title={t('editorRedo')}
         >
           <i className="ti ti-arrow-forward-up" />
         </button>
@@ -387,35 +387,48 @@ export default function EditorToolbar({
             alignItems: 'center',
             justifyContent: 'center'
           }}
-          title={tr('editorSnap')}
+          title={t('editorSnap')}
         >
           <i className="ti ti-magnet" />
         </button>
 
+        {/* ✅ BOUTON SPLIT - CORRIGÉ */}
         <button
           className="btn-secondary btn-sm"
           onClick={onSplit}
           disabled={!canSplit}
           style={{ fontSize: 12, opacity: canSplit ? 1 : 0.4 }}
-          title={tr('editorSplitHint')}
+          title={t('editorSplitHint')}
         >
-          <i className="ti ti-cut" /> {tr('editorSplit')}
+          <i className="ti ti-cut" /> {t('editorSplit')}
         </button>
 
+        {/* ✅ BOUTON LOOP - CORRIGÉ */}
         <button
           className={loopEnabled ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
           onClick={onToggleLoop}
           style={{ fontSize: 12 }}
-          title={tr('editorLoopRegion')}
+          title={t('editorLoopRegion')}
         >
-          <i className="ti ti-repeat" /> {tr('editorLoop')}
+          <i className="ti ti-repeat" /> {t('editorLoop')}
+        </button>
+
+        {/* ✅ BOUTON MANUAL/AUTO - CORRIGÉ */}
+        <button
+          className={autoPlayOnClick ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+          onClick={onToggleAutoPlay}
+          style={{ fontSize: 10, padding: '2px 8px', minHeight: 24 }}
+          title={t('editorAutoPlay') || 'Jouer au clic'}
+        >
+          <i className="ti ti-player-play" />
+          {autoPlayOnClick ? 'Auto' : t('editorManual')}
         </button>
 
         <button
           className={autoCrossfade ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
           onClick={onToggleCrossfade}
           style={{ fontSize: 10, padding: '2px 8px', minHeight: 24 }}
-          title={tr('editorAutoCrossfade') || 'Crossfade automatique'}
+          title={t('editorAutoCrossfade') || 'Crossfade automatique'}
         >
           <i className="ti ti-transition-right" />
           {autoCrossfade ? 'Crossfade ON' : 'Crossfade OFF'}
@@ -449,7 +462,7 @@ export default function EditorToolbar({
               background: 'var(--success)',
               animation: 'pulse 1s ease-in-out infinite'
             }} />
-            {tr('editorPlaying')}
+            {t('editorPlaying')}
           </span>
         )}
         {isPaused && (
@@ -460,7 +473,7 @@ export default function EditorToolbar({
             padding: '2px 8px',
             borderRadius: 10
           }}>
-            {tr('editorPaused')}
+            {t('editorPaused')}
           </span>
         )}
         {isPreviewingEffect && (
@@ -481,14 +494,14 @@ export default function EditorToolbar({
               background: 'var(--accent)',
               animation: 'pulse 0.5s ease-in-out infinite'
             }} />
-            {tr('editorPreviewEffects') || 'Prévisualisation des effets'}
+            {t('editorPreviewEffects') || 'Prévisualisation des effets'}
           </span>
         )}
       </div>
 
       <div style={{ flex: 1 }} />
 
-      {/* ✅ MÉTRONOME - AJOUTÉ ICI */}
+      {/* Métronome */}
       <EditorMetronome
         bpm={metronomeBpm}
         onBpmChange={onMetronomeBpmChange}
@@ -497,28 +510,18 @@ export default function EditorToolbar({
         totalDuration={totalDuration}
         enabled={metronomeEnabled}
         onToggle={onMetronomeToggle}
-        tr={tr}
+        tr={t}
       />
 
       {/* Boutons d'action */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <button
-          className={autoPlayOnClick ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
-          onClick={onToggleAutoPlay}
-          style={{ fontSize: 10, padding: '2px 8px', minHeight: 24 }}
-          title={tr('editorAutoPlay') || 'Jouer au clic'}
-        >
-          <i className="ti ti-player-play" />
-          {autoPlayOnClick ? 'Auto' : 'Manuel'}
-        </button>
-
         <button
           className="btn-secondary btn-sm"
           onClick={onAddTrack}
           style={{ fontSize: 12 }}
           disabled={isLoading}
         >
-          <i className="ti ti-plus" /> {tr('editorAddTrack')}
+          <i className="ti ti-plus" /> {t('editorAddTrack')}
         </button>
 
         <button
@@ -527,7 +530,7 @@ export default function EditorToolbar({
           style={{ fontSize: 12 }}
           disabled={isLoading}
         >
-          <i className="ti ti-music-plus" /> {tr('editorAddClip')}
+          <i className="ti ti-music-plus" /> {t('editorAddClip')}
         </button>
 
         <button
@@ -536,7 +539,7 @@ export default function EditorToolbar({
           style={{ fontSize: 12 }}
           disabled={isLoading}
         >
-          <i className="ti ti-file-import" /> {tr('editorAddFile') || 'Importer un fichier'}
+          <i className="ti ti-file-import" /> {t('editorAddFile') || 'Importer un fichier'}
         </button>
 
         <input
@@ -555,9 +558,9 @@ export default function EditorToolbar({
           disabled={isExporting || isLoading}
         >
           {isExporting ? (
-            <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('editorExporting')}</>
+            <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('editorExporting')}</>
           ) : (
-            <><i className="ti ti-package-export" /> {tr('editorExport')}</>
+            <><i className="ti ti-package-export" /> {t('editorExport')}</>
           )}
         </button>
       </div>
@@ -582,7 +585,7 @@ export default function EditorToolbar({
           }}
         >
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
-            {tr('editorAddClip')}
+            {t('editorAddClip')}
           </div>
 
           <div style={{ marginBottom: 10 }}>
@@ -592,14 +595,14 @@ export default function EditorToolbar({
               display: 'block',
               marginBottom: 4
             }}>
-              {tr('editorSelectTrack')}
+              {t('editorSelectTrack')}
             </label>
             <select
               value={selectedTrackId}
               onChange={e => setSelectedTrackId(e.target.value)}
               style={{ width: '100%', fontSize: 12 }}
             >
-              <option value="">{tr('editorSelectTrack')}</option>
+              <option value="">{t('editorSelectTrack')}</option>
               {tracks.map(track => (
                 <option key={track.id} value={track.id}>
                   {track.name} ({track.clips.length} clips)
@@ -615,14 +618,14 @@ export default function EditorToolbar({
               display: 'block',
               marginBottom: 4
             }}>
-              {tr('editorSelectSound')}
+              {t('editorSelectSound')}
             </label>
             <select
               value={selectedSoundId}
               onChange={handleSoundSelect}
               style={{ width: '100%', fontSize: 12 }}
             >
-              <option value="">{tr('editorSelectSound')}</option>
+              <option value="">{t('editorSelectSound')}</option>
               {sounds.map(sound => (
                 <option key={sound.id} value={sound.id}>
                   {sound.emoji || '🔊'} {sound.name}
@@ -637,7 +640,7 @@ export default function EditorToolbar({
               onClick={() => setShowAddClip(false)}
               style={{ fontSize: 12 }}
             >
-              {tr('cancel')}
+              {t('cancel')}
             </button>
             <button
               className="btn-primary btn-sm"
@@ -645,7 +648,7 @@ export default function EditorToolbar({
               disabled={!selectedTrackId || !selectedSoundId}
               style={{ fontSize: 12, opacity: !selectedTrackId || !selectedSoundId ? 0.5 : 1 }}
             >
-              <i className="ti ti-plus" /> {tr('add')}
+              <i className="ti ti-plus" /> {t('add')}
             </button>
           </div>
 
@@ -659,7 +662,7 @@ export default function EditorToolbar({
               background: 'var(--bg-tertiary)',
               borderRadius: 'var(--radius-sm)'
             }}>
-              {tr('editorAddTrackHint')}
+              {t('editorAddTrackHint')}
             </div>
           )}
         </div>
@@ -674,7 +677,7 @@ export default function EditorToolbar({
           <div className="modal" style={{ width: 400 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">
               <i className="ti ti-file-import" style={{ color: 'var(--accent)' }} />
-              {tr('editorImportToTrack') || 'Importer dans la piste...'}
+              {t('editorImportToTrack') || 'Importer dans la piste...'}
             </div>
 
             <div style={{ marginBottom: 12 }}>
@@ -684,7 +687,7 @@ export default function EditorToolbar({
                 display: 'block',
                 marginBottom: 4
               }}>
-                {tr('editorSelectTrack')}
+                {t('editorSelectTrack')}
               </label>
               <select
                 value={importTrackId}
@@ -719,13 +722,13 @@ export default function EditorToolbar({
                   setPendingFile(null)
                 }}
               >
-                {tr('cancel')}
+                {t('cancel')}
               </button>
               <button
                 className="btn-primary btn-sm"
                 onClick={confirmImportWithTrack}
               >
-                <i className="ti ti-plus" /> {tr('add')}
+                <i className="ti ti-plus" /> {t('add')}
               </button>
             </div>
           </div>
