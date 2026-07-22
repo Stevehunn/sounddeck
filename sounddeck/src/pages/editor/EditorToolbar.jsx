@@ -394,7 +394,7 @@ export default function EditorToolbar({
           onClick={onSplit}
           disabled={!canSplit}
           style={{ fontSize: 12, opacity: canSplit ? 1 : 0.4 }}
-          title={t('editorSplitHint')}
+          title={t('editorSplit')}
         >
           <i className="ti ti-cut" /> {t('editorSplit')}
         </button>
@@ -403,7 +403,7 @@ export default function EditorToolbar({
           className={loopEnabled ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
           onClick={onToggleLoop}
           style={{ fontSize: 12 }}
-          title={t('editorLoopRegion')}
+          title={t('editorLoop')}
         >
           <i className="ti ti-repeat" /> {t('editorLoop')}
         </button>
@@ -585,13 +585,22 @@ export default function EditorToolbar({
               value={selectedTrackId}
               onChange={e => setSelectedTrackId(e.target.value)}
               style={{ width: '100%', fontSize: 12 }}
+              key={`track-select-${currentLang}`}
             >
               <option value="">{t('editorSelectTrack')}</option>
-              {tracks.map(track => (
-                <option key={track.id} value={track.id}>
-                  {track.name} ({track.clips.length} clips)
-                </option>
-              ))}
+              {tracks.map((track, index) => {
+                // Détecter si le nom est un nom par défaut (automatique)
+                const isDefaultName = track.name?.startsWith('__track_') || /^(Piste|Track|Pista)\s+\d+$/.test(track.name)
+                const displayName = isDefaultName 
+                  ? t('editorTrackDefault').replace('{index}', index + 1)
+                  : track.name
+                
+                return (
+                  <option key={track.id} value={track.id}>
+                    {displayName} ({track.clips.length} clips)
+                  </option>
+                )
+              })}
             </select>
           </div>
 
@@ -677,12 +686,20 @@ export default function EditorToolbar({
                 value={importTrackId}
                 onChange={e => setImportTrackId(e.target.value)}
                 style={{ width: '100%', fontSize: 12 }}
+                key={`import-track-select-${currentLang}`}
               >
-                {tracks.map(track => (
-                  <option key={track.id} value={track.id}>
-                    {track.name} ({track.clips.length} clips)
-                  </option>
-                ))}
+                {tracks.map((track, index) => {
+                  const isDefaultName = track.name?.startsWith('__track_') || /^(Piste|Track|Pista)\s+\d+$/.test(track.name)
+                  const displayName = isDefaultName 
+                    ? t('editorTrackDefault').replace('{index}', index + 1)
+                    : track.name
+                  
+                  return (
+                    <option key={track.id} value={track.id}>
+                      {displayName} ({track.clips.length} clips)
+                    </option>
+                  )
+                })}
               </select>
             </div>
 

@@ -42,9 +42,9 @@ export default function EditorNormalize({
           color: 'var(--text-primary)'
         }}
       >
-        <option value="clip">{tr('editorNormalizeClip') || 'Ce clip'}</option>
-        <option value="track">{tr('editorNormalizeTrack') || 'Cette piste'}</option>
-        <option value="project">{tr('editorNormalizeProject') || 'Tout le projet'}</option>
+        <option value="clip">{tr('editorNormalizeScopeClip') || 'Clip actuel'}</option>
+        <option value="track">{tr('editorNormalizeScopeTrack') || 'Piste entière'}</option>
+        <option value="project">{tr('editorNormalizeScopeProject') || 'Projet entier'}</option>
       </select>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

@@ -1202,10 +1202,11 @@ export function useStore() {
     return project
   }, [save])
 
-  const addTrack = useCallback(async () => {
+  const addTrack = useCallback(async (t) => {
     const newTrack = {
       id: `track-${Date.now()}`,
-      name: `Piste ${editorProject.tracks.length + 1}`,
+      name: `__track_${trackIndex}__`,
+      displayIndex: trackIndex,
       clips: [],
       volume: 1,
       muted: false,

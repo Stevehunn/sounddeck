@@ -9,8 +9,12 @@ import EditorMasterVolume from './EditorMasterVolume'
 import { generateWaveformData } from '../../utils/waveformGenerator'
 import { normalizeClip, normalizeAll } from '../../utils/normalizeUtils'
 import { mixdownProject, exportMixdown } from '../../utils/mixdown'
+import { applyEffectsToFile } from '../../utils/audioEffects'
 
 const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
+
+// Cache pour les blobs d'effets
+const effectBlobCache = new Map()
 
 export default function Editor({ store, addToast }) {
   const { t, currentLang } = useLanguage()
@@ -76,11 +80,9 @@ export default function Editor({ store, addToast }) {
   const isPlayingRef = useRef(false)
   const loopRegionRef = useRef(store.editorLoopRegion)
   const playAllClipsRef = useRef(null)
-  
-  // ✅ RÉFÉRENCE POUR LES HOWL PAR PISTE (volume temps réel)
   const trackHowlsRef = useRef({})
+  const effectBlobsRef = useRef([])
   
-  // ✅ VERSION DU PROJET POUR FORCER LES MISES À JOUR
   const [projectVersion, setProjectVersion] = useState(0)
 
   // ─── SYNC DES REFS ────────────────────────────────────────────────────────
@@ -121,14 +123,12 @@ export default function Editor({ store, addToast }) {
     setAutoSaveTimer(timer)
   }, [autoSaveTimer, saveProject])
 
-  // Sauvegarder quand le projet change
   useEffect(() => {
     if (store.editorProject && store.editorProject.id) {
       markDirty()
     }
   }, [store.editorProject?.tracks, store.editorProject?.name, store.editorProject?.markers])
 
-  // Nettoyer le timer
   useEffect(() => {
     return () => {
       if (autoSaveTimer) {
@@ -142,11 +142,11 @@ export default function Editor({ store, addToast }) {
     const project = store.editorProject
     if (project && project.id && project.tracks?.length === 0) {
       const timer = setTimeout(async () => {
-        await store.addTrack()
+        await store.addTrack(t)
       }, 100)
       return () => clearTimeout(timer)
     }
-  }, [store.editorProject?.id, store.editorProject?.tracks?.length])
+  }, [store.editorProject?.id, store.editorProject?.tracks?.length, t])
 
   // ─── CHARGEMENT DES MARQUEURS ─────────────────────────────────────────────
   useEffect(() => {
@@ -263,18 +263,29 @@ export default function Editor({ store, addToast }) {
         previewHowlRef.current.unload()
         previewHowlRef.current = null
       }
+      // Nettoyer les blobs d'effets
+      cleanupEffectBlobs()
     }
+  }, [])
+
+  // ─── NETTOYAGE DES BLOBS ──────────────────────────────────────────────────
+  const cleanupEffectBlobs = useCallback(() => {
+    effectBlobsRef.current.forEach(url => {
+      try { URL.revokeObjectURL(url) } catch (e) {}
+    })
+    effectBlobsRef.current = []
+    effectBlobCache.clear()
   }, [])
 
   // ─── CRÉATION DU PROJET ──────────────────────────────────────────────────
   useEffect(() => {
     const project = store.editorProject
     if (!project || !project.id) {
-      store.createEditorProject('Nouveau projet')
+      store.createEditorProject(t('editorNewProject') || 'Nouveau projet')
     }
   }, [])
 
-  // ─── MISE À JOUR DU VOLUME EN TEMPS RÉEL - AVEC setInterval ──────────────
+  // ─── MISE À JOUR DU VOLUME EN TEMPS RÉEL ──────────────────────────────────
   useEffect(() => {
     let intervalId = null
     
@@ -284,8 +295,6 @@ export default function Editor({ store, addToast }) {
         if (!project) return
         
         const masterVol = isMasterMuted ? 0 : masterVolume / 100
-        let volumeChanged = false
-        
         project.tracks.forEach(track => {
           const howls = trackHowlsRef.current[track.id] || []
           const trackVolume = (track.volume !== undefined && track.volume !== null) ? track.volume : 1
@@ -298,18 +307,11 @@ export default function Editor({ store, addToast }) {
                 const currentVolume = howl.volume()
                 if (Math.abs(currentVolume - clampedVolume) > 0.001) {
                   howl.volume(clampedVolume)
-                  volumeChanged = true
                 }
-              } catch (e) {
-                // Ignorer les erreurs
-              }
+              } catch (e) {}
             }
           })
         })
-        
-        if (volumeChanged) {
-          // console.log('🔊 [VOLUME] Volume mis à jour en temps réel')
-        }
       }, 100)
     }
     
@@ -322,7 +324,7 @@ export default function Editor({ store, addToast }) {
 
   // ─── GESTION DU PROJET ────────────────────────────────────────────────────
   const handleAddTrack = async () => {
-    await store.addTrack()
+    await store.addTrack(t)
     addToast(t('editorTrackAdded'), 'success')
     setProjectVersion(prev => prev + 1)
   }
@@ -533,7 +535,6 @@ export default function Editor({ store, addToast }) {
         handlePasteClip(selectedTrackId)
       }
       
-      // Z = Zoom sur la sélection
       if (e.key === 'z' && !e.ctrlKey && !e.metaKey) {
         if (selectedClipId) {
           const clip = store.editorProject.tracks
@@ -545,7 +546,6 @@ export default function Editor({ store, addToast }) {
         }
       }
 
-      // A = Tout sélectionner
       if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
         e.preventDefault()
         const allClips = store.editorProject.tracks.flatMap(t => t.clips)
@@ -560,7 +560,6 @@ export default function Editor({ store, addToast }) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedClipId, selectedTrackId, handleCopyClip, handleCutClip, handlePasteClip, store.editorProject, clipDurations])
 
-  // ─── ZOOM SUR LA SÉLECTION ──────────────────────────────────────────────
   const handleZoomToRange = useCallback((start, end) => {
     if (window.editorTimelineRef) {
       window.editorTimelineRef.zoomToRange(start, end)
@@ -583,13 +582,16 @@ export default function Editor({ store, addToast }) {
       animationRef.current = null
     }
     
+    // Nettoyer les blobs d'effets
+    cleanupEffectBlobs()
+    
     setIsPlaying(false)
     setIsPaused(false)
     setCurrentTime(0)
     startTimeRef.current = 0
     pausedTimeRef.current = 0
     isPlayingRef.current = false
-  }, [])
+  }, [cleanupEffectBlobs])
 
   const pausePlayback = useCallback(() => {
     if (isPlayingRef.current) {
@@ -611,7 +613,7 @@ export default function Editor({ store, addToast }) {
     }
   }, [currentTime])
 
-  // ─── LECTURE AVEC VOLUME PAR PISTE ──────────────────────────────────────
+  // ─── LECTURE AVEC EFFETS ──────────────────────────────────────────────────
   const playAllClips = useCallback((startAt = 0) => {
     const project = store.editorProject
     if (!project || project.tracks.length === 0) {
@@ -637,13 +639,10 @@ export default function Editor({ store, addToast }) {
     startTimeRef.current = Date.now() - startAt * 1000
     pausedTimeRef.current = 0
 
-    // ✅ Réinitialiser les références des Howl par piste
     trackHowlsRef.current = {}
-
     const howls = []
     const masterVol = isMasterMuted ? 0 : masterVolume / 100
 
-    // ✅ Map des volumes et états par piste
     const trackVolumes = {}
     const trackSolos = {}
     const trackMutes = {}
@@ -653,141 +652,169 @@ export default function Editor({ store, addToast }) {
       trackMutes[t.id] = t.muted || false
     })
 
-    // ✅ Vérifier si une piste est en solo
     const hasSolo = Object.values(trackSolos).some(s => s === true)
 
-    project.tracks.forEach(track => {
-      // ✅ Si une piste est en solo, ne jouer que les pistes en solo
-      if (hasSolo && !trackSolos[track.id]) return
+    // Fonction pour créer un Howl avec ou sans effets
+    const createHowlForClip = async (clip, trackId, trackVolume, clipVolume, finalVolume) => {
+      const fileUrl = clip.path.startsWith('file://') 
+        ? clip.path 
+        : 'file:///' + clip.path.replace(/\\/g, '/')
+
+      // Vérifier si le clip a des effets actifs
+      const hasActiveEffects = clip.effects?.some(e => e.enabled) || false
       
-      // ✅ Si la piste est muette, ignorer
-      if (trackMutes[track.id]) return
-
-      // ✅ Utiliser directement track.volume
-      const trackVolume = (track.volume !== undefined && track.volume !== null) ? track.volume : 1
-
-      // ✅ Initialiser le tableau des Howl pour cette piste
-      if (!trackHowlsRef.current[track.id]) {
-        trackHowlsRef.current[track.id] = []
-      }
-
-      track.clips.forEach(clip => {
-        const fileUrl = clip.path.startsWith('file://') 
-          ? clip.path 
-          : 'file:///' + clip.path.replace(/\\/g, '/')
-
-        const clipDuration = clipDurations[clip.id] || clip.duration || 3
-
-        let clipVolume = 1.0
-        let speed = 1.0
-
-        clip.effects?.forEach(effect => {
-          if (effect.enabled) {
-            switch (effect.type) {
-              case 'volume':
-                clipVolume = effect.params.value || 1.0
-                break
-              case 'speed':
-                speed = effect.params.value || 1.0
-                break
-            }
-          }
-        })
-
-        // ✅ Calcul du volume final
-        const finalVolume = clipVolume * trackVolume * (store.volume / 100) * masterVol
-        const clampedVolume = Math.min(1, Math.max(0.001, finalVolume))
-
-        const howl = new Howl({
-          src: [fileUrl],
-          volume: clampedVolume,
-          rate: speed,
-          html5: true,
-          onloaderror: (id, err) => {
-            console.error('Erreur lecture clip:', clip.name, err)
-          }
-        })
-
-        // ✅ Stocker la référence du Howl avec son clip et son volume
-        const howlData = { howl, clip, clipVolume }
-        trackHowlsRef.current[track.id].push(howlData)
-
-        howls.push({
-          howl,
-          clip,
-          startOffset: clip.start,
-          started: false,
-          duration: clipDuration,
-          trackId: track.id,
-          clipVolume: clipVolume
-        })
-      })
-    })
-
-    allHowlsRef.current = howls
-
-    const startClipsAtTime = (time) => {
-      howls.forEach(item => {
-        if (!item.started && time >= item.startOffset) {
+      let src = fileUrl
+      let isBlob = false
+      
+      if (hasActiveEffects) {
+        // Vérifier le cache
+        const cacheKey = `${clip.id}_${clip.effects.map(e => `${e.id}_${e.enabled}`).join('_')}`
+        
+        if (effectBlobCache.has(cacheKey)) {
+          src = effectBlobCache.get(cacheKey)
+          isBlob = true
+        } else {
           try {
-            item.howl.play()
-            const sourceOffset = item.clip.offset || 0
-            const seekTime = Math.min(time - item.startOffset, item.duration) + sourceOffset
-            if (seekTime > 0) {
-              item.howl.seek(seekTime)
+            // Appliquer les effets et générer un blob
+            const result = await applyEffectsToFile(clip.path, clip.effects)
+            if (result.success && result.needsProcessing && result.url) {
+              src = result.url
+              isBlob = true
+              effectBlobCache.set(cacheKey, src)
+              effectBlobsRef.current.push(src)
             }
-            
-            // ✅ APPLIQUER LE VOLUME IMMÉDIATEMENT APRÈS LE DÉMARRAGE
-            const project = store.editorProject
-            if (project) {
-              const track = project.tracks.find(t => t.id === item.trackId)
-              if (track) {
-                const trackVolume = (track.volume !== undefined && track.volume !== null) ? track.volume : 1
-                const masterVol = isMasterMuted ? 0 : masterVolume / 100
-                const finalVolume = item.clipVolume * trackVolume * (store.volume / 100) * masterVol
-                const clampedVolume = Math.min(1, Math.max(0.001, finalVolume))
-                item.howl.volume(clampedVolume)
-              }
-            }
-            
-            item.started = true
           } catch (e) {
-            console.warn('Erreur démarrage clip:', e)
+            console.warn('Erreur application effets:', e)
+            // Fallback : utiliser le fichier original
           }
         }
+      }
+
+      const speed = clip.effects?.find(e => e.type === 'speed' && e.enabled)?.params?.value || 1
+
+      const howl = new Howl({
+        src: [src],
+        volume: Math.min(1, Math.max(0.001, finalVolume)),
+        rate: speed,
+        html5: true,
+        format: isBlob ? ['wav'] : ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'],
+        onloaderror: (id, err) => {
+          console.error('Erreur lecture clip:', clip.name, err)
+        }
       })
+
+      return { howl, clip, clipVolume, trackId, isBlob }
     }
 
-    const updateProgress = () => {
-      if (!isPlayingRef.current) return
+    // Parcourir les pistes et clips
+    const loadClips = async () => {
+      for (const track of project.tracks) {
+        if (hasSolo && !trackSolos[track.id]) continue
+        if (trackMutes[track.id]) continue
 
-      const elapsed = (Date.now() - startTimeRef.current) / 1000
-      let current = Math.min(elapsed, totalDuration)
+        const trackVolume = (track.volume !== undefined && track.volume !== null) ? track.volume : 1
 
-      const loop = loopRegionRef.current
-      if (loop?.enabled && current >= loop.end) {
-        const loopDuration = loop.end - loop.start
-        if (loopDuration > 0.1) {
-          const offset = (current - loop.end) % loopDuration
-          current = loop.start + offset
-          startTimeRef.current = Date.now() - current * 1000
+        if (!trackHowlsRef.current[track.id]) {
+          trackHowlsRef.current[track.id] = []
+        }
+
+        for (const clip of track.clips) {
+          let clipVolume = 1.0
+          clip.effects?.forEach(effect => {
+            if (effect.enabled && effect.type === 'volume') {
+              clipVolume = effect.params.value || 1.0
+            }
+          })
+
+          const finalVolume = clipVolume * trackVolume * (store.volume / 100) * masterVol
+          const clampedVolume = Math.min(1, Math.max(0.001, finalVolume))
+
+          try {
+            const howlData = await createHowlForClip(clip, track.id, trackVolume, clipVolume, clampedVolume)
+            
+            trackHowlsRef.current[track.id].push(howlData)
+            howls.push({
+              howl: howlData.howl,
+              clip: howlData.clip,
+              startOffset: clip.start,
+              started: false,
+              duration: clipDurations[clip.id] || clip.duration || 3,
+              trackId: track.id,
+              clipVolume: clipVolume,
+              isBlob: howlData.isBlob
+            })
+          } catch (e) {
+            console.warn('Erreur chargement clip:', clip.name, e)
+          }
         }
       }
 
-      startClipsAtTime(current)
-      setCurrentTime(current)
+      allHowlsRef.current = howls
 
-      if (current >= totalDuration) {
-        stopPlayback()
-        return
+      const startClipsAtTime = (time) => {
+        howls.forEach(item => {
+          if (!item.started && time >= item.startOffset) {
+            try {
+              item.howl.play()
+              const sourceOffset = item.clip.offset || 0
+              const seekTime = Math.min(time - item.startOffset, item.duration) + sourceOffset
+              if (seekTime > 0) {
+                item.howl.seek(seekTime)
+              }
+              
+              const project = store.editorProject
+              if (project) {
+                const track = project.tracks.find(t => t.id === item.trackId)
+                if (track) {
+                  const trackVolume = (track.volume !== undefined && track.volume !== null) ? track.volume : 1
+                  const masterVol = isMasterMuted ? 0 : masterVolume / 100
+                  const finalVolume = item.clipVolume * trackVolume * (store.volume / 100) * masterVol
+                  const clampedVolume = Math.min(1, Math.max(0.001, finalVolume))
+                  item.howl.volume(clampedVolume)
+                }
+              }
+              
+              item.started = true
+            } catch (e) {
+              console.warn('Erreur démarrage clip:', e)
+            }
+          }
+        })
       }
 
-      animationRef.current = requestAnimationFrame(updateProgress)
+      const updateProgress = () => {
+        if (!isPlayingRef.current) return
+
+        const elapsed = (Date.now() - startTimeRef.current) / 1000
+        let current = Math.min(elapsed, totalDuration)
+
+        const loop = loopRegionRef.current
+        if (loop?.enabled && current >= loop.end) {
+          const loopDuration = loop.end - loop.start
+          if (loopDuration > 0.1) {
+            const offset = (current - loop.end) % loopDuration
+            current = loop.start + offset
+            startTimeRef.current = Date.now() - current * 1000
+          }
+        }
+
+        startClipsAtTime(current)
+        setCurrentTime(current)
+
+        if (current >= totalDuration) {
+          stopPlayback()
+          return
+        }
+
+        animationRef.current = requestAnimationFrame(updateProgress)
+      }
+
+      startClipsAtTime(startAt)
+      updateProgress()
     }
 
-    startClipsAtTime(startAt)
-    updateProgress()
-  }, [store.editorProject, store.volume, totalDuration, clipDurations, addToast, t, stopPlayback, masterVolume, isMasterMuted])
+    loadClips()
+  }, [store.editorProject, store.volume, totalDuration, clipDurations, addToast, t, stopPlayback, masterVolume, isMasterMuted, cleanupEffectBlobs])
 
   const resumePlayback = useCallback(() => {
     if (isPaused) {
@@ -1006,14 +1033,19 @@ export default function Editor({ store, addToast }) {
     
     setIsNormalizing(true)
     try {
+      console.log(`🔊 Normalisation du clip "${clip.name}" avec targetPeak = ${targetPeak}`)
       const result = await normalizeClip(clip, targetPeak, store)
       if (result) {
         if (result.normalized) {
-          addToast(`"${clip.name}" ${t('editorNormalized')} (gain: ${result.gain.toFixed(2)})`, 'success')
-          const data = await generateWaveformData(result.newPath || clip.path, 200, 0, null, false)
-          if (data) {
-            setWaveformData(prev => ({ ...prev, [clipId]: data }))
+          addToast(`"${clip.name}" ${t('editorNormalized')} (gain: ${result.gain.toFixed(2)}x)`, 'success')
+          // Forcer la mise à jour du waveform avec le nouveau fichier
+          if (result.newPath) {
+            const data = await generateWaveformData(result.newPath, 200, 0, null, false)
+            if (data) {
+              setWaveformData(prev => ({ ...prev, [clipId]: data }))
+            }
           }
+          setProjectVersion(prev => prev + 1)
         } else {
           addToast(`"${clip.name}" ${t('editorAlreadyNormalized')}`, 'info')
         }
@@ -1022,7 +1054,7 @@ export default function Editor({ store, addToast }) {
       }
     } catch (e) {
       console.error('Erreur normalisation:', e)
-      addToast(t('editorNormalizeError'), 'error')
+      addToast(t('editorNormalizeError') + ': ' + e.message, 'error')
     } finally {
       setIsNormalizing(false)
     }
@@ -1054,12 +1086,22 @@ export default function Editor({ store, addToast }) {
       const normalized = results.filter(r => r.normalized)
       if (normalized.length > 0) {
         addToast(`${normalized.length} ${t('editorClipsNormalized')}`, 'success')
+        // Forcer la mise à jour des waveforms
+        for (const result of normalized) {
+          if (result.newPath && result.clipId) {
+            const data = await generateWaveformData(result.newPath, 200, 0, null, false)
+            if (data) {
+              setWaveformData(prev => ({ ...prev, [result.clipId]: data }))
+            }
+          }
+        }
+        setProjectVersion(prev => prev + 1)
       } else {
         addToast(t('editorAlreadyNormalized'), 'info')
       }
     } catch (e) {
       console.error('Erreur normalisation:', e)
-      addToast(t('editorNormalizeError'), 'error')
+      addToast(t('editorNormalizeError') + ': ' + e.message, 'error')
     } finally {
       setIsNormalizing(false)
     }
@@ -1261,8 +1303,9 @@ export default function Editor({ store, addToast }) {
       overflow: 'hidden',
       background: 'var(--bg-primary)'
     }}>
-      {/* Barre d'outils - retrait du bouton Auto/Manual */}
+      {/* Barre d'outils - avec key pour forcer le re-rendu quand la langue change */}
       <EditorToolbar
+        key={`editor-toolbar-${currentLang}`}
         isPlaying={isPlaying}
         isPaused={isPaused}
         currentTime={currentTime}
@@ -1714,8 +1757,8 @@ export default function Editor({ store, addToast }) {
           background: rgba(0,0,0,0.6);
           backdrop-filter: blur(4px);
           display: flex;
-          align-items: center;
-          justify-content: center;
+          alignItems: center;
+          justifyContent: center;
           z-index: 9999;
         }
         .modal {

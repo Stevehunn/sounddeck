@@ -600,7 +600,7 @@ export default function EditorTimeline({
               setZoomLevel(newZoom)
             }}
             style={{ padding: '2px 6px', fontSize: 12, color: 'var(--text-secondary)' }}
-            title="Zoom arrière (Ctrl+-)"
+            title={tr('editorZoomOut') || 'Zoom arrière (Ctrl+-)'}
           >
             <i className="ti ti-zoom-out" />
           </button>
@@ -611,7 +611,7 @@ export default function EditorTimeline({
             minWidth: 50,
             textAlign: 'center'
           }}>
-            {Math.round(globalZoom * 100)}%
+            {tr('editorZoomPercent')?.replace('{percent}', Math.round(globalZoom * 100)) || `${Math.round(globalZoom * 100)}%`}
           </span>
           
           <button
@@ -622,7 +622,7 @@ export default function EditorTimeline({
               setZoomLevel(newZoom)
             }}
             style={{ padding: '2px 6px', fontSize: 12, color: 'var(--text-secondary)' }}
-            title="Zoom avant (Ctrl+=)"
+            title={tr('editorZoomIn') || 'Zoom avant (Ctrl+=)'}
           >
             <i className="ti ti-zoom-in" />
           </button>
@@ -634,7 +634,7 @@ export default function EditorTimeline({
               setZoomLevel(1)
             }}
             style={{ padding: '2px 6px', fontSize: 10, color: 'var(--text-tertiary)' }}
-            title="Réinitialiser le zoom (Ctrl+0)"
+            title={tr('editorZoomReset') || 'Réinitialiser le zoom (Ctrl+0)'}
           >
             <i className="ti ti-refresh" /> 100%
           </button>
@@ -649,9 +649,9 @@ export default function EditorTimeline({
               setZoomLevel(neededZoom)
             }}
             style={{ padding: '2px 6px', fontSize: 10, color: 'var(--text-tertiary)' }}
-            title="Ajuster pour tout voir"
+            title={tr('editorZoomFit') || 'Ajuster pour tout voir'}
           >
-            <i className="ti ti-fit" /> Ajuster
+            <i className="ti ti-fit" /> {tr('editorZoomFit') || 'Ajuster'}
           </button>
 
           <span style={{
@@ -662,7 +662,7 @@ export default function EditorTimeline({
             paddingLeft: 8,
             minWidth: 60
           }}>
-            {formatTime(totalDuration)}
+            {tr('editorDuration') || 'Durée'}: {formatTime(totalDuration)}
           </span>
         </div>
 

@@ -482,13 +482,11 @@ export default function Options({ store, addToast }) { // ❌ Supprimer le param
           <OptionRow label={t('language')}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {LANGUAGES.map(l => (
-                <button key={l.code} 
+                <button 
+                  key={l.code}
                   onClick={async () => {
-                    // ✅ Utiliser changeLanguage du contexte
+                    await store.updateLang(l.code, t)
                     await changeLanguage(l.code)
-                    // ✅ Mettre à jour le store
-                    await store.updateLang(l.code)
-                    // ✅ Forcer le re-render
                     setLangVersion(prev => prev + 1)
                   }}
                   style={{

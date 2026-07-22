@@ -46,14 +46,16 @@ export function applyFade(audioBuffer, fadeInDuration = 0.5, fadeOutDuration = 0
 /**
  * Change la vitesse de lecture d'un buffer audio
  */
-export function changePitch(audioBuffer, speed = 1.0) {
+export function changePitch(audioBuffer, speed = 1.0, ctx = null) {
   if (speed === 1.0) return audioBuffer
+  
+  const context = ctx || new (window.AudioContext || window.webkitAudioContext)()
   
   const sampleRate = audioBuffer.sampleRate
   const channels = audioBuffer.numberOfChannels
   const length = Math.floor(audioBuffer.length / speed)
   
-  const newBuffer = audioBuffer.context.createBuffer(channels, length, sampleRate)
+  const newBuffer = context.createBuffer(channels, length, sampleRate)
   
   for (let channel = 0; channel < channels; channel++) {
     const data = audioBuffer.getChannelData(channel)
@@ -75,19 +77,21 @@ export function changePitch(audioBuffer, speed = 1.0) {
 /**
  * Change la hauteur tonale (pitch) sans modifier la vitesse
  */
-export function changePitchOnly(audioBuffer, semitones = 0) {
+export function changePitchOnly(audioBuffer, semitones = 0, ctx = null) {
   if (semitones === 0) return audioBuffer
+  
+  const context = ctx || new (window.AudioContext || window.webkitAudioContext)()
   
   const pitchRatio = Math.pow(2, semitones / 12)
   const speed = 1 / pitchRatio
   
-  const pitchedBuffer = changePitch(audioBuffer, speed)
+  const pitchedBuffer = changePitch(audioBuffer, speed, context)
   
   const sampleRate = audioBuffer.sampleRate
   const channels = audioBuffer.numberOfChannels
   const originalLength = audioBuffer.length
   
-  const finalBuffer = audioBuffer.context.createBuffer(channels, originalLength, sampleRate)
+  const finalBuffer = context.createBuffer(channels, originalLength, sampleRate)
   
   for (let channel = 0; channel < channels; channel++) {
     const data = pitchedBuffer.getChannelData(channel)
@@ -111,12 +115,14 @@ export function changePitchOnly(audioBuffer, semitones = 0) {
 /**
  * Applique un effet d'écho simple sur un buffer audio
  */
-export function applyEcho(audioBuffer, delay = 0.3, decay = 0.5, mix = 0.3) {
+export function applyEcho(audioBuffer, delay = 0.3, decay = 0.5, mix = 0.3, ctx = null) {
+  const context = ctx || new (window.AudioContext || window.webkitAudioContext)()
+  
   const sampleRate = audioBuffer.sampleRate
   const channels = audioBuffer.numberOfChannels
   const delaySamples = Math.floor(delay * sampleRate)
   
-  const newBuffer = audioBuffer.context.createBuffer(channels, audioBuffer.length + delaySamples, sampleRate)
+  const newBuffer = context.createBuffer(channels, audioBuffer.length + delaySamples, sampleRate)
   
   for (let channel = 0; channel < channels; channel++) {
     const data = audioBuffer.getChannelData(channel)
@@ -137,35 +143,43 @@ export function applyEcho(audioBuffer, delay = 0.3, decay = 0.5, mix = 0.3) {
 }
 
 /**
- * Applique une réverbération simple
+ * ✅ Applique une réverbération optimisée (version légère)
+ * Utilise un filtre simple au lieu d'une convolution complète pour éviter les crashes
  */
-export function applyReverb(audioBuffer, roomSize = 0.5, mix = 0.2) {
+export function applyReverb(audioBuffer, roomSize = 0.5, mix = 0.2, ctx = null) {
+  if (roomSize <= 0 || mix <= 0) return audioBuffer
+  
+  const context = ctx || new (window.AudioContext || window.webkitAudioContext)()
+  
   const sampleRate = audioBuffer.sampleRate
   const channels = audioBuffer.numberOfChannels
-  const reverbLength = Math.floor(roomSize * sampleRate * 1.5)
   
-  const newBuffer = audioBuffer.context.createBuffer(channels, audioBuffer.length + reverbLength, sampleRate)
+  // ✅ Réverbération simplifiée : multiples échos avec décroissance
+  // Beaucoup plus léger et ne fait pas crash
+  const delays = [0.03, 0.06, 0.09, 0.12, 0.15, 0.18, 0.21, 0.24]
+  const decays = delays.map((_, i) => Math.pow(0.6, i + 1) * roomSize * 0.5)
   
-  const irBuffer = audioBuffer.context.createBuffer(1, reverbLength, sampleRate)
-  const irData = irBuffer.getChannelData(0)
-  
-  for (let i = 0; i < reverbLength; i++) {
-    const decay = Math.exp(-i / (reverbLength * 0.3))
-    irData[i] = (Math.random() * 2 - 1) * decay
-  }
+  const maxDelaySamples = Math.floor(delays[delays.length - 1] * sampleRate)
+  const newLength = audioBuffer.length + maxDelaySamples + Math.floor(0.1 * sampleRate)
+  const newBuffer = context.createBuffer(channels, newLength, sampleRate)
   
   for (let channel = 0; channel < channels; channel++) {
     const data = audioBuffer.getChannelData(channel)
     const newData = newBuffer.getChannelData(channel)
     
+    // Copier le signal original avec le mix
     for (let i = 0; i < data.length; i++) {
-      newData[i] += data[i] * (1 - mix)
+      newData[i] = data[i] * (1 - mix)
     }
     
-    for (let i = 0; i < data.length; i++) {
-      for (let j = 0; j < Math.min(reverbLength, newData.length - i); j++) {
-        if (j < reverbLength) {
-          newData[i + j] += data[i] * irData[j] * mix
+    // Ajouter les échos avec décroissance
+    for (let echoIndex = 0; echoIndex < delays.length; echoIndex++) {
+      const delaySamples = Math.floor(delays[echoIndex] * sampleRate)
+      const decay = decays[echoIndex] * mix
+      
+      for (let i = 0; i < data.length; i++) {
+        if (i + delaySamples < newData.length) {
+          newData[i + delaySamples] += data[i] * decay
         }
       }
     }
@@ -197,6 +211,53 @@ export function normalizeAudio(audioBuffer, targetPeak = 0.95) {
     const data = audioBuffer.getChannelData(channel)
     for (let i = 0; i < data.length; i++) {
       data[i] *= gain
+    }
+  }
+  
+  return audioBuffer
+}
+
+/**
+ * Applique un effet individuel sur un buffer
+ */
+export function applyEffectToBuffer(audioBuffer, effect, sampleRate = 44100, ctx = null) {
+  if (!effect.enabled) return audioBuffer
+  
+  const context = ctx || new (window.AudioContext || window.webkitAudioContext)()
+  
+  switch (effect.type) {
+    case 'volume':
+      return applyVolumeEffect(audioBuffer, effect.params.value || 1)
+    case 'fadeIn':
+      return applyFadeIn(audioBuffer, effect.params.duration || 0.5)
+    case 'fadeOut':
+      return applyFadeOut(audioBuffer, effect.params.duration || 0.5)
+    case 'pitch':
+      return changePitchOnly(audioBuffer, effect.params.semitones || 0, context)
+    case 'speed':
+      return changePitch(audioBuffer, effect.params.value || 1, context)
+    case 'echo':
+      return applyEcho(audioBuffer, effect.params.delay || 0.3, effect.params.decay || 0.5, effect.params.mix || 0.3, context)
+    case 'reverb':
+      return applyReverb(audioBuffer, effect.params.roomSize || 0.5, effect.params.mix || 0.2, context)
+    default:
+      return audioBuffer
+  }
+}
+
+/**
+ * Applique un effet de volume
+ */
+function applyVolumeEffect(audioBuffer, volume) {
+  if (volume === 1) return audioBuffer
+  
+  const channels = audioBuffer.numberOfChannels
+  const length = audioBuffer.length
+  
+  for (let channel = 0; channel < channels; channel++) {
+    const data = audioBuffer.getChannelData(channel)
+    for (let i = 0; i < length; i++) {
+      data[i] *= volume
     }
   }
   
@@ -258,6 +319,134 @@ export async function loadAudioBuffer(filePath) {
   }
 }
 
+/**
+ * ✅ Applique les effets sur un fichier audio avec limite de taille
+ * Pour éviter les crashes, on limite la durée des effets lourds
+ */
+export async function applyEffectsToFile(filePath, effects, sampleRate = 44100) {
+  try {
+    // Vérifier si le clip a des effets actifs
+    const activeEffects = effects.filter(e => e.enabled)
+    if (activeEffects.length === 0) {
+      return { success: true, url: null, needsProcessing: false }
+    }
+
+    // Charger le fichier audio
+    const fileUrl = filePath.startsWith('file://') 
+      ? filePath 
+      : 'file:///' + filePath.replace(/\\/g, '/')
+    
+    const response = await fetch(fileUrl)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    const arrayBuffer = await response.arrayBuffer()
+    
+    // ✅ Créer un contexte audio unique pour tout le traitement
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+    
+    // ✅ Vérifier la durée du son - si trop long, réduire la qualité de la réverbération
+    const duration = audioBuffer.duration
+    const hasReverb = activeEffects.some(e => e.type === 'reverb')
+    
+    if (hasReverb && duration > 10) {
+      console.log('⚠️ Son long détecté, réverbération optimisée pour éviter le crash')
+      // Réduire la taille de la pièce et le mix pour les sons longs
+      activeEffects.forEach(e => {
+        if (e.type === 'reverb') {
+          e.params.roomSize = Math.min(e.params.roomSize || 0.5, 0.3)
+          e.params.mix = Math.min(e.params.mix || 0.2, 0.15)
+        }
+      })
+    }
+    
+    // Appliquer les effets en passant le contexte à chaque fonction
+    let processedBuffer = audioBuffer
+    for (const effect of activeEffects) {
+      processedBuffer = applyEffectToBuffer(processedBuffer, effect, sampleRate, audioContext)
+    }
+    
+    // Normaliser pour éviter l'écrêtage
+    processedBuffer = normalizeAudio(processedBuffer, 0.95)
+    
+    // Convertir en WAV
+    const wavData = audioBufferToWav(processedBuffer)
+    const blob = new Blob([wavData], { type: 'audio/wav' })
+    const url = URL.createObjectURL(blob)
+    
+    // Nettoyer le contexte
+    await audioContext.close()
+    
+    return { success: true, url, blob, needsProcessing: true }
+  } catch (e) {
+    console.error('Erreur application effets:', e)
+    return { success: false, error: e.message, needsProcessing: false }
+  }
+}
+
+/**
+ * Convertit un AudioBuffer en WAV (ArrayBuffer)
+ */
+export function audioBufferToWav(buffer) {
+  const numChannels = buffer.numberOfChannels
+  const sampleRate = buffer.sampleRate
+  const format = 1
+  const bitDepth = 16
+  const bytesPerSample = bitDepth / 8
+  const blockAlign = numChannels * bytesPerSample
+  
+  const samples = buffer.length
+  const dataSize = samples * numChannels * bytesPerSample
+  const headerSize = 44
+  const totalSize = headerSize + dataSize
+  
+  const wav = new ArrayBuffer(totalSize)
+  const view = new DataView(wav)
+  
+  // RIFF header
+  writeString(view, 0, 'RIFF')
+  view.setUint32(4, totalSize - 8, true)
+  writeString(view, 8, 'WAVE')
+  
+  // fmt chunk
+  writeString(view, 12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, format, true)
+  view.setUint16(22, numChannels, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * blockAlign, true)
+  view.setUint16(32, blockAlign, true)
+  view.setUint16(34, bitDepth, true)
+  
+  // data chunk
+  writeString(view, 36, 'data')
+  view.setUint32(40, dataSize, true)
+  
+  // Écrire les données audio
+  const offset = 44
+  const dataView = new DataView(wav, offset)
+  
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel)
+    let idx = channel * bytesPerSample
+    
+    for (let i = 0; i < samples; i++) {
+      const sample = Math.max(-1, Math.min(1, channelData[i]))
+      const int16 = sample < 0 ? sample * 0x8000 : sample * 0x7FFF
+      dataView.setInt16(idx + i * blockAlign, int16, true)
+    }
+  }
+  
+  return wav
+}
+
+function writeString(view, offset, string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i))
+  }
+}
+
 export default {
   applyFadeIn,
   applyFadeOut,
@@ -268,5 +457,8 @@ export default {
   applyReverb,
   normalizeAudio,
   getAudioSpectrum,
-  loadAudioBuffer
+  loadAudioBuffer,
+  applyEffectToBuffer,
+  applyEffectsToFile,
+  audioBufferToWav
 }
