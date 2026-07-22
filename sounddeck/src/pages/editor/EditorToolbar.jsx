@@ -30,8 +30,6 @@ export default function EditorToolbar({
   projectName,
   onRenameProject,
   isPreviewingEffect,
-  autoPlayOnClick,
-  onToggleAutoPlay,
   autoCrossfade,
   onToggleCrossfade,
   isDirty,
@@ -41,7 +39,6 @@ export default function EditorToolbar({
   onMetronomeToggle,
   onMetronomeBpmChange
 }) {
-  // ✅ Utiliser useLanguage
   const { t, currentLang } = useLanguage()
   const [showAddClip, setShowAddClip] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
@@ -392,7 +389,6 @@ export default function EditorToolbar({
           <i className="ti ti-magnet" />
         </button>
 
-        {/* ✅ BOUTON SPLIT - CORRIGÉ */}
         <button
           className="btn-secondary btn-sm"
           onClick={onSplit}
@@ -403,7 +399,6 @@ export default function EditorToolbar({
           <i className="ti ti-cut" /> {t('editorSplit')}
         </button>
 
-        {/* ✅ BOUTON LOOP - CORRIGÉ */}
         <button
           className={loopEnabled ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
           onClick={onToggleLoop}
@@ -411,17 +406,6 @@ export default function EditorToolbar({
           title={t('editorLoopRegion')}
         >
           <i className="ti ti-repeat" /> {t('editorLoop')}
-        </button>
-
-        {/* ✅ BOUTON MANUAL/AUTO - CORRIGÉ */}
-        <button
-          className={autoPlayOnClick ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
-          onClick={onToggleAutoPlay}
-          style={{ fontSize: 10, padding: '2px 8px', minHeight: 24 }}
-          title={t('editorAutoPlay') || 'Jouer au clic'}
-        >
-          <i className="ti ti-player-play" />
-          {autoPlayOnClick ? 'Auto' : t('editorManual')}
         </button>
 
         <button

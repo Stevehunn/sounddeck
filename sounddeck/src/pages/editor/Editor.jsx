@@ -12,8 +12,8 @@ import { mixdownProject, exportMixdown } from '../../utils/mixdown'
 
 const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
 
-export default function Editor({ store, addToast }) { // ✅ Supprimer le paramètre lang
-  const { t, currentLang } = useLanguage() // ✅ Utiliser t au lieu de tr
+export default function Editor({ store, addToast }) {
+  const { t, currentLang } = useLanguage()
   
   // ─── ÉTATS PRINCIPAUX ──────────────────────────────────────────────────────
   const [isPlaying, setIsPlaying] = useState(false)
@@ -26,7 +26,6 @@ export default function Editor({ store, addToast }) { // ✅ Supprimer le param�
   const [waveformData, setWaveformData] = useState({})
   const [clipDurations, setClipDurations] = useState({})
   const [snapEnabled, setSnapEnabled] = useState(true)
-  const [autoPlayOnClick, setAutoPlayOnClick] = useState(false)
   
   // ─── ÉTATS COPIER/COLLER ──────────────────────────────────────────────────
   const [clipboard, setClipboard] = useState({ clips: [], trackId: null, copiedAt: null })
@@ -1262,7 +1261,7 @@ export default function Editor({ store, addToast }) { // ✅ Supprimer le param�
       overflow: 'hidden',
       background: 'var(--bg-primary)'
     }}>
-      {/* Barre d'outils */}
+      {/* Barre d'outils - retrait du bouton Auto/Manual */}
       <EditorToolbar
         isPlaying={isPlaying}
         isPaused={isPaused}
@@ -1300,8 +1299,6 @@ export default function Editor({ store, addToast }) { // ✅ Supprimer le param�
         projectName={project?.name || 'Nouveau projet'}
         onRenameProject={handleRenameProject}
         isPreviewingEffect={isPreviewingEffect}
-        autoPlayOnClick={autoPlayOnClick}
-        onToggleAutoPlay={() => setAutoPlayOnClick(prev => !prev)}
         autoCrossfade={autoCrossfade}
         onToggleCrossfade={() => setAutoCrossfade(!autoCrossfade)}
         isDirty={isDirty}
@@ -1376,7 +1373,6 @@ export default function Editor({ store, addToast }) { // ✅ Supprimer le param�
           onMetronomeToggle={handleMetronomeToggle}
           onMetronomeBpmChange={handleMetronomeBpmChange}
           onWaveformUpdate={handleWaveformUpdate}
-          autoPlayOnClick={autoPlayOnClick}
           autoCrossfade={autoCrossfade}
           addToast={addToast}
           lang={currentLang}
@@ -1420,7 +1416,6 @@ export default function Editor({ store, addToast }) { // ✅ Supprimer le param�
           onTrim={handleTrimClip}
           lang={currentLang}
           tr={t}
-          autoPlayOnClick={autoPlayOnClick}
         />
       )}
 

@@ -23,7 +23,6 @@ export default function EditorClip({
   onFadeOutChange,
   onDragCheckpoint,
   onWaveformUpdate,
-  autoPlayOnClick = false,
   tr
 }) {
   const [isDragging, setIsDragging] = useState(false)
@@ -38,20 +37,19 @@ export default function EditorClip({
   const dragValueRef = useRef(0)
   const clipRef = useRef(null)
   
-  // ✅ REFS POUR LE DRAG
+  // REFS POUR LE DRAG
   const hasDraggedRef = useRef(false)
   const mouseDownPosRef = useRef({ x: 0, y: 0 })
   const isDraggingRef = useRef(false)
-  const isClickRef = useRef(false)
-  const clickHandledRef = useRef(false)
-  const shouldPlayRef = useRef(false)
+  
+  // REFS POUR LE DOUBLE-CLIC
+  const lastClickTimeRef = useRef(0)
+  const clickTimerRef = useRef(null)
+  const isDoubleClickRef = useRef(false)
   
   // Lecture preview
   const [isClipPlaying, setIsClipPlaying] = useState(false)
   const [playbackHowl, setPlaybackHowl] = useState(null)
-  
-  // ✅ REF POUR ÉVITER LES DOUBLES LECTURES
-  const playTimeoutRef = useRef(null)
 
   const duration = clipDuration || clip.duration || 3
   const left = clip.start * pixelsPerSecond
@@ -72,9 +70,11 @@ export default function EditorClip({
       if (playbackHowl) {
         playbackHowl.stop()
         playbackHowl.unload()
+        setPlaybackHowl(null)
       }
-      if (playTimeoutRef.current) {
-        clearTimeout(playTimeoutRef.current)
+      if (clickTimerRef.current) {
+        clearTimeout(clickTimerRef.current)
+        clickTimerRef.current = null
       }
     }
   }, [playbackHowl])
@@ -129,7 +129,7 @@ export default function EditorClip({
     }
   }, [fadeDrag, pixelsPerSecond, maxFade, onFadeInChange, onFadeOutChange])
 
-  // ✅ Lecture preview - UNIQUEMENT via le bouton
+  // Lecture preview - via bouton
   const playClipPreview = (e) => {
     if (e) e.stopPropagation()
     
@@ -168,32 +168,72 @@ export default function EditorClip({
     }
   }
 
-  // ✅ GESTION DES ÉVÉNEMENTS SOURIS - SIMPLIFIÉE
+  // ACTION DU DOUBLE-CLIC
+  const handleDoubleClickAction = (e) => {
+    if (e) e.stopPropagation()
+    
+    // Vérifier qu'on n'a pas déjà un son en cours de lecture
+    if (playbackHowl && isClipPlaying) {
+      playbackHowl.stop()
+      playbackHowl.unload()
+      setPlaybackHowl(null)
+      setIsClipPlaying(false)
+      return
+    }
+    
+    // Jouer le clip
+    playClipPreview(e)
+  }
+
+  // GESTION DU CLIC MANUEL
   const handleMouseDown = (e) => {
     if (e.button !== 0) return
-    if (e.target.closest('.clip-actions')) return
+    if (e.target.closest('.clip-actions')) {
+      return
+    }
 
-    // ✅ Réinitialiser toutes les refs
+    // Réinitialiser le timer de double-clic
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current)
+      clickTimerRef.current = null
+    }
+
     mouseDownPosRef.current = { x: e.clientX, y: e.clientY }
     hasDraggedRef.current = false
     isDraggingRef.current = true
-    isClickRef.current = true
-    clickHandledRef.current = false
-    shouldPlayRef.current = false
-    
-    // ✅ Annuler tout timeout de lecture en attente
-    if (playTimeoutRef.current) {
-      clearTimeout(playTimeoutRef.current)
-      playTimeoutRef.current = null
-    }
     
     onDragCheckpoint?.()
     setIsDragging(true)
     setDragStartX(e.clientX)
     setDragStartY(e.clientY)
     
-    // ✅ Sélectionner le clip (NE JAMAIS JOUER ICI)
+    // Sélectionner le clip
     onSelect()
+    
+    // Enregistrer le temps du clic
+    const now = Date.now()
+    const timeSinceLastClick = now - lastClickTimeRef.current
+    
+    // Si le dernier clic était il y a moins de 300ms, c'est un double-clic
+    if (timeSinceLastClick < 300 && timeSinceLastClick > 0) {
+      lastClickTimeRef.current = 0
+      isDoubleClickRef.current = true
+      
+      // Exécuter l'action du double-clic immédiatement
+      handleDoubleClickAction(e)
+      return
+    }
+    
+    // Premier clic ou clic après le délai
+    lastClickTimeRef.current = now
+    isDoubleClickRef.current = false
+    
+    // Démarrer un timer pour réinitialiser après 300ms
+    clickTimerRef.current = setTimeout(() => {
+      lastClickTimeRef.current = 0
+      isDoubleClickRef.current = false
+      clickTimerRef.current = null
+    }, 300)
   }
 
   const handleMouseMove = (e) => {
@@ -202,16 +242,21 @@ export default function EditorClip({
     const dx = Math.abs(e.clientX - mouseDownPosRef.current.x)
     const dy = Math.abs(e.clientY - mouseDownPosRef.current.y)
     
-    // ✅ Si le curseur a bougé de plus de 5px, c'est un drag
+    // Si on a dragué et que c'était un double-clic, on annule le drag
+    if (isDoubleClickRef.current) {
+      setIsDragging(false)
+      isDraggingRef.current = false
+      return
+    }
+    
     if (dx > 5 || dy > 5) {
       hasDraggedRef.current = true
-      isClickRef.current = false
-      shouldPlayRef.current = false
-      
-      // ✅ Annuler le timeout de lecture si un drag commence
-      if (playTimeoutRef.current) {
-        clearTimeout(playTimeoutRef.current)
-        playTimeoutRef.current = null
+      // Si on a commencé à draguer, annuler le double-clic
+      if (clickTimerRef.current) {
+        clearTimeout(clickTimerRef.current)
+        clickTimerRef.current = null
+        lastClickTimeRef.current = 0
+        isDoubleClickRef.current = false
       }
     }
 
@@ -228,89 +273,8 @@ export default function EditorClip({
     setIsDragging(false)
     isDraggingRef.current = false
     
-    // ✅ Si c'était un drag, on annule TOUT
     if (hasDraggedRef.current) {
       hasDraggedRef.current = false
-      isClickRef.current = false
-      shouldPlayRef.current = false
-      
-      // ✅ Annuler le timeout de lecture
-      if (playTimeoutRef.current) {
-        clearTimeout(playTimeoutRef.current)
-        playTimeoutRef.current = null
-      }
-      return
-    }
-    
-    // ✅ Vérifier que c'est un clic (pas de drag)
-    const dx = Math.abs(e.clientX - mouseDownPosRef.current.x)
-    const dy = Math.abs(e.clientY - mouseDownPosRef.current.y)
-    
-    if (dx < 5 && dy < 5 && isClickRef.current && !clickHandledRef.current) {
-      clickHandledRef.current = true
-      
-      // ✅ Vérifier si on doit jouer le son (uniquement si autoPlayOnClick est true)
-      if (autoPlayOnClick === true) {
-        // ✅ Annuler tout timeout existant
-        if (playTimeoutRef.current) {
-          clearTimeout(playTimeoutRef.current)
-          playTimeoutRef.current = null
-        }
-        
-        // ✅ Jouer le son après un court délai pour éviter les conflits
-        playTimeoutRef.current = setTimeout(() => {
-          // ✅ Vérifier qu'on n'a pas dragué entre temps
-          if (shouldPlayRef.current && !hasDraggedRef.current && !isDraggingRef.current) {
-            handleClipClick(e)
-          }
-          shouldPlayRef.current = false
-          playTimeoutRef.current = null
-        }, 50)
-      } else {
-        // ✅ Mode manuel : NE PAS jouer le son
-        // On fait juste un appel à handleClipClick avec autoPlayOnClick = false
-        handleClipClick(e)
-      }
-    }
-    
-    hasDraggedRef.current = false
-    isClickRef.current = false
-  }
-
-  // ✅ CLIC SUR LE CLIP - FINALE
-  const handleClipClick = (e) => {
-    // ✅ Si on est en train de draguer, ignorer
-    if (isDraggingRef.current || hasDraggedRef.current) {
-      return
-    }
-    
-    if (e?.target?.closest?.('.clip-actions')) return
-    
-    // ✅ SI autoPlayOnClick EST FALSE, NE RIEN FAIRE D'AUTRE
-    if (autoPlayOnClick !== true) {
-      return
-    }
-    
-    // ✅ Ici, autoPlayOnClick est true
-    // ✅ Vérifier qu'on n'a pas déjà un son en cours de lecture
-    if (playbackHowl && isClipPlaying) {
-      // Si le son est déjà en train de jouer, on l'arrête
-      playbackHowl.stop()
-      playbackHowl.unload()
-      setPlaybackHowl(null)
-      setIsClipPlaying(false)
-      
-      // ✅ Annuler le timeout
-      if (playTimeoutRef.current) {
-        clearTimeout(playTimeoutRef.current)
-        playTimeoutRef.current = null
-      }
-      return
-    }
-    
-    // ✅ Jouer le clip (avec vérification supplémentaire)
-    if (!isClipPlaying && !playTimeoutRef.current) {
-      playClipPreview(e)
     }
   }
 
@@ -347,7 +311,7 @@ export default function EditorClip({
     setResizeSide(null)
   }
 
-  // ✅ Effets pour les événements globaux
+  // Effets pour les événements globaux
   useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove)
@@ -359,7 +323,7 @@ export default function EditorClip({
     }
   }, [isDragging])
 
-  // ✅ Effets pour le resize
+  // Effets pour le resize
   useEffect(() => {
     if (isResizing) {
       document.addEventListener('mousemove', handleResizeMove)
@@ -396,6 +360,7 @@ export default function EditorClip({
         pointerEvents: isDragging ? 'none' : 'auto'
       }}
       onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -523,19 +488,22 @@ export default function EditorClip({
         }} />
       )}
 
-      {/* Indicateur de preview en cours */}
+      {/* Indicateur de preview en cours avec bouton Pause */}
       {isClipPlaying && (
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'rgba(0,0,0,0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 7,
-          pointerEvents: 'none',
-          borderRadius: 'var(--radius-sm)'
-        }}>
+        <div 
+          className="clip-playing-indicator"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(0,0,0,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 7,
+            pointerEvents: 'none',
+            borderRadius: 'var(--radius-sm)'
+          }}
+        >
           <i className="ti ti-player-pause" style={{ color: 'white', fontSize: 20 }} />
         </div>
       )}
@@ -610,7 +578,7 @@ export default function EditorClip({
         </>
       )}
 
-      {/* Actions contextuelles */}
+      {/* Actions contextuelles - avec bouton Play/Pause */}
       <div className="clip-actions" style={{
         position: 'absolute',
         top: 2,
@@ -620,6 +588,7 @@ export default function EditorClip({
         zIndex: 6,
         flexWrap: 'wrap'
       }}>
+        {/* Bouton Play/Pause */}
         <button
           onClick={(e) => { e.stopPropagation(); playClipPreview(e) }}
           style={{
@@ -629,7 +598,11 @@ export default function EditorClip({
             border: 'none',
             borderRadius: 2,
             color: 'white',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            minWidth: 20,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}
           title={isClipPlaying ? tr('editorStopPreview') : tr('editorListenClip')}
         >

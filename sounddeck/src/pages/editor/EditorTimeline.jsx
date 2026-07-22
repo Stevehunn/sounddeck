@@ -566,7 +566,6 @@ export default function EditorTimeline({
                 onTrackSolo={onTrackSolo}
                 onTrackVolume={onTrackVolume}
                 onTrackReorder={onTrackReorder}
-                autoPlayOnClick={autoPlayOnClick}
                 autoCrossfade={autoCrossfade}
                 lang={lang}
                 tr={tr}
