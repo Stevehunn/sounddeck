@@ -1,8 +1,20 @@
 import { useState, useRef, useEffect } from 'react'
 import EditorTrack from './EditorTrack'
-import EditorMarkers from './EditorMarkers'
-import EditorMetronome from './EditorMetronome'
 import { snapTime, getSnapStep } from './EditorSnap'
+
+// ─── COULEURS DES MARQUEURS ──────────────────────────────────────────────────
+const MARKER_COLORS = [
+  { id: 'red', color: '#f44336', labelKey: 'markerColorRed' },
+  { id: 'pink', color: '#e91e63', labelKey: 'markerColorPink' },
+  { id: 'purple', color: '#9c27b0', labelKey: 'markerColorPurple' },
+  { id: 'blue', color: '#3f51b5', labelKey: 'markerColorBlue' },
+  { id: 'cyan', color: '#00bcd4', labelKey: 'markerColorCyan' },
+  { id: 'green', color: '#4caf50', labelKey: 'markerColorGreen' },
+  { id: 'lime', color: '#8bc34a', labelKey: 'markerColorLime' },
+  { id: 'yellow', color: '#ffeb3b', labelKey: 'markerColorYellow' },
+  { id: 'orange', color: '#ff9800', labelKey: 'markerColorOrange' },
+  { id: 'brown', color: '#795548', labelKey: 'markerColorBrown' },
+]
 
 export default function EditorTimeline({
   tracks,
@@ -18,13 +30,13 @@ export default function EditorTimeline({
   onClipCopy,
   onClipCut,
   onClipPaste,
+  onClipContextMenu,
   onDragCheckpoint,
   onTrackRemove,
   onTrackMute,
   onTrackSolo,
   onTrackVolume,
   onTrackReorder,
-  onMarkersChange,
   waveformData,
   onWaveformUpdate,
   currentTime,
@@ -34,9 +46,6 @@ export default function EditorTimeline({
   snapEnabled,
   loopRegion,
   onSetLoopRegion,
-  markers = [],
-  onAddMarker,
-  onRemoveMarker,
   metronomeEnabled = false,
   metronomeBpm = 120,
   onMetronomeToggle,
@@ -45,7 +54,13 @@ export default function EditorTimeline({
   autoCrossfade = false,
   addToast,
   lang,
-  tr
+  tr,
+  onRenameTrack,
+  // ─── MARQUEURS ──────────────────────────────────────────────────────────
+  markers = [],
+  onAddMarker,
+  onRemoveMarker,
+  onMarkersChange
 }) {
   const containerRef = useRef(null)
   const rulerRef = useRef(null)
@@ -180,7 +195,6 @@ export default function EditorTimeline({
     if (e.target.closest('.editor-clip-wrapper')) return
     if (e.target.closest('button')) return
     if (e.target.closest('.loop-strip')) return
-    if (e.target.closest('.marker-area')) return
 
     const seekTime = clientXToTime(e.clientX)
     if (onSeek) {
@@ -271,7 +285,7 @@ export default function EditorTimeline({
     }
   }
 
-  // Rendu de la règle
+  // ─── RENDU DE LA RÈGLE ──────────────────────────────────────────────────────
   const renderRuler = () => {
     const marks = []
     let step = 1
@@ -320,7 +334,7 @@ export default function EditorTimeline({
     return marks
   }
 
-  // Curseur de lecture
+  // ─── CURSEUR DE LECTURE ────────────────────────────────────────────────────
   const renderPlayhead = () => {
     const position = Math.min(currentTime * pixelsPerSecond, totalWidth)
     return (
@@ -368,6 +382,87 @@ export default function EditorTimeline({
     )
   }
 
+  // ─── MARQUEURS SUR LA RÈGLE ──────────────────────────────────────────────
+  const renderMarkers = () => {
+    // Supprimer les doublons avant de rendre
+    const uniqueMarkers = markers.filter((marker, index, self) => 
+      index === self.findIndex(m => m.id === marker.id)
+    )
+    
+    return uniqueMarkers.map(marker => {
+      const position = marker.time * pixelsPerSecond
+      const isNear = Math.abs(marker.time - currentTime) < 0.3
+      
+      return (
+        <div
+          key={marker.id}
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: position,
+            width: 2,
+            background: marker.color || '#f44336',
+            opacity: isNear ? 0.8 : 0.4,
+            zIndex: 4,
+            pointerEvents: 'none',
+            transform: 'translateX(-1px)',
+            transition: 'opacity 0.2s ease'
+          }}
+        >
+          {/* Petit triangle en haut */}
+          <div style={{
+            position: 'absolute',
+            top: -6,
+            left: -4,
+            width: 0,
+            height: 0,
+            borderLeft: '5px solid transparent',
+            borderRight: '5px solid transparent',
+            borderTop: `6px solid ${marker.color || '#f44336'}`
+          }} />
+          
+          {/* Nom du marqueur */}
+          <div style={{
+            position: 'absolute',
+            top: -20,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontSize: 8,
+            color: isNear ? 'var(--accent)' : 'var(--text-tertiary)',
+            background: 'var(--bg-secondary)',
+            padding: '1px 4px',
+            borderRadius: 3,
+            border: `1px solid ${marker.color || '#f44336'}`,
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+            opacity: isNear ? 1 : 0.6,
+            maxWidth: 120,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            {marker.name}
+          </div>
+          
+          {/* Indicateur de sélection */}
+          {isNear && (
+            <div style={{
+              position: 'absolute',
+              top: -2,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 4,
+              height: 4,
+              borderRadius: '50%',
+              background: 'var(--accent)',
+              boxShadow: '0 0 8px var(--accent)'
+            }} />
+          )}
+        </div>
+      )
+    })
+  }
+
   const formatTime = (seconds) => {
     if (!seconds || isNaN(seconds)) return '0:00'
     const m = Math.floor(seconds / 60)
@@ -400,29 +495,12 @@ export default function EditorTimeline({
         }}
         onClick={handleTimelineClick}
       >
-        {/* Marqueurs */}
-        <div style={{ position: 'relative', height: 40, marginLeft: TRACK_HEAD_WIDTH }} className="marker-area">
-          <EditorMarkers
-            markers={markers}
-            currentTime={currentTime}
-            totalDuration={totalDuration}
-            pixelsPerSecond={pixelsPerSecond}
-            onAddMarker={onAddMarker}
-            onRemoveMarker={onRemoveMarker}
-            onSeek={onSeek}
-            onMarkersChange={onMarkersChange}
-            addToast={addToast}
-            tr={tr}
-            lang={lang}
-          />
-        </div>
-
-        {/* Règle */}
+        {/* Règle avec marqueurs */}
         <div 
           ref={rulerRef} 
           style={{
             position: 'sticky',
-            top: 40,
+            top: 0,
             height: 36,
             background: 'var(--bg-secondary)',
             borderBottom: '1px solid var(--border)',
@@ -430,9 +508,22 @@ export default function EditorTimeline({
             marginLeft: TRACK_HEAD_WIDTH,
             cursor: 'pointer'
           }}
+          onDoubleClick={(e) => {
+            if (onAddMarker) {
+              const time = clientXToTime(e.clientX)
+              const colorIndex = markers.length % MARKER_COLORS.length
+              onAddMarker({
+                id: `marker-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                name: `M${markers.length + 1}`,
+                time: Math.max(0, Math.min(totalDuration, time)),
+                color: MARKER_COLORS[colorIndex].color
+              })
+            }
+          }}
         >
           {renderRuler()}
           {renderPlayhead()}
+          {renderMarkers()}
         </div>
 
         {/* Bande de boucle */}
@@ -441,7 +532,7 @@ export default function EditorTimeline({
           onMouseDown={handleLoopStripMouseDown}
           style={{
             position: 'sticky',
-            top: 76,
+            top: 36,
             height: 10,
             marginLeft: TRACK_HEAD_WIDTH,
             background: 'var(--bg-tertiary)',
@@ -470,7 +561,7 @@ export default function EditorTimeline({
               onMouseDown={handleLoopHandleMouseDown('start')}
               style={{
                 position: 'absolute',
-                top: 86,
+                top: 46,
                 bottom: 0,
                 left: TRACK_HEAD_WIDTH + loopRegion.start * pixelsPerSecond - 4,
                 width: 8,
@@ -491,7 +582,7 @@ export default function EditorTimeline({
               onMouseDown={handleLoopHandleMouseDown('end')}
               style={{
                 position: 'absolute',
-                top: 86,
+                top: 46,
                 bottom: 0,
                 left: TRACK_HEAD_WIDTH + loopRegion.end * pixelsPerSecond - 4,
                 width: 8,
@@ -555,6 +646,7 @@ export default function EditorTimeline({
                 onClipFade={onClipFade}
                 onClipCopy={onClipCopy}
                 onClipCut={onClipCut}
+                onClipContextMenu={onClipContextMenu}
                 onDragCheckpoint={onDragCheckpoint}
                 onTrackRemove={onTrackRemove}
                 waveformData={waveformData}
@@ -569,6 +661,7 @@ export default function EditorTimeline({
                 autoCrossfade={autoCrossfade}
                 lang={lang}
                 tr={tr}
+                onRenameTrack={onRenameTrack}
               />
             </div>
           ))}
@@ -639,7 +732,6 @@ export default function EditorTimeline({
             <i className="ti ti-refresh" /> 100%
           </button>
 
-          {/* Zoom automatique pour tout voir */}
           <button
             className="btn-ghost btn-sm"
             onClick={() => {
@@ -670,10 +762,10 @@ export default function EditorTimeline({
         {snapFeedback?.visible && (
           <div style={{
             position: 'absolute',
-            top: 86,
+            top: 46,
             left: TRACK_HEAD_WIDTH + snapFeedback.time * pixelsPerSecond,
             width: 2,
-            height: 'calc(100% - 86px)',
+            height: 'calc(100% - 46px)',
             background: 'var(--accent)',
             opacity: 0.3,
             pointerEvents: 'none',

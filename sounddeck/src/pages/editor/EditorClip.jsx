@@ -23,6 +23,7 @@ export default function EditorClip({
   onFadeOutChange,
   onDragCheckpoint,
   onWaveformUpdate,
+  onContextMenu,
   tr
 }) {
   const [isDragging, setIsDragging] = useState(false)
@@ -172,7 +173,6 @@ export default function EditorClip({
   const handleDoubleClickAction = (e) => {
     if (e) e.stopPropagation()
     
-    // Vérifier qu'on n'a pas déjà un son en cours de lecture
     if (playbackHowl && isClipPlaying) {
       playbackHowl.stop()
       playbackHowl.unload()
@@ -181,7 +181,6 @@ export default function EditorClip({
       return
     }
     
-    // Jouer le clip
     playClipPreview(e)
   }
 
@@ -192,7 +191,6 @@ export default function EditorClip({
       return
     }
 
-    // Réinitialiser le timer de double-clic
     if (clickTimerRef.current) {
       clearTimeout(clickTimerRef.current)
       clickTimerRef.current = null
@@ -207,28 +205,21 @@ export default function EditorClip({
     setDragStartX(e.clientX)
     setDragStartY(e.clientY)
     
-    // Sélectionner le clip
     onSelect()
     
-    // Enregistrer le temps du clic
     const now = Date.now()
     const timeSinceLastClick = now - lastClickTimeRef.current
     
-    // Si le dernier clic était il y a moins de 300ms, c'est un double-clic
     if (timeSinceLastClick < 300 && timeSinceLastClick > 0) {
       lastClickTimeRef.current = 0
       isDoubleClickRef.current = true
-      
-      // Exécuter l'action du double-clic immédiatement
       handleDoubleClickAction(e)
       return
     }
     
-    // Premier clic ou clic après le délai
     lastClickTimeRef.current = now
     isDoubleClickRef.current = false
     
-    // Démarrer un timer pour réinitialiser après 300ms
     clickTimerRef.current = setTimeout(() => {
       lastClickTimeRef.current = 0
       isDoubleClickRef.current = false
@@ -242,7 +233,6 @@ export default function EditorClip({
     const dx = Math.abs(e.clientX - mouseDownPosRef.current.x)
     const dy = Math.abs(e.clientY - mouseDownPosRef.current.y)
     
-    // Si on a dragué et que c'était un double-clic, on annule le drag
     if (isDoubleClickRef.current) {
       setIsDragging(false)
       isDraggingRef.current = false
@@ -251,7 +241,6 @@ export default function EditorClip({
     
     if (dx > 5 || dy > 5) {
       hasDraggedRef.current = true
-      // Si on a commencé à draguer, annuler le double-clic
       if (clickTimerRef.current) {
         clearTimeout(clickTimerRef.current)
         clickTimerRef.current = null
@@ -311,7 +300,6 @@ export default function EditorClip({
     setResizeSide(null)
   }
 
-  // Effets pour les événements globaux
   useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove)
@@ -323,7 +311,6 @@ export default function EditorClip({
     }
   }, [isDragging])
 
-  // Effets pour le resize
   useEffect(() => {
     if (isResizing) {
       document.addEventListener('mousemove', handleResizeMove)
@@ -334,6 +321,13 @@ export default function EditorClip({
       document.removeEventListener('mouseup', handleResizeUp)
     }
   }, [isResizing])
+
+  // GESTION DU CLIC DROIT
+  const handleContextMenu = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onContextMenu?.(clip.id, trackId, e)
+  }
 
   const effectBadges = clip.effects?.filter(e => e.enabled).map(e => e.type) || []
   const showDuration = duration > 5
@@ -361,6 +355,7 @@ export default function EditorClip({
       }}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
+      onContextMenu={handleContextMenu}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -588,7 +583,6 @@ export default function EditorClip({
         zIndex: 6,
         flexWrap: 'wrap'
       }}>
-        {/* Bouton Play/Pause */}
         <button
           onClick={(e) => { e.stopPropagation(); playClipPreview(e) }}
           style={{

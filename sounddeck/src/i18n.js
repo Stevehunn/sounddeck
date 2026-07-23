@@ -184,8 +184,6 @@ export const TRANSLATIONS = {
     optionsShortcuts: 'Raccourcis',
     optionsBackup: 'Sauvegarde',
     optionsProfiles: 'Profils',
-
-    // Application
     application: 'Application',
     startMinimized: 'Démarrer en arrière-plan',
     startMinimizedDesc: 'Lancer SoundDeck sans ouvrir la fenêtre',
@@ -200,8 +198,6 @@ export const TRANSLATIONS = {
     deactivateShortcuts: 'Désactiver les raccourcis',
     quitApp: 'Quitter SoundDeck',
     openSoundDeck: 'Ouvrir SoundDeck',
-
-    // Apparence
     appearance: 'Apparence',
     language: 'Langue',
     theme: 'Thème',
@@ -226,8 +222,6 @@ export const TRANSLATIONS = {
     focusModeOn: 'Focus ON',
     focusModeOff: 'Focus OFF',
     focusModeShortcut: 'Ctrl+Shift+F pour basculer',
-
-    // Audio
     audio: 'Audio',
     audioMode: 'Mode audio',
     audioModeDesc: 'Comment SoundDeck envoie l\'audio',
@@ -245,7 +239,7 @@ export const TRANSLATIONS = {
     localOutputDeviceDefault: 'Par défaut',
     localOutputDeviceChanged: 'Périphérique local changé : {device}',
 
-    // Gestion des sons
+    // ---- GESTION DES SONS ----
     soundManagement: 'Gestion des sons',
     compressOnImport: 'Compresser à l\'import',
     compressOnImportDesc: 'Réduit la taille des fichiers audio importés (nécessite ffmpeg)',
@@ -265,7 +259,7 @@ export const TRANSLATIONS = {
     compressionSkipped: 'ℹ️ Compression ignorée (fichier déjà petit)',
     compressionNotAvailable: '⚠️ ffmpeg non disponible, compression désactivée',
 
-    // Normalisation
+    // ---- NORMALISATION ----
     normalization: 'Normalisation',
     normalizationDesc: 'Égalise le volume des sons automatiquement',
     normalizationTarget: 'Seuil de normalisation',
@@ -282,8 +276,14 @@ export const TRANSLATIONS = {
     reanalyzeGains: 'Réanalyser les gains',
     reanalyzeGainsDesc: 'Force la réanalyse des niveaux sonores',
     gainCacheCleared: 'Cache des gains vidé, rejouez vos sons pour réanalyser',
+    normalizationTargetVeryLow: '-6 dB (Très doux)',
+    normalizationTargetLow: '-3.7 dB (Doux)',
+    normalizationTargetModerate: '-2 dB (Modéré)',
+    normalizationTargetHigh: '-0.9 dB (Fort)',
+    normalizationTargetVeryHigh: '-0.4 dB (Très fort)',
+    normalizationTargetMax: '0 dB (Max)',
 
-    // Pilote virtuel
+    // ---- PILOTE VIRTUEL ----
     virtualDriver: 'Pilote audio virtuel',
     virtualDriverSub: 'Nécessaire pour Discord',
     installVirtualDriver: 'Installer VB-Cable',
@@ -306,7 +306,7 @@ export const TRANSLATIONS = {
     uninstallGuideStep2: 'Cherche "VB-CABLE" et désinstalle-le.',
     uninstallGuideRestart: '⚠️ Un redémarrage du PC peut être nécessaire après la désinstallation.',
 
-    // Mixeur
+    // ---- MIXEUR ----
     mixerEnable: 'Mixeur micro + sons',
     mixerEnableDesc: 'Mélange ton micro avec les sons',
     mixerActivated: 'Mixeur activé !',
@@ -328,7 +328,7 @@ export const TRANSLATIONS = {
     mixerNotInitialized: 'Mixeur non initialisé',
     mixerSoundVolume: 'Volume des sons',
 
-    // Microphone
+    // ---- MICROPHONE ----
     microphone: 'Micro',
     microphoneSelect: 'Sélectionne ton micro',
     microphoneDefault: 'Micro par défaut',
@@ -345,20 +345,20 @@ export const TRANSLATIONS = {
     micTestFinished: 'Test micro terminé',
     micTesting: 'Test en cours...',
 
-    // Monitoring
+    // ---- MONITORING ----
     monitoring: "S'entendre",
     monitoringDesc: 'Écouter son micro dans les haut-parleurs (volume réduit)',
     monitoringEnabled: '🎤 Monitoring activé (vous vous entendez)',
     monitoringDisabled: '🔇 Monitoring désactivé',
     monitoringWarning: 'Monitoring actif : vous entendez votre micro dans les haut-parleurs',
 
-    // Basse latence
+    // ---- BASSE LATENCE ----
     lowLatencyMode: 'Mode basse latence',
     lowLatencyModeDesc: 'Désactive les filtres audio pour réduire la latence (recommandé pour le jeu)',
     lowLatencyActivated: '⚡ Mode basse latence activé',
     lowLatencyDeactivated: '🔊 Mode basse latence désactivé',
 
-    // Réduction de bruit
+    // ---- RÉDUCTION DE BRUIT ----
     noiseSuppression: 'Réduction de bruit micro',
     noiseSuppressionDesc: 'Filtre les bruits de fond (ventilateur, clavier, etc.)',
     noiseSuppressionMode: 'Mode de réduction de bruit',
@@ -371,13 +371,13 @@ export const TRANSLATIONS = {
     noiseSuppressionDeactivated: '🔊 Réduction de bruit désactivée',
     noiseSuppressionModeChanged: 'Mode réduction de bruit : {mode}',
 
-    // Reconnect
+    // ---- RECONNECT ----
     reconnectFlow: 'Reconnecter le flux',
     reconnectFlowDesc: 'Force la reconnexion du flux au périphérique de sortie',
     reconnect: 'Reconnecter',
     flowReconnected: 'Flux reconnecté',
 
-    // Mode avancé
+    // ---- MODE AVANCÉ ----
     advancedMode: 'Mode avancé',
     advancedModeDesc: 'Utilise VB-Cable + VoiceMeeter Banana pour un mixage professionnel.',
     downloadVBCable: 'Télécharger VB-Cable',
@@ -407,7 +407,7 @@ export const TRANSLATIONS = {
     keyboardLayoutDesc: 'Sélectionnez votre type de clavier',
     keyboardLayoutChanged: 'Disposition changée',
 
-    // Visualisation du clavier
+    // ---- VISUALISATION DU CLAVIER ----
     keyboardVisualizerTitle: 'Raccourcis clavier',
     keyboardVisualizerUsed: 'raccourci utilisé',
     keyboardVisualizerUsedPlural: 'raccourcis utilisés',
@@ -453,6 +453,23 @@ export const TRANSLATIONS = {
     exported: 'exportés',
     configImported: 'Config importée',
     archiveImported: 'Archive importée',
+    backupInterval: 'Intervalle de sauvegarde',
+    backupIntervalDesc: 'Fréquence des sauvegardes automatiques',
+    backupIntervalChanged: 'Intervalle de sauvegarde changé à',
+    minute: 'minute',
+    minutes: 'minutes',
+    backupNow: 'Sauvegarder maintenant',
+    exportBackups: 'Exporter les sauvegardes',
+    importBackups: 'Importer des sauvegardes',
+    noBackups: 'Aucune sauvegarde',
+    restore: 'Restaurer',
+    confirmRestore: 'Voulez-vous vraiment restaurer cette sauvegarde ?',
+    backupSettings: 'Sauvegardes',
+    saving: 'Sauvegarde...',
+    lazyLoading: 'Chargement à la demande',
+    lazyLoadingDesc: 'Charge les sons uniquement quand ils sont visibles',
+    lazyLoadingEnabled: 'Chargement à la demande activé',
+    lazyLoadingDisabled: 'Chargement à la demande désactivé',
 
     // ---- PROFILS ----
     profileManagement: 'Gestion des profils',
@@ -464,7 +481,7 @@ export const TRANSLATIONS = {
     deleteProfile: 'Profil supprimé',
     deleteProfileConfirm: 'Voulez-vous vraiment supprimer le profil "{name}" ?',
 
-    // Profile Manager
+    // ---- PROFILE MANAGER ----
     profileManagerTitle: 'Gérer le profil',
     profileManagerSelectAll: 'Tout sélectionner',
     profileManagerDeselectAll: 'Tout désélectionner',
@@ -563,7 +580,6 @@ export const TRANSLATIONS = {
     discoverDatabaseUpdated: '✅ Base de sons mise à jour !',
     discoverSearchHere: 'Rechercher dans {count} sons',
     discoverClearCacheConfirm: 'Voulez-vous vraiment vider le cache des découvertes ? Les données devront être rechargées pour accéder au contenu.',
-    // catégories
     catLocalTrending: 'Tendances',
     catTrending: 'Tendance',
     catBest: 'Meilleurs / Classiques',
@@ -640,7 +656,6 @@ export const TRANSLATIONS = {
     editorClips: 'Clips',
     editorTracks: 'Pistes',
     editorDuration: 'Durée',
-    // Édition avancée
     editorAddTrack: 'Ajouter une piste',
     editorAddClip: 'Ajouter un son',
     editorAddEffect: 'Ajouter un effet',
@@ -701,6 +716,8 @@ export const TRANSLATIONS = {
     editorClipMoved: 'Clip déplacé',
     editorAutoCrossfade: 'Crossfade automatique',
     editorCrossfadeActive: 'Crossfade actif',
+
+    // ---- MARQUEURS ----
     editorMarkers: 'Marqueurs',
     editorAddMarker: 'Ajouter un marqueur',
     editorRemoveMarker: 'Supprimer le marqueur',
@@ -716,11 +733,68 @@ export const TRANSLATIONS = {
     editorMarkerDeleted: 'Marqueur supprimé',
     editorAllMarkersDeleted: 'Tous les marqueurs supprimés',
     editorDelete: 'Supprimer',
-    editorMetronome: 'Métronome',
-    editorTempo: 'Tempo (BPM)',
-    editorMetronomeVolume: 'Volume du métronome',
+    editorNoMarkers: 'Aucun marqueur',
+    editorNavigate: 'Naviguer',
+    editorPrevious: 'Précédent',
+    editorNext: 'Suivant',
+    editorRename: 'Renommer',
+    editorRenameMarker: 'Renommer (double-clic)',
+    editorAdd: 'Ajouter',
+
+    // ---- COULEURS DES MARQUEURS ----
+    markerColorRed: 'Rouge',
+    markerColorPink: 'Rose',
+    markerColorPurple: 'Violet',
+    markerColorBlue: 'Bleu',
+    markerColorCyan: 'Cyan',
+    markerColorGreen: 'Vert',
+    markerColorLime: 'Vert clair',
+    markerColorYellow: 'Jaune',
+    markerColorOrange: 'Orange',
+    markerColorBrown: 'Marron',
+
+    // ---- ÉDITEUR - PISTES ----
     editorTrackDefault: 'Piste {index}',
-    // Éditeur - Normalisation
+    editorTrackName: 'Nom de la piste',
+    editorTrackNamePlaceholder: 'Ex: Batterie, Voix, Effets...',
+    editorTrackColor: 'Couleur de la piste',
+    editorRenameTrack: 'Renommer la piste',
+    editorTrackRenamed: 'Piste renommée',
+    editorDoubleClickToRename: 'Double-clic pour renommer',
+    editorReorderTrack: 'Réorganiser les pistes',
+    editorUnmute: 'Réactiver le son',
+
+    // ---- ÉDITEUR - EFFETS ----
+    editorEffectsPanelTitle: 'Panneau d\'effets',
+    editorEffectsPanelDescription: 'Ajoutez et modifiez des effets audio sur le clip sélectionné',
+    editorRemoveEffect: 'Supprimer l\'effet',
+    editorEffectEnabled: 'Effet activé',
+    editorEffectDisabled: 'Effet désactivé',
+    editorEffectPreviewing: 'Prévisualisation en cours...',
+    editorEffectNoClip: 'Aucun clip sélectionné',
+    editorEffectsTitle: 'Effets audio',
+    editorEffectsFadeIn: 'Fade In',
+    editorEffectsFadeOut: 'Fade Out',
+    editorEffectsPitch: 'Hauteur',
+    editorEffectsEcho: 'Écho',
+    editorEffectsReverb: 'Réverbération',
+    editorEffectsApplied: '✅ Effets appliqués avec succès',
+    editorEffectsReset: 'Effets réinitialisés',
+    editorEffectsProcessing: 'Traitement en cours...',
+    editorEffectsPreviewError: 'Erreur de prévisualisation',
+    editorEffectsExportError: 'Erreur d\'export audio',
+    editorEffectsNoBuffer: 'Impossible de charger le son',
+    editorEffectsNormalized: 'Son normalisé',
+    editorFadeIn: 'Fade In',
+    editorFadeOut: 'Fade Out',
+    editorListenClip: 'Écouter le clip',
+    editorStopPreview: 'Arrêter la prévisualisation',
+    editorClipEdit: 'Édition',
+    editorAudioEdit: 'Audio',
+    editorFades: 'Fades',
+    editorDuplicate: 'Dupliquer',
+
+    // ---- ÉDITEUR - NORMALISATION ----
     editorNormalizeClip: 'Normaliser le clip',
     editorNormalizeTrack: 'Normaliser la piste',
     editorNormalizeProject: 'Normaliser le projet',
@@ -738,34 +812,22 @@ export const TRANSLATIONS = {
     editorNormalizeScopeClip: 'Clip actuel',
     editorNormalizeScopeTrack: 'Piste entière',
     editorNormalizeScopeProject: 'Projet entier',
-    normalizationTargetVeryLow: '-6 dB (Très doux)',
-    normalizationTargetLow: '-3.7 dB (Doux)',
-    normalizationTargetModerate: '-2 dB (Modéré)',
-    normalizationTargetHigh: '-0.9 dB (Fort)',
-    normalizationTargetVeryHigh: '-0.4 dB (Très fort)',
-    normalizationTargetMax: '0 dB (Max)',
-    // Panneau d'effets
-    editorEffectsPanelTitle: 'Panneau d\'effets',
-    editorEffectsPanelDescription: 'Ajoutez et modifiez des effets audio sur le clip sélectionné',
-    editorRemoveEffect: 'Supprimer l\'effet',
-    editorEffectEnabled: 'Effet activé',
-    editorEffectDisabled: 'Effet désactivé',
-    editorEffectPreviewing: 'Prévisualisation en cours...',
-    editorEffectNoClip: 'Aucun clip sélectionné',
-    // Effets audio
-    editorEffectsTitle: 'Effets audio',
-    editorEffectsFadeIn: 'Fade In',
-    editorEffectsFadeOut: 'Fade Out',
-    editorEffectsPitch: 'Hauteur',
-    editorEffectsEcho: 'Écho',
-    editorEffectsReverb: 'Réverbération',
-    editorEffectsApplied: '✅ Effets appliqués avec succès',
-    editorEffectsReset: 'Effets réinitialisés',
-    editorEffectsProcessing: 'Traitement en cours...',
-    editorEffectsPreviewError: 'Erreur de prévisualisation',
-    editorEffectsExportError: 'Erreur d\'export audio',
-    editorEffectsNoBuffer: 'Impossible de charger le son',
-    editorEffectsNormalized: 'Son normalisé',
+
+    // ---- ÉDITEUR - IMPORT DE FICHIER ----
+    editorImportFile: 'Importer un fichier',
+    editorFileReady: 'Fichier prêt à être importé',
+    editorReady: 'Prêt',
+    editorAutoDetectTrack: 'Sélectionner automatiquement la première piste',
+    editorConfirm: 'Confirmer',
+    editorCancel: 'Annuler',
+    editorImport: 'Importer',
+    editorFileImported: 'Fichier importé dans la piste',
+    editorImportToTrack: 'Importer dans la piste...',
+
+    // ---- ÉDITEUR - MÉTRONOME ----
+    editorMetronome: 'Métronome',
+    editorTempo: 'Tempo (BPM)',
+    editorMetronomeVolume: 'Volume du métronome',
 
     // ---- ROGNEUR ----
     trimmerTitle: 'Rogner le son',
@@ -1021,23 +1083,8 @@ export const TRANSLATIONS = {
     autoBackupDesc: 'Sauvegarde automatique de votre configuration',
     autoBackupEnabled: 'Sauvegarde automatique activée',
     autoBackupDisabled: 'Sauvegarde automatique désactivée',
-    backupInterval: 'Intervalle de sauvegarde',
-    backupIntervalDesc: 'Fréquence des sauvegardes automatiques',
-    backupIntervalChanged: 'Intervalle de sauvegarde changé à',
-    minute: 'minute',
-    minutes: 'minutes',
-    backupNow: 'Sauvegarder maintenant',
-    exportBackups: 'Exporter les sauvegardes',
-    importBackups: 'Importer des sauvegardes',
-    noBackups: 'Aucune sauvegarde',
-    restore: 'Restaurer',
-    confirmRestore: 'Voulez-vous vraiment restaurer cette sauvegarde ?',
-    backupSettings: 'Sauvegardes',
-    saving: 'Sauvegarde...',
-    lazyLoading: 'Chargement à la demande',
-    lazyLoadingDesc: 'Charge les sons uniquement quand ils sont visibles',
-    lazyLoadingEnabled: 'Chargement à la demande activé',
-    lazyLoadingDisabled: 'Chargement à la demande désactivé',
+
+    // ---- ERREURS ----
     errorLogs: 'Logs d\'erreur',
     errorLogsDesc: 'Gestion des erreurs et logs',
     exportLogs: 'Exporter les logs',
@@ -1260,7 +1307,6 @@ export const TRANSLATIONS = {
     pluginsDescription: 'Les plugins sont des fichiers .sdplugin (ZIP) contenant le code et les ressources nécessaires.',
     pluginsReloadTooltip: 'Recharger le plugin',
     pluginsUninstallTooltip: 'Désinstaller le plugin',
-    pluginsUninstallConfirm: 'Voulez-vous vraiment désinstaller le plugin "{name}" ?',
 
     // ---- CONFIRMATION ----
     confirm: 'Confirmer',
@@ -1486,8 +1532,6 @@ export const TRANSLATIONS = {
     optionsShortcuts: 'Shortcuts',
     optionsBackup: 'Backup',
     optionsProfiles: 'Profiles',
-
-    // Application
     application: 'Application',
     startMinimized: 'Start minimized',
     startMinimizedDesc: 'Launch SoundDeck without opening the window',
@@ -1502,8 +1546,6 @@ export const TRANSLATIONS = {
     deactivateShortcuts: 'Disable shortcuts',
     quitApp: 'Quit SoundDeck',
     openSoundDeck: 'Open SoundDeck',
-
-    // Appearance
     appearance: 'Appearance',
     language: 'Language',
     theme: 'Theme',
@@ -1528,8 +1570,6 @@ export const TRANSLATIONS = {
     focusModeOn: 'Focus ON',
     focusModeOff: 'Focus OFF',
     focusModeShortcut: 'Ctrl+Shift+F to toggle',
-
-    // Audio
     audio: 'Audio',
     audioMode: 'Audio mode',
     audioModeDesc: 'How SoundDeck sends audio',
@@ -1547,7 +1587,7 @@ export const TRANSLATIONS = {
     localOutputDeviceDefault: 'Default',
     localOutputDeviceChanged: 'Local device changed: {device}',
 
-    // Sound Management
+    // ---- SOUND MANAGEMENT ----
     soundManagement: 'Sound Management',
     compressOnImport: 'Compress on import',
     compressOnImportDesc: 'Reduces the size of imported audio files (requires ffmpeg)',
@@ -1567,7 +1607,7 @@ export const TRANSLATIONS = {
     compressionSkipped: 'ℹ️ Compression skipped (file already small)',
     compressionNotAvailable: '⚠️ ffmpeg not available, compression disabled',
 
-    // Normalization
+    // ---- NORMALIZATION ----
     normalization: 'Normalization',
     normalizationDesc: 'Automatically equalizes sound volume',
     normalizationTarget: 'Normalization threshold',
@@ -1584,8 +1624,14 @@ export const TRANSLATIONS = {
     reanalyzeGains: 'Re-analyze gains',
     reanalyzeGainsDesc: 'Force re-analysis of sound levels',
     gainCacheCleared: 'Gain cache cleared, replay your sounds to re-analyze',
+    normalizationTargetVeryLow: '-6 dB (Very soft)',
+    normalizationTargetLow: '-3.7 dB (Soft)',
+    normalizationTargetModerate: '-2 dB (Moderate)',
+    normalizationTargetHigh: '-0.9 dB (Loud)',
+    normalizationTargetVeryHigh: '-0.4 dB (Very loud)',
+    normalizationTargetMax: '0 dB (Max)',
 
-    // Virtual driver
+    // ---- VIRTUAL DRIVER ----
     virtualDriver: 'Virtual audio driver',
     virtualDriverSub: 'Required for Discord',
     installVirtualDriver: 'Install VB-Cable',
@@ -1608,7 +1654,7 @@ export const TRANSLATIONS = {
     uninstallGuideStep2: 'Search for "VB-CABLE" and uninstall it.',
     uninstallGuideRestart: '⚠️ A PC restart may be required after uninstallation.',
 
-    // Mixer
+    // ---- MIXER ----
     mixerEnable: 'Mixer mic + sounds',
     mixerEnableDesc: 'Mix your microphone with sounds',
     mixerActivated: 'Mixer activated!',
@@ -1630,7 +1676,7 @@ export const TRANSLATIONS = {
     mixerNotInitialized: 'Mixer not initialized',
     mixerSoundVolume: 'Sound volume',
 
-    // Microphone
+    // ---- MICROPHONE ----
     microphone: 'Microphone',
     microphoneSelect: 'Select your microphone',
     microphoneDefault: 'Default microphone',
@@ -1647,20 +1693,20 @@ export const TRANSLATIONS = {
     micTestFinished: 'Microphone test finished',
     micTesting: 'Testing...',
 
-    // Monitoring
+    // ---- MONITORING ----
     monitoring: "Self-hear",
     monitoringDesc: 'Hear your microphone in speakers (reduced volume)',
     monitoringEnabled: '🎤 Monitoring enabled (you hear yourself)',
     monitoringDisabled: '🔇 Monitoring disabled',
     monitoringWarning: 'Monitoring active: you hear your microphone in speakers',
 
-    // Low latency
+    // ---- LOW LATENCY ----
     lowLatencyMode: 'Low latency mode',
     lowLatencyModeDesc: 'Disables audio filters to reduce latency (recommended for gaming)',
     lowLatencyActivated: '⚡ Low latency mode activated',
     lowLatencyDeactivated: '🔊 Low latency mode deactivated',
 
-    // Noise suppression
+    // ---- NOISE SUPPRESSION ----
     noiseSuppression: 'Microphone noise suppression',
     noiseSuppressionDesc: 'Filters background noise (fan, keyboard, etc.)',
     noiseSuppressionMode: 'Noise suppression mode',
@@ -1673,13 +1719,13 @@ export const TRANSLATIONS = {
     noiseSuppressionDeactivated: '🔊 Noise suppression deactivated',
     noiseSuppressionModeChanged: 'Noise suppression mode: {mode}',
 
-    // Reconnect
+    // ---- RECONNECT ----
     reconnectFlow: 'Reconnect flow',
     reconnectFlowDesc: 'Force flow reconnection to output device',
     reconnect: 'Reconnect',
     flowReconnected: 'Flow reconnected',
 
-    // Advanced mode
+    // ---- ADVANCED MODE ----
     advancedMode: 'Advanced mode',
     advancedModeDesc: 'Use VB-Cable + VoiceMeeter Banana for professional mixing.',
     downloadVBCable: 'Download VB-Cable',
@@ -1709,7 +1755,7 @@ export const TRANSLATIONS = {
     keyboardLayoutDesc: 'Select your keyboard type',
     keyboardLayoutChanged: 'Layout changed',
 
-    // Keyboard visualization
+    // ---- KEYBOARD VISUALIZATION ----
     keyboardVisualizerTitle: 'Keyboard shortcuts',
     keyboardVisualizerUsed: 'shortcut used',
     keyboardVisualizerUsedPlural: 'shortcuts used',
@@ -1755,6 +1801,23 @@ export const TRANSLATIONS = {
     exported: 'exported',
     configImported: 'Config imported',
     archiveImported: 'Archive imported',
+    backupInterval: 'Backup interval',
+    backupIntervalDesc: 'Frequency of automatic backups',
+    backupIntervalChanged: 'Backup interval changed to',
+    minute: 'minute',
+    minutes: 'minutes',
+    backupNow: 'Backup now',
+    exportBackups: 'Export backups',
+    importBackups: 'Import backups',
+    noBackups: 'No backups',
+    restore: 'Restore',
+    confirmRestore: 'Are you sure you want to restore this backup?',
+    backupSettings: 'Backups',
+    saving: 'Saving...',
+    lazyLoading: 'Lazy loading',
+    lazyLoadingDesc: 'Load sounds only when visible',
+    lazyLoadingEnabled: 'Lazy loading enabled',
+    lazyLoadingDisabled: 'Lazy loading disabled',
 
     // ---- PROFILES ----
     profileManagement: 'Profile management',
@@ -1766,7 +1829,7 @@ export const TRANSLATIONS = {
     deleteProfile: 'Profile deleted',
     deleteProfileConfirm: 'Do you really want to delete the profile "{name}"?',
 
-    // Profile Manager
+    // ---- PROFILE MANAGER ----
     profileManagerTitle: 'Manage profile',
     profileManagerSelectAll: 'Select all',
     profileManagerDeselectAll: 'Deselect all',
@@ -1865,7 +1928,6 @@ export const TRANSLATIONS = {
     discoverDatabaseUpdated: '✅ Sound database updated!',
     discoverSearchHere: 'Search in {count} sounds',
     discoverClearCacheConfirm: 'Do you really want to clear the discovery cache? The data will need to be reloaded to access the content.',
-    // categories
     catLocalTrending: 'Trending',
     catTrending: 'Trending',
     catBest: 'Best / Classics',
@@ -1942,7 +2004,6 @@ export const TRANSLATIONS = {
     editorClips: 'Clips',
     editorTracks: 'Tracks',
     editorDuration: 'Duration',
-    // Advanced editing
     editorAddTrack: 'Add track',
     editorAddClip: 'Add sound',
     editorAddEffect: 'Add effect',
@@ -2003,6 +2064,8 @@ export const TRANSLATIONS = {
     editorClipMoved: 'Clip moved',
     editorAutoCrossfade: 'Auto crossfade',
     editorCrossfadeActive: 'Crossfade active',
+
+    // ---- MARKERS ----
     editorMarkers: 'Markers',
     editorAddMarker: 'Add marker',
     editorRemoveMarker: 'Remove marker',
@@ -2018,11 +2081,68 @@ export const TRANSLATIONS = {
     editorMarkerDeleted: 'Marker deleted',
     editorAllMarkersDeleted: 'All markers deleted',
     editorDelete: 'Delete',
-    editorMetronome: 'Metronome',
-    editorTempo: 'Tempo (BPM)',
-    editorMetronomeVolume: 'Metronome volume',
+    editorNoMarkers: 'No markers',
+    editorNavigate: 'Navigate',
+    editorPrevious: 'Previous',
+    editorNext: 'Next',
+    editorRename: 'Rename',
+    editorRenameMarker: 'Rename (double-click)',
+    editorAdd: 'Add',
+
+    // ---- MARKER COLORS ----
+    markerColorRed: 'Red',
+    markerColorPink: 'Pink',
+    markerColorPurple: 'Purple',
+    markerColorBlue: 'Blue',
+    markerColorCyan: 'Cyan',
+    markerColorGreen: 'Green',
+    markerColorLime: 'Lime',
+    markerColorYellow: 'Yellow',
+    markerColorOrange: 'Orange',
+    markerColorBrown: 'Brown',
+
+    // ---- EDITOR - TRACKS ----
     editorTrackDefault: 'Track {index}',
-    // Editor - Normalization
+    editorTrackName: 'Track name',
+    editorTrackNamePlaceholder: 'Ex: Drums, Voice, Effects...',
+    editorTrackColor: 'Track color',
+    editorRenameTrack: 'Rename track',
+    editorTrackRenamed: 'Track renamed',
+    editorDoubleClickToRename: 'Double-click to rename',
+    editorReorderTrack: 'Reorder tracks',
+    editorUnmute: 'Unmute',
+
+    // ---- EDITOR - EFFECTS ----
+    editorEffectsPanelTitle: 'Effects panel',
+    editorEffectsPanelDescription: 'Add and modify audio effects on the selected clip',
+    editorRemoveEffect: 'Remove effect',
+    editorEffectEnabled: 'Effect enabled',
+    editorEffectDisabled: 'Effect disabled',
+    editorEffectPreviewing: 'Previewing...',
+    editorEffectNoClip: 'No clip selected',
+    editorEffectsTitle: 'Audio Effects',
+    editorEffectsFadeIn: 'Fade In',
+    editorEffectsFadeOut: 'Fade Out',
+    editorEffectsPitch: 'Pitch',
+    editorEffectsEcho: 'Echo',
+    editorEffectsReverb: 'Reverb',
+    editorEffectsApplied: '✅ Effects applied successfully',
+    editorEffectsReset: 'Effects reset',
+    editorEffectsProcessing: 'Processing...',
+    editorEffectsPreviewError: 'Preview error',
+    editorEffectsExportError: 'Audio export error',
+    editorEffectsNoBuffer: 'Cannot load sound',
+    editorEffectsNormalized: 'Sound normalized',
+    editorFadeIn: 'Fade In',
+    editorFadeOut: 'Fade Out',
+    editorListenClip: 'Listen to clip',
+    editorStopPreview: 'Stop preview',
+    editorClipEdit: 'Edit',
+    editorAudioEdit: 'Audio',
+    editorFades: 'Fades',
+    editorDuplicate: 'Duplicate',
+
+    // ---- EDITOR - NORMALIZATION ----
     editorNormalizeClip: 'Normalize clip',
     editorNormalizeTrack: 'Normalize track',
     editorNormalizeProject: 'Normalize project',
@@ -2040,34 +2160,22 @@ export const TRANSLATIONS = {
     editorNormalizeScopeClip: 'Current clip',
     editorNormalizeScopeTrack: 'Entire track',
     editorNormalizeScopeProject: 'Entire project',
-    normalizationTargetVeryLow: '-6 dB (Very soft)',
-    normalizationTargetLow: '-3.7 dB (Soft)',
-    normalizationTargetModerate: '-2 dB (Moderate)',
-    normalizationTargetHigh: '-0.9 dB (Loud)',
-    normalizationTargetVeryHigh: '-0.4 dB (Very loud)',
-    normalizationTargetMax: '0 dB (Max)',
-    // Effects panel
-    editorEffectsPanelTitle: 'Effects panel',
-    editorEffectsPanelDescription: 'Add and modify audio effects on the selected clip',
-    editorRemoveEffect: 'Remove effect',
-    editorEffectEnabled: 'Effect enabled',
-    editorEffectDisabled: 'Effect disabled',
-    editorEffectPreviewing: 'Previewing...',
-    editorEffectNoClip: 'No clip selected',
-    // Audio effects
-    editorEffectsTitle: 'Audio Effects',
-    editorEffectsFadeIn: 'Fade In',
-    editorEffectsFadeOut: 'Fade Out',
-    editorEffectsPitch: 'Pitch',
-    editorEffectsEcho: 'Echo',
-    editorEffectsReverb: 'Reverb',
-    editorEffectsApplied: '✅ Effects applied successfully',
-    editorEffectsReset: 'Effects reset',
-    editorEffectsProcessing: 'Processing...',
-    editorEffectsPreviewError: 'Preview error',
-    editorEffectsExportError: 'Audio export error',
-    editorEffectsNoBuffer: 'Cannot load sound',
-    editorEffectsNormalized: 'Sound normalized',
+
+    // ---- EDITOR - FILE IMPORT ----
+    editorImportFile: 'Import file',
+    editorFileReady: 'File ready to be imported',
+    editorReady: 'Ready',
+    editorAutoDetectTrack: 'Auto-select first track',
+    editorConfirm: 'Confirm',
+    editorCancel: 'Cancel',
+    editorImport: 'Import',
+    editorFileImported: 'File imported to track',
+    editorImportToTrack: 'Import to track...',
+
+    // ---- EDITOR - METRONOME ----
+    editorMetronome: 'Metronome',
+    editorTempo: 'Tempo (BPM)',
+    editorMetronomeVolume: 'Metronome volume',
 
     // ---- AUDIO TRIMMER ----
     trimmerTitle: 'Trim sound',
@@ -2323,23 +2431,8 @@ export const TRANSLATIONS = {
     autoBackupDesc: 'Automatically backup your configuration',
     autoBackupEnabled: 'Auto backup enabled',
     autoBackupDisabled: 'Auto backup disabled',
-    backupInterval: 'Backup interval',
-    backupIntervalDesc: 'Frequency of automatic backups',
-    backupIntervalChanged: 'Backup interval changed to',
-    minute: 'minute',
-    minutes: 'minutes',
-    backupNow: 'Backup now',
-    exportBackups: 'Export backups',
-    importBackups: 'Import backups',
-    noBackups: 'No backups',
-    restore: 'Restore',
-    confirmRestore: 'Are you sure you want to restore this backup?',
-    backupSettings: 'Backups',
-    saving: 'Saving...',
-    lazyLoading: 'Lazy loading',
-    lazyLoadingDesc: 'Load sounds only when visible',
-    lazyLoadingEnabled: 'Lazy loading enabled',
-    lazyLoadingDisabled: 'Lazy loading disabled',
+
+    // ---- ERRORS ----
     errorLogs: 'Error logs',
     errorLogsDesc: 'Error management and logs',
     exportLogs: 'Export logs',
@@ -2788,8 +2881,6 @@ export const TRANSLATIONS = {
     optionsShortcuts: 'Atajos',
     optionsBackup: 'Copia de seguridad',
     optionsProfiles: 'Perfiles',
-
-    // Application
     application: 'Aplicación',
     startMinimized: 'Iniciar minimizado',
     startMinimizedDesc: 'Iniciar SoundDeck sin abrir la ventana',
@@ -2804,8 +2895,6 @@ export const TRANSLATIONS = {
     deactivateShortcuts: 'Desactivar atajos',
     quitApp: 'Salir de SoundDeck',
     openSoundDeck: 'Abrir SoundDeck',
-
-    // Appearance
     appearance: 'Apariencia',
     language: 'Idioma',
     theme: 'Tema',
@@ -2830,8 +2919,6 @@ export const TRANSLATIONS = {
     focusModeOn: 'Focus ON',
     focusModeOff: 'Focus OFF',
     focusModeShortcut: 'Ctrl+Shift+F para alternar',
-
-    // Audio
     audio: 'Audio',
     audioMode: 'Modo audio',
     audioModeDesc: 'Cómo SoundDeck envía el audio',
@@ -2849,7 +2936,7 @@ export const TRANSLATIONS = {
     localOutputDeviceDefault: 'Por defecto',
     localOutputDeviceChanged: 'Dispositivo local cambiado: {device}',
 
-    // Sound Management
+    // ---- SOUND MANAGEMENT ----
     soundManagement: 'Gestión de sonidos',
     compressOnImport: 'Comprimir al importar',
     compressOnImportDesc: 'Reduce el tamaño de los archivos de audio importados (requiere ffmpeg)',
@@ -2869,7 +2956,7 @@ export const TRANSLATIONS = {
     compressionSkipped: 'ℹ️ Compresión omitida (archivo ya pequeño)',
     compressionNotAvailable: '⚠️ ffmpeg no disponible, compresión desactivada',
 
-    // Normalization
+    // ---- NORMALIZATION ----
     normalization: 'Normalización',
     normalizationDesc: 'Iguala el volumen de los sonidos automáticamente',
     normalizationTarget: 'Umbral de normalización',
@@ -2886,8 +2973,14 @@ export const TRANSLATIONS = {
     reanalyzeGains: 'Reanalizar ganancias',
     reanalyzeGainsDesc: 'Forzar el reanálisis de los niveles de sonido',
     gainCacheCleared: 'Caché de ganancias vaciado, reproduce tus sonidos para reanalizar',
+    normalizationTargetVeryLow: '-6 dB (Muy suave)',
+    normalizationTargetLow: '-3.7 dB (Suave)',
+    normalizationTargetModerate: '-2 dB (Moderado)',
+    normalizationTargetHigh: '-0.9 dB (Fuerte)',
+    normalizationTargetVeryHigh: '-0.4 dB (Muy fuerte)',
+    normalizationTargetMax: '0 dB (Máx)',
 
-    // Virtual driver
+    // ---- VIRTUAL DRIVER ----
     virtualDriver: 'Controlador de audio virtual',
     virtualDriverSub: 'Necesario para Discord',
     installVirtualDriver: 'Instalar VB-Cable',
@@ -2910,7 +3003,7 @@ export const TRANSLATIONS = {
     uninstallGuideStep2: 'Busca "VB-CABLE" y desinstálalo.',
     uninstallGuideRestart: '⚠️ Puede ser necesario reiniciar el PC después de la desinstalación.',
 
-    // Mixer
+    // ---- MIXER ----
     mixerEnable: 'Mezclador micro + sonidos',
     mixerEnableDesc: 'Mezcla tu micrófono con los sonidos',
     mixerActivated: '¡Mezclador activado!',
@@ -2932,7 +3025,7 @@ export const TRANSLATIONS = {
     mixerNotInitialized: 'Mezclador no inicializado',
     mixerSoundVolume: 'Volumen de sonidos',
 
-    // Microphone
+    // ---- MICROPHONE ----
     microphone: 'Micrófono',
     microphoneSelect: 'Selecciona tu micrófono',
     microphoneDefault: 'Micrófono por defecto',
@@ -2949,20 +3042,20 @@ export const TRANSLATIONS = {
     micTestFinished: 'Prueba de micrófono finalizada',
     micTesting: 'Probando...',
 
-    // Monitoring
+    // ---- MONITORING ----
     monitoring: "Escucharse",
     monitoringDesc: 'Escuchar tu micrófono en los altavoces (volumen reducido)',
     monitoringEnabled: '🎤 Monitoreo activado (te escuchas a ti mismo)',
     monitoringDisabled: '🔇 Monitoreo desactivado',
     monitoringWarning: 'Monitoreo activo: escuchas tu micrófono en los altavoces',
 
-    // Low latency
+    // ---- LOW LATENCY ----
     lowLatencyMode: 'Modo baja latencia',
     lowLatencyModeDesc: 'Desactiva los filtros de audio para reducir la latencia (recomendado para juegos)',
     lowLatencyActivated: '⚡ Modo baja latencia activado',
     lowLatencyDeactivated: '🔊 Modo baja latencia desactivado',
 
-    // Noise suppression
+    // ---- NOISE SUPPRESSION ----
     noiseSuppression: 'Supresión de ruido del micrófono',
     noiseSuppressionDesc: 'Filtra el ruido de fondo (ventilador, teclado, etc.)',
     noiseSuppressionMode: 'Modo de supresión de ruido',
@@ -2975,13 +3068,13 @@ export const TRANSLATIONS = {
     noiseSuppressionDeactivated: '🔊 Supresión de ruido desactivada',
     noiseSuppressionModeChanged: 'Modo de supresión de ruido: {mode}',
 
-    // Reconnect
+    // ---- RECONNECT ----
     reconnectFlow: 'Reconectar flujo',
     reconnectFlowDesc: 'Fuerza la reconexión del flujo al dispositivo de salida',
     reconnect: 'Reconectar',
     flowReconnected: 'Flujo reconectado',
 
-    // Advanced mode
+    // ---- ADVANCED MODE ----
     advancedMode: 'Modo avanzado',
     advancedModeDesc: 'Usa VB-Cable + VoiceMeeter Banana para mezcla profesional.',
     downloadVBCable: 'Descargar VB-Cable',
@@ -3011,7 +3104,7 @@ export const TRANSLATIONS = {
     keyboardLayoutDesc: 'Selecciona tu tipo de teclado',
     keyboardLayoutChanged: 'Distribución cambiada',
 
-    // Keyboard visualization
+    // ---- KEYBOARD VISUALIZATION ----
     keyboardVisualizerTitle: 'Atajos de teclado',
     keyboardVisualizerUsed: 'atajo utilizado',
     keyboardVisualizerUsedPlural: 'atajos utilizados',
@@ -3057,6 +3150,23 @@ export const TRANSLATIONS = {
     exported: 'exportados',
     configImported: 'Configuración importada',
     archiveImported: 'Archivo importado',
+    backupInterval: 'Intervalo de copia',
+    backupIntervalDesc: 'Frecuencia de las copias automáticas',
+    backupIntervalChanged: 'Intervalo de copia cambiado a',
+    minute: 'minuto',
+    minutes: 'minutos',
+    backupNow: 'Copiar ahora',
+    exportBackups: 'Exportar copias',
+    importBackups: 'Importar copias',
+    noBackups: 'Sin copias',
+    restore: 'Restaurar',
+    confirmRestore: '¿Seguro que quieres restaurar esta copia?',
+    backupSettings: 'Copias',
+    saving: 'Guardando...',
+    lazyLoading: 'Carga bajo demanda',
+    lazyLoadingDesc: 'Carga los sonidos solo cuando son visibles',
+    lazyLoadingEnabled: 'Carga bajo demanda activada',
+    lazyLoadingDisabled: 'Carga bajo demanda desactivada',
 
     // ---- PROFILES ----
     profileManagement: 'Gestión de perfiles',
@@ -3068,7 +3178,7 @@ export const TRANSLATIONS = {
     deleteProfile: 'Perfil eliminado',
     deleteProfileConfirm: '¿Realmente quieres eliminar el perfil "{name}"?',
 
-    // Profile Manager
+    // ---- PROFILE MANAGER ----
     profileManagerTitle: 'Gestionar perfil',
     profileManagerSelectAll: 'Seleccionar todo',
     profileManagerDeselectAll: 'Deseleccionar todo',
@@ -3167,7 +3277,6 @@ export const TRANSLATIONS = {
     discoverDatabaseUpdated: '✅ ¡Base de sonidos actualizada!',
     discoverSearchHere: 'Buscar en {count} sonidos',
     discoverClearCacheConfirm: '¿Realmente quieres vaciar la caché de descubrimiento? Será necesario volver a cargar los datos para acceder al contenido.',
-    // categories
     catLocalTrending: 'Tendencias',
     catTrending: 'Tendencias',
     catBest: 'Mejores / Clásicos',
@@ -3244,7 +3353,6 @@ export const TRANSLATIONS = {
     editorClips: 'Clips',
     editorTracks: 'Pistas',
     editorDuration: 'Duración',
-    // Advanced editing
     editorAddTrack: 'Añadir pista',
     editorAddClip: 'Añadir sonido',
     editorAddEffect: 'Añadir efecto',
@@ -3305,6 +3413,8 @@ export const TRANSLATIONS = {
     editorClipMoved: 'Clip movido',
     editorAutoCrossfade: 'Crossfade automático',
     editorCrossfadeActive: 'Crossfade activo',
+
+    // ---- MARKERS ----
     editorMarkers: 'Marcadores',
     editorAddMarker: 'Agregar marcador',
     editorRemoveMarker: 'Eliminar marcador',
@@ -3320,11 +3430,68 @@ export const TRANSLATIONS = {
     editorMarkerDeleted: 'Marcador eliminado',
     editorAllMarkersDeleted: 'Todos los marcadores eliminados',
     editorDelete: 'Eliminar',
-    editorMetronome: 'Metrónomo',
-    editorTempo: 'Tempo (BPM)',
-    editorMetronomeVolume: 'Volumen del metrónomo',
+    editorNoMarkers: 'Sin marcadores',
+    editorNavigate: 'Navegar',
+    editorPrevious: 'Anterior',
+    editorNext: 'Siguiente',
+    editorRename: 'Renombrar',
+    editorRenameMarker: 'Renombrar (doble clic)',
+    editorAdd: 'Agregar',
+
+    // ---- MARKER COLORS ----
+    markerColorRed: 'Rojo',
+    markerColorPink: 'Rosa',
+    markerColorPurple: 'Violeta',
+    markerColorBlue: 'Azul',
+    markerColorCyan: 'Cian',
+    markerColorGreen: 'Verde',
+    markerColorLime: 'Verde claro',
+    markerColorYellow: 'Amarillo',
+    markerColorOrange: 'Naranja',
+    markerColorBrown: 'Marrón',
+
+    // ---- EDITOR - TRACKS ----
     editorTrackDefault: 'Pista {index}',
-    // Editor - Normalization
+    editorTrackName: 'Nombre de la pista',
+    editorTrackNamePlaceholder: 'Ej: Batería, Voz, Efectos...',
+    editorTrackColor: 'Color de la pista',
+    editorRenameTrack: 'Renombrar pista',
+    editorTrackRenamed: 'Pista renombrada',
+    editorDoubleClickToRename: 'Doble clic para renombrar',
+    editorReorderTrack: 'Reordenar pistas',
+    editorUnmute: 'Reactivar sonido',
+
+    // ---- EDITOR - EFFECTS ----
+    editorEffectsPanelTitle: 'Panel de efectos',
+    editorEffectsPanelDescription: 'Añade y modifica efectos de audio en el clip seleccionado',
+    editorRemoveEffect: 'Eliminar efecto',
+    editorEffectEnabled: 'Efecto activado',
+    editorEffectDisabled: 'Efecto desactivado',
+    editorEffectPreviewing: 'Previsualizando...',
+    editorEffectNoClip: 'Ningún clip seleccionado',
+    editorEffectsTitle: 'Efectos de audio',
+    editorEffectsFadeIn: 'Fade In',
+    editorEffectsFadeOut: 'Fade Out',
+    editorEffectsPitch: 'Tono',
+    editorEffectsEcho: 'Eco',
+    editorEffectsReverb: 'Reverberación',
+    editorEffectsApplied: '✅ Efectos aplicados con éxito',
+    editorEffectsReset: 'Efectos restablecidos',
+    editorEffectsProcessing: 'Procesando...',
+    editorEffectsPreviewError: 'Error de previsualización',
+    editorEffectsExportError: 'Error de exportación de audio',
+    editorEffectsNoBuffer: 'No se puede cargar el sonido',
+    editorEffectsNormalized: 'Sonido normalizado',
+    editorFadeIn: 'Fade In',
+    editorFadeOut: 'Fade Out',
+    editorListenClip: 'Escuchar clip',
+    editorStopPreview: 'Detener previsualización',
+    editorClipEdit: 'Edición',
+    editorAudioEdit: 'Audio',
+    editorFades: 'Fades',
+    editorDuplicate: 'Duplicar',
+
+    // ---- EDITOR - NORMALIZATION ----
     editorNormalizeClip: 'Normalizar clip',
     editorNormalizeTrack: 'Normalizar pista',
     editorNormalizeProject: 'Normalizar proyecto',
@@ -3342,34 +3509,22 @@ export const TRANSLATIONS = {
     editorNormalizeScopeClip: 'Clip actual',
     editorNormalizeScopeTrack: 'Pista entera',
     editorNormalizeScopeProject: 'Proyecto entero',
-    normalizationTargetVeryLow: '-6 dB (Muy suave)',
-    normalizationTargetLow: '-3.7 dB (Suave)',
-    normalizationTargetModerate: '-2 dB (Moderado)',
-    normalizationTargetHigh: '-0.9 dB (Fuerte)',
-    normalizationTargetVeryHigh: '-0.4 dB (Muy fuerte)',
-    normalizationTargetMax: '0 dB (Máx)',
-    // Effects panel
-    editorEffectsPanelTitle: 'Panel de efectos',
-    editorEffectsPanelDescription: 'Añade y modifica efectos de audio en el clip seleccionado',
-    editorRemoveEffect: 'Eliminar efecto',
-    editorEffectEnabled: 'Efecto activado',
-    editorEffectDisabled: 'Efecto desactivado',
-    editorEffectPreviewing: 'Previsualizando...',
-    editorEffectNoClip: 'Ningún clip seleccionado',
-    // Audio effects
-    editorEffectsTitle: 'Efectos de audio',
-    editorEffectsFadeIn: 'Fade In',
-    editorEffectsFadeOut: 'Fade Out',
-    editorEffectsPitch: 'Tono',
-    editorEffectsEcho: 'Eco',
-    editorEffectsReverb: 'Reverberación',
-    editorEffectsApplied: '✅ Efectos aplicados con éxito',
-    editorEffectsReset: 'Efectos restablecidos',
-    editorEffectsProcessing: 'Procesando...',
-    editorEffectsPreviewError: 'Error de previsualización',
-    editorEffectsExportError: 'Error de exportación de audio',
-    editorEffectsNoBuffer: 'No se puede cargar el sonido',
-    editorEffectsNormalized: 'Sonido normalizado',
+
+    // ---- EDITOR - FILE IMPORT ----
+    editorImportFile: 'Importar archivo',
+    editorFileReady: 'Archivo listo para importar',
+    editorReady: 'Listo',
+    editorAutoDetectTrack: 'Seleccionar automáticamente la primera pista',
+    editorConfirm: 'Confirmar',
+    editorCancel: 'Cancelar',
+    editorImport: 'Importar',
+    editorFileImported: 'Archivo importado a la pista',
+    editorImportToTrack: 'Importar a la pista...',
+
+    // ---- EDITOR - METRONOME ----
+    editorMetronome: 'Metrónomo',
+    editorTempo: 'Tempo (BPM)',
+    editorMetronomeVolume: 'Volumen del metrónomo',
 
     // ---- AUDIO TRIMMER ----
     trimmerTitle: 'Recortar sonido',
@@ -3625,23 +3780,8 @@ export const TRANSLATIONS = {
     autoBackupDesc: 'Copia de seguridad automática de tu configuración',
     autoBackupEnabled: 'Copia automática activada',
     autoBackupDisabled: 'Copia automática desactivada',
-    backupInterval: 'Intervalo de copia',
-    backupIntervalDesc: 'Frecuencia de las copias automáticas',
-    backupIntervalChanged: 'Intervalo de copia cambiado a',
-    minute: 'minuto',
-    minutes: 'minutos',
-    backupNow: 'Copiar ahora',
-    exportBackups: 'Exportar copias',
-    importBackups: 'Importar copias',
-    noBackups: 'Sin copias',
-    restore: 'Restaurar',
-    confirmRestore: '¿Seguro que quieres restaurar esta copia?',
-    backupSettings: 'Copias',
-    saving: 'Guardando...',
-    lazyLoading: 'Carga bajo demanda',
-    lazyLoadingDesc: 'Carga los sonidos solo cuando son visibles',
-    lazyLoadingEnabled: 'Carga bajo demanda activada',
-    lazyLoadingDisabled: 'Carga bajo demanda desactivada',
+
+    // ---- ERRORS ----
     errorLogs: 'Registros de errores',
     errorLogsDesc: 'Gestión de errores y registros',
     exportLogs: 'Exportar registros',

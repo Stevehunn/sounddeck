@@ -1202,10 +1202,17 @@ export function useStore() {
     return project
   }, [save])
 
-  const addTrack = useCallback(async (t) => {
+  const addTrack = useCallback(async (name = null, color = null) => {
+    const trackIndex = editorProject.tracks.length + 1
+    const trackName = name || `Piste ${trackIndex}`
+    
+    // Générer une couleur aléatoire si non fournie
+    const trackColor = color || `hsl(${(trackIndex * 30 + 200) % 360}, 60%, 50%)`
+    
     const newTrack = {
       id: `track-${Date.now()}`,
-      name: `__track_${trackIndex}__`,
+      name: trackName,
+      color: trackColor,
       displayIndex: trackIndex,
       clips: [],
       volume: 1,
@@ -1220,6 +1227,34 @@ export function useStore() {
     }
     await commitEditorProject(updated)
     return newTrack
+  }, [editorProject, commitEditorProject])
+
+  const renameTrack = useCallback(async (trackId, newName) => {
+    const updated = {
+      ...editorProject,
+      tracks: editorProject.tracks.map(track => {
+        if (track.id === trackId) {
+          return { ...track, name: newName }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+  }, [editorProject, commitEditorProject])
+
+  const updateTrackColor = useCallback(async (trackId, color) => {
+    const updated = {
+      ...editorProject,
+      tracks: editorProject.tracks.map(track => {
+        if (track.id === trackId) {
+          return { ...track, color }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
   }, [editorProject, commitEditorProject])
 
   const updateTrack = useCallback(async (trackId, updates) => {
@@ -1899,6 +1934,8 @@ export function useStore() {
     commitEditorProject,
     setEditorProject,
     updateEditorProject,
+    renameTrack,
+    updateTrackColor,
 
     // Undo/Redo
     undoEditor,

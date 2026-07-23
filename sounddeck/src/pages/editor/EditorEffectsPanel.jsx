@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import TrimModal from './TrimModal'
 import useConfirm from '../../hooks/useConfirm'
 
 const EFFECT_TYPES = [
@@ -52,27 +51,14 @@ export default function EditorEffectsPanel({
   onClipUpdate,
   onPreview,
   isPreviewing,
-  onNormalize,
-  onTrim,
   lang,
   tr,
   autoPlayOnClick = false
 }) {
   const [showAddEffect, setShowAddEffect] = useState(false)
-  const [showTrimModal, setShowTrimModal] = useState(false)
-  const [normalizeTarget, setNormalizeTarget] = useState(0.95)
   const previewTimeoutRef = useRef(null)
   
   const { confirm, ConfirmWrapper } = useConfirm({ lang })
-
-  const getTargetPeakOptions = () => [
-    { value: 0.5, label: tr('normalizationTargetVeryLow') || '-6 dB (Très doux)' },
-    { value: 0.65, label: tr('normalizationTargetLow') || '-3.7 dB (Doux)' },
-    { value: 0.8, label: tr('normalizationTargetModerate') || '-2 dB (Modéré)' },
-    { value: 0.9, label: tr('normalizationTargetHigh') || '-0.9 dB (Fort)' },
-    { value: 0.95, label: tr('normalizationTargetVeryHigh') || '-0.4 dB (Très fort)' },
-    { value: 1.0, label: tr('normalizationTargetMax') || '0 dB (Max)' },
-  ]
 
   const previewEffects = useCallback(async () => {
     if (!clip || !clip.path) return
@@ -140,95 +126,6 @@ export default function EditorEffectsPanel({
     setShowAddEffect(false)
   }
 
-  const handleTrimClick = () => {
-    setShowTrimModal(true)
-  }
-
-  const handleTrimConfirm = (clipId, start, end) => {
-    onTrim?.(clipId, start, end)
-    setShowTrimModal(false)
-  }
-
-  // ✅ Gestion de la normalisation avec popup personnalisée
-  const handleNormalizeClick = async () => {
-    if (!clip) return
-
-    let localTarget = normalizeTarget
-
-    const result = await new Promise((resolve) => {
-      const closePopup = () => {
-        setShowNormalizePopup(false)
-      }
-
-      let selectedTarget = localTarget
-
-      const handleConfirm = () => {
-        setNormalizeTarget(selectedTarget)
-        closePopup()
-        resolve(true)
-      }
-
-      const handleCancel = () => {
-        closePopup()
-        resolve(false)
-      }
-
-      const handleTargetChange = (e) => {
-        e.stopPropagation()
-        selectedTarget = Number(e.target.value)
-        setNormalizeTarget(selectedTarget)
-      }
-
-      setShowNormalizePopup({
-        onConfirm: handleConfirm,
-        onCancel: handleCancel,
-        onTargetChange: handleTargetChange,
-        currentTarget: selectedTarget
-      })
-    })
-
-    if (result) {
-      onNormalize?.(clip.id, normalizeTarget)
-    }
-  }
-
-  const [showNormalizePopup, setShowNormalizePopup] = useState(null)
-
-  // Fonction pour formater l'affichage des valeurs
-  const formatValue = (param, value) => {
-    if (param === 'semitones') {
-      return `${value > 0 ? '+' : ''}${value}`
-    }
-    if (param === 'value') {
-      return `${value.toFixed(1)}x`
-    }
-    if (typeof value === 'number') {
-      return value.toFixed(1)
-    }
-    return value
-  }
-
-  // Fonction pour obtenir la couleur en fonction de la valeur
-  const getValueColor = (param, value) => {
-    const range = PARAM_RANGES[param]
-    if (!range) return 'var(--text-secondary)'
-    
-    const ratio = (value - range.min) / (range.max - range.min)
-    
-    if (param === 'value') {
-      if (value < 0.5) return 'var(--danger)'
-      if (value < 0.8) return 'var(--warning)'
-      if (value > 2) return 'var(--success)'
-      return 'var(--text-secondary)'
-    }
-    if (param === 'semitones') {
-      if (Math.abs(value) > 12) return 'var(--danger)'
-      if (Math.abs(value) > 6) return 'var(--warning)'
-      return 'var(--success)'
-    }
-    return 'var(--text-secondary)'
-  }
-
   return (
     <>
       <div style={{
@@ -259,28 +156,9 @@ export default function EditorEffectsPanel({
             }}>
               {clip.effects?.filter(e => e.enabled).length || 0} {tr('editorEffectsActive')}
             </span>
-            {/* ✅ SUPPRESSION DE L'AFFICHAGE AUTO/MANUAL */}
           </div>
 
           <div style={{ display: 'flex', gap: 6 }}>
-            <button
-              className="btn-secondary btn-sm"
-              onClick={handleTrimClick}
-              style={{ fontSize: 11 }}
-              title={tr('editorTrim') || 'Rogner le son'}
-            >
-              <i className="ti ti-cut" /> {tr('editorTrim') || 'Rogner'}
-            </button>
-
-            <button
-              className="btn-secondary btn-sm"
-              onClick={handleNormalizeClick}
-              style={{ fontSize: 11 }}
-              title={tr('editorNormalizeClip') || 'Normaliser le volume'}
-            >
-              <i className="ti ti-wave" /> {tr('editorNormalize') || 'Normaliser'}
-            </button>
-
             <button
               className="btn-secondary btn-sm"
               onClick={() => setShowAddEffect(!showAddEffect)}
@@ -351,8 +229,6 @@ export default function EditorEffectsPanel({
                 {def.params.map(param => {
                   const range = PARAM_RANGES[param]
                   const value = effect.params[param] || 0
-                  const color = getValueColor(param, value)
-                  const formattedValue = formatValue(param, value)
                   
                   return (
                     <div key={param} style={{
@@ -377,19 +253,19 @@ export default function EditorEffectsPanel({
                         onChange={e => handleParamChange(effect.id, param, parseFloat(e.target.value))}
                         style={{ 
                           flex: 1, 
-                          accentColor: color,
+                          accentColor: 'var(--accent)',
                           background: 'transparent'
                         }}
                       />
                       <span style={{
                         fontSize: 9,
-                        color: color,
+                        color: 'var(--text-secondary)',
                         minWidth: 40,
                         textAlign: 'right',
                         fontWeight: 600,
                         fontFamily: 'monospace'
                       }}>
-                        {formattedValue}
+                        {typeof value === 'number' ? value.toFixed(1) : value}
                       </span>
                     </div>
                   )
@@ -457,107 +333,7 @@ export default function EditorEffectsPanel({
             {tr('editorEffectPreview') || 'Aperçu des effets...'}
           </div>
         )}
-
-        {/* Modal de rognage */}
-        {showTrimModal && (
-          <TrimModal
-            clip={clip}
-            onConfirm={handleTrimConfirm}
-            onCancel={() => setShowTrimModal(false)}
-            tr={tr}
-          />
-        )}
       </div>
-
-      {/* ✅ Popup de normalisation personnalisée avec traductions des options */}
-      {showNormalizePopup && (
-        <div 
-          className="modal-overlay" 
-          onClick={showNormalizePopup.onCancel}
-          style={{ zIndex: 10000 }}
-        >
-          <div 
-            className="modal" 
-            style={{ width: 420 }} 
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-title" style={{ color: 'var(--accent)' }}>
-              <i className="ti ti-wave" style={{ color: 'var(--accent)', marginRight: 8 }} />
-              {tr('editorNormalize') || 'Normaliser le volume'}
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                {tr('editorNormalizeConfirm') || 'Normaliser le volume de ce clip ?'}
-              </div>
-              
-              <div>
-                <label style={{ 
-                  fontSize: 12, 
-                  color: 'var(--text-secondary)', 
-                  display: 'block', 
-                  marginBottom: 6,
-                  fontWeight: 500
-                }}>
-                  <i className="ti ti-wave" style={{ marginRight: 4 }} />
-                  {tr('normalizationTarget') || 'Pic cible'}
-                </label>
-                <select
-                  value={normalizeTarget}
-                  onChange={showNormalizePopup.onTargetChange}
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  style={{ 
-                    width: '100%', 
-                    fontSize: 12,
-                    padding: '6px 10px',
-                    borderRadius: 'var(--radius-sm)',
-                    background: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--text-primary)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {getTargetPeakOptions().map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{
-                fontSize: 11,
-                color: 'var(--text-tertiary)',
-                padding: '6px 10px',
-                background: 'var(--bg-tertiary)',
-                borderRadius: 'var(--radius-sm)',
-                lineHeight: 1.5
-              }}>
-                <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
-                {tr('normalizationTargetDesc') || 'Plus la valeur est élevée, plus les sons sont amplifiés'}
-              </div>
-            </div>
-
-            <div className="modal-actions" style={{ marginTop: 16 }}>
-              <button 
-                className="btn-secondary btn-lg" 
-                onClick={showNormalizePopup.onCancel}
-                style={{ borderRadius: 'var(--radius-md)', minHeight: 40, padding: '8px 20px' }}
-              >
-                <i className="ti ti-x" /> {tr('cancel') || 'Annuler'}
-              </button>
-              <button 
-                className="btn-primary btn-lg" 
-                onClick={showNormalizePopup.onConfirm}
-                style={{ borderRadius: 'var(--radius-md)', minHeight: 40, padding: '8px 20px' }}
-              >
-                <i className="ti ti-check" /> {tr('confirm') || 'Normaliser'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <ConfirmWrapper />
     </>

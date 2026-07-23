@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import EditorClip from './EditorClip'
 
 export default function EditorTrack({
@@ -16,6 +16,7 @@ export default function EditorTrack({
   onClipFade,
   onClipCopy,
   onClipCut,
+  onClipContextMenu,
   onDragCheckpoint,
   onTrackRemove,
   waveformData,
@@ -30,7 +31,8 @@ export default function EditorTrack({
   autoPlayOnClick = false,
   autoCrossfade = false,
   lang,
-  tr
+  tr,
+  onRenameTrack
 }) {
   const [isMuted, setIsMuted] = useState(track.muted || false)
   const [isSolo, setIsSolo] = useState(track.solo || false)
@@ -38,14 +40,17 @@ export default function EditorTrack({
   const [isDragging, setIsDragging] = useState(false)
   const [isDragOverTrack, setIsDragOverTrack] = useState(false)
   const [isDraggingClip, setIsDraggingClip] = useState(false)
-  
-  // ✅ REFS POUR ÉVITER LES BOUCLES
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [renameValue, setRenameValue] = useState(track.name || '')
+  const renameInputRef = useRef(null)
+
+  const trackHeight = 80
+  const trackColor = track.color || `hsl(${(trackIndex * 30 + 200) % 360}, 60%, 40%)`
+
+  // ─── REFS POUR ÉVITER LES BOUCLES ──────────────────────────────────────────
   const isCrossfadingRef = useRef(false)
   const lastOverlapsRef = useRef('')
   const updateTimeoutRef = useRef(null)
-
-  const trackHeight = 80
-  const trackColor = `hsl(${(trackIndex * 30 + 200) % 360}, 60%, 40%)`
 
   useEffect(() => {
     setIsMuted(track.muted || false)
@@ -59,7 +64,35 @@ export default function EditorTrack({
     setVolume(track.volume != null ? Math.round(track.volume * 100) : 100)
   }, [track.volume])
 
-  // ─── CROSSFADE AUTOMATIQUE ──────────────────────────────────────────────
+  // ─── RENOMMAGE ──────────────────────────────────────────────────────────────
+  const handleRenameStart = (e) => {
+    e.stopPropagation()
+    setRenameValue(track.name || '')
+    setIsRenaming(true)
+    setTimeout(() => {
+      if (renameInputRef.current) {
+        renameInputRef.current.focus()
+        renameInputRef.current.select()
+      }
+    }, 50)
+  }
+
+  const handleRenameConfirm = () => {
+    if (renameValue.trim() && renameValue.trim() !== track.name) {
+      onRenameTrack?.(track.id, renameValue.trim())
+    }
+    setIsRenaming(false)
+  }
+
+  const handleRenameKeyDown = (e) => {
+    if (e.key === 'Enter') handleRenameConfirm()
+    if (e.key === 'Escape') {
+      setIsRenaming(false)
+      setRenameValue(track.name || '')
+    }
+  }
+
+  // ─── CROSSFADE AUTOMATIQUE ──────────────────────────────────────────────────
   const checkOverlaps = useCallback(() => {
     if (!autoCrossfade || isCrossfadingRef.current) return
     if (isDraggingClip || isDragging) return
@@ -128,7 +161,6 @@ export default function EditorTrack({
   }, [checkOverlaps])
 
   // ─── HANDLERS ──────────────────────────────────────────────────────────────
-
   const handleClipUpdate = useCallback((clipId, updates) => {
     if (onClipUpdate) {
       onClipUpdate(track.id, clipId, updates)
@@ -151,7 +183,6 @@ export default function EditorTrack({
     e.stopPropagation()
   }
 
-  // ✅ MUTE - Couper le son de la piste
   const handleMuteToggle = (e) => {
     e.stopPropagation()
     const newMuted = !isMuted
@@ -161,7 +192,6 @@ export default function EditorTrack({
     }
   }
 
-  // ✅ SOLO - Isoler la piste
   const handleSoloToggle = (e) => {
     e.stopPropagation()
     const newSolo = !isSolo
@@ -171,11 +201,10 @@ export default function EditorTrack({
     }
   }
 
-  // ✅ VOLUME - CORRIGÉ (0 à 100)
   const handleVolumeChange = (e) => {
     e.stopPropagation()
-    const displayValue = parseFloat(e.target.value) // 0-100
-    const normalizedValue = displayValue / 100 // 0-1
+    const displayValue = parseFloat(e.target.value)
+    const normalizedValue = displayValue / 100
     
     setVolume(displayValue)
     if (onTrackVolume) {
@@ -184,7 +213,6 @@ export default function EditorTrack({
   }
 
   // ─── DRAG & DROP ──────────────────────────────────────────────────────────
-  
   const handleTrackDragStart = (e) => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('application/x-sounddeck-track-index', String(trackIndex))
@@ -316,7 +344,7 @@ export default function EditorTrack({
 
         {/* Barre de couleur */}
         <div style={{
-          width: 3,
+          width: 4,
           height: '100%',
           background: trackColor,
           borderRadius: 2,
@@ -324,38 +352,94 @@ export default function EditorTrack({
           marginRight: 4
         }} />
 
-        {/* Volume slider - CORRIGÉ (0 à 100) */}
+        {/* Nom de la piste - PLUS GROS AVEC BOUTON RENOMMER */}
         <div style={{
           display: 'flex',
-          alignItems: 'center',
-          gap: 4,
+          flexDirection: 'column',
           flex: 1,
-          minWidth: 50
+          minWidth: 0,
+          justifyContent: 'center'
         }}>
-          <i className="ti ti-volume" style={{ fontSize: 11, color: 'var(--text-tertiary)' }} />
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={volume}
-            onChange={handleVolumeChange}
-            onClick={e => e.stopPropagation()}
-            onMouseDown={e => e.stopPropagation()}
-            title={tr('editorTrackVolume')}
-            style={{
-              flex: 1,
-              accentColor: 'var(--text-tertiary)',
-              height: 4,
-              minWidth: 30,
+          {isRenaming ? (
+            <input
+              ref={renameInputRef}
+              type="text"
+              value={renameValue}
+              onChange={e => setRenameValue(e.target.value)}
+              onBlur={handleRenameConfirm}
+              onKeyDown={handleRenameKeyDown}
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--accent)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '2px 6px',
+                color: 'var(--text-primary)',
+                width: '100%',
+                minHeight: 24
+              }}
+              onClick={e => e.stopPropagation()}
+            />
+          ) : (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
               cursor: 'pointer'
             }}
-          />
-          <span style={{ fontSize: 9, color: 'var(--text-tertiary)', fontFamily: 'monospace', minWidth: 24 }}>
-            {volume}%
-          </span>
+            onDoubleClick={handleRenameStart}
+            >
+              <span style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flex: 1
+              }}
+              title={tr('editorDoubleClickToRename') || 'Double-clic pour renommer'}
+              >
+                {track.name}
+              </span>
+              <button
+                onClick={handleRenameStart}
+                style={{
+                  padding: '1px 4px',
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-tertiary)',
+                  cursor: 'pointer',
+                  borderRadius: 4,
+                  fontSize: 12,
+                  opacity: 0.6,
+                  transition: 'all 0.15s'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.opacity = 1
+                  e.currentTarget.style.color = 'var(--accent)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.opacity = 0.6
+                  e.currentTarget.style.color = 'var(--text-tertiary)'
+                }}
+                title={tr('editorRenameTrack') || 'Renommer la piste'}
+              >
+                <i className="ti ti-pencil" style={{ fontSize: 11 }} />
+              </button>
+            </div>
+          )}
+          <div style={{
+            fontSize: 8,
+            color: 'var(--text-tertiary)',
+            opacity: 0.6
+          }}>
+            {track.clips.length} {tr('editorClips') || 'clips'}
+          </div>
         </div>
 
-        {/* Boutons d'action */}
+        {/* Boutons d'action (Mute, Solo, Delete) */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
@@ -363,7 +447,6 @@ export default function EditorTrack({
           flexShrink: 0,
           alignItems: 'center'
         }}>
-          {/* ✅ Bouton Mute (Couper le son) */}
           <button
             className={`btn-sm ${isMuted ? 'btn-danger' : 'btn-secondary'}`}
             onClick={handleMuteToggle}
@@ -387,7 +470,6 @@ export default function EditorTrack({
             <i className={`ti ${isMuted ? 'ti-volume-off' : 'ti-volume'}`} style={{ fontSize: 10 }} />
           </button>
 
-          {/* ✅ Bouton Solo (Isoler la piste) */}
           <button
             className={`btn-sm ${isSolo ? 'btn-success' : 'btn-secondary'}`}
             onClick={handleSoloToggle}
@@ -411,7 +493,6 @@ export default function EditorTrack({
             <i className="ti ti-headphones" style={{ fontSize: 10 }} />
           </button>
 
-          {/* ✅ Bouton Supprimer la piste (icône poubelle) */}
           <button
             className="btn-ghost btn-sm"
             onClick={(e) => {
@@ -443,20 +524,6 @@ export default function EditorTrack({
           >
             <i className="ti ti-trash" style={{ fontSize: 10 }} />
           </button>
-
-          {/* Nom de la piste */}
-          <span style={{
-            fontSize: 6,
-            color: 'var(--text-tertiary)',
-            textAlign: 'center',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            maxWidth: 40,
-            marginTop: 1
-          }}>
-            {track.name}
-          </span>
         </div>
       </div>
 
@@ -497,6 +564,7 @@ export default function EditorTrack({
                 onDuplicate={() => onClipDuplicate(track.id, clip.id)}
                 onCopy={() => onClipCopy?.(clip.id, track.id)}
                 onCut={() => onClipCut?.(clip.id, track.id)}
+                onContextMenu={onClipContextMenu}
                 onDragStart={(e) => handleClipDragStart(e, clip.id)}
                 onFadeInChange={(duration) => onClipFade?.(track.id, clip.id, 'in', duration)}
                 onFadeOutChange={(duration) => onClipFade?.(track.id, clip.id, 'out', duration)}

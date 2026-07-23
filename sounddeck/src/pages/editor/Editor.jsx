@@ -4,8 +4,10 @@ import { Howl } from 'howler'
 import EditorTimeline from './EditorTimeline'
 import EditorToolbar from './EditorToolbar'
 import EditorEffectsPanel from './EditorEffectsPanel'
-import EditorNormalize from './EditorNormalize'
 import EditorMasterVolume from './EditorMasterVolume'
+import ClipActionsMenu from './components/ClipActionsMenu'
+import EditorMarkersPanel from './components/EditorMarkersPanel'
+import AddTrackModal from './components/AddTrackModal'
 import { generateWaveformData } from '../../utils/waveformGenerator'
 import { normalizeClip, normalizeAll } from '../../utils/normalizeUtils'
 import { mixdownProject, exportMixdown } from '../../utils/mixdown'
@@ -36,6 +38,7 @@ export default function Editor({ store, addToast }) {
   
   // ─── ÉTATS MARQUEURS ──────────────────────────────────────────────────────
   const [markers, setMarkers] = useState([])
+  const defaultTrackCreatedRef = useRef(false)
   
   // ─── ÉTATS MÉTRONOME ──────────────────────────────────────────────────────
   const [metronomeEnabled, setMetronomeEnabled] = useState(false)
@@ -43,6 +46,7 @@ export default function Editor({ store, addToast }) {
   
   // ─── ÉTATS NORMALISATION ──────────────────────────────────────────────────
   const [isNormalizing, setIsNormalizing] = useState(false)
+  const [normalizeTarget, setNormalizeTarget] = useState(0.95)
   
   // ─── ÉTATS MASTER VOLUME ──────────────────────────────────────────────────
   const [masterVolume, setMasterVolume] = useState(100)
@@ -69,6 +73,19 @@ export default function Editor({ store, addToast }) {
   const [isAutoSaving, setIsAutoSaving] = useState(false)
   const [autoSaveTimer, setAutoSaveTimer] = useState(null)
   const [autoCrossfade, setAutoCrossfade] = useState(true)
+  
+  // ─── ÉTATS MENU CONTEXTUEL ──────────────────────────────────────────────
+  const [clipMenu, setClipMenu] = useState(null)
+  const [selectedClipForMenu, setSelectedClipForMenu] = useState(null)
+  const [selectedTrackForMenu, setSelectedTrackForMenu] = useState(null)
+  
+  // ─── ÉTATS TRIM ───────────────────────────────────────────────────────────
+  const [showTrimModal, setShowTrimModal] = useState(false)
+  const [trimClipId, setTrimClipId] = useState(null)
+  
+  // ─── ÉTATS AJOUT DE PISTE ────────────────────────────────────────────────
+  const [showAddTrackModal, setShowAddTrackModal] = useState(false)
+  const [pendingTrackName, setPendingTrackName] = useState('')
   
   // ─── RÉFÉRENCES ────────────────────────────────────────────────────────────
   const audioRef = useRef(null)
@@ -140,19 +157,27 @@ export default function Editor({ store, addToast }) {
   // ─── PISTE PAR DÉFAUT ──────────────────────────────────────────────────────
   useEffect(() => {
     const project = store.editorProject
-    if (project && project.id && project.tracks?.length === 0) {
-      const timer = setTimeout(async () => {
-        await store.addTrack(t)
-      }, 100)
-      return () => clearTimeout(timer)
+    if (project && project.id && project.tracks?.length === 0 && !defaultTrackCreatedRef.current) {
+      defaultTrackCreatedRef.current = true
+      const trackIndex = project.tracks.length + 1
+      store.addTrack(t('editorTrackDefault').replace('{index}', trackIndex))
+        .then(() => {
+          setProjectVersion(prev => prev + 1)
+        })
+        .catch(() => {
+          defaultTrackCreatedRef.current = false
+        })
     }
-  }, [store.editorProject?.id, store.editorProject?.tracks?.length, t])
+  }, [store.editorProject?.id, store.editorProject?.tracks?.length, t, store])
 
   // ─── CHARGEMENT DES MARQUEURS ─────────────────────────────────────────────
   useEffect(() => {
     const savedMarkers = store.editorProject?.markers || []
     if (savedMarkers.length > 0) {
-      setMarkers(savedMarkers)
+      const uniqueMarkers = savedMarkers.filter((marker, index, self) => 
+        index === self.findIndex(m => m.id === marker.id)
+      )
+      setMarkers(uniqueMarkers)
     }
   }, [store.editorProject?.markers])
 
@@ -263,7 +288,6 @@ export default function Editor({ store, addToast }) {
         previewHowlRef.current.unload()
         previewHowlRef.current = null
       }
-      // Nettoyer les blobs d'effets
       cleanupEffectBlobs()
     }
   }, [])
@@ -324,8 +348,21 @@ export default function Editor({ store, addToast }) {
 
   // ─── GESTION DU PROJET ────────────────────────────────────────────────────
   const handleAddTrack = async () => {
-    await store.addTrack(t)
+    const trackIndex = store.editorProject.tracks.length + 1
+    setPendingTrackName(t('editorTrackDefault').replace('{index}', trackIndex))
+    setShowAddTrackModal(true)
+  }
+
+  const handleAddTrackConfirm = async (name, color) => {
+    await store.addTrack(name, color)
     addToast(t('editorTrackAdded'), 'success')
+    setProjectVersion(prev => prev + 1)
+    setShowAddTrackModal(false)
+  }
+
+  const handleRenameTrack = async (trackId, newName) => {
+    await store.renameTrack(trackId, newName)
+    addToast(t('editorTrackRenamed'), 'success')
     setProjectVersion(prev => prev + 1)
   }
 
@@ -582,7 +619,6 @@ export default function Editor({ store, addToast }) {
       animationRef.current = null
     }
     
-    // Nettoyer les blobs d'effets
     cleanupEffectBlobs()
     
     setIsPlaying(false)
@@ -654,20 +690,17 @@ export default function Editor({ store, addToast }) {
 
     const hasSolo = Object.values(trackSolos).some(s => s === true)
 
-    // Fonction pour créer un Howl avec ou sans effets
     const createHowlForClip = async (clip, trackId, trackVolume, clipVolume, finalVolume) => {
       const fileUrl = clip.path.startsWith('file://') 
         ? clip.path 
         : 'file:///' + clip.path.replace(/\\/g, '/')
 
-      // Vérifier si le clip a des effets actifs
       const hasActiveEffects = clip.effects?.some(e => e.enabled) || false
       
       let src = fileUrl
       let isBlob = false
       
       if (hasActiveEffects) {
-        // Vérifier le cache
         const cacheKey = `${clip.id}_${clip.effects.map(e => `${e.id}_${e.enabled}`).join('_')}`
         
         if (effectBlobCache.has(cacheKey)) {
@@ -675,7 +708,6 @@ export default function Editor({ store, addToast }) {
           isBlob = true
         } else {
           try {
-            // Appliquer les effets et générer un blob
             const result = await applyEffectsToFile(clip.path, clip.effects)
             if (result.success && result.needsProcessing && result.url) {
               src = result.url
@@ -685,7 +717,6 @@ export default function Editor({ store, addToast }) {
             }
           } catch (e) {
             console.warn('Erreur application effets:', e)
-            // Fallback : utiliser le fichier original
           }
         }
       }
@@ -706,7 +737,6 @@ export default function Editor({ store, addToast }) {
       return { howl, clip, clipVolume, trackId, isBlob }
     }
 
-    // Parcourir les pistes et clips
     const loadClips = async () => {
       for (const track of project.tracks) {
         if (hasSolo && !trackSolos[track.id]) continue
@@ -924,37 +954,6 @@ export default function Editor({ store, addToast }) {
     }
   }, [getClipUnderPlayhead, currentTime, clipDurations, store, addToast, t])
 
-  // ─── SPLIT ET SÉPARER ─────────────────────────────────────────────────────
-  const handleSplitAndScatter = useCallback(async () => {
-    const target = getClipUnderPlayhead()
-    if (!target) return
-
-    const newClip = await store.splitClip(target.trackId, target.clip.id, currentTime, clipDurations[target.clip.id])
-    
-    if (newClip) {
-      await store.addTrack()
-      const newTrackId = store.editorProject.tracks[store.editorProject.tracks.length - 1].id
-      
-      await store.moveClip(target.trackId, newClip.id, 0, newTrackId, { skipHistory: true })
-      
-      const updatedClipDurations = { ...clipDurations }
-      updatedClipDurations[target.clip.id] = currentTime - target.clip.start
-      setClipDurations(updatedClipDurations)
-      
-      try {
-        const data = await generateWaveformData(newClip.path, 200, newClip.offset || 0, null, false)
-        if (data) {
-          setWaveformData(prev => ({ ...prev, [newClip.id]: data }))
-        }
-      } catch (e) {}
-      
-      setSelectedTrackId(newTrackId)
-      setSelectedClipId(newClip.id)
-      addToast(t('editorSplitAndScatterSuccess'), 'success')
-      setProjectVersion(prev => prev + 1)
-    }
-  }, [getClipUnderPlayhead, currentTime, clipDurations, store, addToast, t])
-
   // ─── ROGNER UN SON ────────────────────────────────────────────────────────
   const handleTrimClip = useCallback(async (clipId, start, end) => {
     const clip = store.editorProject.tracks
@@ -1038,7 +1037,6 @@ export default function Editor({ store, addToast }) {
       if (result) {
         if (result.normalized) {
           addToast(`"${clip.name}" ${t('editorNormalized')} (gain: ${result.gain.toFixed(2)}x)`, 'success')
-          // Forcer la mise à jour du waveform avec le nouveau fichier
           if (result.newPath) {
             const data = await generateWaveformData(result.newPath, 200, 0, null, false)
             if (data) {
@@ -1086,7 +1084,6 @@ export default function Editor({ store, addToast }) {
       const normalized = results.filter(r => r.normalized)
       if (normalized.length > 0) {
         addToast(`${normalized.length} ${t('editorClipsNormalized')}`, 'success')
-        // Forcer la mise à jour des waveforms
         for (const result of normalized) {
           if (result.newPath && result.clipId) {
             const data = await generateWaveformData(result.newPath, 200, 0, null, false)
@@ -1109,19 +1106,36 @@ export default function Editor({ store, addToast }) {
 
   // ─── MARQUEURS ────────────────────────────────────────────────────────────
   const handleAddMarker = useCallback((marker) => {
-    setMarkers(prev => [...prev, marker])
-    store.saveEditorMarkers?.([...markers, marker])
-  }, [markers])
+    setMarkers(prev => {
+      // Vérifier si le marqueur existe déjà
+      const exists = prev.some(m => m.id === marker.id)
+      if (exists) {
+        // Mettre à jour le marqueur existant
+        const updated = prev.map(m => m.id === marker.id ? marker : m)
+        store.saveEditorMarkers?.(updated)
+        return updated
+      }
+      const newMarkers = [...prev, marker]
+      store.saveEditorMarkers?.(newMarkers)
+      return newMarkers
+    })
+  }, [store])
 
   const handleRemoveMarker = useCallback((markerId) => {
-    const newMarkers = markers.filter(m => m.id !== markerId)
-    setMarkers(newMarkers)
-    store.saveEditorMarkers?.(newMarkers)
-  }, [markers])
+    setMarkers(prev => {
+      const newMarkers = prev.filter(m => m.id !== markerId)
+      store.saveEditorMarkers?.(newMarkers)
+      return newMarkers
+    })
+  }, [store])
 
   const handleMarkersChange = useCallback((updatedMarkers) => {
-    setMarkers(updatedMarkers)
-    store.saveEditorMarkers?.(updatedMarkers)
+    // Supprimer les doublons avant de sauvegarder
+    const uniqueMarkers = updatedMarkers.filter((marker, index, self) => 
+      index === self.findIndex(m => m.id === marker.id)
+    )
+    setMarkers(uniqueMarkers)
+    store.saveEditorMarkers?.(uniqueMarkers)
   }, [store])
 
   // ─── MÉTRONOME ────────────────────────────────────────────────────────────
@@ -1262,6 +1276,83 @@ export default function Editor({ store, addToast }) {
     setIsMasterMuted(prev => !prev)
   }, [])
 
+  // ─── MENU CONTEXTUEL ──────────────────────────────────────────────────────
+  const handleClipContextMenu = useCallback((clipId, trackId, e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    const clip = store.editorProject.tracks
+      .flatMap(t => t.clips)
+      .find(c => c.id === clipId)
+    
+    if (!clip) return
+    
+    setSelectedClipForMenu(clipId)
+    setSelectedTrackForMenu(trackId)
+    
+    const rect = e.currentTarget?.getBoundingClientRect() || e.target?.getBoundingClientRect()
+    const top = Math.min(e.clientY || rect?.bottom || 0, window.innerHeight - 40)
+    const left = Math.min(e.clientX || rect?.left || 0, window.innerWidth - 40)
+    
+    setClipMenu({ top, left })
+  }, [store.editorProject])
+
+  // ─── HANDLERS MENU CONTEXTUEL ────────────────────────────────────────────
+  const handleLoopFromMenu = useCallback((clipId) => {
+    const clip = store.editorProject.tracks
+      .flatMap(t => t.clips)
+      .find(c => c.id === clipId)
+    if (clip) {
+      const clipDuration = clipDurations[clipId] || clip.duration || 3
+      store.setEditorLoopRegion(clip.start, clip.start + clipDuration)
+      store.toggleEditorLoop()
+      addToast(t('editorLoopSet'), 'success')
+    }
+    setClipMenu(null)
+  }, [store, clipDurations, t, addToast])
+
+  const handleSplitFromMenu = useCallback((trackId, clipId) => {
+    const clip = store.editorProject.tracks
+      .flatMap(t => t.clips)
+      .find(c => c.id === clipId)
+    if (clip) {
+      const clipDuration = clipDurations[clipId] || clip.duration || 3
+      const splitTime = clip.start + clipDuration / 2
+      setCurrentTime(splitTime)
+      handleSplit()
+    }
+    setClipMenu(null)
+  }, [store, clipDurations, handleSplit])
+
+  const handleTrimFromMenu = useCallback((clipId) => {
+    setTrimClipId(clipId)
+    setShowTrimModal(true)
+    setClipMenu(null)
+  }, [])
+
+  const handleNormalizeFromMenu = useCallback((clipId) => {
+    handleNormalizeClip(clipId, normalizeTarget)
+    setClipMenu(null)
+  }, [handleNormalizeClip, normalizeTarget])
+
+  const handleAddEffectFromMenu = useCallback((trackId, clipId) => {
+    setSelectedClipId(clipId)
+    setSelectedTrackId(trackId)
+    setClipMenu(null)
+  }, [])
+
+  const handleDuplicateFromMenu = useCallback(async (trackId, clipId) => {
+    await store.duplicateClip(trackId, clipId)
+    addToast(t('editorClipDuplicated'), 'success')
+    setClipMenu(null)
+  }, [store, t, addToast])
+
+  const handleDeleteFromMenu = useCallback(async (trackId, clipId) => {
+    await store.removeClip(trackId, clipId)
+    addToast(t('editorClipRemoved'), 'info')
+    setClipMenu(null)
+  }, [store, t, addToast])
+
   // ─── FORMATAGE ────────────────────────────────────────────────────────────
   const formatTime = (seconds) => {
     if (!seconds || isNaN(seconds)) return '0:00'
@@ -1303,7 +1394,7 @@ export default function Editor({ store, addToast }) {
       overflow: 'hidden',
       background: 'var(--bg-primary)'
     }}>
-      {/* Barre d'outils - avec key pour forcer le re-rendu quand la langue change */}
+      {/* Barre d'outils */}
       <EditorToolbar
         key={`editor-toolbar-${currentLang}`}
         isPlaying={isPlaying}
@@ -1328,17 +1419,6 @@ export default function Editor({ store, addToast }) {
         canRedo={store.canRedoEditor}
         snapEnabled={snapEnabled}
         onToggleSnap={() => setSnapEnabled(prev => !prev)}
-        onSplit={handleSplit}
-        canSplit={!!getClipUnderPlayhead()}
-        loopEnabled={store.editorLoopRegion.enabled}
-        onToggleLoop={() => {
-          const loop = store.editorLoopRegion
-          if (loop.end <= loop.start) {
-            addToast(t('editorLoopNoRegion'), 'info')
-            return
-          }
-          store.toggleEditorLoop()
-        }}
         projectName={project?.name || 'Nouveau projet'}
         onRenameProject={handleRenameProject}
         isPreviewingEffect={isPreviewingEffect}
@@ -1350,6 +1430,7 @@ export default function Editor({ store, addToast }) {
         metronomeBpm={metronomeBpm}
         onMetronomeToggle={handleMetronomeToggle}
         onMetronomeBpmChange={handleMetronomeBpmChange}
+        addToast={addToast}
       />
 
       {/* Timeline */}
@@ -1384,6 +1465,7 @@ export default function Editor({ store, addToast }) {
           onClipCopy={handleCopyClip}
           onClipCut={handleCutClip}
           onClipPaste={handlePasteClip}
+          onClipContextMenu={handleClipContextMenu}
           onDragCheckpoint={store.pushEditorHistoryCheckpoint}
           onTrackRemove={handleRemoveTrack}
           onSeek={handleSeek}
@@ -1407,10 +1489,6 @@ export default function Editor({ store, addToast }) {
           snapEnabled={snapEnabled}
           loopRegion={store.editorLoopRegion}
           onSetLoopRegion={store.setEditorLoopRegion}
-          markers={markers}
-          onAddMarker={handleAddMarker}
-          onRemoveMarker={handleRemoveMarker}
-          onMarkersChange={handleMarkersChange}
           metronomeEnabled={metronomeEnabled}
           metronomeBpm={metronomeBpm}
           onMetronomeToggle={handleMetronomeToggle}
@@ -1420,6 +1498,11 @@ export default function Editor({ store, addToast }) {
           addToast={addToast}
           lang={currentLang}
           tr={t}
+          onRenameTrack={handleRenameTrack}
+          markers={markers}
+          onAddMarker={handleAddMarker}
+          onRemoveMarker={handleRemoveMarker}
+          onMarkersChange={handleMarkersChange}
         />
       </div>
 
@@ -1455,8 +1538,6 @@ export default function Editor({ store, addToast }) {
           onClipUpdate={store.updateClip}
           onPreview={handlePreviewEffects}
           isPreviewing={isPreviewingEffect}
-          onNormalize={handleNormalizeClip}
-          onTrim={handleTrimClip}
           lang={currentLang}
           tr={t}
         />
@@ -1474,16 +1555,6 @@ export default function Editor({ store, addToast }) {
         flexWrap: 'wrap',
         gap: 8
       }}>
-        <EditorNormalize
-          clip={selectedClip}
-          onNormalize={handleNormalizeClip}
-          onNormalizeAll={handleNormalizeAll}
-          isNormalizing={isNormalizing}
-          tr={t}
-        />
-
-        <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
-
         <EditorMasterVolume
           volume={isMasterMuted ? 0 : masterVolume}
           onVolumeChange={handleMasterVolumeChange}
@@ -1511,6 +1582,53 @@ export default function Editor({ store, addToast }) {
           </span>
         </div>
       </div>
+
+      {/* Menu contextuel des clips */}
+      {clipMenu && selectedClipForMenu && (
+        <ClipActionsMenu
+          clip={store.editorProject.tracks
+            .flatMap(t => t.clips)
+            .find(c => c.id === selectedClipForMenu)}
+          trackId={selectedTrackForMenu}
+          position={clipMenu}
+          onClose={() => setClipMenu(null)}
+          onSplit={handleSplitFromMenu}
+          onLoop={handleLoopFromMenu}
+          onTrim={handleTrimFromMenu}
+          onNormalize={handleNormalizeFromMenu}
+          onAddEffect={handleAddEffectFromMenu}
+          onDuplicate={handleDuplicateFromMenu}
+          onCopy={handleCopyClip}
+          onCut={handleCutClip}
+          onDelete={handleDeleteFromMenu}
+          onFadeIn={store.setClipFade}
+          onFadeOut={store.setClipFade}
+          onPreviewEffects={handlePreviewEffects}
+          isPlaying={isPlaying}
+          isLoopEnabled={store.editorLoopRegion.enabled}
+          tr={t}
+        />
+      )}
+
+      {/* Panneau flottant des marqueurs */}
+      <EditorMarkersPanel
+        markers={markers}
+        currentTime={currentTime}
+        onAddMarker={handleAddMarker}
+        onRemoveMarker={handleRemoveMarker}
+        onSeek={handleSeek}
+        tr={t}
+      />
+
+      {/* Modal d'ajout de piste */}
+      {showAddTrackModal && (
+        <AddTrackModal
+          onConfirm={handleAddTrackConfirm}
+          onCancel={() => setShowAddTrackModal(false)}
+          defaultName={pendingTrackName}
+          tr={t}
+        />
+      )}
 
       {/* Modal d'export */}
       {showExportModal && (
@@ -1774,7 +1892,7 @@ export default function Editor({ store, addToast }) {
           font-weight: 600;
           margin-bottom: 16px;
           display: flex;
-          align-items: center;
+          alignItems: center;
           gap: 8px;
           color: var(--text-primary);
         }
