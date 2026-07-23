@@ -62,10 +62,8 @@ export default function EditorMarkersPanel({
     }
   }, [editingMarkerId])
 
-  // Raccourci clavier Ctrl+M
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Ctrl+M ou Cmd+M
       if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
         e.preventDefault()
         handleAddMarkerAtCurrentTime()
@@ -104,22 +102,17 @@ export default function EditorMarkersPanel({
   }, [markers, currentTime, onSeek, onRemoveMarker, selectedMarkerId])
 
   const handleAddMarkerAtCurrentTime = useCallback(() => {
-    const name = `M${markers.length + 1}`
-    const colorIndex = markers.length % MARKER_COLORS.length
     const newMarker = {
-      id: `marker-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      name,
-      time: currentTime,
-      color: MARKER_COLORS[colorIndex].color
+        id: `marker-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        name: `${t('markerDefault') || 'M'}${markers.length + 1}`,
+        time: currentTime,
+        color: MARKER_COLORS[markers.length % MARKER_COLORS.length].color,
     }
     onAddMarker?.(newMarker)
-    if (isOpen) {
-      setNewMarkerName('')
-    }
-  }, [markers.length, currentTime, onAddMarker, isOpen])
+  }, [markers.length, currentTime, onAddMarker, t])
 
-  const handleAddMarkerWithName = () => {
-    const name = newMarkerName.trim() || `M${markers.length + 1}`
+  const handleAddMarkerWithName = useCallback(() => {
+    const name = newMarkerName.trim() || `${t('markerDefault') || 'M'}${markers.length + 1}`
     const newMarker = {
       id: `marker-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       name,
@@ -132,17 +125,17 @@ export default function EditorMarkersPanel({
     if (nameInputRef.current) {
       nameInputRef.current.focus()
     }
-  }
+  }, [newMarkerName, markers.length, currentTime, selectedColor, onAddMarker, t])
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter') handleAddMarkerWithName()
     if (e.key === 'Escape') {
       setIsOpen(false)
       setEditingMarkerId(null)
     }
-  }
+  }, [handleAddMarkerWithName])
 
-  const handleEditKeyDown = (e) => {
+  const handleEditKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {
       const marker = markers.find(m => m.id === editingMarkerId)
       if (marker && editingName.trim()) {
@@ -156,18 +149,18 @@ export default function EditorMarkersPanel({
       setEditingMarkerId(null)
       setEditingName('')
     }
-  }
+  }, [markers, editingMarkerId, editingName, onAddMarker])
 
-  const startEditing = (marker, e) => {
+  const startEditing = useCallback((marker, e) => {
     if (e) e.stopPropagation()
     setEditingMarkerId(marker.id)
     setEditingName(marker.name)
-  }
+  }, [])
 
-  const goToMarker = (marker) => {
+  const goToMarker = useCallback((marker) => {
     onSeek?.(marker.time)
     setSelectedMarkerId(marker.id)
-  }
+  }, [onSeek])
 
   const formatTime = (seconds) => {
     if (!seconds || isNaN(seconds)) return '0:00'
@@ -288,7 +281,7 @@ export default function EditorMarkersPanel({
                 value={newMarkerName}
                 onChange={e => setNewMarkerName(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={t('editorMarkerName') || 'Nom du marqueur...'}
+                placeholder={t('markerAddPlaceholder') || 'Nom du marqueur...'}
                 style={{
                   flex: 1,
                   fontSize: 11,
@@ -597,8 +590,8 @@ export default function EditorMarkersPanel({
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <span><kbd>←</kbd> <kbd>→</kbd> {t('editorNavigate') || 'Naviguer'}</span>
-              <span><kbd>Suppr</kbd> {t('editorDelete') || 'Supprimer'}</span>
-              <span><kbd>Double-clic</kbd> {t('editorRename') || 'Renommer'}</span>
+              <span><kbd>{t('markerDelete') || 'Suppr'}</kbd> {t('editorDelete') || 'Supprimer'}</span>
+              <span><kbd>{t('markerDoubleClick') || 'Double-clic'}</kbd> {t('editorRename') || 'Renommer'}</span>
             </div>
           </div>
         </div>

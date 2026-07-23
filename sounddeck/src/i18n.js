@@ -740,6 +740,13 @@ export const TRANSLATIONS = {
     editorRename: 'Renommer',
     editorRenameMarker: 'Renommer (double-clic)',
     editorAdd: 'Ajouter',
+    markerDelete: 'Suppr',
+    markerDoubleClick: 'Double-clic sur le nom du marqueur',
+    markerDefault: 'Marqueur',
+    markers: 'Marqueurs',
+    markersEmpty: 'Aucun marqueur',
+    markerAddPlaceholder: 'Nom du marqueur...',
+    markerAdd: 'Ajouter un marqueur',
 
     // ---- COULEURS DES MARQUEURS ----
     markerColorRed: 'Rouge',
@@ -2088,6 +2095,13 @@ export const TRANSLATIONS = {
     editorRename: 'Rename',
     editorRenameMarker: 'Rename (double-click)',
     editorAdd: 'Add',
+    markerDelete: 'Del',
+    markerDoubleClick: 'Double-click on the marker name',
+    markerDefault: 'Marker',
+    markers: 'Markers',
+    markersEmpty: 'No markers',
+    markerAddPlaceholder: 'Marker name...',
+    markerAdd: 'Add marker',
 
     // ---- MARKER COLORS ----
     markerColorRed: 'Red',
@@ -3437,6 +3451,13 @@ export const TRANSLATIONS = {
     editorRename: 'Renombrar',
     editorRenameMarker: 'Renombrar (doble clic)',
     editorAdd: 'Agregar',
+    markerDelete: 'Supr',
+    markerDoubleClick: 'Haga doble clic en el nombre del marcador.',
+    markerDefault: 'Marcador',
+    markers: 'Marcadores',
+    markersEmpty: 'Sin marcadores',
+    markerAddPlaceholder: 'Nombre del marcador...',
+    markerAdd: 'Añadir marcador',
 
     // ---- MARKER COLORS ----
     markerColorRed: 'Rojo',

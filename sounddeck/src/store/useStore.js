@@ -46,7 +46,6 @@ export function useStore() {
   const [toggleShortcutsAccelerator, setToggleShortcutsAccelerator] = useState('CommandOrControl+Shift+K')
   const [toggleWindowShortcut, setToggleWindowShortcut] = useState('CommandOrControl+Shift+S')
   const [soundOrder, setSoundOrder] = useState({})
-  const [orderVersion, setOrderVersion] = useState(0)
   const [normalizationEnabled, setNormalizationEnabled] = useState(true)
   const [normalizationTarget, setNormalizationTarget] = useState(0.1)
   const [startMinimized, setStartMinimized] = useState(false)
@@ -609,7 +608,6 @@ export function useStore() {
     })
     setSoundOrder(updatedOrder)
     await save('soundOrder', updatedOrder)
-    setOrderVersion(prev => prev + 1)
     return newSound
   }, [sounds, save, soundOrder])
 
@@ -634,18 +632,11 @@ export function useStore() {
     setShortcuts(updatedShortcuts)
     await save('shortcuts', updatedShortcuts)
     await window.electronAPI.updateShortcuts(updatedShortcuts)
-    setOrderVersion(prev => prev + 1)
   }, [sounds, shortcuts, save, soundOrder])
 
   const updateSound = useCallback(async (soundId, changes) => {
-    const updated = sounds.map(s => s.id === soundId ? { ...s, ...changes } : s)
-    setSounds(updated)
-    await save('sounds', updated)
-  }, [sounds, save])
-
-  const incrementPlayCount = useCallback(async (soundId) => {
-    const updated = sounds.map(s =>
-      s.id === soundId ? { ...s, playCount: (s.playCount || 0) + 1, lastPlayed: Date.now() } : s
+    const updated = sounds.map(s => 
+      s.id === soundId ? { ...s, ...changes } : s
     )
     setSounds(updated)
     await save('sounds', updated)
@@ -655,6 +646,14 @@ export function useStore() {
     const clampedDb = Math.max(-24, Math.min(24, volumeDb))
     const updated = sounds.map(s =>
       s.id === soundId ? { ...s, volume: clampedDb, volumeDb: clampedDb } : s
+    )
+    setSounds(updated)
+    await save('sounds', updated)
+  }, [sounds, save])
+
+  const incrementPlayCount = useCallback(async (soundId) => {
+    const updated = sounds.map(s =>
+      s.id === soundId ? { ...s, playCount: (s.playCount || 0) + 1, lastPlayed: Date.now() } : s
     )
     setSounds(updated)
     await save('sounds', updated)
@@ -695,7 +694,7 @@ export function useStore() {
     setSoundOrder(updatedOrder)
     await save('sounds', updated)
     await save('soundOrder', updatedOrder)
-    setOrderVersion(prev => prev + 1)
+    // ❌ RETIRER setOrderVersion
   }, [sounds, save, soundOrder])
 
   const removeSoundFromProfile = useCallback(async (soundId, profileId) => {
@@ -711,7 +710,6 @@ export function useStore() {
     setSoundOrder(updatedOrder)
     await save('sounds', updated)
     await save('soundOrder', updatedOrder)
-    setOrderVersion(prev => prev + 1)
   }, [sounds, save, soundOrder])
 
   const reorderSounds = useCallback(async (startIndex, endIndex) => {
@@ -738,7 +736,6 @@ export function useStore() {
     const updatedOrder = { ...soundOrder, [profileId]: orderedIds }
     setSoundOrder(updatedOrder)
     await save('soundOrder', updatedOrder)
-    setOrderVersion(prev => prev + 1)
     return true
   }, [sounds, currentProfileId, soundOrder, save])
 
@@ -1751,7 +1748,7 @@ export function useStore() {
 
     const missing = profileSounds.filter(s => !order.includes(s.id))
     return [...ordered, ...missing]
-  }, [sounds, soundOrder, currentProfileId, orderVersion])
+  }, [sounds, soundOrder, currentProfileId])
 
   const favoriteSounds = useMemo(() => {
     return orderedSounds.filter(s => s.favorites?.includes(currentProfileId) || false)
