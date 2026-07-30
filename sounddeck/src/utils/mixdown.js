@@ -200,6 +200,12 @@ export async function mixdownProject(project, clipDurations, sampleRate = 44100,
  */
 export async function exportMixdown(buffer, format = 'mp3', bitrate = 192, outputPath, onProgress) {
   try {
+    if (!outputPath) {
+      console.error('❌ [mixdown] outputPath est undefined !')
+      return { success: false, error: 'outputPath manquant' }
+    }
+    console.log(`📄 [mixdown] exportMixdown appelé avec outputPath: ${outputPath}`)
+
     if (onProgress) onProgress(0.1)
     
     const wavData = audioBufferToWav(buffer)
@@ -284,42 +290,70 @@ export async function exportMixdown(buffer, format = 'mp3', bitrate = 192, outpu
  * Sauvegarde un fichier audio via l'API Electron
  */
 async function saveAudioFileViaElectron(data, outputPath) {
+  console.log(`💾 [mixdown] saveAudioFileViaElectron: ${outputPath}`)
   const uint8Array = new Uint8Array(data)
-  const fileName = outputPath.split('/').pop() || outputPath.split('\\').pop() || 'exported.wav'
   
+  // ✅ Essayer writeSoundFile d'abord
   try {
+    console.log('📝 [mixdown] Tentative writeSoundFile...')
     const result = await window.electronAPI.writeSoundFile?.(outputPath, Array.from(uint8Array))
     if (result?.success) {
+      console.log('✅ [mixdown] writeSoundFile réussi:', outputPath)
       return { success: true, path: outputPath }
     }
+    console.log('⚠️ [mixdown] writeSoundFile a échoué:', result)
   } catch (e) {
-    console.warn('writeSoundFile non disponible:', e)
+    console.warn('⚠️ [mixdown] writeSoundFile exception:', e)
   }
   
+  // ✅ Essayer exportAudioFile
   try {
-    const blob = new Blob([data], { type: 'audio/wav' })
-    const url = URL.createObjectURL(blob)
-    
-    const result = await window.electronAPI.downloadSoundUrl?.(url, fileName)
+    console.log('📝 [mixdown] Tentative exportAudioFile...')
+    const fileName = outputPath.split('/').pop() || outputPath.split('\\').pop() || 'exported.wav'
+    const result = await window.electronAPI.exportAudioFile?.({
+      data: Array.from(uint8Array),
+      fileName: fileName,
+      format: 'wav'
+    })
     if (result?.success) {
+      console.log('✅ [mixdown] exportAudioFile réussi:', result.path)
       return { success: true, path: result.path }
     }
+    console.log('⚠️ [mixdown] exportAudioFile a échoué:', result)
   } catch (e) {
-    console.warn('downloadSoundUrl non disponible:', e)
+    console.warn('⚠️ [mixdown] exportAudioFile exception:', e)
   }
   
+  // ✅ Essayer saveFileDialog
   try {
+    console.log('📝 [mixdown] Tentative saveFileDialog...')
+    const fileName = outputPath.split('/').pop() || outputPath.split('\\').pop() || 'exported.wav'
+    const result = await window.electronAPI.saveFileDialog?.(fileName, data)
+    if (result?.success && result?.path) {
+      console.log('✅ [mixdown] saveFileDialog réussi:', result.path)
+      return { success: true, path: result.path }
+    }
+    console.log('⚠️ [mixdown] saveFileDialog a échoué:', result)
+  } catch (e) {
+    console.warn('⚠️ [mixdown] saveFileDialog exception:', e)
+  }
+  
+  // Dernier fallback : téléchargement navigateur
+  try {
+    console.log('📥 [mixdown] Dernier fallback: téléchargement navigateur')
     const blob = new Blob([data], { type: 'audio/wav' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = fileName
+    a.download = outputPath.split('/').pop() || outputPath.split('\\').pop() || 'exported.wav'
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     setTimeout(() => URL.revokeObjectURL(url), 10000)
-    return { success: true, path: 'download://' + fileName, downloaded: true }
+    console.log('✅ [mixdown] Téléchargement navigateur réussi')
+    return { success: true, path: 'download://' + a.download, downloaded: true }
   } catch (e) {
+    console.error('❌ [mixdown] Échec de tous les fallbacks:', e)
     return { success: false, error: e.message }
   }
 }

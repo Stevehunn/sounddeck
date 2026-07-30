@@ -1,3 +1,4 @@
+// src/pages/editor/components/EditorToolbar/EditorMetronome.jsx
 import { useState, useRef, useEffect, useCallback } from 'react'
 
 export default function EditorMetronome({
@@ -13,7 +14,7 @@ export default function EditorMetronome({
   const [tempo, setTempo] = useState(bpm || 120)
   const [volume, setVolume] = useState(50)
   const [accentVolume, setAccentVolume] = useState(80)
-  const [timeSignature, setTimeSignature] = useState({ beats: 4, noteValue: 4 })
+  const [timeSignature] = useState({ beats: 4, noteValue: 4 })
   const [isClicking, setIsClicking] = useState(false)
   const [count, setCount] = useState(0)
   
@@ -22,10 +23,8 @@ export default function EditorMetronome({
   const isEnabledRef = useRef(false)
   const isPlayingRef = useRef(false)
   const currentTimeRef = useRef(0)
-  const nextClickTimeRef = useRef(0)
-  const lastClickTimeRef = useRef(-1000) // ✅ Pour éviter les doubles clics
+  const lastClickTimeRef = useRef(-1000)
 
-  // ─── SYNC DES REFS ──────────────────────────────────────────────────────
   useEffect(() => {
     isEnabledRef.current = enabled
   }, [enabled])
@@ -38,7 +37,6 @@ export default function EditorMetronome({
     currentTimeRef.current = currentTime
   }, [currentTime])
 
-  // ─── INITIALISATION DU CONTEXTE AUDIO ──────────────────────────────────
   const initAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
       try {
@@ -57,10 +55,8 @@ export default function EditorMetronome({
     return true
   }, [])
 
-  // ─── GÉNÉRATION DU SON DE CLIC ─────────────────────────────────────────
   const generateClickSound = useCallback((isAccent = false) => {
     try {
-      // ✅ Initialiser le contexte si nécessaire
       if (!initAudioContext()) {
         console.warn('❌ Impossible d\'initialiser le contexte audio')
         return false
@@ -72,7 +68,6 @@ export default function EditorMetronome({
         return false
       }
       
-      // ✅ S'assurer que le contexte est running
       if (ctx.state === 'suspended') {
         ctx.resume().catch(e => console.warn('Erreur reprise contexte:', e))
       }
@@ -103,32 +98,21 @@ export default function EditorMetronome({
     }
   }, [volume, accentVolume, initAudioContext])
 
-  // ─── JOUE UN CLIC ──────────────────────────────────────────────────────
   const playClick = useCallback((isAccent = false) => {
     const now = performance.now()
     
-    // ✅ Éviter les doubles clics trop rapprochés (moins de 10ms)
-    if (now - lastClickTimeRef.current < 10) {
-      return
-    }
+    if (now - lastClickTimeRef.current < 10) return
     
     const success = generateClickSound(isAccent)
     if (success) {
       lastClickTimeRef.current = now
-      if (isAccent) {
-        // console.log('🔊 Clic accentué')
-      } else {
-        // console.log('🔊 Clic normal')
-      }
     }
   }, [generateClickSound])
 
-  // ─── BOUCLE PRINCIPALE DU MÉTRONOME ──────────────────────────────────────
   const metronomeLoop = useCallback(() => {
     const isEnabled = isEnabledRef.current
     const isPlayingNow = isPlayingRef.current
     
-    // ✅ Si le métronome est désactivé ou que la lecture est en pause, ne rien faire
     if (!isEnabled || !isPlayingNow) {
       setIsClicking(false)
       animationFrameRef.current = requestAnimationFrame(metronomeLoop)
@@ -138,17 +122,13 @@ export default function EditorMetronome({
     const current = currentTimeRef.current
     const beatDuration = 60 / (tempo || 120)
     
-    // ✅ Calculer le prochain temps de clic aligné sur la grille
-    // On utilise un seuil de 0.01s pour éviter les erreurs d'arrondi
     const currentBeat = Math.floor(current / beatDuration)
     const nextBeatTime = (currentBeat + 1) * beatDuration
     const timeUntilNextBeat = nextBeatTime - current
     
-    // ✅ Vérifier si on doit jouer un clic (si on est proche du prochain battement)
     if (timeUntilNextBeat < 0.02 && timeUntilNextBeat >= 0) {
       const isAccent = (currentBeat + 1) % timeSignature.beats === 1
       
-      // ✅ Vérifier qu'on n'a pas déjà joué ce clic
       const lastClickTime = lastClickTimeRef.current
       const timeSinceLastClick = (performance.now() - lastClickTime) / 1000
       
@@ -156,17 +136,13 @@ export default function EditorMetronome({
         playClick(isAccent)
         setCount((currentBeat + 1) % timeSignature.beats)
         setIsClicking(true)
-        console.log(`🎵 Clic métronome ${isAccent ? 'accentué' : 'normal'} à ${current.toFixed(2)}s (battement ${(currentBeat + 1) % timeSignature.beats + 1}/${timeSignature.beats})`)
       }
     }
     
-    // ✅ Continuer la boucle
     animationFrameRef.current = requestAnimationFrame(metronomeLoop)
   }, [tempo, timeSignature.beats, playClick])
 
-  // ─── DÉMARRER/ARRÊTER LE MÉTRONOME ──────────────────────────────────────
   const startMetronome = useCallback(() => {
-    // ✅ Arrêter la boucle précédente
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current)
       animationFrameRef.current = null
@@ -183,21 +159,16 @@ export default function EditorMetronome({
     setCount(0)
     lastClickTimeRef.current = -1000
     
-    // ✅ Initialiser le contexte audio
     initAudioContext()
-    
-    // ✅ Démarrer la boucle
     animationFrameRef.current = requestAnimationFrame(metronomeLoop)
   }, [enabled, isPlaying, initAudioContext, metronomeLoop])
 
-  // ─── TOGGLE MÉTRONOME ──────────────────────────────────────────────────
   const handleToggle = useCallback(() => {
     const newState = !enabled
     console.log(`🎵 Toggle métronome: ${newState ? 'ON' : 'OFF'}`)
     onToggle?.(newState)
     
     if (newState) {
-      // ✅ Activer
       if (isPlaying) {
         startMetronome()
       } else {
@@ -205,7 +176,6 @@ export default function EditorMetronome({
         setCount(0)
       }
     } else {
-      // ✅ Désactiver
       setIsClicking(false)
       setCount(0)
       if (animationFrameRef.current) {
@@ -215,20 +185,14 @@ export default function EditorMetronome({
     }
   }, [enabled, onToggle, isPlaying, startMetronome])
 
-  // ─── CHANGEMENT DE BPM ──────────────────────────────────────────────────
   const handleBpmChange = useCallback((newBpm) => {
     const clamped = Math.max(40, Math.min(240, newBpm))
     setTempo(clamped)
     onBpmChange?.(clamped)
-    
-    // ✅ Réinitialiser le compteur
     setCount(0)
   }, [onBpmChange])
 
-  // ─── EFFET : SYNC AVEC LA LECTURE ──────────────────────────────────────
   useEffect(() => {
-    console.log(`🎵 État métronome: enabled=${enabled}, isPlaying=${isPlaying}`)
-    
     if (enabled && isPlaying) {
       startMetronome()
     } else if (!isPlaying) {
@@ -237,15 +201,12 @@ export default function EditorMetronome({
     }
   }, [isPlaying, enabled, startMetronome])
 
-  // ─── EFFET : RÉINITIALISATION QUAND LE TEMPO CHANGE ────────────────────
   useEffect(() => {
     if (enabled && isPlaying) {
-      // ✅ Redémarrer la boucle avec le nouveau tempo
       startMetronome()
     }
   }, [tempo, enabled, isPlaying, startMetronome])
 
-  // ─── NETTOYAGE ──────────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       if (animationFrameRef.current) {
@@ -254,12 +215,9 @@ export default function EditorMetronome({
       }
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close().catch(() => {})
-        console.log('🎵 Contexte audio du métronome fermé')
       }
     }
   }, [])
-
-  // ─── RENDU ──────────────────────────────────────────────────────────────
 
   return (
     <div style={{
@@ -272,7 +230,6 @@ export default function EditorMetronome({
       border: `1px solid ${enabled ? 'var(--accent)' : 'var(--border)'}`,
       transition: 'all 0.2s ease'
     }}>
-      {/* Bouton Toggle */}
       <button
         className={enabled ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
         onClick={handleToggle}
@@ -299,7 +256,6 @@ export default function EditorMetronome({
         )}
       </button>
 
-      {/* Contrôle du BPM */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <input
           type="range"
@@ -325,7 +281,6 @@ export default function EditorMetronome({
         </span>
       </div>
 
-      {/* Contrôle du volume */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <i className="ti ti-volume" style={{ fontSize: 12, color: 'var(--text-tertiary)' }} />
         <input
@@ -343,7 +298,6 @@ export default function EditorMetronome({
         />
       </div>
 
-      {/* Indicateur de compteur */}
       {enabled && isClicking && (
         <span style={{
           fontSize: 9,

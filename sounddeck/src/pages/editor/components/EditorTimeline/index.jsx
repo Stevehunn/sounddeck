@@ -1,20 +1,30 @@
-import { useState, useRef, useEffect } from 'react'
-import EditorTrack from './EditorTrack'
-import { snapTime, getSnapStep } from './EditorSnap'
+// src/pages/editor/components/EditorTimeline/index.jsx
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { useEditor } from '../../contexts/EditorContext'
+import EditorTrack from '../EditorTrack'
 
-// ─── COULEURS DES MARQUEURS ──────────────────────────────────────────────────
-const MARKER_COLORS = [
-  { id: 'red', color: '#f44336', labelKey: 'markerColorRed' },
-  { id: 'pink', color: '#e91e63', labelKey: 'markerColorPink' },
-  { id: 'purple', color: '#9c27b0', labelKey: 'markerColorPurple' },
-  { id: 'blue', color: '#3f51b5', labelKey: 'markerColorBlue' },
-  { id: 'cyan', color: '#00bcd4', labelKey: 'markerColorCyan' },
-  { id: 'green', color: '#4caf50', labelKey: 'markerColorGreen' },
-  { id: 'lime', color: '#8bc34a', labelKey: 'markerColorLime' },
-  { id: 'yellow', color: '#ffeb3b', labelKey: 'markerColorYellow' },
-  { id: 'orange', color: '#ff9800', labelKey: 'markerColorOrange' },
-  { id: 'brown', color: '#795548', labelKey: 'markerColorBrown' },
-]
+const TRACK_HEAD_WIDTH = 190
+const BASE_PIXELS_PER_SECOND = 80
+
+function getSnapStep(zoomLevel) {
+  if (zoomLevel < 0.08) return 60
+  if (zoomLevel < 0.15) return 30
+  if (zoomLevel < 0.3) return 10
+  if (zoomLevel < 0.6) return 5
+  if (zoomLevel < 1.5) return 1
+  if (zoomLevel < 3) return 0.5
+  return 0.1
+}
+
+function formatTime(seconds) {
+  if (!seconds || isNaN(seconds)) return '0:00'
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  if (m > 0) {
+    return `${m}:${s.toString().padStart(2, '0')}`
+  }
+  return `${s.toFixed(1)}s`
+}
 
 export default function EditorTimeline({
   tracks,
@@ -29,10 +39,10 @@ export default function EditorTimeline({
   onClipFade,
   onClipCopy,
   onClipCut,
-  onClipPaste,
   onClipContextMenu,
   onDragCheckpoint,
   onTrackRemove,
+  onSeek,
   onTrackMute,
   onTrackSolo,
   onTrackVolume,
@@ -42,43 +52,53 @@ export default function EditorTimeline({
   currentTime,
   isPlaying,
   clipDurations,
-  onSeek,
   snapEnabled,
   loopRegion,
   onSetLoopRegion,
-  metronomeEnabled = false,
-  metronomeBpm = 120,
-  onMetronomeToggle,
-  onMetronomeBpmChange,
-  autoPlayOnClick = false,
-  autoCrossfade = false,
+  autoCrossfade,
   addToast,
-  lang,
   tr,
   onRenameTrack,
-  // ─── MARQUEURS ──────────────────────────────────────────────────────────
-  markers = [],
-  onAddMarker,
-  onRemoveMarker,
-  onMarkersChange
+  zoomLevel = 1,
+  onZoomChange,
+  onSetLoopStart,
+  onSetLoopEnd,
+  onClearLoop,
+  onToggleLoop,
+  onSplitClip,
+  onTrimClip,
+  onSetFade,
+  onUpdateClipDuration
 }) {
   const containerRef = useRef(null)
   const rulerRef = useRef(null)
   const timelineRef = useRef(null)
 
-  const [zoomLevel, setZoomLevel] = useState(1)
-  const [globalZoom, setGlobalZoom] = useState(1)
   const [isPanning, setIsPanning] = useState(false)
   const [panStartX, setPanStartX] = useState(0)
   const [scrollLeft, setScrollLeft] = useState(0)
   const [loopDrag, setLoopDrag] = useState(null)
   const [dropTargetTrackId, setDropTargetTrackId] = useState(null)
   const [snapFeedback, setSnapFeedback] = useState(null)
+  const [isDraggingTrack, setIsDraggingTrack] = useState(false)
 
-  const TRACK_HEAD_WIDTH = 190
-  const BASE_PIXELS_PER_SECOND = 80
   const pixelsPerSecond = BASE_PIXELS_PER_SECOND * zoomLevel
   const totalWidth = Math.max(totalDuration * pixelsPerSecond + 100, 600)
+
+  // ✅ Le crossfade est maintenant géré par Web Audio API directement
+  // Les fades sont appliqués via les GainNode dans useAudioEngine
+  // Cette fonction est conservée pour compatibilité mais ne fait rien
+  const applyCrossfades = useCallback(() => {
+    // Le crossfade est géré par Web Audio API via les fades
+    // Les clips qui se chevauchent auront leurs fades appliqués automatiquement
+  }, [])
+
+  // ✅ Appliquer le crossfade quand les clips changent
+  useEffect(() => {
+    if (autoCrossfade) {
+      applyCrossfades()
+    }
+  }, [tracks, clipDurations, autoCrossfade, applyCrossfades])
 
   const clientXToTime = (clientX) => {
     const timeline = timelineRef.current
@@ -90,7 +110,7 @@ export default function EditorTimeline({
     return clampedX / pixelsPerSecond
   }
 
-  const snapTimeForClip = (time, trackId, clipId) => {
+  const snapTime = (time, trackId, clipId) => {
     if (!snapEnabled) return time
 
     const step = getSnapStep(zoomLevel)
@@ -122,11 +142,12 @@ export default function EditorTimeline({
   }
 
   const handleClipMoveWithSnap = (trackId, clipId, newStart, newTrackId = null) => {
-    const snapped = snapTimeForClip(Math.max(0, newStart), trackId, clipId)
+    setIsDraggingTrack(true)
+    const snapped = snapTime(Math.max(0, newStart), trackId, clipId)
     onClipMove(trackId, clipId, snapped, newTrackId)
+    setTimeout(() => setIsDraggingTrack(false), 100)
   }
 
-  // Zoom avec la molette
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -136,24 +157,20 @@ export default function EditorTimeline({
         e.preventDefault()
         const delta = e.deltaY > 0 ? -0.05 : 0.05
         const newZoom = Math.max(0.05, Math.min(10, zoomLevel + delta))
-        setZoomLevel(newZoom)
-        setGlobalZoom(newZoom)
+        onZoomChange?.(newZoom)
         
-        if (containerRef.current) {
-          const rect = containerRef.current.getBoundingClientRect()
-          const centerX = rect.width / 2
-          const currentScroll = containerRef.current.scrollLeft
-          const newScroll = currentScroll + (centerX * delta * 0.5)
-          containerRef.current.scrollLeft = Math.max(0, newScroll)
-        }
+        const rect = container.getBoundingClientRect()
+        const centerX = rect.width / 2
+        const currentScroll = container.scrollLeft
+        const newScroll = currentScroll + (centerX * delta * 0.5)
+        container.scrollLeft = Math.max(0, newScroll)
       }
     }
 
     container.addEventListener('wheel', onWheel, { passive: false })
     return () => container.removeEventListener('wheel', onWheel)
-  }, [zoomLevel])
+  }, [zoomLevel, onZoomChange])
 
-  // Pan
   const handleMouseDown = (e) => {
     if (e.button === 1 || (e.button === 0 && e.target === rulerRef.current)) {
       setIsPanning(true)
@@ -189,7 +206,6 @@ export default function EditorTimeline({
     }
   }, [isPanning])
 
-  // Timeline click
   const handleTimelineClick = (e) => {
     if (isPanning) return
     if (e.target.closest('.editor-clip-wrapper')) return
@@ -197,12 +213,9 @@ export default function EditorTimeline({
     if (e.target.closest('.loop-strip')) return
 
     const seekTime = clientXToTime(e.clientX)
-    if (onSeek) {
-      onSeek(seekTime)
-    }
+    onSeek?.(seekTime)
   }
 
-  // Loop
   const handleLoopStripMouseDown = (e) => {
     e.stopPropagation()
     const time = clientXToTime(e.clientX)
@@ -221,7 +234,10 @@ export default function EditorTimeline({
 
     const handleMove = (e) => {
       const time = clientXToTime(e.clientX)
-      onSetLoopRegion?.(Math.min(loopDrag.anchor, time), Math.max(loopDrag.anchor, time))
+      onSetLoopRegion?.(
+        Math.min(loopDrag.anchor, time),
+        Math.max(loopDrag.anchor, time)
+      )
     }
     const handleUp = () => setLoopDrag(null)
 
@@ -231,61 +247,10 @@ export default function EditorTimeline({
       document.removeEventListener('mousemove', handleMove)
       document.removeEventListener('mouseup', handleUp)
     }
-  }, [loopDrag])
+  }, [loopDrag, onSetLoopRegion])
 
-  // Raccourcis zoom
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === '=') {
-        e.preventDefault()
-        setZoomLevel(prev => Math.min(10, prev + 0.1))
-        setGlobalZoom(prev => Math.min(10, prev + 0.1))
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === '-') {
-        e.preventDefault()
-        setZoomLevel(prev => Math.max(0.05, prev - 0.1))
-        setGlobalZoom(prev => Math.max(0.05, prev - 0.1))
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === '0') {
-        e.preventDefault()
-        setZoomLevel(1)
-        setGlobalZoom(1)
-      }
-    }
+  // ─── RENDU ────────────────────────────────────────────────────────────────
 
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [])
-
-  // Drag & drop inter-pistes
-  const handleTrackDragOver = (e, trackId) => {
-    e.preventDefault()
-    setDropTargetTrackId(trackId)
-  }
-
-  const handleTrackDragLeave = () => {
-    setDropTargetTrackId(null)
-  }
-
-  const handleTrackDrop = (e, trackId) => {
-    e.preventDefault()
-    setDropTargetTrackId(null)
-    
-    try {
-      const data = JSON.parse(e.dataTransfer.getData('text/plain'))
-      if (data.clipId && data.trackId && data.trackId !== trackId) {
-        const rect = e.currentTarget.getBoundingClientRect()
-        const x = e.clientX - rect.left
-        const newStart = Math.max(0, x / pixelsPerSecond)
-        handleClipMoveWithSnap(data.trackId, data.clipId, newStart, trackId)
-        onClipSelect(data.clipId, trackId)
-      }
-    } catch (err) {
-      console.warn('Drop error:', err)
-    }
-  }
-
-  // ─── RENDU DE LA RÈGLE ──────────────────────────────────────────────────────
   const renderRuler = () => {
     const marks = []
     let step = 1
@@ -334,7 +299,6 @@ export default function EditorTimeline({
     return marks
   }
 
-  // ─── CURSEUR DE LECTURE ────────────────────────────────────────────────────
   const renderPlayhead = () => {
     const position = Math.min(currentTime * pixelsPerSecond, totalWidth)
     return (
@@ -382,96 +346,7 @@ export default function EditorTimeline({
     )
   }
 
-  // ─── MARQUEURS SUR LA RÈGLE ──────────────────────────────────────────────
-  const renderMarkers = () => {
-    // Supprimer les doublons avant de rendre
-    const uniqueMarkers = markers.filter((marker, index, self) => 
-      index === self.findIndex(m => m.id === marker.id)
-    )
-    
-    return uniqueMarkers.map(marker => {
-      const position = marker.time * pixelsPerSecond
-      const isNear = Math.abs(marker.time - currentTime) < 0.3
-      
-      return (
-        <div
-          key={marker.id}
-          style={{
-            position: 'absolute',
-            top: 0,
-            bottom: 0,
-            left: position,
-            width: 2,
-            background: marker.color || '#f44336',
-            opacity: isNear ? 0.8 : 0.4,
-            zIndex: 4,
-            pointerEvents: 'none',
-            transform: 'translateX(-1px)',
-            transition: 'opacity 0.2s ease'
-          }}
-        >
-          {/* Petit triangle en haut */}
-          <div style={{
-            position: 'absolute',
-            top: -6,
-            left: -4,
-            width: 0,
-            height: 0,
-            borderLeft: '5px solid transparent',
-            borderRight: '5px solid transparent',
-            borderTop: `6px solid ${marker.color || '#f44336'}`
-          }} />
-          
-          {/* Nom du marqueur */}
-          <div style={{
-            position: 'absolute',
-            top: -20,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            fontSize: 8,
-            color: isNear ? 'var(--accent)' : 'var(--text-tertiary)',
-            background: 'var(--bg-secondary)',
-            padding: '1px 4px',
-            borderRadius: 3,
-            border: `1px solid ${marker.color || '#f44336'}`,
-            whiteSpace: 'nowrap',
-            pointerEvents: 'none',
-            opacity: isNear ? 1 : 0.6,
-            maxWidth: 120,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis'
-          }}>
-            {marker.name}
-          </div>
-          
-          {/* Indicateur de sélection */}
-          {isNear && (
-            <div style={{
-              position: 'absolute',
-              top: -2,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 4,
-              height: 4,
-              borderRadius: '50%',
-              background: 'var(--accent)',
-              boxShadow: '0 0 8px var(--accent)'
-            }} />
-          )}
-        </div>
-      )
-    })
-  }
-
-  const formatTime = (seconds) => {
-    if (!seconds || isNaN(seconds)) return '0:00'
-    const m = Math.floor(seconds / 60)
-    const s = Math.floor(seconds % 60)
-    if (m > 0) {
-      return `${m}:${s.toString().padStart(2, '0')}`
-    }
-    return `${s.toFixed(1)}s`
-  }
+  // ─── RENDU PRINCIPAL ──────────────────────────────────────────────────────
 
   return (
     <div
@@ -509,21 +384,11 @@ export default function EditorTimeline({
             cursor: 'pointer'
           }}
           onDoubleClick={(e) => {
-            if (onAddMarker) {
-              const time = clientXToTime(e.clientX)
-              const colorIndex = markers.length % MARKER_COLORS.length
-              onAddMarker({
-                id: `marker-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                name: `M${markers.length + 1}`,
-                time: Math.max(0, Math.min(totalDuration, time)),
-                color: MARKER_COLORS[colorIndex].color
-              })
-            }
+            const time = clientXToTime(e.clientX)
           }}
         >
           {renderRuler()}
           {renderPlayhead()}
-          {renderMarkers()}
         </div>
 
         {/* Bande de boucle */}
@@ -621,53 +486,43 @@ export default function EditorTimeline({
           )}
 
           {tracks.map((track, index) => (
-            <div
+            <EditorTrack
               key={track.id}
-              onDragOver={(e) => handleTrackDragOver(e, track.id)}
-              onDragLeave={handleTrackDragLeave}
-              onDrop={(e) => handleTrackDrop(e, track.id)}
-              style={{
-                opacity: dropTargetTrackId === track.id ? 0.7 : 1,
-                transition: 'opacity 0.2s ease'
-              }}
-            >
-              <EditorTrack
-                track={track}
-                trackIndex={index}
-                totalDuration={totalDuration}
-                pixelsPerSecond={pixelsPerSecond}
-                selectedClipId={selectedClipId}
-                selectedTrackId={selectedTrackId}
-                onClipSelect={onClipSelect}
-                onClipMove={handleClipMoveWithSnap}
-                onClipUpdate={onClipUpdate}
-                onClipRemove={onClipRemove}
-                onClipDuplicate={onClipDuplicate}
-                onClipFade={onClipFade}
-                onClipCopy={onClipCopy}
-                onClipCut={onClipCut}
-                onClipContextMenu={onClipContextMenu}
-                onDragCheckpoint={onDragCheckpoint}
-                onTrackRemove={onTrackRemove}
-                waveformData={waveformData}
-                onWaveformUpdate={onWaveformUpdate}
-                isPlaying={isPlaying}
-                currentTime={currentTime}
-                clipDurations={clipDurations}
-                onTrackMute={onTrackMute}
-                onTrackSolo={onTrackSolo}
-                onTrackVolume={onTrackVolume}
-                onTrackReorder={onTrackReorder}
-                autoCrossfade={autoCrossfade}
-                lang={lang}
-                tr={tr}
-                onRenameTrack={onRenameTrack}
-              />
-            </div>
+              track={track}
+              trackIndex={index}
+              totalDuration={totalDuration}
+              pixelsPerSecond={pixelsPerSecond}
+              selectedClipId={selectedClipId}
+              selectedTrackId={selectedTrackId}
+              onClipSelect={onClipSelect}
+              onClipMove={handleClipMoveWithSnap}
+              onClipUpdate={onClipUpdate}
+              onClipRemove={onClipRemove}
+              onClipDuplicate={onClipDuplicate}
+              onClipFade={onClipFade}
+              onClipCopy={onClipCopy}
+              onClipCut={onClipCut}
+              onClipContextMenu={onClipContextMenu}
+              onDragCheckpoint={onDragCheckpoint}
+              onTrackRemove={onTrackRemove}
+              waveformData={waveformData}
+              onWaveformUpdate={onWaveformUpdate}
+              isPlaying={isPlaying}
+              currentTime={currentTime}
+              clipDurations={clipDurations}
+              onTrackMute={onTrackMute}
+              onTrackSolo={onTrackSolo}
+              onTrackVolume={onTrackVolume}
+              onTrackReorder={onTrackReorder}
+              autoCrossfade={autoCrossfade}
+              tr={tr}
+              onRenameTrack={onRenameTrack}
+              onUpdateClipDuration={onUpdateClipDuration}
+            />
           ))}
         </div>
 
-        {/* Barre de contrôle du zoom avec bouton Ajuster */}
+        {/* Contrôles de zoom */}
         <div style={{
           position: 'sticky',
           bottom: 8,
@@ -687,11 +542,7 @@ export default function EditorTimeline({
         }}>
           <button
             className="btn-ghost btn-sm"
-            onClick={() => {
-              const newZoom = Math.max(0.05, globalZoom - 0.1)
-              setGlobalZoom(newZoom)
-              setZoomLevel(newZoom)
-            }}
+            onClick={() => onZoomChange?.(Math.max(0.05, zoomLevel - 0.1))}
             style={{ padding: '2px 6px', fontSize: 12, color: 'var(--text-secondary)' }}
             title={tr('editorZoomOut') || 'Zoom arrière (Ctrl+-)'}
           >
@@ -704,16 +555,12 @@ export default function EditorTimeline({
             minWidth: 50,
             textAlign: 'center'
           }}>
-            {tr('editorZoomPercent')?.replace('{percent}', Math.round(globalZoom * 100)) || `${Math.round(globalZoom * 100)}%`}
+            {tr('editorZoomPercent')?.replace('{percent}', Math.round(zoomLevel * 100)) || `${Math.round(zoomLevel * 100)}%`}
           </span>
           
           <button
             className="btn-ghost btn-sm"
-            onClick={() => {
-              const newZoom = Math.min(10, globalZoom + 0.1)
-              setGlobalZoom(newZoom)
-              setZoomLevel(newZoom)
-            }}
+            onClick={() => onZoomChange?.(Math.min(10, zoomLevel + 0.1))}
             style={{ padding: '2px 6px', fontSize: 12, color: 'var(--text-secondary)' }}
             title={tr('editorZoomIn') || 'Zoom avant (Ctrl+=)'}
           >
@@ -722,10 +569,7 @@ export default function EditorTimeline({
           
           <button
             className="btn-ghost btn-sm"
-            onClick={() => {
-              setGlobalZoom(1)
-              setZoomLevel(1)
-            }}
+            onClick={() => onZoomChange?.(1)}
             style={{ padding: '2px 6px', fontSize: 10, color: 'var(--text-tertiary)' }}
             title={tr('editorZoomReset') || 'Réinitialiser le zoom (Ctrl+0)'}
           >
@@ -737,8 +581,7 @@ export default function EditorTimeline({
             onClick={() => {
               const containerWidth = containerRef.current?.clientWidth - TRACK_HEAD_WIDTH || 800
               const neededZoom = Math.max(0.05, Math.min(5, containerWidth / (totalDuration * BASE_PIXELS_PER_SECOND + 100)))
-              setGlobalZoom(neededZoom)
-              setZoomLevel(neededZoom)
+              onZoomChange?.(neededZoom)
             }}
             style={{ padding: '2px 6px', fontSize: 10, color: 'var(--text-tertiary)' }}
             title={tr('editorZoomFit') || 'Ajuster pour tout voir'}

@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
+// src/pages/editor/components/EditorClip/index.jsx
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Howl } from 'howler'
 
 export default function EditorClip({
   clip,
-  index,
   totalDuration,
   pixelsPerSecond,
   trackHeight,
@@ -18,46 +18,39 @@ export default function EditorClip({
   onDuplicate,
   onCopy,
   onCut,
-  onDragStart,
+  onContextMenu,
   onFadeInChange,
   onFadeOutChange,
   onDragCheckpoint,
   onWaveformUpdate,
-  onContextMenu,
+  onDurationUpdate, // ✅ NOUVEAU PROP
   tr
 }) {
   const [isDragging, setIsDragging] = useState(false)
   const [dragStartX, setDragStartX] = useState(0)
-  const [dragStartY, setDragStartY] = useState(0)
   const [isResizing, setIsResizing] = useState(false)
   const [resizeSide, setResizeSide] = useState(null)
   const [isHovered, setIsHovered] = useState(false)
   const [fadeDrag, setFadeDrag] = useState(null)
   const [liveFadeIn, setLiveFadeIn] = useState(null)
   const [liveFadeOut, setLiveFadeOut] = useState(null)
+  const [isClipPlaying, setIsClipPlaying] = useState(false)
+  const [playbackHowl, setPlaybackHowl] = useState(null)
+  const [isRefreshingDuration, setIsRefreshingDuration] = useState(false)
+
   const dragValueRef = useRef(0)
   const clipRef = useRef(null)
-  
-  // REFS POUR LE DRAG
   const hasDraggedRef = useRef(false)
   const mouseDownPosRef = useRef({ x: 0, y: 0 })
   const isDraggingRef = useRef(false)
-  
-  // REFS POUR LE DOUBLE-CLIC
   const lastClickTimeRef = useRef(0)
   const clickTimerRef = useRef(null)
   const isDoubleClickRef = useRef(false)
-  
-  // Lecture preview
-  const [isClipPlaying, setIsClipPlaying] = useState(false)
-  const [playbackHowl, setPlaybackHowl] = useState(null)
+  const lastMouseXRef = useRef(0)
 
   const duration = clipDuration || clip.duration || 3
   const left = clip.start * pixelsPerSecond
   const width = Math.max(duration * pixelsPerSecond, 10)
-
-  const hue = (index * 30 + 200) % 360
-  const color = `hsl(${hue}, 70%, 50%)`
 
   const fadeInEffect = clip.effects?.find(e => e.type === 'fadeIn')
   const fadeOutEffect = clip.effects?.find(e => e.type === 'fadeOut')
@@ -65,7 +58,11 @@ export default function EditorClip({
   const fadeOutDuration = liveFadeOut != null ? liveFadeOut : (fadeOutEffect?.enabled ? (fadeOutEffect.params?.duration || 0) : 0)
   const maxFade = duration / 2
 
-  // Nettoyage du playback
+  const hasActiveEffects = clip.effects?.some(e => e.enabled) || false
+  const effectBadges = clip.effects?.filter(e => e.enabled).map(e => e.type) || []
+  const showDuration = duration > 5
+
+  // Nettoyage
   useEffect(() => {
     return () => {
       if (playbackHowl) {
@@ -80,7 +77,7 @@ export default function EditorClip({
     }
   }, [playbackHowl])
 
-  // Regénérer le waveform quand le clip est modifié
+  // Régénérer le waveform
   useEffect(() => {
     if (clip.path && onWaveformUpdate) {
       const timer = setTimeout(() => {
@@ -90,6 +87,49 @@ export default function EditorClip({
     }
   }, [clip.path, clip.duration, clip.offset, clip.id, onWaveformUpdate])
 
+  // ✅ Fonction pour rafraîchir la durée du clip
+  const refreshDuration = useCallback(async () => {
+    if (!clip.path || isRefreshingDuration) return
+    
+    setIsRefreshingDuration(true)
+    
+    try {
+      // Utiliser la même méthode que getAudioDuration
+      const fileUrl = clip.path.startsWith('file://') 
+        ? clip.path 
+        : 'file:///' + clip.path.replace(/\\/g, '/')
+      
+      const response = await fetch(fileUrl)
+      if (!response.ok) {
+        console.warn(`⚠️ Fichier non accessible: ${clip.path}`)
+        return
+      }
+      
+      const arrayBuffer = await response.arrayBuffer()
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+      const realDuration = audioBuffer.duration
+      await audioContext.close()
+      
+      console.log(`📏 Durée réelle de "${clip.name}": ${realDuration.toFixed(2)}s (actuelle: ${duration.toFixed(2)}s)`)
+      
+      if (Math.abs(realDuration - duration) > 0.1) {
+        // ✅ Mettre à jour la durée
+        onDurationUpdate?.(clip.id, realDuration)
+        // ✅ Mettre à jour le waveform
+        onWaveformUpdate?.(clip.id, clip.path, clip.offset || 0, realDuration)
+        console.log(`✅ Durée mise à jour: ${realDuration.toFixed(2)}s`)
+      } else {
+        console.log(`✅ Durée déjà correcte: ${duration.toFixed(2)}s`)
+      }
+    } catch (e) {
+      console.warn(`⚠️ Erreur rafraîchissement durée pour "${clip.name}":`, e.message)
+    } finally {
+      setIsRefreshingDuration(false)
+    }
+  }, [clip.path, clip.name, clip.id, duration, onDurationUpdate, onWaveformUpdate, isRefreshingDuration])
+
+  // ─── FADE DRAG ──────────────────────────────────────────────────────────────
   const handleFadeMouseDown = (e, edge) => {
     e.stopPropagation()
     const current = edge === 'in' ? fadeInDuration : fadeOutDuration
@@ -130,7 +170,7 @@ export default function EditorClip({
     }
   }, [fadeDrag, pixelsPerSecond, maxFade, onFadeInChange, onFadeOutChange])
 
-  // Lecture preview - via bouton
+  // ─── LECTURE PREVIEW ──────────────────────────────────────────────────────
   const playClipPreview = (e) => {
     if (e) e.stopPropagation()
     
@@ -169,27 +209,10 @@ export default function EditorClip({
     }
   }
 
-  // ACTION DU DOUBLE-CLIC
-  const handleDoubleClickAction = (e) => {
-    if (e) e.stopPropagation()
-    
-    if (playbackHowl && isClipPlaying) {
-      playbackHowl.stop()
-      playbackHowl.unload()
-      setPlaybackHowl(null)
-      setIsClipPlaying(false)
-      return
-    }
-    
-    playClipPreview(e)
-  }
-
-  // GESTION DU CLIC MANUEL
+  // ─── GESTION DU CLIC ──────────────────────────────────────────────────────
   const handleMouseDown = (e) => {
     if (e.button !== 0) return
-    if (e.target.closest('.clip-actions')) {
-      return
-    }
+    if (e.target.closest('.clip-actions')) return
 
     if (clickTimerRef.current) {
       clearTimeout(clickTimerRef.current)
@@ -199,11 +222,11 @@ export default function EditorClip({
     mouseDownPosRef.current = { x: e.clientX, y: e.clientY }
     hasDraggedRef.current = false
     isDraggingRef.current = true
+    lastMouseXRef.current = e.clientX
     
     onDragCheckpoint?.()
     setIsDragging(true)
     setDragStartX(e.clientX)
-    setDragStartY(e.clientY)
     
     onSelect()
     
@@ -213,7 +236,7 @@ export default function EditorClip({
     if (timeSinceLastClick < 300 && timeSinceLastClick > 0) {
       lastClickTimeRef.current = 0
       isDoubleClickRef.current = true
-      handleDoubleClickAction(e)
+      playClipPreview(e)
       return
     }
     
@@ -255,7 +278,7 @@ export default function EditorClip({
 
     onMove(newStart)
     setDragStartX(e.clientX)
-    setDragStartY(e.clientY)
+    lastMouseXRef.current = e.clientX
   }
 
   const handleMouseUp = (e) => {
@@ -267,12 +290,14 @@ export default function EditorClip({
     }
   }
 
+  // ─── RESIZE ──────────────────────────────────────────────────────────────
   const handleResizeStart = (e, side) => {
     e.stopPropagation()
     onDragCheckpoint?.()
     setIsResizing(true)
     setResizeSide(side)
     setDragStartX(e.clientX)
+    lastMouseXRef.current = e.clientX
   }
 
   const handleResizeMove = (e) => {
@@ -293,11 +318,19 @@ export default function EditorClip({
     }
 
     setDragStartX(e.clientX)
+    lastMouseXRef.current = e.clientX
   }
 
   const handleResizeUp = () => {
     setIsResizing(false)
     setResizeSide(null)
+    
+    const deltaX = lastMouseXRef.current - dragStartX
+    const deltaSeconds = deltaX / pixelsPerSecond
+    const newDuration = Math.max(0.5, duration + deltaSeconds)
+    if (newDuration > 0.5 && Math.abs(newDuration - duration) > 0.01) {
+      onDurationUpdate?.(clip.id, newDuration)
+    }
   }
 
   useEffect(() => {
@@ -322,16 +355,14 @@ export default function EditorClip({
     }
   }, [isResizing])
 
-  // GESTION DU CLIC DROIT
+  // ─── CONTEXT MENU ─────────────────────────────────────────────────────────
   const handleContextMenu = (e) => {
     e.preventDefault()
     e.stopPropagation()
-    onContextMenu?.(clip.id, trackId, e)
+    onContextMenu?.(clip.id, null, e)
   }
 
-  const effectBadges = clip.effects?.filter(e => e.enabled).map(e => e.type) || []
-  const showDuration = duration > 5
-  const hasActiveEffects = clip.effects?.some(e => e.enabled) || false
+  // ─── RENDU ────────────────────────────────────────────────────────────────
 
   return (
     <div
@@ -342,12 +373,12 @@ export default function EditorClip({
         top: 4,
         width: width,
         height: trackHeight,
-        background: isSelected ? color : 'var(--bg-tertiary)',
+        background: isSelected ? `hsl(${(clip.index * 30 + 200) % 360}, 70%, 50%)` : 'var(--bg-tertiary)',
         borderRadius: 'var(--radius-sm)',
-        border: `2px solid ${isSelected ? color : 'var(--border)'}`,
+        border: `2px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
         cursor: isDragging ? 'grabbing' : 'grab',
         transition: isDragging || isResizing ? 'none' : 'all 0.15s ease',
-        boxShadow: isSelected ? `0 0 20px ${color}44` : 'none',
+        boxShadow: isSelected ? `0 0 20px rgba(124,111,247,0.4)` : 'none',
         zIndex: isSelected ? 3 : 1,
         overflow: 'hidden',
         userSelect: 'none',
@@ -399,7 +430,43 @@ export default function EditorClip({
         )}
       </div>
 
-      {/* Badge effets actifs */}
+      {/* ✅ Bouton Rafraîchir la durée - visible au survol */}
+      {isHovered && isSelected && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            refreshDuration()
+          }}
+          disabled={isRefreshingDuration}
+          style={{
+            position: 'absolute',
+            top: 2,
+            right: 30,
+            zIndex: 10,
+            padding: '1px 6px',
+            fontSize: 9,
+            background: 'rgba(0,0,0,0.7)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 3,
+            color: 'white',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 3,
+            opacity: isRefreshingDuration ? 0.6 : 0.8,
+            transition: 'all 0.15s'
+          }}
+          title={tr('editorRefreshDuration') || 'Recalculer la durée réelle du clip'}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = 1 }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = 0.8 }}
+        >
+          <i className={`ti ${isRefreshingDuration ? 'ti-loader' : 'ti-refresh'}`} 
+             style={isRefreshingDuration ? { animation: 'spin 1s linear infinite' } : {}} />
+          <span>{isRefreshingDuration ? '...' : (tr('editorRefreshDuration') || 'Durée')}</span>
+        </button>
+      )}
+
+      {/* Badge effets */}
       {hasActiveEffects && (
         <div style={{
           position: 'absolute',
@@ -483,7 +550,7 @@ export default function EditorClip({
         }} />
       )}
 
-      {/* Indicateur de preview en cours avec bouton Pause */}
+      {/* Indicateur de preview */}
       {isClipPlaying && (
         <div 
           className="clip-playing-indicator"
@@ -573,7 +640,7 @@ export default function EditorClip({
         </>
       )}
 
-      {/* Actions contextuelles - avec bouton Play/Pause */}
+      {/* Actions contextuelles */}
       <div className="clip-actions" style={{
         position: 'absolute',
         top: 2,
@@ -672,6 +739,17 @@ export default function EditorClip({
         @keyframes pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.3; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .clip-playing-indicator {
+          animation: clipPlayingPulse 0.8s ease-in-out infinite;
+        }
+        @keyframes clipPlayingPulse {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 0.6; }
         }
       `}</style>
     </div>

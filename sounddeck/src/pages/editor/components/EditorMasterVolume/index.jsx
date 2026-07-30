@@ -1,3 +1,4 @@
+// src/pages/editor/components/EditorMasterVolume/index.jsx
 import { useState, useCallback } from 'react'
 
 export default function EditorMasterVolume({

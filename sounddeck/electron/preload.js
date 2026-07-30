@@ -99,6 +99,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   writeSoundFile: (filePath, data) => ipcRenderer.invoke('write-sound-file', filePath, data),
   exportAudioFile: (data, fileName, format) => ipcRenderer.invoke('export-audio-file', { data, fileName, format }),
   convertAudio: (inputPath, outputPath, format, bitrate) => ipcRenderer.invoke('convert-audio', inputPath, outputPath, format, bitrate),
+  openDirectoryDialog: () => ipcRenderer.invoke('open-directory-dialog'),
+  readFile: (filePath) => ipcRenderer.invoke('read-file', filePath),
 
   // ─── DIVERS ──────────────────────────────────────────────────────────────
   isElectron: true,

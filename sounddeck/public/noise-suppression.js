@@ -1,20 +1,32 @@
-// AudioWorklet pour la réduction de bruit avancée
+// public/noise-suppression.js
+/**
+ * AudioWorklet pour la réduction de bruit en temps réel
+ * Utilisé par le mixeur audio de SoundDeck
+ */
 class NoiseSuppressionProcessor extends AudioWorkletProcessor {
   constructor() {
     super()
-    
-    // Paramètres de réduction de bruit
     this.noiseFloor = 0.01
-    this.smoothing = 0.9
-    this.noiseProfile = new Float32Array(128).fill(0.01)
-    this.frameCount = 0
+    this.smoothing = 0.8
+    this.attack = 0.01
+    this.release = 0.1
+    this.envelope = 0
+    this.gain = 1
+    this.sampleRate = 48000
     
-    // Enveloppe de gain (pour éviter les clics)
-    this.attackMs = 50
-    this.releaseMs = 200
-    this.attackCoeff = Math.exp(-1 / (this.attackMs * 0.001 * 128))
-    this.releaseCoeff = Math.exp(-1 / (this.releaseMs * 0.001 * 128))
-    this.gain = 0.1
+    // Paramètres configurables
+    this.threshold = -50 // dB
+    this.ratio = 4
+    this.knee = 10
+    
+    this.port.onmessage = (event) => {
+      if (event.data.threshold !== undefined) {
+        this.threshold = event.data.threshold
+      }
+      if (event.data.ratio !== undefined) {
+        this.ratio = event.data.ratio
+      }
+    }
   }
 
   process(inputs, outputs, parameters) {
@@ -23,41 +35,36 @@ class NoiseSuppressionProcessor extends AudioWorkletProcessor {
     
     if (!input || !input[0]) return true
     
-    const channel = input[0]
-    const outChannel = output[0]
+    const channelData = input[0]
+    const outputData = output[0]
     
-    for (let i = 0; i < channel.length; i++) {
-      const sample = channel[i]
-      const absSample = Math.abs(sample)
-      
-      // Mise à jour du profil de bruit (période de silence)
-      if (absSample < 0.02 && this.frameCount % 100 === 0) {
-        const idx = i % this.noiseProfile.length
-        this.noiseProfile[idx] = this.noiseProfile[idx] * 0.95 + absSample * 0.05
-      }
-      
-      // Seuil adaptatif
-      const threshold = this.noiseProfile[i % this.noiseProfile.length] * 2.5
-      
-      // Calcul du gain avec enveloppe
-      let targetGain
-      if (absSample < threshold) {
-        targetGain = 0.005 // Forte atténuation du bruit
-      } else {
-        // Réduction progressive
-        const ratio = (absSample - threshold) / (absSample + 0.001)
-        targetGain = Math.min(1, Math.max(0.1, ratio))
-      }
-      
-      // Lissage du gain (évite les clics)
-      if (targetGain > this.gain) {
-        this.gain = this.gain * this.attackCoeff + targetGain * (1 - this.attackCoeff)
-      } else {
-        this.gain = this.gain * this.releaseCoeff + targetGain * (1 - this.releaseCoeff)
-      }
-      
-      outChannel[i] = sample * this.gain
-      this.frameCount++
+    // Calcul du niveau RMS
+    let rms = 0
+    for (let i = 0; i < channelData.length; i++) {
+      rms += channelData[i] * channelData[i]
+    }
+    rms = Math.sqrt(rms / channelData.length)
+    
+    // Seuil en dB
+    const rmsDb = 20 * Math.log10(Math.max(rms, 1e-10))
+    
+    // Calcul du gain
+    let gain = 1
+    if (rmsDb > this.threshold) {
+      const excess = rmsDb - this.threshold
+      const gainDb = -excess * (1 - 1/this.ratio)
+      gain = Math.pow(10, gainDb / 20)
+    }
+    
+    // Lissage (attack/release)
+    const attackCoef = Math.exp(-1 / (this.attack * this.sampleRate))
+    const releaseCoef = Math.exp(-1 / (this.release * this.sampleRate))
+    const coef = this.gain > gain ? attackCoef : releaseCoef
+    this.gain = this.gain * coef + gain * (1 - coef)
+    
+    // Application
+    for (let i = 0; i < channelData.length; i++) {
+      outputData[i] = channelData[i] * this.gain
     }
     
     return true

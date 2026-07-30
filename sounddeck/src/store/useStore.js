@@ -1,3 +1,4 @@
+// src/store/useStore.js
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -95,7 +96,11 @@ export function useStore() {
   const [selectedClipId, setSelectedClipId] = useState(null)
 
   // ─── ZONE DE BOUCLE DE L'ÉDITEUR ──────────────────────────────────────────
-  const [editorLoopRegion, setEditorLoopRegionState] = useState({ enabled: false, start: 0, end: 0 })
+  const [editorLoopRegion, setEditorLoopRegionState] = useState({ 
+    enabled: false, 
+    start: 0, 
+    end: 10 
+  })
 
   const setEditorLoopRegion = useCallback((start, end) => {
     const s = Math.max(0, Math.min(start, end))
@@ -108,7 +113,7 @@ export function useStore() {
   }, [])
 
   const clearEditorLoopRegion = useCallback(() => {
-    setEditorLoopRegionState({ enabled: false, start: 0, end: 0 })
+    setEditorLoopRegionState({ enabled: false, start: 0, end: 10 })
   }, [])
 
   // ─── Sauvegarde automatique ───────────────────────────────────────────────────
@@ -165,7 +170,6 @@ export function useStore() {
         setVirtualDriverInstalled(savedVirtualDriverInstalled)
         setVirtualDeviceActive(savedVirtualDeviceActive)
 
-        // ✅ STOCKER LA VALEUR DANS LA VARIABLE DÉCLARÉE PLUS HAUT
         savedMixerEnabled = await window.electronAPI.storeGet('mixerEnabled') ?? false
         const savedMicrophoneDevice = await window.electronAPI.storeGet('microphoneDevice') || 'default'
         const savedMicrophoneVolume = await window.electronAPI.storeGet('microphoneVolume') ?? 80
@@ -260,7 +264,6 @@ export function useStore() {
           await window.electronAPI.updateShortcuts(cleanedShortcuts)
           console.log('✅ Raccourcis orphelins nettoyés au chargement')
         }
-        // ═══════════════════════════════════════════════════════════════════════
 
         setProfileShortcut(savedProfileShortcut)
         setTheme(savedTheme)
@@ -284,8 +287,20 @@ export function useStore() {
 
         // ─── CHARGEMENT DU PROJET ÉDITEUR ──────────────────────────────────
         const savedEditorProject = await window.electronAPI.storeGet('editorProject')
-        if (savedEditorProject) {
-          setEditorProject(savedEditorProject)
+        if (savedEditorProject?.tracks) {
+          const cleanedProject = {
+            ...savedEditorProject,
+            tracks: savedEditorProject.tracks.map(track => ({
+              ...track,
+              clips: track.clips.map(clip => ({
+                ...clip,
+                effects: (clip.effects || []).filter(e => e.type !== 'pitch')
+              }))
+            }))
+          }
+          // Sauvegarder le projet nettoyé
+          await window.electronAPI.storeSet('editorProject', cleanedProject)
+          console.log('🧹 Effets Pitch obsolètes nettoyés')
         }
 
         const savedSelectedClipId = await window.electronAPI.storeGet('selectedClipId')
@@ -374,23 +389,19 @@ export function useStore() {
         setProfiles([{ id: 'all', name: 'Tous les sons', isDefault: true }])
         setCurrentProfileId('all')
       } finally {
-        // ✅ VÉRIFICATION FINALE: Synchronisation du mixeur
         try {
-        const { getMixerFullState, isMixerActive, stopMixer } = await import('../utils/audioMixer')
-        const fullState = getMixerFullState()
-        const isActive = isMixerActive()
-        
-        if (!savedMixerEnabled && isActive) {
-          await stopMixer()
-        } else if (savedMixerEnabled && !isActive) {
-          // On va laisser initMixerOnStartup le gérer
-        }
-      } catch (e) {}
+          const { getMixerFullState, isMixerActive, stopMixer } = await import('../utils/audioMixer')
+          const isActive = isMixerActive()
+          
+          if (!savedMixerEnabled && isActive) {
+            await stopMixer()
+          }
+        } catch (e) {}
 
-      setLoading(false)
+        setLoading(false)
+      }
     }
-  }
-  loadData()
+    loadData()
   }, [])
 
   // ─── HISTORIQUE UNDO/REDO DE L'ÉDITEUR ──────────────────────────────────────
@@ -694,7 +705,6 @@ export function useStore() {
     setSoundOrder(updatedOrder)
     await save('sounds', updated)
     await save('soundOrder', updatedOrder)
-    // ❌ RETIRER setOrderVersion
   }, [sounds, save, soundOrder])
 
   const removeSoundFromProfile = useCallback(async (soundId, profileId) => {
@@ -857,14 +867,6 @@ export function useStore() {
     setLang(newLang)
     await save('lang', newLang)
     await window.electronAPI.storeSetLang?.(newLang)
-    
-    // ✅ Mettre à jour le contexte de langue
-    try {
-      const { useLanguage } = await import('../context/LanguageContext')
-      // Le contexte sera mis à jour via le Provider
-    } catch (e) {
-      console.warn('Erreur mise à jour contexte langue:', e)
-    }
   }, [save])
 
   const updateTheme = useCallback(async (newTheme) => {
@@ -1016,11 +1018,6 @@ export function useStore() {
     }
   }, [save, microphoneDevice, audioDevice, playLocally, monitoringEnabled, mixerSoundVolume, localAudioDevice])
 
-  const updateMicrophoneDevice = useCallback(async (deviceId) => {
-    setMicrophoneDevice(deviceId)
-    await save('microphoneDevice', deviceId)
-  }, [save])
-
   const updateMicrophoneVolume = useCallback(async (volume) => {
     setMicrophoneVolume(volume)
     await save('microphoneVolume', volume)
@@ -1046,7 +1043,6 @@ export function useStore() {
     await save('noiseSuppressionMode', mode)
   }, [save])
 
-  // Dans la fonction initMixerOnStartup - REMPLACER complètement
   const initMixerOnStartup = useCallback(async () => {
     try {
       const { getMixerFullState, isMixerActive, stopMixer, initAudioMixer, resumeAudioContext, connectMixerToOutput, setNoiseSuppressionMode, setStoreRef } = await import('../utils/audioMixer')
@@ -1102,15 +1098,15 @@ export function useStore() {
     }
   }, [mixerEnabled, microphoneDevice, audioDevice, noiseSuppressionMode, save, playLocally, monitoringEnabled, mixerSoundVolume, localAudioDevice])
 
-    const updateMicrophoneDeviceId = useCallback(async (deviceId) => {
-      if (deviceId && deviceId !== 'default') {
-        try {
-          const devices = await navigator.mediaDevices.enumerateDevices()
-          const audioInputs = devices.filter(d => d.kind === 'audioinput')
-          const deviceExists = audioInputs.some(d => d.deviceId === deviceId)
+  const updateMicrophoneDeviceId = useCallback(async (deviceId) => {
+    if (deviceId && deviceId !== 'default') {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const audioInputs = devices.filter(d => d.kind === 'audioinput')
+        const deviceExists = audioInputs.some(d => d.deviceId === deviceId)
 
-          if (!deviceExists) {
-            console.warn(`⚠️ Périphérique ${deviceId} non trouvé, utilisation du périphérique par défaut`)
+        if (!deviceExists) {
+          console.warn(`⚠️ Périphérique ${deviceId} non trouvé, utilisation du périphérique par défaut`)
           deviceId = 'default'
         }
       } catch (e) {
@@ -1184,6 +1180,125 @@ export function useStore() {
 
   // ─── ÉDITEUR AVANCÉ ──────────────────────────────────────────────────────────
 
+  const getAudioDuration = useCallback(async (filePath) => {
+    try {
+      const fileUrl = filePath.startsWith('file://') 
+        ? filePath 
+        : 'file:///' + filePath.replace(/\\/g, '/')
+      
+      const response = await fetch(fileUrl)
+      if (!response.ok) {
+        console.warn(`⚠️ Fichier non accessible: ${filePath}`)
+        return 3
+      }
+      
+      const arrayBuffer = await response.arrayBuffer()
+      
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+      const duration = audioBuffer.duration
+      await audioContext.close()
+      
+      console.log(`📏 Durée réelle détectée: ${duration.toFixed(2)}s pour ${filePath}`)
+      return duration
+    } catch (e) {
+      console.warn(`⚠️ Erreur détection durée pour ${filePath}:`, e.message)
+      try {
+        const fileUrl = filePath.startsWith('file://') 
+          ? filePath 
+          : 'file:///' + filePath.replace(/\\/g, '/')
+        const audio = new Audio()
+        audio.src = fileUrl
+        const duration = await new Promise((resolve) => {
+          audio.addEventListener('loadedmetadata', () => resolve(audio.duration))
+          audio.addEventListener('error', () => resolve(3))
+          setTimeout(() => resolve(3), 5000)
+        })
+        return duration
+      } catch (e2) {
+        return 3
+      }
+    }
+  }, [])
+
+  // ─── MISE À JOUR DE LA DURÉE D'UN CLIP DANS L'ÉDITEUR ──────────────────────
+  // ✅ UNE SEULE DÉCLARATION ICI
+
+  const updateClipDurationInEditor = useCallback(async (clipId, duration) => {
+    // Émettre un événement pour l'éditeur
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('clip-duration-updated', {
+        detail: { clipId, duration }
+      }))
+    }
+    
+    // Mettre à jour le clip dans le projet
+    const updated = {
+      ...editorProject,
+      tracks: editorProject.tracks.map(track => ({
+        ...track,
+        clips: track.clips.map(clip => 
+          clip.id === clipId 
+            ? { ...clip, duration } 
+            : clip
+        )
+      })),
+      updatedAt: Date.now()
+    }
+    
+    await commitEditorProject(updated, { skipHistory: true })
+  }, [editorProject, commitEditorProject])
+
+  const fixAllClipDurations = useCallback(async () => {
+    console.log('🔄 Correction des durées de tous les clips...')
+    if (!editorProject?.tracks) {
+      console.log('⏭️ Aucun projet')
+      return 0
+    }
+    
+    let fixedCount = 0
+    let newTracks = [...editorProject.tracks]
+
+    for (const track of newTracks) {
+      for (const clip of track.clips) {
+        if (clip.path) {
+          try {
+            const realDuration = await getAudioDuration(clip.path)
+            const currentDuration = clip.duration || 3
+            
+            console.log(`📏 "${clip.name}" : actuelle=${currentDuration.toFixed(2)}s, réelle=${realDuration.toFixed(2)}s`)
+            
+            if (Math.abs(realDuration - currentDuration) > 0.1) {
+              clip.duration = realDuration
+              fixedCount++
+            }
+          } catch (e) {
+            console.warn(`⚠️ Erreur pour "${clip.name}":`, e)
+          }
+        }
+      }
+    }
+
+    if (fixedCount > 0) {
+      const updated = {
+        ...editorProject,
+        tracks: newTracks,
+        updatedAt: Date.now()
+      }
+      setEditorProject(updated)
+      await save('editorProject', updated)
+      
+      // ✅ AJOUTER : Recalculer totalDuration
+      // Le composant Editor recalculera automatiquement
+      
+      console.log(`✅ ${fixedCount} clip(s) corrigé(s)`)
+    } else {
+      console.log('✅ Aucun clip à corriger')
+    }
+    
+    return fixedCount
+  }, [editorProject, getAudioDuration, save])
+
   const createEditorProject = useCallback(async (name = 'Nouveau projet') => {
     const project = {
       id: uuidv4(),
@@ -1203,7 +1318,6 @@ export function useStore() {
     const trackIndex = editorProject.tracks.length + 1
     const trackName = name || `Piste ${trackIndex}`
     
-    // Générer une couleur aléatoire si non fournie
     const trackColor = color || `hsl(${(trackIndex * 30 + 200) % 360}, 60%, 50%)`
     
     const newTrack = {
@@ -1292,7 +1406,7 @@ export function useStore() {
     await commitEditorProject(updated)
   }, [editorProject, commitEditorProject])
 
-  const addClipToTrack = useCallback(async (trackId, soundId, start = 0, duration = 3) => {
+  const addClipToTrack = useCallback(async (trackId, soundId, start = null, duration = null) => {
     const sound = sounds.find(s => s.id === soundId)
     if (!sound) {
       console.warn('Son non trouvé:', soundId)
@@ -1304,13 +1418,34 @@ export function useStore() {
       console.warn('Fichier son introuvable:', sound.path)
     }
 
+    // ✅ Détecter la durée réelle
+    const actualDuration = await getAudioDuration(sound.path)
+    console.log(`📏 Durée détectée pour "${sound.name}": ${actualDuration}s`)
+
+    // ✅ Calculer la position de départ
+    let actualStart = start
+    const track = editorProject.tracks.find(t => t.id === trackId)
+    if (track && (actualStart === null || actualStart === undefined)) {
+      if (track.clips.length > 0) {
+        const lastClip = track.clips.reduce((max, clip) => {
+          const clipEnd = clip.start + (clip.duration || 3)
+          return clipEnd > max.end ? { start: clip.start, end: clipEnd } : max
+        }, { start: 0, end: 0 })
+        actualStart = lastClip.end + 0.5
+      } else {
+        actualStart = 0
+      }
+    } else if (actualStart === null || actualStart === undefined) {
+      actualStart = 0
+    }
+
     const newClip = {
       id: `clip-${Date.now()}`,
       soundId: sound.id,
       name: sound.name,
       path: sound.path,
-      start: start,
-      duration: duration,
+      start: actualStart,
+      duration: actualDuration,
       offset: 0,
       volume: 0,
       volumeDb: 0,
@@ -1325,25 +1460,53 @@ export function useStore() {
       ...editorProject,
       tracks: editorProject.tracks.map(track => {
         if (track.id === trackId) {
-          return { ...track, clips: [...track.clips, newClip] }
+          const clips = [...track.clips, newClip]
+          clips.sort((a, b) => a.start - b.start)
+          return { ...track, clips }
         }
         return track
       }),
       updatedAt: Date.now()
     }
+    
     await commitEditorProject(updated)
+    
+    // ✅ AJOUT : Mettre à jour la durée dans l'éditeur
+    await updateClipDurationInEditor(newClip.id, actualDuration)
+    
     return newClip
-  }, [editorProject, sounds, commitEditorProject])
+  }, [editorProject, sounds, commitEditorProject, getAudioDuration, updateClipDurationInEditor])
 
-  const addClipFromFile = useCallback(async (trackId, filePath, start = 0) => {
+  const addClipFromFile = useCallback(async (trackId, filePath, start = null) => {
     const fileName = filePath.split(/[\\/]/).pop() || 'audio'
+    
+    const actualDuration = await getAudioDuration(filePath)
+    console.log(`📏 Durée détectée pour "${fileName}": ${actualDuration}s`)
+
+    // ✅ Calculer la position de départ si non spécifiée
+    let actualStart = start
+    const track = editorProject.tracks.find(t => t.id === trackId)
+    if (track && (actualStart === null || actualStart === undefined)) {
+      if (track.clips.length > 0) {
+        const lastClip = track.clips.reduce((max, clip) => {
+          const clipEnd = clip.start + (clip.duration || 3)
+          return clipEnd > max.end ? { start: clip.start, end: clipEnd } : max
+        }, { start: 0, end: 0 })
+        actualStart = lastClip.end + 0.5
+      } else {
+        actualStart = 0
+      }
+    } else if (actualStart === null || actualStart === undefined) {
+      actualStart = 0
+    }
+
     const newClip = {
       id: `clip-${Date.now()}`,
       soundId: null,
       name: fileName,
       path: filePath,
-      start: start,
-      duration: 3,
+      start: actualStart,
+      duration: actualDuration,
       offset: 0,
       volume: 0,
       volumeDb: 0,
@@ -1359,15 +1522,27 @@ export function useStore() {
       ...editorProject,
       tracks: editorProject.tracks.map(track => {
         if (track.id === trackId) {
-          return { ...track, clips: [...track.clips, newClip] }
+          const clips = [...track.clips, newClip]
+          clips.sort((a, b) => a.start - b.start)
+          return { ...track, clips }
         }
         return track
       }),
       updatedAt: Date.now()
     }
     await commitEditorProject(updated)
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('project-updated', {
+        detail: { project: updated }
+      }))
+    }
+    
+    // ✅ AJOUT : Mettre à jour la durée dans l'éditeur
+    await updateClipDurationInEditor(newClip.id, actualDuration)
+    
     return newClip
-  }, [editorProject, commitEditorProject])
+  }, [editorProject, commitEditorProject, getAudioDuration, updateClipDurationInEditor])
 
   const updateClip = useCallback(async (trackId, clipId, updates, options = {}) => {
     const updated = {
@@ -1459,7 +1634,8 @@ export function useStore() {
     const newClip = {
       ...clip,
       id: `clip-${Date.now()}`,
-      start: clip.start + clip.duration + 0.5
+      start: clip.start + clip.duration + 0.5,
+      effects: (clip.effects || []).map(e => ({ ...e, id: `effect-${Date.now()}-${e.id || Math.random().toString(36).slice(2, 6)}` }))
     }
 
     const updated = {
@@ -1475,6 +1651,7 @@ export function useStore() {
       updatedAt: Date.now()
     }
     await commitEditorProject(updated)
+    return newClip
   }, [editorProject, commitEditorProject])
 
   const splitClip = useCallback(async (trackId, clipId, atTime, knownDuration) => {
@@ -1504,7 +1681,7 @@ export function useStore() {
       duration: clipDuration - splitOffset,
       offset: (clip.offset || 0) + splitOffset,
       fadeIn: 0,
-      effects: clip.effects.map(e => ({ ...e, id: `effect-${Date.now()}-${e.id}` }))
+      effects: (clip.effects || []).map(e => ({ ...e, id: `effect-${Date.now()}-${e.id || Math.random().toString(36).slice(2, 6)}` }))
     }
 
     const updated = {
@@ -1542,7 +1719,7 @@ export function useStore() {
               if (clip.id === clipId) {
                 return {
                   ...clip,
-                  effects: [...clip.effects, effect]
+                  effects: [...(clip.effects || []), effect]
                 }
               }
               return clip
@@ -1568,7 +1745,7 @@ export function useStore() {
               if (clip.id === clipId) {
                 return {
                   ...clip,
-                  effects: clip.effects.filter(e => e.id !== effectId)
+                  effects: (clip.effects || []).filter(e => e.id !== effectId)
                 }
               }
               return clip
@@ -1593,12 +1770,42 @@ export function useStore() {
               if (clip.id === clipId) {
                 return {
                   ...clip,
-                  effects: clip.effects.map(effect => {
+                  effects: (clip.effects || []).map(effect => {
                     if (effect.id === effectId) {
                       return {
                         ...effect,
                         params: { ...effect.params, [param]: value }
                       }
+                    }
+                    return effect
+                  })
+                }
+              }
+              return clip
+            })
+          }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    await commitEditorProject(updated)
+  }, [editorProject, commitEditorProject])
+
+  const toggleEffect = useCallback(async (trackId, clipId, effectId, enabled) => {
+    const updated = {
+      ...editorProject,
+      tracks: editorProject.tracks.map(track => {
+        if (track.id === trackId) {
+          return {
+            ...track,
+            clips: track.clips.map(clip => {
+              if (clip.id === clipId) {
+                return {
+                  ...clip,
+                  effects: (clip.effects || []).map(effect => {
+                    if (effect.id === effectId) {
+                      return { ...effect, enabled }
                     }
                     return effect
                   })
@@ -1621,7 +1828,7 @@ export function useStore() {
     const clip = track?.clips.find(c => c.id === clipId)
     if (!clip) return
 
-    const existing = clip.effects.find(e => e.type === effectType)
+    const existing = (clip.effects || []).find(e => e.type === effectType)
     const roundedDuration = Math.round(duration * 100) / 100
 
     const updated = {
@@ -1635,7 +1842,7 @@ export function useStore() {
             if (existing) {
               return {
                 ...c,
-                effects: c.effects.map(e => e.id === existing.id
+                effects: (c.effects || []).map(e => e.id === existing.id
                   ? { ...e, enabled: roundedDuration > 0, params: { ...e.params, duration: roundedDuration } }
                   : e
                 )
@@ -1644,7 +1851,7 @@ export function useStore() {
             if (roundedDuration <= 0) return c
             return {
               ...c,
-              effects: [...c.effects, {
+              effects: [...(c.effects || []), {
                 id: `effect-${Date.now()}`,
                 type: effectType,
                 params: { duration: roundedDuration },
@@ -1895,9 +2102,6 @@ export function useStore() {
     lowLatencyMode,
     updateLowLatencyMode,
 
-    lazyLoadingEnabled,
-    updateLazyLoadingEnabled,
-
     // Compression audio
     compressOnImport,
     compressionBitrate,
@@ -1908,6 +2112,7 @@ export function useStore() {
     editorProject,
     selectedClipId,
     setSelectedClipId,
+    fixAllClipDurations,
     createEditorProject,
     addTrack,
     updateTrack,
@@ -1933,6 +2138,8 @@ export function useStore() {
     updateEditorProject,
     renameTrack,
     updateTrackColor,
+    toggleEffect,
+    updateClipDurationInEditor,
 
     // Undo/Redo
     undoEditor,
@@ -1941,7 +2148,7 @@ export function useStore() {
     canRedoEditor,
     pushEditorHistoryCheckpoint,
 
-    // Zone de boucle
+    // ✅ Zone de boucle - UNE SEULE FOIS
     editorLoopRegion,
     setEditorLoopRegion,
     toggleEditorLoop,

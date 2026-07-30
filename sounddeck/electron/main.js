@@ -2385,6 +2385,23 @@ ipcMain.handle('import-profile', async () => {
   }
 })
 
+ipcMain.handle('open-directory-dialog', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choisir un dossier d\'export',
+    properties: ['openDirectory']
+  })
+  return result
+})
+
+ipcMain.handle('read-file', async (event, filePath) => {
+  try {
+    const data = fs.readFileSync(filePath)
+    return { success: true, data: data.buffer }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
+
 // ─── HANDLERS MYINSTANTS ──────────────────────────────────────────────────
 
 const https = require('https')
