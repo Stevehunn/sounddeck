@@ -87,7 +87,6 @@ export default {
     myinstantsCategoryEditorSaved: '✅ Catégories sauvegardées !',
     myinstantsCategoryEditorResetConfirm: 'Voulez-vous vraiment réinitialiser les catégories par défaut ?',
     myinstantsSearch: 'Rechercher',
-    myinstantsRefresh: 'Actualiser',
     myinstantsClearSearch: 'Effacer la recherche',
     myinstantsNoCategories: 'Aucune catégorie sélectionnée',
     myinstantsCategoryEditorCancel: 'Annuler',
@@ -196,7 +195,6 @@ export default {
     myinstantsCategoryEditorResetConfirm: 'Do you really want to reset categories to default?',
 
     myinstantsSearch: 'Search',
-    myinstantsRefresh: 'Refresh',
     myinstantsClearSearch: 'Clear search',
     myinstantsNoCategories: 'No categories selected',
     myinstantsCategoryEditorCancel: 'Cancel',
@@ -305,7 +303,6 @@ export default {
     myinstantsCategoryEditorResetConfirm: '¿Realmente quieres restablecer las categorías por defecto?',
 
     myinstantsSearch: 'Buscar',
-    myinstantsRefresh: 'Actualizar',
     myinstantsClearSearch: 'Limpiar búsqueda',
     myinstantsNoCategories: 'No hay categorías seleccionadas',
     myinstantsCategoryEditorCancel: 'Cancelar',

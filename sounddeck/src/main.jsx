@@ -1,10 +1,11 @@
+// src/main.jsx
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
-import { LanguageProvider } from './context/LanguageContext'
+import { LanguageProvider } from '@core/i18n/LanguageContext'
 import './index.css'
 import './animations.css'
-import { setupGlobalErrorHandler } from './utils/errorHandler'
+import { setupGlobalErrorHandler } from './shared/utils/errorHandler'
 
 // ✅ Configurer le gestionnaire d'erreurs global
 setupGlobalErrorHandler()
@@ -21,10 +22,7 @@ window.addEventListener('unhandledrejection', (event) => {
 // ✅ Détection automatique de la langue système au démarrage
 const initApp = async () => {
   try {
-    // Vérifier si une langue est déjà sauvegardée
     const savedLang = await window.electronAPI?.storeGet?.('lang')
-    
-    // Si aucune langue n'est sauvegardée, le LanguageProvider va détecter automatiquement
     console.log('🚀 Démarrage de SoundDeck...')
     if (savedLang) {
       console.log(`🌐 Langue chargée: ${savedLang}`)
@@ -36,12 +34,8 @@ const initApp = async () => {
   }
 }
 
-// Initialiser l'application
 initApp()
 
-// ✅ Rendu de l'application avec le LanguageProvider
-// ⚠️ IMPORTANT : LanguageProvider DOIT être à l'extérieur de tout
-// pour que useLanguage() soit disponible dans tous les composants
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <LanguageProvider>

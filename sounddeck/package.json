@@ -13,7 +13,8 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "test:ci": "vitest run --coverage",
-    "build:plugin": "node scripts/build-plugin.js"
+    "build:plugin": "node scripts/build-plugin.js",
+    "migrate": "node scripts/migrate-architecture.js"
   },
   "build": {
     "appId": "com.sounddeck.app",

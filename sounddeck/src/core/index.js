@@ -1,3 +1,7 @@
-export { PluginManager, pluginManager } from './PluginManager'
-export { PluginProvider, usePlugins } from './PluginContext'
-export { default as usePluginPage } from './hooks/usePluginPage'
+// src/core/index.js
+export * from './store'
+export * from './services'
+export { default as PluginManager, pluginManager } from './plugins/PluginManager'
+export { PluginProvider, usePlugins } from './plugins/PluginContext'
+export { usePluginPage } from './plugins/hooks/usePluginPage'
+export { LanguageProvider, useLanguage } from './i18n/LanguageContext'

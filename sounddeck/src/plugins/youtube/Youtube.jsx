@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import Waveform from '../../components/Waveform'
-import { useLanguage } from '../../context/LanguageContext'
-import { detectPlatform, getSpotifyTrack, getSoundCloudTrack, sanitizeFilename } from '../../utils/platformImport'
+import Waveform from '@shared/components/audio/Waveform'
+import { useLanguage } from '@core/i18n/LanguageContext'
+import { detectPlatform, getSpotifyTrack, getSoundCloudTrack, sanitizeFilename } from '@shared/utils/platformImport'
 import { Howl } from 'howler'
-import useConfirm from '../../hooks/useConfirm.jsx'
+import useConfirm from '@shared/hooks/useConfirm'
 
 const EMOJIS = ['🎵','🎤','🎸','🎹','🥁','🎺','🎻','🎼','🔊','💥','😂','🔥']
 

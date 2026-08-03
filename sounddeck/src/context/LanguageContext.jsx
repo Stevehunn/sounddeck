@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { TRANSLATIONS, LANGUAGES } from '../i18n'
+import { TRANSLATIONS, LANGUAGES } from '@core/i18n/translations'
 // ✅ Importer les traductions des plugins
 import myinstantsTranslations from '../plugins/myinstants/i18n'
 import youtubeTranslations from '../plugins/youtube/i18n'

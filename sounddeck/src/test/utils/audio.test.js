@@ -35,7 +35,7 @@ import {
   setStoreRef,
   registerStopSequencerCallback,
   stopAllSounds
-} from '../utils/audio'
+} from '@core/services/AudioService'
 
 describe('audio.js - Fonctions de base', () => {
   beforeEach(() => {

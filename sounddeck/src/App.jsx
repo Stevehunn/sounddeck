@@ -1,26 +1,28 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useStore } from './store/useStore'
-import { useLanguage } from './context/LanguageContext'
-import Sidebar from './components/Sidebar'
-import Home from './pages/Home'
-import Options from './pages/Options'
-import Trimmer from './pages/Trimmer'
-import Editor from './pages/editor/Editor'
-import Sequencer from './pages/Sequencer'
-import Guide from './pages/Guide'
-import Stats from './pages/Stats'
-import Presentation from './pages/Presentation'
-import Toast from './components/Toast'
-import QuitConfirm from './components/QuitConfirm'
-import WelcomeScreen from './components/WelcomeScreen'
-import Tutorial from './components/Tutorial'
-import TutorialAdvanced from './components/TutorialAdvanced'
-import { playSound, stopAllSounds, setStoreRef } from './utils/audio'
-import { warmupAudioContext } from './utils/audioMixer'
+import { useStore } from '@core/store/useStore'
+import { useLanguage } from '@core/i18n/LanguageContext'
+import Sidebar from '@shared/components/navigation/Sidebar'
+import Home from '@features/home/Home'
+import Options from '@features/options/Options'
+import Trimmer from '@features/trimmer/Trimmer'
+import Editor from '@features/editor/Editor'
+import Sequencer from '@features/sequencer/Sequencer'
+import Guide from '@features/guide/Guide'
+import Stats from '@features/stats/Stats'
+import Presentation from '@features/presentation/Presentation'
+import Toast from '@shared/components/ui/Toast'
+import QuitConfirm from '@shared/components/modals/QuitConfirm'
+import WelcomeScreen from '@features/welcome/WelcomeScreen'
+import Tutorial from '@shared/components/ui/Tutorial'
+import TutorialAdvanced from '@shared/components/ui/TutorialAdvanced'
 
-// ✅ IMPORT DU SYSTÈME DE PLUGINS
-import { PluginProvider, usePlugins } from './core/PluginContext'
-import { usePluginPage } from './core/hooks/usePluginPage'
+// ✅ IMPORTS AUDIO CORRECTS
+import { playSound, stopAllSounds, setStoreRef } from '@core/services/AudioService'
+import { warmupAudioContext } from '@core/services/AudioMixerService'
+
+// ✅ IMPORTS PLUGINS
+import { PluginProvider, usePlugins } from '@core/plugins/PluginContext'
+import { usePluginPage } from '@core/plugins/hooks/usePluginPage'
 
 // ─── COMPOSANT PRINCIPAL AVEC PLUGINS ────────────────────────────────────────
 function AppContent() {
@@ -45,6 +47,7 @@ function AppContent() {
     error: pluginError 
   } = usePluginPage(isPluginPage(currentPage) ? currentPage : null)
 
+  /*
   // ✅ Charger les plugins automatiquement au démarrage
   useEffect(() => {
     const loadPlugins = async () => {
@@ -97,6 +100,7 @@ function AppContent() {
 
     loadPlugins()
   }, [pluginsLoaded, pluginManager])
+  */
 
   const soundsRef = useRef([])
   const addToastRef = useRef(null)
@@ -330,7 +334,7 @@ function AppContent() {
     if (!store.loading && store.mixerEnabled && mixerInitialized) {
       const checkMixer = async () => {
         try {
-          const { isMixerOperational, repairMixer } = await import('./utils/audioMixer')
+          const { isMixerOperational, repairMixer } = await import("@core/services/AudioMixerService");
           if (!isMixerOperational()) {
             console.log('🔧 Mixeur non opérationnel après changement de langue, tentative de réparation...')
             repairMixer()

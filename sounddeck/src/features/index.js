@@ -1,0 +1,11 @@
+// src/features/index.js
+export { default as Home } from './home/Home'
+export { default as Discover } from './discover/Discover'
+export { default as Editor } from './editor/Editor'
+export { default as Sequencer } from './sequencer/Sequencer'
+export { default as Trimmer } from './trimmer/Trimmer'
+export { default as Options } from './options/Options'
+export { default as Guide } from './guide/Guide'
+export { default as Stats } from './stats/Stats'
+export { default as Presentation } from './presentation/Presentation'
+export { default as WelcomeScreen } from './welcome/WelcomeScreen'

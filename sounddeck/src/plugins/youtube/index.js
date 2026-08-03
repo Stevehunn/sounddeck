@@ -1,4 +1,5 @@
-import YouTube from './YouTube'
+// src/plugins/youtube/index.js - CE FICHIER EST CORRECT
+import YouTube from './YouTube.jsx'
 
 const YouTubePlugin = {
   id: 'youtube',
@@ -19,9 +20,6 @@ const YouTubePlugin = {
       visible: true
     }
   ],
-
-  // ✅ Le plugin n'a plus besoin de ses propres traductions
-  // car il utilise le contexte global
 
   init(store, manager) {
     console.log('▶️ Plugin YouTube initialisé')

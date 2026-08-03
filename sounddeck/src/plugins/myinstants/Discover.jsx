@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Howl } from 'howler'
 import { CATEGORIES, CATEGORIES_LIST, DEFAULT_CATEGORIES } from './categories'
-import { useLanguage } from '../../context/LanguageContext'
+import { useLanguage } from '@core/i18n/LanguageContext'
 
 export default function MyInstantsDiscover({ store, addToast }) {
   const { t, currentLang } = useLanguage()
