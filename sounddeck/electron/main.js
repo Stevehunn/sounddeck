@@ -64,7 +64,18 @@ function registerAllHandlers() {
   
   console.log(`  📊 Handlers après store: ${ipcMain.eventNames().join(', ')}`)
   
-  // Système - handlers généraux
+  // Raccourcis
+  console.log('  📦 Enregistrement shortcutManager...')
+  if (shortcutManager && typeof shortcutManager.registerShortcutHandlers === 'function') {
+    shortcutManager.registerShortcutHandlers()
+    console.log('  ✅ shortcutManager.registerShortcutHandlers exécuté')
+  } else {
+    console.error('❌ shortcutManager.registerShortcutHandlers n\'est pas une fonction !')
+  }
+  
+  console.log(`  📊 Handlers après raccourcis: ${ipcMain.eventNames().join(', ')}`)
+  
+  // Système - handlers généraux (INCLUT fetch-myinstants)
   console.log('  📦 Enregistrement ipcHandlers (système)...')
   if (ipcHandlers && typeof ipcHandlers.registerSystemHandlers === 'function') {
     ipcHandlers.registerSystemHandlers()
@@ -118,6 +129,10 @@ function registerAllHandlers() {
     console.log('  ✅ ipcHandlers.registerTrayUpdateHandler exécuté')
   }
   
+  // ❌ SUPPRIMER LE DOUBLE ENREGISTREMENT DE fetch-myinstants
+  // Le handler est déjà enregistré dans ipcHandlers.registerSystemHandlers()
+  // Ne pas le réenregistrer ici !
+  
   console.log('✅ Tous les handlers IPC enregistrés')
   console.log(`📊 Handlers finaux: ${ipcMain.eventNames().join(', ')}`)
 }
@@ -125,21 +140,19 @@ function registerAllHandlers() {
 // ─── CRÉATION DE LA FENÊTRE ─────────────────────────────────────────────
 
 function createMainWindow() {
-  // Créer la fenêtre
   mainWindow = windowManager.createWindow(shouldStartMinimized)
   
-  // Enregistrer TOUS les handlers (maintenant que mainWindow existe)
   registerAllHandlers()
   
-  // ❌ SUPPRIMER L'APPEL À forceRegisterHandlers()
-  // forceRegisterHandlers() // <-- À SUPPRIMER
-
-  // ─── Gestion du tray et des raccourcis ────────────────────────────────
+  console.log('🔍 Vérification des handlers essentiels:')
+  console.log(`  - fetch-myinstants: ${ipcMain.eventNames().includes('fetch-myinstants') ? '✅' : '❌'}`)
+  console.log(`  - update-tray-language: ${ipcMain.eventNames().includes('update-tray-language') ? '✅' : '❌'}`)
+  console.log(`  - store-get: ${ipcMain.eventNames().includes('store-get') ? '✅' : '❌'}`)
+  console.log(`📊 Tous les handlers: ${ipcMain.eventNames().join(', ')}`)
 
   mainWindow.once('ready-to-show', () => {
     const lang = store.get('lang', 'fr')
     
-    // Créer le tray avec des callbacks
     trayManager.createTray(lang, {
       onOpen: () => {
         windowManager.showMainWindow()
@@ -168,28 +181,22 @@ function createMainWindow() {
       }
     })
 
-    // Enregistrer les raccourcis globaux
     shortcutManager.registerShortcuts(mainWindow)
     shortcutManager.registerToggleShortcut(mainWindow)
     
-    // Enregistrer le raccourci pour toggle la fenêtre
     const savedToggleWindowShortcut = store.get('toggleWindowShortcut', 'CommandOrControl+Shift+S')
     shortcutManager.registerToggleWindowShortcut(mainWindow, savedToggleWindowShortcut)
 
-    // Afficher la fenêtre si nécessaire
     if (!shouldStartMinimized) {
       mainWindow.show()
     }
     
-    // Exécuter un diagnostic en développement
     if (isDev) {
       setTimeout(() => {
         diagnostic.runFullDiagnostic()
       }, 3000)
     }
   })
-
-  // ─── GESTION DE LA FERMETURE ──────────────────────────────────────────
 
   mainWindow.on('close', (e) => {
     const closeToTray = store.get('closeToTray', true)
@@ -244,7 +251,6 @@ function updateTrayMenu() {
 // ─── APP ──────────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
-  // Nettoyer les raccourcis orphelins
   const sounds = store.get('sounds', [])
   const soundIds = new Set(sounds.map(s => s.id))
   const shortcuts = store.get('shortcuts', {})
@@ -262,7 +268,6 @@ app.whenReady().then(async () => {
     console.log('✅ Raccourcis orphelins nettoyés au démarrage')
   }
 
-  // Détection de la langue système
   const systemLang = app.getLocale().split('-')[0]
   const supportedLangs = ['fr', 'en', 'es']
   const savedLang = store.get('lang')
@@ -272,10 +277,8 @@ app.whenReady().then(async () => {
     console.log(`🌐 Langue système détectée: ${systemLang}`)
   }
 
-  // Créer la fenêtre principale
   await createMainWindow()
 
-  // Gestion du démarrage automatique
   const isLaunchAtStartup = store.get('launchAtStartup', false)
   if (isLaunchAtStartup) {
     console.log('🔧 Démarrage automatique activé')
@@ -287,8 +290,6 @@ app.whenReady().then(async () => {
     }
   })
 })
-
-// ─── GESTION DE LA FERMETURE ────────────────────────────────────────────
 
 app.on('window-all-closed', () => {
   if (!isQuitting) {

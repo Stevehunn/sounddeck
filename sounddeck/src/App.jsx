@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useStore } from '@core/store/useStore'
+import { useStore } from '@core/store'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import Sidebar from '@shared/components/navigation/Sidebar'
 import Home from '@features/home/Home'

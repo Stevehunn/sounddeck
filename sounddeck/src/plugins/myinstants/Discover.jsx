@@ -30,6 +30,17 @@ export default function MyInstantsDiscover({ store, addToast }) {
 
   const CATEGORIES_PREF_KEY = 'myinstants_selected_categories'
 
+  // ─── VÉRIFICATION DE L'API ──────────────────────────────────────────────
+
+  const checkApi = useCallback(() => {
+    if (!window.electronAPI?.fetchMyinstants) {
+      console.error('❌ [Discover] window.electronAPI.fetchMyinstants non disponible')
+      setError('API MyInstants non disponible')
+      return false
+    }
+    return true
+  }, [])
+
   // ─── FONCTIONS DE CACHE ──────────────────────────────────────────────────
 
   const loadCategoryPreferences = useCallback(() => {
@@ -72,16 +83,25 @@ export default function MyInstantsDiscover({ store, addToast }) {
   // ─── FONCTION DE CHARGEMENT D'UNE CATÉGORIE ──────────────────────────────
 
   const loadCategory = useCallback(async (categoryId, forceRefresh = false) => {
+    console.log(`🔍 [Discover] loadCategory: ${categoryId}, forceRefresh: ${forceRefresh}`)
+    
     const category = CATEGORIES[categoryId]
-    if (!category) return
+    if (!category) {
+      console.warn(`⚠️ [Discover] Catégorie inconnue: ${categoryId}`)
+      return
+    }
+
+    if (!checkApi()) return
 
     if (!forceRefresh && activeCategory === categoryId && results.length > 0) {
+      console.log(`📦 [Discover] Utilisation du cache pour ${categoryId}`)
       return
     }
 
     if (!forceRefresh) {
       const cached = getCachedCategory(categoryId)
       if (cached && cached.length > 0) {
+        console.log(`📦 [Discover] Cache trouvé pour ${categoryId}: ${cached.length} sons`)
         setResults(cached)
         setError('')
         setActiveCategory(categoryId)
@@ -99,7 +119,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
       let mode = category.mode
       let query = category.query
 
-      const fetchWithTimeout = (promise, timeout = 10000) => {
+      const fetchWithTimeout = (promise, timeout = 200000) => {
         return Promise.race([
           promise,
           new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeout))
@@ -107,6 +127,8 @@ export default function MyInstantsDiscover({ store, addToast }) {
       }
 
       let result
+      console.log(`🌐 [Discover] Chargement de ${categoryId} avec mode=${mode}`)
+      
       if (mode === 'local' || mode === 'trending') {
         result = await fetchWithTimeout(window.electronAPI.fetchMyinstants('', mode === 'local' ? 'local' : 'trending', currentLang))
       } else if (mode === 'multi') {
@@ -115,6 +137,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
         const seen = new Set()
         const limitedTerms = terms.slice(0, 3)
         for (const term of limitedTerms) {
+          console.log(`🔍 [Discover] Recherche multi: ${term}`)
           const r = await fetchWithTimeout(window.electronAPI.fetchMyinstants(term, 'search', currentLang))
           if (r.success) {
             for (const sound of r.sounds) {
@@ -127,10 +150,12 @@ export default function MyInstantsDiscover({ store, addToast }) {
         }
         result = { success: true, sounds: allResults }
       } else {
+        console.log(`🔍 [Discover] Recherche: ${query}`)
         result = await fetchWithTimeout(window.electronAPI.fetchMyinstants(query, 'search', currentLang))
       }
 
       if (result.success) {
+        console.log(`✅ [Discover] ${result.sounds.length} sons trouvés pour ${categoryId}`)
         setResults(result.sounds || [])
         if (result.sounds.length > 0) {
           setCachedCategory(categoryId, result.sounds)
@@ -139,16 +164,17 @@ export default function MyInstantsDiscover({ store, addToast }) {
           setError(t('myinstantsNoResults'))
         }
       } else {
+        console.warn(`⚠️ [Discover] Erreur: ${result.error}`)
         setError(result.error || t('myinstantsError'))
       }
     } catch (e) {
-      console.error('Erreur chargement catégorie:', e)
+      console.error('❌ [Discover] Erreur chargement catégorie:', e)
       setError(e.message || t('myinstantsError'))
     }
     
     setLoading(false)
     setCacheInfo(getCacheInfo())
-  }, [currentLang, t, activeCategory, results.length])
+  }, [currentLang, t, activeCategory, results.length, checkApi])
 
   // ─── PRÉCHARGEMENT DE TOUTES LES CATÉGORIES ──────────────────────────────
 
@@ -163,10 +189,13 @@ export default function MyInstantsDiscover({ store, addToast }) {
     })
     
     if (allCached) {
+      console.log('✅ [Discover] Toutes les catégories sont en cache')
       setIsPreloadComplete(true)
       setCacheInfo(getCacheInfo())
       return
     }
+
+    if (!checkApi()) return
 
     setIsPreloading(true)
     preloadAbortRef.current = false
@@ -195,7 +224,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
       
       try {
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), 8000)
+          setTimeout(() => reject(new Error('Timeout')), 200000)
         )
         
         let result
@@ -236,7 +265,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
         }
         return false
       } catch (e) {
-        console.warn(`⚠️ Échec préchargement de ${id}:`, e.message)
+        console.warn(`⚠️ [Discover] Échec préchargement de ${id}:`, e.message)
         return false
       }
     }
@@ -272,11 +301,15 @@ export default function MyInstantsDiscover({ store, addToast }) {
       }
     }
     
-  }, [currentLang, isPreloading, isPreloadComplete, t, loadCategory, getVisibleCategories])
+  }, [currentLang, isPreloading, isPreloadComplete, t, loadCategory, getVisibleCategories, checkApi])
 
   // ─── RECHERCHE ─────────────────────────────────────────────────────────────
 
   const handleSearch = useCallback(async () => {
+    console.log(`🔍 [Discover] handleSearch: "${search}"`)
+    
+    if (!checkApi()) return
+    
     if (!search.trim()) {
       loadCategory(activeCategory || 'trending')
       return
@@ -287,21 +320,24 @@ export default function MyInstantsDiscover({ store, addToast }) {
     setResults([])
 
     try {
+      console.log(`🌐 [Discover] Recherche: ${search.trim()}`)
       const result = await window.electronAPI.fetchMyinstants(search.trim(), 'search', currentLang)
       if (result.success) {
+        console.log(`✅ [Discover] ${result.sounds.length} résultats pour "${search}"`)
         setResults(result.sounds || [])
         if (result.sounds.length === 0) {
           setError(t('myinstantsNoResults'))
         }
       } else {
+        console.warn(`⚠️ [Discover] Erreur recherche: ${result.error}`)
         setError(result.error || t('myinstantsError'))
       }
     } catch (e) {
-      console.error('Erreur recherche:', e)
+      console.error('❌ [Discover] Erreur recherche:', e)
       setError(e.message || t('myinstantsError'))
     }
     setLoading(false)
-  }, [search, currentLang, t, activeCategory, loadCategory])
+  }, [search, currentLang, t, activeCategory, loadCategory, checkApi])
 
   // ─── VÉRIFICATION SI UN SON EST DÉJÀ DANS LA BIBLIOTHÈQUE ──────────────
 
@@ -337,7 +373,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
       addToast(t('myinstantsAdded'), 'success')
       setShowProfileModal(null)
     } catch (e) {
-      console.error('Erreur ajout:', e)
+      console.error('❌ [Discover] Erreur ajout:', e)
       addToast(t('myinstantsError') + ': ' + e.message, 'error')
     } finally {
       setDownloading(prev => ({ ...prev, [showProfileModal.id]: false }))
@@ -387,7 +423,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
       setPreviewing(sound.id)
       howl.play()
     } catch (e) {
-      console.error('Erreur preview:', e)
+      console.error('❌ [Discover] Erreur preview:', e)
       addToast(t('myinstantsPreviewError'), 'error')
     }
   }
@@ -683,6 +719,9 @@ export default function MyInstantsDiscover({ store, addToast }) {
   // ─── INITIALISATION ──────────────────────────────────────────────────────
 
   useEffect(() => {
+    console.log('🚀 [Discover] Initialisation du plugin MyInstants')
+    console.log(`📌 API disponible: ${!!window.electronAPI?.fetchMyinstants}`)
+    
     const init = async () => {
       const selected = loadCategoryPreferences()
       
@@ -704,6 +743,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
     init()
     
     return () => {
+      console.log('🗑️ [Discover] Nettoyage du plugin MyInstants')
       preloadAbortRef.current = true
       if (previewHowlRef.current) {
         previewHowlRef.current.stop()
@@ -1134,6 +1174,7 @@ function getCachedCategory(categoryId) {
 }
 
 function setCachedCategory(categoryId, sounds) {
+  console.log(`💾 [Cache] Sauvegarde de ${sounds.length} sons pour ${categoryId}`)
   categoryCache.set(categoryId, sounds)
 }
 
