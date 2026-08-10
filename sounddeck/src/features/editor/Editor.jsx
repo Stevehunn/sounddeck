@@ -505,28 +505,105 @@ function EditorTimelineContent() {
 
       {showExportModal && (
         <ExportModal
-          defaultName={exportName}
-          defaultFormat={exportFormat}
-          store={store}
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
           onExport={async (options) => {
-            console.log('📤 [Editor] Export démarré')
+            console.log('📤 [Editor] Export démarré avec options:', options)
             setIsExporting(true)
+            
             try {
+              // ✅ 1. Mixer le projet
+              console.log('🎵 [Editor] Mixdown du projet...')
               const buffer = await mixdownProject(project, clipDurations, 44100)
-              const result = await exportMixdown(buffer, options.format, options.bitrate, options.outputPath)
-              if (result.success) {
-                addToast?.(`${t('editorExportSuccess')}`, 'success')
+              
+              if (!buffer) {
+                throw new Error('Erreur lors du mixage')
               }
+              
+              console.log('✅ [Editor] Mixdown terminé, durée:', buffer.duration)
+              
+              // ✅ 2. Gérer l'export selon l'emplacement choisi
+              const exportResults = []
+              
+              // 2a. Exporter en fichier si demandé
+              if (options.exportLocation === 'file' || options.exportLocation === 'both') {
+                console.log('📁 [Editor] Export en fichier...')
+                
+                // Demander où sauvegarder
+                const saveResult = await window.electronAPI.saveFileDialog?.(
+                  options.outputPath || `${options.name}.${options.format === 'wav' ? 'wav' : options.format}`,
+                  null
+                )
+                
+                if (saveResult?.success && saveResult?.path) {
+                  const result = await exportMixdown(
+                    buffer, 
+                    options.format, 
+                    options.bitrate, 
+                    saveResult.path
+                  )
+                  if (result.success) {
+                    exportResults.push({ type: 'file', path: saveResult.path })
+                    addToast?.(`${t('editorExportSuccess')}: ${saveResult.path}`, 'success')
+                  } else {
+                    throw new Error(result.error || 'Erreur export fichier')
+                  }
+                } else if (saveResult?.canceled) {
+                  // L'utilisateur a annulé
+                  setIsExporting(false)
+                  setShowExportModal(false)
+                  return
+                } else {
+                  // Fallback: utiliser le nom par défaut
+                  const fallbackPath = options.outputPath || `${options.name}.${options.format === 'wav' ? 'wav' : options.format}`
+                  const result = await exportMixdown(buffer, options.format, options.bitrate, fallbackPath)
+                  if (result.success) {
+                    exportResults.push({ type: 'file', path: fallbackPath })
+                    addToast?.(`${t('editorExportSuccess')}: ${fallbackPath}`, 'success')
+                  } else {
+                    throw new Error(result.error || 'Erreur export fichier')
+                  }
+                }
+              }
+              
+              // 2b. Ajouter à la bibliothèque si demandé
+              if (options.exportLocation === 'library' || options.exportLocation === 'both') {
+                console.log('📚 [Editor] Ajout à la bibliothèque...')
+                
+                // Exporter en WAV temporairement pour la bibliothèque
+                const tempPath = `temp_${Date.now()}.wav`
+                const tempResult = await exportMixdown(buffer, 'wav', 44100, tempPath)
+                
+                if (tempResult.success) {
+                  // Ajouter le son à la bibliothèque
+                  const profiles = options.profiles || ['all']
+                  await store.addSound({
+                    name: options.name || 'Export',
+                    path: tempResult.path,
+                    emoji: '🎵',
+                    profiles: profiles
+                  })
+                  exportResults.push({ type: 'library', name: options.name })
+                  addToast?.(`"${options.name}" ${t('editorCreated')}`, 'success')
+                } else {
+                  throw new Error('Erreur ajout à la bibliothèque')
+                }
+              }
+              
               setIsExporting(false)
-              return result
+              setShowExportModal(false)
+              return { success: true, results: exportResults }
+              
             } catch (e) {
-              console.error('❌ [Editor] Export error:', e)
+              console.error('❌ [Editor] Erreur export:', e)
               addToast?.(`${t('editorExportError')}: ${e.message}`, 'error')
               setIsExporting(false)
               return { success: false, error: e.message }
             }
           }}
-          onCancel={() => setShowExportModal(false)}
+          store={store}
+          totalDuration={totalDuration}
+          defaultName={exportName}
           tr={t}
         />
       )}
