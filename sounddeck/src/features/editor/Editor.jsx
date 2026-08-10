@@ -12,6 +12,7 @@ import MarkersPanel from './components/Markers/MarkersPanel'
 import AddTrackModal from './components/Modals/AddTrackModal'
 import TrimModal from './components/Modals/TrimModal'
 import ExportModal from './components/Modals/ExportModal'
+import ImportFileModal from './components/Modals/ImportFileModal'
 import { getClipById } from './utils'
 import { mixdownProject, exportMixdown } from '@shared/utils/mixdown'
 
@@ -35,15 +36,7 @@ function EditorContent() {
   const { t } = useLanguage()
   const context = useEditor()
   
-  console.log('📝 [Editor] Context:', { 
-    isInitialized: context?.isInitialized, 
-    projectId: context?.project?.id,
-    hasSetClipDurations: !!context?.setClipDurations,
-    tracksLength: context?.tracks?.length || 0
-  })
-  
   if (!context || !context.isInitialized) {
-    console.log('⏳ [Editor] En attente de l\'initialisation...')
     return (
       <div style={{
         display: 'flex',
@@ -60,7 +53,6 @@ function EditorContent() {
   }
   
   if (!context.project || !context.project.id) {
-    console.log('📂 [Editor] Aucun projet, affichage de la vue de création')
     return (
       <div style={{
         display: 'flex',
@@ -86,7 +78,6 @@ function EditorContent() {
     )
   }
 
-  console.log('✅ [Editor] Projet chargé, rendu de EditorTimelineContent')
   return <EditorTimelineContent />
 }
 
@@ -118,6 +109,7 @@ function EditorTimelineContent() {
     soloTrack,
     setTrackVolume,
     addClip,
+    addClipFromFile,
     removeClip,
     updateClip,
     duplicateClip,
@@ -140,18 +132,6 @@ function EditorTimelineContent() {
     setAutoCrossfade,
   } = context
 
-  console.log('📊 [Editor] Contexte:', {
-    tracks: tracks?.length || 0,
-    selectedClipId,
-    selectedTrackId,
-    isPlaying,
-    currentTime,
-    hasSetClipDurations: !!setClipDurations,
-    hasAddTrack: !!addTrack,
-    hasRemoveTrack: !!removeTrack,
-    typeofAddTrack: typeof addTrack
-  })
-
   // ─── ÉTATS LOCAUX ──────────────────────────────────────────────────────
   const [clipMenu, setClipMenu] = useState(null)
   const [selectedClipForMenu, setSelectedClipForMenu] = useState(null)
@@ -169,6 +149,12 @@ function EditorTimelineContent() {
   const [exportBitrate, setExportBitrate] = useState(192)
   const [showEffectsPanel, setShowEffectsPanel] = useState(true)
 
+  // ✅ ÉTATS POUR L'IMPORT - MODIFIÉS
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [selectedImportTrackId, setSelectedImportTrackId] = useState('')
+  const [pendingImportFile, setPendingImportFile] = useState(null)
+  const [pendingImportFileName, setPendingImportFileName] = useState('')
+
   // ─── HANDLERS ──────────────────────────────────────────────────────────
 
   const handleAddTrack = useCallback(() => {
@@ -177,7 +163,6 @@ function EditorTimelineContent() {
       const trackIndex = tracks.length + 1
       const defaultName = t('editorTrackDefault').replace('{index}', trackIndex)
       setPendingTrackName(defaultName)
-      console.log('✅ [Editor] Ouverture du modal avec nom par défaut:', defaultName)
       setShowAddTrackModal(true)
     } catch (e) {
       console.error('❌ [Editor] Erreur handleAddTrack:', e)
@@ -185,29 +170,20 @@ function EditorTimelineContent() {
     }
   }, [tracks.length, t, addToast])
 
-  // ✅ CORRECTION - handleAddTrackConfirm avec vérification
   const handleAddTrackConfirm = useCallback(async (name, color) => {
     console.log('✅ [Editor] handleAddTrackConfirm:', name, color)
-    console.log('📊 [Editor] addTrack est une fonction?', typeof addTrack)
     
     if (typeof addTrack !== 'function') {
-      console.error('❌ [Editor] addTrack n\'est pas une fonction!')
       addToast?.('Erreur: addTrack non disponible', 'error')
       setShowAddTrackModal(false)
       return null
     }
     
     try {
-      console.log('📊 [Editor] Appel de addTrack avec:', name, color)
       const result = await addTrack(name, color)
-      console.log('📊 [Editor] Résultat addTrack:', result)
-      
       if (result) {
-        console.log('✅ [Editor] Piste ajoutée avec succès:', result)
-        console.log('📊 [Editor] Nombre de pistes actuel:', tracks.length)
         addToast?.(`Piste "${result.name}" ajoutée`, 'success')
       } else {
-        console.error('❌ [Editor] Échec ajout piste - result est null')
         addToast?.('Erreur lors de l\'ajout de la piste', 'error')
       }
       setShowAddTrackModal(false)
@@ -218,29 +194,22 @@ function EditorTimelineContent() {
       setShowAddTrackModal(false)
       return null
     }
-  }, [addTrack, addToast, tracks.length])
+  }, [addTrack, addToast])
 
   const handlePlayToggle = useCallback(() => {
-    console.log('▶️ [Editor] handlePlayToggle - isPlaying:', isPlaying, 'isPaused:', isPaused)
-    
     if (isPlaying) {
       pause()
     } else if (isPaused) {
       play()
     } else {
-      console.log('▶️ [Editor] Démarrage de la lecture depuis', currentTime)
       play()
     }
-  }, [isPlaying, isPaused, currentTime, play, pause])
+  }, [isPlaying, isPaused, play, pause])
 
   const handleRemoveTrack = useCallback(async (trackId) => {
-    console.log('🗑️ [Editor] handleRemoveTrack:', trackId)
     try {
       const track = tracks.find(t => t.id === trackId)
-      if (!track) {
-        console.error('❌ [Editor] Piste non trouvée:', trackId)
-        return
-      }
+      if (!track) return
       
       if (tracks.length <= 1) {
         addToast?.('Impossible de supprimer la dernière piste', 'warning')
@@ -267,18 +236,78 @@ function EditorTimelineContent() {
     await addClip(trackId, soundId, startPosition)
   }, [addClip])
 
+  // ✅ NOUVEAU HANDLER - OUVRE UNIQUEMENT LE MODAL (SANS FENÊTRE DE SÉLECTION)
+  const handleAddFileClick = useCallback(() => {
+    console.log('📁 [Editor] handleAddFileClick - Ouverture du modal d\'import')
+    
+    if (tracks.length === 0) {
+      addToast?.(t('editorNoTracks'), 'error')
+      return
+    }
+    
+    // ✅ Réinitialiser les états
+    setPendingImportFile(null)
+    setPendingImportFileName('')
+    
+    // ✅ Sélectionner la première piste par défaut
+    setSelectedImportTrackId(tracks[0].id)
+    
+    // ✅ Ouvrir le modal
+    setShowImportModal(true)
+  }, [tracks, addToast, t])
+
+  // ✅ HANDLER POUR LA CONFIRMATION DU MODAL D'IMPORT
+  const handleImportConfirm = useCallback(async ({ file, fileName, trackId, startTime }) => {
+    console.log('📁 [Editor] handleImportConfirm:', { fileName, trackId, startTime })
+    
+    if (!file) {
+      console.error('❌ [Editor] Aucun fichier sélectionné')
+      addToast?.('Aucun fichier sélectionné', 'error')
+      return
+    }
+
+    // ✅ Sauvegarder le fichier temporairement
+    try {
+      const soundsDir = await window.electronAPI.getSoundsDir?.()
+      const safeName = fileName.replace(/[^a-zA-Z0-9._\- ]/g, '_') + '_' + Date.now() + '.wav'
+      const tempPath = soundsDir + '/' + safeName
+      
+      // Écrire le fichier
+      const writeResult = await window.electronAPI.writeSoundFile?.(tempPath, Array.from(new Uint8Array(file)))
+      
+      if (!writeResult?.success) {
+        addToast?.('Erreur lors de la sauvegarde du fichier', 'error')
+        return
+      }
+      
+      // Importer dans la piste
+      const result = await addClipFromFile(trackId, tempPath, startTime)
+      
+      if (result) {
+        addToast?.(`"${fileName}" ${t('editorFileImported')}`, 'success')
+      } else {
+        addToast?.(t('editorFileImportError'), 'error')
+      }
+      
+    } catch (e) {
+      console.error('❌ [Editor] Erreur import:', e)
+      addToast?.(t('editorFileImportError') + ': ' + e.message, 'error')
+    }
+    
+    setShowImportModal(false)
+    setPendingImportFile(null)
+    setPendingImportFileName('')
+  }, [addClipFromFile, addToast, t])
+
   const handleRemoveClip = useCallback((trackId, clipId) => {
-    console.log('🗑️ [Editor] handleRemoveClip:', trackId, clipId)
     removeClip(trackId, clipId)
   }, [removeClip])
 
   const handleClipSelect = useCallback((clipId, trackId) => {
-    console.log('🎯 [Editor] handleClipSelect:', clipId, trackId)
     selectClip(clipId, trackId)
   }, [selectClip])
 
   const handleClipContextMenu = useCallback((e, clipId, trackId) => {
-    console.log('📋 [Editor] handleClipContextMenu:', clipId, trackId)
     e.preventDefault()
     setSelectedClipForMenu(clipId)
     setSelectedTrackForMenu(trackId)
@@ -286,7 +315,6 @@ function EditorTimelineContent() {
   }, [])
 
   const handleUpdateClipDuration = useCallback((clipId, newDuration) => {
-    console.log('📏 [Editor] handleUpdateClipDuration:', clipId, newDuration)
     if (selectedTrackId) {
       updateClip(selectedTrackId, clipId, { duration: newDuration })
       setClipDurations(prev => ({ ...prev, [clipId]: newDuration }))
@@ -294,7 +322,6 @@ function EditorTimelineContent() {
   }, [selectedTrackId, updateClip, setClipDurations])
 
   const handleRefreshDurations = useCallback(async () => {
-    console.log('🔄 [Editor] handleRefreshDurations')
     if (!store) return 0
     const fixedCount = await store.fixAllClipDurations?.()
     if (project?.tracks) {
@@ -308,12 +335,10 @@ function EditorTimelineContent() {
       }
       setClipDurations(durations)
     }
-    console.log(`✅ [Editor] ${fixedCount || 0} durées corrigées`)
     return fixedCount
   }, [store, project, setClipDurations])
 
   const handleExportClick = useCallback(() => {
-    console.log('📤 [Editor] handleExportClick')
     if (!project || project.tracks.length === 0 || 
         project.tracks.every(t => t.clips.length === 0)) {
       addToast?.(t('editorNothingToExport'), 'info')
@@ -332,18 +357,6 @@ function EditorTimelineContent() {
     return `${m}:${s.toString().padStart(2, '0')}`
   }
 
-  console.log('🔍 [Editor] DEBUG - Vérification des fonctions:')
-  console.log('  - addTrack:', typeof addTrack)
-  console.log('  - removeTrack:', typeof removeTrack)
-  console.log('  - addClip:', typeof addClip)
-  console.log('  - removeClip:', typeof removeClip)
-  console.log('  - updateClip:', typeof updateClip)
-  console.log('  - duplicateClip:', typeof duplicateClip)
-  console.log('  - onPlay:', typeof play)
-  console.log('  - onStop:', typeof stop)
-  console.log('  - setClipDurations:', typeof setClipDurations)
-  console.log('  - store.addClipToTrack:', typeof store?.addClipToTrack)
-
   return (
     <div style={{
       display: 'flex',
@@ -361,6 +374,7 @@ function EditorTimelineContent() {
         totalDuration={totalDuration}
         onAddTrack={handleAddTrack}
         onAddClip={handleAddClip}
+        onAddFile={handleAddFileClick}
         onPlay={togglePlay}
         onStop={stop}
         onExport={handleExportClick}
@@ -421,7 +435,6 @@ function EditorTimelineContent() {
       {showEffectsPanel && (() => {
         const selectedClip = selectedClipId ? getClipById(tracks, selectedClipId) : null
         if (!selectedClip) return null
-        console.log('🎛️ [Editor] Affichage du panneau d\'effets pour:', selectedClip.name)
         return (
           <EditorEffectsPanel
             clip={selectedClip}
@@ -460,13 +473,31 @@ function EditorTimelineContent() {
         </div>
       </div>
 
-      {/* ✅ MODAL ADD TRACK EN PORTAL */}
+      {/* MODAL ADD TRACK */}
       {showAddTrackModal && createPortal(
         <AddTrackModal
           isOpen={showAddTrackModal}
           onConfirm={handleAddTrackConfirm}
           onCancel={() => setShowAddTrackModal(false)}
           defaultName={pendingTrackName}
+          tr={t}
+        />,
+        document.body
+      )}
+
+      {/* ✅ MODAL IMPORT FILE - OUVERT SANS FENÊTRE DE SÉLECTION PRÉALABLE */}
+      {showImportModal && createPortal(
+        <ImportFileModal
+          isOpen={showImportModal}
+          onClose={() => {
+            setShowImportModal(false)
+            setPendingImportFile(null)
+            setPendingImportFileName('')
+          }}
+          onConfirm={handleImportConfirm}
+          tracks={tracks}
+          defaultTrackId={selectedImportTrackId}
+          fileName={pendingImportFileName}
           tr={t}
         />,
         document.body
@@ -532,14 +563,12 @@ function EditorTimelineContent() {
             setClipMenu(null)
           }}
           onDuplicate={(trackId, clipId) => {
-            console.log('📋 [Editor] Dupliquer depuis le menu:', trackId, clipId)
             duplicateClip(trackId, clipId)
             setClipMenu(null)
           }}
           onCopy={() => {}}
           onCut={() => {}}
           onDelete={(trackId, clipId) => {
-            console.log('🗑️ [Editor] Supprimer depuis le menu:', trackId, clipId)
             removeClip(trackId, clipId)
             setClipMenu(null)
           }}

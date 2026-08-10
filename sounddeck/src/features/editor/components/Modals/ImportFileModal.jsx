@@ -1,15 +1,32 @@
 // src/features/editor/components/Modals/ImportFileModal.jsx
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 
 const SUPPORTED_FORMATS = ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'opus', 'webm']
 
-export default function ImportFileModal({ isOpen, onClose, onImport, tracks, tr }) {
+export default function ImportFileModal({ 
+  isOpen, 
+  onClose, 
+  onConfirm,  // ✅ Nouvelle prop pour confirmer l'import
+  tracks, 
+  tr,
+  fileName: defaultFileName = ''
+}) {
   const [file, setFile] = useState(null)
-  const [fileName, setFileName] = useState('')
+  const [fileName, setFileName] = useState(defaultFileName)
   const [trackId, setTrackId] = useState(tracks?.[0]?.id || '')
   const [startTime, setStartTime] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
   const fileInputRef = useRef(null)
+
+  // ✅ Réinitialiser quand le modal s'ouvre
+  useEffect(() => {
+    if (isOpen) {
+      setTrackId(tracks?.[0]?.id || '')
+      setFile(null)
+      setFileName(defaultFileName)
+      setStartTime(0)
+    }
+  }, [isOpen, tracks, defaultFileName])
 
   if (!isOpen) return null
 
@@ -40,14 +57,18 @@ export default function ImportFileModal({ isOpen, onClose, onImport, tracks, tr 
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!file || !trackId) return
+    if (!file || !trackId) {
+      alert('Veuillez sélectionner un fichier et une piste')
+      return
+    }
 
     setIsProcessing(true)
     try {
       const arrayBuffer = await file.arrayBuffer()
-      onImport?.({
+      // ✅ Utiliser onConfirm pour retourner les données au parent
+      onConfirm?.({
         file: arrayBuffer,
-        fileName,
+        fileName: fileName || file.name,
         trackId,
         startTime
       })
@@ -55,7 +76,6 @@ export default function ImportFileModal({ isOpen, onClose, onImport, tracks, tr 
       console.error('Erreur import:', err)
     } finally {
       setIsProcessing(false)
-      onClose()
     }
   }
 
@@ -73,6 +93,7 @@ export default function ImportFileModal({ isOpen, onClose, onImport, tracks, tr 
         </div>
 
         <form onSubmit={handleSubmit}>
+          {/* Zone de drop */}
           <div
             style={{
               border: `2px dashed ${file ? 'var(--success)' : 'var(--border)'}`,
@@ -125,6 +146,7 @@ export default function ImportFileModal({ isOpen, onClose, onImport, tracks, tr 
             )}
           </div>
 
+          {/* Nom du fichier */}
           <div style={{ marginBottom: 12 }}>
             <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
               {tr('editorNameLabel') || 'Nom'}
@@ -138,6 +160,7 @@ export default function ImportFileModal({ isOpen, onClose, onImport, tracks, tr 
             />
           </div>
 
+          {/* Sélection de la piste */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
@@ -149,8 +172,10 @@ export default function ImportFileModal({ isOpen, onClose, onImport, tracks, tr 
                 style={{ width: '100%' }}
                 required
               >
-                {tracks?.map(t => (
-                  <option key={t.id} value={t.id}>{t.name || `Piste ${tracks.indexOf(t) + 1}`}</option>
+                {tracks?.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name || `Piste ${tracks.indexOf(t) + 1}`} ({t.clips?.length || 0} clips)
+                  </option>
                 ))}
               </select>
             </div>

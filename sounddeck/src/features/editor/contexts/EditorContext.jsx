@@ -62,7 +62,6 @@ export function EditorProvider({ children, store, addToast }) {
 
   // ─── FONCTIONS HELPER POUR LE CROSSFADE ──────────────────────────────
 
-  // Trouver le clip précédent dans la même piste
   const findPreviousClip = useCallback((clip, track) => {
     if (!track || !track.clips) return null
     const previous = track.clips
@@ -71,14 +70,12 @@ export function EditorProvider({ children, store, addToast }) {
     return previous || null
   }, [])
 
-  // Calculer le chevauchement entre deux clips
   const calculateOverlap = useCallback((clipA, clipB) => {
     const endA = clipA.start + (clipDurations[clipA.id] || clipA.duration || 3)
     const startB = clipB.start
     return Math.max(0, endA - startB)
   }, [clipDurations])
 
-  // Appliquer le fade out à un clip existant
   const applyFadeOutToClip = useCallback((clipId, duration) => {
     const entry = audioSourcesRef.current[clipId]
     if (!entry) return
@@ -90,6 +87,29 @@ export function EditorProvider({ children, store, addToast }) {
     gainNode.gain.setValueAtTime(currentGain, now)
     gainNode.gain.linearRampToValueAtTime(0, now + duration)
     console.log(`🌊 [Crossfade] Fade out sur ${clipId} sur ${duration.toFixed(2)}s`)
+  }, [])
+
+  // ─── GET AUDIO DURATION - DÉPLACÉE ICI AVANT addClipFromFile ──────────────────────────────
+
+  const getAudioDuration = useCallback(async (filePath) => {
+    try {
+      const fileUrl = filePath.startsWith('file://') 
+        ? filePath 
+        : 'file:///' + filePath.replace(/\\/g, '/')
+      
+      const response = await fetch(fileUrl)
+      if (!response.ok) return 3
+      
+      const arrayBuffer = await response.arrayBuffer()
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+      const duration = audioBuffer.duration
+      await audioContext.close()
+      return duration
+    } catch (e) {
+      console.warn('⚠️ Erreur chargement durée:', e)
+      return 3
+    }
   }, [])
 
   // ─── CHARGEMENT DU PROJET ──────────────────────────────────────────────
@@ -278,15 +298,13 @@ export function EditorProvider({ children, store, addToast }) {
       
       // ✅ APPLIQUER LE CROSSFADE si activé
       if (autoCrossfade) {
-        // Vérifier si ce clip chevauche le précédent
         const previousClip = findPreviousClip(clip, track)
         if (previousClip) {
           const overlap = calculateOverlap(previousClip, clip)
           if (overlap > 0.01) {
-            const fadeDuration = Math.min(overlap, 0.1) // 0.1s max
+            const fadeDuration = Math.min(overlap, 0.1)
             const now = ctx.currentTime
             
-            // Appliquer fade out sur le clip précédent
             const prevEntry = audioSourcesRef.current[previousClip.id]
             if (prevEntry) {
               const prevGain = prevEntry.gainNode
@@ -296,7 +314,6 @@ export function EditorProvider({ children, store, addToast }) {
               console.log(`🌊 [Crossfade] Fade out sur ${previousClip.name} sur ${fadeDuration.toFixed(2)}s`)
             }
             
-            // Fade in pour ce clip
             gainNode.gain.setValueAtTime(0, now)
             gainNode.gain.linearRampToValueAtTime(trackVolume, now + fadeDuration)
             console.log(`🌊 [Crossfade] Fade in sur ${clip.name} sur ${fadeDuration.toFixed(2)}s`)
@@ -858,6 +875,108 @@ export function EditorProvider({ children, store, addToast }) {
     }
   }, [store, project, addToast])
 
+  // ✅ FONCTION addClipFromFile - maintenant getAudioDuration est définie avant
+  const addClipFromFile = useCallback(async (trackId, filePath, startPosition = null) => {
+    console.log('📁 [EditorContext] addClipFromFile:', { trackId, filePath, startPosition })
+    
+    if (!filePath) {
+      console.error('❌ [EditorContext] Aucun fichier fourni')
+      addToast?.('Aucun fichier sélectionné', 'error')
+      return null
+    }
+
+    try {
+      // Vérifier que la piste existe
+      const track = project?.tracks?.find(t => t.id === trackId)
+      if (!track) {
+        console.error('❌ [EditorContext] Piste non trouvée:', trackId)
+        addToast?.('Piste non trouvée', 'error')
+        return null
+      }
+
+      // Importer le fichier dans le dossier des sons
+      const importResult = await window.electronAPI.importSoundFile(filePath)
+      if (!importResult?.success) {
+        console.error('❌ [EditorContext] Échec import du fichier:', importResult?.error)
+        addToast?.('Erreur lors de l\'import du fichier', 'error')
+        return null
+      }
+
+      const fileName = filePath.split(/[\\/]/).pop() || 'Fichier audio'
+      const actualDuration = await getAudioDuration(importResult.path) // ✅ getAudioDuration est maintenant définie
+      
+      // Calculer la position de départ
+      let actualStart = startPosition
+      if (actualStart === null || actualStart === undefined) {
+        if (track.clips.length > 0) {
+          const lastClip = track.clips.reduce((max, clip) => {
+            const clipEnd = clip.start + (clip.duration || 3)
+            return clipEnd > max.end ? { start: clip.start, end: clipEnd } : max
+          }, { start: 0, end: 0 })
+          actualStart = lastClip.end + 0.5
+        } else {
+          actualStart = 0
+        }
+      }
+
+      const newClip = {
+        id: `clip-${Date.now()}`,
+        soundId: null,
+        name: fileName,
+        path: importResult.path,
+        start: actualStart,
+        duration: actualDuration,
+        offset: 0,
+        volume: 0,
+        volumeDb: 0,
+        effects: [],
+        fadeIn: 0,
+        fadeOut: 0,
+        pitch: 0,
+        speed: 1,
+        isExternal: true
+      }
+
+      const updatedProject = {
+        ...project,
+        tracks: project.tracks.map(t => {
+          if (t.id === trackId) {
+            const clips = [...t.clips, newClip]
+            clips.sort((a, b) => a.start - b.start)
+            return { ...t, clips }
+          }
+          return t
+        }),
+        updatedAt: Date.now()
+      }
+
+      setProject(updatedProject)
+      projectRef.current = updatedProject
+      
+      setClipDurations(prev => ({
+        ...prev,
+        [newClip.id]: actualDuration
+      }))
+      
+      if (store?.updateEditorProject) {
+        await store.updateEditorProject(updatedProject)
+      }
+      
+      setIsDirty(true)
+      addToast?.(`"${fileName}" ${t('editorFileImported')}`, 'success')
+      setSelectedClipId(newClip.id)
+      setSelectedTrackId(trackId)
+      
+      console.log('✅ [EditorContext] Clip importé avec succès:', newClip)
+      return newClip
+      
+    } catch (e) {
+      console.error('❌ [EditorContext] Erreur addClipFromFile:', e)
+      addToast?.(e.message || 'Erreur lors de l\'import du fichier', 'error')
+      return null
+    }
+  }, [project, addToast, store, t, getAudioDuration])
+
   const removeClip = useCallback((trackId, clipId) => {
     console.log('🗑️ [EditorContext] removeClip:', trackId, clipId)
     
@@ -1021,7 +1140,6 @@ export function EditorProvider({ children, store, addToast }) {
       return
     }
     
-    // Trouver le clip à déplacer
     let clipToMove = null
     let sourceTrack = null
     
@@ -1041,7 +1159,6 @@ export function EditorProvider({ children, store, addToast }) {
     
     console.log('📦 [EditorContext] Clip trouvé:', clipToMove.name, 'start actuel:', clipToMove.start)
     
-    // Créer une copie du clip avec la nouvelle position
     const updatedClip = {
       ...clipToMove,
       start: Math.max(0, newStart)
@@ -1050,17 +1167,14 @@ export function EditorProvider({ children, store, addToast }) {
     let updatedTracks
     
     if (newTrackId && newTrackId !== trackId) {
-      // Déplacer vers une autre piste
       updatedTracks = project.tracks.map(track => {
         if (track.id === trackId) {
-          // Supprimer de la piste source
           return {
             ...track,
             clips: track.clips.filter(c => c.id !== clipId)
           }
         }
         if (track.id === newTrackId) {
-          // Ajouter à la piste destination
           const newClips = [...track.clips, updatedClip]
           newClips.sort((a, b) => a.start - b.start)
           return {
@@ -1071,7 +1185,6 @@ export function EditorProvider({ children, store, addToast }) {
         return track
       })
     } else {
-      // Déplacer dans la même piste
       updatedTracks = project.tracks.map(track => {
         if (track.id === trackId) {
           const newClips = track.clips.map(clip => 
@@ -1093,11 +1206,9 @@ export function EditorProvider({ children, store, addToast }) {
       updatedAt: Date.now()
     }
     
-    // Mettre à jour l'état
     setProject(updatedProject)
     projectRef.current = updatedProject
     
-    // Sauvegarder dans le store
     if (store?.updateEditorProject) {
       store.updateEditorProject(updatedProject).catch(() => {})
     }
@@ -1197,6 +1308,7 @@ export function EditorProvider({ children, store, addToast }) {
     
     // Fonctions Clip
     addClip,
+    addClipFromFile, // ✅ ajoutée
     removeClip,
     updateClip,
     duplicateClip,

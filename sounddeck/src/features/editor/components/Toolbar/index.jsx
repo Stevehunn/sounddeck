@@ -12,6 +12,7 @@ export default function EditorToolbar({
   totalDuration,
   onAddTrack,
   onAddClip,
+  onAddFile,
   onPlay,
   onStop,
   onExport,
@@ -361,7 +362,7 @@ export default function EditorToolbar({
 
         <button
           className="btn-secondary btn-sm"
-          onClick={handleAddFileClick}
+          onClick={onAddFile}
           style={{ fontSize: 12 }}
         >
           <i className="ti ti-file-import" /> {tr('editorAddFile') || 'Importer un fichier'}
