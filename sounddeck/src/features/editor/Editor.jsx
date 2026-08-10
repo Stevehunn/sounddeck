@@ -15,6 +15,7 @@ import ExportModal from './components/Modals/ExportModal'
 import ImportFileModal from './components/Modals/ImportFileModal'
 import { getClipById } from './utils'
 import { mixdownProject, exportMixdown } from '@shared/utils/mixdown'
+import useKeyboardShortcuts from './hooks/useKeyboardShortcuts' // ✅ AJOUTÉ
 
 console.log('📝 [Editor] Chargement du module Editor')
 
@@ -149,7 +150,7 @@ function EditorTimelineContent() {
   const [exportBitrate, setExportBitrate] = useState(192)
   const [showEffectsPanel, setShowEffectsPanel] = useState(true)
 
-  // ✅ ÉTATS POUR L'IMPORT - MODIFIÉS
+  // ✅ ÉTATS POUR L'IMPORT
   const [showImportModal, setShowImportModal] = useState(false)
   const [selectedImportTrackId, setSelectedImportTrackId] = useState('')
   const [pendingImportFile, setPendingImportFile] = useState(null)
@@ -236,7 +237,6 @@ function EditorTimelineContent() {
     await addClip(trackId, soundId, startPosition)
   }, [addClip])
 
-  // ✅ NOUVEAU HANDLER - OUVRE UNIQUEMENT LE MODAL (SANS FENÊTRE DE SÉLECTION)
   const handleAddFileClick = useCallback(() => {
     console.log('📁 [Editor] handleAddFileClick - Ouverture du modal d\'import')
     
@@ -245,18 +245,12 @@ function EditorTimelineContent() {
       return
     }
     
-    // ✅ Réinitialiser les états
     setPendingImportFile(null)
     setPendingImportFileName('')
-    
-    // ✅ Sélectionner la première piste par défaut
     setSelectedImportTrackId(tracks[0].id)
-    
-    // ✅ Ouvrir le modal
     setShowImportModal(true)
   }, [tracks, addToast, t])
 
-  // ✅ HANDLER POUR LA CONFIRMATION DU MODAL D'IMPORT
   const handleImportConfirm = useCallback(async ({ file, fileName, trackId, startTime }) => {
     console.log('📁 [Editor] handleImportConfirm:', { fileName, trackId, startTime })
     
@@ -266,13 +260,11 @@ function EditorTimelineContent() {
       return
     }
 
-    // ✅ Sauvegarder le fichier temporairement
     try {
       const soundsDir = await window.electronAPI.getSoundsDir?.()
       const safeName = fileName.replace(/[^a-zA-Z0-9._\- ]/g, '_') + '_' + Date.now() + '.wav'
       const tempPath = soundsDir + '/' + safeName
       
-      // Écrire le fichier
       const writeResult = await window.electronAPI.writeSoundFile?.(tempPath, Array.from(new Uint8Array(file)))
       
       if (!writeResult?.success) {
@@ -280,7 +272,6 @@ function EditorTimelineContent() {
         return
       }
       
-      // Importer dans la piste
       const result = await addClipFromFile(trackId, tempPath, startTime)
       
       if (result) {
@@ -357,10 +348,8 @@ function EditorTimelineContent() {
     console.log(`🎛️ [Editor] Prévisualisation des effets pour ${clip.name}`)
     
     try {
-      // ✅ Importer la fonction d'effets
       const { applyEffectsToBuffer } = await import('@shared/utils/realTimeEffects')
       
-      // Charger le buffer
       const fileUrl = clip.path.startsWith('file://') 
         ? clip.path 
         : 'file:///' + clip.path.replace(/\\/g, '/')
@@ -374,7 +363,6 @@ function EditorTimelineContent() {
       const audioContext = new (window.AudioContext || window.webkitAudioContext)()
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
       
-      // ✅ Appliquer les effets
       const hasActiveEffects = clip.effects?.some(e => e.enabled) || false
       let processedBuffer = audioBuffer
       
@@ -383,7 +371,6 @@ function EditorTimelineContent() {
         console.log('✅ [Editor] Effets appliqués pour la prévisualisation')
       }
       
-      // ✅ Jouer le buffer traité
       const source = audioContext.createBufferSource()
       source.buffer = processedBuffer
       
@@ -395,12 +382,10 @@ function EditorTimelineContent() {
       
       source.start(0)
       
-      // ✅ Nettoyer après la lecture
       source.onended = () => {
         audioContext.close().catch(() => {})
       }
       
-      // ✅ Arrêter après 5 secondes maximum
       setTimeout(() => {
         try {
           source.stop()
@@ -414,6 +399,85 @@ function EditorTimelineContent() {
     }
   }, [addToast, t])
 
+  // ─── RACCOURCIS CLAVIER ──────────────────────────────────────────────
+
+  // ✅ Récupérer les fonctions undo/redo depuis le store
+  const undoEditor = store?.undoEditor || (() => {
+    console.log('ℹ️ Undo non disponible')
+    addToast?.('Undo non disponible', 'info')
+  })
+  
+  const redoEditor = store?.redoEditor || (() => {
+    console.log('ℹ️ Redo non disponible')
+    addToast?.('Redo non disponible', 'info')
+  })
+  
+  const canUndo = store?.canUndoEditor || false
+  const canRedo = store?.canRedoEditor || false
+
+  // ✅ Utiliser le hook de raccourcis clavier
+  const { shortcuts } = useKeyboardShortcuts({
+    onPlay: () => {
+      console.log('⌨️ Play')
+      if (isPlaying) {
+        pause()
+      } else if (isPaused) {
+        play()
+      } else {
+        play()
+      }
+    },
+    onPause: pause,
+    onStop: stop,
+    onUndo: undoEditor,
+    onRedo: redoEditor,
+    onAddTrack: handleAddTrack,
+    onAddMarker: () => {
+      console.log('⌨️ Add Marker à', currentTime)
+      // Ajouter un marqueur à la position actuelle
+      const markers = project?.markers || []
+      const newMarker = {
+        id: `marker-${Date.now()}`,
+        name: `Marqueur ${markers.length + 1}`,
+        time: currentTime,
+        color: '#3b82f6'
+      }
+      const updatedProject = {
+        ...project,
+        markers: [...markers, newMarker],
+        updatedAt: Date.now()
+      }
+      store?.updateEditorProject?.(updatedProject)
+      addToast?.('Marqueur ajouté', 'success')
+    },
+    onDelete: () => {
+      console.log('⌨️ Delete')
+      if (selectedClipId && selectedTrackId) {
+        removeClip(selectedTrackId, selectedClipId)
+        addToast?.('Clip supprimé', 'info')
+      } else {
+        addToast?.('Aucun clip sélectionné', 'info')
+      }
+    },
+    onSplit: () => {
+      console.log('⌨️ Split')
+      if (selectedClipId && selectedTrackId) {
+        // TODO: Implémenter le split
+        addToast?.('Split pas encore implémenté', 'info')
+      } else {
+        addToast?.('Aucun clip sélectionné', 'info')
+      }
+    },
+    onToggleSnap: () => setSnapEnabled(!snapEnabled),
+    onZoomIn: () => handleZoomChange(zoomLevel + 0.1),
+    onZoomOut: () => handleZoomChange(zoomLevel - 0.1),
+    onZoomReset: () => handleZoomChange(1),
+    isPlaying: isPlaying || isPaused,
+    canUndo: canUndo,
+    canRedo: canRedo,
+    isEnabled: true
+  })
+
   // ─── RENDU ──────────────────────────────────────────────────────────────
 
   const formatTime = (seconds) => {
@@ -422,6 +486,9 @@ function EditorTimelineContent() {
     const s = Math.floor(seconds % 60)
     return `${m}:${s.toString().padStart(2, '0')}`
   }
+
+  // ✅ Afficher les raccourcis dans la console pour débogage
+  console.log('⌨️ Raccourcis clavier actifs:', shortcuts)
 
   return (
     <div style={{
@@ -444,10 +511,10 @@ function EditorTimelineContent() {
         onPlay={togglePlay}
         onStop={stop}
         onExport={handleExportClick}
-        onUndo={store?.undoEditor || (() => {})}
-        onRedo={store?.redoEditor || (() => {})}
-        canUndo={store?.canUndoEditor || false}
-        canRedo={store?.canRedoEditor || false}
+        onUndo={undoEditor}
+        onRedo={redoEditor}
+        canUndo={canUndo}
+        canRedo={canRedo}
         snapEnabled={snapEnabled}
         onToggleSnap={() => setSnapEnabled(!snapEnabled)}
         autoCrossfade={autoCrossfade}
@@ -502,13 +569,12 @@ function EditorTimelineContent() {
         const selectedClip = selectedClipId ? getClipById(tracks, selectedClipId) : null
         if (!selectedClip) return null
         
-        // ✅ Récupérer les fonctions du contexte
         const {
           addEffectToClip,
           removeEffectFromClip,
           updateEffectParam,
           toggleEffect,
-          setClipFade // ✅ S'assurer que setClipFade est récupéré
+          setClipFade
         } = context
         
         console.log('🎛️ [Editor] setClipFade est une fonction?', typeof setClipFade)
@@ -522,7 +588,7 @@ function EditorTimelineContent() {
             onEffectUpdate={updateEffectParam}
             onEffectToggle={toggleEffect}
             onClipUpdate={updateClip}
-            onFadeUpdate={setClipFade} // ✅ Passer setClipFade
+            onFadeUpdate={setClipFade}
             tr={t}
           />
         )
@@ -563,7 +629,7 @@ function EditorTimelineContent() {
         document.body
       )}
 
-      {/* ✅ MODAL IMPORT FILE - OUVERT SANS FENÊTRE DE SÉLECTION PRÉALABLE */}
+      {/* MODAL IMPORT FILE */}
       {showImportModal && createPortal(
         <ImportFileModal
           isOpen={showImportModal}
@@ -590,7 +656,6 @@ function EditorTimelineContent() {
             setIsExporting(true)
             
             try {
-              // ✅ 1. Mixer le projet
               console.log('🎵 [Editor] Mixdown du projet...')
               const buffer = await mixdownProject(project, clipDurations, 44100)
               
@@ -600,14 +665,11 @@ function EditorTimelineContent() {
               
               console.log('✅ [Editor] Mixdown terminé, durée:', buffer.duration)
               
-              // ✅ 2. Gérer l'export selon l'emplacement choisi
               const exportResults = []
               
-              // 2a. Exporter en fichier si demandé
               if (options.exportLocation === 'file' || options.exportLocation === 'both') {
                 console.log('📁 [Editor] Export en fichier...')
                 
-                // Demander où sauvegarder
                 const saveResult = await window.electronAPI.saveFileDialog?.(
                   options.outputPath || `${options.name}.${options.format === 'wav' ? 'wav' : options.format}`,
                   null
@@ -627,12 +689,10 @@ function EditorTimelineContent() {
                     throw new Error(result.error || 'Erreur export fichier')
                   }
                 } else if (saveResult?.canceled) {
-                  // L'utilisateur a annulé
                   setIsExporting(false)
                   setShowExportModal(false)
                   return
                 } else {
-                  // Fallback: utiliser le nom par défaut
                   const fallbackPath = options.outputPath || `${options.name}.${options.format === 'wav' ? 'wav' : options.format}`
                   const result = await exportMixdown(buffer, options.format, options.bitrate, fallbackPath)
                   if (result.success) {
@@ -644,16 +704,13 @@ function EditorTimelineContent() {
                 }
               }
               
-              // 2b. Ajouter à la bibliothèque si demandé
               if (options.exportLocation === 'library' || options.exportLocation === 'both') {
                 console.log('📚 [Editor] Ajout à la bibliothèque...')
                 
-                // Exporter en WAV temporairement pour la bibliothèque
                 const tempPath = `temp_${Date.now()}.wav`
                 const tempResult = await exportMixdown(buffer, 'wav', 44100, tempPath)
                 
                 if (tempResult.success) {
-                  // Ajouter le son à la bibliothèque
                   const profiles = options.profiles || ['all']
                   await store.addSound({
                     name: options.name || 'Export',

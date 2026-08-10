@@ -23,7 +23,7 @@ export function useKeyboardShortcuts({
   const handleKeyDown = useCallback((e) => {
     if (!isEnabled) return
     
-    // Ne pas capturer si on est dans un input
+    // ✅ Ne pas capturer si on est dans un input
     const target = e.target
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
       return
@@ -34,9 +34,10 @@ export function useKeyboardShortcuts({
     const shift = e.shiftKey
     const alt = e.altKey
 
-    // Espace - Play/Pause
+    // ✅ Espace - Play/Pause
     if (e.key === ' ' && !ctrl) {
       e.preventDefault()
+      console.log('⌨️ Espace: Play/Pause')
       if (isPlaying) {
         onPause?.()
       } else {
@@ -45,79 +46,90 @@ export function useKeyboardShortcuts({
       return
     }
 
-    // Escape - Stop
+    // ✅ Escape - Stop
     if (e.key === 'Escape') {
       e.preventDefault()
+      console.log('⌨️ Escape: Stop')
       onStop?.()
       return
     }
 
-    // Ctrl+Z - Undo
+    // ✅ Ctrl+Z - Undo
     if (ctrl && e.key === 'z' && !shift) {
       e.preventDefault()
+      console.log('⌨️ Ctrl+Z: Undo')
       onUndo?.()
       return
     }
 
-    // Ctrl+Y ou Ctrl+Shift+Z - Redo
+    // ✅ Ctrl+Y ou Ctrl+Shift+Z - Redo
     if (ctrl && (e.key === 'y' || (e.key === 'z' && shift))) {
       e.preventDefault()
+      console.log('⌨️ Ctrl+Y: Redo')
       onRedo?.()
       return
     }
 
-    // Ctrl+T - Add Track
+    // ✅ Ctrl+T - Add Track
     if (ctrl && e.key === 't' && !shift) {
       e.preventDefault()
+      console.log('⌨️ Ctrl+T: Add Track')
       onAddTrack?.()
       return
     }
 
-    // Ctrl+M - Add Marker
+    // ✅ Ctrl+M - Add Marker
     if (ctrl && e.key === 'm') {
       e.preventDefault()
+      console.log('⌨️ Ctrl+M: Add Marker')
       onAddMarker?.()
       return
     }
 
-    // Delete / Backspace - Delete
+    // ✅ Delete / Backspace - Delete
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault()
+      console.log('⌨️ Delete: Supprimer')
       onDelete?.()
       return
     }
 
-    // Ctrl+Shift+S - Toggle Snap
+    // ✅ Ctrl+Shift+S - Toggle Snap
     if (ctrl && shift && e.key === 's') {
       e.preventDefault()
+      console.log('⌨️ Ctrl+Shift+S: Toggle Snap')
       onToggleSnap?.()
       return
     }
 
-    // Ctrl+= / Ctrl++ - Zoom In
+    // ✅ Ctrl+= / Ctrl++ - Zoom In
     if (ctrl && (e.key === '=' || e.key === '+')) {
       e.preventDefault()
+      console.log('⌨️ Ctrl+=: Zoom In')
       onZoomIn?.()
       return
     }
 
-    // Ctrl+- - Zoom Out
+    // ✅ Ctrl+- - Zoom Out
     if (ctrl && e.key === '-') {
       e.preventDefault()
+      console.log('⌨️ Ctrl+-: Zoom Out')
       onZoomOut?.()
       return
     }
 
-    // Ctrl+0 - Zoom Reset
+    // ✅ Ctrl+0 - Zoom Reset
     if (ctrl && e.key === '0') {
       e.preventDefault()
+      console.log('⌨️ Ctrl+0: Zoom Reset')
       onZoomReset?.()
       return
     }
 
-    // S - Split
-    if (e.key === 's' && !ctrl && !shift) {
+    // ✅ S - Split (sans modificateur)
+    if (e.key === 's' && !ctrl && !shift && !alt) {
       e.preventDefault()
+      console.log('⌨️ S: Split')
       onSplit?.()
       return
     }
@@ -148,22 +160,23 @@ export function useKeyboardShortcuts({
     }
   }, [handleKeyDown])
 
-  return {
-    shortcuts: {
-      'Space': 'Play/Pause',
-      'Escape': 'Stop',
-      'Ctrl+Z': 'Undo',
-      'Ctrl+Y': 'Redo',
-      'Ctrl+T': 'Add Track',
-      'Ctrl+M': 'Add Marker',
-      'Delete': 'Delete',
-      'Ctrl+Shift+S': 'Toggle Snap',
-      'Ctrl+=/+': 'Zoom In',
-      'Ctrl+-': 'Zoom Out',
-      'Ctrl+0': 'Zoom Reset',
-      'S': 'Split'
-    }
+  // ✅ Retourner la liste des raccourcis pour affichage
+  const shortcuts = {
+    'Space': 'Play/Pause',
+    'Escape': 'Stop',
+    'Ctrl+Z': 'Undo',
+    'Ctrl+Y': 'Redo',
+    'Ctrl+T': 'Add Track',
+    'Ctrl+M': 'Add Marker',
+    'Delete': 'Delete',
+    'Ctrl+Shift+S': 'Toggle Snap',
+    'Ctrl+=/+': 'Zoom In',
+    'Ctrl+-': 'Zoom Out',
+    'Ctrl+0': 'Zoom Reset',
+    'S': 'Split'
   }
+
+  return { shortcuts }
 }
 
 export default useKeyboardShortcuts
