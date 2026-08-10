@@ -89,7 +89,7 @@ export function EditorProvider({ children, store, addToast }) {
     console.log(`🌊 [Crossfade] Fade out sur ${clipId} sur ${duration.toFixed(2)}s`)
   }, [])
 
-  // ─── GET AUDIO DURATION - DÉPLACÉE ICI AVANT addClipFromFile ──────────────────────────────
+  // ─── GET AUDIO DURATION ──────────────────────────────────────────────
 
   const getAudioDuration = useCallback(async (filePath) => {
     try {
@@ -267,7 +267,7 @@ export function EditorProvider({ children, store, addToast }) {
     }
   }, [])
 
-  // ✅ playClip AVEC CROSSFADE
+  // ✅ playClip AVEC EFFETS EN TEMPS RÉEL
   const playClip = useCallback(async (clip, track) => {
     if (!clip?.path) {
       console.warn('⚠️ [EditorContext] Clip sans chemin:', clip)
@@ -275,6 +275,7 @@ export function EditorProvider({ children, store, addToast }) {
     }
     
     console.log(`▶️ [EditorContext] playClip: ${clip.name} (${clip.id})`)
+    console.log(`📊 [EditorContext] Effets du clip:`, clip.effects?.filter(e => e.enabled) || [])
     
     try {
       const buffer = await loadAudioBuffer(clip.path)
@@ -289,8 +290,30 @@ export function EditorProvider({ children, store, addToast }) {
         return
       }
       
+      let sourceBuffer = buffer
+      
+      // ✅ APPLIQUER LES EFFETS AVANT LA LECTURE
+      if (clip.effects && clip.effects.length > 0) {
+        const activeEffects = clip.effects.filter(e => e.enabled)
+        if (activeEffects.length > 0) {
+          console.log(`✨ [EditorContext] Application de ${activeEffects.length} effets sur ${clip.name}`)
+          try {
+            const { applyEffectsToBuffer } = await import('@shared/utils/realTimeEffects')
+            const processedBuffer = applyEffectsToBuffer(buffer, clip.effects, ctx.sampleRate, true)
+            if (processedBuffer) {
+              sourceBuffer = processedBuffer
+              console.log(`✅ [EditorContext] Effets appliqués avec succès sur ${clip.name}`)
+            } else {
+              console.warn(`⚠️ [EditorContext] Aucun effet appliqué sur ${clip.name}`)
+            }
+          } catch (e) {
+            console.error(`❌ [EditorContext] Erreur application effets sur ${clip.name}:`, e)
+          }
+        }
+      }
+      
       const source = ctx.createBufferSource()
-      source.buffer = buffer
+      source.buffer = sourceBuffer
       
       const gainNode = ctx.createGain()
       const trackVolume = track?.volume || 1
@@ -321,25 +344,13 @@ export function EditorProvider({ children, store, addToast }) {
         }
       }
       
-      if (clip.effects && clip.effects.length > 0) {
-        try {
-          const { applyEffectsToBuffer } = await import('@shared/utils/realTimeEffects')
-          const processedBuffer = applyEffectsToBuffer(buffer, clip.effects, ctx.sampleRate, true)
-          if (processedBuffer) {
-            source.buffer = processedBuffer
-          }
-        } catch (e) {
-          console.warn('⚠️ Erreur application effets:', e)
-        }
-      }
-      
       source.connect(gainNode)
       gainNode.connect(ctx.destination)
       
       const offset = Math.max(0, currentTime - (clip.start || 0))
-      const startTime = Math.min(offset, buffer.duration - 0.01)
+      const startTime = Math.min(offset, sourceBuffer.duration - 0.01)
       
-      console.log(`▶️ [EditorContext] Lecture: ${clip.name} à ${startTime.toFixed(2)}s`)
+      console.log(`▶️ [EditorContext] Lecture: ${clip.name} à ${startTime.toFixed(2)}s (durée: ${sourceBuffer.duration.toFixed(2)}s)`)
       
       source.start(0, startTime)
       audioSourcesRef.current[clip.id] = { source, gainNode }
@@ -875,7 +886,7 @@ export function EditorProvider({ children, store, addToast }) {
     }
   }, [store, project, addToast])
 
-  // ✅ FONCTION addClipFromFile - maintenant getAudioDuration est définie avant
+  // ✅ addClipFromFile
   const addClipFromFile = useCallback(async (trackId, filePath, startPosition = null) => {
     console.log('📁 [EditorContext] addClipFromFile:', { trackId, filePath, startPosition })
     
@@ -886,7 +897,6 @@ export function EditorProvider({ children, store, addToast }) {
     }
 
     try {
-      // Vérifier que la piste existe
       const track = project?.tracks?.find(t => t.id === trackId)
       if (!track) {
         console.error('❌ [EditorContext] Piste non trouvée:', trackId)
@@ -894,7 +904,6 @@ export function EditorProvider({ children, store, addToast }) {
         return null
       }
 
-      // Importer le fichier dans le dossier des sons
       const importResult = await window.electronAPI.importSoundFile(filePath)
       if (!importResult?.success) {
         console.error('❌ [EditorContext] Échec import du fichier:', importResult?.error)
@@ -903,9 +912,8 @@ export function EditorProvider({ children, store, addToast }) {
       }
 
       const fileName = filePath.split(/[\\/]/).pop() || 'Fichier audio'
-      const actualDuration = await getAudioDuration(importResult.path) // ✅ getAudioDuration est maintenant définie
+      const actualDuration = await getAudioDuration(importResult.path)
       
-      // Calculer la position de départ
       let actualStart = startPosition
       if (actualStart === null || actualStart === undefined) {
         if (track.clips.length > 0) {
@@ -1217,6 +1225,264 @@ export function EditorProvider({ children, store, addToast }) {
     console.log('✅ [EditorContext] Clip déplacé à', newStart)
   }, [project, store])
 
+  // ─── FONCTIONS EFFETS ──────────────────────────────────────────────────
+
+  const addEffectToClip = useCallback(async (trackId, clipId, effectType, params = {}) => {
+    console.log('✨ [EditorContext] addEffectToClip:', { trackId, clipId, effectType, params })
+    
+    if (!project) {
+      console.error('❌ [EditorContext] Aucun projet')
+      return null
+    }
+    
+    const effect = {
+      id: `effect-${Date.now()}`,
+      type: effectType,
+      params: params,
+      enabled: true
+    }
+    
+    const updatedProject = {
+      ...project,
+      tracks: project.tracks.map(track => {
+        if (track.id === trackId) {
+          return {
+            ...track,
+            clips: track.clips.map(clip => {
+              if (clip.id === clipId) {
+                return {
+                  ...clip,
+                  effects: [...(clip.effects || []), effect]
+                }
+              }
+              return clip
+            })
+          }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    if (store?.updateEditorProject) {
+      await store.updateEditorProject(updatedProject)
+    }
+    
+    setIsDirty(true)
+    console.log('✅ [EditorContext] Effet ajouté:', effect)
+    return effect
+  }, [project, store])
+
+  const removeEffectFromClip = useCallback(async (trackId, clipId, effectId) => {
+    console.log('🗑️ [EditorContext] removeEffectFromClip:', { trackId, clipId, effectId })
+    
+    if (!project) return
+    
+    const updatedProject = {
+      ...project,
+      tracks: project.tracks.map(track => {
+        if (track.id === trackId) {
+          return {
+            ...track,
+            clips: track.clips.map(clip => {
+              if (clip.id === clipId) {
+                return {
+                  ...clip,
+                  effects: (clip.effects || []).filter(e => e.id !== effectId)
+                }
+              }
+              return clip
+            })
+          }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    if (store?.updateEditorProject) {
+      await store.updateEditorProject(updatedProject)
+    }
+    
+    setIsDirty(true)
+    console.log('✅ [EditorContext] Effet supprimé')
+  }, [project, store])
+
+  const updateEffectParam = useCallback(async (trackId, clipId, effectId, param, value) => {
+    console.log('📝 [EditorContext] updateEffectParam:', { trackId, clipId, effectId, param, value })
+    
+    if (!project) {
+      console.error('❌ [EditorContext] Aucun projet')
+      return
+    }
+    
+    const updatedProject = {
+      ...project,
+      tracks: project.tracks.map(track => {
+        if (track.id === trackId) {
+          return {
+            ...track,
+            clips: track.clips.map(clip => {
+              if (clip.id === clipId) {
+                return {
+                  ...clip,
+                  effects: (clip.effects || []).map(effect => {
+                    if (effect.id === effectId) {
+                      return {
+                        ...effect,
+                        params: { ...effect.params, [param]: value }
+                      }
+                    }
+                    return effect
+                  })
+                }
+              }
+              return clip
+            })
+          }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    if (store?.updateEditorProject) {
+      await store.updateEditorProject(updatedProject)
+    }
+    
+    setIsDirty(true)
+  }, [project, store])
+
+  const toggleEffect = useCallback(async (trackId, clipId, effectId, enabled) => {
+    console.log('🔄 [EditorContext] toggleEffect:', { trackId, clipId, effectId, enabled })
+    
+    if (!project) return
+    
+    const updatedProject = {
+      ...project,
+      tracks: project.tracks.map(track => {
+        if (track.id === trackId) {
+          return {
+            ...track,
+            clips: track.clips.map(clip => {
+              if (clip.id === clipId) {
+                return {
+                  ...clip,
+                  effects: (clip.effects || []).map(effect => {
+                    if (effect.id === effectId) {
+                      return { ...effect, enabled }
+                    }
+                    return effect
+                  })
+                }
+              }
+              return clip
+            })
+          }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    if (store?.updateEditorProject) {
+      await store.updateEditorProject(updatedProject)
+    }
+    
+    setIsDirty(true)
+  }, [project, store])
+
+  // ─── FONCTIONS FADE ──────────────────────────────────────────────────
+
+  const setClipFade = useCallback(async (trackId, clipId, edge, duration) => {
+    console.log('🌊 [EditorContext] setClipFade:', { trackId, clipId, edge, duration })
+    
+    if (!project) {
+      console.error('❌ [EditorContext] Aucun projet')
+      return
+    }
+    
+    const clampedDuration = Math.max(0.05, Math.min(10, duration))
+    const effectType = edge === 'in' ? 'fadeIn' : 'fadeOut'
+    
+    console.log(`🌊 [EditorContext] Application du fade ${edge} avec durée ${clampedDuration}s`)
+    
+    const updatedProject = {
+      ...project,
+      tracks: project.tracks.map(track => {
+        if (track.id === trackId) {
+          return {
+            ...track,
+            clips: track.clips.map(clip => {
+              if (clip.id === clipId) {
+                // ✅ Vérifier si un effet de fade existe déjà
+                const existingEffect = (clip.effects || []).find(e => e.type === effectType)
+                
+                if (existingEffect) {
+                  // ✅ Mettre à jour l'effet existant
+                  console.log(`🔄 [EditorContext] Mise à jour de l'effet ${effectType} existant`)
+                  return {
+                    ...clip,
+                    effects: (clip.effects || []).map(e => {
+                      if (e.type === effectType) {
+                        return {
+                          ...e,
+                          params: { duration: clampedDuration },
+                          enabled: clampedDuration > 0.05
+                        }
+                      }
+                      return e
+                    })
+                  }
+                } else {
+                  // ✅ Ajouter un nouvel effet
+                  console.log(`➕ [EditorContext] Ajout d'un nouvel effet ${effectType}`)
+                  return {
+                    ...clip,
+                    effects: [
+                      ...(clip.effects || []),
+                      {
+                        id: `effect-${Date.now()}`,
+                        type: effectType,
+                        params: { duration: clampedDuration },
+                        enabled: clampedDuration > 0.05
+                      }
+                    ]
+                  }
+                }
+              }
+              return clip
+            })
+          }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    if (store?.updateEditorProject) {
+      await store.updateEditorProject(updatedProject)
+    }
+    
+    setIsDirty(true)
+    console.log(`✅ [EditorContext] Fade ${edge} appliqué: ${clampedDuration}s`)
+  }, [project, store])
+
   // ─── FONCTIONS SELECTION ──────────────────────────────────────────────
 
   const selectClip = useCallback((clipId, trackId) => {
@@ -1308,11 +1574,18 @@ export function EditorProvider({ children, store, addToast }) {
     
     // Fonctions Clip
     addClip,
-    addClipFromFile, // ✅ ajoutée
+    addClipFromFile,
     removeClip,
     updateClip,
     duplicateClip,
     moveClip,
+    
+    // Fonctions Effets
+    addEffectToClip,
+    removeEffectFromClip,
+    updateEffectParam,
+    toggleEffect,
+    setClipFade, // ✅ AJOUTÉ
     
     // Playback
     play,

@@ -348,6 +348,72 @@ function EditorTimelineContent() {
     setShowExportModal(true)
   }, [project, addToast, t])
 
+  const handlePreviewEffects = useCallback(async (clip) => {
+    if (!clip || !clip.path) {
+      console.warn('⚠️ [Editor] Aucun clip à prévisualiser')
+      return
+    }
+    
+    console.log(`🎛️ [Editor] Prévisualisation des effets pour ${clip.name}`)
+    
+    try {
+      // ✅ Importer la fonction d'effets
+      const { applyEffectsToBuffer } = await import('@shared/utils/realTimeEffects')
+      
+      // Charger le buffer
+      const fileUrl = clip.path.startsWith('file://') 
+        ? clip.path 
+        : 'file:///' + clip.path.replace(/\\/g, '/')
+      
+      const response = await fetch(fileUrl)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      const arrayBuffer = await response.arrayBuffer()
+      
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+      
+      // ✅ Appliquer les effets
+      const hasActiveEffects = clip.effects?.some(e => e.enabled) || false
+      let processedBuffer = audioBuffer
+      
+      if (hasActiveEffects) {
+        processedBuffer = applyEffectsToBuffer(audioBuffer, clip.effects, audioContext.sampleRate, true)
+        console.log('✅ [Editor] Effets appliqués pour la prévisualisation')
+      }
+      
+      // ✅ Jouer le buffer traité
+      const source = audioContext.createBufferSource()
+      source.buffer = processedBuffer
+      
+      const gainNode = audioContext.createGain()
+      gainNode.gain.value = 0.5
+      
+      source.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+      
+      source.start(0)
+      
+      // ✅ Nettoyer après la lecture
+      source.onended = () => {
+        audioContext.close().catch(() => {})
+      }
+      
+      // ✅ Arrêter après 5 secondes maximum
+      setTimeout(() => {
+        try {
+          source.stop()
+          audioContext.close().catch(() => {})
+        } catch (e) {}
+      }, Math.min(processedBuffer.duration * 1000, 5000))
+      
+    } catch (e) {
+      console.error('❌ [Editor] Erreur prévisualisation effets:', e)
+      addToast?.(t('editorEffectPreviewError') || 'Erreur lors de la prévisualisation', 'error')
+    }
+  }, [addToast, t])
+
   // ─── RENDU ──────────────────────────────────────────────────────────────
 
   const formatTime = (seconds) => {
@@ -435,16 +501,28 @@ function EditorTimelineContent() {
       {showEffectsPanel && (() => {
         const selectedClip = selectedClipId ? getClipById(tracks, selectedClipId) : null
         if (!selectedClip) return null
+        
+        // ✅ Récupérer les fonctions du contexte
+        const {
+          addEffectToClip,
+          removeEffectFromClip,
+          updateEffectParam,
+          toggleEffect,
+          setClipFade // ✅ S'assurer que setClipFade est récupéré
+        } = context
+        
+        console.log('🎛️ [Editor] setClipFade est une fonction?', typeof setClipFade)
+        
         return (
           <EditorEffectsPanel
             clip={selectedClip}
             trackId={selectedTrackId}
-            onEffectAdd={store?.addEffectToClip || (() => {})}
-            onEffectRemove={store?.removeEffectFromClip || (() => {})}
-            onEffectUpdate={store?.updateEffectParam || (() => {})}
-            onEffectToggle={store?.toggleEffect || (() => {})}
+            onEffectAdd={addEffectToClip}
+            onEffectRemove={removeEffectFromClip}
+            onEffectUpdate={updateEffectParam}
+            onEffectToggle={toggleEffect}
             onClipUpdate={updateClip}
-            onFadeUpdate={store?.setClipFade || (() => {})}
+            onFadeUpdate={setClipFade} // ✅ Passer setClipFade
             tr={t}
           />
         )

@@ -1,7 +1,7 @@
-// src/pages/editor/components/EditorEffectsPanel/index.jsx
+// src/features/editor/components/EffectsPanel/index.jsx
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-// ✅ Effets disponibles - PITCH SUPPRIMÉ
+// ✅ Effets disponibles
 const EFFECT_TYPES = [
   { id: 'volume', label: 'Volume', icon: 'ti-volume', params: ['value'] },
   { id: 'fadeIn', label: 'Fade In', icon: 'ti-sun', params: ['duration'] },
@@ -33,7 +33,7 @@ const PARAM_DEFAULTS = {
 
 const PARAM_RANGES = {
   value: { min: 0, max: 5, step: 0.05 },
-  duration: { min: 0.1, max: 10, step: 0.1 },
+  duration: { min: 0.05, max: 10, step: 0.05 },
   semitones: { min: -24, max: 24, step: 1 },
   delay: { min: 0.05, max: 3, step: 0.05 },
   decay: { min: 0, max: 1, step: 0.05 },
@@ -46,7 +46,13 @@ const formatParamValue = (effectType, param, value) => {
     const percent = value * 100
     return `${Math.round(percent)}%`
   }
-  return typeof value === 'number' ? value.toFixed(1) : value
+  if (param === 'duration') {
+    return `${value.toFixed(2)}s`
+  }
+  if (effectType === 'volume') {
+    return `${value.toFixed(1)}x`
+  }
+  return typeof value === 'number' ? value.toFixed(2) : value
 }
 
 export default function EditorEffectsPanel({
@@ -65,9 +71,24 @@ export default function EditorEffectsPanel({
 }) {
   const [showAddEffect, setShowAddEffect] = useState(false)
   const previewTimeoutRef = useRef(null)
+  const [isProcessingPreview, setIsProcessingPreview] = useState(false)
 
+  // ✅ Vérifier que les handlers existent
+  console.log('🎛️ [EffectsPanel] Handlers reçus:', {
+    onEffectAdd: typeof onEffectAdd,
+    onEffectRemove: typeof onEffectRemove,
+    onEffectUpdate: typeof onEffectUpdate,
+    onEffectToggle: typeof onEffectToggle,
+    onFadeUpdate: typeof onFadeUpdate,
+    onPreview: typeof onPreview,
+  })
+
+  // ✅ PRÉVISUALISATION RÉELLE DES EFFETS
   const previewEffects = useCallback(async () => {
-    if (!clip || !clip.path) return
+    if (!clip || !clip.path) {
+      console.warn('⚠️ [EffectsPanel] Aucun clip à prévisualiser')
+      return
+    }
     
     if (previewTimeoutRef.current) {
       clearTimeout(previewTimeoutRef.current)
@@ -76,15 +97,78 @@ export default function EditorEffectsPanel({
 
     const hasActiveEffects = clip.effects?.some(e => e.enabled) || false
     if (!hasActiveEffects) {
-      onPreview?.(clip, null)
+      console.log('ℹ️ [EffectsPanel] Aucun effet actif')
+      if (onPreview) {
+        onPreview(clip, null)
+      }
       return
     }
 
+    console.log(`🎛️ [EffectsPanel] Prévisualisation des effets pour ${clip.name}`)
+    console.log(`📊 [EffectsPanel] Effets actifs:`, clip.effects.filter(e => e.enabled))
+
+    setIsProcessingPreview(true)
+
     try {
-      onPreview?.(clip, null)
+      const fileUrl = clip.path.startsWith('file://') 
+        ? clip.path 
+        : 'file:///' + clip.path.replace(/\\/g, '/')
+      
+      const response = await fetch(fileUrl)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      const arrayBuffer = await response.arrayBuffer()
+      
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+      
+      const { applyEffectsToBuffer } = await import('@shared/utils/realTimeEffects')
+      const processedBuffer = applyEffectsToBuffer(audioBuffer, clip.effects, audioContext.sampleRate, true)
+      
+      if (processedBuffer && processedBuffer !== audioBuffer) {
+        console.log('✅ [EffectsPanel] Effets appliqués avec succès')
+        const source = audioContext.createBufferSource()
+        source.buffer = processedBuffer
+        
+        const gainNode = audioContext.createGain()
+        gainNode.gain.value = 0.5
+        
+        source.connect(gainNode)
+        gainNode.connect(audioContext.destination)
+        
+        source.start(0)
+        
+        source.onended = () => {
+          audioContext.close().catch(() => {})
+          setIsProcessingPreview(false)
+        }
+        
+        setTimeout(() => {
+          try {
+            source.stop()
+            audioContext.close().catch(() => {})
+            setIsProcessingPreview(false)
+          } catch (e) {}
+        }, Math.min(processedBuffer.duration * 1000, 5000))
+        
+      } else {
+        console.warn('⚠️ [EffectsPanel] Aucun effet appliqué, lecture normale')
+        if (onPreview) {
+          onPreview(clip, null)
+        }
+        setTimeout(() => {
+          audioContext.close().catch(() => {})
+          setIsProcessingPreview(false)
+        }, 100)
+      }
+      
     } catch (e) {
-      console.warn('Erreur prévisualisation effets:', e)
-      onPreview?.(clip, null)
+      console.error('❌ [EffectsPanel] Erreur prévisualisation effets:', e)
+      if (onPreview) {
+        onPreview(clip, null)
+      }
+      setIsProcessingPreview(false)
     }
   }, [clip, onPreview])
 
@@ -109,33 +193,63 @@ export default function EditorEffectsPanel({
   }, [clip?.effects, clip?.id, schedulePreview])
 
   const handleParamChange = (effectId, param, value) => {
-    onEffectUpdate(trackId, clip.id, effectId, param, value)
+    console.log('📝 [EffectsPanel] handleParamChange:', { effectId, param, value })
+    if (onEffectUpdate) {
+      onEffectUpdate(trackId, clip.id, effectId, param, value)
+    }
   }
 
   const handleEffectToggle = (effectId, enabled) => {
-    onEffectToggle(trackId, clip.id, effectId, enabled)
+    console.log('🔄 [EffectsPanel] handleEffectToggle:', { effectId, enabled })
+    if (onEffectToggle) {
+      onEffectToggle(trackId, clip.id, effectId, enabled)
+    }
   }
 
   const handleEffectRemove = (effectId) => {
-    onEffectRemove(trackId, clip.id, effectId)
+    console.log('🗑️ [EffectsPanel] handleEffectRemove:', { effectId })
+    if (onEffectRemove) {
+      onEffectRemove(trackId, clip.id, effectId)
+    }
   }
 
   const handleFadeInChange = useCallback((duration) => {
-    onFadeUpdate?.(trackId, clip.id, 'in', duration)
+    console.log('🌅 [EffectsPanel] handleFadeInChange:', { duration, trackId, clipId: clip.id })
+    const clampedDuration = Math.max(0.05, Math.min(10, duration))
+    if (onFadeUpdate) {
+      onFadeUpdate(trackId, clip.id, 'in', clampedDuration)
+    } else {
+      console.warn('⚠️ [EffectsPanel] onFadeUpdate est undefined')
+    }
   }, [onFadeUpdate, trackId, clip])
 
   const handleFadeOutChange = useCallback((duration) => {
-    onFadeUpdate?.(trackId, clip.id, 'out', duration)
+    console.log('🌇 [EffectsPanel] handleFadeOutChange:', { duration, trackId, clipId: clip.id })
+    const clampedDuration = Math.max(0.05, Math.min(10, duration))
+    if (onFadeUpdate) {
+      onFadeUpdate(trackId, clip.id, 'out', clampedDuration)
+    } else {
+      console.warn('⚠️ [EffectsPanel] onFadeUpdate est undefined')
+    }
   }, [onFadeUpdate, trackId, clip])
 
   if (!clip) return null
 
   const handleAddEffect = (effectType) => {
+    console.log('➕ [EffectsPanel] handleAddEffect:', { effectType, trackId, clipId: clip.id })
+    
+    if (!onEffectAdd) {
+      console.error('❌ [EffectsPanel] onEffectAdd est undefined')
+      return
+    }
+    
     const defaults = {}
     const effectDef = EFFECT_TYPES.find(e => e.id === effectType)
     effectDef?.params.forEach(param => {
-      defaults[param] = PARAM_DEFAULTS[param] || 0
+      defaults[param] = PARAM_DEFAULTS[param] !== undefined ? PARAM_DEFAULTS[param] : 0
     })
+    
+    console.log('📦 [EffectsPanel] Ajout de l\'effet avec params:', defaults)
     onEffectAdd(trackId, clip.id, effectType, defaults)
     setShowAddEffect(false)
   }
@@ -146,7 +260,7 @@ export default function EditorEffectsPanel({
       borderTop: '1px solid var(--border)',
       background: 'var(--bg-secondary)',
       flexShrink: 0,
-      maxHeight: 200,
+      maxHeight: 250,
       overflowY: 'auto'
     }}>
       <div style={{
@@ -244,7 +358,7 @@ export default function EditorEffectsPanel({
               {/* Paramètres */}
               {def.params.map(param => {
                 const range = PARAM_RANGES[param]
-                const value = effect.params[param] || 0
+                const value = effect.params[param] !== undefined ? effect.params[param] : PARAM_DEFAULTS[param] || 0
                 
                 return (
                   <div key={param} style={{
@@ -268,6 +382,7 @@ export default function EditorEffectsPanel({
                       value={value}
                       onChange={e => {
                         const newValue = parseFloat(e.target.value)
+                        console.log(`🎛️ [EffectsPanel] Changement de ${param}: ${newValue}`)
                         if (isFade && param === 'duration') {
                           handleFadeChange(newValue)
                         } else {
@@ -339,7 +454,7 @@ export default function EditorEffectsPanel({
       )}
 
       {/* Indicateur de prévisualisation */}
-      {isPreviewing && (
+      {(isPreviewing || isProcessingPreview) && (
         <div style={{
           marginTop: 8,
           padding: '4px 10px',
@@ -353,7 +468,7 @@ export default function EditorEffectsPanel({
           gap: 6
         }}>
           <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
-          {tr('editorEffectPreview') || 'Aperçu des effets...'}
+          {isProcessingPreview ? 'Génération de l\'aperçu...' : tr('editorEffectPreview') || 'Aperçu des effets...'}
         </div>
       )}
     </div>

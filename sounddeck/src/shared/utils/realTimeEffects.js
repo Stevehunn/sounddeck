@@ -18,13 +18,30 @@ const effectCache = new Map()
  * @returns {AudioBuffer} Buffer avec effets appliqués
  */
 export function applyEffectsToBuffer(audioBuffer, effects, sampleRate = 44100, normalize = true) {
-  if (!audioBuffer || !effects || effects.length === 0) return audioBuffer
+  console.log(`🎛️ [realTimeEffects] applyEffectsToBuffer appelé`)
+  console.log(`📊 [realTimeEffects] Effets reçus:`, effects)
+  console.log(`📊 [realTimeEffects] Buffer durée: ${audioBuffer.duration.toFixed(2)}s`)
   
-  let result = audioBuffer
+  if (!audioBuffer) {
+    console.error('❌ [realTimeEffects] Buffer null')
+    return audioBuffer
+  }
+  
+  if (!effects || effects.length === 0) {
+    console.log('ℹ️ [realTimeEffects] Aucun effet à appliquer')
+    return audioBuffer
+  }
   
   // Filtrer les effets actifs
   const activeEffects = effects.filter(e => e.enabled)
-  if (activeEffects.length === 0) return result
+  console.log(`📊 [realTimeEffects] Effets actifs: ${activeEffects.length}`, activeEffects)
+  
+  if (activeEffects.length === 0) {
+    console.log('ℹ️ [realTimeEffects] Aucun effet actif')
+    return audioBuffer
+  }
+  
+  let result = audioBuffer
   
   // Créer un AudioContext pour le traitement
   const ctx = new (window.AudioContext || window.webkitAudioContext)()
@@ -32,42 +49,49 @@ export function applyEffectsToBuffer(audioBuffer, effects, sampleRate = 44100, n
   try {
     // Appliquer les effets dans l'ordre
     for (const effect of activeEffects) {
+      console.log(`🎛️ [realTimeEffects] Application de l'effet: ${effect.type}`, effect.params)
+      
       switch (effect.type) {
         case 'volume':
           result = applyVolumeEffect(result, effect.params.value || 1, ctx)
+          console.log(`  ✅ Volume appliqué: ${effect.params.value || 1}x`)
           break
         case 'fadeIn':
           result = applyFadeInEffect(result, effect.params.duration || 0.5, ctx)
+          console.log(`  ✅ Fade In appliqué: ${effect.params.duration || 0.5}s`)
           break
         case 'fadeOut':
           result = applyFadeOutEffect(result, effect.params.duration || 0.5, ctx)
-          break
-        case 'pitch':
-          result = applyPitchEffect(result, effect.params.semitones || 0, ctx)
+          console.log(`  ✅ Fade Out appliqué: ${effect.params.duration || 0.5}s`)
           break
         case 'speed':
           result = applySpeedEffect(result, effect.params.value || 1, ctx)
+          console.log(`  ✅ Speed appliqué: ${effect.params.value || 1}x`)
           break
         case 'echo':
           result = applyEchoEffect(result, effect.params.delay || 0.3, effect.params.decay || 0.5, effect.params.mix || 0.3, ctx)
+          console.log(`  ✅ Echo appliqué: delay=${effect.params.delay || 0.3}s, mix=${effect.params.mix || 0.3}`)
           break
         case 'reverb':
           result = applyReverbEffect(result, effect.params.roomSize || 0.5, effect.params.mix || 0.2, ctx)
+          console.log(`  ✅ Reverb appliquée: roomSize=${effect.params.roomSize || 0.5}, mix=${effect.params.mix || 0.2}`)
           break
         default:
-          break
+          console.warn(`⚠️ [realTimeEffects] Effet non reconnu: ${effect.type}`)
       }
     }
     
     // Normaliser pour éviter l'écrêtage
     if (normalize) {
       result = normalizeBuffer(result, ctx)
+      console.log(`  ✅ Normalisation appliquée`)
     }
     
+    console.log(`✅ [realTimeEffects] Tous les effets appliqués avec succès`)
     return result
     
   } catch (e) {
-    console.warn('Erreur application effets:', e)
+    console.error('❌ [realTimeEffects] Erreur application effets:', e)
     return audioBuffer
   } finally {
     if (ctx.state !== 'closed') {
@@ -78,8 +102,22 @@ export function applyEffectsToBuffer(audioBuffer, effects, sampleRate = 44100, n
 
 // ─── EFFETS INDIVIDUELS ──────────────────────────────────────────────────────
 
+/**
+ * ✅ Applique un effet de volume
+ * @param {AudioBuffer} buffer - Buffer source
+ * @param {number} volume - Volume (0 à 5, 1 = normal)
+ * @param {AudioContext} ctx - Contexte audio
+ * @returns {AudioBuffer} Buffer modifié
+ */
 function applyVolumeEffect(buffer, volume, ctx) {
-  if (volume === 1) return buffer
+  const clampedVolume = Math.max(0, Math.min(5, volume))
+  
+  console.log(`🔊 [applyVolumeEffect] volume reçu: ${volume}, clamped: ${clampedVolume}`)
+  
+  if (clampedVolume === 1) {
+    console.log(`ℹ️ [applyVolumeEffect] Volume à 1, aucun changement`)
+    return buffer
+  }
   
   const channels = buffer.numberOfChannels
   const length = buffer.length
@@ -89,64 +127,143 @@ function applyVolumeEffect(buffer, volume, ctx) {
     const data = buffer.getChannelData(channel)
     const newData = newBuffer.getChannelData(channel)
     for (let i = 0; i < length; i++) {
-      newData[i] = data[i] * volume
+      newData[i] = data[i] * clampedVolume
     }
   }
   
+  console.log(`✅ [applyVolumeEffect] Volume appliqué: ${clampedVolume}x`)
   return newBuffer
 }
 
+/**
+ * ✅ Applique un effet de Fade In
+ * @param {AudioBuffer} buffer - Buffer source
+ * @param {number} duration - Durée du fade en secondes
+ * @param {AudioContext} ctx - Contexte audio
+ * @returns {AudioBuffer} Buffer modifié
+ */
 function applyFadeInEffect(buffer, duration, ctx) {
-  if (duration <= 0) return buffer
+  if (duration <= 0.05) {
+    console.log(`ℹ️ [applyFadeInEffect] Durée trop courte (${duration}s), ignorée`)
+    return buffer
+  }
   
   const sampleRate = buffer.sampleRate
-  const fadeSamples = Math.floor(duration * sampleRate)
-  const channels = buffer.numberOfChannels
   const length = buffer.length
+  const channels = buffer.numberOfChannels
+  
+  let fadeSamples = Math.floor(duration * sampleRate)
+  
+  console.log(`🌅 [applyFadeInEffect] Duration: ${duration}s, Fade samples: ${fadeSamples}, Total samples: ${length}`)
+  
+  // ✅ Limiter le fade à la durée du clip
+  if (fadeSamples > length) {
+    console.warn(`⚠️ Fade In (${duration}s) plus long que le clip (${(length / sampleRate).toFixed(2)}s), réduction à la durée du clip`)
+    fadeSamples = length
+  }
+  
+  if (fadeSamples >= length) {
+    console.log(`ℹ️ Fade In couvre tout le clip`)
+  }
+  
   const newBuffer = ctx.createBuffer(channels, length, sampleRate)
   
   for (let channel = 0; channel < channels; channel++) {
     const data = buffer.getChannelData(channel)
     const newData = newBuffer.getChannelData(channel)
-    for (let i = 0; i < length; i++) {
-      if (i < fadeSamples) {
-        const ratio = i / fadeSamples
-        newData[i] = data[i] * (ratio * ratio)
-      } else {
-        newData[i] = data[i]
+    
+    if (fadeSamples >= length) {
+      for (let i = 0; i < length; i++) {
+        const ratio = i / length
+        const gain = ratio * ratio
+        newData[i] = data[i] * gain
+      }
+    } else {
+      for (let i = 0; i < length; i++) {
+        if (i < fadeSamples) {
+          const ratio = i / fadeSamples
+          const gain = ratio * ratio
+          newData[i] = data[i] * gain
+        } else {
+          newData[i] = data[i]
+        }
       }
     }
   }
   
+  console.log(`✅ [applyFadeInEffect] Fade In appliqué: ${duration}s`)
   return newBuffer
 }
 
+/**
+ * ✅ Applique un effet de Fade Out
+ * @param {AudioBuffer} buffer - Buffer source
+ * @param {number} duration - Durée du fade en secondes
+ * @param {AudioContext} ctx - Contexte audio
+ * @returns {AudioBuffer} Buffer modifié
+ */
 function applyFadeOutEffect(buffer, duration, ctx) {
-  if (duration <= 0) return buffer
+  if (duration <= 0.05) {
+    console.log(`ℹ️ [applyFadeOutEffect] Durée trop courte (${duration}s), ignorée`)
+    return buffer
+  }
   
   const sampleRate = buffer.sampleRate
-  const fadeSamples = Math.floor(duration * sampleRate)
-  const channels = buffer.numberOfChannels
   const length = buffer.length
-  const newBuffer = ctx.createBuffer(channels, length, sampleRate)
+  const channels = buffer.numberOfChannels
+  
+  let fadeSamples = Math.floor(duration * sampleRate)
+  
+  console.log(`🌇 [applyFadeOutEffect] Duration: ${duration}s, Fade samples: ${fadeSamples}, Total samples: ${length}`)
+  
+  // ✅ Limiter le fade à la durée du clip
+  if (fadeSamples > length) {
+    console.warn(`⚠️ Fade Out (${duration}s) plus long que le clip (${(length / sampleRate).toFixed(2)}s), réduction à la durée du clip`)
+    fadeSamples = length
+  }
+  
   const start = Math.max(0, length - fadeSamples)
   
+  if (fadeSamples >= length) {
+    console.log(`ℹ️ Fade Out couvre tout le clip`)
+  }
+  
+  const newBuffer = ctx.createBuffer(channels, length, sampleRate)
+  
   for (let channel = 0; channel < channels; channel++) {
     const data = buffer.getChannelData(channel)
     const newData = newBuffer.getChannelData(channel)
-    for (let i = 0; i < length; i++) {
-      if (i >= start) {
-        const ratio = (i - start) / fadeSamples
-        newData[i] = data[i] * (1 - ratio * ratio)
-      } else {
-        newData[i] = data[i]
+    
+    if (fadeSamples >= length) {
+      for (let i = 0; i < length; i++) {
+        const ratio = 1 - (i / length)
+        const gain = ratio * ratio
+        newData[i] = data[i] * gain
+      }
+    } else {
+      for (let i = 0; i < length; i++) {
+        if (i >= start) {
+          const ratio = (i - start) / fadeSamples
+          const gain = 1 - (ratio * ratio)
+          newData[i] = data[i] * gain
+        } else {
+          newData[i] = data[i]
+        }
       }
     }
   }
   
+  console.log(`✅ [applyFadeOutEffect] Fade Out appliqué: ${duration}s`)
   return newBuffer
 }
 
+/**
+ * Applique un effet de Pitch (hauteur)
+ * @param {AudioBuffer} buffer - Buffer source
+ * @param {number} semitones - Demi-tons
+ * @param {AudioContext} ctx - Contexte audio
+ * @returns {AudioBuffer} Buffer modifié
+ */
 function applyPitchEffect(buffer, semitones, ctx) {
   if (semitones === 0) return buffer
   
@@ -177,12 +294,21 @@ function applyPitchEffect(buffer, semitones, ctx) {
   return newBuffer
 }
 
+/**
+ * Applique un effet de Speed (vitesse)
+ * @param {AudioBuffer} buffer - Buffer source
+ * @param {number} speed - Vitesse (0.1 à 4)
+ * @param {AudioContext} ctx - Contexte audio
+ * @returns {AudioBuffer} Buffer modifié
+ */
 function applySpeedEffect(buffer, speed, ctx) {
-  if (speed === 1) return buffer
+  const clampedSpeed = Math.max(0.1, Math.min(4, speed))
+  
+  if (clampedSpeed === 1) return buffer
   
   const channels = buffer.numberOfChannels
   const sampleRate = buffer.sampleRate
-  const newLength = Math.floor(buffer.length / speed)
+  const newLength = Math.floor(buffer.length / clampedSpeed)
   const newBuffer = ctx.createBuffer(channels, newLength, sampleRate)
   
   for (let channel = 0; channel < channels; channel++) {
@@ -190,7 +316,7 @@ function applySpeedEffect(buffer, speed, ctx) {
     const newData = newBuffer.getChannelData(channel)
     
     for (let i = 0; i < newLength; i++) {
-      const srcIndex = i * speed
+      const srcIndex = i * clampedSpeed
       const srcIndexFloor = Math.floor(srcIndex)
       const srcIndexCeil = Math.min(srcIndexFloor + 1, data.length - 1)
       const frac = srcIndex - srcIndexFloor
@@ -202,11 +328,24 @@ function applySpeedEffect(buffer, speed, ctx) {
   return newBuffer
 }
 
+/**
+ * Applique un effet d'Écho
+ * @param {AudioBuffer} buffer - Buffer source
+ * @param {number} delay - Délai en secondes
+ * @param {number} decay - Atténuation (0 à 1)
+ * @param {number} mix - Mix (0 à 1)
+ * @param {AudioContext} ctx - Contexte audio
+ * @returns {AudioBuffer} Buffer modifié
+ */
 function applyEchoEffect(buffer, delay, decay, mix, ctx) {
-  if (delay <= 0 || mix <= 0) return buffer
+  const clampedDelay = Math.max(0.05, Math.min(3, delay))
+  const clampedDecay = Math.max(0, Math.min(1, decay))
+  const clampedMix = Math.max(0, Math.min(1, mix))
+  
+  if (clampedMix <= 0) return buffer
   
   const sampleRate = buffer.sampleRate
-  const delaySamples = Math.floor(delay * sampleRate)
+  const delaySamples = Math.floor(clampedDelay * sampleRate)
   const channels = buffer.numberOfChannels
   const newLength = buffer.length + delaySamples
   const newBuffer = ctx.createBuffer(channels, newLength, sampleRate)
@@ -215,15 +354,13 @@ function applyEchoEffect(buffer, delay, decay, mix, ctx) {
     const data = buffer.getChannelData(channel)
     const newData = newBuffer.getChannelData(channel)
     
-    // Copier le signal original avec le mix
     for (let i = 0; i < data.length; i++) {
-      newData[i] += data[i] * (1 - mix)
+      newData[i] += data[i] * (1 - clampedMix)
     }
     
-    // Ajouter l'écho
     for (let i = 0; i < data.length; i++) {
       if (i + delaySamples < newData.length) {
-        newData[i + delaySamples] += data[i] * mix * decay
+        newData[i + delaySamples] += data[i] * clampedMix * clampedDecay
       }
     }
   }
@@ -231,16 +368,26 @@ function applyEchoEffect(buffer, delay, decay, mix, ctx) {
   return newBuffer
 }
 
+/**
+ * Applique un effet de Réverbération
+ * @param {AudioBuffer} buffer - Buffer source
+ * @param {number} roomSize - Taille de la pièce (0 à 1)
+ * @param {number} mix - Mix (0 à 1)
+ * @param {AudioContext} ctx - Contexte audio
+ * @returns {AudioBuffer} Buffer modifié
+ */
 function applyReverbEffect(buffer, roomSize, mix, ctx) {
-  if (roomSize <= 0 || mix <= 0) return buffer
+  const clampedRoomSize = Math.max(0.05, Math.min(1, roomSize))
+  const clampedMix = Math.max(0, Math.min(1, mix))
+  
+  if (clampedMix <= 0 || clampedRoomSize <= 0) return buffer
   
   const sampleRate = buffer.sampleRate
-  const reverbLength = Math.floor(roomSize * sampleRate * 1.5)
+  const reverbLength = Math.floor(clampedRoomSize * sampleRate * 1.5)
   const channels = buffer.numberOfChannels
   const newLength = buffer.length + reverbLength
   const newBuffer = ctx.createBuffer(channels, newLength, sampleRate)
   
-  // Créer une réponse impulsionnelle stochastique
   const irBuffer = ctx.createBuffer(1, reverbLength, sampleRate)
   const irData = irBuffer.getChannelData(0)
   for (let i = 0; i < reverbLength; i++) {
@@ -252,16 +399,14 @@ function applyReverbEffect(buffer, roomSize, mix, ctx) {
     const data = buffer.getChannelData(channel)
     const newData = newBuffer.getChannelData(channel)
     
-    // Signal original avec le mix
     for (let i = 0; i < data.length; i++) {
-      newData[i] += data[i] * (1 - mix)
+      newData[i] += data[i] * (1 - clampedMix)
     }
     
-    // Réverbération - convolution simple
     for (let i = 0; i < data.length; i++) {
       const maxJ = Math.min(reverbLength, newData.length - i)
       for (let j = 0; j < maxJ; j++) {
-        newData[i + j] += data[i] * irData[j] * mix
+        newData[i + j] += data[i] * irData[j] * clampedMix
       }
     }
   }
@@ -269,6 +414,12 @@ function applyReverbEffect(buffer, roomSize, mix, ctx) {
   return newBuffer
 }
 
+/**
+ * Normalise un buffer pour éviter l'écrêtage
+ * @param {AudioBuffer} buffer - Buffer à normaliser
+ * @param {AudioContext} ctx - Contexte audio
+ * @returns {AudioBuffer} Buffer normalisé
+ */
 function normalizeBuffer(buffer, ctx) {
   const channels = buffer.numberOfChannels
   const length = buffer.length
