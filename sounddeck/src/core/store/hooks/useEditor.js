@@ -101,6 +101,7 @@ export function useEditor(save) {
   }, [save])
 
   const updateEditorProject = useCallback(async (project) => {
+    console.log('💾 [useEditor] updateEditorProject:', project?.id)
     setEditorProject(project)
     await save('editorProject', project)
     return project

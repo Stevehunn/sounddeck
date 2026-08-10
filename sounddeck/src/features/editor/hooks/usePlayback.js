@@ -1,139 +1,113 @@
 // src/features/editor/hooks/usePlayback.js
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { AudioEditorService } from '@core/services'
+import { useState, useCallback, useRef, useEffect } from 'react'
 
-export function usePlayback({
-  project,
-  clipDurations,
-  store,
-  masterVolume = 100,
-  isMasterMuted = false,
-  loopRegion = null,
-  onError = null
-}) {
+export function usePlayback(project, onTimeUpdate) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
-  const [totalDuration, setTotalDuration] = useState(10)
+  const [totalDuration, setTotalDuration] = useState(60)
+  
+  const animationRef = useRef(null)
+  const startTimeRef = useRef(0)
+  const startTimeOffsetRef = useRef(0)
+  const lastTimestampRef = useRef(0)
 
-  const isMountedRef = useRef(true)
-  const prevProjectRef = useRef(null)
-  const isInitializedRef = useRef(false)
-
-  useEffect(() => {
-    isMountedRef.current = true
-    return () => {
-      isMountedRef.current = false
-      AudioEditorService.disposeEditor()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!project || !project.id) return
-    
-    if (prevProjectRef.current === project.id && isInitializedRef.current) {
-      return
-    }
-    
-    prevProjectRef.current = project.id
-    
-    const state = AudioEditorService.initEditor(
-      project,
-      clipDurations,
-      loopRegion,
-      onError
-    )
-    
-    if (state) {
-      setTotalDuration(state.totalDuration)
-      setCurrentTime(state.currentTime)
-      setIsPlaying(state.isPlaying)
-      setIsPaused(state.isPaused)
-      isInitializedRef.current = true
-    }
-    
-    return () => {
-      if (isMountedRef.current) {
-        // Ne pas nettoyer complètement
-      }
-    }
-  }, [project?.id, clipDurations, loopRegion, onError])
-
+  // Calculer la durée totale du projet
   useEffect(() => {
     if (project?.tracks) {
       let maxDuration = 10
       for (const track of project.tracks) {
         for (const clip of track.clips) {
-          const duration = clipDurations[clip.id] || clip.duration || 3
-          const end = clip.start + duration
+          const end = (clip.start || 0) + (clip.duration || 3)
           if (end > maxDuration) maxDuration = end
         }
       }
-      const newDuration = Math.max(maxDuration + 2, 10)
-      if (newDuration !== totalDuration) {
-        setTotalDuration(newDuration)
-      }
+      setTotalDuration(Math.max(maxDuration + 2, 10))
     }
-  }, [project?.tracks, clipDurations, totalDuration])
+  }, [project])
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!isMountedRef.current) return
-      const state = AudioEditorService.getEditorState()
-      if (state) {
-        setCurrentTime(state.currentTime)
-        setIsPlaying(state.isPlaying)
-        setIsPaused(state.isPaused)
-        if (state.totalDuration !== totalDuration) {
-          setTotalDuration(state.totalDuration)
-        }
-      }
-    }, 50)
-
-    return () => clearInterval(interval)
-  }, [totalDuration])
-
-  const play = useCallback((startAt = 0) => {
-    if (!isMountedRef.current) return
-    AudioEditorService.playEditor(startAt)
+  const play = useCallback((startTime = 0) => {
+    setIsPlaying(true)
+    setIsPaused(false)
+    setCurrentTime(startTime)
+    startTimeRef.current = performance.now()
+    startTimeOffsetRef.current = startTime
+    lastTimestampRef.current = startTime
   }, [])
 
   const pause = useCallback(() => {
-    if (!isMountedRef.current) return
-    AudioEditorService.pauseEditor()
+    setIsPaused(true)
+    setIsPlaying(false)
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current)
+      animationRef.current = null
+    }
   }, [])
 
   const resume = useCallback(() => {
-    if (!isMountedRef.current) return
-    AudioEditorService.resumeEditor()
-  }, [])
+    setIsPlaying(true)
+    setIsPaused(false)
+    startTimeRef.current = performance.now()
+    startTimeOffsetRef.current = currentTime
+    lastTimestampRef.current = currentTime
+  }, [currentTime])
 
   const stop = useCallback(() => {
-    if (!isMountedRef.current) return
-    AudioEditorService.stopEditor()
+    setIsPlaying(false)
+    setIsPaused(false)
     setCurrentTime(0)
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current)
+      animationRef.current = null
+    }
   }, [])
 
   const seek = useCallback((time) => {
-    if (!isMountedRef.current) return
-    AudioEditorService.seekEditor(time)
-    setCurrentTime(time)
-  }, [])
+    const clamped = Math.max(0, Math.min(time, totalDuration))
+    setCurrentTime(clamped)
+    startTimeOffsetRef.current = clamped
+    lastTimestampRef.current = clamped
+  }, [totalDuration])
+
+  // Animation loop
+  useEffect(() => {
+    if (!isPlaying) return
+
+    const update = (timestamp) => {
+      const delta = (timestamp - startTimeRef.current) / 1000
+      const newTime = startTimeOffsetRef.current + delta
+      
+      if (newTime >= totalDuration) {
+        setCurrentTime(totalDuration)
+        setIsPlaying(false)
+        onTimeUpdate?.(totalDuration)
+        return
+      }
+      
+      setCurrentTime(newTime)
+      onTimeUpdate?.(newTime)
+      animationRef.current = requestAnimationFrame(update)
+    }
+
+    animationRef.current = requestAnimationFrame(update)
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+        animationRef.current = null
+      }
+    }
+  }, [isPlaying, totalDuration, onTimeUpdate])
 
   const togglePlay = useCallback(() => {
-    if (!isMountedRef.current) return
-    AudioEditorService.toggleEditorPlay()
-  }, [])
-
-  const updateClipEffects = useCallback((clipId) => {
-    console.log(`🔄 Mise à jour des effets pour le clip ${clipId}`)
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      AudioEditorService.disposeEditor()
+    if (isPlaying) {
+      pause()
+    } else if (isPaused) {
+      resume()
+    } else {
+      play(currentTime > 0 ? currentTime : 0)
     }
-  }, [])
+  }, [isPlaying, isPaused, currentTime, play, pause, resume])
 
   return {
     isPlaying,
@@ -146,16 +120,7 @@ export function usePlayback({
     stop,
     seek,
     togglePlay,
-    updateClipEffects,
-    isEngineReady: true,
-    engine: null,
-    getAudioContext: () => null,
-    loadBuffer: () => null,
-    startClip: () => null,
-    applyEffects: () => null,
-    getActiveClips: () => [],
-    audioContext: null,
-    rebuildEngine: stop,
+    setTotalDuration
   }
 }
 

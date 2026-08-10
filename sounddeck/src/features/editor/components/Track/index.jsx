@@ -1,11 +1,8 @@
 // src/features/editor/components/Track/index.jsx
-import { useState, useRef, useEffect, useCallback } from 'react'
-// ✅ CORRIGER L'IMPORT
+import React, { useState, useRef, useCallback, memo } from 'react'
 import EditorClip from '../Clip'
 
-// ... reste du code inchangé
-
-export default function EditorTrack({
+const EditorTrack = memo(({
   track,
   trackIndex,
   totalDuration,
@@ -18,386 +15,186 @@ export default function EditorTrack({
   onClipRemove,
   onClipDuplicate,
   onClipFade,
-  onClipCopy,
-  onClipCut,
   onClipContextMenu,
   onDragCheckpoint,
-  onTrackRemove,
   waveformData,
-  onWaveformUpdate,
   isPlaying,
   currentTime,
   clipDurations,
-  onTrackMute,
-  onTrackSolo,
-  onTrackVolume,
-  onTrackReorder,
-  autoCrossfade,
+  onUpdateClipDuration,
+  trackColor,
+  snapEnabled,  // ✅ AJOUTÉ
   tr,
-  onRenameTrack,
-  onUpdateClipDuration // ✅ Nouvelle prop
-}) {
-  const [isMuted, setIsMuted] = useState(track.muted || false)
-  const [isSolo, setIsSolo] = useState(track.solo || false)
-  const [volume, setVolume] = useState(track.volume != null ? Math.round(track.volume * 100) : 100)
-  const [isRenaming, setIsRenaming] = useState(false)
-  const [renameValue, setRenameValue] = useState(track.name || '')
-  const renameInputRef = useRef(null)
+  onPlayClip,
+  onStopClip,
+  onCopyClip,
+  onCutClip,
+  onPasteClip,
+}) => {
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStartX, setDragStartX] = useState(0)
+  const [dragClipId, setDragClipId] = useState(null)
+  const [dragStartTime, setDragStartTime] = useState(0)
+  
+  const trackRef = useRef(null)
 
-  const trackHeight = 80
-  const trackColor = track.color || `hsl(${(trackIndex * 30 + 200) % 360}, 60%, 40%)`
+  // Utiliser trackColor s'il est fourni, sinon générer
+  const getTrackColor = useCallback((index) => {
+    if (trackColor) return trackColor
+    const colors = [
+      'hsl(220, 70%, 55%)',
+      'hsl(340, 70%, 55%)',
+      'hsl(40, 70%, 55%)',
+      'hsl(160, 70%, 55%)',
+      'hsl(280, 70%, 55%)',
+      'hsl(10, 70%, 55%)',
+      'hsl(190, 70%, 55%)',
+      'hsl(70, 70%, 55%)'
+    ]
+    return colors[index % colors.length]
+  }, [trackColor])
 
-  useEffect(() => {
-    setIsMuted(track.muted || false)
-  }, [track.muted])
-
-  useEffect(() => {
-    setIsSolo(track.solo || false)
-  }, [track.solo])
-
-  useEffect(() => {
-    setVolume(track.volume != null ? Math.round(track.volume * 100) : 100)
-  }, [track.volume])
-
-  // ─── RENOMMAGE ──────────────────────────────────────────────────────────────
-  const handleRenameStart = (e) => {
-    e.stopPropagation()
-    setRenameValue(track.name || '')
-    setIsRenaming(true)
-    setTimeout(() => {
-      if (renameInputRef.current) {
-        renameInputRef.current.focus()
-        renameInputRef.current.select()
-      }
-    }, 50)
+  const handleMouseDown = (e) => {
+    if (e.button !== 0) return
+    const rect = trackRef.current?.getBoundingClientRect()
+    if (!rect) return
+    
+    const x = e.clientX - rect.left
+    const time = Math.max(0, x / pixelsPerSecond)
+    
+    setIsDragging(true)
+    setDragStartX(e.clientX)
+    setDragClipId(null)
+    setDragStartTime(time)
   }
 
-  const handleRenameConfirm = () => {
-    if (renameValue.trim() && renameValue.trim() !== track.name) {
-      onRenameTrack?.(track.id, renameValue.trim())
+  const handleMouseMove = useCallback((e) => {
+    if (!isDragging) return
+    
+    const rect = trackRef.current?.getBoundingClientRect()
+    if (!rect) return
+    
+    const x = e.clientX - rect.left
+    const time = Math.max(0, x / pixelsPerSecond)
+    
+    if (dragClipId) {
+      onClipMove?.(track.id, dragClipId, time - dragStartTime, track.id)
     }
-    setIsRenaming(false)
-  }
+  }, [isDragging, dragClipId, dragStartTime, track.id, onClipMove, pixelsPerSecond])
 
-  const handleRenameKeyDown = (e) => {
-    if (e.key === 'Enter') handleRenameConfirm()
-    if (e.key === 'Escape') {
-      setIsRenaming(false)
-      setRenameValue(track.name || '')
+  const handleMouseUp = useCallback(() => {
+    if (isDragging) {
+      setIsDragging(false)
+      onDragCheckpoint?.()
     }
-  }
+  }, [isDragging, onDragCheckpoint])
 
-  // ─── HANDLERS ──────────────────────────────────────────────────────────────
-  const handleMuteToggle = (e) => {
-    e.stopPropagation()
-    const newMuted = !isMuted
-    setIsMuted(newMuted)
-    onTrackMute?.(track.id, newMuted)
-  }
+  React.useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+    }
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp])
 
-  const handleSoloToggle = (e) => {
-    e.stopPropagation()
-    const newSolo = !isSolo
-    setIsSolo(newSolo)
-    onTrackSolo?.(track.id, newSolo)
-  }
+  const color = getTrackColor(trackIndex)
 
-  const handleVolumeChange = (e) => {
-    e.stopPropagation()
-    const displayValue = parseFloat(e.target.value)
-    const normalizedValue = displayValue / 100
-    setVolume(displayValue)
-    onTrackVolume?.(track.id, normalizedValue)
-  }
+  // Handlers avec ordre correct (clipId, trackId)
+  const handleClipSelect = useCallback((clipId) => {
+    console.log('🎯 [Track] handleClipSelect:', clipId)
+    onClipSelect?.(clipId, track.id)
+  }, [onClipSelect, track.id])
 
-  // ─── DRAG & DROP ──────────────────────────────────────────────────────────
-  const handleTrackDragStart = (e) => {
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('application/x-sounddeck-track-index', String(trackIndex))
-  }
+  const handleClipMove = useCallback((clipId, newStart, newTrackId) => {
+    console.log('🔄 [Track] handleClipMove:', { clipId, newStart, newTrackId })
+    onClipMove?.(track.id, clipId, newStart, newTrackId)
+  }, [onClipMove, track.id])
 
-  const sortedClips = [...track.clips].sort((a, b) => a.start - b.start)
+  const handleClipUpdate = useCallback((clipId, updates) => {
+    console.log('✏️ [Track] handleClipUpdate:', { clipId, updates })
+    onClipUpdate?.(track.id, clipId, updates)
+  }, [onClipUpdate, track.id])
+
+  const handleClipRemove = useCallback((clipId) => {
+    console.log('🗑️ [Track] handleClipRemove:', clipId)
+    onClipRemove?.(clipId, track.id)
+  }, [onClipRemove, track.id])
+
+  const handleClipDuplicate = useCallback((clipId) => {
+    console.log('📋 [Track] handleClipDuplicate:', clipId)
+    onClipDuplicate?.(clipId, track.id)
+  }, [onClipDuplicate, track.id])
+
+  const handleClipFade = useCallback((clipId, edge, duration) => {
+    console.log('🌊 [Track] handleClipFade:', { clipId, edge, duration })
+    onClipFade?.(track.id, clipId, edge, duration)
+  }, [onClipFade, track.id])
+
+  const handleUpdateClipDuration = useCallback((clipId, newDuration) => {
+    console.log('📏 [Track] handleUpdateClipDuration:', { clipId, newDuration })
+    onUpdateClipDuration?.(clipId, newDuration)
+  }, [onUpdateClipDuration])
 
   return (
     <div
+      ref={trackRef}
       style={{
         position: 'relative',
-        height: trackHeight + 8,
-        marginBottom: 4,
+        height: 80,
+        minHeight: 80,
+        width: '100%',
         borderBottom: '1px solid var(--border)',
-        background: selectedTrackId === track.id ? 'var(--accent-light)' : 'var(--bg-secondary)',
-        borderRadius: 'var(--radius-sm)',
-        transition: 'background 0.15s',
-        opacity: isMuted ? 0.4 : 1
+        background: selectedTrackId === track.id ? 'rgba(124,111,247,0.05)' : 'transparent',
+        userSelect: 'none',
+        transition: 'background 0.15s'
       }}
+      onMouseDown={handleMouseDown}
     >
-      {/* En-tête de piste */}
-      <div
-        style={{
-          position: 'absolute',
-          left: -190,
-          top: 0,
-          width: 180,
-          height: '100%',
-          padding: '4px 6px',
-          display: 'flex',
-          gap: 6,
-          background: 'var(--bg-secondary)',
-          borderRight: '1px solid var(--border)',
-          zIndex: 2,
-          pointerEvents: 'auto'
-        }}
-      >
-        {/* Poignée de drag */}
-        <div
-          draggable
-          onDragStart={handleTrackDragStart}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            cursor: 'grab',
-            flexShrink: 0,
-            padding: '0 2px',
-            writingMode: 'vertical-lr',
-            userSelect: 'none'
-          }}
-          title={tr('editorReorderTrack')}
-        >
-          <i className="ti ti-grip-vertical" style={{ fontSize: 14 }} />
-        </div>
+      {track.clips?.map((clip) => {
+        const duration = clipDurations?.[clip.id] || clip.duration || 3
+        const clipStart = clip.start || 0
+        const isSelected = selectedClipId === clip.id
 
-        {/* Barre de couleur */}
-        <div style={{
-          width: 4,
-          height: '100%',
-          background: trackColor,
-          borderRadius: 2,
-          flexShrink: 0,
-          marginRight: 4
-        }} />
-
-        {/* Nom de la piste */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          flex: 1,
-          minWidth: 0,
-          justifyContent: 'center'
-        }}>
-          {isRenaming ? (
-            <input
-              ref={renameInputRef}
-              type="text"
-              value={renameValue}
-              onChange={e => setRenameValue(e.target.value)}
-              onBlur={handleRenameConfirm}
-              onKeyDown={handleRenameKeyDown}
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                background: 'var(--bg-tertiary)',
-                border: '1px solid var(--accent)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '2px 6px',
-                color: 'var(--text-primary)',
-                width: '100%',
-                minHeight: 24
-              }}
-              onClick={e => e.stopPropagation()}
-            />
-          ) : (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              cursor: 'pointer'
+        return (
+          <EditorClip
+            key={clip.id}
+            clip={clip}
+            duration={duration}
+            start={clipStart}
+            trackId={track.id}
+            trackColor={color}
+            isSelected={isSelected}
+            pixelsPerSecond={pixelsPerSecond}
+            snapEnabled={snapEnabled}  // ✅ AJOUTÉ
+            onSelect={handleClipSelect}
+            onMove={handleClipMove}
+            onUpdate={handleClipUpdate}
+            onRemove={handleClipRemove}
+            onDuplicate={handleClipDuplicate}
+            onFade={handleClipFade}
+            onContextMenu={(e) => {
+              onClipContextMenu?.(e, track.id, clip.id)
             }}
-            onDoubleClick={handleRenameStart}
-            >
-              <span style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                flex: 1
-              }}>
-                {track.name}
-              </span>
-              <button
-                onClick={handleRenameStart}
-                style={{
-                  padding: '1px 4px',
-                  border: 'none',
-                  background: 'transparent',
-                  color: 'var(--text-tertiary)',
-                  cursor: 'pointer',
-                  borderRadius: 4,
-                  fontSize: 12,
-                  opacity: 0.6,
-                  transition: 'all 0.15s'
-                }}
-                title={tr('editorRenameTrack') || 'Renommer la piste'}
-              >
-                <i className="ti ti-pencil" style={{ fontSize: 11 }} />
-              </button>
-            </div>
-          )}
-          <div style={{
-            fontSize: 8,
-            color: 'var(--text-tertiary)',
-            opacity: 0.6
-          }}>
-            {track.clips.length} {tr('editorClips') || 'clips'}
-          </div>
-        </div>
-
-        {/* Boutons d'action */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 2,
-          flexShrink: 0,
-          alignItems: 'center'
-        }}>
-          <button
-            className={`btn-sm ${isMuted ? 'btn-danger' : 'btn-secondary'}`}
-            onClick={handleMuteToggle}
-            style={{
-              padding: '1px 4px',
-              fontSize: 8,
-              minHeight: 16,
-              borderRadius: 'var(--radius-sm)',
-              border: isMuted ? '1px solid var(--danger)' : '1px solid var(--border)',
-              background: isMuted ? 'rgba(224,82,82,0.2)' : 'var(--bg-tertiary)',
-              color: isMuted ? 'var(--danger)' : 'var(--text-secondary)',
-              cursor: 'pointer',
-              width: 20,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-            title={isMuted ? tr('editorUnmute') || 'Réactiver le son' : tr('editorMute') || 'Couper le son'}
-          >
-            <i className={`ti ${isMuted ? 'ti-volume-off' : 'ti-volume'}`} style={{ fontSize: 10 }} />
-          </button>
-
-          <button
-            className={`btn-sm ${isSolo ? 'btn-success' : 'btn-secondary'}`}
-            onClick={handleSoloToggle}
-            style={{
-              padding: '1px 4px',
-              fontSize: 8,
-              minHeight: 16,
-              borderRadius: 'var(--radius-sm)',
-              border: isSolo ? '1px solid var(--success)' : '1px solid var(--border)',
-              background: isSolo ? 'rgba(29,158,117,0.2)' : 'var(--bg-tertiary)',
-              color: isSolo ? 'var(--success)' : 'var(--text-secondary)',
-              cursor: 'pointer',
-              width: 20,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-            title={isSolo ? tr('editorUnsolo') || 'Désactiver solo' : tr('editorSolo') || 'Solo (isoler la piste)'}
-          >
-            <i className="ti ti-headphones" style={{ fontSize: 10 }} />
-          </button>
-
-          <button
-            className="btn-ghost btn-sm"
-            onClick={(e) => {
-              e.stopPropagation()
-              onTrackRemove(track.id)
-            }}
-            style={{
-              padding: '1px 4px',
-              fontSize: 8,
-              color: 'var(--text-tertiary)',
-              borderRadius: 'var(--radius-sm)',
-              width: 20,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '1px solid transparent',
-              background: 'transparent',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-            title={tr('editorRemoveTrack') || 'Supprimer la piste'}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = 'var(--danger)'
-              e.currentTarget.style.borderColor = 'var(--danger)'
-              e.currentTarget.style.background = 'rgba(224,82,82,0.1)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'var(--text-tertiary)'
-              e.currentTarget.style.borderColor = 'transparent'
-              e.currentTarget.style.background = 'transparent'
-            }}
-          >
-            <i className="ti ti-trash" style={{ fontSize: 10 }} />
-          </button>
-        </div>
-      </div>
-
-      {/* Clips */}
-      <div 
-        style={{ 
-          position: 'relative', 
-          height: '100%', 
-          padding: '4px 0',
-          pointerEvents: 'auto'
-        }}
-        className="editor-track-clips"
-      >
-        {sortedClips.map((clip) => {
-          const clipDuration = clipDurations?.[clip.id] || clip.duration || 3
-          return (
-            <EditorClip
-              key={clip.id}
-              clip={clip}
-              totalDuration={totalDuration}
-              pixelsPerSecond={pixelsPerSecond}
-              trackHeight={trackHeight - 8}
-              isSelected={selectedClipId === clip.id}
-              isPlaying={isPlaying && selectedClipId === clip.id}
-              waveformData={waveformData[clip.id] || null}
-              onWaveformUpdate={onWaveformUpdate}
-              clipDuration={clipDuration}
-              onSelect={() => onClipSelect(clip.id, track.id)}
-              onMove={(newStart) => onClipMove(track.id, clip.id, newStart)}
-              onUpdate={(updates) => onClipUpdate(track.id, clip.id, updates)}
-              onRemove={() => onClipRemove(track.id, clip.id)}
-              onDuplicate={() => onClipDuplicate(track.id, clip.id)}
-              onCopy={() => onClipCopy?.(clip.id, track.id)}
-              onCut={() => onClipCut?.(clip.id, track.id)}
-              onContextMenu={(clipId, _, e) => onClipContextMenu?.(clipId, track.id, e)}
-              onFadeInChange={(duration) => onClipFade?.(track.id, clip.id, 'in', duration)}
-              onFadeOutChange={(duration) => onClipFade?.(track.id, clip.id, 'out', duration)}
-              onDragCheckpoint={onDragCheckpoint}
-              onDurationUpdate={onUpdateClipDuration} // ✅ Transmettre la prop
-              tr={tr}
-            />
-          )
-        })}
-      </div>
-
-      {/* Indicateur de nombre de clips */}
-      {track.clips.length > 0 && (
-        <div style={{
-          position: 'absolute',
-          right: 4,
-          bottom: 2,
-          fontSize: 8,
-          color: 'var(--text-tertiary)',
-          opacity: 0.4,
-          pointerEvents: 'none'
-        }}>
-          {track.clips.length} clip{track.clips.length > 1 ? 's' : ''}
-        </div>
-      )}
+            onUpdateDuration={handleUpdateClipDuration}
+            waveformData={waveformData?.[clip.id]}
+            isPlaying={isPlaying}
+            currentTime={currentTime}
+            tr={tr}
+            onPlayClip={onPlayClip}
+            onStopClip={onStopClip}
+            onCopyClip={onCopyClip}
+            onCutClip={onCutClip}
+            onPasteClip={onPasteClip}
+          />
+        )
+      })}
     </div>
   )
-}
+})
+
+EditorTrack.displayName = 'EditorTrack'
+
+export default EditorTrack

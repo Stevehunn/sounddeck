@@ -1,253 +1,166 @@
-// src/pages/editor/utils/effects/index.js
-
-// ✅ Exports statiques
-export { VolumeEffect } from './VolumeEffect'
-export { SpeedEffect } from './SpeedEffect'
-export { FadeEffect } from './FadeEffect'
-export { EchoEffect } from './EchoEffect'
-export { ReverbEffect } from './ReverbEffect'
-
-// ✅ Imports pour EffectChain
-import { VolumeEffect } from './VolumeEffect'
-import { SpeedEffect } from './SpeedEffect'
-import { FadeEffect } from './FadeEffect'
-import { EchoEffect } from './EchoEffect'
-import { ReverbEffect } from './ReverbEffect'
+// src/features/editor/utils/effects/index.js
 
 /**
- * EffectChain - Gère la chaîne d'effets pour un clip
- * Applique les effets dans l'ordre et maintient les connexions
+ * Applique un effet de volume
+ * @param {AudioBuffer} buffer - Buffer audio
+ * @param {number} gain - Gain (0 à 5, 1 = normal)
+ * @returns {AudioBuffer} Buffer modifié
  */
-export class EffectChain {
-  constructor(audioContext) {
-    this.audioContext = audioContext
-    this.effects = {}       // Stocke les instances d'effets
-    this.nodes = []         // Stocke les nœuds créés
-    this.activeEffects = [] // Effets actifs
+export function applyVolumeEffect(buffer, gain) {
+  const clampedGain = Math.max(0, Math.min(5, gain))
+  if (clampedGain === 1) return buffer
+  
+  const newBuffer = buffer.context.createBuffer(
+    buffer.numberOfChannels,
+    buffer.length,
+    buffer.sampleRate
+  )
+  
+  for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+    const inputData = buffer.getChannelData(channel)
+    const outputData = newBuffer.getChannelData(channel)
+    for (let i = 0; i < inputData.length; i++) {
+      outputData[i] = inputData[i] * clampedGain
+    }
   }
+  
+  return newBuffer
+}
 
-  /**
-   * Crée et applique tous les effets d'un clip
-   * @param {string} clipId - ID du clip
-   * @param {Array} effects - Liste des effets du clip
-   * @param {AudioNode} source - Source audio d'entrée
-   * @param {GainNode} gainNode - Nœud de gain du clip
-   * @param {string} clipPath - Chemin du fichier audio (non utilisé)
-   * @returns {Promise<Object>} { nodes, lastNode }
-   */
-  async createEffects(clipId, effects, source, gainNode, clipPath) {
-    console.log(`🔄 [EffectChain] createEffects() pour clip ${clipId}`)
-    console.log(`  - ${effects?.length || 0} effets à appliquer`)
+/**
+ * Applique un effet de fade in/out
+ * @param {AudioBuffer} buffer - Buffer audio
+ * @param {number} fadeInDuration - Durée du fade in en secondes
+ * @param {number} fadeOutDuration - Durée du fade out en secondes
+ * @param {number} sampleRate - Taux d'échantillonnage
+ * @returns {AudioBuffer} Buffer modifié
+ */
+export function applyFadeEffect(buffer, fadeInDuration = 0, fadeOutDuration = 0, sampleRate = 44100) {
+  if (fadeInDuration <= 0 && fadeOutDuration <= 0) return buffer
+  
+  const newBuffer = buffer.context.createBuffer(
+    buffer.numberOfChannels,
+    buffer.length,
+    buffer.sampleRate
+  )
+  
+  const fadeInSamples = Math.floor(fadeInDuration * sampleRate)
+  const fadeOutSamples = Math.floor(fadeOutDuration * sampleRate)
+  const totalSamples = buffer.length
+  
+  for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+    const inputData = buffer.getChannelData(channel)
+    const outputData = newBuffer.getChannelData(channel)
     
-    const result = { nodes: [], lastNode: source }
-
-    // Nettoyer les anciens effets
-    this.dispose()
-
-    if (!effects || effects.length === 0) {
-      console.log(`  ⏭️ Aucun effet à appliquer`)
-      return result
+    for (let i = 0; i < totalSamples; i++) {
+      let gain = 1
+      
+      // Fade in
+      if (i < fadeInSamples && fadeInSamples > 0) {
+        gain = i / fadeInSamples
+      }
+      
+      // Fade out
+      if (i > totalSamples - fadeOutSamples && fadeOutSamples > 0) {
+        const fadePos = (i - (totalSamples - fadeOutSamples)) / fadeOutSamples
+        gain *= (1 - fadePos)
+      }
+      
+      outputData[i] = inputData[i] * gain
     }
+  }
+  
+  return newBuffer
+}
 
-    // Filtrer les effets actifs
-    const activeEffects = effects.filter(e => e.enabled)
-    if (activeEffects.length === 0) {
-      console.log(`  ⏭️ Aucun effet actif`)
-      return result
+/**
+ * Applique un effet de réverbération (simplifié)
+ * @param {AudioBuffer} buffer - Buffer audio
+ * @param {number} decay - Temps de réverbération en secondes (0.1 à 5)
+ * @param {number} mix - Mix (0 à 1)
+ * @param {number} sampleRate - Taux d'échantillonnage
+ * @returns {AudioBuffer} Buffer modifié
+ */
+export function applyReverbEffect(buffer, decay = 1, mix = 0.3, sampleRate = 44100) {
+  if (mix <= 0) return buffer
+  
+  const decaySamples = Math.floor(decay * sampleRate)
+  const bufferLength = buffer.length
+  const reverbBuffer = buffer.context.createBuffer(
+    buffer.numberOfChannels,
+    bufferLength + decaySamples,
+    buffer.sampleRate
+  )
+  
+  for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+    const inputData = buffer.getChannelData(channel)
+    const outputData = reverbBuffer.getChannelData(channel)
+    
+    // Copier le signal original
+    for (let i = 0; i < bufferLength; i++) {
+      outputData[i] = inputData[i] * (1 - mix)
     }
-
-    console.log(`  🔧 ${activeEffects.length} effet(s) actif(s) à appliquer`)
-
-    for (const effect of activeEffects) {
-      console.log(`  🔧 Application de l'effet: ${effect.type}`)
-
-      switch (effect.type) {
-        case 'volume': {
-          const value = effect.params?.value ?? 1
-          console.log(`    📊 Volume: ${value.toFixed(2)}x`)
-          if (gainNode) {
-            gainNode.gain.value = Math.max(0, Math.min(5, value))
-          }
-          break
-        }
-
-        case 'speed': {
-          const value = effect.params?.value ?? 1
-          console.log(`    🏃 Speed: ${value.toFixed(2)}x`)
-          if (!this.effects.speed) {
-            this.effects.speed = new SpeedEffect()
-          }
-          this.effects.speed.apply(source, clipId, value)
-          break
-        }
-
-        case 'fadeIn': {
-          const duration = effect.params?.duration ?? 0.5
-          console.log(`    🌅 Fade In: ${duration.toFixed(2)}s`)
-          if (!this.effects.fade) {
-            this.effects.fade = new FadeEffect(this.audioContext)
-          }
-          this.effects.fade.applyFadeIn(gainNode, clipId, duration)
-          break
-        }
-
-        case 'fadeOut': {
-          const duration = effect.params?.duration ?? 0.5
-          console.log(`    🌇 Fade Out: ${duration.toFixed(2)}s`)
-          if (!this.effects.fade) {
-            this.effects.fade = new FadeEffect(this.audioContext)
-          }
-          this.effects.fade.setFadeOutParams(clipId, duration)
-          break
-        }
-
-        case 'echo': {
-          const delay = effect.params?.delay ?? 0.3
-          const decay = effect.params?.decay ?? 0.5
-          const mix = effect.params?.mix ?? 0.3
-          console.log(`    🔄 Echo: delay=${delay.toFixed(2)}s, decay=${decay.toFixed(2)}, mix=${mix.toFixed(2)}`)
-          if (!this.effects.echo) {
-            this.effects.echo = new EchoEffect(this.audioContext)
-          }
-          const echoNode = this.effects.echo.createNode(
-            result.lastNode,
-            clipId,
-            effect.params
-          )
-          if (echoNode) {
-            result.nodes.push(echoNode)
-            result.lastNode = echoNode
-          }
-          break
-        }
-
-        case 'reverb': {
-          const roomSize = effect.params?.roomSize ?? 0.5
-          const mix = effect.params?.mix ?? 0.2
-          console.log(`    🌊 Reverb: roomSize=${roomSize.toFixed(2)}, mix=${mix.toFixed(2)}`)
-          if (!this.effects.reverb) {
-            this.effects.reverb = new ReverbEffect(this.audioContext)
-          }
-          const reverbNode = this.effects.reverb.createNode(
-            result.lastNode,
-            clipId,
-            effect.params
-          )
-          if (reverbNode) {
-            result.nodes.push(reverbNode)
-            result.lastNode = reverbNode
-          }
-          break
-        }
-
-        default:
-          console.warn(`  ⚠️ Effet inconnu: ${effect.type}`)
+    
+    // Ajouter la réverbération (simplifiée)
+    for (let i = 0; i < bufferLength; i++) {
+      for (let j = 0; j < decaySamples && i + j < bufferLength + decaySamples; j += Math.floor(decaySamples / 10)) {
+        const gain = (1 - j / decaySamples) * mix * 0.5
+        outputData[i + j] += inputData[i] * gain
       }
     }
-
-    this.activeEffects = activeEffects
-    this.nodes = result.nodes
-    
-    console.log(`✅ [EffectChain] Effets appliqués, ${result.nodes.length} nœuds créés`)
-    console.log(`  - Dernier nœud: ${result.lastNode?.constructor?.name || 'inconnu'}`)
-    return result
   }
+  
+  return reverbBuffer
+}
 
-  /**
-   * Met à jour un paramètre d'effet en temps réel
-   */
-  updateEffect(clipId, effectType, param, value) {
-    console.log(`🔄 [EffectChain] updateEffect()`, { clipId, effectType, param, value })
+/**
+ * Applique un effet d'écho (simplifié)
+ * @param {AudioBuffer} buffer - Buffer audio
+ * @param {number} delay - Délai en secondes (0.05 à 2)
+ * @param {number} feedback - Feedback (0 à 0.9)
+ * @param {number} mix - Mix (0 à 1)
+ * @param {number} sampleRate - Taux d'échantillonnage
+ * @returns {AudioBuffer} Buffer modifié
+ */
+export function applyEchoEffect(buffer, delay = 0.3, feedback = 0.5, mix = 0.4, sampleRate = 44100) {
+  if (mix <= 0) return buffer
+  
+  const delaySamples = Math.floor(delay * sampleRate)
+  const bufferLength = buffer.length
+  const echoBuffer = buffer.context.createBuffer(
+    buffer.numberOfChannels,
+    bufferLength + delaySamples * 2,
+    buffer.sampleRate
+  )
+  
+  for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+    const inputData = buffer.getChannelData(channel)
+    const outputData = echoBuffer.getChannelData(channel)
     
-    switch (effectType) {
-      case 'speed':
-        if (this.effects.speed) {
-          this.effects.speed.update(value)
-        }
-        break
-      case 'echo':
-        if (this.effects.echo) {
-          this.effects.echo.update({ [param]: value })
-        }
-        break
-      case 'reverb':
-        if (this.effects.reverb) {
-          this.effects.reverb.update({ [param]: value })
-        }
-        break
-      case 'volume':
-        if (this.effects.volume) {
-          this.effects.volume.update(value)
-        }
-        break
-      default:
-        console.warn(`  ⚠️ Effet non trouvé pour mise à jour: ${effectType}`)
+    // Copier le signal original
+    for (let i = 0; i < bufferLength; i++) {
+      outputData[i] = inputData[i] * (1 - mix)
     }
-  }
-
-  /**
-   * Applique un fade out pendant la lecture
-   */
-  applyFadeOut(clipId, gainNode, currentTime, clipDuration, clipStart) {
-    if (this.effects.fade) {
-      this.effects.fade.applyFadeOut(
-        gainNode,
-        clipId,
-        currentTime,
-        clipDuration,
-        clipStart
-      )
-    }
-  }
-
-  /**
-   * Nettoie tous les effets
-   */
-  dispose() {
-    console.log(`🧹 [EffectChain] dispose() appelé, nettoyage de ${Object.keys(this.effects).length} effets`)
     
-    for (const key in this.effects) {
-      if (this.effects[key]?.dispose) {
-        try {
-          this.effects[key].dispose()
-        } catch (e) {
-          console.warn(`⚠️ Erreur nettoyage ${key}:`, e.message)
+    // Ajouter l'écho
+    let echoGain = mix
+    for (let repeat = 0; repeat < 5 && echoGain > 0.01; repeat++) {
+      const offset = delaySamples * (repeat + 1)
+      for (let i = 0; i < bufferLength; i++) {
+        if (i + offset < bufferLength + delaySamples * 2) {
+          outputData[i + offset] += inputData[i] * echoGain
         }
       }
+      echoGain *= feedback
     }
-    
-    this.effects = {}
-    this.nodes = []
-    this.activeEffects = []
   }
-
-  /**
-   * Vérifie si la chaîne a des effets actifs
-   */
-  hasActiveEffects() {
-    return this.activeEffects.length > 0
-  }
-
-  /**
-   * Récupère le nombre d'effets actifs
-   */
-  getActiveEffectCount() {
-    return this.activeEffects.length
-  }
-
-  /**
-   * Récupère les types d'effets actifs
-   */
-  getActiveEffectTypes() {
-    return this.activeEffects.map(e => e.type)
-  }
+  
+  return echoBuffer
 }
 
 export default {
-  VolumeEffect,
-  SpeedEffect,
-  FadeEffect,
-  EchoEffect,
-  ReverbEffect,
-  EffectChain
+  applyVolumeEffect,
+  applyFadeEffect,
+  applyReverbEffect,
+  applyEchoEffect
 }

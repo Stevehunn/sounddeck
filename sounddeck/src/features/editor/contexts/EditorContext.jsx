@@ -1,499 +1,1230 @@
 // src/features/editor/contexts/EditorContext.jsx
-import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react'
-// ✅ CORRIGER L'IMPORT
-import { generateWaveformData } from '@shared/utils/waveformGenerator'
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
+import { useLanguage } from '@core/i18n/LanguageContext'
 
 const EditorContext = createContext(null)
 
-export function EditorProvider({ store, addToast, children }) {
-  const project = store.editorProject
-
-  console.log('🔵 [EditorContext] Rendu du provider, project:', project?.id || 'null', 'tracks:', project?.tracks?.length || 0)
-
-  // ─── ÉTATS ──────────────────────────────────────────────────────────────────
+export function EditorProvider({ children, store, addToast }) {
+  const { t } = useLanguage()
+  
+  // ─── ÉTATS ──────────────────────────────────────────────────────────────
+  console.log('🔄 [EditorContext] Initialisation des états')
+  
+  const [project, setProject] = useState(null)
   const [selectedClipId, setSelectedClipId] = useState(null)
   const [selectedTrackId, setSelectedTrackId] = useState(null)
-  const [waveformData, setWaveformData] = useState({})
+  const [currentTime, setCurrentTime] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+  const [zoomLevel, setZoomLevel] = useState(1)
+  const [snapEnabled, setSnapEnabled] = useState(true)
+  const [loopRegion, setLoopRegion] = useState({ enabled: false, start: 0, end: 10 })
+  const [autoCrossfade, setAutoCrossfade] = useState(true)
   const [clipDurations, setClipDurations] = useState({})
+  const [waveformData, setWaveformData] = useState({})
+  const [isDurationsLoaded, setIsDurationsLoaded] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false)
+  const [totalDuration, setTotalDuration] = useState(10)
   const [isLoading, setIsLoading] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
   const [isAutoSaving, setIsAutoSaving] = useState(false)
-  const [isInitialized, setIsInitialized] = useState(false)
-
-  // ─── REFS ──────────────────────────────────────────────────────────────────
-  const waveformCacheRef = useRef(new Map())
-  const loadingRefsRef = useRef(new Map())
-  const autoSaveTimerRef = useRef(null)
-  const isMountedRef = useRef(true)
   
-  const prevProjectSnapshotRef = useRef(null)
-  const isInitialMountRef = useRef(true)
-  const isSavingRef = useRef(false)
-  const isProcessingChangeRef = useRef(false)
-  
+  // ─── REFS ──────────────────────────────────────────────────────────────
   const isLoadingRef = useRef(false)
-  const isWaveformLoadingRef = useRef(false)
-  const isDurationsLoadedRef = useRef(false)
-  const hasLoadedWaveformsRef = useRef(false)
   const initialLoadDoneRef = useRef(false)
+  const audioContextRef = useRef(null)
+  const audioSourcesRef = useRef({})
+  const animationRef = useRef(null)
+  const projectRef = useRef(null)
+  const lastPlayedClipsRef = useRef(new Set())
+  const currentTimeRef = useRef(0)
+  const isPlayingRef = useRef(false)
+  const isPausedRef = useRef(false)
 
-  // ─── NETTOYAGE ─────────────────────────────────────────────────────────────
+  // Mettre à jour la ref quand le projet change
   useEffect(() => {
-    isMountedRef.current = true
-    return () => {
-      isMountedRef.current = false
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current)
-        autoSaveTimerRef.current = null
+    projectRef.current = project
+    console.log('📊 [EditorContext] Projet mis à jour dans la ref:', project?.id, 'pistes:', project?.tracks?.length)
+  }, [project])
+
+  // Synchroniser les refs avec les états
+  useEffect(() => {
+    currentTimeRef.current = currentTime
+  }, [currentTime])
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying
+  }, [isPlaying])
+
+  useEffect(() => {
+    isPausedRef.current = isPaused
+  }, [isPaused])
+
+  // ─── FONCTIONS HELPER POUR LE CROSSFADE ──────────────────────────────
+
+  // Trouver le clip précédent dans la même piste
+  const findPreviousClip = useCallback((clip, track) => {
+    if (!track || !track.clips) return null
+    const previous = track.clips
+      .filter(c => c.id !== clip.id && c.start < clip.start)
+      .sort((a, b) => b.start - a.start)[0]
+    return previous || null
+  }, [])
+
+  // Calculer le chevauchement entre deux clips
+  const calculateOverlap = useCallback((clipA, clipB) => {
+    const endA = clipA.start + (clipDurations[clipA.id] || clipA.duration || 3)
+    const startB = clipB.start
+    return Math.max(0, endA - startB)
+  }, [clipDurations])
+
+  // Appliquer le fade out à un clip existant
+  const applyFadeOutToClip = useCallback((clipId, duration) => {
+    const entry = audioSourcesRef.current[clipId]
+    if (!entry) return
+    const { gainNode } = entry
+    const ctx = audioContextRef.current
+    if (!ctx) return
+    const now = ctx.currentTime
+    const currentGain = gainNode.gain.value
+    gainNode.gain.setValueAtTime(currentGain, now)
+    gainNode.gain.linearRampToValueAtTime(0, now + duration)
+    console.log(`🌊 [Crossfade] Fade out sur ${clipId} sur ${duration.toFixed(2)}s`)
+  }, [])
+
+  // ─── CHARGEMENT DU PROJET ──────────────────────────────────────────────
+
+  const loadProject = useCallback(async (projectData) => {
+    console.log('📂 [EditorContext] loadProject:', projectData?.id)
+    
+    if (!projectData) {
+      console.log('⚠️ [EditorContext] loadProject: projectData est null')
+      setIsInitialized(true)
+      return
+    }
+
+    if (project?.id === projectData.id && project?.tracks?.length === projectData.tracks?.length) {
+      console.log('⏭️ [EditorContext] Projet identique, ignoré')
+      setIsInitialized(true)
+      return
+    }
+
+    console.log('🔄 [EditorContext] Mise à jour du projet:', projectData.id)
+    setProject(projectData)
+    projectRef.current = projectData
+    setSelectedClipId(null)
+    setSelectedTrackId(null)
+    setCurrentTime(0)
+    setIsPlaying(false)
+    setIsPaused(false)
+    setIsDurationsLoaded(false)
+    setIsInitialized(true)
+    
+    let maxDuration = 10
+    if (projectData.tracks) {
+      console.log(`📊 [EditorContext] ${projectData.tracks.length} pistes trouvées`)
+      for (const track of projectData.tracks) {
+        console.log(`  📋 Piste: ${track.name} - ${track.clips?.length || 0} clips`)
+        for (const clip of track.clips) {
+          const duration = clip.duration || 3
+          const end = (clip.start || 0) + duration
+          if (end > maxDuration) maxDuration = end
+        }
       }
+      setTotalDuration(Math.max(maxDuration + 2, 10))
+      console.log(`📏 [EditorContext] Durée totale: ${Math.max(maxDuration + 2, 10)}s`)
+    }
+    
+    if (projectData.tracks) {
+      const durations = {}
+      for (const track of projectData.tracks) {
+        for (const clip of track.clips) {
+          if (clip.id) {
+            durations[clip.id] = clip.duration || 3
+          }
+        }
+      }
+      setClipDurations(durations)
+      setIsDurationsLoaded(true)
+      console.log(`📦 [EditorContext] ${Object.keys(durations).length} durées de clips chargées`)
+    }
+  }, [project])
+
+  // ─── INITIALISATION ──────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (initialLoadDoneRef.current || isLoadingRef.current) {
+      console.log('⏭️ [EditorContext] Initialisation déjà en cours ou terminée')
+      return
+    }
+    
+    console.log('🔵 [EditorContext] Initialisation...')
+    isLoadingRef.current = true
+    
+    const init = async () => {
+      try {
+        console.log('🔍 [EditorContext] Vérification du store...')
+        const editorProject = store?.editorProject
+        
+        if (editorProject) {
+          console.log('📂 [EditorContext] Projet trouvé:', editorProject.id)
+          await loadProject(editorProject)
+        } else {
+          console.log('📂 [EditorContext] Aucun projet trouvé, création...')
+          const newProject = await store?.createEditorProject?.('Nouveau projet')
+          if (newProject) {
+            console.log('✅ [EditorContext] Nouveau projet créé:', newProject.id)
+            await loadProject(newProject)
+          } else {
+            console.log('⚠️ [EditorContext] Création du projet de secours')
+            const fallbackProject = {
+              id: `project-${Date.now()}`,
+              name: 'Nouveau projet',
+              tracks: [],
+              duration: 60,
+              createdAt: Date.now(),
+              updatedAt: Date.now()
+            }
+            setProject(fallbackProject)
+            projectRef.current = fallbackProject
+            setTotalDuration(10)
+            setIsInitialized(true)
+          }
+        }
+      } catch (e) {
+        console.error('❌ [EditorContext] Erreur initialisation:', e)
+        const fallbackProject = {
+          id: `project-${Date.now()}`,
+          name: 'Nouveau projet',
+          tracks: [],
+          duration: 60,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }
+        setProject(fallbackProject)
+        projectRef.current = fallbackProject
+        setTotalDuration(10)
+        setIsInitialized(true)
+      } finally {
+        isLoadingRef.current = false
+        initialLoadDoneRef.current = true
+        console.log('✅ [EditorContext] Initialisation terminée')
+      }
+    }
+    
+    init()
+  }, [store, loadProject])
+
+  // ─── FONCTIONS PLAYBACK ──────────────────────────────────────────────
+  
+  const loadAudioBuffer = useCallback(async (filePath) => {
+    console.log('🎵 [EditorContext] loadAudioBuffer:', filePath)
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
+        console.log('🎵 [EditorContext] AudioContext créé')
+      }
+      
+      const ctx = audioContextRef.current
+      if (ctx.state === 'suspended') {
+        await ctx.resume()
+        console.log('🎵 [EditorContext] AudioContext repris')
+      }
+      
+      const fileUrl = filePath.startsWith('file://') 
+        ? filePath 
+        : 'file:///' + filePath.replace(/\\/g, '/')
+      
+      const response = await fetch(fileUrl)
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const arrayBuffer = await response.arrayBuffer()
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
+      console.log(`🎵 [EditorContext] Buffer chargé: ${audioBuffer.duration.toFixed(2)}s`)
+      return audioBuffer
+    } catch (e) {
+      console.error('❌ [EditorContext] Erreur chargement audio:', e)
+      return null
     }
   }, [])
 
-  // ─── INITIALISATION DU PROJET ──────────────────────────────────────────────
-  useEffect(() => {
-    const initProject = async () => {
-      if (project && project.id) {
-        setIsInitialized(true)
+  // ✅ playClip AVEC CROSSFADE
+  const playClip = useCallback(async (clip, track) => {
+    if (!clip?.path) {
+      console.warn('⚠️ [EditorContext] Clip sans chemin:', clip)
+      return
+    }
+    
+    console.log(`▶️ [EditorContext] playClip: ${clip.name} (${clip.id})`)
+    
+    try {
+      const buffer = await loadAudioBuffer(clip.path)
+      if (!buffer) {
+        console.error('❌ [EditorContext] Buffer non chargé pour:', clip.name)
+        return
+      }
+      
+      const ctx = audioContextRef.current
+      if (!ctx) {
+        console.error('❌ [EditorContext] AudioContext non disponible')
+        return
+      }
+      
+      const source = ctx.createBufferSource()
+      source.buffer = buffer
+      
+      const gainNode = ctx.createGain()
+      const trackVolume = track?.volume || 1
+      gainNode.gain.value = trackVolume
+      
+      // ✅ APPLIQUER LE CROSSFADE si activé
+      if (autoCrossfade) {
+        // Vérifier si ce clip chevauche le précédent
+        const previousClip = findPreviousClip(clip, track)
+        if (previousClip) {
+          const overlap = calculateOverlap(previousClip, clip)
+          if (overlap > 0.01) {
+            const fadeDuration = Math.min(overlap, 0.1) // 0.1s max
+            const now = ctx.currentTime
+            
+            // Appliquer fade out sur le clip précédent
+            const prevEntry = audioSourcesRef.current[previousClip.id]
+            if (prevEntry) {
+              const prevGain = prevEntry.gainNode
+              const currentGain = prevGain.gain.value
+              prevGain.gain.setValueAtTime(currentGain, now)
+              prevGain.gain.linearRampToValueAtTime(0, now + fadeDuration)
+              console.log(`🌊 [Crossfade] Fade out sur ${previousClip.name} sur ${fadeDuration.toFixed(2)}s`)
+            }
+            
+            // Fade in pour ce clip
+            gainNode.gain.setValueAtTime(0, now)
+            gainNode.gain.linearRampToValueAtTime(trackVolume, now + fadeDuration)
+            console.log(`🌊 [Crossfade] Fade in sur ${clip.name} sur ${fadeDuration.toFixed(2)}s`)
+          }
+        }
+      }
+      
+      if (clip.effects && clip.effects.length > 0) {
+        try {
+          const { applyEffectsToBuffer } = await import('@shared/utils/realTimeEffects')
+          const processedBuffer = applyEffectsToBuffer(buffer, clip.effects, ctx.sampleRate, true)
+          if (processedBuffer) {
+            source.buffer = processedBuffer
+          }
+        } catch (e) {
+          console.warn('⚠️ Erreur application effets:', e)
+        }
+      }
+      
+      source.connect(gainNode)
+      gainNode.connect(ctx.destination)
+      
+      const offset = Math.max(0, currentTime - (clip.start || 0))
+      const startTime = Math.min(offset, buffer.duration - 0.01)
+      
+      console.log(`▶️ [EditorContext] Lecture: ${clip.name} à ${startTime.toFixed(2)}s`)
+      
+      source.start(0, startTime)
+      audioSourcesRef.current[clip.id] = { source, gainNode }
+      
+      source.onended = () => {
+        console.log(`⏹️ [EditorContext] Fin du clip: ${clip.name}`)
+        delete audioSourcesRef.current[clip.id]
+      }
+      
+    } catch (e) {
+      console.error('❌ [EditorContext] Erreur lecture clip:', e)
+    }
+  }, [loadAudioBuffer, currentTime, autoCrossfade, findPreviousClip, calculateOverlap])
+
+  // ✅ startPlaybackLoop AVEC CROSSFADE
+  const startPlaybackLoop = useCallback(() => {
+    console.log('🔄 [EditorContext] startPlaybackLoop')
+    
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current)
+      animationRef.current = null
+    }
+
+    let lastTime = performance.now()
+    let accumulated = 0
+    const playedClips = new Set()
+    let isLoopRunning = true
+
+    const loop = () => {
+      if (!isPlayingRef.current || isPausedRef.current) {
+        if (isLoopRunning) {
+          animationRef.current = requestAnimationFrame(loop)
+        }
         return
       }
 
-      if (!store.editorProject || !store.editorProject.id) {
-        console.log('🔄 [EditorContext] Création d\'un nouveau projet...')
-        const newProject = await store.createEditorProject('Nouveau projet')
-        if (newProject) {
-          setIsInitialized(true)
+      const now = performance.now()
+      const delta = (now - lastTime) / 1000
+      lastTime = now
+      accumulated += delta
+
+      if (accumulated >= 0.016) {
+        const newTime = currentTimeRef.current + accumulated
+        accumulated = 0
+        
+        if (projectRef.current?.tracks) {
+          const tracks = projectRef.current.tracks
+          for (const track of tracks) {
+            if (track.muted) continue
+            for (const clip of track.clips) {
+              const duration = clipDurations[clip.id] || clip.duration || 3
+              const start = clip.start || 0
+              const end = start + duration
+              
+              if (newTime >= start && newTime < end) {
+                if (!playedClips.has(clip.id)) {
+                  console.log(`▶️ [EditorContext] Lancement du clip: ${clip.name} à ${newTime.toFixed(2)}s`)
+                  playClip(clip, track)
+                  playedClips.add(clip.id)
+                }
+              } else if (newTime >= end) {
+                playedClips.delete(clip.id)
+              }
+            }
+          }
         }
+        
+        if (newTime >= totalDuration) {
+          console.log('⏹️ [EditorContext] Fin de la lecture à', newTime.toFixed(2), 's')
+          setIsPlaying(false)
+          setCurrentTime(totalDuration)
+          for (const [id, { source }] of Object.entries(audioSourcesRef.current)) {
+            try { source.stop() } catch (e) {}
+          }
+          audioSourcesRef.current = {}
+          isLoopRunning = false
+          return
+        }
+        
+        setCurrentTime(newTime)
+      }
+      
+      if (isLoopRunning) {
+        animationRef.current = requestAnimationFrame(loop)
       }
     }
-
-    initProject()
-  }, [project, store])
-
-  // ─── SAUVEGARDE AUTOMATIQUE ──────────────────────────────────────────────
-  const saveProject = useCallback(async () => {
-    if (!store.editorProject?.id || !isMountedRef.current) return
-    if (isSavingRef.current) return
     
-    isSavingRef.current = true
-    setIsAutoSaving(true)
+    lastTime = performance.now()
+    accumulated = 0
+    isLoopRunning = true
+    animationRef.current = requestAnimationFrame(loop)
+    console.log('✅ [EditorContext] Animation démarrée')
+  }, [totalDuration, playClip, clipDurations])
+
+  const play = useCallback(async () => {
+    console.log('▶️ [EditorContext] play - isPlaying actuel:', isPlaying)
     
     try {
-      await window.electronAPI.storeSet('editorProject', store.editorProject)
-      if (isMountedRef.current) {
-        setIsDirty(false)
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
+        console.log('🎵 [EditorContext] AudioContext créé')
       }
-    } catch (e) {
-      console.warn('❌ [saveProject] Erreur:', e)
-    } finally {
-      if (isMountedRef.current) {
-        setIsAutoSaving(false)
-        isSavingRef.current = false
-      }
-    }
-  }, [store.editorProject])
-
-  const markDirty = useCallback(() => {
-    if (!isMountedRef.current || isSavingRef.current) return
-    
-    setIsDirty(true)
-    
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current)
-      autoSaveTimerRef.current = null
-    }
-    
-    autoSaveTimerRef.current = setTimeout(() => {
-      saveProject()
-      autoSaveTimerRef.current = null
-    }, 3000)
-  }, [saveProject])
-
-  // ─── SUIVI DES CHANGEMENTS DU PROJET ──────────────────────────────────────
-  useEffect(() => {
-    if (!project || !project.id) return
-    
-    if (isInitialMountRef.current) {
-      isInitialMountRef.current = false
-      prevProjectSnapshotRef.current = JSON.stringify(project)
       
-      if (!initialLoadDoneRef.current) {
-        initialLoadDoneRef.current = true
-        isDurationsLoadedRef.current = true
-        hasLoadedWaveformsRef.current = true
-        setIsLoading(false)
-        console.log('✅ [EditorContext] Initialisation terminée (projet vide)')
+      const ctx = audioContextRef.current
+      if (ctx.state === 'suspended') {
+        await ctx.resume()
+        console.log('🎵 [EditorContext] AudioContext repris')
       }
-      return
+      
+      setIsPlaying(true)
+      setIsPaused(false)
+      
+      lastPlayedClipsRef.current = new Set()
+      
+      console.log('✅ [EditorContext] Lecture démarrée, la boucle gérera les clips')
+      
+      setTimeout(() => {
+        startPlaybackLoop()
+      }, 50)
+      
+    } catch (e) {
+      console.error('❌ [EditorContext] Erreur play:', e)
+      setIsPlaying(false)
+    }
+  }, [project, clipDurations, currentTime, playClip, startPlaybackLoop, isPlaying])
+
+  const resume = useCallback(async () => {
+    console.log('▶️ [EditorContext] resume')
+    
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      await audioContextRef.current.resume()
     }
     
-    if (isProcessingChangeRef.current || isSavingRef.current) return
-    
-    const currentSnapshot = JSON.stringify(project)
-    const prevSnapshot = prevProjectSnapshotRef.current
-    
-    if (currentSnapshot === prevSnapshot) return
-    
-    prevProjectSnapshotRef.current = currentSnapshot
-    isProcessingChangeRef.current = true
+    setIsPaused(false)
+    setIsPlaying(true)
     
     setTimeout(() => {
-      isProcessingChangeRef.current = false
-    }, 200)
+      startPlaybackLoop()
+    }, 50)
+  }, [startPlaybackLoop])
+
+  const pause = useCallback(() => {
+    console.log('⏸️ [EditorContext] pause')
+    setIsPaused(true)
+    setIsPlaying(false)
     
-    markDirty()
-    
-    if (project.tracks?.some(t => t.clips.length > 0) && !isDurationsLoadedRef.current) {
-      loadClipDurations()
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current)
+      animationRef.current = null
     }
     
-  }, [project, markDirty])
-
-  // ─── DURÉES DES CLIPS ──────────────────────────────────────────────────────
-  const loadClipDurations = useCallback(async () => {
-    if (isLoadingRef.current) return
+    if (audioContextRef.current && audioContextRef.current.state === 'running') {
+      audioContextRef.current.suspend().catch(() => {})
+    }
     
-    if (!project?.tracks) {
-      console.log('⏭️ [loadClipDurations] Pas de pistes')
+    for (const [id, { source }] of Object.entries(audioSourcesRef.current)) {
+      try { source.stop() } catch (e) {}
+    }
+    audioSourcesRef.current = {}
+  }, [])
+
+  const stop = useCallback(() => {
+    console.log('⏹️ [EditorContext] stop')
+    setIsPlaying(false)
+    setIsPaused(false)
+    setCurrentTime(0)
+    lastPlayedClipsRef.current = new Set()
+    
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current)
+      animationRef.current = null
+    }
+    
+    for (const [id, { source }] of Object.entries(audioSourcesRef.current)) {
+      try { source.stop() } catch (e) {}
+    }
+    audioSourcesRef.current = {}
+  }, [])
+
+  const seek = useCallback((time) => {
+    const clamped = Math.max(0, Math.min(time, totalDuration))
+    console.log('🎯 [EditorContext] seek:', clamped.toFixed(2))
+    setCurrentTime(clamped)
+    lastPlayedClipsRef.current = new Set()
+  }, [totalDuration])
+
+  const togglePlay = useCallback(() => {
+    console.log(`🔄 [EditorContext] togglePlay - isPlaying: ${isPlaying}, isPaused: ${isPaused}`)
+    
+    if (isPlaying) {
+      console.log('⏸️ [EditorContext] Pause')
+      pause()
+    } else if (isPaused) {
+      console.log('▶️ [EditorContext] Reprise')
+      resume()
+    } else {
+      console.log('▶️ [EditorContext] Démarrage')
+      play()
+    }
+  }, [isPlaying, isPaused, play, pause, resume])
+
+  // ─── FONCTIONS TRACK ──────────────────────────────────────────────────
+
+  const addTrack = useCallback(async (name, color) => {
+    console.log('🎵 [EditorContext] addTrack appelé:', name, color)
+    console.log('📊 [EditorContext] Projet actuel:', project?.id, 'pistes:', project?.tracks?.length)
+    console.log('📊 [EditorContext] Projet ref actuel:', projectRef.current?.id, 'pistes:', projectRef.current?.tracks?.length)
+    
+    try {
+      let currentProject = project || projectRef.current
+      
+      if (!currentProject) {
+        console.log('⚠️ [EditorContext] Pas de projet, création...')
+        const newProject = {
+          id: `project-${Date.now()}`,
+          name: 'Nouveau projet',
+          tracks: [],
+          duration: 60,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }
+        setProject(newProject)
+        projectRef.current = newProject
+        currentProject = newProject
+      }
+      
+      const trackIndex = currentProject.tracks?.length || 0
+      const trackName = name || `Piste ${trackIndex + 1}`
+      const trackColor = color || `hsl(${(trackIndex * 30 + 200) % 360}, 60%, 50%)`
+      
+      const newTrack = {
+        id: `track-${Date.now()}`,
+        name: trackName,
+        color: trackColor,
+        clips: [],
+        volume: 1,
+        muted: false,
+        solo: false,
+        effects: []
+      }
+      
+      console.log('✅ [EditorContext] Nouvelle piste créée:', newTrack)
+      
+      const updatedProject = {
+        ...currentProject,
+        tracks: [...(currentProject.tracks || []), newTrack],
+        updatedAt: Date.now()
+      }
+      
+      console.log('📊 [EditorContext] Projet mis à jour - pistes:', updatedProject.tracks.length)
+      
+      setProject(updatedProject)
+      projectRef.current = updatedProject
+      
+      if (store?.updateEditorProject) {
+        console.log('💾 [EditorContext] Sauvegarde du projet dans le store')
+        await store.updateEditorProject(updatedProject)
+      } else {
+        console.warn('⚠️ [EditorContext] store.updateEditorProject non disponible')
+      }
+      
+      const durations = {}
+      for (const track of updatedProject.tracks) {
+        for (const clip of track.clips) {
+          if (clip.id) {
+            durations[clip.id] = clip.duration || 3
+          }
+        }
+      }
+      setClipDurations(durations)
+      
+      setIsDirty(true)
+      addToast?.(`${trackName} ajoutée`, 'success')
+      return newTrack
+      
+    } catch (e) {
+      console.error('❌ [EditorContext] Erreur addTrack:', e)
+      addToast?.('Erreur lors de l\'ajout de la piste: ' + e.message, 'error')
+      return null
+    }
+  }, [project, addToast, store])
+
+  const removeTrack = useCallback(async (trackId) => {
+    console.log('🗑️ [EditorContext] removeTrack appelé:', trackId)
+    console.log('📊 [EditorContext] Projet actuel - pistes:', project?.tracks?.length)
+    
+    if (!project) {
+      console.error('❌ [EditorContext] Aucun projet')
+      addToast?.('Aucun projet', 'error')
       return
     }
-
-    const hasClips = project.tracks.some(t => t.clips.length > 0)
-    if (!hasClips) {
-      console.log('⏭️ [loadClipDurations] Aucun clip, marquer comme chargé')
-      isDurationsLoadedRef.current = true
+    
+    const trackToRemove = project.tracks.find(t => t.id === trackId)
+    if (!trackToRemove) {
+      console.error('❌ [EditorContext] Piste non trouvée:', trackId)
+      addToast?.('Piste non trouvée', 'error')
       return
     }
-
-    console.log('🔄 [loadClipDurations] Chargement des durées...')
-    isLoadingRef.current = true
     
-    const newClipDurations = {}
-    let hasChanges = false
+    console.log('📋 [EditorContext] Piste à supprimer:', trackToRemove.name)
+    console.log('📊 [EditorContext] Clips dans la piste:', trackToRemove.clips.length)
+    
+    if (project.tracks.length <= 1) {
+      console.warn('⚠️ [EditorContext] Impossible de supprimer la dernière piste')
+      addToast?.('Impossible de supprimer la dernière piste', 'warning')
+      return
+    }
+    
+    if (trackToRemove.clips.length > 0) {
+      const confirmed = window.confirm(
+        `La piste "${trackToRemove.name}" contient ${trackToRemove.clips.length} clip(s). Voulez-vous vraiment la supprimer ?`
+      )
+      if (!confirmed) return
+    }
+    
+    const updatedTracks = project.tracks.filter(track => track.id !== trackId)
+    console.log('📊 [EditorContext] Après suppression - pistes:', updatedTracks.length)
+    
+    const updatedProject = {
+      ...project,
+      tracks: updatedTracks,
+      updatedAt: Date.now()
+    }
+    
+    console.log('🔄 [EditorContext] Mise à jour du projet...')
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    if (store?.updateEditorProject) {
+      console.log('💾 [EditorContext] Sauvegarde du projet dans le store')
+      await store.updateEditorProject(updatedProject)
+    }
+    
+    const durations = { ...clipDurations }
+    for (const clip of trackToRemove.clips) {
+      delete durations[clip.id]
+    }
+    setClipDurations(durations)
+    
+    setIsDirty(true)
+    addToast?.(`Piste "${trackToRemove.name}" supprimée`, 'info')
+    
+    if (selectedTrackId === trackId) {
+      setSelectedTrackId(null)
+      setSelectedClipId(null)
+    }
+    
+    console.log('✅ [EditorContext] Piste supprimée avec succès')
+  }, [project, addToast, store, clipDurations, selectedTrackId])
 
-    const getRealDuration = async (filePath) => {
-      try {
-        const fileUrl = filePath.startsWith('file://') 
-          ? filePath 
-          : 'file:///' + filePath.replace(/\\/g, '/')
+  const renameTrack = useCallback(async (trackId, newName) => {
+    console.log('✏️ [EditorContext] renameTrack:', trackId, newName)
+    
+    if (!project) return
+    
+    const updatedProject = {
+      ...project,
+      tracks: project.tracks.map(track => {
+        if (track.id === trackId) {
+          return { ...track, name: newName }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    if (store?.updateEditorProject) {
+      await store.updateEditorProject(updatedProject)
+    }
+    
+    setIsDirty(true)
+  }, [project, store])
+
+  const muteTrack = useCallback((trackId, muted) => {
+    console.log('🔇 [EditorContext] muteTrack:', trackId, muted)
+    
+    if (!project) {
+      console.error('❌ [EditorContext] Aucun projet')
+      return
+    }
+    
+    const updatedProject = {
+      ...project,
+      tracks: project.tracks.map(track => {
+        if (track.id === trackId) {
+          console.log(`🔇 [EditorContext] Mute de ${track.name}: ${muted}`)
+          return { ...track, muted }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    if (store?.updateEditorProject) {
+      store.updateEditorProject(updatedProject).catch(() => {})
+    }
+    
+    setIsDirty(true)
+  }, [project, store])
+
+  const soloTrack = useCallback((trackId, solo) => {
+    console.log('🎧 [EditorContext] soloTrack:', trackId, solo)
+    
+    if (!project) {
+      console.error('❌ [EditorContext] Aucun projet')
+      return
+    }
+    
+    const updatedProject = {
+      ...project,
+      tracks: project.tracks.map(track => {
+        if (track.id === trackId) {
+          console.log(`🎧 [EditorContext] Solo de ${track.name}: ${solo}`)
+          return { ...track, solo }
+        } else if (solo) {
+          console.log(`🔇 [EditorContext] Mute automatique de ${track.name}`)
+          return { ...track, muted: true, solo: false }
+        } else {
+          return { ...track, solo: false }
+        }
+      }),
+      updatedAt: Date.now()
+    }
+    
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    if (store?.updateEditorProject) {
+      store.updateEditorProject(updatedProject).catch(() => {})
+    }
+    
+    setIsDirty(true)
+  }, [project, store])
+
+  const setTrackVolume = useCallback((trackId, volume) => {
+    console.log('🔊 [EditorContext] setTrackVolume:', trackId, volume)
+    
+    if (!project) {
+      console.error('❌ [EditorContext] Aucun projet')
+      return
+    }
+    
+    const updatedProject = {
+      ...project,
+      tracks: project.tracks.map(track => {
+        if (track.id === trackId) {
+          console.log(`🔊 [EditorContext] Volume de ${track.name}: ${volume}`)
+          return { ...track, volume }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    if (store?.updateEditorProject) {
+      store.updateEditorProject(updatedProject).catch(() => {})
+    }
+    
+    setIsDirty(true)
+  }, [project, store])
+
+  // ─── FONCTIONS CLIP ──────────────────────────────────────────────────
+
+  const addClip = useCallback(async (trackId, soundId, startPosition = null) => {
+    console.log('🎵 [EditorContext] addClip:', { trackId, soundId, startPosition })
+    
+    if (!store) {
+      console.error('❌ [EditorContext] Store non disponible')
+      addToast?.('Store non disponible', 'error')
+      return null
+    }
+    
+    const sound = store.sounds?.find(s => s.id === soundId)
+    if (!sound) {
+      console.error('❌ [EditorContext] Son non trouvé:', soundId)
+      addToast?.('Son non trouvé', 'error')
+      return null
+    }
+
+    try {
+      const clip = await store.addClipToTrack?.(trackId, soundId, startPosition)
+      
+      if (clip && project) {
+        console.log('✅ [EditorContext] Clip ajouté:', clip)
         
-        const response = await fetch(fileUrl)
-        if (!response.ok) return null
+        const updatedProject = {
+          ...project,
+          tracks: project.tracks.map(track => {
+            if (track.id === trackId) {
+              return {
+                ...track,
+                clips: [...track.clips, clip]
+              }
+            }
+            return track
+          }),
+          updatedAt: Date.now()
+        }
+        setProject(updatedProject)
+        projectRef.current = updatedProject
         
-        const arrayBuffer = await response.arrayBuffer()
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-        const duration = audioBuffer.duration
-        await audioContext.close()
-        return duration
-      } catch (e) {
-        console.warn(`⚠️ Erreur chargement durée:`, e.message)
+        if (clip.duration) {
+          setClipDurations(prev => ({
+            ...prev,
+            [clip.id]: clip.duration
+          }))
+        }
+        
+        if (store?.updateEditorProject) {
+          await store.updateEditorProject(updatedProject)
+        }
+        
+        setIsDirty(true)
+        addToast?.(`"${sound.name}" ajouté`, 'success')
+        setSelectedClipId(clip.id)
+        setSelectedTrackId(trackId)
+        return clip
+      } else {
+        console.error('❌ [EditorContext] Échec ajout clip')
+        addToast?.('Erreur lors de l\'ajout du clip', 'error')
         return null
       }
+    } catch (e) {
+      console.error('❌ [EditorContext] Erreur addClip:', e)
+      addToast?.(e.message || 'Erreur lors de l\'ajout du clip', 'error')
+      return null
     }
+  }, [store, project, addToast])
 
-    for (const track of project.tracks) {
-      for (const clip of track.clips) {
-        if (clip.path) {
-          if (clipDurations[clip.id]) {
-            newClipDurations[clip.id] = clipDurations[clip.id]
-            continue
-          }
-          
-          try {
-            const realDuration = await getRealDuration(clip.path)
-            if (realDuration !== null && realDuration > 0) {
-              newClipDurations[clip.id] = realDuration
-              hasChanges = true
-              console.log(`📏 Durée chargée pour "${clip.name}": ${realDuration.toFixed(2)}s`)
-            } else {
-              newClipDurations[clip.id] = clip.duration || 3
-            }
-          } catch (e) {
-            newClipDurations[clip.id] = clip.duration || 3
-          }
-        }
-      }
-    }
-
-    if (isMountedRef.current) {
-      if (hasChanges) {
-        setClipDurations(newClipDurations)
-      }
-      isDurationsLoadedRef.current = true
-    }
+  const removeClip = useCallback((trackId, clipId) => {
+    console.log('🗑️ [EditorContext] removeClip:', trackId, clipId)
     
-    isLoadingRef.current = false
-    console.log('✅ [loadClipDurations] Terminé, hasChanges:', hasChanges)
-  }, [project, clipDurations])
-
-  // ─── WAVEFORMS ─────────────────────────────────────────────────────────────
-  const loadWaveforms = useCallback(async () => {
-    console.log('🔴 [loadWaveforms] APPELÉ !')
-    
-    if (isWaveformLoadingRef.current) {
-      console.log('⏭️ [loadWaveforms] Déjà en cours, ignoré')
+    if (!project) {
+      console.error('❌ [EditorContext] Aucun projet')
       return
     }
     
-    if (!project?.tracks) {
-      console.log('⏭️ [loadWaveforms] Pas de pistes')
+    const track = project.tracks.find(t => t.id === trackId)
+    if (!track) {
+      console.error('❌ [EditorContext] Piste non trouvée:', trackId)
       return
-    }
-
-    if (hasLoadedWaveformsRef.current) {
-      console.log('⏭️ [loadWaveforms] Déjà chargé, ignoré')
-      return
-    }
-
-    // ✅ Vérifier s'il y a des clips dans les pistes
-    const hasClips = project.tracks.some(t => t.clips.length > 0)
-    if (!hasClips) {
-      console.log('⏭️ [loadWaveforms] Aucun clip à charger, marquer comme chargé')
-      hasLoadedWaveformsRef.current = true
-      return
-    }
-
-    console.log('🔄 [loadWaveforms] Chargement des waveforms...')
-    isWaveformLoadingRef.current = true
-    
-    if (isMountedRef.current) {
-      setIsLoading(true)
     }
     
-    const newWaveformData = {}
-    let hasNewData = false
-
-    for (const track of project.tracks) {
-      for (const clip of track.clips) {
-        if (clip.path && !waveformData[clip.id]) {
-          if (loadingRefsRef.current.has(clip.id)) continue
-          loadingRefsRef.current.set(clip.id, true)
-
-          try {
-            const sliceDuration = clipDurations[clip.id] || clip.duration || null
-            console.log(`  📁 Génération waveform pour "${clip.name}"`)
-            const data = await generateWaveformData(
-              clip.path, 
-              200, 
-              clip.offset || 0, 
-              sliceDuration
-            )
-            if (data) {
-              newWaveformData[clip.id] = data
-              waveformCacheRef.current.set(clip.id, data)
-              hasNewData = true
-              console.log(`  ✅ Waveform généré pour "${clip.name}"`)
-            }
-          } catch (e) {
-            console.warn(`  ❌ Erreur pour "${clip.name}":`, e)
-          } finally {
-            loadingRefsRef.current.delete(clip.id)
+    const clipExists = track.clips.some(c => c.id === clipId)
+    if (!clipExists) {
+      console.error('❌ [EditorContext] Clip non trouvé:', clipId)
+      return
+    }
+    
+    console.log(`📊 [EditorContext] Avant suppression - clips: ${track.clips.length}`)
+    
+    const updatedProject = {
+      ...project,
+      tracks: project.tracks.map(t => {
+        if (t.id === trackId) {
+          return {
+            ...t,
+            clips: t.clips.filter(c => c.id !== clipId)
           }
         }
-      }
-    }
-
-    if (isMountedRef.current && hasNewData) {
-      console.log(`  📝 Mise à jour avec ${Object.keys(newWaveformData).length} nouveaux clips`)
-      setWaveformData(prev => ({ ...prev, ...newWaveformData }))
+        return t
+      }),
+      updatedAt: Date.now()
     }
     
-    if (isMountedRef.current) {
-      setIsLoading(false)
-    }
+    const newTrack = updatedProject.tracks.find(t => t.id === trackId)
+    console.log(`📊 [EditorContext] Après suppression - clips: ${newTrack?.clips?.length || 0}`)
     
-    hasLoadedWaveformsRef.current = true
-    isWaveformLoadingRef.current = false
-    console.log('✅ [loadWaveforms] Terminé')
-  }, [project, clipDurations, waveformData])
-
-  // ─── ÉCOUTEUR D'ÉVÉNEMENT POUR LES MISES À JOUR DE DURÉE ────────────────
-  useEffect(() => {
-    const handleClipDurationUpdate = (event) => {
-      const { clipId, duration } = event.detail
-      if (clipId && duration && duration > 0) {
-        console.log(`📏 Mise à jour durée du clip ${clipId}: ${duration.toFixed(2)}s`)
-        setClipDurations(prev => ({
-          ...prev,
-          [clipId]: duration
-        }))
-        isDurationsLoadedRef.current = true
-        
-        // ✅ FORCER LE RECHARGEMENT DES WAVEFORMS
-        console.log('🔄 [EditorContext] Réinitialisation des flags pour recharger les waveforms')
-        hasLoadedWaveformsRef.current = false
-        isWaveformLoadingRef.current = false
-        
-        // ✅ Déclencher le rechargement après un court délai
-        setTimeout(() => {
-          console.log('🔄 [EditorContext] Tentative de rechargement des waveforms après délai')
-          loadWaveforms()
-        }, 100)
-      }
-    }
+    setProject(updatedProject)
+    projectRef.current = updatedProject
     
-    window.addEventListener('clip-duration-updated', handleClipDurationUpdate)
-    
-    return () => {
-      window.removeEventListener('clip-duration-updated', handleClipDurationUpdate)
-    }
-  }, [loadWaveforms])
-
-  // ─── ÉCOUTEUR D'ÉVÉNEMENT POUR LES MISES À JOUR DU PROJET ────────────────
-  useEffect(() => {
-    const handleProjectUpdated = (event) => {
-      const { project: updatedProject } = event.detail
-      if (updatedProject?.tracks?.some(t => t.clips.length > 0)) {
-        console.log('🔄 [EditorContext] Projet mis à jour, rechargement des waveforms')
-        // Réinitialiser les flags
-        hasLoadedWaveformsRef.current = false
-        isWaveformLoadingRef.current = false
-        // Forcer le rechargement
-        setTimeout(() => {
-          loadWaveforms()
-        }, 50)
-      }
-    }
-    
-    window.addEventListener('project-updated', handleProjectUpdated)
-    
-    return () => {
-      window.removeEventListener('project-updated', handleProjectUpdated)
-    }
-  }, [loadWaveforms])
-
-  // ─── CHARGEMENT INITIAL ──────────────────────────────────────────────────
-  useEffect(() => {
-    console.log('🔍 [useEffect 1] project?.id:', project?.id, 'isDurationsLoaded:', isDurationsLoadedRef.current)
-    if (project?.id && !isDurationsLoadedRef.current && !isLoadingRef.current) {
-      loadClipDurations()
-    }
-  }, [project?.id, loadClipDurations])
-
-  useEffect(() => {
-    console.log('🔍 [useEffect 2] Vérification loadWaveforms:', {
-      hasTracks: !!project?.tracks,
-      isDurationsLoaded: isDurationsLoadedRef.current,
-      clipDurationsLength: Object.keys(clipDurations).length,
-      hasLoadedWaveforms: hasLoadedWaveformsRef.current,
-      isWaveformLoading: isWaveformLoadingRef.current,
-      hasClips: project?.tracks?.some(t => t.clips.length > 0) || false
+    setClipDurations(prev => {
+      const newDurations = { ...prev }
+      delete newDurations[clipId]
+      return newDurations
     })
     
-    if (project?.tracks && 
-        isDurationsLoadedRef.current &&
-        !hasLoadedWaveformsRef.current &&
-        !isWaveformLoadingRef.current) {
-      console.log('🔴 [useEffect 2] CONDITIONS RÉUNIES, appel à loadWaveforms')
-      loadWaveforms()
-    } else {
-      console.log('⏭️ [useEffect 2] Conditions non réunies')
+    if (store?.updateEditorProject) {
+      store.updateEditorProject(updatedProject).catch(() => {})
     }
-  }, [project?.tracks, clipDurations, loadWaveforms, isDurationsLoadedRef.current])
+    
+    if (selectedClipId === clipId) {
+      setSelectedClipId(null)
+      setSelectedTrackId(null)
+    }
+    
+    setIsDirty(true)
+    addToast?.('Clip supprimé', 'info')
+  }, [project, selectedClipId, addToast, store])
 
-  // ─── CALCULS ──────────────────────────────────────────────────────────────
-  const totalDuration = useMemo(() => {
-    if (!project?.tracks) return 10
-    let maxDuration = 10
+  const updateClip = useCallback((trackId, clipId, updates) => {
+    console.log('✏️ [EditorContext] updateClip:', trackId, clipId, updates)
+    
+    if (!project) return
+    
+    const updatedProject = {
+      ...project,
+      tracks: project.tracks.map(track => {
+        if (track.id === trackId) {
+          return {
+            ...track,
+            clips: track.clips.map(clip => {
+              if (clip.id !== clipId) return clip
+              return { ...clip, ...updates }
+            })
+          }
+        }
+        return track
+      }),
+      updatedAt: Date.now()
+    }
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    if (store?.updateEditorProject) {
+      store.updateEditorProject(updatedProject).catch(() => {})
+    }
+    
+    setIsDirty(true)
+  }, [project, store])
+
+  const duplicateClip = useCallback((trackId, clipId) => {
+    console.log('📋 [EditorContext] duplicateClip:', trackId, clipId)
+    
+    if (!project) {
+      console.error('❌ [EditorContext] Aucun projet')
+      return null
+    }
+    
+    const track = project.tracks.find(t => t.id === trackId)
+    if (!track) {
+      console.error('❌ [EditorContext] Piste non trouvée:', trackId)
+      return null
+    }
+    
+    const clip = track.clips.find(c => c.id === clipId)
+    if (!clip) {
+      console.error('❌ [EditorContext] Clip non trouvé:', clipId)
+      return null
+    }
+    
+    const duration = clipDurations[clip.id] || clip.duration || 3
+    const newClip = {
+      ...clip,
+      id: `clip-${Date.now()}`,
+      start: (clip.start || 0) + duration + 0.5,
+      effects: (clip.effects || []).map(e => ({ ...e, id: `effect-${Date.now()}-${e.id || Math.random().toString(36).slice(2, 6)}` }))
+    }
+    
+    console.log('✅ [EditorContext] Nouveau clip créé:', newClip)
+    
+    const updatedProject = {
+      ...project,
+      tracks: project.tracks.map(t => {
+        if (t.id === trackId) {
+          const clips = [...t.clips, newClip]
+          clips.sort((a, b) => a.start - b.start)
+          return { ...t, clips }
+        }
+        return t
+      }),
+      updatedAt: Date.now()
+    }
+    
+    const newTrack = updatedProject.tracks.find(t => t.id === trackId)
+    console.log(`📊 [EditorContext] Après duplication - clips: ${newTrack?.clips?.length || 0}`)
+    
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    setClipDurations(prev => ({
+      ...prev,
+      [newClip.id]: newClip.duration || 3
+    }))
+    
+    if (store?.updateEditorProject) {
+      store.updateEditorProject(updatedProject).catch(() => {})
+    }
+    
+    setIsDirty(true)
+    addToast?.('Clip dupliqué', 'success')
+    return newClip
+  }, [project, clipDurations, addToast, store])
+
+  const moveClip = useCallback((trackId, clipId, newStart, newTrackId) => {
+    console.log('🔄 [EditorContext] moveClip:', { trackId, clipId, newStart, newTrackId })
+    
+    if (!project) {
+      console.error('❌ [EditorContext] Aucun projet')
+      return
+    }
+    
+    // Trouver le clip à déplacer
+    let clipToMove = null
+    let sourceTrack = null
+    
     for (const track of project.tracks) {
-      for (const clip of track.clips) {
-        const duration = clipDurations[clip.id] || clip.duration || 3
-        const end = clip.start + duration
-        if (end > maxDuration) maxDuration = end
+      const clip = track.clips.find(c => c.id === clipId)
+      if (clip) {
+        clipToMove = clip
+        sourceTrack = track
+        break
       }
     }
-    return Math.max(maxDuration + 2, 10)
-  }, [project, clipDurations])
-
-  const selectedClip = useMemo(() => {
-    if (!selectedClipId || !project?.tracks) return null
-    for (const track of project.tracks) {
-      const clip = track.clips.find(c => c.id === selectedClipId)
-      if (clip) return clip
+    
+    if (!clipToMove) {
+      console.error('❌ [EditorContext] Clip non trouvé:', clipId)
+      return
     }
-    return null
-  }, [selectedClipId, project])
+    
+    console.log('📦 [EditorContext] Clip trouvé:', clipToMove.name, 'start actuel:', clipToMove.start)
+    
+    // Créer une copie du clip avec la nouvelle position
+    const updatedClip = {
+      ...clipToMove,
+      start: Math.max(0, newStart)
+    }
+    
+    let updatedTracks
+    
+    if (newTrackId && newTrackId !== trackId) {
+      // Déplacer vers une autre piste
+      updatedTracks = project.tracks.map(track => {
+        if (track.id === trackId) {
+          // Supprimer de la piste source
+          return {
+            ...track,
+            clips: track.clips.filter(c => c.id !== clipId)
+          }
+        }
+        if (track.id === newTrackId) {
+          // Ajouter à la piste destination
+          const newClips = [...track.clips, updatedClip]
+          newClips.sort((a, b) => a.start - b.start)
+          return {
+            ...track,
+            clips: newClips
+          }
+        }
+        return track
+      })
+    } else {
+      // Déplacer dans la même piste
+      updatedTracks = project.tracks.map(track => {
+        if (track.id === trackId) {
+          const newClips = track.clips.map(clip => 
+            clip.id === clipId ? updatedClip : clip
+          )
+          newClips.sort((a, b) => a.start - b.start)
+          return {
+            ...track,
+            clips: newClips
+          }
+        }
+        return track
+      })
+    }
+    
+    const updatedProject = {
+      ...project,
+      tracks: updatedTracks,
+      updatedAt: Date.now()
+    }
+    
+    // Mettre à jour l'état
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    // Sauvegarder dans le store
+    if (store?.updateEditorProject) {
+      store.updateEditorProject(updatedProject).catch(() => {})
+    }
+    
+    setIsDirty(true)
+    console.log('✅ [EditorContext] Clip déplacé à', newStart)
+  }, [project, store])
 
-  const selectedTrack = useMemo(() => {
-    if (!selectedTrackId || !project?.tracks) return null
-    return project.tracks.find(t => t.id === selectedTrackId) || null
-  }, [selectedTrackId, project])
+  // ─── FONCTIONS SELECTION ──────────────────────────────────────────────
 
-  // ─── ACTIONS ──────────────────────────────────────────────────────────────
   const selectClip = useCallback((clipId, trackId) => {
+    console.log('🎯 [EditorContext] selectClip:', clipId, trackId)
     setSelectedClipId(clipId)
-    setSelectedTrackId(trackId || null)
+    setSelectedTrackId(trackId)
   }, [])
 
   const deselectClip = useCallback(() => {
+    console.log('🎯 [EditorContext] deselectClip')
     setSelectedClipId(null)
     setSelectedTrackId(null)
   }, [])
 
-  const updateWaveform = useCallback(async (clipId, filePath, offset = 0, duration = null) => {
-    try {
-      const data = await generateWaveformData(filePath, 200, offset || 0, duration || null, false)
-      if (data && isMountedRef.current) {
-        setWaveformData(prev => ({ ...prev, [clipId]: data }))
-        waveformCacheRef.current.set(clipId, data)
-      }
-    } catch (e) {
-      console.warn('Erreur mise à jour waveform:', e)
-    }
+  // ─── FONCTIONS LOOP ──────────────────────────────────────────────────
+
+  const setLoopRegionFn = useCallback((start, end) => {
+    console.log('🔄 [EditorContext] setLoopRegionFn:', start, end)
+    setLoopRegion(prev => ({
+      ...prev,
+      start: Math.max(0, start),
+      end: Math.min(totalDuration, end)
+    }))
+  }, [totalDuration])
+
+  const toggleLoop = useCallback(() => {
+    console.log('🔄 [EditorContext] toggleLoop')
+    setLoopRegion(prev => ({
+      ...prev,
+      enabled: !prev.enabled
+    }))
   }, [])
 
-  // ─── VALEUR DU CONTEXTE ──────────────────────────────────────────────────
-  const value = useMemo(() => ({
+  const clearLoop = useCallback(() => {
+    console.log('🔄 [EditorContext] clearLoop')
+    setLoopRegion({ enabled: false, start: 0, end: 10 })
+  }, [])
+
+  // ─── ZOOM ─────────────────────────────────────────────────────────────
+
+  const handleZoomChange = useCallback((newZoom) => {
+    console.log('🔍 [EditorContext] handleZoomChange:', newZoom)
+    setZoomLevel(Math.max(0.05, Math.min(10, newZoom)))
+  }, [])
+
+  // ─── VALUE ──────────────────────────────────────────────────────────────
+
+  const value = {
+    // États
     project,
+    setProject,
+    tracks: project?.tracks || [],
     selectedClipId,
-    selectedTrackId,
-    waveformData,
-    clipDurations,
-    isLoading,
-    isDirty,
-    isAutoSaving,
-    totalDuration,
-    selectedClip,
-    selectedTrack,
-    selectClip,
-    deselectClip,
     setSelectedClipId,
-    setSelectedTrackId,
-    updateWaveform,
-    loadClipDurations,
-    loadWaveforms,
-    markDirty,
-    saveProject,
-    store,
-    addToast,
-    editorLoopRegion: store.editorLoopRegion || { enabled: false, start: 0, end: 10 },
-    setEditorLoopRegion: store.setEditorLoopRegion,
-    toggleEditorLoop: store.toggleEditorLoop,
-    clearEditorLoopRegion: store.clearEditorLoopRegion,
-    isInitialized,
-  }), [
-    project,
-    selectedClipId,
     selectedTrackId,
-    waveformData,
+    setSelectedTrackId,
+    currentTime,
+    setCurrentTime,
+    isPlaying,
+    setIsPlaying,
+    isPaused,
+    setIsPaused,
+    zoomLevel,
+    setZoomLevel,
+    snapEnabled,
+    setSnapEnabled,
+    loopRegion,
+    setLoopRegion: setLoopRegionFn,
+    autoCrossfade,
+    setAutoCrossfade,
     clipDurations,
+    setClipDurations,
+    waveformData,
+    setWaveformData,
+    isDurationsLoaded,
+    isInitialized,
+    totalDuration,
     isLoading,
     isDirty,
     isAutoSaving,
-    totalDuration,
-    selectedClip,
-    selectedTrack,
+    
+    // Fonctions Track
+    addTrack,
+    removeTrack,
+    renameTrack,
+    muteTrack,
+    soloTrack,
+    setTrackVolume,
+    
+    // Fonctions Clip
+    addClip,
+    removeClip,
+    updateClip,
+    duplicateClip,
+    moveClip,
+    
+    // Playback
+    play,
+    pause,
+    stop,
+    seek,
+    togglePlay,
+    
+    // Selection
     selectClip,
     deselectClip,
-    updateWaveform,
-    loadClipDurations,
-    loadWaveforms,
-    markDirty,
-    saveProject,
+    
+    // Loop
+    toggleLoop,
+    clearLoop,
+    
+    // Zoom
+    handleZoomChange,
+    
+    // Store
     store,
     addToast,
-    isInitialized,
-  ])
+    t,
+  }
 
   return (
     <EditorContext.Provider value={value}>
@@ -505,7 +1236,7 @@ export function EditorProvider({ store, addToast, children }) {
 export function useEditor() {
   const context = useContext(EditorContext)
   if (!context) {
-    throw new Error('useEditor must be used within an EditorProvider')
+    throw new Error('useEditor must be used within EditorProvider')
   }
   return context
 }

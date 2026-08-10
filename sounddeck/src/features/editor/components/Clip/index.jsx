@@ -1,337 +1,130 @@
-// src/pages/editor/components/EditorClip/index.jsx
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { Howl } from 'howler'
+// src/features/editor/components/Clip/index.jsx
+import React, { useState, useRef, useCallback, memo, useEffect } from 'react'
+import ClipWaveform from './ClipWaveform'
+import ClipFadeHandles from './ClipFadeHandles'
+import ClipResizeHandles from './ClipResizeHandles'
+import ClipActions from './ClipActions'
 
-export default function EditorClip({
+const EditorClip = memo(({
   clip,
-  totalDuration,
-  pixelsPerSecond,
-  trackHeight,
+  duration,
+  start,
+  trackId,
+  trackColor,
   isSelected,
-  isPlaying,
-  waveformData,
-  clipDuration,
+  pixelsPerSecond,
+  snapEnabled,  // ✅ AJOUTÉ
   onSelect,
   onMove,
   onUpdate,
   onRemove,
   onDuplicate,
-  onCopy,
-  onCut,
+  onFade,
   onContextMenu,
-  onFadeInChange,
-  onFadeOutChange,
-  onDragCheckpoint,
-  onWaveformUpdate,
-  onDurationUpdate, // ✅ NOUVEAU PROP
-  tr
-}) {
+  onUpdateDuration,
+  waveformData,
+  isPlaying,
+  currentTime,
+  tr,
+  onPlayClip,
+  onStopClip,
+  onCopyClip,
+  onCutClip,
+  onPasteClip,
+}) => {
   const [isDragging, setIsDragging] = useState(false)
   const [dragStartX, setDragStartX] = useState(0)
-  const [isResizing, setIsResizing] = useState(false)
-  const [resizeSide, setResizeSide] = useState(null)
-  const [isHovered, setIsHovered] = useState(false)
-  const [fadeDrag, setFadeDrag] = useState(null)
-  const [liveFadeIn, setLiveFadeIn] = useState(null)
-  const [liveFadeOut, setLiveFadeOut] = useState(null)
+  const [dragStartTime, setDragStartTime] = useState(0)
+  const [dragMode, setDragMode] = useState('move')
+  const [isHovering, setIsHovering] = useState(false)
   const [isClipPlaying, setIsClipPlaying] = useState(false)
-  const [playbackHowl, setPlaybackHowl] = useState(null)
-  const [isRefreshingDuration, setIsRefreshingDuration] = useState(false)
-
-  const dragValueRef = useRef(0)
   const clipRef = useRef(null)
-  const hasDraggedRef = useRef(false)
-  const mouseDownPosRef = useRef({ x: 0, y: 0 })
-  const isDraggingRef = useRef(false)
-  const lastClickTimeRef = useRef(0)
-  const clickTimerRef = useRef(null)
-  const isDoubleClickRef = useRef(false)
-  const lastMouseXRef = useRef(0)
+  const dragStartClipId = useRef(null)
 
-  const duration = clipDuration || clip.duration || 3
-  const left = clip.start * pixelsPerSecond
-  const width = Math.max(duration * pixelsPerSecond, 10)
+  const clipWidth = Math.max(duration * pixelsPerSecond, 20)
+  const clipLeft = start * pixelsPerSecond
 
-  const fadeInEffect = clip.effects?.find(e => e.type === 'fadeIn')
-  const fadeOutEffect = clip.effects?.find(e => e.type === 'fadeOut')
-  const fadeInDuration = liveFadeIn != null ? liveFadeIn : (fadeInEffect?.enabled ? (fadeInEffect.params?.duration || 0) : 0)
-  const fadeOutDuration = liveFadeOut != null ? liveFadeOut : (fadeOutEffect?.enabled ? (fadeOutEffect.params?.duration || 0) : 0)
-  const maxFade = duration / 2
+  // ✅ Valeur de snap (0.1 seconde)
+  const SNAP_VALUE = 0.1
 
-  const hasActiveEffects = clip.effects?.some(e => e.enabled) || false
-  const effectBadges = clip.effects?.filter(e => e.enabled).map(e => e.type) || []
-  const showDuration = duration > 5
-
-  // Nettoyage
+  // Calculer si le clip est en cours de lecture
   useEffect(() => {
-    return () => {
-      if (playbackHowl) {
-        playbackHowl.stop()
-        playbackHowl.unload()
-        setPlaybackHowl(null)
-      }
-      if (clickTimerRef.current) {
-        clearTimeout(clickTimerRef.current)
-        clickTimerRef.current = null
-      }
-    }
-  }, [playbackHowl])
+    setIsClipPlaying(isPlaying && currentTime >= start && currentTime <= start + duration)
+  }, [isPlaying, currentTime, start, duration])
 
-  // Régénérer le waveform
-  useEffect(() => {
-    if (clip.path && onWaveformUpdate) {
-      const timer = setTimeout(() => {
-        onWaveformUpdate(clip.id, clip.path, clip.offset || 0, clip.duration || null)
-      }, 300)
-      return () => clearTimeout(timer)
-    }
-  }, [clip.path, clip.duration, clip.offset, clip.id, onWaveformUpdate])
+  // Calculer si le curseur doit être affiché
+  const showPlayhead = currentTime >= start && currentTime <= start + duration
 
-  // ✅ Fonction pour rafraîchir la durée du clip
-  const refreshDuration = useCallback(async () => {
-    if (!clip.path || isRefreshingDuration) return
-    
-    setIsRefreshingDuration(true)
-    
-    try {
-      // Utiliser la même méthode que getAudioDuration
-      const fileUrl = clip.path.startsWith('file://') 
-        ? clip.path 
-        : 'file:///' + clip.path.replace(/\\/g, '/')
-      
-      const response = await fetch(fileUrl)
-      if (!response.ok) {
-        console.warn(`⚠️ Fichier non accessible: ${clip.path}`)
-        return
-      }
-      
-      const arrayBuffer = await response.arrayBuffer()
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-      const realDuration = audioBuffer.duration
-      await audioContext.close()
-      
-      console.log(`📏 Durée réelle de "${clip.name}": ${realDuration.toFixed(2)}s (actuelle: ${duration.toFixed(2)}s)`)
-      
-      if (Math.abs(realDuration - duration) > 0.1) {
-        // ✅ Mettre à jour la durée
-        onDurationUpdate?.(clip.id, realDuration)
-        // ✅ Mettre à jour le waveform
-        onWaveformUpdate?.(clip.id, clip.path, clip.offset || 0, realDuration)
-        console.log(`✅ Durée mise à jour: ${realDuration.toFixed(2)}s`)
-      } else {
-        console.log(`✅ Durée déjà correcte: ${duration.toFixed(2)}s`)
-      }
-    } catch (e) {
-      console.warn(`⚠️ Erreur rafraîchissement durée pour "${clip.name}":`, e.message)
-    } finally {
-      setIsRefreshingDuration(false)
-    }
-  }, [clip.path, clip.name, clip.id, duration, onDurationUpdate, onWaveformUpdate, isRefreshingDuration])
+  // Calculer la position du curseur en pixels
+  const playheadPosition = Math.max(0, Math.min((currentTime - start) * pixelsPerSecond, clipWidth - 2))
 
-  // ─── FADE DRAG ──────────────────────────────────────────────────────────────
-  const handleFadeMouseDown = (e, edge) => {
-    e.stopPropagation()
-    const current = edge === 'in' ? fadeInDuration : fadeOutDuration
-    dragValueRef.current = current
-    setFadeDrag({ edge, startX: e.clientX, startDuration: current })
-  }
-
-  useEffect(() => {
-    if (!fadeDrag) return
-
-    const handleMove = (e) => {
-      const deltaSeconds = (e.clientX - fadeDrag.startX) / pixelsPerSecond
-      const raw = fadeDrag.edge === 'in'
-        ? fadeDrag.startDuration + deltaSeconds
-        : fadeDrag.startDuration - deltaSeconds
-      const clamped = Math.max(0, Math.min(maxFade, raw))
-      dragValueRef.current = clamped
-      if (fadeDrag.edge === 'in') setLiveFadeIn(clamped)
-      else setLiveFadeOut(clamped)
-    }
-
-    const handleUp = () => {
-      if (fadeDrag.edge === 'in') {
-        onFadeInChange?.(dragValueRef.current)
-        setLiveFadeIn(null)
-      } else {
-        onFadeOutChange?.(dragValueRef.current)
-        setLiveFadeOut(null)
-      }
-      setFadeDrag(null)
-    }
-
-    document.addEventListener('mousemove', handleMove)
-    document.addEventListener('mouseup', handleUp)
-    return () => {
-      document.removeEventListener('mousemove', handleMove)
-      document.removeEventListener('mouseup', handleUp)
-    }
-  }, [fadeDrag, pixelsPerSecond, maxFade, onFadeInChange, onFadeOutChange])
-
-  // ─── LECTURE PREVIEW ──────────────────────────────────────────────────────
-  const playClipPreview = (e) => {
-    if (e) e.stopPropagation()
-    
-    if (playbackHowl && isClipPlaying) {
-      playbackHowl.stop()
-      playbackHowl.unload()
-      setPlaybackHowl(null)
-      setIsClipPlaying(false)
-      return
-    }
-
-    try {
-      const fileUrl = clip.path.startsWith('file://') 
-        ? clip.path 
-        : 'file:///' + clip.path.replace(/\\/g, '/')
-      
-      const howl = new Howl({
-        src: [fileUrl],
-        volume: 0.5,
-        html5: true,
-        onend: () => {
-          setIsClipPlaying(false)
-          setPlaybackHowl(null)
-        },
-        onstop: () => {
-          setIsClipPlaying(false)
-          setPlaybackHowl(null)
-        }
-      })
-      
-      setPlaybackHowl(howl)
-      setIsClipPlaying(true)
-      howl.play()
-    } catch (e) {
-      console.warn('Erreur lecture preview:', e)
-    }
-  }
-
-  // ─── GESTION DU CLIC ──────────────────────────────────────────────────────
   const handleMouseDown = (e) => {
     if (e.button !== 0) return
-    if (e.target.closest('.clip-actions')) return
-
-    if (clickTimerRef.current) {
-      clearTimeout(clickTimerRef.current)
-      clickTimerRef.current = null
-    }
-
-    mouseDownPosRef.current = { x: e.clientX, y: e.clientY }
-    hasDraggedRef.current = false
-    isDraggingRef.current = true
-    lastMouseXRef.current = e.clientX
     
-    onDragCheckpoint?.()
+    const target = e.target
+    const isResizeStart = target.dataset.resize === 'start'
+    const isResizeEnd = target.dataset.resize === 'end'
+    
+    if (isResizeStart || isResizeEnd) {
+      setDragMode(isResizeStart ? 'resize-start' : 'resize-end')
+    } else {
+      setDragMode('move')
+      onSelect?.(clip.id)
+      dragStartClipId.current = clip.id
+    }
+    
     setIsDragging(true)
     setDragStartX(e.clientX)
-    
-    onSelect()
-    
-    const now = Date.now()
-    const timeSinceLastClick = now - lastClickTimeRef.current
-    
-    if (timeSinceLastClick < 300 && timeSinceLastClick > 0) {
-      lastClickTimeRef.current = 0
-      isDoubleClickRef.current = true
-      playClipPreview(e)
-      return
-    }
-    
-    lastClickTimeRef.current = now
-    isDoubleClickRef.current = false
-    
-    clickTimerRef.current = setTimeout(() => {
-      lastClickTimeRef.current = 0
-      isDoubleClickRef.current = false
-      clickTimerRef.current = null
-    }, 300)
-  }
-
-  const handleMouseMove = (e) => {
-    if (!isDraggingRef.current) return
-
-    const dx = Math.abs(e.clientX - mouseDownPosRef.current.x)
-    const dy = Math.abs(e.clientY - mouseDownPosRef.current.y)
-    
-    if (isDoubleClickRef.current) {
-      setIsDragging(false)
-      isDraggingRef.current = false
-      return
-    }
-    
-    if (dx > 5 || dy > 5) {
-      hasDraggedRef.current = true
-      if (clickTimerRef.current) {
-        clearTimeout(clickTimerRef.current)
-        clickTimerRef.current = null
-        lastClickTimeRef.current = 0
-        isDoubleClickRef.current = false
-      }
-    }
-
-    const deltaX = e.clientX - dragStartX
-    const deltaSeconds = deltaX / pixelsPerSecond
-    const newStart = Math.max(0, clip.start + deltaSeconds)
-
-    onMove(newStart)
-    setDragStartX(e.clientX)
-    lastMouseXRef.current = e.clientX
-  }
-
-  const handleMouseUp = (e) => {
-    setIsDragging(false)
-    isDraggingRef.current = false
-    
-    if (hasDraggedRef.current) {
-      hasDraggedRef.current = false
-    }
-  }
-
-  // ─── RESIZE ──────────────────────────────────────────────────────────────
-  const handleResizeStart = (e, side) => {
+    setDragStartTime(start)
     e.stopPropagation()
-    onDragCheckpoint?.()
-    setIsResizing(true)
-    setResizeSide(side)
-    setDragStartX(e.clientX)
-    lastMouseXRef.current = e.clientX
+    e.preventDefault()
   }
 
-  const handleResizeMove = (e) => {
-    if (!isResizing) return
-
-    const deltaX = e.clientX - dragStartX
-    const deltaSeconds = deltaX / pixelsPerSecond
-
-    if (resizeSide === 'end') {
-      const newDuration = Math.max(0.5, duration + deltaSeconds)
-      onUpdate({ duration: newDuration })
-    } else if (resizeSide === 'start') {
-      const newStart = Math.max(0, clip.start + deltaSeconds)
-      const newDuration = duration - deltaSeconds
-      if (newDuration >= 0.5) {
-        onUpdate({ start: newStart, duration: newDuration })
-      }
-    }
-
-    setDragStartX(e.clientX)
-    lastMouseXRef.current = e.clientX
-  }
-
-  const handleResizeUp = () => {
-    setIsResizing(false)
-    setResizeSide(null)
+  const handleMouseMove = useCallback((e) => {
+    if (!isDragging) return
     
-    const deltaX = lastMouseXRef.current - dragStartX
-    const deltaSeconds = deltaX / pixelsPerSecond
-    const newDuration = Math.max(0.5, duration + deltaSeconds)
-    if (newDuration > 0.5 && Math.abs(newDuration - duration) > 0.01) {
-      onDurationUpdate?.(clip.id, newDuration)
+    const deltaX = (e.clientX - dragStartX) / pixelsPerSecond
+    
+    if (dragMode === 'move') {
+      let newStart = Math.max(0, dragStartTime + deltaX)
+      // ✅ Appliquer le snap si activé
+      if (snapEnabled) {
+        newStart = Math.round(newStart / SNAP_VALUE) * SNAP_VALUE
+        newStart = Math.round(newStart * 100) / 100
+      }
+      if (onMove && dragStartClipId.current) {
+        onMove(dragStartClipId.current, newStart, trackId)
+      }
+    } else if (dragMode === 'resize-start') {
+      let newStart = Math.max(0, dragStartTime + deltaX)
+      // ✅ Appliquer le snap pour le resize-start
+      if (snapEnabled) {
+        newStart = Math.round(newStart / SNAP_VALUE) * SNAP_VALUE
+        newStart = Math.round(newStart * 100) / 100
+      }
+      const newDuration = duration + (dragStartTime - newStart)
+      if (newDuration > 0.05) {
+        onUpdate?.(clip.id, { start: newStart, duration: newDuration })
+        onUpdateDuration?.(clip.id, newDuration)
+      }
+    } else if (dragMode === 'resize-end') {
+      let newDuration = Math.max(0.05, duration + deltaX)
+      // ✅ Appliquer le snap pour le resize-end
+      if (snapEnabled) {
+        newDuration = Math.round(newDuration / SNAP_VALUE) * SNAP_VALUE
+        newDuration = Math.round(newDuration * 100) / 100
+      }
+      onUpdate?.(clip.id, { duration: newDuration })
+      onUpdateDuration?.(clip.id, newDuration)
     }
-  }
+  }, [isDragging, dragMode, dragStartX, dragStartTime, duration, pixelsPerSecond, clip.id, onMove, onUpdate, onUpdateDuration, trackId, snapEnabled])
+
+  const handleMouseUp = useCallback(() => {
+    if (isDragging) {
+      setIsDragging(false)
+      dragStartClipId.current = null
+    }
+  }, [isDragging])
 
   useEffect(() => {
     if (isDragging) {
@@ -342,416 +135,251 @@ export default function EditorClip({
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [isDragging])
+  }, [isDragging, handleMouseMove, handleMouseUp])
 
-  useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleResizeMove)
-      document.addEventListener('mouseup', handleResizeUp)
-    }
-    return () => {
-      document.removeEventListener('mousemove', handleResizeMove)
-      document.removeEventListener('mouseup', handleResizeUp)
-    }
-  }, [isResizing])
-
-  // ─── CONTEXT MENU ─────────────────────────────────────────────────────────
-  const handleContextMenu = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    onContextMenu?.(clip.id, null, e)
+  const getClipColor = (baseColor) => {
+    const opacity = isSelected ? 0.35 : 0.15
+    return `color-mix(in srgb, ${baseColor} ${opacity * 100}%, var(--bg-secondary))`
   }
 
-  // ─── RENDU ────────────────────────────────────────────────────────────────
+  // Handlers avec ordre correct (clipId, trackId)
+  const handlePlay = (e) => {
+    e?.stopPropagation?.()
+    console.log('▶️ [Clip] Jouer:', clip.name, 'à', start)
+    if (onPlayClip) {
+      onPlayClip(clip, trackId)
+    }
+  }
+
+  const handleStop = (e) => {
+    e?.stopPropagation?.()
+    console.log('⏹️ [Clip] Arrêter:', clip.name)
+    onStopClip?.(clip.id)
+  }
+
+  const handleDuplicate = (clipId, trackId) => {
+    console.log('📋 [Clip] Dupliquer:', clipId, trackId)
+    if (onDuplicate && clipId && trackId) {
+      onDuplicate(clipId, trackId)
+    }
+  }
+
+  const handleRemove = (clipId, trackId) => {
+    console.log('🗑️ [Clip] Supprimer:', clipId, trackId)
+    if (onRemove && clipId && trackId) {
+      onRemove(clipId, trackId)
+    }
+  }
+
+  const handleCopy = (e) => {
+    e?.stopPropagation?.()
+    console.log('📋 [Clip] Copier:', clip.name)
+    onCopyClip?.(clip)
+  }
+
+  const handleCut = (e) => {
+    e?.stopPropagation?.()
+    console.log('✂️ [Clip] Couper:', clip.name)
+    onCutClip?.(clip)
+  }
 
   return (
     <div
       ref={clipRef}
       style={{
         position: 'absolute',
-        left: left,
         top: 4,
-        width: width,
-        height: trackHeight,
-        background: isSelected ? `hsl(${(clip.index * 30 + 200) % 360}, 70%, 50%)` : 'var(--bg-tertiary)',
-        borderRadius: 'var(--radius-sm)',
-        border: `2px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
+        bottom: 4,
+        left: clipLeft,
+        width: clipWidth,
+        minWidth: 10,
+        background: getClipColor(trackColor),
+        border: `2px solid ${isSelected ? 'var(--accent)' : trackColor}`,
+        borderRadius: 6,
         cursor: isDragging ? 'grabbing' : 'grab',
-        transition: isDragging || isResizing ? 'none' : 'all 0.15s ease',
-        boxShadow: isSelected ? `0 0 20px rgba(124,111,247,0.4)` : 'none',
+        transition: isDragging ? 'none' : 'border-color 0.15s, box-shadow 0.15s',
+        boxShadow: isSelected ? '0 0 20px rgba(124,111,247,0.3)' : 'none',
         zIndex: isSelected ? 3 : 1,
+        opacity: isDragging ? 0.7 : 1,
         overflow: 'hidden',
-        userSelect: 'none',
-        pointerEvents: isDragging ? 'none' : 'auto'
+        userSelect: 'none'
       }}
       onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onContextMenu={handleContextMenu}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenu?.(e)
+      }}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
     >
-      {/* Waveform */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 4px',
-        opacity: 0.6,
-        pointerEvents: 'none'
-      }}>
-        {waveformData && waveformData.length > 0 ? (
-          waveformData.map((value, i) => {
-            const barHeight = Math.max(2, value * trackHeight * 0.8)
-            return (
-              <div
-                key={i}
-                style={{
-                  flex: 1,
-                  height: barHeight,
-                  minWidth: 1,
-                  background: isSelected ? 'white' : 'var(--text-secondary)',
-                  borderRadius: 1,
-                  opacity: 0.7,
-                  marginRight: 0.5
-                }}
-              />
-            )
-          })
-        ) : (
-          <div style={{
-            width: '100%',
-            textAlign: 'center',
-            fontSize: 11,
-            color: 'var(--text-tertiary)'
-          }}>
-            <i className="ti ti-music" style={{ fontSize: 14 }} />
-          </div>
-        )}
-      </div>
+      <ClipWaveform
+        waveformData={waveformData}
+        trackColor={trackColor}
+        duration={duration}
+      />
 
-      {/* ✅ Bouton Rafraîchir la durée - visible au survol */}
-      {isHovered && isSelected && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            refreshDuration()
-          }}
-          disabled={isRefreshingDuration}
-          style={{
-            position: 'absolute',
-            top: 2,
-            right: 30,
-            zIndex: 10,
-            padding: '1px 6px',
-            fontSize: 9,
-            background: 'rgba(0,0,0,0.7)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            borderRadius: 3,
-            color: 'white',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 3,
-            opacity: isRefreshingDuration ? 0.6 : 0.8,
-            transition: 'all 0.15s'
-          }}
-          title={tr('editorRefreshDuration') || 'Recalculer la durée réelle du clip'}
-          onMouseEnter={(e) => { e.currentTarget.style.opacity = 1 }}
-          onMouseLeave={(e) => { e.currentTarget.style.opacity = 0.8 }}
-        >
-          <i className={`ti ${isRefreshingDuration ? 'ti-loader' : 'ti-refresh'}`} 
-             style={isRefreshingDuration ? { animation: 'spin 1s linear infinite' } : {}} />
-          <span>{isRefreshingDuration ? '...' : (tr('editorRefreshDuration') || 'Durée')}</span>
-        </button>
-      )}
-
-      {/* Badge effets */}
-      {hasActiveEffects && (
-        <div style={{
-          position: 'absolute',
-          top: 2,
-          left: 4,
-          fontSize: 7,
-          padding: '1px 4px',
-          borderRadius: 2,
-          background: 'rgba(124,111,247,0.8)',
-          color: 'white',
-          zIndex: 3,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2
-        }}>
-          <i className="ti ti-wand" style={{ fontSize: 8 }} /> Effets
-        </div>
-      )}
-
-      {/* Nom du clip */}
       <div style={{
         position: 'absolute',
         bottom: 4,
         left: 6,
         right: 6,
         fontSize: 9,
-        fontWeight: 600,
-        color: isSelected ? 'white' : 'var(--text-secondary)',
+        fontWeight: 500,
+        color: 'var(--text-secondary)',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
-        textShadow: isSelected ? '0 1px 4px rgba(0,0,0,0.5)' : 'none',
-        zIndex: 2,
-        pointerEvents: 'none'
+        pointerEvents: 'none',
+        textShadow: '0 1px 4px rgba(0,0,0,0.5)'
       }}>
-        {clip.name}
-        {showDuration && (
-          <span style={{ marginLeft: 4, opacity: 0.7 }}>
-            ({Math.round(duration)}s)
-          </span>
-        )}
+        {clip.name || 'Clip'}
+        <span style={{
+          marginLeft: 4,
+          fontSize: 8,
+          opacity: 0.6,
+          color: 'var(--text-tertiary)'
+        }}>
+          {duration.toFixed(1)}s
+        </span>
       </div>
 
-      {/* Badges d'effets */}
-      {effectBadges.length > 0 && (
+      {isHovering && (
         <div style={{
           position: 'absolute',
           top: 2,
-          right: 4,
+          left: 4,
           display: 'flex',
           gap: 2,
-          zIndex: 2,
-          pointerEvents: 'none'
+          zIndex: 7,
+          pointerEvents: 'auto'
         }}>
-          {effectBadges.slice(0, 3).map(type => (
-            <span key={type} style={{
-              fontSize: 7,
-              padding: '0 4px',
-              borderRadius: 2,
+          {isClipPlaying ? (
+            <button
+              onClick={handleStop}
+              style={{
+                padding: '2px 5px',
+                fontSize: 10,
+                color: 'var(--warning)',
+                background: 'rgba(0,0,0,0.6)',
+                borderRadius: 3,
+                border: '1px solid rgba(255,255,255,0.1)',
+                cursor: 'pointer'
+              }}
+              title="Arrêter"
+            >
+              <i className="ti ti-player-stop" />
+            </button>
+          ) : (
+            <button
+              onClick={handlePlay}
+              style={{
+                padding: '2px 5px',
+                fontSize: 10,
+                color: 'var(--success)',
+                background: 'rgba(0,0,0,0.6)',
+                borderRadius: 3,
+                border: '1px solid rgba(255,255,255,0.1)',
+                cursor: 'pointer'
+              }}
+              title="Jouer le clip"
+            >
+              <i className="ti ti-player-play" />
+            </button>
+          )}
+          
+          <button
+            onClick={handleCopy}
+            style={{
+              padding: '2px 5px',
+              fontSize: 10,
+              color: 'var(--text-secondary)',
               background: 'rgba(0,0,0,0.6)',
-              color: 'white',
-              textTransform: 'uppercase'
-            }}>
-              {type.slice(0, 3)}
-            </span>
-          ))}
+              borderRadius: 3,
+              border: '1px solid rgba(255,255,255,0.1)',
+              cursor: 'pointer'
+            }}
+            title="Copier"
+          >
+            <i className="ti ti-copy" />
+          </button>
+          
+          <button
+            onClick={handleCut}
+            style={{
+              padding: '2px 5px',
+              fontSize: 10,
+              color: 'var(--warning)',
+              background: 'rgba(0,0,0,0.6)',
+              borderRadius: 3,
+              border: '1px solid rgba(255,255,255,0.1)',
+              cursor: 'pointer'
+            }}
+            title="Couper"
+          >
+            <i className="ti ti-cut" />
+          </button>
         </div>
       )}
 
-      {/* Indicateur de lecture du projet */}
-      {isPlaying && (
+      <ClipFadeHandles
+        clip={clip}
+        trackId={trackId}
+        isSelected={isSelected}
+        isHovering={isHovering}
+        onFade={onFade}
+        pixelsPerSecond={pixelsPerSecond}
+      />
+
+      <ClipResizeHandles
+        isSelected={isSelected}
+        isHovering={isHovering}
+        duration={duration}
+        pixelsPerSecond={pixelsPerSecond}
+        onResizeStart={(e) => {
+          e.stopPropagation()
+          setDragMode('resize-start')
+          setIsDragging(true)
+          setDragStartX(e.clientX)
+          setDragStartTime(start)
+        }}
+        onResizeEnd={(e) => {
+          e.stopPropagation()
+          setDragMode('resize-end')
+          setIsDragging(true)
+          setDragStartX(e.clientX)
+          setDragStartTime(start)
+        }}
+      />
+
+      <ClipActions
+        isSelected={isSelected}
+        isHovering={isHovering}
+        clipId={clip.id}
+        trackId={trackId}
+        onDuplicate={handleDuplicate}
+        onRemove={handleRemove}
+        tr={tr}
+      />
+
+      {/* CURSEUR DU CLIP - Position exacte en pixels */}
+      {showPlayhead && (
         <div style={{
           position: 'absolute',
+          left: playheadPosition,
           top: 0,
-          left: 0,
-          right: 0,
-          height: 2,
-          background: 'var(--accent)',
+          bottom: 0,
+          width: 2,
+          background: isClipPlaying ? 'var(--accent)' : 'rgba(124,111,247,0.4)',
           zIndex: 4,
-          animation: 'pulse 0.8s ease-in-out infinite'
+          boxShadow: isClipPlaying ? '0 0 10px rgba(124,111,247,0.5)' : 'none',
+          pointerEvents: 'none',
+          transition: isClipPlaying ? 'none' : 'left 0.05s ease'
         }} />
       )}
-
-      {/* Indicateur de preview */}
-      {isClipPlaying && (
-        <div 
-          className="clip-playing-indicator"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'rgba(0,0,0,0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 7,
-            pointerEvents: 'none',
-            borderRadius: 'var(--radius-sm)'
-          }}
-        >
-          <i className="ti ti-player-pause" style={{ color: 'white', fontSize: 20 }} />
-        </div>
-      )}
-
-      {/* Poignées de fade */}
-      {(isHovered || isSelected || fadeDrag) && (
-        <>
-          <div
-            onMouseDown={(e) => handleFadeMouseDown(e, 'in')}
-            style={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              width: 0,
-              height: 0,
-              borderStyle: 'solid',
-              borderWidth: `0 0 ${Math.min(trackHeight, Math.max(10, fadeInDuration * pixelsPerSecond))}px ${Math.min(width / 2, Math.max(10, fadeInDuration * pixelsPerSecond))}px`,
-              borderColor: 'transparent transparent rgba(0,0,0,0.4) transparent',
-              cursor: 'ew-resize',
-              zIndex: 5,
-              transition: fadeDrag ? 'none' : 'border-width 0.1s ease'
-            }}
-            title={tr('editorFadeIn')}
-          />
-          <div
-            onMouseDown={(e) => handleFadeMouseDown(e, 'out')}
-            style={{
-              position: 'absolute',
-              right: 0,
-              top: 0,
-              width: 0,
-              height: 0,
-              borderStyle: 'solid',
-              borderWidth: `0 ${Math.min(width / 2, Math.max(10, fadeOutDuration * pixelsPerSecond))}px ${Math.min(trackHeight, Math.max(10, fadeOutDuration * pixelsPerSecond))}px 0`,
-              borderColor: 'transparent rgba(0,0,0,0.4) transparent transparent',
-              cursor: 'ew-resize',
-              zIndex: 5,
-              transition: fadeDrag ? 'none' : 'border-width 0.1s ease'
-            }}
-            title={tr('editorFadeOut')}
-          />
-        </>
-      )}
-
-      {/* Poignées de resize */}
-      {isSelected && (
-        <>
-          <div
-            style={{
-              position: 'absolute',
-              left: -3,
-              top: 0,
-              bottom: 0,
-              width: 6,
-              cursor: 'ew-resize',
-              zIndex: 5
-            }}
-            onMouseDown={(e) => handleResizeStart(e, 'start')}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              right: -3,
-              top: 0,
-              bottom: 0,
-              width: 6,
-              cursor: 'ew-resize',
-              zIndex: 5
-            }}
-            onMouseDown={(e) => handleResizeStart(e, 'end')}
-          />
-        </>
-      )}
-
-      {/* Actions contextuelles */}
-      <div className="clip-actions" style={{
-        position: 'absolute',
-        top: 2,
-        right: 4,
-        display: isSelected ? 'flex' : 'none',
-        gap: 2,
-        zIndex: 6,
-        flexWrap: 'wrap'
-      }}>
-        <button
-          onClick={(e) => { e.stopPropagation(); playClipPreview(e) }}
-          style={{
-            padding: '1px 4px',
-            fontSize: 9,
-            background: isClipPlaying ? 'rgba(239,159,39,0.8)' : 'rgba(0,0,0,0.6)',
-            border: 'none',
-            borderRadius: 2,
-            color: 'white',
-            cursor: 'pointer',
-            minWidth: 20,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-          title={isClipPlaying ? tr('editorStopPreview') : tr('editorListenClip')}
-        >
-          <i className={`ti ${isClipPlaying ? 'ti-player-pause' : 'ti-player-play'}`} />
-        </button>
-
-        <button
-          onClick={(e) => { e.stopPropagation(); onCopy?.(clip.id) }}
-          style={{
-            padding: '1px 4px',
-            fontSize: 9,
-            background: 'rgba(0,0,0,0.6)',
-            border: 'none',
-            borderRadius: 2,
-            color: 'white',
-            cursor: 'pointer'
-          }}
-          title={tr('editorCopy') || 'Copier (Ctrl+C)'}
-        >
-          <i className="ti ti-copy" />
-        </button>
-        
-        <button
-          onClick={(e) => { e.stopPropagation(); onCut?.(clip.id) }}
-          style={{
-            padding: '1px 4px',
-            fontSize: 9,
-            background: 'rgba(224,82,82,0.6)',
-            border: 'none',
-            borderRadius: 2,
-            color: 'white',
-            cursor: 'pointer'
-          }}
-          title={tr('editorCut') || 'Couper (Ctrl+X)'}
-        >
-          <i className="ti ti-scissors" />
-        </button>
-
-        <button
-          onClick={(e) => { e.stopPropagation(); onDuplicate() }}
-          style={{
-            padding: '1px 4px',
-            fontSize: 9,
-            background: 'rgba(29,158,117,0.6)',
-            border: 'none',
-            borderRadius: 2,
-            color: 'white',
-            cursor: 'pointer'
-          }}
-          title={tr('editorDuplicateClip')}
-        >
-          <i className="ti ti-copy" style={{ transform: 'scaleX(-1)' }} />
-        </button>
-
-        <button
-          onClick={(e) => { e.stopPropagation(); onRemove() }}
-          style={{
-            padding: '1px 4px',
-            fontSize: 9,
-            background: 'rgba(224,82,82,0.8)',
-            border: 'none',
-            borderRadius: 2,
-            color: 'white',
-            cursor: 'pointer'
-          }}
-          title={tr('editorRemoveClip') || 'Supprimer (Delete)'}
-        >
-          <i className="ti ti-trash" />
-        </button>
-      </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        .clip-playing-indicator {
-          animation: clipPlayingPulse 0.8s ease-in-out infinite;
-        }
-        @keyframes clipPlayingPulse {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 0.6; }
-        }
-      `}</style>
     </div>
   )
-}
+})
+
+EditorClip.displayName = 'EditorClip'
+
+export default EditorClip

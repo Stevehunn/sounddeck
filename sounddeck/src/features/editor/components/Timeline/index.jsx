@@ -1,19 +1,17 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
-// ✅ CORRIGER L'IMPORT
-import EditorClip from '../Clip'
+// src/features/editor/components/Timeline/index.jsx
+import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { useEditor } from '../../contexts/EditorContext'
+import { useLanguage } from '@core/i18n/LanguageContext'
+import EditorTrack from '../Track'
+import TrackHeader from '../Track/TrackHeader'
+import TrackControls from '../Track/TrackControls'
+import TimelineRuler from './TimelineRuler'
+import TimelinePlayhead from './TimelinePlayhead'
+import TimelineLoop from './TimelineLoop'
+import TimelineZoomControls from './TimelineZoomControls'
 
-const TRACK_HEAD_WIDTH = 190
+const TRACK_HEAD_WIDTH = 200
 const BASE_PIXELS_PER_SECOND = 80
-
-function getSnapStep(zoomLevel) {
-  if (zoomLevel < 0.08) return 60
-  if (zoomLevel < 0.15) return 30
-  if (zoomLevel < 0.3) return 10
-  if (zoomLevel < 0.6) return 5
-  if (zoomLevel < 1.5) return 1
-  if (zoomLevel < 3) return 0.5
-  return 0.1
-}
 
 function formatTime(seconds) {
   if (!seconds || isNaN(seconds)) return '0:00'
@@ -25,327 +23,181 @@ function formatTime(seconds) {
   return `${s.toFixed(1)}s`
 }
 
-export default function EditorTimeline({
-  tracks,
-  selectedClipId,
-  selectedTrackId,
-  totalDuration,
-  onClipSelect,
-  onClipMove,
-  onClipUpdate,
-  onClipRemove,
-  onClipDuplicate,
-  onClipFade,
-  onClipCopy,
-  onClipCut,
-  onClipContextMenu,
-  onDragCheckpoint,
-  onTrackRemove,
-  onSeek,
-  onTrackMute,
-  onTrackSolo,
-  onTrackVolume,
-  onTrackReorder,
-  waveformData,
-  onWaveformUpdate,
-  currentTime,
-  isPlaying,
-  clipDurations,
-  snapEnabled,
-  loopRegion,
-  onSetLoopRegion,
-  autoCrossfade,
-  addToast,
-  tr,
-  onRenameTrack,
-  zoomLevel = 1,
-  onZoomChange,
-  onSetLoopStart,
-  onSetLoopEnd,
-  onClearLoop,
-  onToggleLoop,
-  onSplitClip,
-  onTrimClip,
-  onSetFade,
-  onUpdateClipDuration
-}) {
-  const containerRef = useRef(null)
-  const rulerRef = useRef(null)
-  const timelineRef = useRef(null)
+export default function EditorTimeline() {
+  const { t } = useLanguage()
+  const context = useEditor()
+  
+  const {
+    tracks,
+    selectedClipId,
+    selectedTrackId,
+    totalDuration,
+    currentTime,
+    isPlaying,
+    clipDurations,
+    waveformData,
+    zoomLevel,
+    snapEnabled,
+    loopRegion,
+    autoCrossfade,
+    selectClip,
+    updateClip,
+    removeClip,
+    duplicateClip,
+    moveClip,
+    play,
+    pause,
+    stop,
+    seek,
+    togglePlay,
+    muteTrack,
+    soloTrack,
+    setTrackVolume,
+    setLoopRegion,
+    toggleLoop,
+    clearLoop,
+    handleZoomChange,
+    addToast,
+    store,
+    setClipDurations,
+    removeTrack,
+  } = context
 
+  console.log('🔍 [Timeline] Contexte:', {
+    hasTracks: !!tracks,
+    trackCount: tracks?.length || 0,
+    hasSelectClip: !!selectClip,
+    hasUpdateClip: !!updateClip,
+    hasSetClipDurations: !!setClipDurations,
+    hasRemoveTrack: !!removeTrack,
+    hasMoveClip: !!moveClip
+  })
+
+  const containerRef = useRef(null)
+  const clipsContainerRef = useRef(null)
   const [isPanning, setIsPanning] = useState(false)
   const [panStartX, setPanStartX] = useState(0)
   const [scrollLeft, setScrollLeft] = useState(0)
-  const [loopDrag, setLoopDrag] = useState(null)
-  const [dropTargetTrackId, setDropTargetTrackId] = useState(null)
-  const [snapFeedback, setSnapFeedback] = useState(null)
-  const [isDraggingTrack, setIsDraggingTrack] = useState(false)
 
   const pixelsPerSecond = BASE_PIXELS_PER_SECOND * zoomLevel
   const totalWidth = Math.max(totalDuration * pixelsPerSecond + 100, 600)
 
-  // ✅ Le crossfade est maintenant géré par Web Audio API directement
-  // Les fades sont appliqués via les GainNode dans useAudioEngine
-  // Cette fonction est conservée pour compatibilité mais ne fait rien
-  const applyCrossfades = useCallback(() => {
-    // Le crossfade est géré par Web Audio API via les fades
-    // Les clips qui se chevauchent auront leurs fades appliqués automatiquement
-  }, [])
-
-  // ✅ Appliquer le crossfade quand les clips changent
-  useEffect(() => {
-    if (autoCrossfade) {
-      applyCrossfades()
-    }
-  }, [tracks, clipDurations, autoCrossfade, applyCrossfades])
+  const getTrackColor = (index) => {
+    const colors = [
+      'hsl(220, 70%, 55%)',
+      'hsl(340, 70%, 55%)',
+      'hsl(40, 70%, 55%)',
+      'hsl(160, 70%, 55%)',
+      'hsl(280, 70%, 55%)',
+      'hsl(10, 70%, 55%)',
+      'hsl(190, 70%, 55%)',
+      'hsl(70, 70%, 55%)'
+    ]
+    return colors[index % colors.length]
+  }
 
   const clientXToTime = (clientX) => {
-    const timeline = timelineRef.current
-    if (!timeline) return 0
-    const timelineRect = timeline.getBoundingClientRect()
-    const clickInTimeline = (clientX - timelineRect.left) - TRACK_HEAD_WIDTH
-    const maxPixels = totalDuration * pixelsPerSecond
-    const clampedX = Math.max(0, Math.min(maxPixels, clickInTimeline))
+    const clipsContainer = clipsContainerRef.current
+    if (!clipsContainer) return 0
+    const rect = clipsContainer.getBoundingClientRect()
+    const scrollLeft = clipsContainer.scrollLeft
+    const clickInTimeline = (clientX - rect.left) + scrollLeft
+    const clampedX = Math.max(0, Math.min(totalWidth, clickInTimeline))
     return clampedX / pixelsPerSecond
   }
 
-  const snapTime = (time, trackId, clipId) => {
-    if (!snapEnabled) return time
-
-    const step = getSnapStep(zoomLevel)
-    let best = Math.round(time / step) * step
-    let bestDist = Math.abs(time - best)
-
-    const thresholdSeconds = 8 / pixelsPerSecond
-    const track = tracks.find(t => t.id === trackId)
-    if (track) {
-      track.clips.forEach(c => {
-        if (c.id === clipId) return
-        const cDuration = clipDurations?.[c.id] || c.duration || 3
-        ;[c.start, c.start + cDuration].forEach(edge => {
-          const dist = Math.abs(time - edge)
-          if (dist < bestDist) {
-            best = edge
-            bestDist = dist
-          }
-        })
-      })
-    }
-
-    if (bestDist <= thresholdSeconds && bestDist > 0.01) {
-      setSnapFeedback({ time: best, visible: true })
-      setTimeout(() => setSnapFeedback(null), 300)
-    }
-
-    return bestDist <= thresholdSeconds ? best : time
-  }
-
-  const handleClipMoveWithSnap = (trackId, clipId, newStart, newTrackId = null) => {
-    setIsDraggingTrack(true)
-    const snapped = snapTime(Math.max(0, newStart), trackId, clipId)
-    onClipMove(trackId, clipId, snapped, newTrackId)
-    setTimeout(() => setIsDraggingTrack(false), 100)
-  }
-
   useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
+    const clipsContainer = clipsContainerRef.current
+    if (!clipsContainer) return
 
     const onWheel = (e) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault()
         const delta = e.deltaY > 0 ? -0.05 : 0.05
         const newZoom = Math.max(0.05, Math.min(10, zoomLevel + delta))
-        onZoomChange?.(newZoom)
-        
-        const rect = container.getBoundingClientRect()
-        const centerX = rect.width / 2
-        const currentScroll = container.scrollLeft
-        const newScroll = currentScroll + (centerX * delta * 0.5)
-        container.scrollLeft = Math.max(0, newScroll)
+        handleZoomChange?.(newZoom)
+      } else {
+        clipsContainer.scrollLeft += e.deltaY
+        e.preventDefault()
       }
     }
 
-    container.addEventListener('wheel', onWheel, { passive: false })
-    return () => container.removeEventListener('wheel', onWheel)
-  }, [zoomLevel, onZoomChange])
+    clipsContainer.addEventListener('wheel', onWheel, { passive: false })
+    return () => clipsContainer.removeEventListener('wheel', onWheel)
+  }, [zoomLevel, handleZoomChange])
 
-  const handleMouseDown = (e) => {
-    if (e.button === 1 || (e.button === 0 && e.target === rulerRef.current)) {
-      setIsPanning(true)
-      setPanStartX(e.clientX)
-      setScrollLeft(containerRef.current?.scrollLeft || 0)
-      containerRef.current?.style.setProperty('cursor', 'grabbing')
+  const handleClipSelect = useCallback((clipId, trackId) => {
+    console.log('🎯 [Timeline] handleClipSelect:', clipId, trackId)
+    selectClip?.(clipId, trackId)
+  }, [selectClip])
+
+  const handleClipMove = useCallback((trackId, clipId, newStart, newTrackId) => {
+    console.log('🔄 [Timeline] handleClipMove:', { trackId, clipId, newStart, newTrackId })
+    moveClip?.(trackId, clipId, newStart, newTrackId)
+  }, [moveClip])
+
+  const handleClipUpdate = useCallback((trackId, clipId, updates) => {
+    console.log('✏️ [Timeline] handleClipUpdate:', { trackId, clipId, updates })
+    updateClip?.(trackId, clipId, updates)
+  }, [updateClip])
+
+  const handleClipRemove = useCallback((clipId, trackId) => {
+    console.log('🗑️ [Timeline] handleClipRemove:', { trackId, clipId })
+    removeClip?.(trackId, clipId)
+  }, [removeClip])
+
+  const handleClipDuplicate = useCallback((clipId, trackId) => {
+    console.log('📋 [Timeline] handleClipDuplicate:', { trackId, clipId })
+    duplicateClip?.(trackId, clipId)
+  }, [duplicateClip])
+
+  const handleClipFade = useCallback((trackId, clipId, edge, duration) => {
+    console.log('🌊 [Timeline] handleClipFade:', { trackId, clipId, edge, duration })
+    store?.setClipFade?.(trackId, clipId, edge, duration)
+  }, [store])
+
+  const handleClipContextMenu = useCallback((e, trackId, clipId) => {
+    console.log('📋 [Timeline] handleClipContextMenu:', { trackId, clipId })
+    e.preventDefault()
+  }, [])
+
+  const handleUpdateClipDuration = useCallback((clipId, newDuration) => {
+    console.log('📏 [Timeline] handleUpdateClipDuration:', { clipId, newDuration })
+    if (setClipDurations) {
+      setClipDurations(prev => ({ ...prev, [clipId]: newDuration }))
     }
-  }
+    store?.updateClipDurationInEditor?.(clipId, newDuration)
+  }, [setClipDurations, store])
 
-  const handleMouseMove = (e) => {
-    if (isPanning) {
-      const deltaX = e.clientX - panStartX
-      const newScroll = scrollLeft - deltaX
-      if (containerRef.current) {
-        containerRef.current.scrollLeft = Math.max(0, newScroll)
-      }
-    }
-  }
+  const handleTrackRemove = useCallback((trackId) => {
+    console.log('🗑️ [Timeline] handleTrackRemove:', trackId)
+    removeTrack?.(trackId)
+  }, [removeTrack])
 
-  const handleMouseUp = () => {
-    setIsPanning(false)
-    containerRef.current?.style.setProperty('cursor', 'default')
-  }
+  const handleTrackMute = useCallback((trackId, muted) => {
+    console.log('🔇 [Timeline] handleTrackMute:', { trackId, muted })
+    muteTrack?.(trackId, muted)
+  }, [muteTrack])
 
-  useEffect(() => {
-    if (isPanning) {
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-    }
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isPanning])
+  const handleTrackSolo = useCallback((trackId, solo) => {
+    console.log('🎧 [Timeline] handleTrackSolo:', { trackId, solo })
+    soloTrack?.(trackId, solo)
+  }, [soloTrack])
 
-  const handleTimelineClick = (e) => {
-    if (isPanning) return
-    if (e.target.closest('.editor-clip-wrapper')) return
-    if (e.target.closest('button')) return
-    if (e.target.closest('.loop-strip')) return
+  const handleTrackVolume = useCallback((trackId, volume) => {
+    console.log('🔊 [Timeline] handleTrackVolume:', { trackId, volume })
+    setTrackVolume?.(trackId, volume)
+  }, [setTrackVolume])
 
-    const seekTime = clientXToTime(e.clientX)
-    onSeek?.(seekTime)
-  }
+  const handleSeek = useCallback((time) => {
+    console.log('🎯 [Timeline] handleSeek:', time)
+    seek?.(time)
+  }, [seek])
 
-  const handleLoopStripMouseDown = (e) => {
-    e.stopPropagation()
-    const time = clientXToTime(e.clientX)
-    setLoopDrag({ mode: 'create', anchor: time })
-    onSetLoopRegion?.(time, time + 0.1)
-  }
-
-  const handleLoopHandleMouseDown = (mode) => (e) => {
-    e.stopPropagation()
-    const anchor = mode === 'start' ? loopRegion.end : loopRegion.start
-    setLoopDrag({ mode, anchor })
-  }
-
-  useEffect(() => {
-    if (!loopDrag) return
-
-    const handleMove = (e) => {
-      const time = clientXToTime(e.clientX)
-      onSetLoopRegion?.(
-        Math.min(loopDrag.anchor, time),
-        Math.max(loopDrag.anchor, time)
-      )
-    }
-    const handleUp = () => setLoopDrag(null)
-
-    document.addEventListener('mousemove', handleMove)
-    document.addEventListener('mouseup', handleUp)
-    return () => {
-      document.removeEventListener('mousemove', handleMove)
-      document.removeEventListener('mouseup', handleUp)
-    }
-  }, [loopDrag, onSetLoopRegion])
-
-  // ─── RENDU ────────────────────────────────────────────────────────────────
-
-  const renderRuler = () => {
-    const marks = []
-    let step = 1
-    if (zoomLevel < 0.08) step = 60
-    else if (zoomLevel < 0.15) step = 30
-    else if (zoomLevel < 0.3) step = 10
-    else if (zoomLevel < 0.6) step = 5
-    else if (zoomLevel < 1.5) step = 1
-    else if (zoomLevel < 3) step = 0.5
-    else step = 0.1
-
-    for (let i = 0; i <= Math.ceil(totalDuration) + 1; i += step) {
-      const position = i * pixelsPerSecond
-      const isMain = i % 5 === 0 || step >= 5
-      
-      marks.push(
-        <div
-          key={i}
-          style={{
-            position: 'absolute',
-            left: position,
-            top: 0,
-            height: isMain ? 16 : 8,
-            width: 1,
-            background: isMain ? 'var(--text-secondary)' : 'var(--text-tertiary)',
-            transform: 'translateX(-0.5px)'
-          }}
-        >
-          {isMain && (
-            <span style={{
-              position: 'absolute',
-              top: 18,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              fontSize: Math.max(7, 10 * Math.min(zoomLevel, 2) / 1.5),
-              color: 'var(--text-tertiary)',
-              fontFamily: 'monospace',
-              whiteSpace: 'nowrap'
-            }}>
-              {i}s
-            </span>
-          )}
-        </div>
-      )
-    }
-    return marks
-  }
-
-  const renderPlayhead = () => {
-    const position = Math.min(currentTime * pixelsPerSecond, totalWidth)
-    return (
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        left: position,
-        width: 2,
-        background: 'var(--accent)',
-        zIndex: 10,
-        pointerEvents: 'none',
-        transform: 'translateX(-1px)',
-        boxShadow: '0 0 10px rgba(124,111,247,0.5)',
-        transition: isPlaying ? 'none' : 'left 0.1s ease'
-      }}>
-        <div style={{
-          position: 'absolute',
-          top: -4,
-          left: -4,
-          width: 10,
-          height: 10,
-          borderRadius: '50%',
-          background: 'var(--accent)',
-          border: '2px solid var(--bg-primary)'
-        }} />
-        <div style={{
-          position: 'absolute',
-          top: -20,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          fontSize: 9,
-          fontFamily: 'monospace',
-          color: 'var(--accent)',
-          background: 'var(--bg-secondary)',
-          padding: '1px 4px',
-          borderRadius: 3,
-          border: '1px solid var(--accent)',
-          whiteSpace: 'nowrap',
-          opacity: 0.8
-        }}>
-          {formatTime(currentTime)}
-        </div>
-      </div>
-    )
-  }
-
-  // ─── RENDU PRINCIPAL ──────────────────────────────────────────────────────
+  const handlePlay = useCallback(() => {
+    console.log('▶️ [Timeline] handlePlay')
+    togglePlay?.()
+  }, [togglePlay])
 
   return (
     <div
@@ -353,268 +205,277 @@ export default function EditorTimeline({
       style={{
         width: '100%',
         height: '100%',
-        overflow: 'auto',
-        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
         background: 'var(--bg-primary)',
-        cursor: isPanning ? 'grabbing' : 'default'
+        overflow: 'hidden',
+        position: 'relative'
       }}
-      onMouseDown={handleMouseDown}
     >
-      <div
-        ref={timelineRef}
-        style={{
-          minWidth: totalWidth + 40,
-          minHeight: '100%',
-          position: 'relative'
+      <div style={{
+        display: 'flex',
+        height: 36,
+        minHeight: 36,
+        background: 'var(--bg-secondary)',
+        borderBottom: '1px solid var(--border)',
+        flexShrink: 0,
+        zIndex: 5,
+        position: 'relative'
+      }}>
+        <div style={{
+          width: TRACK_HEAD_WIDTH,
+          minWidth: TRACK_HEAD_WIDTH,
+          flexShrink: 0,
+          background: 'var(--bg-secondary)',
+          borderRight: '1px solid var(--border)'
+        }} />
+        <div style={{
+          flex: 1,
+          position: 'relative',
+          overflow: 'hidden',
+          cursor: 'pointer'
         }}
-        onClick={handleTimelineClick}
-      >
-        {/* Règle avec marqueurs */}
-        <div 
-          ref={rulerRef} 
-          style={{
-            position: 'sticky',
-            top: 0,
-            height: 36,
-            background: 'var(--bg-secondary)',
-            borderBottom: '1px solid var(--border)',
-            zIndex: 5,
-            marginLeft: TRACK_HEAD_WIDTH,
-            cursor: 'pointer'
-          }}
-          onDoubleClick={(e) => {
-            const time = clientXToTime(e.clientX)
-          }}
+        onDoubleClick={(e) => {
+          const time = clientXToTime(e.clientX)
+          handleSeek(time)
+        }}
         >
-          {renderRuler()}
-          {renderPlayhead()}
+          <TimelineRuler
+            totalDuration={totalDuration}
+            pixelsPerSecond={pixelsPerSecond}
+            currentTime={currentTime}
+            isPlaying={isPlaying}
+            zoomLevel={zoomLevel}
+            formatTime={formatTime}
+          />
+          <TimelinePlayhead
+            currentTime={currentTime}
+            pixelsPerSecond={pixelsPerSecond}
+            isPlaying={isPlaying}
+            formatTime={formatTime}
+          />
         </div>
+      </div>
 
-        {/* Bande de boucle */}
-        <div
-          className="loop-strip"
-          onMouseDown={handleLoopStripMouseDown}
-          style={{
-            position: 'sticky',
-            top: 36,
-            height: 10,
-            marginLeft: TRACK_HEAD_WIDTH,
-            background: 'var(--bg-tertiary)',
-            borderBottom: '1px solid var(--border)',
-            zIndex: 5,
-            cursor: 'text'
-          }}
-        >
-          {loopRegion && (loopRegion.enabled || loopRegion.end > loopRegion.start) && (
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              bottom: 0,
-              left: loopRegion.start * pixelsPerSecond,
-              width: (loopRegion.end - loopRegion.start) * pixelsPerSecond,
-              background: loopRegion.enabled ? 'var(--accent)' : 'var(--text-tertiary)',
-              opacity: 0.7
-            }} />
-          )}
+      <div style={{
+        display: 'flex',
+        height: 10,
+        minHeight: 10,
+        flexShrink: 0,
+        background: 'var(--bg-tertiary)',
+        borderBottom: '1px solid var(--border)',
+        position: 'relative'
+      }}>
+        <div style={{
+          width: TRACK_HEAD_WIDTH,
+          minWidth: TRACK_HEAD_WIDTH,
+          flexShrink: 0,
+          background: 'var(--bg-tertiary)',
+          borderRight: '1px solid var(--border)'
+        }} />
+        <div style={{ flex: 1, position: 'relative' }}>
+          <TimelineLoop
+            loopRegion={loopRegion}
+            pixelsPerSecond={pixelsPerSecond}
+            onSetLoopRegion={setLoopRegion}
+            onClearLoop={clearLoop}
+            onToggleLoop={toggleLoop}
+            tr={t}
+            totalDuration={totalDuration}
+          />
         </div>
+      </div>
 
-        {/* Bornes de boucle */}
-        {loopRegion && loopRegion.end > loopRegion.start && (
-          <>
-            <div
-              onMouseDown={handleLoopHandleMouseDown('start')}
-              style={{
-                position: 'absolute',
-                top: 46,
-                bottom: 0,
-                left: TRACK_HEAD_WIDTH + loopRegion.start * pixelsPerSecond - 4,
-                width: 8,
-                cursor: 'ew-resize',
-                zIndex: 4,
-                display: 'flex',
-                justifyContent: 'center'
-              }}
-            >
-              <div style={{
-                width: 2,
-                height: '100%',
-                background: loopRegion.enabled ? 'var(--accent)' : 'var(--text-tertiary)',
-                opacity: loopRegion.enabled ? 0.9 : 0.4
-              }} />
-            </div>
-            <div
-              onMouseDown={handleLoopHandleMouseDown('end')}
-              style={{
-                position: 'absolute',
-                top: 46,
-                bottom: 0,
-                left: TRACK_HEAD_WIDTH + loopRegion.end * pixelsPerSecond - 4,
-                width: 8,
-                cursor: 'ew-resize',
-                zIndex: 4,
-                display: 'flex',
-                justifyContent: 'center'
-              }}
-            >
-              <div style={{
-                width: 2,
-                height: '100%',
-                background: loopRegion.enabled ? 'var(--accent)' : 'var(--text-tertiary)',
-                opacity: loopRegion.enabled ? 0.9 : 0.4
-              }} />
-            </div>
-          </>
-        )}
-
-        {/* Zone des pistes */}
-        <div style={{ marginLeft: TRACK_HEAD_WIDTH }}>
+      <div style={{
+        display: 'flex',
+        flex: 1,
+        overflow: 'hidden',
+        position: 'relative'
+      }}>
+        <div style={{
+          width: TRACK_HEAD_WIDTH,
+          minWidth: TRACK_HEAD_WIDTH,
+          height: '100%',
+          flexShrink: 0,
+          background: 'var(--bg-secondary)',
+          borderRight: '1px solid var(--border)',
+          zIndex: 2,
+          overflow: 'hidden'
+        }}>
           {tracks.length === 0 && (
             <div style={{
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              height: 200,
+              height: '100%',
               color: 'var(--text-tertiary)',
-              gap: 12
+              gap: 8,
+              padding: 16,
+              fontSize: 12
             }}>
-              <i className="ti ti-playlist" style={{ fontSize: 40 }} />
-              <span>{tr('editorNoTracks')}</span>
-              <span style={{ fontSize: 12 }}>{tr('editorAddTrackHint')}</span>
+              <i className="ti ti-playlist" style={{ fontSize: 24 }} />
+              <span>{t('editorNoTracks')}</span>
+              <span style={{ fontSize: 10 }}>{t('editorAddTrackHint')}</span>
             </div>
           )}
-
-          {tracks.map((track, index) => (
-            <EditorTrack
-              key={track.id}
-              track={track}
-              trackIndex={index}
-              totalDuration={totalDuration}
-              pixelsPerSecond={pixelsPerSecond}
-              selectedClipId={selectedClipId}
-              selectedTrackId={selectedTrackId}
-              onClipSelect={onClipSelect}
-              onClipMove={handleClipMoveWithSnap}
-              onClipUpdate={onClipUpdate}
-              onClipRemove={onClipRemove}
-              onClipDuplicate={onClipDuplicate}
-              onClipFade={onClipFade}
-              onClipCopy={onClipCopy}
-              onClipCut={onClipCut}
-              onClipContextMenu={onClipContextMenu}
-              onDragCheckpoint={onDragCheckpoint}
-              onTrackRemove={onTrackRemove}
-              waveformData={waveformData}
-              onWaveformUpdate={onWaveformUpdate}
-              isPlaying={isPlaying}
-              currentTime={currentTime}
-              clipDurations={clipDurations}
-              onTrackMute={onTrackMute}
-              onTrackSolo={onTrackSolo}
-              onTrackVolume={onTrackVolume}
-              onTrackReorder={onTrackReorder}
-              autoCrossfade={autoCrossfade}
-              tr={tr}
-              onRenameTrack={onRenameTrack}
-              onUpdateClipDuration={onUpdateClipDuration}
-            />
-          ))}
+          
+          {tracks.map((track, index) => {
+            const trackColor = track.color || getTrackColor(index)
+            return (
+              <div
+                key={`header-${track.id}`}
+                style={{
+                  height: 80,
+                  minHeight: 80,
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '4px 8px',
+                  borderBottom: '1px solid var(--border)',
+                  background: selectedTrackId === track.id ? 'rgba(124,111,247,0.05)' : 'transparent',
+                  gap: 4
+                }}
+              >
+                <TrackHeader
+                  track={track}
+                  trackIndex={index}
+                  trackColor={trackColor}
+                  isHovering={true}
+                  selectedTrackId={selectedTrackId}
+                  onTrackRemove={handleTrackRemove}
+                  onRenameTrack={store?.renameTrack || (() => {})}
+                  tr={t}
+                />
+                <TrackControls
+                  track={track}
+                  trackColor={trackColor}
+                  onTrackMute={handleTrackMute}
+                  onTrackSolo={handleTrackSolo}
+                  onTrackVolume={handleTrackVolume}
+                  tr={t}
+                />
+              </div>
+            )
+          })}
         </div>
 
-        {/* Contrôles de zoom */}
-        <div style={{
-          position: 'sticky',
-          bottom: 8,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '4px 12px',
-          background: 'rgba(0,0,0,0.8)',
-          backdropFilter: 'blur(8px)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--border)',
-          zIndex: 20,
-          marginTop: 8,
-          width: 'fit-content'
-        }}>
-          <button
-            className="btn-ghost btn-sm"
-            onClick={() => onZoomChange?.(Math.max(0.05, zoomLevel - 0.1))}
-            style={{ padding: '2px 6px', fontSize: 12, color: 'var(--text-secondary)' }}
-            title={tr('editorZoomOut') || 'Zoom arrière (Ctrl+-)'}
-          >
-            <i className="ti ti-zoom-out" />
-          </button>
-          
-          <span style={{
-            fontSize: 11,
-            color: 'var(--text-secondary)',
-            minWidth: 50,
-            textAlign: 'center'
-          }}>
-            {tr('editorZoomPercent')?.replace('{percent}', Math.round(zoomLevel * 100)) || `${Math.round(zoomLevel * 100)}%`}
-          </span>
-          
-          <button
-            className="btn-ghost btn-sm"
-            onClick={() => onZoomChange?.(Math.min(10, zoomLevel + 0.1))}
-            style={{ padding: '2px 6px', fontSize: 12, color: 'var(--text-secondary)' }}
-            title={tr('editorZoomIn') || 'Zoom avant (Ctrl+=)'}
-          >
-            <i className="ti ti-zoom-in" />
-          </button>
-          
-          <button
-            className="btn-ghost btn-sm"
-            onClick={() => onZoomChange?.(1)}
-            style={{ padding: '2px 6px', fontSize: 10, color: 'var(--text-tertiary)' }}
-            title={tr('editorZoomReset') || 'Réinitialiser le zoom (Ctrl+0)'}
-          >
-            <i className="ti ti-refresh" /> 100%
-          </button>
-
-          <button
-            className="btn-ghost btn-sm"
-            onClick={() => {
-              const containerWidth = containerRef.current?.clientWidth - TRACK_HEAD_WIDTH || 800
-              const neededZoom = Math.max(0.05, Math.min(5, containerWidth / (totalDuration * BASE_PIXELS_PER_SECOND + 100)))
-              onZoomChange?.(neededZoom)
-            }}
-            style={{ padding: '2px 6px', fontSize: 10, color: 'var(--text-tertiary)' }}
-            title={tr('editorZoomFit') || 'Ajuster pour tout voir'}
-          >
-            <i className="ti ti-fit" /> {tr('editorZoomFit') || 'Ajuster'}
-          </button>
-
-          <span style={{
-            fontSize: 9,
-            color: 'var(--text-tertiary)',
-            marginLeft: 4,
-            borderLeft: '1px solid var(--border)',
-            paddingLeft: 8,
-            minWidth: 60
-          }}>
-            {tr('editorDuration') || 'Durée'}: {formatTime(totalDuration)}
-          </span>
-        </div>
-
-        {/* Feedback visuel du snap */}
-        {snapFeedback?.visible && (
+        <div
+          ref={clipsContainerRef}
+          style={{
+            flex: 1,
+            height: '100%',
+            overflow: 'auto',
+            position: 'relative',
+            background: 'var(--bg-primary)'
+          }}
+        >
           <div style={{
-            position: 'absolute',
-            top: 46,
-            left: TRACK_HEAD_WIDTH + snapFeedback.time * pixelsPerSecond,
-            width: 2,
-            height: 'calc(100% - 46px)',
-            background: 'var(--accent)',
-            opacity: 0.3,
-            pointerEvents: 'none',
-            zIndex: 3,
-            transition: 'opacity 0.3s ease'
-          }} />
-        )}
+            position: 'relative',
+            width: Math.max(totalWidth, 600),
+            height: '100%'
+          }}>
+            {tracks.map((track, index) => {
+              const trackColor = track.color || getTrackColor(index)
+              return (
+                <EditorTrack
+                  key={track.id}
+                  track={track}
+                  trackIndex={index}
+                  totalDuration={totalDuration}
+                  pixelsPerSecond={pixelsPerSecond}
+                  selectedClipId={selectedClipId}
+                  selectedTrackId={selectedTrackId}
+                  onClipSelect={handleClipSelect}
+                  onClipMove={handleClipMove}
+                  onClipUpdate={handleClipUpdate}
+                  onClipRemove={handleClipRemove}
+                  onClipDuplicate={handleClipDuplicate}
+                  onClipFade={handleClipFade}
+                  onClipContextMenu={handleClipContextMenu}
+                  onDragCheckpoint={store?.pushEditorHistoryCheckpoint || (() => {})}
+                  waveformData={waveformData}
+                  isPlaying={isPlaying}
+                  currentTime={currentTime}
+                  clipDurations={clipDurations}
+                  onUpdateClipDuration={handleUpdateClipDuration}
+                  trackColor={trackColor}
+                  snapEnabled={snapEnabled}  // ✅ AJOUTÉ
+                  tr={t}
+                  onPlayClip={(clip, trackId) => {
+                    console.log('▶️ [Timeline] Play clip:', clip.name)
+                    const time = clip.start || 0
+                    console.log('🎯 [Timeline] Seek vers', time)
+                    seek?.(time)
+                    if (!isPlaying) {
+                      setTimeout(() => {
+                        console.log('▶️ [Timeline] Démarrage playback')
+                        togglePlay?.()
+                      }, 100)
+                    } else {
+                      console.log('⏸️ [Timeline] Lecture déjà en cours, seek seulement')
+                    }
+                  }}
+                  onStopClip={() => stop?.()}
+                  onCopyClip={(clip) => {
+                    console.log('📋 [Timeline] Copier clip:', clip.name)
+                    navigator.clipboard?.writeText?.(JSON.stringify(clip))
+                    addToast?.('Clip copié', 'info')
+                  }}
+                  onCutClip={(clip) => {
+                    console.log('✂️ [Timeline] Couper clip:', clip.name)
+                    navigator.clipboard?.writeText?.(JSON.stringify(clip))
+                    addToast?.('Clip coupé', 'info')
+                  }}
+                  onPasteClip={(trackId) => {
+                    console.log('📋 [Timeline] Coller clip dans piste:', trackId)
+                    navigator.clipboard?.readText?.().then(data => {
+                      try {
+                        const clip = JSON.parse(data)
+                        if (clip.id && clip.name) {
+                          const newClip = {
+                            ...clip,
+                            id: `clip-${Date.now()}`,
+                            start: (clip.start || 0) + (clip.duration || 3) + 0.5
+                          }
+                          store?.addClipToTrack?.(trackId, null, newClip.start)
+                          addToast?.('Clip collé', 'success')
+                        }
+                      } catch (e) {
+                        console.error('Erreur collage:', e)
+                        addToast?.('Erreur lors du collage', 'error')
+                      }
+                    }).catch(() => {
+                      addToast?.('Presse-papiers vide', 'warning')
+                    })
+                  }}
+                />
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div style={{
+        position: 'sticky',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        display: 'flex',
+        justifyContent: 'center',
+        padding: '4px 0',
+        background: 'rgba(0,0,0,0.8)',
+        backdropFilter: 'blur(8px)',
+        borderTop: '1px solid var(--border)',
+        zIndex: 20,
+        flexShrink: 0
+      }}>
+        <TimelineZoomControls
+          zoomLevel={zoomLevel}
+          onZoomChange={handleZoomChange}
+          totalDuration={totalDuration}
+          containerRef={containerRef}
+          tr={t}
+        />
       </div>
     </div>
   )
