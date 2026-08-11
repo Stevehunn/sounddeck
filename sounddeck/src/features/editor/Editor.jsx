@@ -562,6 +562,33 @@ function EditorTimelineContent() {
           onUpdateClipDuration={handleUpdateClipDuration}
           tr={t}
           addToast={addToast}
+          onPlayClip={(clip, trackId) => {
+            console.log('▶️ [Editor] Play clip (depuis Editor):', clip.name)
+            console.log('📊 [Editor] isPlaying:', isPlaying, 'currentTime:', currentTime)
+            
+            // ✅ Si la lecture est déjà en cours, ne pas reculer
+            if (isPlaying) {
+              console.log('⏸️ [Editor] Lecture déjà en cours, pas de changement')
+              return
+            }
+            
+            // ✅ Se positionner au début du clip
+            const clipStart = clip.start || 0
+            const clipDuration = clipDurations[clip.id] || clip.duration || 3
+            const clipEnd = clipStart + clipDuration
+            
+            console.log('🎯 [Editor] Seek vers', clipStart)
+            seek?.(clipStart)
+            
+            // ✅ Enregistrer la position où arrêter la lecture
+            context.setStopAtTime?.(clipEnd)
+            
+            // ✅ Démarrer la lecture
+            setTimeout(() => {
+              console.log('▶️ [Editor] Démarrage playback, arrêt à', clipEnd)
+              togglePlay?.()
+            }, 50)
+          }}
         />
       </div>
 

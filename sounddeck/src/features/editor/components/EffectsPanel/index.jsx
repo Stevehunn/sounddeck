@@ -65,13 +65,25 @@ export default function EditorEffectsPanel({
   onClipUpdate,
   onFadeUpdate,
   onPreview,
-  isPreviewing,
+  isPreviewing: isPreviewingProp,
   tr,
   lang
 }) {
   const [showAddEffect, setShowAddEffect] = useState(false)
-  const previewTimeoutRef = useRef(null)
   const [isProcessingPreview, setIsProcessingPreview] = useState(false)
+  
+  // ✅ ÉTATS POUR LE CONTRÔLE DE LA PRÉVISUALISATION
+  const [autoPreview, setAutoPreview] = useState(true)
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false)
+  const [previewProgress, setPreviewProgress] = useState(0)
+  const [previewDuration, setPreviewDuration] = useState(0)
+  const previewSourceRef = useRef(null)
+  const previewContextRef = useRef(null)
+  const previewProgressIntervalRef = useRef(null)
+  const autoPreviewTimerRef = useRef(null) // ✅ Timer pour le délai de 1s
+  const isUserInteractingRef = useRef(false) // ✅ Empêcher les déclenchements intempestifs
+  const PREVIEW_MAX_DURATION = 5 // ✅ Durée max de preview en secondes
+  const AUTO_PREVIEW_DELAY = 1000 // ✅ Délai de 1 seconde avant de jouer
 
   // ✅ Vérifier que les handlers existent
   console.log('🎛️ [EffectsPanel] Handlers reçus:', {
@@ -83,17 +95,51 @@ export default function EditorEffectsPanel({
     onPreview: typeof onPreview,
   })
 
-  // ✅ PRÉVISUALISATION RÉELLE DES EFFETS
-  const previewEffects = useCallback(async () => {
+  // ✅ Arrêter la prévisualisation
+  const stopPreview = useCallback(() => {
+    console.log('⏹️ [EffectsPanel] Arrêt de la prévisualisation')
+    
+    // ✅ Annuler le timer auto-preview
+    if (autoPreviewTimerRef.current) {
+      clearTimeout(autoPreviewTimerRef.current)
+      autoPreviewTimerRef.current = null
+    }
+    
+    if (previewProgressIntervalRef.current) {
+      clearInterval(previewProgressIntervalRef.current)
+      previewProgressIntervalRef.current = null
+    }
+    
+    if (previewSourceRef.current) {
+      try {
+        previewSourceRef.current.stop()
+        previewSourceRef.current.disconnect()
+      } catch (e) {}
+      previewSourceRef.current = null
+    }
+    
+    if (previewContextRef.current && previewContextRef.current.state !== 'closed') {
+      try {
+        previewContextRef.current.close()
+      } catch (e) {}
+      previewContextRef.current = null
+    }
+    
+    setIsPreviewPlaying(false)
+    setPreviewProgress(0)
+    setPreviewDuration(0)
+    setIsProcessingPreview(false)
+  }, [])
+
+  // ✅ Jouer la prévisualisation (appelée uniquement quand on clique sur Écouter ou après le délai)
+  const playPreview = useCallback(async () => {
     if (!clip || !clip.path) {
       console.warn('⚠️ [EffectsPanel] Aucun clip à prévisualiser')
       return
     }
-    
-    if (previewTimeoutRef.current) {
-      clearTimeout(previewTimeoutRef.current)
-      previewTimeoutRef.current = null
-    }
+
+    // ✅ Arrêter la preview en cours
+    stopPreview()
 
     const hasActiveEffects = clip.effects?.some(e => e.enabled) || false
     if (!hasActiveEffects) {
@@ -104,7 +150,7 @@ export default function EditorEffectsPanel({
       return
     }
 
-    console.log(`🎛️ [EffectsPanel] Prévisualisation des effets pour ${clip.name}`)
+    console.log(`🎛️ [EffectsPanel] Lecture de la prévisualisation pour ${clip.name}`)
     console.log(`📊 [EffectsPanel] Effets actifs:`, clip.effects.filter(e => e.enabled))
 
     setIsProcessingPreview(true)
@@ -121,15 +167,24 @@ export default function EditorEffectsPanel({
       const arrayBuffer = await response.arrayBuffer()
       
       const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      previewContextRef.current = audioContext
+      
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
       
+      // ✅ Appliquer les effets
       const { applyEffectsToBuffer } = await import('@shared/utils/realTimeEffects')
       const processedBuffer = applyEffectsToBuffer(audioBuffer, clip.effects, audioContext.sampleRate, true)
       
       if (processedBuffer && processedBuffer !== audioBuffer) {
         console.log('✅ [EffectsPanel] Effets appliqués avec succès')
+        
+        // ✅ Calculer la durée de preview (max 5 secondes ou la durée du clip)
+        const actualDuration = Math.min(processedBuffer.duration, PREVIEW_MAX_DURATION)
+        setPreviewDuration(actualDuration)
+        
         const source = audioContext.createBufferSource()
         source.buffer = processedBuffer
+        previewSourceRef.current = source
         
         const gainNode = audioContext.createGain()
         gainNode.gain.value = 0.5
@@ -138,29 +193,36 @@ export default function EditorEffectsPanel({
         gainNode.connect(audioContext.destination)
         
         source.start(0)
+        setIsPreviewPlaying(true)
+        setPreviewProgress(0)
+        setIsProcessingPreview(false)
         
-        source.onended = () => {
-          audioContext.close().catch(() => {})
-          setIsProcessingPreview(false)
+        // ✅ Mise à jour de la progression
+        if (previewProgressIntervalRef.current) {
+          clearInterval(previewProgressIntervalRef.current)
         }
         
-        setTimeout(() => {
-          try {
-            source.stop()
-            audioContext.close().catch(() => {})
-            setIsProcessingPreview(false)
-          } catch (e) {}
-        }, Math.min(processedBuffer.duration * 1000, 5000))
+        const startTime = Date.now()
+        previewProgressIntervalRef.current = setInterval(() => {
+          const elapsed = (Date.now() - startTime) / 1000
+          const progress = Math.min(100, (elapsed / actualDuration) * 100)
+          setPreviewProgress(progress)
+          
+          if (progress >= 100) {
+            stopPreview()
+          }
+        }, 50)
+        
+        source.onended = () => {
+          stopPreview()
+        }
         
       } else {
         console.warn('⚠️ [EffectsPanel] Aucun effet appliqué, lecture normale')
         if (onPreview) {
           onPreview(clip, null)
         }
-        setTimeout(() => {
-          audioContext.close().catch(() => {})
-          setIsProcessingPreview(false)
-        }, 100)
+        stopPreview()
       }
       
     } catch (e) {
@@ -168,35 +230,44 @@ export default function EditorEffectsPanel({
       if (onPreview) {
         onPreview(clip, null)
       }
-      setIsProcessingPreview(false)
+      stopPreview()
     }
-  }, [clip, onPreview])
+  }, [clip, onPreview, stopPreview])
 
+  // ✅ Planifier la prévisualisation avec délai de 1s
   const schedulePreview = useCallback(() => {
-    if (previewTimeoutRef.current) {
-      clearTimeout(previewTimeoutRef.current)
+    if (!autoPreview) {
+      console.log('ℹ️ [EffectsPanel] Auto-preview désactivée')
+      return
     }
-    previewTimeoutRef.current = setTimeout(() => {
-      previewEffects()
-    }, 300)
-  }, [previewEffects])
+    
+    // ✅ Annuler le timer précédent
+    if (autoPreviewTimerRef.current) {
+      clearTimeout(autoPreviewTimerRef.current)
+      autoPreviewTimerRef.current = null
+    }
+    
+    // ✅ Arrêter la preview en cours
+    stopPreview()
+    
+    console.log(`⏳ [EffectsPanel] Planification de la preview dans ${AUTO_PREVIEW_DELAY}ms`)
+    
+    // ✅ Démarrer un nouveau timer avec délai de 1s
+    autoPreviewTimerRef.current = setTimeout(() => {
+      console.log('▶️ [EffectsPanel] Déclenchement de l\'auto-preview après délai')
+      playPreview()
+      autoPreviewTimerRef.current = null
+    }, AUTO_PREVIEW_DELAY)
+  }, [autoPreview, stopPreview, playPreview])
 
-  useEffect(() => {
-    if (clip && clip.effects) {
-      schedulePreview()
-    }
-    return () => {
-      if (previewTimeoutRef.current) {
-        clearTimeout(previewTimeoutRef.current)
-      }
-    }
-  }, [clip?.effects, clip?.id, schedulePreview])
-
+  // ✅ Gestion des changements de paramètres
   const handleParamChange = (effectId, param, value) => {
     console.log('📝 [EffectsPanel] handleParamChange:', { effectId, param, value })
     if (onEffectUpdate) {
       onEffectUpdate(trackId, clip.id, effectId, param, value)
     }
+    // ✅ Planifier la preview après changement de paramètre
+    schedulePreview()
   }
 
   const handleEffectToggle = (effectId, enabled) => {
@@ -204,6 +275,8 @@ export default function EditorEffectsPanel({
     if (onEffectToggle) {
       onEffectToggle(trackId, clip.id, effectId, enabled)
     }
+    // ✅ Planifier la preview après activation/désactivation d'un effet
+    schedulePreview()
   }
 
   const handleEffectRemove = (effectId) => {
@@ -211,6 +284,8 @@ export default function EditorEffectsPanel({
     if (onEffectRemove) {
       onEffectRemove(trackId, clip.id, effectId)
     }
+    // ✅ Planifier la preview après suppression d'un effet
+    schedulePreview()
   }
 
   const handleFadeInChange = useCallback((duration) => {
@@ -218,23 +293,33 @@ export default function EditorEffectsPanel({
     const clampedDuration = Math.max(0.05, Math.min(10, duration))
     if (onFadeUpdate) {
       onFadeUpdate(trackId, clip.id, 'in', clampedDuration)
-    } else {
-      console.warn('⚠️ [EffectsPanel] onFadeUpdate est undefined')
     }
-  }, [onFadeUpdate, trackId, clip])
+    // ✅ Planifier la preview après changement de fade
+    schedulePreview()
+  }, [onFadeUpdate, trackId, clip, schedulePreview])
 
   const handleFadeOutChange = useCallback((duration) => {
     console.log('🌇 [EffectsPanel] handleFadeOutChange:', { duration, trackId, clipId: clip.id })
     const clampedDuration = Math.max(0.05, Math.min(10, duration))
     if (onFadeUpdate) {
       onFadeUpdate(trackId, clip.id, 'out', clampedDuration)
-    } else {
-      console.warn('⚠️ [EffectsPanel] onFadeUpdate est undefined')
     }
-  }, [onFadeUpdate, trackId, clip])
+    // ✅ Planifier la preview après changement de fade
+    schedulePreview()
+  }, [onFadeUpdate, trackId, clip, schedulePreview])
 
-  if (!clip) return null
+  // ✅ Nettoyage au démontage
+  useEffect(() => {
+    return () => {
+      stopPreview()
+      if (autoPreviewTimerRef.current) {
+        clearTimeout(autoPreviewTimerRef.current)
+        autoPreviewTimerRef.current = null
+      }
+    }
+  }, [stopPreview])
 
+  // ✅ Quand un effet est ajouté, planifier la preview
   const handleAddEffect = (effectType) => {
     console.log('➕ [EffectsPanel] handleAddEffect:', { effectType, trackId, clipId: clip.id })
     
@@ -252,7 +337,44 @@ export default function EditorEffectsPanel({
     console.log('📦 [EffectsPanel] Ajout de l\'effet avec params:', defaults)
     onEffectAdd(trackId, clip.id, effectType, defaults)
     setShowAddEffect(false)
+    
+    // ✅ Planifier la preview après ajout d'un effet
+    schedulePreview()
   }
+
+  // ✅ Toggle auto-preview
+  const toggleAutoPreview = () => {
+    const newState = !autoPreview
+    setAutoPreview(newState)
+    if (!newState) {
+      // ✅ Si on désactive, arrêter la preview et annuler le timer
+      if (autoPreviewTimerRef.current) {
+        clearTimeout(autoPreviewTimerRef.current)
+        autoPreviewTimerRef.current = null
+      }
+      stopPreview()
+    } else {
+      // ✅ Si on active, planifier une preview
+      schedulePreview()
+    }
+    console.log(`🔄 [EffectsPanel] Auto-preview: ${newState ? 'ON' : 'OFF'}`)
+  }
+
+  // ✅ Toggle play/stop preview (manuel)
+  const togglePlayPreview = () => {
+    if (isPreviewPlaying) {
+      stopPreview()
+    } else {
+      // ✅ Annuler le timer auto-preview si on joue manuellement
+      if (autoPreviewTimerRef.current) {
+        clearTimeout(autoPreviewTimerRef.current)
+        autoPreviewTimerRef.current = null
+      }
+      playPreview()
+    }
+  }
+
+  if (!clip) return null
 
   return (
     <div style={{
@@ -260,14 +382,16 @@ export default function EditorEffectsPanel({
       borderTop: '1px solid var(--border)',
       background: 'var(--bg-secondary)',
       flexShrink: 0,
-      maxHeight: 250,
+      maxHeight: 280,
       overflowY: 'auto'
     }}>
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 8
+        marginBottom: 8,
+        flexWrap: 'wrap',
+        gap: 6
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <i className="ti ti-wand" style={{ color: 'var(--accent)' }} />
@@ -285,17 +409,126 @@ export default function EditorEffectsPanel({
           </span>
         </div>
 
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* ✅ Bouton Play/Stop Preview */}
+          <button
+            className={`btn-${isPreviewPlaying ? 'danger' : 'success'} btn-sm`}
+            onClick={togglePlayPreview}
+            disabled={isProcessingPreview && !isPreviewPlaying}
+            style={{
+              fontSize: 11,
+              padding: '4px 10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              minHeight: 28
+            }}
+          >
+            <i className={`ti ${isPreviewPlaying ? 'ti-player-stop' : isProcessingPreview ? 'ti-loader' : 'ti-player-play'}`} 
+               style={isProcessingPreview && !isPreviewPlaying ? { animation: 'spin 1s linear infinite' } : {}} />
+            {isPreviewPlaying ? 'Arrêter' : isProcessingPreview ? 'Génération...' : 'Écouter'}
+          </button>
+
+          {/* ✅ Toggle Auto-Preview */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '2px 8px',
+            borderRadius: 'var(--radius-sm)',
+            border: `1px solid ${autoPreview ? 'var(--accent)' : 'var(--border)'}`,
+            background: autoPreview ? 'var(--accent-light)' : 'var(--bg-tertiary)',
+            cursor: 'pointer'
+          }}
+          onClick={toggleAutoPreview}
+          title={autoPreview ? 'Désactiver l\'auto-preview (délai 1s)' : 'Activer l\'auto-preview (délai 1s)'}
+          >
+            <span style={{ fontSize: 10, color: autoPreview ? 'var(--accent)' : 'var(--text-tertiary)' }}>
+              <i className={`ti ${autoPreview ? 'ti-player-play' : 'ti-player-pause'}`} />
+            </span>
+            <span style={{ fontSize: 10, color: autoPreview ? 'var(--accent)' : 'var(--text-tertiary)' }}>
+              Auto
+            </span>
+            <span style={{
+              fontSize: 8,
+              padding: '1px 6px',
+              borderRadius: 10,
+              background: autoPreview ? 'var(--accent)' : 'var(--bg-tertiary)',
+              color: autoPreview ? 'white' : 'var(--text-tertiary)'
+            }}>
+              {autoPreview ? 'ON' : 'OFF'}
+            </span>
+            <span style={{
+              fontSize: 7,
+              color: 'var(--text-tertiary)',
+              opacity: 0.6
+            }}>
+              1s
+            </span>
+          </div>
+
+          {/* ✅ Bouton Ajouter un effet */}
           <button
             className="btn-secondary btn-sm"
             onClick={() => setShowAddEffect(!showAddEffect)}
-            style={{ fontSize: 12 }}
+            style={{ fontSize: 11, padding: '4px 10px' }}
           >
             <i className={`ti ${showAddEffect ? 'ti-x' : 'ti-plus'}`} />
             {showAddEffect ? tr('cancel') : tr('editorAddEffect')}
           </button>
         </div>
       </div>
+
+      {/* ✅ Barre de progression de la preview */}
+      {isPreviewPlaying && (
+        <div style={{
+          marginBottom: 8,
+          padding: '2px 0'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: 9,
+            color: 'var(--text-tertiary)',
+            marginBottom: 2
+          }}>
+            <span>🔊 Prévisualisation</span>
+            <span>{Math.round(previewProgress)}%</span>
+          </div>
+          <div style={{
+            width: '100%',
+            height: 3,
+            background: 'var(--bg-tertiary)',
+            borderRadius: 2,
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              width: `${previewProgress}%`,
+              height: '100%',
+              background: 'var(--accent)',
+              borderRadius: 2,
+              transition: 'width 0.1s linear'
+            }} />
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Indicateur de délai d'auto-preview */}
+      {autoPreview && !isPreviewPlaying && !isProcessingPreview && clip.effects?.some(e => e.enabled) && (
+        <div style={{
+          marginBottom: 8,
+          padding: '2px 6px',
+          fontSize: 9,
+          color: 'var(--text-tertiary)',
+          opacity: 0.6,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4
+        }}>
+          <i className="ti ti-clock" />
+          Auto-preview dans 1s après modification...
+        </div>
+      )}
 
       {/* Liste des effets actuels */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
@@ -304,7 +537,6 @@ export default function EditorEffectsPanel({
           if (!def) return null
 
           const isFade = effect.type === 'fadeIn' || effect.type === 'fadeOut'
-          const handleFadeChange = effect.type === 'fadeIn' ? handleFadeInChange : handleFadeOutChange
 
           return (
             <div
@@ -360,6 +592,10 @@ export default function EditorEffectsPanel({
                 const range = PARAM_RANGES[param]
                 const value = effect.params[param] !== undefined ? effect.params[param] : PARAM_DEFAULTS[param] || 0
                 
+                const min = range?.min !== undefined ? range.min : 0
+                const max = range?.max !== undefined ? range.max : 1
+                const step = range?.step !== undefined ? range.step : 0.05
+                
                 return (
                   <div key={param} style={{
                     display: 'flex',
@@ -376,9 +612,9 @@ export default function EditorEffectsPanel({
                     </span>
                     <input
                       type="range"
-                      min={range?.min || 0}
-                      max={range?.max || 1}
-                      step={range?.step || 0.05}
+                      min={min}
+                      max={max}
+                      step={step}
                       value={value}
                       onChange={e => {
                         const newValue = parseFloat(e.target.value)
@@ -454,7 +690,7 @@ export default function EditorEffectsPanel({
       )}
 
       {/* Indicateur de prévisualisation */}
-      {(isPreviewing || isProcessingPreview) && (
+      {(isProcessingPreview && !isPreviewPlaying) && (
         <div style={{
           marginTop: 8,
           padding: '4px 10px',
@@ -468,7 +704,26 @@ export default function EditorEffectsPanel({
           gap: 6
         }}>
           <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
-          {isProcessingPreview ? 'Génération de l\'aperçu...' : tr('editorEffectPreview') || 'Aperçu des effets...'}
+          {tr('editorEffectPreview') || 'Aperçu des effets...'}
+        </div>
+      )}
+
+      {/* ✅ Indicateur de lecture en cours */}
+      {isPreviewPlaying && (
+        <div style={{
+          marginTop: 8,
+          padding: '4px 10px',
+          borderRadius: 'var(--radius-sm)',
+          background: 'rgba(29,158,117,0.1)',
+          border: '1px solid var(--success)',
+          fontSize: 10,
+          color: 'var(--success)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6
+        }}>
+          <i className="ti ti-volume" style={{ animation: 'pulse 0.8s ease-in-out infinite' }} />
+          Lecture en cours... {Math.round(previewProgress)}%
         </div>
       )}
     </div>

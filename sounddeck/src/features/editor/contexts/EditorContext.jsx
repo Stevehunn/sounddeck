@@ -28,6 +28,7 @@ export function EditorProvider({ children, store, addToast }) {
   const [isLoading, setIsLoading] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
   const [isAutoSaving, setIsAutoSaving] = useState(false)
+  const [stopAtTime, setStopAtTime] = useState(null) // ✅ NOUVEAU
   
   // ─── REFS ──────────────────────────────────────────────────────────────
   const isLoadingRef = useRef(false)
@@ -40,6 +41,8 @@ export function EditorProvider({ children, store, addToast }) {
   const currentTimeRef = useRef(0)
   const isPlayingRef = useRef(false)
   const isPausedRef = useRef(false)
+  const selectedClipIdRef = useRef(null)
+  const stopAtTimeRef = useRef(null) // ✅ NOUVEAU
 
   // Mettre à jour la ref quand le projet change
   useEffect(() => {
@@ -59,6 +62,14 @@ export function EditorProvider({ children, store, addToast }) {
   useEffect(() => {
     isPausedRef.current = isPaused
   }, [isPaused])
+
+  useEffect(() => {
+    selectedClipIdRef.current = selectedClipId
+  }, [selectedClipId])
+
+  useEffect(() => {
+    stopAtTimeRef.current = stopAtTime
+  }, [stopAtTime])
 
   // ─── FONCTIONS HELPER POUR LE CROSSFADE ──────────────────────────────
 
@@ -365,7 +376,7 @@ export function EditorProvider({ children, store, addToast }) {
     }
   }, [loadAudioBuffer, currentTime, autoCrossfade, findPreviousClip, calculateOverlap])
 
-  // ✅ startPlaybackLoop AVEC CROSSFADE
+  // ✅ startPlaybackLoop AVEC ARRÊT PROGRAMMÉ
   const startPlaybackLoop = useCallback(() => {
     console.log('🔄 [EditorContext] startPlaybackLoop')
     
@@ -376,7 +387,6 @@ export function EditorProvider({ children, store, addToast }) {
 
     let lastTime = performance.now()
     let accumulated = 0
-    const playedClips = new Set()
     let isLoopRunning = true
 
     const loop = () => {
@@ -398,34 +408,71 @@ export function EditorProvider({ children, store, addToast }) {
         
         if (projectRef.current?.tracks) {
           const tracks = projectRef.current.tracks
+          const activeClips = new Set()
+          const soloClipId = selectedClipIdRef.current
+          
           for (const track of tracks) {
             if (track.muted) continue
+            
             for (const clip of track.clips) {
               const duration = clipDurations[clip.id] || clip.duration || 3
               const start = clip.start || 0
               const end = start + duration
               
-              if (newTime >= start && newTime < end) {
-                if (!playedClips.has(clip.id)) {
-                  console.log(`▶️ [EditorContext] Lancement du clip: ${clip.name} à ${newTime.toFixed(2)}s`)
-                  playClip(clip, track)
-                  playedClips.add(clip.id)
+              let shouldPlay = false
+              
+              if (soloClipId) {
+                if (clip.id === soloClipId && newTime >= start && newTime < end) {
+                  shouldPlay = true
                 }
-              } else if (newTime >= end) {
-                playedClips.delete(clip.id)
+              } else if (newTime >= start && newTime < end) {
+                shouldPlay = true
               }
+              
+              if (shouldPlay) {
+                activeClips.add(clip.id)
+                if (!lastPlayedClipsRef.current.has(clip.id)) {
+                  console.log(`▶️ [EditorContext] Lancement du clip: ${clip.name} à ${newTime.toFixed(2)}s${soloClipId ? ' (solo)' : ''}`)
+                  playClip(clip, track)
+                  lastPlayedClipsRef.current.add(clip.id)
+                }
+              } else if (newTime >= end || (soloClipId && clip.id !== soloClipId)) {
+                lastPlayedClipsRef.current.delete(clip.id)
+              }
+            }
+          }
+          
+          // ✅ Arrêter les clips qui ne sont plus actifs
+          for (const clipId of lastPlayedClipsRef.current) {
+            if (!activeClips.has(clipId)) {
+              const entry = audioSourcesRef.current[clipId]
+              if (entry) {
+                try { 
+                  entry.source.stop() 
+                  entry.source.disconnect() 
+                } catch (e) {}
+                delete audioSourcesRef.current[clipId]
+              }
+              lastPlayedClipsRef.current.delete(clipId)
             }
           }
         }
         
-        if (newTime >= totalDuration) {
-          console.log('⏹️ [EditorContext] Fin de la lecture à', newTime.toFixed(2), 's')
+        // ✅ VÉRIFIER SI ON DOIT S'ARRÊTER
+        const shouldStop = (stopAtTimeRef.current !== null && newTime >= stopAtTimeRef.current) || newTime >= totalDuration
+        
+        if (shouldStop) {
+          const stopPosition = stopAtTimeRef.current !== null ? stopAtTimeRef.current : totalDuration
+          console.log(`⏹️ [EditorContext] Fin de la lecture à ${newTime.toFixed(2)}s (arrêt programmé à ${stopPosition.toFixed(2)}s)`)
           setIsPlaying(false)
-          setCurrentTime(totalDuration)
+          setCurrentTime(stopPosition)
+          setStopAtTime(null)
+          stopAtTimeRef.current = null
           for (const [id, { source }] of Object.entries(audioSourcesRef.current)) {
             try { source.stop() } catch (e) {}
           }
           audioSourcesRef.current = {}
+          lastPlayedClipsRef.current = new Set()
           isLoopRunning = false
           return
         }
@@ -441,12 +488,21 @@ export function EditorProvider({ children, store, addToast }) {
     lastTime = performance.now()
     accumulated = 0
     isLoopRunning = true
+    
+    lastPlayedClipsRef.current = new Set()
+    for (const [id, { source }] of Object.entries(audioSourcesRef.current)) {
+      try { source.stop() } catch (e) {}
+    }
+    audioSourcesRef.current = {}
+    
     animationRef.current = requestAnimationFrame(loop)
     console.log('✅ [EditorContext] Animation démarrée')
   }, [totalDuration, playClip, clipDurations])
 
   const play = useCallback(async () => {
     console.log('▶️ [EditorContext] play - isPlaying actuel:', isPlaying)
+    setStopAtTime(null)
+    stopAtTimeRef.current = null
     
     try {
       if (!audioContextRef.current) {
@@ -462,7 +518,6 @@ export function EditorProvider({ children, store, addToast }) {
       
       setIsPlaying(true)
       setIsPaused(false)
-      
       lastPlayedClipsRef.current = new Set()
       
       console.log('✅ [EditorContext] Lecture démarrée, la boucle gérera les clips')
@@ -518,6 +573,8 @@ export function EditorProvider({ children, store, addToast }) {
     setIsPaused(false)
     setCurrentTime(0)
     lastPlayedClipsRef.current = new Set()
+    setStopAtTime(null)
+    stopAtTimeRef.current = null
     
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current)
@@ -534,6 +591,15 @@ export function EditorProvider({ children, store, addToast }) {
     const clamped = Math.max(0, Math.min(time, totalDuration))
     console.log('🎯 [EditorContext] seek:', clamped.toFixed(2))
     setCurrentTime(clamped)
+    currentTimeRef.current = clamped
+    
+    for (const [id, { source }] of Object.entries(audioSourcesRef.current)) {
+      try { 
+        source.stop() 
+        source.disconnect() 
+      } catch (e) {}
+    }
+    audioSourcesRef.current = {}
     lastPlayedClipsRef.current = new Set()
   }, [totalDuration])
 
@@ -1499,6 +1565,7 @@ export function EditorProvider({ children, store, addToast }) {
 
   // ─── FONCTIONS LOOP ──────────────────────────────────────────────────
 
+  // ✅ CORRECTION : setLoopRegionFn est bien définie ici !
   const setLoopRegionFn = useCallback((start, end) => {
     console.log('🔄 [EditorContext] setLoopRegionFn:', start, end)
     setLoopRegion(prev => ({
@@ -1563,6 +1630,8 @@ export function EditorProvider({ children, store, addToast }) {
     isLoading,
     isDirty,
     isAutoSaving,
+    stopAtTime,
+    setStopAtTime,
     
     // Fonctions Track
     addTrack,
@@ -1585,7 +1654,7 @@ export function EditorProvider({ children, store, addToast }) {
     removeEffectFromClip,
     updateEffectParam,
     toggleEffect,
-    setClipFade, // ✅ AJOUTÉ
+    setClipFade,
     
     // Playback
     play,

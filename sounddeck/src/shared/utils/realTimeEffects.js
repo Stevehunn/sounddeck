@@ -81,10 +81,21 @@ export function applyEffectsToBuffer(audioBuffer, effects, sampleRate = 44100, n
       }
     }
     
-    // Normaliser pour éviter l'écrêtage
-    if (normalize) {
+    // ✅ VÉRIFIER SI LE VOLUME EST LE SEUL EFFET
+    const onlyVolume = activeEffects.length === 1 && activeEffects[0].type === 'volume'
+    const volumeValue = onlyVolume ? activeEffects[0].params.value : 1
+    
+    // ✅ DÉTERMINER SI LA NORMALISATION EST NÉCESSAIRE
+    // - Si le volume est > 1, on ne normalise PAS (sinon on annule l'effet)
+    // - Si le volume est le seul effet, on ne normalise PAS (sauf si volume < 1)
+    // - Si volume <= 1 et qu'il y a d'autres effets, on normalise
+    const shouldNormalize = normalize && !onlyVolume && volumeValue <= 1
+    
+    if (shouldNormalize) {
       result = normalizeBuffer(result, ctx)
       console.log(`  ✅ Normalisation appliquée`)
+    } else {
+      console.log(`  ℹ️ Normalisation ignorée (volume=${volumeValue}x, onlyVolume=${onlyVolume})`)
     }
     
     console.log(`✅ [realTimeEffects] Tous les effets appliqués avec succès`)
@@ -114,7 +125,8 @@ function applyVolumeEffect(buffer, volume, ctx) {
   
   console.log(`🔊 [applyVolumeEffect] volume reçu: ${volume}, clamped: ${clampedVolume}`)
   
-  if (clampedVolume === 1) {
+  // ✅ Si le volume est à 1, retourner le buffer inchangé
+  if (Math.abs(clampedVolume - 1) < 0.001) {
     console.log(`ℹ️ [applyVolumeEffect] Volume à 1, aucun changement`)
     return buffer
   }
@@ -127,7 +139,9 @@ function applyVolumeEffect(buffer, volume, ctx) {
     const data = buffer.getChannelData(channel)
     const newData = newBuffer.getChannelData(channel)
     for (let i = 0; i < length; i++) {
-      newData[i] = data[i] * clampedVolume
+      // ✅ Clamper pour éviter l'écrêtage
+      let value = data[i] * clampedVolume
+      newData[i] = Math.max(-1, Math.min(1, value))
     }
   }
   
@@ -175,14 +189,14 @@ function applyFadeInEffect(buffer, duration, ctx) {
     if (fadeSamples >= length) {
       for (let i = 0; i < length; i++) {
         const ratio = i / length
-        const gain = ratio * ratio
+        const gain = ratio * ratio // Courbe quadratique
         newData[i] = data[i] * gain
       }
     } else {
       for (let i = 0; i < length; i++) {
         if (i < fadeSamples) {
           const ratio = i / fadeSamples
-          const gain = ratio * ratio
+          const gain = ratio * ratio // Courbe quadratique
           newData[i] = data[i] * gain
         } else {
           newData[i] = data[i]
@@ -237,14 +251,14 @@ function applyFadeOutEffect(buffer, duration, ctx) {
     if (fadeSamples >= length) {
       for (let i = 0; i < length; i++) {
         const ratio = 1 - (i / length)
-        const gain = ratio * ratio
+        const gain = ratio * ratio // Courbe quadratique
         newData[i] = data[i] * gain
       }
     } else {
       for (let i = 0; i < length; i++) {
         if (i >= start) {
           const ratio = (i - start) / fadeSamples
-          const gain = 1 - (ratio * ratio)
+          const gain = 1 - (ratio * ratio) // Courbe quadratique inversée
           newData[i] = data[i] * gain
         } else {
           newData[i] = data[i]
@@ -354,10 +368,12 @@ function applyEchoEffect(buffer, delay, decay, mix, ctx) {
     const data = buffer.getChannelData(channel)
     const newData = newBuffer.getChannelData(channel)
     
+    // Copier le signal original avec le mix
     for (let i = 0; i < data.length; i++) {
       newData[i] += data[i] * (1 - clampedMix)
     }
     
+    // Ajouter l'écho
     for (let i = 0; i < data.length; i++) {
       if (i + delaySamples < newData.length) {
         newData[i + delaySamples] += data[i] * clampedMix * clampedDecay
@@ -388,6 +404,7 @@ function applyReverbEffect(buffer, roomSize, mix, ctx) {
   const newLength = buffer.length + reverbLength
   const newBuffer = ctx.createBuffer(channels, newLength, sampleRate)
   
+  // Créer une réponse impulsionnelle stochastique
   const irBuffer = ctx.createBuffer(1, reverbLength, sampleRate)
   const irData = irBuffer.getChannelData(0)
   for (let i = 0; i < reverbLength; i++) {
@@ -399,10 +416,12 @@ function applyReverbEffect(buffer, roomSize, mix, ctx) {
     const data = buffer.getChannelData(channel)
     const newData = newBuffer.getChannelData(channel)
     
+    // Signal original avec le mix
     for (let i = 0; i < data.length; i++) {
       newData[i] += data[i] * (1 - clampedMix)
     }
     
+    // Réverbération - convolution simple
     for (let i = 0; i < data.length; i++) {
       const maxJ = Math.min(reverbLength, newData.length - i)
       for (let j = 0; j < maxJ; j++) {
@@ -433,21 +452,47 @@ function normalizeBuffer(buffer, ctx) {
     }
   }
   
-  if (maxPeak === 0) return buffer
-  if (maxPeak < 0.9) return buffer
-  
-  const gain = 0.95 / maxPeak
-  
-  const newBuffer = ctx.createBuffer(channels, length, buffer.sampleRate)
-  for (let channel = 0; channel < channels; channel++) {
-    const data = buffer.getChannelData(channel)
-    const newData = newBuffer.getChannelData(channel)
-    for (let i = 0; i < length; i++) {
-      newData[i] = data[i] * gain
-    }
+  // ✅ Si maxPeak est déjà dans une plage acceptable, ne rien faire
+  if (maxPeak === 0 || (maxPeak < 0.95 && maxPeak > 0.1)) {
+    console.log(`  ℹ️ [normalizeBuffer] Pas de normalisation nécessaire (maxPeak=${maxPeak.toFixed(3)})`)
+    return buffer
   }
   
-  return newBuffer
+  // ✅ Si maxPeak > 0.95, réduire pour éviter l'écrêtage
+  if (maxPeak > 0.95) {
+    const gain = 0.95 / maxPeak
+    console.log(`  🔧 [normalizeBuffer] Réduction du gain: ${gain.toFixed(3)}x (maxPeak=${maxPeak.toFixed(3)})`)
+    
+    const newBuffer = ctx.createBuffer(channels, length, buffer.sampleRate)
+    for (let channel = 0; channel < channels; channel++) {
+      const data = buffer.getChannelData(channel)
+      const newData = newBuffer.getChannelData(channel)
+      for (let i = 0; i < length; i++) {
+        newData[i] = data[i] * gain
+      }
+    }
+    return newBuffer
+  }
+  
+  // ✅ Si maxPeak < 0.1, augmenter le gain (pour les sons très faibles)
+  if (maxPeak < 0.1) {
+    const gain = 0.3 / maxPeak
+    console.log(`  🔧 [normalizeBuffer] Augmentation du gain: ${gain.toFixed(3)}x (maxPeak=${maxPeak.toFixed(3)})`)
+    
+    const newBuffer = ctx.createBuffer(channels, length, buffer.sampleRate)
+    for (let channel = 0; channel < channels; channel++) {
+      const data = buffer.getChannelData(channel)
+      const newData = newBuffer.getChannelData(channel)
+      const clampedGain = Math.min(gain, 5)
+      for (let i = 0; i < length; i++) {
+        let value = data[i] * clampedGain
+        newData[i] = Math.max(-1, Math.min(1, value))
+      }
+    }
+    return newBuffer
+  }
+  
+  return buffer
 }
 
 // ─── CACHE ──────────────────────────────────────────────────────────────────
