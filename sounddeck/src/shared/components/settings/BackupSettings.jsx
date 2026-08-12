@@ -1,5 +1,7 @@
+// src/shared/components/settings/BackupSettings.jsx
 import { useState, useEffect } from 'react'
-import { useLanguage } from '@core/i18n/LanguageContext' // ✅ Bon import
+import { useLanguage } from '@core/i18n/LanguageContext'
+import { DeleteButton } from '@shared/components/ui' // ✅ Ajout
 import {
   getBackupList,
   restoreBackup,
@@ -55,6 +57,28 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
       window.location.reload()
     } else {
       addToast('❌ Erreur restauration: ' + result.error, 'error')
+    }
+  }
+
+  const handleDelete = async (index) => {
+    const confirmed = await confirm({
+      title: t('deleteBackup'),
+      message: t('deleteBackupConfirm'),
+      type: 'danger'
+    })
+    if (!confirmed) return
+    
+    try {
+      const { deleteBackup } = await import('../../utils/backupManager.js')
+      const result = await deleteBackup(index)
+      if (result.success) {
+        addToast('✅ Sauvegarde supprimée', 'success')
+        loadBackups()
+      } else {
+        addToast('❌ Erreur: ' + result.error, 'error')
+      }
+    } catch (e) {
+      addToast('❌ Erreur: ' + e.message, 'error')
     }
   }
 
@@ -190,15 +214,27 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
                   {backup.sounds?.length || 0} sons · {backup.profiles?.length || 0} profils
                 </div>
               </div>
-              <button
-                className="btn-ghost btn-sm"
-                onClick={() => handleRestore(index)}
-                style={{ fontSize: 11, color: 'var(--text-tertiary)' }}
-                onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
-                onMouseLeave={e => e.currentTarget.style.color = 'var(--text-tertiary)'}
-              >
-                <i className="ti ti-refresh" /> {t('restore')}
-              </button>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button
+                  className="btn-ghost btn-sm"
+                  onClick={() => handleRestore(index)}
+                  style={{ fontSize: 11, color: 'var(--text-tertiary)' }}
+                  onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'var(--text-tertiary)'}
+                >
+                  <i className="ti ti-refresh" /> {t('restore')}
+                </button>
+                {/* ✅ Bouton Supprimer générique */}
+                <DeleteButton
+                  onDelete={() => handleDelete(index)}
+                  confirmTitle={t('deleteBackup') || 'Confirmer la suppression de la sauvegarde'}
+                  confirmMessage={t('deleteBackupConfirm') || 'Voulez-vous vraiment supprimer cette sauvegarde ?'}
+                  itemName={formatDate(backup.timestamp)}
+                  size="sm"
+                  variant="ghost"
+                  icon="ti-trash"
+                />
+              </div>
             </div>
           ))}
         </div>

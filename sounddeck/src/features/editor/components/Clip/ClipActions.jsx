@@ -1,5 +1,6 @@
 // src/features/editor/components/Clip/ClipActions.jsx
 import React, { memo } from 'react'
+import { DeleteButton } from '@shared/components/ui'
 
 const ClipActions = memo(({
   isSelected,
@@ -14,23 +15,12 @@ const ClipActions = memo(({
 
   if (!visible) return null
 
-  // ✅ ORDRE CORRECT: clipId, trackId
   const handleDuplicateClick = (e) => {
     e?.stopPropagation?.()
     e?.preventDefault?.()
     console.log('📋 [ClipActions] Duplicate clicked:', { clipId, trackId })
     if (onDuplicate && clipId && trackId) {
       onDuplicate(clipId, trackId)
-    }
-  }
-
-  // ✅ ORDRE CORRECT: clipId, trackId
-  const handleRemoveClick = (e) => {
-    e?.stopPropagation?.()
-    e?.preventDefault?.()
-    console.log('🗑️ [ClipActions] Remove clicked:', { clipId, trackId })
-    if (onRemove && clipId && trackId) {
-      onRemove(clipId, trackId)
     }
   }
 
@@ -54,28 +44,45 @@ const ClipActions = memo(({
           background: 'rgba(0,0,0,0.6)',
           borderRadius: 3,
           border: '1px solid rgba(255,255,255,0.1)',
-          cursor: 'pointer'
+          cursor: 'pointer',
+          transition: 'all 0.15s ease'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = 'var(--accent)'
+          e.currentTarget.style.borderColor = 'var(--accent)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = 'var(--text-secondary)'
+          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'
         }}
         title={tr('editorDuplicateClip') || 'Dupliquer'}
       >
         <i className="ti ti-copy" />
       </button>
-      <button
-        className="btn-ghost btn-sm"
-        onClick={handleRemoveClick}
+
+      {/* ✅ Bouton Supprimer générique */}
+      <DeleteButton
+        onDelete={() => {
+          console.log('🗑️ [ClipActions] Remove clicked:', { clipId, trackId })
+          if (onRemove && clipId && trackId) {
+            onRemove(clipId, trackId)
+          }
+        }}
+        confirmTitle={tr('confirmDeleteClip') || 'Confirmer la suppression du clip'}
+        confirmMessage={tr('confirmDeleteClipMessage') || 'Voulez-vous vraiment supprimer ce clip ?'}
+        itemName=""
+        size="sm"
+        variant="ghost"
+        icon="ti-trash"
+        disabled={false}
         style={{
           padding: '2px 5px',
           fontSize: 9,
-          color: 'var(--danger)',
           background: 'rgba(0,0,0,0.6)',
           borderRadius: 3,
           border: '1px solid rgba(255,255,255,0.1)',
-          cursor: 'pointer'
         }}
-        title={tr('editorRemoveClip') || 'Supprimer'}
-      >
-        <i className="ti ti-trash" />
-      </button>
+      />
     </div>
   )
 })

@@ -1,5 +1,6 @@
 // src/features/editor/components/Track/TrackHeader.jsx
 import React, { useState, memo } from 'react'
+import { DeleteButton } from '@shared/components/ui'
 
 const TrackHeader = memo(({
   track,
@@ -35,6 +36,9 @@ const TrackHeader = memo(({
       setIsEditing(false)
     }
   }
+
+  // Vérifier si la piste contient des clips
+  const hasClips = track.clips && track.clips.length > 0
 
   return (
     <div style={{
@@ -97,41 +101,20 @@ const TrackHeader = memo(({
         </div>
       )}
 
-      <button
-        className="btn-ghost btn-sm"
-        onClick={(e) => {
-          e.stopPropagation()
+      {/* ✅ Bouton Supprimer générique */}
+      <DeleteButton
+        onDelete={() => {
           console.log('🗑️ [TrackHeader] Suppression de la piste:', track.id)
-          onTrackRemove?.(track.id)  // ✅ Appelle onTrackRemove avec track.id
+          onTrackRemove?.(track.id)
         }}
-        style={{
-          padding: '2px 4px',
-          fontSize: 12,
-          color: 'var(--text-tertiary)',
-          borderRadius: 3,
-          flexShrink: 0,
-          minWidth: 20,
-          minHeight: 20,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          transition: 'all 0.2s ease'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.color = 'var(--danger)'
-          e.currentTarget.style.background = 'rgba(224, 82, 82, 0.1)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.color = 'var(--text-tertiary)'
-          e.currentTarget.style.background = 'transparent'
-        }}
-        title={tr('editorRemoveTrack')}
-      >
-        <i className="ti ti-trash" />
-      </button>
+        confirmTitle={tr('confirmDeleteTrack') || 'Confirmer la suppression de la piste'}
+        confirmMessage={tr('confirmDeleteTrackMessage') || 'Voulez-vous vraiment supprimer cette piste ?'}
+        itemName={name}
+        size="sm"
+        variant="ghost"
+        icon="ti-trash"
+        disabled={false}
+      />
     </div>
   )
 })

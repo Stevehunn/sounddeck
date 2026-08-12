@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { playSound, stopSound, isPlaying, getSoundProgress } from '@core/services/AudioService'
-// ✅ CORRIGER L'IMPORT - Utiliser le bon chemin absolu
-import ShortcutRecorder from "@shared/components/settings/ShortcutRecorder";
+import ShortcutRecorder from "@shared/components/settings/ShortcutRecorder"
 import { useLanguage } from '@core/i18n/LanguageContext'
+import useConfirm from '@shared/hooks/useConfirm' // ✅ Ajout
 
 function fmtTime(s) {
   if (!s || isNaN(s)) return '0:00'
@@ -51,6 +51,7 @@ export default function SoundCard({
   size = 'medium'
 }) {
   const { t, currentLang } = useLanguage()
+  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang }) // ✅ Ajout
   const [playing, setPlaying] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showVolume, setShowVolume] = useState(false)
@@ -301,6 +302,24 @@ export default function SoundCard({
   }
 
   const isFavorite = sound.favorites?.includes(currentProfileId) || false;
+
+  // ✅ Fonction de suppression avec confirmation
+  const handleDeleteWithConfirm = async () => {
+    // Fermer le menu
+    setShowMenu(false)
+    
+    const confirmed = await confirm({
+      title: t('confirmDeleteSound') || 'Confirmer la suppression du son',
+      message: t('confirmDeleteSoundMessage') || 'Voulez-vous vraiment supprimer définitivement ce son ?',
+      type: 'danger',
+      confirmText: t('menuDelete') || 'Supprimer définitivement',
+      cancelText: t('cancel') || 'Annuler',
+    })
+    
+    if (confirmed) {
+      onDelete?.(sound.id)
+    }
+  }
 
   return (
     <>
@@ -609,12 +628,13 @@ export default function SoundCard({
             onRename={() => { setEditingName(true); setShowMenu(false) }}
             onVolumeOpen={handleVolumeOpen}
             onRemoveFromProfile={onRemoveFromProfile ? () => { onRemoveFromProfile(sound.id); setShowMenu(false) } : null}
-            onDelete={() => { onDelete(sound.id); setShowMenu(false) }}
+            onDelete={onDelete}
             onChangeImage={handleChangeImage}
             onChangeEmoji={handleChangeEmoji}
             position={menuPosition}
             lang={lang}
             onHeightMeasured={setMenuHeight}
+            onDeleteWithConfirm={handleDeleteWithConfirm} // ✅ Passer la fonction
           />
         </div>,
         document.body
@@ -716,11 +736,13 @@ export default function SoundCard({
         </div>,
         document.body
       )}
+      
+      <ConfirmWrapper /> {/* ✅ Ajout du wrapper pour les confirmations */}
     </>
   )
 }
 
-// VolumePanel
+// VolumePanel (inchangé)
 function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragStart, onDragEnd, soundName, position }) {
   const { t, currentLang } = useLanguage()
   const [localVolume, setLocalVolume] = useState(volume)
@@ -948,7 +970,7 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
   )
 }
 
-// ContextMenuPortal
+// ContextMenuPortal - avec bouton supprimer qui utilise la confirmation
 function ContextMenuPortal({ 
   sound, 
   currentProfileId, 
@@ -962,7 +984,8 @@ function ContextMenuPortal({
   onChangeEmoji,
   position, 
   lang = 'fr',
-  onHeightMeasured
+  onHeightMeasured,
+  onDeleteWithConfirm // ✅ Ajout
 }) {
   const { t, currentLang } = useLanguage()
   const menuRef = useRef(null)
@@ -1092,13 +1115,43 @@ function ContextMenuPortal({
         </>
       )}
       <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-      <MenuItem 
-        icon="ti-trash" 
-        label={t('menuDelete')} 
-        onClick={() => handleAction(onDelete)}
-        danger 
-        lang={lang}
-      />
+      
+      {/* ✅ Bouton Supprimer définitivement - avec confirmation */}
+      <div style={{ padding: '2px 4px' }}>
+        <button
+          onClick={() => {
+            // Fermer le menu
+            onClose()
+            // Appeler la fonction de suppression avec confirmation
+            onDeleteWithConfirm?.()
+          }}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '6px 10px',
+            background: 'transparent',
+            border: 'none',
+            borderRadius: 6,
+            cursor: 'pointer',
+            textAlign: 'left',
+            transition: 'background 0.1s',
+            color: 'var(--danger)',
+            fontSize: 13,
+            fontFamily: 'inherit'
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'rgba(224, 82, 82, 0.1)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'transparent'
+          }}
+        >
+          <i className="ti ti-trash" style={{ fontSize: 16, minWidth: 20 }} />
+          {t('menuDelete') || 'Supprimer définitivement'}
+        </button>
+      </div>
     </div>
   )
 }

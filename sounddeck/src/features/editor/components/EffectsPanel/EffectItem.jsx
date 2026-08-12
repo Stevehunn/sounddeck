@@ -1,5 +1,6 @@
 // src/features/editor/components/EffectsPanel/EffectItem.jsx
 import React, { useState, memo } from 'react'
+import { DeleteButton } from '@shared/components/ui'
 
 const EFFECT_ICONS = {
   volume: 'ti-volume',
@@ -124,13 +125,18 @@ const EffectItem = memo(({
           >
             <i className={`ti ${effect.enabled ? 'ti-check' : 'ti-x'}`} />
           </button>
-          <button
-            className="btn-ghost btn-sm"
-            onClick={(e) => { e.stopPropagation(); onRemove?.(effect.id) }}
-            style={{ padding: '2px 4px', fontSize: 9, color: 'var(--danger)' }}
-          >
-            <i className="ti ti-trash" />
-          </button>
+          
+          {/* ✅ Bouton Supprimer générique */}
+          <DeleteButton
+            onDelete={() => onRemove?.(effect.id)}
+            confirmTitle={tr('confirmDeleteEffect') || 'Confirmer la suppression de l\'effet'}
+            confirmMessage={tr('confirmDeleteEffectMessage') || 'Voulez-vous vraiment supprimer cet effet ?'}
+            itemName={effect.type}
+            size="sm"
+            variant="ghost"
+            icon="ti-trash"
+          />
+          
           <i className={`ti ${isOpen ? 'ti-chevron-up' : 'ti-chevron-down'}`} style={{ fontSize: 10, color: 'var(--text-tertiary)' }} />
         </div>
       </div>

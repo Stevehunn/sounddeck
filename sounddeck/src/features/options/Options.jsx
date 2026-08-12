@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, forwardRef, useCallback } from 'react'
 import { createRoot } from 'react-dom/client'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { LANGUAGES } from '@core/i18n/locales'
+import { DeleteButton } from '@shared/components/ui'
 import ShortcutRecorder from '@shared/components/settings/ShortcutRecorder'
 import CustomThemeEditor from '@shared/components/ui/CustomThemeEditor'
 import SidebarEditor from '@shared/components/navigation/SidebarEditor'
@@ -1424,18 +1425,16 @@ export default function Options({ store, addToast }) {
                     >
                       <i className="ti ti-refresh" />
                     </button>
-                    <button 
-                      className="btn-danger btn-sm"
-                      onClick={() => handlePluginUninstall(plugin)}
-                      style={{ 
-                        fontSize: 11, 
-                        padding: '4px 8px',
-                        color: 'var(--danger)'
-                      }}
-                      title={t('pluginsUninstallTooltip')}
-                    >
-                      <i className="ti ti-trash" />
-                    </button>
+                    {/* ✅ Bouton Supprimer générique */}
+                    <DeleteButton
+                      onDelete={() => handlePluginUninstall(plugin)}
+                      confirmTitle={t('pluginsUninstall') || 'Confirmer la suppression du plugin'}
+                      confirmMessage={t('pluginsUninstallConfirm')?.replace('{name}', plugin.name) || `Voulez-vous vraiment supprimer le plugin "${plugin.name}" ?`}
+                      itemName={plugin.name}
+                      size="sm"
+                      variant="ghost"
+                      icon="ti-trash"
+                    />
                   </div>
                 </div>
               ))}
@@ -1551,12 +1550,17 @@ export default function Options({ store, addToast }) {
               >
                 <i className="ti ti-file-text" /> {t('exportLogs')}
               </button>
-              <button 
-                className="btn-danger btn-sm"
-                onClick={handleClearLogs}
-              >
-                <i className="ti ti-trash" /> {t('clearLogs')}
-              </button>
+              {/* ✅ Bouton Supprimer générique */}
+              <DeleteButton
+                onDelete={handleClearLogs}
+                confirmTitle={t('clearLogs') || 'Confirmer la suppression des logs'}
+                confirmMessage={t('clearLogsConfirm') || 'Voulez-vous vraiment supprimer tous les logs d\'erreur ?'}
+                size="sm"
+                variant="danger"
+                icon="ti-trash"
+                label={t('clearLogs') || 'Effacer'}
+                showLabel={true}
+              />
             </div>
           </OptionRow>
 
@@ -1779,13 +1783,19 @@ export default function Options({ store, addToast }) {
                 <i className="ti ti-package-export" /> {t('exportProfile')}
               </button>
               {!p.isDefault && (
-                <button 
-                  className="btn-danger btn-sm" 
-                  style={{ padding: '4px 8px', minHeight: 28 }}
-                  onClick={async () => { await store.deleteProfile(p.id); addToast(t('profileDeleted'), 'info') }}
-                >
-                  <i className="ti ti-trash" />
-                </button>
+                // ✅ Bouton Supprimer générique
+                <DeleteButton
+                  onDelete={async () => {
+                    await store.deleteProfile(p.id)
+                    addToast(t('profileDeleted'), 'info')
+                  }}
+                  confirmTitle={t('confirmDeleteProfile') || 'Confirmer la suppression du profil'}
+                  confirmMessage={t('confirmDeleteProfileMessage') || 'Voulez-vous vraiment supprimer ce profil ?'}
+                  itemName={p.name}
+                  size="sm"
+                  variant="ghost"
+                  icon="ti-trash"
+                />
               )}
             </div>
           ))}

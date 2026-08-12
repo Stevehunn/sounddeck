@@ -1,7 +1,7 @@
 // src/shared/components/modals/ProfileManagerModal.jsx
 import { useState } from 'react'
-// ✅ CORRIGER L'IMPORT - Utiliser le bon chemin
 import { useLanguage } from '@core/i18n/LanguageContext'
+import { DeleteButton } from '@shared/components/ui'
 import useConfirm from '@shared/hooks/useConfirm'
 
 export default function ProfileManagerModal({ 
@@ -124,14 +124,18 @@ export default function ProfileManagerModal({
 
             <div style={{ flex: 1 }} />
 
-            <button 
-              className="btn-danger btn-sm" 
-              onClick={handleDeleteProfile}
-              style={{ fontSize: 12, padding: '4px 12px', borderRadius: 'var(--radius-sm)' }}
-            >
-              <i className="ti ti-trash" />
-              {t('profileManagerDeleteProfile')}
-            </button>
+            {/* ✅ Bouton Supprimer générique */}
+            <DeleteButton
+              onDelete={handleDeleteProfile}
+              confirmTitle={t('profileManagerDeleteConfirm') || 'Confirmer la suppression du profil'}
+              confirmMessage={t('profileManagerDeleteMessage')?.replace('{name}', profileName)?.replace('{count}', sounds.length) || `Voulez-vous vraiment supprimer le profil "${profileName}" avec ses ${sounds.length} sons ?`}
+              itemName={profileName}
+              size="sm"
+              variant="danger"
+              icon="ti-trash"
+              label={t('profileManagerDeleteProfile') || 'Supprimer le profil'}
+              showLabel={true}
+            />
           </div>
 
           <div style={{ 

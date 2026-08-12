@@ -1,5 +1,7 @@
+// src/features/editor/components/ClipActionsMenu.jsx
 import React, { useState, useRef, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
+import { DeleteButton } from '@shared/components/ui'
 
 export default function ClipActionsMenu({
   clip,
@@ -148,7 +150,21 @@ export default function ClipActionsMenu({
             <MenuItem icon="ti-copy" label={t('editorCopy') || 'Copier'} onClick={() => onCopy?.(clip.id, trackId)} shortcut="Ctrl+C" />
             <MenuItem icon="ti-scissors" label={t('editorCut') || 'Couper'} onClick={() => onCut?.(clip.id, trackId)} shortcut="Ctrl+X" />
             <MenuItem icon="ti-copy" label={t('editorDuplicate') || 'Dupliquer'} onClick={() => onDuplicate?.(trackId, clip.id)} shortcut="Ctrl+D" />
-            <MenuItem icon="ti-trash" label={t('editorDelete') || 'Supprimer'} onClick={() => onDelete?.(trackId, clip.id)} shortcut="Delete" danger />
+            
+            {/* ✅ Bouton Supprimer générique dans le menu */}
+            <div style={{ padding: '2px 4px' }}>
+              <DeleteButton
+                onDelete={() => onDelete?.(trackId, clip.id)}
+                confirmTitle={t('confirmDeleteClip') || 'Confirmer la suppression du clip'}
+                confirmMessage={t('confirmDeleteClipMessage') || 'Voulez-vous vraiment supprimer ce clip ?'}
+                itemName={clip.name}
+                size="sm"
+                variant="ghost"
+                icon="ti-trash"
+                label={t('editorDelete') || 'Supprimer'}
+                showLabel={true}
+              />
+            </div>
           </div>
         )}
 

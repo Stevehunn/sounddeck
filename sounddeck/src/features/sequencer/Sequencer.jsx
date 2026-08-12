@@ -1,8 +1,8 @@
 // src/features/sequencer/Sequencer.jsx
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Howl } from 'howler'
-// ✅ CORRIGER LES IMPORTS
 import { useLanguage } from '@core/i18n/LanguageContext'
+import { DeleteButton } from '@shared/components/ui'
 import { registerStopSequencerCallback, getSoundProgress } from '@core/services/AudioService'
 import useConfirm from '@shared/hooks/useConfirm'
 
@@ -75,7 +75,6 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
             <i className="ti ti-playlist" style={{ color: 'var(--accent)' }} /> {t('sequencerTitle')}
           </div>
           
-          {/* ✅ Création de playlist améliorée avec bouton annuler */}
           {showNewPlaylist ? (
             <div style={{ 
               display: 'flex', 
@@ -168,13 +167,15 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
                   {pl.items.length} {t('sounds')}
                 </div>
               </div>
-              <button onClick={e => { e.stopPropagation(); deletePlaylist(pl.id) }}
-                className="btn-ghost btn-sm"
-                style={{ color: 'var(--text-tertiary)', padding: '2px 4px', borderRadius: 'var(--radius-sm)' }}
-                onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)' }}
-                onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-tertiary)' }}>
-                <i className="ti ti-trash" />
-              </button>
+              <DeleteButton
+                onDelete={() => deletePlaylist(pl.id)}
+                confirmTitle={t('deletePlaylist') || 'Confirmer la suppression de la playlist'}
+                confirmMessage={t('deletePlaylistConfirm') || 'Voulez-vous vraiment supprimer cette playlist ?'}
+                itemName={pl.name}
+                size="sm"
+                variant="ghost"
+                icon="ti-trash"
+              />
             </div>
           ))}
         </div>
@@ -654,28 +655,15 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
                 </div>
               </div>
 
-              <button 
-                onClick={() => removeItem(idx)}
-                className="btn-ghost btn-sm"
-                style={{ 
-                  color: 'var(--text-tertiary)', 
-                  padding: '4px', 
-                  borderRadius: 'var(--radius-sm)',
-                  minHeight: 28,
-                  minWidth: 28,
-                  transition: 'all var(--transition-base) ease'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.color = 'var(--danger)'
-                  e.currentTarget.style.background = 'rgba(224, 82, 82, 0.1)'
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.color = 'var(--text-tertiary)'
-                  e.currentTarget.style.background = 'transparent'
-                }}
-              >
-                <i className="ti ti-trash" />
-              </button>
+              <DeleteButton
+                onDelete={() => removeItem(idx)}
+                confirmTitle={t('deleteItem') || 'Confirmer la suppression'}
+                confirmMessage={t('deleteItemConfirm') || 'Voulez-vous vraiment supprimer cet élément de la playlist ?'}
+                itemName={sound?.name || 'Élément'}
+                size="sm"
+                variant="ghost"
+                icon="ti-trash"
+              />
             </div>
           )
         })}
