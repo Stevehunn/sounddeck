@@ -29,28 +29,43 @@ const MarkersPanel = memo(({
   const [selectedColor, setSelectedColor] = useState('#3b82f6')
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [markerName, setMarkerName] = useState('')
+  const [markerTime, setMarkerTime] = useState(currentTime)
+  const [useCurrentTime, setUseCurrentTime] = useState(true)
 
   const handleAddMarker = useCallback(() => {
     if (onAddMarker) {
       const name = markerName.trim() || `Marker ${(markers?.length || 0) + 1}`
+      const time = useCurrentTime ? currentTime : markerTime
       onAddMarker({
         name,
-        time: currentTime || 0,
+        time: Math.max(0, Math.min(time, totalDuration)),
         color: selectedColor
       })
       setMarkerName('')
       setIsAdding(false)
+      setUseCurrentTime(true)
     }
-  }, [onAddMarker, selectedColor, currentTime, markers?.length, markerName])
+  }, [onAddMarker, selectedColor, currentTime, markers?.length, markerName, useCurrentTime, markerTime, totalDuration])
 
   const handleCancel = useCallback(() => {
     setIsAdding(false)
     setMarkerName('')
+    setUseCurrentTime(true)
   }, [])
 
   const handleAddAtCurrentTime = useCallback(() => {
     setIsAdding(true)
     setMarkerName(`Marker ${(markers?.length || 0) + 1}`)
+    setMarkerTime(currentTime)
+    setUseCurrentTime(true)
+  }, [markers?.length, currentTime])
+
+  // ✅ Ajouter un marqueur à la position de la souris sur la timeline
+  const handleAddAtMousePosition = useCallback((time) => {
+    setIsAdding(true)
+    setMarkerName(`Marker ${(markers?.length || 0) + 1}`)
+    setMarkerTime(time)
+    setUseCurrentTime(false)
   }, [markers?.length])
 
   const sortedMarkers = markers ? [...markers].sort((a, b) => a.time - b.time) : []
@@ -66,6 +81,20 @@ const MarkersPanel = memo(({
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [handleAddAtCurrentTime])
+
+  // Exposer la fonction d'ajout à la position de la souris
+  useEffect(() => {
+    if (window.__editorMarkers) {
+      window.__editorMarkers.addAtPosition = handleAddAtMousePosition
+    } else {
+      window.__editorMarkers = { addAtPosition: handleAddAtMousePosition }
+    }
+    return () => {
+      if (window.__editorMarkers) {
+        delete window.__editorMarkers.addAtPosition
+      }
+    }
+  }, [handleAddAtMousePosition])
 
   if (!onAddMarker) {
     return (
@@ -189,6 +218,84 @@ const MarkersPanel = memo(({
             />
           </div>
 
+          {/* Position du marqueur */}
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+              {tr('markerPosition') || 'Position'}
+            </label>
+            <div style={{
+              display: 'flex',
+              gap: 8,
+              alignItems: 'center'
+            }}>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 11,
+                color: 'var(--text-secondary)',
+                cursor: 'pointer'
+              }}>
+                <input
+                  type="radio"
+                  checked={useCurrentTime}
+                  onChange={() => {
+                    setUseCurrentTime(true)
+                    setMarkerTime(currentTime)
+                  }}
+                  style={{ width: 'auto', accentColor: 'var(--accent)' }}
+                />
+                {tr('markerCurrentTime') || 'Position actuelle'} ({currentTime.toFixed(1)}s)
+              </label>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 11,
+                color: 'var(--text-secondary)',
+                cursor: 'pointer'
+              }}>
+                <input
+                  type="radio"
+                  checked={!useCurrentTime}
+                  onChange={() => setUseCurrentTime(false)}
+                  style={{ width: 'auto', accentColor: 'var(--accent)' }}
+                />
+                {tr('markerCustomTime') || 'Personnalisée'}
+              </label>
+            </div>
+            {!useCurrentTime && (
+              <div style={{ marginTop: 4 }}>
+                <input
+                  type="number"
+                  value={markerTime}
+                  onChange={(e) => setMarkerTime(Math.max(0, parseFloat(e.target.value) || 0))}
+                  min={0}
+                  max={totalDuration}
+                  step={0.1}
+                  className="input-sm"
+                  style={{
+                    width: '100%',
+                    padding: '4px 8px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: 12,
+                    outline: 'none'
+                  }}
+                />
+                <div style={{
+                  fontSize: 9,
+                  color: 'var(--text-tertiary)',
+                  marginTop: 2
+                }}>
+                  {tr('markerTimeRange') || `Temps en secondes (0 - ${totalDuration.toFixed(1)}s)`}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Sélecteur de couleur */}
           <div style={{ marginBottom: 8 }}>
             <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
@@ -277,7 +384,7 @@ const MarkersPanel = memo(({
             </div>
           </div>
 
-          {/* Boutons d'action - Utilisation des classes btn */}
+          {/* Boutons d'action */}
           <div style={{
             display: 'flex',
             gap: 6,
