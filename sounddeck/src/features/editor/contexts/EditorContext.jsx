@@ -8,8 +8,6 @@ export function EditorProvider({ children, store, addToast }) {
   const { t } = useLanguage()
   
   // ─── ÉTATS ──────────────────────────────────────────────────────────────
-  console.log('🔄 [EditorContext] Initialisation des états')
-  
   const [project, setProject] = useState(null)
   const [selectedClipId, setSelectedClipId] = useState(null)
   const [selectedTrackId, setSelectedTrackId] = useState(null)
@@ -30,6 +28,9 @@ export function EditorProvider({ children, store, addToast }) {
   const [isAutoSaving, setIsAutoSaving] = useState(false)
   const [stopAtTime, setStopAtTime] = useState(null)
   
+  // ✅ État pour le solo de lecture (indépendant de la sélection)
+  const [soloPlayClipId, setSoloPlayClipId] = useState(null)
+  
   // ─── REFS ──────────────────────────────────────────────────────────────
   const isLoadingRef = useRef(false)
   const initialLoadDoneRef = useRef(false)
@@ -43,14 +44,13 @@ export function EditorProvider({ children, store, addToast }) {
   const isPausedRef = useRef(false)
   const selectedClipIdRef = useRef(null)
   const stopAtTimeRef = useRef(null)
+  const soloPlayClipIdRef = useRef(null)
 
-  // Mettre à jour la ref quand le projet change
+  // Mettre à jour les refs quand les états changent
   useEffect(() => {
     projectRef.current = project
-    console.log('📊 [EditorContext] Projet mis à jour dans la ref:', project?.id, 'pistes:', project?.tracks?.length)
   }, [project])
 
-  // Synchroniser les refs avec les états
   useEffect(() => {
     currentTimeRef.current = currentTime
   }, [currentTime])
@@ -71,7 +71,11 @@ export function EditorProvider({ children, store, addToast }) {
     stopAtTimeRef.current = stopAtTime
   }, [stopAtTime])
 
-  // ─── FONCTIONS HELPER POUR LE CROSSFADE ──────────────────────────────
+  useEffect(() => {
+    soloPlayClipIdRef.current = soloPlayClipId
+  }, [soloPlayClipId])
+
+  // ─── FONCTIONS HELPER ──────────────────────────────────────────────
 
   const findPreviousClip = useCallback((clip, track) => {
     if (!track || !track.clips) return null
@@ -86,21 +90,6 @@ export function EditorProvider({ children, store, addToast }) {
     const startB = clipB.start
     return Math.max(0, endA - startB)
   }, [clipDurations])
-
-  const applyFadeOutToClip = useCallback((clipId, duration) => {
-    const entry = audioSourcesRef.current[clipId]
-    if (!entry) return
-    const { gainNode } = entry
-    const ctx = audioContextRef.current
-    if (!ctx) return
-    const now = ctx.currentTime
-    const currentGain = gainNode.gain.value
-    gainNode.gain.setValueAtTime(currentGain, now)
-    gainNode.gain.linearRampToValueAtTime(0, now + duration)
-    console.log(`🌊 [Crossfade] Fade out sur ${clipId} sur ${duration.toFixed(2)}s`)
-  }, [])
-
-  // ─── GET AUDIO DURATION ──────────────────────────────────────────────
 
   const getAudioDuration = useCallback(async (filePath) => {
     try {
@@ -118,7 +107,6 @@ export function EditorProvider({ children, store, addToast }) {
       await audioContext.close()
       return duration
     } catch (e) {
-      console.warn('⚠️ Erreur chargement durée:', e)
       return 3
     }
   }, [])
@@ -126,21 +114,16 @@ export function EditorProvider({ children, store, addToast }) {
   // ─── CHARGEMENT DU PROJET ──────────────────────────────────────────────
 
   const loadProject = useCallback(async (projectData) => {
-    console.log('📂 [EditorContext] loadProject:', projectData?.id)
-    
     if (!projectData) {
-      console.log('⚠️ [EditorContext] loadProject: projectData est null')
       setIsInitialized(true)
       return
     }
 
     if (project?.id === projectData.id && project?.tracks?.length === projectData.tracks?.length) {
-      console.log('⏭️ [EditorContext] Projet identique, ignoré')
       setIsInitialized(true)
       return
     }
 
-    console.log('🔄 [EditorContext] Mise à jour du projet:', projectData.id)
     setProject(projectData)
     projectRef.current = projectData
     setSelectedClipId(null)
@@ -150,12 +133,11 @@ export function EditorProvider({ children, store, addToast }) {
     setIsPaused(false)
     setIsDurationsLoaded(false)
     setIsInitialized(true)
+    setSoloPlayClipId(null)
     
     let maxDuration = 10
     if (projectData.tracks) {
-      console.log(`📊 [EditorContext] ${projectData.tracks.length} pistes trouvées`)
       for (const track of projectData.tracks) {
-        console.log(`  📋 Piste: ${track.name} - ${track.clips?.length || 0} clips`)
         for (const clip of track.clips) {
           const duration = clip.duration || 3
           const end = (clip.start || 0) + duration
@@ -163,7 +145,6 @@ export function EditorProvider({ children, store, addToast }) {
         }
       }
       setTotalDuration(Math.max(maxDuration + 2, 10))
-      console.log(`📏 [EditorContext] Durée totale: ${Math.max(maxDuration + 2, 10)}s`)
     }
     
     if (projectData.tracks) {
@@ -177,37 +158,27 @@ export function EditorProvider({ children, store, addToast }) {
       }
       setClipDurations(durations)
       setIsDurationsLoaded(true)
-      console.log(`📦 [EditorContext] ${Object.keys(durations).length} durées de clips chargées`)
     }
   }, [project])
 
   // ─── INITIALISATION ──────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (initialLoadDoneRef.current || isLoadingRef.current) {
-      console.log('⏭️ [EditorContext] Initialisation déjà en cours ou terminée')
-      return
-    }
+    if (initialLoadDoneRef.current || isLoadingRef.current) return
     
-    console.log('🔵 [EditorContext] Initialisation...')
     isLoadingRef.current = true
     
     const init = async () => {
       try {
-        console.log('🔍 [EditorContext] Vérification du store...')
         const editorProject = store?.editorProject
         
         if (editorProject) {
-          console.log('📂 [EditorContext] Projet trouvé:', editorProject.id)
           await loadProject(editorProject)
         } else {
-          console.log('📂 [EditorContext] Aucun projet trouvé, création...')
           const newProject = await store?.createEditorProject?.('Nouveau projet')
           if (newProject) {
-            console.log('✅ [EditorContext] Nouveau projet créé:', newProject.id)
             await loadProject(newProject)
           } else {
-            console.log('⚠️ [EditorContext] Création du projet de secours')
             const fallbackProject = {
               id: `project-${Date.now()}`,
               name: 'Nouveau projet',
@@ -223,7 +194,6 @@ export function EditorProvider({ children, store, addToast }) {
           }
         }
       } catch (e) {
-        console.error('❌ [EditorContext] Erreur initialisation:', e)
         const fallbackProject = {
           id: `project-${Date.now()}`,
           name: 'Nouveau projet',
@@ -239,7 +209,6 @@ export function EditorProvider({ children, store, addToast }) {
       } finally {
         isLoadingRef.current = false
         initialLoadDoneRef.current = true
-        console.log('✅ [EditorContext] Initialisation terminée')
       }
     }
     
@@ -249,17 +218,14 @@ export function EditorProvider({ children, store, addToast }) {
   // ─── FONCTIONS PLAYBACK ──────────────────────────────────────────────
   
   const loadAudioBuffer = useCallback(async (filePath) => {
-    console.log('🎵 [EditorContext] loadAudioBuffer:', filePath)
     try {
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
-        console.log('🎵 [EditorContext] AudioContext créé')
       }
       
       const ctx = audioContextRef.current
       if (ctx.state === 'suspended') {
         await ctx.resume()
-        console.log('🎵 [EditorContext] AudioContext repris')
       }
       
       const fileUrl = filePath.startsWith('file://') 
@@ -270,56 +236,34 @@ export function EditorProvider({ children, store, addToast }) {
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const arrayBuffer = await response.arrayBuffer()
       const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
-      console.log(`🎵 [EditorContext] Buffer chargé: ${audioBuffer.duration.toFixed(2)}s`)
       return audioBuffer
     } catch (e) {
-      console.error('❌ [EditorContext] Erreur chargement audio:', e)
       return null
     }
   }, [])
 
-  // ✅ playClip AVEC EFFETS EN TEMPS RÉEL
   const playClip = useCallback(async (clip, track) => {
-    if (!clip?.path) {
-      console.warn('⚠️ [EditorContext] Clip sans chemin:', clip)
-      return
-    }
-    
-    console.log(`▶️ [EditorContext] playClip: ${clip.name} (${clip.id})`)
-    console.log(`📊 [EditorContext] Effets du clip:`, clip.effects?.filter(e => e.enabled) || [])
+    if (!clip?.path) return
     
     try {
       const buffer = await loadAudioBuffer(clip.path)
-      if (!buffer) {
-        console.error('❌ [EditorContext] Buffer non chargé pour:', clip.name)
-        return
-      }
+      if (!buffer) return
       
       const ctx = audioContextRef.current
-      if (!ctx) {
-        console.error('❌ [EditorContext] AudioContext non disponible')
-        return
-      }
+      if (!ctx) return
       
       let sourceBuffer = buffer
       
-      // ✅ APPLIQUER LES EFFETS AVANT LA LECTURE
       if (clip.effects && clip.effects.length > 0) {
         const activeEffects = clip.effects.filter(e => e.enabled)
         if (activeEffects.length > 0) {
-          console.log(`✨ [EditorContext] Application de ${activeEffects.length} effets sur ${clip.name}`)
           try {
             const { applyEffectsToBuffer } = await import('@shared/utils/realTimeEffects')
             const processedBuffer = applyEffectsToBuffer(buffer, clip.effects, ctx.sampleRate, true)
             if (processedBuffer) {
               sourceBuffer = processedBuffer
-              console.log(`✅ [EditorContext] Effets appliqués avec succès sur ${clip.name}`)
-            } else {
-              console.warn(`⚠️ [EditorContext] Aucun effet appliqué sur ${clip.name}`)
             }
-          } catch (e) {
-            console.error(`❌ [EditorContext] Erreur application effets sur ${clip.name}:`, e)
-          }
+          } catch (e) {}
         }
       }
       
@@ -330,7 +274,6 @@ export function EditorProvider({ children, store, addToast }) {
       const trackVolume = track?.volume || 1
       gainNode.gain.value = trackVolume
       
-      // ✅ APPLIQUER LE CROSSFADE si activé
       if (autoCrossfade) {
         const previousClip = findPreviousClip(clip, track)
         if (previousClip) {
@@ -345,12 +288,10 @@ export function EditorProvider({ children, store, addToast }) {
               const currentGain = prevGain.gain.value
               prevGain.gain.setValueAtTime(currentGain, now)
               prevGain.gain.linearRampToValueAtTime(0, now + fadeDuration)
-              console.log(`🌊 [Crossfade] Fade out sur ${previousClip.name} sur ${fadeDuration.toFixed(2)}s`)
             }
             
             gainNode.gain.setValueAtTime(0, now)
             gainNode.gain.linearRampToValueAtTime(trackVolume, now + fadeDuration)
-            console.log(`🌊 [Crossfade] Fade in sur ${clip.name} sur ${fadeDuration.toFixed(2)}s`)
           }
         }
       }
@@ -361,25 +302,17 @@ export function EditorProvider({ children, store, addToast }) {
       const offset = Math.max(0, currentTime - (clip.start || 0))
       const startTime = Math.min(offset, sourceBuffer.duration - 0.01)
       
-      console.log(`▶️ [EditorContext] Lecture: ${clip.name} à ${startTime.toFixed(2)}s (durée: ${sourceBuffer.duration.toFixed(2)}s)`)
-      
       source.start(0, startTime)
       audioSourcesRef.current[clip.id] = { source, gainNode }
       
       source.onended = () => {
-        console.log(`⏹️ [EditorContext] Fin du clip: ${clip.name}`)
         delete audioSourcesRef.current[clip.id]
       }
       
-    } catch (e) {
-      console.error('❌ [EditorContext] Erreur lecture clip:', e)
-    }
+    } catch (e) {}
   }, [loadAudioBuffer, currentTime, autoCrossfade, findPreviousClip, calculateOverlap])
 
-  // ✅ startPlaybackLoop AVEC ARRÊT PROGRAMMÉ
   const startPlaybackLoop = useCallback(() => {
-    console.log('🔄 [EditorContext] startPlaybackLoop')
-    
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current)
       animationRef.current = null
@@ -409,7 +342,7 @@ export function EditorProvider({ children, store, addToast }) {
         if (projectRef.current?.tracks) {
           const tracks = projectRef.current.tracks
           const activeClips = new Set()
-          const soloClipId = selectedClipIdRef.current
+          const soloClipId = soloPlayClipIdRef.current
           
           for (const track of tracks) {
             if (track.muted) continue
@@ -432,7 +365,6 @@ export function EditorProvider({ children, store, addToast }) {
               if (shouldPlay) {
                 activeClips.add(clip.id)
                 if (!lastPlayedClipsRef.current.has(clip.id)) {
-                  console.log(`▶️ [EditorContext] Lancement du clip: ${clip.name} à ${newTime.toFixed(2)}s${soloClipId ? ' (solo)' : ''}`)
                   playClip(clip, track)
                   lastPlayedClipsRef.current.add(clip.id)
                 }
@@ -442,7 +374,6 @@ export function EditorProvider({ children, store, addToast }) {
             }
           }
           
-          // ✅ Arrêter les clips qui ne sont plus actifs
           for (const clipId of lastPlayedClipsRef.current) {
             if (!activeClips.has(clipId)) {
               const entry = audioSourcesRef.current[clipId]
@@ -458,16 +389,16 @@ export function EditorProvider({ children, store, addToast }) {
           }
         }
         
-        // ✅ VÉRIFIER SI ON DOIT S'ARRÊTER
         const shouldStop = (stopAtTimeRef.current !== null && newTime >= stopAtTimeRef.current) || newTime >= totalDuration
         
         if (shouldStop) {
           const stopPosition = stopAtTimeRef.current !== null ? stopAtTimeRef.current : totalDuration
-          console.log(`⏹️ [EditorContext] Fin de la lecture à ${newTime.toFixed(2)}s (arrêt programmé à ${stopPosition.toFixed(2)}s)`)
           setIsPlaying(false)
           setCurrentTime(stopPosition)
           setStopAtTime(null)
           stopAtTimeRef.current = null
+          setSoloPlayClipId(null)
+          soloPlayClipIdRef.current = null
           for (const [id, { source }] of Object.entries(audioSourcesRef.current)) {
             try { source.stop() } catch (e) {}
           }
@@ -496,45 +427,77 @@ export function EditorProvider({ children, store, addToast }) {
     audioSourcesRef.current = {}
     
     animationRef.current = requestAnimationFrame(loop)
-    console.log('✅ [EditorContext] Animation démarrée')
   }, [totalDuration, playClip, clipDurations])
 
+  // ─── PLAYBACK CONTROLS ──────────────────────────────────────────────
+
   const play = useCallback(async () => {
-    console.log('▶️ [EditorContext] play - isPlaying actuel:', isPlaying)
     setStopAtTime(null)
     stopAtTimeRef.current = null
     
     try {
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
-        console.log('🎵 [EditorContext] AudioContext créé')
       }
       
       const ctx = audioContextRef.current
       if (ctx.state === 'suspended') {
         await ctx.resume()
-        console.log('🎵 [EditorContext] AudioContext repris')
       }
       
       setIsPlaying(true)
       setIsPaused(false)
       lastPlayedClipsRef.current = new Set()
       
-      console.log('✅ [EditorContext] Lecture démarrée, la boucle gérera les clips')
+      setTimeout(() => {
+        startPlaybackLoop()
+      }, 50)
+      
+    } catch (e) {
+      setIsPlaying(false)
+    }
+  }, [startPlaybackLoop])
+
+  const playClipOnly = useCallback(async (clip, trackId) => {
+    setSoloPlayClipId(clip.id)
+    soloPlayClipIdRef.current = clip.id
+    
+    const clipStart = clip.start || 0
+    const clipDuration = clipDurations[clip.id] || clip.duration || 3
+    const clipEnd = clipStart + clipDuration
+    
+    setCurrentTime(clipStart)
+    currentTimeRef.current = clipStart
+    
+    setStopAtTime(clipEnd)
+    stopAtTimeRef.current = clipEnd
+    
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
+      }
+      
+      const ctx = audioContextRef.current
+      if (ctx.state === 'suspended') {
+        await ctx.resume()
+      }
+      
+      setIsPlaying(true)
+      setIsPaused(false)
+      lastPlayedClipsRef.current = new Set()
       
       setTimeout(() => {
         startPlaybackLoop()
       }, 50)
       
     } catch (e) {
-      console.error('❌ [EditorContext] Erreur play:', e)
       setIsPlaying(false)
+      setSoloPlayClipId(null)
+      soloPlayClipIdRef.current = null
     }
-  }, [project, clipDurations, currentTime, playClip, startPlaybackLoop, isPlaying])
+  }, [clipDurations, startPlaybackLoop])
 
   const resume = useCallback(async () => {
-    console.log('▶️ [EditorContext] resume')
-    
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
       await audioContextRef.current.resume()
     }
@@ -548,7 +511,6 @@ export function EditorProvider({ children, store, addToast }) {
   }, [startPlaybackLoop])
 
   const pause = useCallback(() => {
-    console.log('⏸️ [EditorContext] pause')
     setIsPaused(true)
     setIsPlaying(false)
     
@@ -568,13 +530,15 @@ export function EditorProvider({ children, store, addToast }) {
   }, [])
 
   const stop = useCallback(() => {
-    console.log('⏹️ [EditorContext] stop')
     setIsPlaying(false)
     setIsPaused(false)
     setCurrentTime(0)
     lastPlayedClipsRef.current = new Set()
     setStopAtTime(null)
     stopAtTimeRef.current = null
+    
+    setSoloPlayClipId(null)
+    soloPlayClipIdRef.current = null
     
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current)
@@ -589,7 +553,6 @@ export function EditorProvider({ children, store, addToast }) {
 
   const seek = useCallback((time) => {
     const clamped = Math.max(0, Math.min(time, totalDuration))
-    console.log('🎯 [EditorContext] seek:', clamped.toFixed(2))
     setCurrentTime(clamped)
     currentTimeRef.current = clamped
     
@@ -604,16 +567,13 @@ export function EditorProvider({ children, store, addToast }) {
   }, [totalDuration])
 
   const togglePlay = useCallback(() => {
-    console.log(`🔄 [EditorContext] togglePlay - isPlaying: ${isPlaying}, isPaused: ${isPaused}`)
-    
     if (isPlaying) {
-      console.log('⏸️ [EditorContext] Pause')
       pause()
     } else if (isPaused) {
-      console.log('▶️ [EditorContext] Reprise')
       resume()
     } else {
-      console.log('▶️ [EditorContext] Démarrage')
+      setSoloPlayClipId(null)
+      soloPlayClipIdRef.current = null
       play()
     }
   }, [isPlaying, isPaused, play, pause, resume])
@@ -621,15 +581,10 @@ export function EditorProvider({ children, store, addToast }) {
   // ─── FONCTIONS TRACK ──────────────────────────────────────────────────
 
   const addTrack = useCallback(async (name, color) => {
-    console.log('🎵 [EditorContext] addTrack appelé:', name, color)
-    console.log('📊 [EditorContext] Projet actuel:', project?.id, 'pistes:', project?.tracks?.length)
-    console.log('📊 [EditorContext] Projet ref actuel:', projectRef.current?.id, 'pistes:', projectRef.current?.tracks?.length)
-    
     try {
       let currentProject = project || projectRef.current
       
       if (!currentProject) {
-        console.log('⚠️ [EditorContext] Pas de projet, création...')
         const newProject = {
           id: `project-${Date.now()}`,
           name: 'Nouveau projet',
@@ -658,24 +613,17 @@ export function EditorProvider({ children, store, addToast }) {
         effects: []
       }
       
-      console.log('✅ [EditorContext] Nouvelle piste créée:', newTrack)
-      
       const updatedProject = {
         ...currentProject,
         tracks: [...(currentProject.tracks || []), newTrack],
         updatedAt: Date.now()
       }
       
-      console.log('📊 [EditorContext] Projet mis à jour - pistes:', updatedProject.tracks.length)
-      
       setProject(updatedProject)
       projectRef.current = updatedProject
       
       if (store?.updateEditorProject) {
-        console.log('💾 [EditorContext] Sauvegarde du projet dans le store')
         await store.updateEditorProject(updatedProject)
-      } else {
-        console.warn('⚠️ [EditorContext] store.updateEditorProject non disponible')
       }
       
       const durations = {}
@@ -693,34 +641,24 @@ export function EditorProvider({ children, store, addToast }) {
       return newTrack
       
     } catch (e) {
-      console.error('❌ [EditorContext] Erreur addTrack:', e)
       addToast?.('Erreur lors de l\'ajout de la piste: ' + e.message, 'error')
       return null
     }
   }, [project, addToast, store])
 
   const removeTrack = useCallback(async (trackId) => {
-    console.log('🗑️ [EditorContext] removeTrack appelé:', trackId)
-    console.log('📊 [EditorContext] Projet actuel - pistes:', project?.tracks?.length)
-    
     if (!project) {
-      console.error('❌ [EditorContext] Aucun projet')
       addToast?.('Aucun projet', 'error')
       return
     }
     
     const trackToRemove = project.tracks.find(t => t.id === trackId)
     if (!trackToRemove) {
-      console.error('❌ [EditorContext] Piste non trouvée:', trackId)
       addToast?.('Piste non trouvée', 'error')
       return
     }
     
-    console.log('📋 [EditorContext] Piste à supprimer:', trackToRemove.name)
-    console.log('📊 [EditorContext] Clips dans la piste:', trackToRemove.clips.length)
-    
     if (project.tracks.length <= 1) {
-      console.warn('⚠️ [EditorContext] Impossible de supprimer la dernière piste')
       addToast?.('Impossible de supprimer la dernière piste', 'warning')
       return
     }
@@ -733,7 +671,6 @@ export function EditorProvider({ children, store, addToast }) {
     }
     
     const updatedTracks = project.tracks.filter(track => track.id !== trackId)
-    console.log('📊 [EditorContext] Après suppression - pistes:', updatedTracks.length)
     
     const updatedProject = {
       ...project,
@@ -741,12 +678,10 @@ export function EditorProvider({ children, store, addToast }) {
       updatedAt: Date.now()
     }
     
-    console.log('🔄 [EditorContext] Mise à jour du projet...')
     setProject(updatedProject)
     projectRef.current = updatedProject
     
     if (store?.updateEditorProject) {
-      console.log('💾 [EditorContext] Sauvegarde du projet dans le store')
       await store.updateEditorProject(updatedProject)
     }
     
@@ -763,13 +698,9 @@ export function EditorProvider({ children, store, addToast }) {
       setSelectedTrackId(null)
       setSelectedClipId(null)
     }
-    
-    console.log('✅ [EditorContext] Piste supprimée avec succès')
   }, [project, addToast, store, clipDurations, selectedTrackId])
 
   const renameTrack = useCallback(async (trackId, newName) => {
-    console.log('✏️ [EditorContext] renameTrack:', trackId, newName)
-    
     if (!project) return
     
     const updatedProject = {
@@ -793,18 +724,12 @@ export function EditorProvider({ children, store, addToast }) {
   }, [project, store])
 
   const muteTrack = useCallback((trackId, muted) => {
-    console.log('🔇 [EditorContext] muteTrack:', trackId, muted)
-    
-    if (!project) {
-      console.error('❌ [EditorContext] Aucun projet')
-      return
-    }
+    if (!project) return
     
     const updatedProject = {
       ...project,
       tracks: project.tracks.map(track => {
         if (track.id === trackId) {
-          console.log(`🔇 [EditorContext] Mute de ${track.name}: ${muted}`)
           return { ...track, muted }
         }
         return track
@@ -822,21 +747,14 @@ export function EditorProvider({ children, store, addToast }) {
   }, [project, store])
 
   const soloTrack = useCallback((trackId, solo) => {
-    console.log('🎧 [EditorContext] soloTrack:', trackId, solo)
-    
-    if (!project) {
-      console.error('❌ [EditorContext] Aucun projet')
-      return
-    }
+    if (!project) return
     
     const updatedProject = {
       ...project,
       tracks: project.tracks.map(track => {
         if (track.id === trackId) {
-          console.log(`🎧 [EditorContext] Solo de ${track.name}: ${solo}`)
           return { ...track, solo }
         } else if (solo) {
-          console.log(`🔇 [EditorContext] Mute automatique de ${track.name}`)
           return { ...track, muted: true, solo: false }
         } else {
           return { ...track, solo: false }
@@ -856,18 +774,12 @@ export function EditorProvider({ children, store, addToast }) {
   }, [project, store])
 
   const setTrackVolume = useCallback((trackId, volume) => {
-    console.log('🔊 [EditorContext] setTrackVolume:', trackId, volume)
-    
-    if (!project) {
-      console.error('❌ [EditorContext] Aucun projet')
-      return
-    }
+    if (!project) return
     
     const updatedProject = {
       ...project,
       tracks: project.tracks.map(track => {
         if (track.id === trackId) {
-          console.log(`🔊 [EditorContext] Volume de ${track.name}: ${volume}`)
           return { ...track, volume }
         }
         return track
@@ -887,17 +799,13 @@ export function EditorProvider({ children, store, addToast }) {
   // ─── FONCTIONS CLIP ──────────────────────────────────────────────────
 
   const addClip = useCallback(async (trackId, soundId, startPosition = null) => {
-    console.log('🎵 [EditorContext] addClip:', { trackId, soundId, startPosition })
-    
     if (!store) {
-      console.error('❌ [EditorContext] Store non disponible')
       addToast?.('Store non disponible', 'error')
       return null
     }
     
     const sound = store.sounds?.find(s => s.id === soundId)
     if (!sound) {
-      console.error('❌ [EditorContext] Son non trouvé:', soundId)
       addToast?.('Son non trouvé', 'error')
       return null
     }
@@ -906,8 +814,6 @@ export function EditorProvider({ children, store, addToast }) {
       const clip = await store.addClipToTrack?.(trackId, soundId, startPosition)
       
       if (clip && project) {
-        console.log('✅ [EditorContext] Clip ajouté:', clip)
-        
         const updatedProject = {
           ...project,
           tracks: project.tracks.map(track => {
@@ -941,23 +847,17 @@ export function EditorProvider({ children, store, addToast }) {
         setSelectedTrackId(trackId)
         return clip
       } else {
-        console.error('❌ [EditorContext] Échec ajout clip')
         addToast?.('Erreur lors de l\'ajout du clip', 'error')
         return null
       }
     } catch (e) {
-      console.error('❌ [EditorContext] Erreur addClip:', e)
       addToast?.(e.message || 'Erreur lors de l\'ajout du clip', 'error')
       return null
     }
   }, [store, project, addToast])
 
-  // ✅ addClipFromFile
   const addClipFromFile = useCallback(async (trackId, filePath, startPosition = null) => {
-    console.log('📁 [EditorContext] addClipFromFile:', { trackId, filePath, startPosition })
-    
     if (!filePath) {
-      console.error('❌ [EditorContext] Aucun fichier fourni')
       addToast?.('Aucun fichier sélectionné', 'error')
       return null
     }
@@ -965,14 +865,12 @@ export function EditorProvider({ children, store, addToast }) {
     try {
       const track = project?.tracks?.find(t => t.id === trackId)
       if (!track) {
-        console.error('❌ [EditorContext] Piste non trouvée:', trackId)
         addToast?.('Piste non trouvée', 'error')
         return null
       }
 
       const importResult = await window.electronAPI.importSoundFile(filePath)
       if (!importResult?.success) {
-        console.error('❌ [EditorContext] Échec import du fichier:', importResult?.error)
         addToast?.('Erreur lors de l\'import du fichier', 'error')
         return null
       }
@@ -1041,37 +939,22 @@ export function EditorProvider({ children, store, addToast }) {
       setSelectedClipId(newClip.id)
       setSelectedTrackId(trackId)
       
-      console.log('✅ [EditorContext] Clip importé avec succès:', newClip)
       return newClip
       
     } catch (e) {
-      console.error('❌ [EditorContext] Erreur addClipFromFile:', e)
       addToast?.(e.message || 'Erreur lors de l\'import du fichier', 'error')
       return null
     }
   }, [project, addToast, store, t, getAudioDuration])
 
   const removeClip = useCallback((trackId, clipId) => {
-    console.log('🗑️ [EditorContext] removeClip:', trackId, clipId)
-    
-    if (!project) {
-      console.error('❌ [EditorContext] Aucun projet')
-      return
-    }
+    if (!project) return
     
     const track = project.tracks.find(t => t.id === trackId)
-    if (!track) {
-      console.error('❌ [EditorContext] Piste non trouvée:', trackId)
-      return
-    }
+    if (!track) return
     
     const clipExists = track.clips.some(c => c.id === clipId)
-    if (!clipExists) {
-      console.error('❌ [EditorContext] Clip non trouvé:', clipId)
-      return
-    }
-    
-    console.log(`📊 [EditorContext] Avant suppression - clips: ${track.clips.length}`)
+    if (!clipExists) return
     
     const updatedProject = {
       ...project,
@@ -1086,9 +969,6 @@ export function EditorProvider({ children, store, addToast }) {
       }),
       updatedAt: Date.now()
     }
-    
-    const newTrack = updatedProject.tracks.find(t => t.id === trackId)
-    console.log(`📊 [EditorContext] Après suppression - clips: ${newTrack?.clips?.length || 0}`)
     
     setProject(updatedProject)
     projectRef.current = updatedProject
@@ -1113,8 +993,6 @@ export function EditorProvider({ children, store, addToast }) {
   }, [project, selectedClipId, addToast, store])
 
   const updateClip = useCallback((trackId, clipId, updates) => {
-    console.log('✏️ [EditorContext] updateClip:', trackId, clipId, updates)
-    
     if (!project) return
     
     const updatedProject = {
@@ -1144,24 +1022,13 @@ export function EditorProvider({ children, store, addToast }) {
   }, [project, store])
 
   const duplicateClip = useCallback((trackId, clipId) => {
-    console.log('📋 [EditorContext] duplicateClip:', trackId, clipId)
-    
-    if (!project) {
-      console.error('❌ [EditorContext] Aucun projet')
-      return null
-    }
+    if (!project) return null
     
     const track = project.tracks.find(t => t.id === trackId)
-    if (!track) {
-      console.error('❌ [EditorContext] Piste non trouvée:', trackId)
-      return null
-    }
+    if (!track) return null
     
     const clip = track.clips.find(c => c.id === clipId)
-    if (!clip) {
-      console.error('❌ [EditorContext] Clip non trouvé:', clipId)
-      return null
-    }
+    if (!clip) return null
     
     const duration = clipDurations[clip.id] || clip.duration || 3
     const newClip = {
@@ -1170,8 +1037,6 @@ export function EditorProvider({ children, store, addToast }) {
       start: (clip.start || 0) + duration + 0.5,
       effects: (clip.effects || []).map(e => ({ ...e, id: `effect-${Date.now()}-${e.id || Math.random().toString(36).slice(2, 6)}` }))
     }
-    
-    console.log('✅ [EditorContext] Nouveau clip créé:', newClip)
     
     const updatedProject = {
       ...project,
@@ -1185,9 +1050,6 @@ export function EditorProvider({ children, store, addToast }) {
       }),
       updatedAt: Date.now()
     }
-    
-    const newTrack = updatedProject.tracks.find(t => t.id === trackId)
-    console.log(`📊 [EditorContext] Après duplication - clips: ${newTrack?.clips?.length || 0}`)
     
     setProject(updatedProject)
     projectRef.current = updatedProject
@@ -1206,69 +1068,57 @@ export function EditorProvider({ children, store, addToast }) {
     return newClip
   }, [project, clipDurations, addToast, store])
 
-  const moveClip = useCallback((trackId, clipId, newStart, newTrackId) => {
-    console.log('🔄 [EditorContext] moveClip:', { trackId, clipId, newStart, newTrackId })
+  const moveClip = useCallback((trackId, clipId, newStart, newTrackId, options = {}) => {
+    if (!project) return
     
-    if (!project) {
-      console.error('❌ [EditorContext] Aucun projet')
-      return
-    }
+    let sourceTrack = project.tracks.find(t => t.id === trackId)
+    let clipToMove = sourceTrack?.clips.find(c => c.id === clipId)
     
-    let clipToMove = null
-    let sourceTrack = null
-    
-    for (const track of project.tracks) {
-      const clip = track.clips.find(c => c.id === clipId)
-      if (clip) {
-        clipToMove = clip
-        sourceTrack = track
-        break
+    if (!clipToMove) {
+      for (const track of project.tracks) {
+        const clip = track.clips.find(c => c.id === clipId)
+        if (clip) {
+          clipToMove = clip
+          sourceTrack = track
+          break
+        }
       }
     }
     
-    if (!clipToMove) {
-      console.error('❌ [EditorContext] Clip non trouvé:', clipId)
-      return
-    }
+    if (!clipToMove) return
     
-    console.log('📦 [EditorContext] Clip trouvé:', clipToMove.name, 'start actuel:', clipToMove.start)
+    const actualTrackId = sourceTrack?.id || trackId
+    const targetTrackId = newTrackId || actualTrackId
+    const clampedStart = Math.max(0, newStart)
     
-    const updatedClip = {
-      ...clipToMove,
-      start: Math.max(0, newStart)
-    }
+    const updatedClip = { ...clipToMove, start: clampedStart }
     
-    let updatedTracks
+    let finalTracks
     
-    if (newTrackId && newTrackId !== trackId) {
-      updatedTracks = project.tracks.map(track => {
-        if (track.id === trackId) {
-          return {
-            ...track,
-            clips: track.clips.filter(c => c.id !== clipId)
-          }
-        }
-        if (track.id === newTrackId) {
-          const newClips = [...track.clips, updatedClip]
-          newClips.sort((a, b) => a.start - b.start)
-          return {
-            ...track,
-            clips: newClips
-          }
+    if (actualTrackId === targetTrackId) {
+      finalTracks = project.tracks.map(track => {
+        if (track.id === actualTrackId) {
+          const clips = track.clips.map(c => 
+            c.id === clipId ? updatedClip : c
+          )
+          clips.sort((a, b) => a.start - b.start)
+          return { ...track, clips }
         }
         return track
       })
     } else {
-      updatedTracks = project.tracks.map(track => {
-        if (track.id === trackId) {
-          const newClips = track.clips.map(clip => 
-            clip.id === clipId ? updatedClip : clip
-          )
-          newClips.sort((a, b) => a.start - b.start)
-          return {
-            ...track,
-            clips: newClips
-          }
+      const tracksWithoutClip = project.tracks.map(track => {
+        if (track.id === actualTrackId) {
+          return { ...track, clips: track.clips.filter(c => c.id !== clipId) }
+        }
+        return track
+      })
+      
+      finalTracks = tracksWithoutClip.map(track => {
+        if (track.id === targetTrackId) {
+          const clips = [...track.clips, updatedClip]
+          clips.sort((a, b) => a.start - b.start)
+          return { ...track, clips }
         }
         return track
       })
@@ -1276,30 +1126,29 @@ export function EditorProvider({ children, store, addToast }) {
     
     const updatedProject = {
       ...project,
-      tracks: updatedTracks,
+      tracks: finalTracks,
       updatedAt: Date.now()
     }
     
     setProject(updatedProject)
     projectRef.current = updatedProject
+    setIsDirty(true)
+    
+    const newDurations = { ...clipDurations }
+    if (updatedClip.duration) {
+      newDurations[clipId] = updatedClip.duration
+    }
+    setClipDurations(newDurations)
     
     if (store?.updateEditorProject) {
       store.updateEditorProject(updatedProject).catch(() => {})
     }
-    
-    setIsDirty(true)
-    console.log('✅ [EditorContext] Clip déplacé à', newStart)
-  }, [project, store])
+  }, [project, store, clipDurations])
 
   // ─── FONCTIONS EFFETS ──────────────────────────────────────────────────
 
   const addEffectToClip = useCallback(async (trackId, clipId, effectType, params = {}) => {
-    console.log('✨ [EditorContext] addEffectToClip:', { trackId, clipId, effectType, params })
-    
-    if (!project) {
-      console.error('❌ [EditorContext] Aucun projet')
-      return null
-    }
+    if (!project) return null
     
     const effect = {
       id: `effect-${Date.now()}`,
@@ -1338,13 +1187,10 @@ export function EditorProvider({ children, store, addToast }) {
     }
     
     setIsDirty(true)
-    console.log('✅ [EditorContext] Effet ajouté:', effect)
     return effect
   }, [project, store])
 
   const removeEffectFromClip = useCallback(async (trackId, clipId, effectId) => {
-    console.log('🗑️ [EditorContext] removeEffectFromClip:', { trackId, clipId, effectId })
-    
     if (!project) return
     
     const updatedProject = {
@@ -1377,16 +1223,10 @@ export function EditorProvider({ children, store, addToast }) {
     }
     
     setIsDirty(true)
-    console.log('✅ [EditorContext] Effet supprimé')
   }, [project, store])
 
   const updateEffectParam = useCallback(async (trackId, clipId, effectId, param, value) => {
-    console.log('📝 [EditorContext] updateEffectParam:', { trackId, clipId, effectId, param, value })
-    
-    if (!project) {
-      console.error('❌ [EditorContext] Aucun projet')
-      return
-    }
+    if (!project) return
     
     const updatedProject = {
       ...project,
@@ -1429,8 +1269,6 @@ export function EditorProvider({ children, store, addToast }) {
   }, [project, store])
 
   const toggleEffect = useCallback(async (trackId, clipId, effectId, enabled) => {
-    console.log('🔄 [EditorContext] toggleEffect:', { trackId, clipId, effectId, enabled })
-    
     if (!project) return
     
     const updatedProject = {
@@ -1470,20 +1308,11 @@ export function EditorProvider({ children, store, addToast }) {
     setIsDirty(true)
   }, [project, store])
 
-  // ─── FONCTIONS FADE ──────────────────────────────────────────────────
-
   const setClipFade = useCallback(async (trackId, clipId, edge, duration) => {
-    console.log('🌊 [EditorContext] setClipFade:', { trackId, clipId, edge, duration })
-    
-    if (!project) {
-      console.error('❌ [EditorContext] Aucun projet')
-      return
-    }
+    if (!project) return
     
     const clampedDuration = Math.max(0.05, Math.min(10, duration))
     const effectType = edge === 'in' ? 'fadeIn' : 'fadeOut'
-    
-    console.log(`🌊 [EditorContext] Application du fade ${edge} avec durée ${clampedDuration}s`)
     
     const updatedProject = {
       ...project,
@@ -1493,12 +1322,9 @@ export function EditorProvider({ children, store, addToast }) {
             ...track,
             clips: track.clips.map(clip => {
               if (clip.id === clipId) {
-                // ✅ Vérifier si un effet de fade existe déjà
                 const existingEffect = (clip.effects || []).find(e => e.type === effectType)
                 
                 if (existingEffect) {
-                  // ✅ Mettre à jour l'effet existant
-                  console.log(`🔄 [EditorContext] Mise à jour de l'effet ${effectType} existant`)
                   return {
                     ...clip,
                     effects: (clip.effects || []).map(e => {
@@ -1513,8 +1339,6 @@ export function EditorProvider({ children, store, addToast }) {
                     })
                   }
                 } else {
-                  // ✅ Ajouter un nouvel effet
-                  console.log(`➕ [EditorContext] Ajout d'un nouvel effet ${effectType}`)
                   return {
                     ...clip,
                     effects: [
@@ -1546,19 +1370,16 @@ export function EditorProvider({ children, store, addToast }) {
     }
     
     setIsDirty(true)
-    console.log(`✅ [EditorContext] Fade ${edge} appliqué: ${clampedDuration}s`)
   }, [project, store])
 
   // ─── FONCTIONS SELECTION ──────────────────────────────────────────────
 
   const selectClip = useCallback((clipId, trackId) => {
-    console.log('🎯 [EditorContext] selectClip:', clipId, trackId)
     setSelectedClipId(clipId)
     setSelectedTrackId(trackId)
   }, [])
 
   const deselectClip = useCallback(() => {
-    console.log('🎯 [EditorContext] deselectClip')
     setSelectedClipId(null)
     setSelectedTrackId(null)
   }, [])
@@ -1566,7 +1387,6 @@ export function EditorProvider({ children, store, addToast }) {
   // ─── FONCTIONS LOOP ──────────────────────────────────────────────────
 
   const setLoopRegionFn = useCallback((start, end) => {
-    console.log('🔄 [EditorContext] setLoopRegionFn:', start, end)
     setLoopRegion(prev => ({
       ...prev,
       start: Math.max(0, start),
@@ -1575,7 +1395,6 @@ export function EditorProvider({ children, store, addToast }) {
   }, [totalDuration])
 
   const toggleLoop = useCallback(() => {
-    console.log('🔄 [EditorContext] toggleLoop')
     setLoopRegion(prev => ({
       ...prev,
       enabled: !prev.enabled
@@ -1583,26 +1402,19 @@ export function EditorProvider({ children, store, addToast }) {
   }, [])
 
   const clearLoop = useCallback(() => {
-    console.log('🔄 [EditorContext] clearLoop')
     setLoopRegion({ enabled: false, start: 0, end: 10 })
   }, [])
 
   // ─── ZOOM ─────────────────────────────────────────────────────────────
 
   const handleZoomChange = useCallback((newZoom) => {
-    console.log('🔍 [EditorContext] handleZoomChange:', newZoom)
     setZoomLevel(Math.max(0.05, Math.min(10, newZoom)))
   }, [])
 
   // ─── FONCTIONS MARKERS ──────────────────────────────────────────────────
 
   const addMarker = useCallback((markerData) => {
-    console.log('📍 [EditorContext] addMarker:', markerData)
-    
-    if (!project) {
-      console.error('❌ [EditorContext] Aucun projet')
-      return null
-    }
+    if (!project) return null
     
     const newMarker = {
       id: `marker-${Date.now()}`,
@@ -1630,18 +1442,10 @@ export function EditorProvider({ children, store, addToast }) {
   }, [project, store, currentTime, addToast])
 
   const removeMarker = useCallback((markerId) => {
-    console.log('🗑️ [EditorContext] removeMarker:', markerId)
-    
-    if (!project) {
-      console.error('❌ [EditorContext] Aucun projet')
-      return
-    }
+    if (!project) return
     
     const markerToRemove = project.markers?.find(m => m.id === markerId)
-    if (!markerToRemove) {
-      console.error('❌ [EditorContext] Marqueur non trouvé:', markerId)
-      return
-    }
+    if (!markerToRemove) return
     
     const updatedProject = {
       ...project,
@@ -1661,12 +1465,7 @@ export function EditorProvider({ children, store, addToast }) {
   }, [project, store, addToast])
 
   const updateMarker = useCallback((markerId, updates) => {
-    console.log('✏️ [EditorContext] updateMarker:', markerId, updates)
-    
-    if (!project) {
-      console.error('❌ [EditorContext] Aucun projet')
-      return
-    }
+    if (!project) return
     
     const updatedProject = {
       ...project,
@@ -1690,14 +1489,12 @@ export function EditorProvider({ children, store, addToast }) {
   }, [project, store])
 
   const navigateToMarker = useCallback((time) => {
-    console.log('📍 [EditorContext] navigateToMarker:', time)
     seek(time)
   }, [seek])
 
   // ─── VALUE ──────────────────────────────────────────────────────────────
 
   const value = {
-    // États
     project,
     setProject,
     tracks: project?.tracks || [],
@@ -1731,56 +1528,41 @@ export function EditorProvider({ children, store, addToast }) {
     isAutoSaving,
     stopAtTime,
     setStopAtTime,
-    
-    // Fonctions Track
+    soloPlayClipId,
+    setSoloPlayClipId,
     addTrack,
     removeTrack,
     renameTrack,
     muteTrack,
     soloTrack,
     setTrackVolume,
-    
-    // Fonctions Clip
     addClip,
     addClipFromFile,
     removeClip,
     updateClip,
     duplicateClip,
     moveClip,
-    
-    // Fonctions Effets
     addEffectToClip,
     removeEffectFromClip,
     updateEffectParam,
     toggleEffect,
     setClipFade,
-    
-    // Playback
     play,
     pause,
     stop,
     seek,
     togglePlay,
-    
-    // Selection
+    playClipOnly,
     selectClip,
     deselectClip,
-    
-    // Loop
     toggleLoop,
     clearLoop,
-    
-    // Zoom
     handleZoomChange,
-    
-    // Fonctions Markers
     markers: project?.markers || [],
     addMarker,
     removeMarker,
     updateMarker,
     navigateToMarker,
-    
-    // Store
     store,
     addToast,
     t,

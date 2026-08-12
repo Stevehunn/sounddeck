@@ -1,5 +1,5 @@
 // src/features/editor/Editor.jsx
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { EditorProvider, useEditor } from './contexts/EditorContext'
@@ -8,7 +8,6 @@ import EditorToolbar from './components/Toolbar'
 import EditorEffectsPanel from './components/EffectsPanel'
 import EditorMasterVolume from './components/MasterVolume'
 import ClipActionsMenu from './components/ClipActionsMenu'
-import MarkersPanel from './components/Markers/MarkersPanel'
 import AddTrackModal from './components/Modals/AddTrackModal'
 import TrimModal from './components/Modals/TrimModal'
 import ExportModal from './components/Modals/ExportModal'
@@ -17,12 +16,7 @@ import { getClipById } from './utils'
 import { mixdownProject, exportMixdown } from '@shared/utils/mixdown'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
 
-console.log('📝 [Editor] Chargement du module Editor')
-
-// ─── COMPOSANT PRINCIPAL ──────────────────────────────────────────────────
-
 export default function Editor({ store, addToast }) {
-  console.log('📝 [Editor] Rendu du composant principal')
   return (
     <EditorProvider store={store} addToast={addToast}>
       <EditorContent />
@@ -30,10 +24,7 @@ export default function Editor({ store, addToast }) {
   )
 }
 
-// ─── COMPOSANT CONTENU ──────────────────────────────────────────────────────
-
 function EditorContent() {
-  console.log('📝 [Editor] Rendu de EditorContent')
   const { t } = useLanguage()
   const context = useEditor()
   
@@ -82,10 +73,7 @@ function EditorContent() {
   return <EditorTimelineContent />
 }
 
-// ─── COMPOSANT AVEC TOUTE LA LOGIQUE ──────────────────────────────────────
-
 function EditorTimelineContent() {
-  console.log('📝 [Editor] Rendu de EditorTimelineContent')
   const { t } = useLanguage()
   const context = useEditor()
   
@@ -131,6 +119,7 @@ function EditorTimelineContent() {
     setSnapEnabled,
     autoCrossfade,
     setAutoCrossfade,
+    playClipOnly,
   } = context
 
   // ─── ÉTATS LOCAUX ──────────────────────────────────────────────────────
@@ -146,11 +135,7 @@ function EditorTimelineContent() {
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportName, setExportName] = useState('')
   const [isExporting, setIsExporting] = useState(false)
-  const [exportFormat, setExportFormat] = useState('mp3')
-  const [exportBitrate, setExportBitrate] = useState(192)
   const [showEffectsPanel, setShowEffectsPanel] = useState(true)
-
-  // ✅ ÉTATS POUR L'IMPORT
   const [showImportModal, setShowImportModal] = useState(false)
   const [selectedImportTrackId, setSelectedImportTrackId] = useState('')
   const [pendingImportFile, setPendingImportFile] = useState(null)
@@ -159,21 +144,17 @@ function EditorTimelineContent() {
   // ─── HANDLERS ──────────────────────────────────────────────────────────
 
   const handleAddTrack = useCallback(() => {
-    console.log('➕ [Editor] handleAddTrack appelé')
     try {
       const trackIndex = tracks.length + 1
       const defaultName = t('editorTrackDefault').replace('{index}', trackIndex)
       setPendingTrackName(defaultName)
       setShowAddTrackModal(true)
     } catch (e) {
-      console.error('❌ [Editor] Erreur handleAddTrack:', e)
       addToast?.('Erreur lors de l\'ouverture du modal', 'error')
     }
   }, [tracks.length, t, addToast])
 
   const handleAddTrackConfirm = useCallback(async (name, color) => {
-    console.log('✅ [Editor] handleAddTrackConfirm:', name, color)
-    
     if (typeof addTrack !== 'function') {
       addToast?.('Erreur: addTrack non disponible', 'error')
       setShowAddTrackModal(false)
@@ -190,7 +171,6 @@ function EditorTimelineContent() {
       setShowAddTrackModal(false)
       return result
     } catch (e) {
-      console.error('❌ [Editor] Erreur handleAddTrackConfirm:', e)
       addToast?.('Erreur lors de l\'ajout de la piste: ' + e.message, 'error')
       setShowAddTrackModal(false)
       return null
@@ -227,19 +207,15 @@ function EditorTimelineContent() {
       await removeTrack(trackId)
       addToast?.(`Piste "${track.name}" supprimée`, 'info')
     } catch (e) {
-      console.error('❌ [Editor] Erreur handleRemoveTrack:', e)
       addToast?.('Erreur lors de la suppression', 'error')
     }
   }, [tracks, removeTrack, addToast])
 
   const handleAddClip = useCallback(async (trackId, soundId, startPosition) => {
-    console.log('🎵 [Editor] handleAddClip:', { trackId, soundId, startPosition })
     await addClip(trackId, soundId, startPosition)
   }, [addClip])
 
   const handleAddFileClick = useCallback(() => {
-    console.log('📁 [Editor] handleAddFileClick - Ouverture du modal d\'import')
-    
     if (tracks.length === 0) {
       addToast?.(t('editorNoTracks'), 'error')
       return
@@ -252,10 +228,7 @@ function EditorTimelineContent() {
   }, [tracks, addToast, t])
 
   const handleImportConfirm = useCallback(async ({ file, fileName, trackId, startTime }) => {
-    console.log('📁 [Editor] handleImportConfirm:', { fileName, trackId, startTime })
-    
     if (!file) {
-      console.error('❌ [Editor] Aucun fichier sélectionné')
       addToast?.('Aucun fichier sélectionné', 'error')
       return
     }
@@ -281,7 +254,6 @@ function EditorTimelineContent() {
       }
       
     } catch (e) {
-      console.error('❌ [Editor] Erreur import:', e)
       addToast?.(t('editorFileImportError') + ': ' + e.message, 'error')
     }
     
@@ -345,8 +317,6 @@ function EditorTimelineContent() {
       return
     }
     
-    console.log(`🎛️ [Editor] Prévisualisation des effets pour ${clip.name}`)
-    
     try {
       const { applyEffectsToBuffer } = await import('@shared/utils/realTimeEffects')
       
@@ -368,7 +338,6 @@ function EditorTimelineContent() {
       
       if (hasActiveEffects) {
         processedBuffer = applyEffectsToBuffer(audioBuffer, clip.effects, audioContext.sampleRate, true)
-        console.log('✅ [Editor] Effets appliqués pour la prévisualisation')
       }
       
       const source = audioContext.createBufferSource()
@@ -394,7 +363,6 @@ function EditorTimelineContent() {
       }, Math.min(processedBuffer.duration * 1000, 5000))
       
     } catch (e) {
-      console.error('❌ [Editor] Erreur prévisualisation effets:', e)
       addToast?.(t('editorEffectPreviewError') || 'Erreur lors de la prévisualisation', 'error')
     }
   }, [addToast, t])
@@ -402,7 +370,6 @@ function EditorTimelineContent() {
   // ─── HANDLERS MARKERS ──────────────────────────────────────────────────
 
   const handleAddMarker = useCallback((markerData) => {
-    console.log('📍 [Editor] handleAddMarker:', markerData)
     const { addMarker } = context
     if (addMarker) {
       addMarker(markerData)
@@ -412,7 +379,6 @@ function EditorTimelineContent() {
   }, [context, addToast])
 
   const handleRemoveMarker = useCallback((markerId) => {
-    console.log('🗑️ [Editor] handleRemoveMarker:', markerId)
     const { removeMarker } = context
     if (removeMarker) {
       removeMarker(markerId)
@@ -420,7 +386,6 @@ function EditorTimelineContent() {
   }, [context])
 
   const handleUpdateMarker = useCallback((markerId, updates) => {
-    console.log('✏️ [Editor] handleUpdateMarker:', markerId, updates)
     const { updateMarker } = context
     if (updateMarker) {
       updateMarker(markerId, updates)
@@ -428,7 +393,6 @@ function EditorTimelineContent() {
   }, [context])
 
   const handleNavigateToMarker = useCallback((time) => {
-    console.log('📍 [Editor] handleNavigateToMarker:', time)
     const { navigateToMarker } = context
     if (navigateToMarker) {
       navigateToMarker(time)
@@ -439,22 +403,13 @@ function EditorTimelineContent() {
 
   // ─── RACCOURCIS CLAVIER ──────────────────────────────────────────────
 
-  const undoEditor = store?.undoEditor || (() => {
-    console.log('ℹ️ Undo non disponible')
-    addToast?.('Undo non disponible', 'info')
-  })
-  
-  const redoEditor = store?.redoEditor || (() => {
-    console.log('ℹ️ Redo non disponible')
-    addToast?.('Redo non disponible', 'info')
-  })
-  
+  const undoEditor = store?.undoEditor || (() => addToast?.('Undo non disponible', 'info'))
+  const redoEditor = store?.redoEditor || (() => addToast?.('Redo non disponible', 'info'))
   const canUndo = store?.canUndoEditor || false
   const canRedo = store?.canRedoEditor || false
 
   useKeyboardShortcuts({
     onPlay: () => {
-      console.log('⌨️ Play')
       if (isPlaying) {
         pause()
       } else if (isPaused) {
@@ -469,8 +424,6 @@ function EditorTimelineContent() {
     onRedo: redoEditor,
     onAddTrack: handleAddTrack,
     onAddMarker: () => {
-      console.log('⌨️ Add Marker à', currentTime)
-      // Ajouter un marqueur à la position actuelle
       const markers = project?.markers || []
       const newMarker = {
         id: `marker-${Date.now()}`,
@@ -487,7 +440,6 @@ function EditorTimelineContent() {
       addToast?.('Marqueur ajouté', 'success')
     },
     onDelete: () => {
-      console.log('⌨️ Delete')
       if (selectedClipId && selectedTrackId) {
         removeClip(selectedTrackId, selectedClipId)
         addToast?.('Clip supprimé', 'info')
@@ -496,7 +448,6 @@ function EditorTimelineContent() {
       }
     },
     onSplit: () => {
-      console.log('⌨️ Split')
       if (selectedClipId && selectedTrackId) {
         addToast?.('Split pas encore implémenté', 'info')
       } else {
@@ -522,8 +473,6 @@ function EditorTimelineContent() {
     return `${m}:${s.toString().padStart(2, '0')}`
   }
 
-  console.log('⌨️ Raccourcis clavier actifs:', useKeyboardShortcuts({})?.shortcuts || {})
-
   return (
     <div style={{
       display: 'flex',
@@ -542,7 +491,7 @@ function EditorTimelineContent() {
         onAddTrack={handleAddTrack}
         onAddClip={handleAddClip}
         onAddFile={handleAddFileClick}
-        onPlay={togglePlay}
+        onPlay={handlePlayToggle}
         onStop={stop}
         onExport={handleExportClick}
         onUndo={undoEditor}
@@ -576,11 +525,11 @@ function EditorTimelineContent() {
           zoomLevel={zoomLevel}
           onZoomChange={handleZoomChange}
           onClipSelect={handleClipSelect}
-          onClipMove={store?.moveClip || context.moveClip || (() => {})}
+          onClipMove={context.moveClip}
           onClipUpdate={updateClip}
           onClipRemove={handleRemoveClip}
           onClipDuplicate={duplicateClip}
-          onClipFade={store?.setClipFade || context.setClipFade || (() => {})}
+          onClipFade={context.setClipFade || (() => {})}
           onClipContextMenu={handleClipContextMenu}
           onDragCheckpoint={store?.pushEditorHistoryCheckpoint || (() => {})}
           onTrackRemove={handleRemoveTrack}
@@ -594,7 +543,6 @@ function EditorTimelineContent() {
           onClearLoop={clearLoop}
           onToggleLoop={toggleLoop}
           onUpdateClipDuration={handleUpdateClipDuration}
-          // ✅ Props pour les marqueurs
           markers={context.markers}
           onAddMarker={handleAddMarker}
           onRemoveMarker={handleRemoveMarker}
@@ -603,28 +551,12 @@ function EditorTimelineContent() {
           tr={t}
           addToast={addToast}
           onPlayClip={(clip, trackId) => {
-            console.log('▶️ [Editor] Play clip (depuis Editor):', clip.name)
-            console.log('📊 [Editor] isPlaying:', isPlaying, 'currentTime:', currentTime)
-            
-            if (isPlaying) {
-              console.log('⏸️ [Editor] Lecture déjà en cours, pas de changement')
-              return
-            }
-            
-            const clipStart = clip.start || 0
-            const clipDuration = clipDurations[clip.id] || clip.duration || 3
-            const clipEnd = clipStart + clipDuration
-            
-            console.log('🎯 [Editor] Seek vers', clipStart)
-            seek?.(clipStart)
-            
-            context.setStopAtTime?.(clipEnd)
-            
-            setTimeout(() => {
-              console.log('▶️ [Editor] Démarrage playback, arrêt à', clipEnd)
-              togglePlay?.()
-            }, 50)
+            playClipOnly(clip, trackId)
           }}
+          onStopClip={stop}
+          onCopyClip={(clip) => {}}
+          onCutClip={(clip) => {}}
+          onPasteClip={(trackId) => {}}
         />
       </div>
 
@@ -708,29 +640,24 @@ function EditorTimelineContent() {
         document.body
       )}
 
+      {/* MODAL EXPORT */}
       {showExportModal && (
         <ExportModal
           isOpen={showExportModal}
           onClose={() => setShowExportModal(false)}
           onExport={async (options) => {
-            console.log('📤 [Editor] Export démarré avec options:', options)
             setIsExporting(true)
             
             try {
-              console.log('🎵 [Editor] Mixdown du projet...')
               const buffer = await mixdownProject(project, clipDurations, 44100)
               
               if (!buffer) {
                 throw new Error('Erreur lors du mixage')
               }
               
-              console.log('✅ [Editor] Mixdown terminé, durée:', buffer.duration)
-              
               const exportResults = []
               
               if (options.exportLocation === 'file' || options.exportLocation === 'both') {
-                console.log('📁 [Editor] Export en fichier...')
-                
                 const saveResult = await window.electronAPI.saveFileDialog?.(
                   options.outputPath || `${options.name}.${options.format === 'wav' ? 'wav' : options.format}`,
                   null
@@ -766,8 +693,6 @@ function EditorTimelineContent() {
               }
               
               if (options.exportLocation === 'library' || options.exportLocation === 'both') {
-                console.log('📚 [Editor] Ajout à la bibliothèque...')
-                
                 const tempPath = `temp_${Date.now()}.wav`
                 const tempResult = await exportMixdown(buffer, 'wav', 44100, tempPath)
                 
@@ -791,7 +716,6 @@ function EditorTimelineContent() {
               return { success: true, results: exportResults }
               
             } catch (e) {
-              console.error('❌ [Editor] Erreur export:', e)
               addToast?.(`${t('editorExportError')}: ${e.message}`, 'error')
               setIsExporting(false)
               return { success: false, error: e.message }
@@ -804,6 +728,7 @@ function EditorTimelineContent() {
         />
       )}
 
+      {/* CLIP ACTIONS MENU */}
       {clipMenu && (
         <ClipActionsMenu
           clip={selectedClipForMenu ? getClipById(tracks, selectedClipForMenu) : null}

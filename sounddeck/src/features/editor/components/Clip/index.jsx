@@ -1,11 +1,11 @@
 // src/features/editor/components/Clip/index.jsx
-import React, { useState, useRef, useCallback, memo, useEffect } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import ClipWaveform from './ClipWaveform'
 import ClipFadeHandles from './ClipFadeHandles'
 import ClipResizeHandles from './ClipResizeHandles'
 import ClipActions from './ClipActions'
 
-const EditorClip = memo(({
+const EditorClip = ({
   clip,
   duration,
   start,
@@ -13,7 +13,7 @@ const EditorClip = memo(({
   trackColor,
   isSelected,
   pixelsPerSecond,
-  snapEnabled,  // ✅ AJOUTÉ
+  snapEnabled,
   onSelect,
   onMove,
   onUpdate,
@@ -34,97 +34,147 @@ const EditorClip = memo(({
 }) => {
   const [isDragging, setIsDragging] = useState(false)
   const [dragStartX, setDragStartX] = useState(0)
-  const [dragStartTime, setDragStartTime] = useState(0)
   const [dragMode, setDragMode] = useState('move')
   const [isHovering, setIsHovering] = useState(false)
   const [isClipPlaying, setIsClipPlaying] = useState(false)
+  
+  const [localStart, setLocalStart] = useState(start)
+  
   const clipRef = useRef(null)
   const dragStartClipId = useRef(null)
+  const frameIdRef = useRef(null)
+  const dragStartTimeRef = useRef(start)
+  const accumulatedDeltaRef = useRef(0)
+  const lastClientXRef = useRef(0)
+  const isDraggingRef = useRef(false)
+  const hasMovedRef = useRef(false)
 
   const clipWidth = Math.max(duration * pixelsPerSecond, 20)
-  const clipLeft = start * pixelsPerSecond
+  const clipLeft = localStart * pixelsPerSecond
+  const SNAP_VALUE = 0.01
+  const DRAG_SENSITIVITY = 1.0
 
-  // ✅ Valeur de snap (0.1 seconde)
-  const SNAP_VALUE = 0.1
+  useEffect(() => {
+    if (!isDragging) {
+      setLocalStart(start)
+      dragStartTimeRef.current = start
+    }
+  }, [start, isDragging])
 
-  // Calculer si le clip est en cours de lecture
+  useEffect(() => {
+    if (isDragging) {
+      dragStartTimeRef.current = start
+    }
+  }, [start, isDragging])
+
   useEffect(() => {
     setIsClipPlaying(isPlaying && currentTime >= start && currentTime <= start + duration)
   }, [isPlaying, currentTime, start, duration])
 
-  // Calculer si le curseur doit être affiché
-  const showPlayhead = currentTime >= start && currentTime <= start + duration
-
-  // Calculer la position du curseur en pixels
   const playheadPosition = Math.max(0, Math.min((currentTime - start) * pixelsPerSecond, clipWidth - 2))
 
   const handleMouseDown = (e) => {
     if (e.button !== 0) return
     
     const target = e.target
-    const isResizeStart = target.dataset.resize === 'start'
-    const isResizeEnd = target.dataset.resize === 'end'
+    const isResizeStart = target.dataset?.resize === 'start' || target.closest?.('[data-resize="start"]')
+    const isResizeEnd = target.dataset?.resize === 'end' || target.closest?.('[data-resize="end"]')
     
     if (isResizeStart || isResizeEnd) {
       setDragMode(isResizeStart ? 'resize-start' : 'resize-end')
-    } else {
-      setDragMode('move')
-      onSelect?.(clip.id)
-      dragStartClipId.current = clip.id
+      setIsDragging(true)
+      isDraggingRef.current = true
+      setDragStartX(e.clientX)
+      lastClientXRef.current = e.clientX
+      accumulatedDeltaRef.current = 0
+      hasMovedRef.current = false
+      dragStartTimeRef.current = start
+      e.stopPropagation()
+      e.preventDefault()
+      return
     }
     
+    const isActionButton = target.closest?.('.delete-button') || 
+                          target.closest?.('[data-action]') ||
+                          target.closest?.('button')
+    
+    if (isActionButton) {
+      e.stopPropagation()
+      e.preventDefault()
+      return
+    }
+    
+    onSelect?.(clip.id)
+    dragStartClipId.current = clip.id
     setIsDragging(true)
+    isDraggingRef.current = true
     setDragStartX(e.clientX)
-    setDragStartTime(start)
+    lastClientXRef.current = e.clientX
+    accumulatedDeltaRef.current = 0
+    hasMovedRef.current = false
+    dragStartTimeRef.current = start
+    
     e.stopPropagation()
     e.preventDefault()
   }
 
   const handleMouseMove = useCallback((e) => {
-    if (!isDragging) return
+    if (!isDraggingRef.current) return
     
-    const deltaX = (e.clientX - dragStartX) / pixelsPerSecond
-    
-    if (dragMode === 'move') {
-      let newStart = Math.max(0, dragStartTime + deltaX)
-      // ✅ Appliquer le snap si activé
-      if (snapEnabled) {
-        newStart = Math.round(newStart / SNAP_VALUE) * SNAP_VALUE
-        newStart = Math.round(newStart * 100) / 100
-      }
-      if (onMove && dragStartClipId.current) {
-        onMove(dragStartClipId.current, newStart, trackId)
-      }
-    } else if (dragMode === 'resize-start') {
-      let newStart = Math.max(0, dragStartTime + deltaX)
-      // ✅ Appliquer le snap pour le resize-start
-      if (snapEnabled) {
-        newStart = Math.round(newStart / SNAP_VALUE) * SNAP_VALUE
-        newStart = Math.round(newStart * 100) / 100
-      }
-      const newDuration = duration + (dragStartTime - newStart)
-      if (newDuration > 0.05) {
-        onUpdate?.(clip.id, { start: newStart, duration: newDuration })
-        onUpdateDuration?.(clip.id, newDuration)
-      }
-    } else if (dragMode === 'resize-end') {
-      let newDuration = Math.max(0.05, duration + deltaX)
-      // ✅ Appliquer le snap pour le resize-end
-      if (snapEnabled) {
-        newDuration = Math.round(newDuration / SNAP_VALUE) * SNAP_VALUE
-        newDuration = Math.round(newDuration * 100) / 100
-      }
-      onUpdate?.(clip.id, { duration: newDuration })
-      onUpdateDuration?.(clip.id, newDuration)
+    if (frameIdRef.current) {
+      cancelAnimationFrame(frameIdRef.current)
+      frameIdRef.current = null
     }
-  }, [isDragging, dragMode, dragStartX, dragStartTime, duration, pixelsPerSecond, clip.id, onMove, onUpdate, onUpdateDuration, trackId, snapEnabled])
+    
+    frameIdRef.current = requestAnimationFrame(() => {
+      const deltaPixels = e.clientX - lastClientXRef.current
+      lastClientXRef.current = e.clientX
+      
+      accumulatedDeltaRef.current += deltaPixels
+      
+      const totalDeltaSeconds = (accumulatedDeltaRef.current / pixelsPerSecond) * DRAG_SENSITIVITY
+      let newStart = Math.max(0, dragStartTimeRef.current + totalDeltaSeconds)
+      
+      if (snapEnabled) {
+        newStart = Math.round(newStart / SNAP_VALUE) * SNAP_VALUE
+        newStart = Math.round(newStart * 1000) / 1000
+      }
+      
+      if (Math.abs(accumulatedDeltaRef.current) > 1) {
+        hasMovedRef.current = true
+      }
+      
+      setLocalStart(newStart)
+      
+      frameIdRef.current = null
+    })
+  }, [pixelsPerSecond, snapEnabled])
 
   const handleMouseUp = useCallback(() => {
-    if (isDragging) {
-      setIsDragging(false)
-      dragStartClipId.current = null
+    if (!isDraggingRef.current) return
+    
+    if (frameIdRef.current) {
+      cancelAnimationFrame(frameIdRef.current)
+      frameIdRef.current = null
     }
-  }, [isDragging])
+    
+    const finalStart = localStart
+    
+    if (hasMovedRef.current && onMove && dragStartClipId.current) {
+      onMove(
+        dragStartClipId.current,
+        finalStart,
+        null,
+        { skipHistory: true }
+      )
+    }
+    
+    setIsDragging(false)
+    isDraggingRef.current = false
+    dragStartClipId.current = null
+    accumulatedDeltaRef.current = 0
+    hasMovedRef.current = false
+  }, [localStart, onMove])
 
   useEffect(() => {
     if (isDragging) {
@@ -134,6 +184,11 @@ const EditorClip = memo(({
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      
+      if (frameIdRef.current) {
+        cancelAnimationFrame(frameIdRef.current)
+        frameIdRef.current = null
+      }
     }
   }, [isDragging, handleMouseMove, handleMouseUp])
 
@@ -142,50 +197,42 @@ const EditorClip = memo(({
     return `color-mix(in srgb, ${baseColor} ${opacity * 100}%, var(--bg-secondary))`
   }
 
-  // Handlers avec ordre correct (clipId, trackId)
   const handlePlay = (e) => {
     e?.stopPropagation?.()
-    console.log('▶️ [Clip] Jouer:', clip.name, 'à', start)
-    if (onPlayClip) {
-      onPlayClip(clip, trackId)
-    }
+    onPlayClip?.(clip, trackId)
   }
 
   const handleStop = (e) => {
     e?.stopPropagation?.()
-    console.log('⏹️ [Clip] Arrêter:', clip.name)
     onStopClip?.(clip.id)
   }
 
   const handleDuplicate = (clipId, trackId) => {
-    console.log('📋 [Clip] Dupliquer:', clipId, trackId)
     if (onDuplicate && clipId && trackId) {
       onDuplicate(clipId, trackId)
     }
   }
 
-  const handleRemove = (clipId, trackId) => {
-    console.log('🗑️ [Clip] Supprimer:', clipId, trackId)
+  const handleRemove = (trackId, clipId) => {
     if (onRemove && clipId && trackId) {
-      onRemove(clipId, trackId)
+      onRemove(trackId, clipId)
     }
   }
 
   const handleCopy = (e) => {
     e?.stopPropagation?.()
-    console.log('📋 [Clip] Copier:', clip.name)
     onCopyClip?.(clip)
   }
 
   const handleCut = (e) => {
     e?.stopPropagation?.()
-    console.log('✂️ [Clip] Couper:', clip.name)
     onCutClip?.(clip)
   }
 
   return (
     <div
       ref={clipRef}
+      className="editor-clip-wrapper"
       style={{
         position: 'absolute',
         top: 4,
@@ -197,12 +244,13 @@ const EditorClip = memo(({
         border: `2px solid ${isSelected ? 'var(--accent)' : trackColor}`,
         borderRadius: 6,
         cursor: isDragging ? 'grabbing' : 'grab',
-        transition: isDragging ? 'none' : 'border-color 0.15s, box-shadow 0.15s',
+        transition: isDragging ? 'none' : 'border-color 0.15s, box-shadow 0.15s, left 0.05s ease',
         boxShadow: isSelected ? '0 0 20px rgba(124,111,247,0.3)' : 'none',
-        zIndex: isSelected ? 3 : 1,
-        opacity: isDragging ? 0.7 : 1,
+        zIndex: isDragging ? 10 : isSelected ? 3 : 2,
+        opacity: isDragging ? 0.8 : 1,
         overflow: 'hidden',
-        userSelect: 'none'
+        userSelect: 'none',
+        pointerEvents: 'auto',
       }}
       onMouseDown={handleMouseDown}
       onContextMenu={(e) => {
@@ -339,15 +387,23 @@ const EditorClip = memo(({
           e.stopPropagation()
           setDragMode('resize-start')
           setIsDragging(true)
+          isDraggingRef.current = true
           setDragStartX(e.clientX)
-          setDragStartTime(start)
+          lastClientXRef.current = e.clientX
+          accumulatedDeltaRef.current = 0
+          hasMovedRef.current = false
+          dragStartTimeRef.current = start
         }}
         onResizeEnd={(e) => {
           e.stopPropagation()
           setDragMode('resize-end')
           setIsDragging(true)
+          isDraggingRef.current = true
           setDragStartX(e.clientX)
-          setDragStartTime(start)
+          lastClientXRef.current = e.clientX
+          accumulatedDeltaRef.current = 0
+          hasMovedRef.current = false
+          dragStartTimeRef.current = start
         }}
       />
 
@@ -361,8 +417,7 @@ const EditorClip = memo(({
         tr={tr}
       />
 
-      {/* CURSEUR DU CLIP - Position exacte en pixels */}
-      {showPlayhead && (
+      {isPlaying && currentTime >= start && currentTime <= start + duration && (
         <div style={{
           position: 'absolute',
           left: playheadPosition,
@@ -378,8 +433,6 @@ const EditorClip = memo(({
       )}
     </div>
   )
-})
-
-EditorClip.displayName = 'EditorClip'
+}
 
 export default EditorClip

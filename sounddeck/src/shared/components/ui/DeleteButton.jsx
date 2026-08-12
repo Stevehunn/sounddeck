@@ -3,26 +3,10 @@ import React, { useState } from 'react'
 import useConfirm from '@shared/hooks/useConfirm'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
-/**
- * Bouton Supprimer générique avec popup de confirmation
- * Utilise le système de confirmation existant de l'application
- * 
- * @param {Object} props
- * @param {Function} props.onDelete - Fonction appelée lors de la confirmation
- * @param {string} props.confirmTitle - Titre de la popup de confirmation
- * @param {string} props.confirmMessage - Message de confirmation
- * @param {string} props.itemName - Nom de l'élément à supprimer
- * @param {string} props.size - 'sm' | 'md' | 'lg'
- * @param {string} props.className - Classes CSS supplémentaires
- * @param {boolean} props.disabled - Désactiver le bouton
- * @param {string} props.icon - Icône personnalisée (défaut: ti-trash)
- * @param {string} props.label - Label du bouton (défaut: 'Supprimer')
- * @param {boolean} props.showLabel - Afficher le label à côté de l'icône
- * @param {string} props.variant - 'danger' | 'ghost' | 'outline' (défaut: 'ghost')
- * @param {string} props.type - 'danger' | 'warning' | 'info' (défaut: 'danger')
- */
 const DeleteButton = ({
   onDelete,
+  onConfirmStart,
+  onConfirmEnd,
   confirmTitle = 'Confirmer la suppression',
   confirmMessage = 'Voulez-vous vraiment supprimer cet élément ?',
   itemName = '',
@@ -34,41 +18,56 @@ const DeleteButton = ({
   showLabel = false,
   variant = 'ghost',
   type = 'danger',
+  style = {},
 }) => {
   const { t, currentLang } = useLanguage()
   const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
   const [isHovering, setIsHovering] = useState(false)
+  const [isConfirming, setIsConfirming] = useState(false)
 
   const handleClick = async (e) => {
     e?.stopPropagation?.()
     
-    const confirmed = await confirm({
-      title: confirmTitle,
-      message: confirmMessage + (itemName ? ` "${itemName}"` : ''),
-      type: type,
-      confirmText: label,
-      cancelText: t('cancel') || 'Annuler',
-    })
+    setIsConfirming(true)
+    if (onConfirmStart) {
+      onConfirmStart()
+    }
     
-    if (confirmed) {
-      onDelete?.()
+    try {
+      const confirmed = await confirm({
+        title: confirmTitle,
+        message: confirmMessage + (itemName ? ` "${itemName}"` : ''),
+        type: type,
+        confirmText: label,
+        cancelText: t('cancel') || 'Annuler',
+      })
+      
+      if (confirmed) {
+        onDelete?.()
+      }
+    } catch (err) {
+      // Ignorer les erreurs
+    } finally {
+      setIsConfirming(false)
+      if (onConfirmEnd) {
+        onConfirmEnd()
+      }
     }
   }
 
-  // Styles selon la variante
   const getVariantStyles = () => {
     switch (variant) {
       case 'ghost':
         return {
-          background: isHovering ? 'rgba(224, 82, 82, 0.1)' : 'transparent',
+          backgroundColor: isHovering ? 'rgba(224, 82, 82, 0.1)' : 'transparent',
           color: isHovering ? 'var(--danger)' : 'var(--text-secondary)',
-          borderWidth: isHovering ? '1px' : '1px',
+          borderWidth: '1px',
           borderStyle: 'solid',
           borderColor: isHovering ? 'var(--danger)' : 'transparent',
         }
       case 'outline':
         return {
-          background: isHovering ? 'rgba(224, 82, 82, 0.1)' : 'transparent',
+          backgroundColor: isHovering ? 'rgba(224, 82, 82, 0.1)' : 'transparent',
           color: isHovering ? 'var(--danger)' : 'var(--danger)',
           borderWidth: '1px',
           borderStyle: 'solid',
@@ -77,9 +76,11 @@ const DeleteButton = ({
       case 'danger':
       default:
         return {
-          background: isHovering ? '#c0392b' : 'var(--danger)',
+          backgroundColor: isHovering ? '#c0392b' : 'var(--danger)',
           color: 'white',
-          border: 'none',
+          borderWidth: '0px',
+          borderStyle: 'none',
+          borderColor: 'transparent',
           boxShadow: isHovering 
             ? '0 4px 15px rgba(224, 82, 82, 0.4)' 
             : '0 2px 8px rgba(224, 82, 82, 0.2)',
@@ -87,7 +88,6 @@ const DeleteButton = ({
     }
   }
 
-  // Taille du bouton
   const getSizeStyles = () => {
     switch (size) {
       case 'lg':
@@ -102,6 +102,7 @@ const DeleteButton = ({
 
   const variantStyles = getVariantStyles()
   const sizeStyles = getSizeStyles()
+  const isDisabled = disabled || isConfirming
 
   return (
     <>
@@ -110,22 +111,23 @@ const DeleteButton = ({
         onClick={handleClick}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
-        disabled={disabled}
+        disabled={isDisabled}
         style={{
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
           gap: 4,
           borderRadius: 'var(--radius-sm)',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          opacity: disabled ? 0.5 : 1,
+          cursor: isDisabled ? 'default' : 'pointer',
+          opacity: isDisabled ? 0.5 : 1,
           transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-          transform: isHovering && !disabled ? 'scale(1.05)' : 'scale(1)',
+          transform: isHovering && !isDisabled ? 'scale(1.05)' : 'scale(1)',
           outline: 'none',
           fontFamily: 'inherit',
           fontWeight: 500,
           ...variantStyles,
           ...sizeStyles,
+          ...style,
         }}
         title={label}
       >

@@ -1,8 +1,8 @@
 // src/features/editor/components/Track/index.jsx
-import React, { useState, useRef, useCallback, memo } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import EditorClip from '../Clip'
 
-const EditorTrack = memo(({
+const EditorTrack = ({
   track,
   trackIndex,
   totalDuration,
@@ -23,7 +23,7 @@ const EditorTrack = memo(({
   clipDurations,
   onUpdateClipDuration,
   trackColor,
-  snapEnabled,  // ✅ AJOUTÉ
+  snapEnabled,
   tr,
   onPlayClip,
   onStopClip,
@@ -37,8 +37,25 @@ const EditorTrack = memo(({
   const [dragStartTime, setDragStartTime] = useState(0)
   
   const trackRef = useRef(null)
+  
+  const [clipVersion, setClipVersion] = useState(0)
+  const prevClipPositions = useRef({})
 
-  // Utiliser trackColor s'il est fourni, sinon générer
+  useEffect(() => {
+    let changed = false
+    for (const clip of track.clips) {
+      const key = clip.id
+      const pos = clip.start
+      if (prevClipPositions.current[key] !== pos) {
+        prevClipPositions.current[key] = pos
+        changed = true
+      }
+    }
+    if (changed) {
+      setClipVersion(prev => prev + 1)
+    }
+  }, [track.clips])
+
   const getTrackColor = useCallback((index) => {
     if (trackColor) return trackColor
     const colors = [
@@ -89,7 +106,7 @@ const EditorTrack = memo(({
     }
   }, [isDragging, onDragCheckpoint])
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove)
       document.addEventListener('mouseup', handleMouseUp)
@@ -102,39 +119,31 @@ const EditorTrack = memo(({
 
   const color = getTrackColor(trackIndex)
 
-  // Handlers avec ordre correct (clipId, trackId)
   const handleClipSelect = useCallback((clipId) => {
-    console.log('🎯 [Track] handleClipSelect:', clipId)
     onClipSelect?.(clipId, track.id)
   }, [onClipSelect, track.id])
 
-  const handleClipMove = useCallback((clipId, newStart, newTrackId) => {
-    console.log('🔄 [Track] handleClipMove:', { clipId, newStart, newTrackId })
-    onClipMove?.(track.id, clipId, newStart, newTrackId)
+  const handleClipMove = useCallback((clipId, newStart, newTrackId, options) => {
+    onClipMove?.(track.id, clipId, newStart, newTrackId, options)
   }, [onClipMove, track.id])
 
   const handleClipUpdate = useCallback((clipId, updates) => {
-    console.log('✏️ [Track] handleClipUpdate:', { clipId, updates })
     onClipUpdate?.(track.id, clipId, updates)
   }, [onClipUpdate, track.id])
 
-  const handleClipRemove = useCallback((clipId) => {
-    console.log('🗑️ [Track] handleClipRemove:', clipId)
-    onClipRemove?.(clipId, track.id)
-  }, [onClipRemove, track.id])
+  const handleClipRemove = useCallback((trackId, clipId) => {
+    onClipRemove?.(trackId, clipId)
+  }, [onClipRemove])
 
   const handleClipDuplicate = useCallback((clipId) => {
-    console.log('📋 [Track] handleClipDuplicate:', clipId)
     onClipDuplicate?.(clipId, track.id)
   }, [onClipDuplicate, track.id])
 
   const handleClipFade = useCallback((clipId, edge, duration) => {
-    console.log('🌊 [Track] handleClipFade:', { clipId, edge, duration })
     onClipFade?.(track.id, clipId, edge, duration)
   }, [onClipFade, track.id])
 
   const handleUpdateClipDuration = useCallback((clipId, newDuration) => {
-    console.log('📏 [Track] handleUpdateClipDuration:', { clipId, newDuration })
     onUpdateClipDuration?.(clipId, newDuration)
   }, [onUpdateClipDuration])
 
@@ -158,9 +167,11 @@ const EditorTrack = memo(({
         const clipStart = clip.start || 0
         const isSelected = selectedClipId === clip.id
 
+        const clipKey = `${clip.id}-${clipStart.toFixed(4)}-${clipVersion}`
+
         return (
           <EditorClip
-            key={clip.id}
+            key={clipKey}
             clip={clip}
             duration={duration}
             start={clipStart}
@@ -168,7 +179,7 @@ const EditorTrack = memo(({
             trackColor={color}
             isSelected={isSelected}
             pixelsPerSecond={pixelsPerSecond}
-            snapEnabled={snapEnabled}  // ✅ AJOUTÉ
+            snapEnabled={snapEnabled}
             onSelect={handleClipSelect}
             onMove={handleClipMove}
             onUpdate={handleClipUpdate}
@@ -193,8 +204,6 @@ const EditorTrack = memo(({
       })}
     </div>
   )
-})
-
-EditorTrack.displayName = 'EditorTrack'
+}
 
 export default EditorTrack

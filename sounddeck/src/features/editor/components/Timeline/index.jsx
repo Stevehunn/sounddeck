@@ -73,13 +73,6 @@ export default function EditorTimeline({
   onUpdateMarker,
   onNavigateToMarker,
 }) {
-  console.log('🔍 [Timeline] Contexte:', {
-    hasTracks: !!tracks,
-    trackCount: tracks?.length || 0,
-    hasOnPlayClip: !!onPlayClip,
-    markersCount: markers?.length || 0,
-  })
-
   const containerRef = useRef(null)
   const clipsContainerRef = useRef(null)
   const rulerRef = useRef(null)
@@ -105,7 +98,6 @@ export default function EditorTimeline({
     return colors[index % colors.length]
   }
 
-  // ✅ Fonction pour convertir une position X en temps
   const clientXToTime = useCallback((clientX, containerElement) => {
     const container = containerElement || clipsContainerRef.current
     if (!container) return 0
@@ -116,9 +108,7 @@ export default function EditorTimeline({
     return clampedX / pixelsPerSecond
   }, [totalWidth, pixelsPerSecond])
 
-  // ✅ Handler pour le clic sur la timeline (ruler ou zone des pistes)
   const handleTimelineClick = useCallback((e) => {
-    // Ne pas traiter si on a cliqué sur un clip ou un bouton
     const target = e.target
     if (target.closest?.('.editor-clip-wrapper') || target.closest?.('button')) {
       return
@@ -126,14 +116,11 @@ export default function EditorTimeline({
     
     const time = clientXToTime(e.clientX)
     if (time >= 0 && time <= totalDuration) {
-      console.log('🎯 [Timeline] Clic à', time.toFixed(2), 's')
       onSeek?.(time)
     }
   }, [clientXToTime, totalDuration, onSeek])
 
-  // ✅ Handler pour le clic sur la règle
   const handleRulerClick = useCallback((e) => {
-    // Si c'est un double-clic, on laisse le double-clic gérer le zoom
     if (e.detail === 2) {
       const time = clientXToTime(e.clientX, rulerRef.current)
       onSeek?.(time)
@@ -142,17 +129,10 @@ export default function EditorTimeline({
     
     const time = clientXToTime(e.clientX, rulerRef.current)
     if (time >= 0 && time <= totalDuration) {
-      console.log('🎯 [Timeline] Clic sur règle à', time.toFixed(2), 's')
       onSeek?.(time)
     }
   }, [clientXToTime, totalDuration, onSeek])
 
-  // ✅ Handler pour le double-clic sur la règle
-  const handleRulerDoubleClick = useCallback((e) => {
-    // Le double-clic est géré par handleRulerClick via e.detail === 2
-  }, [])
-
-  // ✅ Rendre les repères des marqueurs sur la règle
   const renderMarkerMarkers = () => {
     if (!markers || markers.length === 0) return null
     
@@ -176,7 +156,6 @@ export default function EditorTimeline({
           }}
           title={`${marker.name} (${formatTime(marker.time)})`}
         >
-          {/* Petite pointe en haut */}
           <div style={{
             position: 'absolute',
             top: 0,
@@ -189,7 +168,6 @@ export default function EditorTimeline({
             borderTop: `6px solid ${marker.color || '#3b82f6'}`
           }} />
           
-          {/* Étiquette du marqueur sur la règle */}
           <div style={{
             position: 'absolute',
             top: 6,
@@ -211,7 +189,6 @@ export default function EditorTimeline({
             {marker.name.length > 8 ? marker.name.slice(0, 8) + '…' : marker.name}
           </div>
           
-          {/* Ligne verticale sur toute la hauteur des pistes */}
           <div style={{
             position: 'absolute',
             top: 20,
@@ -228,7 +205,6 @@ export default function EditorTimeline({
     })
   }
 
-  // Effet pour la molette de zoom
   useEffect(() => {
     const clipsContainer = clipsContainerRef.current
     if (!clipsContainer) return
@@ -249,7 +225,6 @@ export default function EditorTimeline({
     return () => clipsContainer.removeEventListener('wheel', onWheel)
   }, [zoomLevel, onZoomChange])
 
-  // Générer une clé pour chaque piste
   const getTrackKey = (track) => {
     const clipPositions = track.clips.map(c => `${c.id}:${c.start.toFixed(3)}`).join('|')
     return `${track.id}-${clipPositions}`
@@ -268,7 +243,7 @@ export default function EditorTimeline({
         position: 'relative'
       }}
     >
-      {/* Ruler - avec clic pour seek */}
+      {/* Ruler */}
       <div style={{
         display: 'flex',
         height: 36,
@@ -295,7 +270,6 @@ export default function EditorTimeline({
             cursor: 'pointer'
           }}
           onClick={handleRulerClick}
-          onDoubleClick={handleRulerDoubleClick}
         >
           <TimelineRuler
             totalDuration={totalDuration}
@@ -311,8 +285,6 @@ export default function EditorTimeline({
             isPlaying={isPlaying}
             formatTime={formatTime}
           />
-          
-          {/* ✅ Repères des marqueurs sur la règle */}
           {renderMarkerMarkers()}
         </div>
       </div>
@@ -422,7 +394,7 @@ export default function EditorTimeline({
           })}
         </div>
 
-        {/* Clips - avec repères des marqueurs */}
+        {/* Clips */}
         <div
           ref={clipsContainerRef}
           style={{
@@ -440,7 +412,6 @@ export default function EditorTimeline({
             width: Math.max(totalWidth, 600),
             height: '100%'
           }}>
-            {/* ✅ Lignes verticales des marqueurs sur les pistes */}
             {markers && markers.length > 0 && markers.map((marker) => {
               const position = marker.time * pixelsPerSecond
               if (position > totalWidth) return null
@@ -503,7 +474,7 @@ export default function EditorTimeline({
           </div>
         </div>
 
-        {/* ✅ PANEL DES MARQUEURS - côté droit */}
+        {/* Markers Panel */}
         {showMarkersPanel && onAddMarker && (
           <div style={{
             width: 280,
@@ -516,7 +487,6 @@ export default function EditorTimeline({
             display: 'flex',
             flexDirection: 'column'
           }}>
-            {/* En-tête du panneau avec bouton de fermeture */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -562,7 +532,6 @@ export default function EditorTimeline({
               </button>
             </div>
 
-            {/* Contenu du panneau */}
             <div style={{
               flex: 1,
               overflow: 'auto',
@@ -582,7 +551,6 @@ export default function EditorTimeline({
           </div>
         )}
 
-        {/* ✅ Bouton pour ouvrir le panneau des marqueurs s'il est caché */}
         {!showMarkersPanel && onAddMarker && (
           <button
             className="btn-secondary btn-sm"
