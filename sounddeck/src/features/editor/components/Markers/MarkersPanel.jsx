@@ -1,7 +1,6 @@
 // src/features/editor/components/Markers/MarkersPanel.jsx
-import React, { useState, useCallback, memo } from 'react'
+import React, { useState, useCallback, memo, useEffect } from 'react'
 import MarkerItem from './MarkerItem'
-import MarkerAddForm from './MarkerAddForm'
 
 const MARKER_COLORS = [
   { id: 'red', color: '#ef4444' },
@@ -17,48 +16,88 @@ const MARKER_COLORS = [
 ]
 
 const MarkersPanel = memo(({
-  markers,
+  markers = [],
   onAddMarker,
   onRemoveMarker,
   onUpdateMarker,
   onNavigateToMarker,
-  currentTime,
-  totalDuration,
+  currentTime = 0,
+  totalDuration = 60,
   tr
 }) => {
   const [isAdding, setIsAdding] = useState(false)
-  const [selectedColor, setSelectedColor] = useState('blue')
+  const [selectedColor, setSelectedColor] = useState('#3b82f6')
+  const [showColorPicker, setShowColorPicker] = useState(false)
+  const [markerName, setMarkerName] = useState('')
 
-  const handleAddMarker = (name) => {
-    const color = MARKER_COLORS.find(c => c.id === selectedColor)
-    onAddMarker?.({
-      name: name || `Marker ${(markers?.length || 0) + 1}`,
-      time: currentTime || 0,
-      color: color?.color || '#3b82f6'
-    })
+  const handleAddMarker = useCallback(() => {
+    if (onAddMarker) {
+      const name = markerName.trim() || `Marker ${(markers?.length || 0) + 1}`
+      onAddMarker({
+        name,
+        time: currentTime || 0,
+        color: selectedColor
+      })
+      setMarkerName('')
+      setIsAdding(false)
+    }
+  }, [onAddMarker, selectedColor, currentTime, markers?.length, markerName])
+
+  const handleCancel = useCallback(() => {
     setIsAdding(false)
-  }
+    setMarkerName('')
+  }, [])
 
-  const handleAddAtCurrentTime = () => {
+  const handleAddAtCurrentTime = useCallback(() => {
     setIsAdding(true)
-  }
+    setMarkerName(`Marker ${(markers?.length || 0) + 1}`)
+  }, [markers?.length])
 
   const sortedMarkers = markers ? [...markers].sort((a, b) => a.time - b.time) : []
+
+  // Raccourci clavier Ctrl+M
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
+        e.preventDefault()
+        handleAddAtCurrentTime()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [handleAddAtCurrentTime])
+
+  if (!onAddMarker) {
+    return (
+      <div style={{
+        padding: 12,
+        color: 'var(--text-tertiary)',
+        fontSize: 12,
+        textAlign: 'center'
+      }}>
+        Marqueurs non disponibles
+      </div>
+    )
+  }
 
   return (
     <div style={{
       background: 'var(--bg-secondary)',
-      border: '1px solid var(--border)',
       borderRadius: 'var(--radius-md)',
       padding: 12,
-      maxHeight: 300,
-      overflow: 'auto'
+      maxHeight: '100%',
+      overflow: 'auto',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 8
     }}>
+      {/* En-tête */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 12
+        flexShrink: 0,
+        gap: 8
       }}>
         <div style={{
           fontSize: 13,
@@ -68,7 +107,7 @@ const MarkersPanel = memo(({
           gap: 6
         }}>
           <i className="ti ti-flag" style={{ color: 'var(--accent)' }} />
-          {tr('editorMarkers') || 'Marqueurs'}
+          {tr?.('editorMarkers') || 'Marqueurs'}
           <span style={{
             fontSize: 10,
             fontWeight: 400,
@@ -79,85 +118,235 @@ const MarkersPanel = memo(({
           </span>
         </div>
 
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button
-            className="btn-ghost btn-sm"
-            onClick={handleAddAtCurrentTime}
-            style={{
-              fontSize: 11,
-              color: 'var(--accent)',
-              padding: '2px 8px',
-              border: '1px solid var(--accent)',
-              borderRadius: 'var(--radius-sm)'
-            }}
-            title={tr('editorAddMarker') || 'Ajouter un marqueur (Ctrl+M)'}
-          >
-            <i className="ti ti-plus" /> {tr('editorAdd') || 'Ajouter'}
-          </button>
-        </div>
-      </div>
-
-      {/* Couleur sélectionnée */}
-      <div style={{
-        display: 'flex',
-        gap: 4,
-        marginBottom: 8,
-        flexWrap: 'wrap'
-      }}>
-        {MARKER_COLORS.map(c => (
-          <button
-            key={c.id}
-            onClick={() => setSelectedColor(c.id)}
-            style={{
-              width: 20,
-              height: 20,
-              borderRadius: '50%',
-              background: c.color,
-              border: selectedColor === c.id ? '2px solid var(--accent)' : '2px solid transparent',
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-              outline: 'none'
-            }}
-            title={tr(`markerColor${c.id.charAt(0).toUpperCase() + c.id.slice(1)}`) || c.id}
-          />
-        ))}
+        <button
+          className="btn-ghost btn-sm"
+          onClick={handleAddAtCurrentTime}
+          style={{
+            fontSize: 11,
+            color: 'var(--accent)',
+            padding: '4px 10px',
+            border: '1px solid var(--accent)',
+            borderRadius: 'var(--radius-sm)',
+            cursor: 'pointer',
+            background: 'transparent',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            whiteSpace: 'nowrap',
+            transition: 'all 0.15s'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--accent-light)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent'
+          }}
+          title={tr?.('editorAddMarker') || 'Ajouter un marqueur (Ctrl+M)'}
+        >
+          <i className="ti ti-plus" style={{ fontSize: 12 }} />
+          {tr?.('editorAdd') || 'Ajouter'}
+        </button>
       </div>
 
       {/* Formulaire d'ajout */}
       {isAdding && (
-        <MarkerAddForm
-          onAdd={handleAddMarker}
-          onCancel={() => setIsAdding(false)}
-          defaultName={`Marker ${(markers?.length || 0) + 1}`}
-          tr={tr}
-        />
-      )}
-
-      {/* Liste des marqueurs */}
-      {sortedMarkers.length === 0 && !isAdding && (
         <div style={{
-          textAlign: 'center',
-          padding: 20,
-          color: 'var(--text-tertiary)',
-          fontSize: 12
+          background: 'var(--bg-tertiary)',
+          borderRadius: 'var(--radius-sm)',
+          padding: 10,
+          border: '1px solid var(--border)',
+          flexShrink: 0
         }}>
-          <i className="ti ti-flag" style={{ fontSize: 24, display: 'block', marginBottom: 8 }} />
-          {tr('markersEmpty') || 'Aucun marqueur'}
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+              {tr('markerName') || 'Nom du marqueur'}
+            </label>
+            <input
+              ref={(input) => input?.focus()}
+              type="text"
+              value={markerName}
+              onChange={(e) => setMarkerName(e.target.value)}
+              placeholder={tr('markerNamePlaceholder') || 'Entrez un nom...'}
+              className="input-sm"
+              style={{
+                width: '100%',
+                padding: '6px 10px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: 12,
+                outline: 'none'
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleAddMarker()
+                }
+                if (e.key === 'Escape') {
+                  handleCancel()
+                }
+              }}
+            />
+          </div>
+
+          {/* Sélecteur de couleur */}
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+              {tr('markerColor') || 'Couleur'}
+            </label>
+            <div style={{
+              display: 'flex',
+              gap: 4,
+              flexWrap: 'wrap',
+              alignItems: 'center'
+            }}>
+              {MARKER_COLORS.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedColor(c.color)}
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    background: c.color,
+                    border: selectedColor === c.color ? '2px solid var(--accent)' : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    outline: 'none',
+                    flexShrink: 0
+                  }}
+                  title={c.id}
+                />
+              ))}
+              {/* Sélecteur de couleur personnalisé */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowColorPicker(!showColorPicker)}
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    background: selectedColor,
+                    border: '2px solid var(--border)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 10,
+                    color: 'white',
+                    textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                  }}
+                  title="Couleur personnalisée"
+                >
+                  +
+                </button>
+                {showColorPicker && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    marginTop: 4,
+                    zIndex: 10,
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: 4,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                  }}>
+                    <input
+                      type="color"
+                      value={selectedColor}
+                      onChange={(e) => {
+                        setSelectedColor(e.target.value)
+                        setShowColorPicker(false)
+                      }}
+                      style={{
+                        width: 80,
+                        height: 40,
+                        padding: 2,
+                        cursor: 'pointer',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'transparent'
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Boutons d'action - Utilisation des classes btn */}
+          <div style={{
+            display: 'flex',
+            gap: 6,
+            justifyContent: 'flex-end'
+          }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={handleCancel}
+              style={{
+                fontSize: 11,
+                padding: '4px 12px',
+                minHeight: 28,
+                borderRadius: 'var(--radius-sm)'
+              }}
+            >
+              {tr('cancel') || 'Annuler'}
+            </button>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={handleAddMarker}
+              style={{
+                fontSize: 11,
+                padding: '4px 12px',
+                minHeight: 28,
+                borderRadius: 'var(--radius-sm)',
+                background: 'var(--accent)',
+                color: 'white'
+              }}
+            >
+              <i className="ti ti-check" /> {tr('add') || 'Ajouter'}
+            </button>
+          </div>
         </div>
       )}
 
-      {sortedMarkers.map((marker, index) => (
-        <MarkerItem
-          key={marker.id || index}
-          marker={marker}
-          onRemove={onRemoveMarker}
-          onUpdate={onUpdateMarker}
-          onNavigate={onNavigateToMarker}
-          currentTime={currentTime}
-          totalDuration={totalDuration}
-          tr={tr}
-        />
-      ))}
+      {/* Liste des marqueurs */}
+      <div style={{
+        flex: 1,
+        overflow: 'auto',
+        minHeight: 50
+      }}>
+        {sortedMarkers.length === 0 && !isAdding && (
+          <div style={{
+            textAlign: 'center',
+            padding: 20,
+            color: 'var(--text-tertiary)',
+            fontSize: 12
+          }}>
+            <i className="ti ti-flag" style={{ fontSize: 24, display: 'block', marginBottom: 8 }} />
+            {tr?.('markersEmpty') || 'Aucun marqueur'}
+            <div style={{ fontSize: 10, marginTop: 4, opacity: 0.6 }}>
+              {tr?.('editorAddMarkerHint') || 'Appuyez sur Ctrl+M pour en ajouter un'}
+            </div>
+          </div>
+        )}
+
+        {sortedMarkers.map((marker, index) => (
+          <MarkerItem
+            key={marker.id || index}
+            marker={marker}
+            onRemove={onRemoveMarker}
+            onUpdate={onUpdateMarker}
+            onNavigate={onNavigateToMarker}
+            currentTime={currentTime}
+            totalDuration={totalDuration}
+            tr={tr}
+          />
+        ))}
+      </div>
     </div>
   )
 })

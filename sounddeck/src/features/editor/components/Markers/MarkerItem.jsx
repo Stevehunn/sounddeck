@@ -52,13 +52,17 @@ const MarkerItem = memo(({
       display: 'flex',
       alignItems: 'center',
       gap: 8,
-      padding: '4px 8px',
+      padding: '6px 8px',
       marginBottom: 2,
       borderRadius: 'var(--radius-sm)',
-      background: isCurrent ? 'var(--accent-light)' : 'transparent',
+      background: isCurrent ? 'rgba(124,111,247,0.15)' : 'transparent',
       border: isCurrent ? '1px solid var(--accent)' : '1px solid transparent',
-      transition: 'all 0.15s'
-    }}>
+      transition: 'all 0.15s',
+      cursor: 'pointer',
+      minHeight: 32
+    }}
+    onClick={() => onNavigate?.(marker.time)}
+    >
       {/* Indicateur de couleur */}
       <div style={{
         width: 4,
@@ -74,10 +78,15 @@ const MarkerItem = memo(({
         fontFamily: 'monospace',
         color: 'var(--text-secondary)',
         minWidth: 40,
-        cursor: 'pointer'
+        cursor: 'pointer',
+        padding: '2px 4px',
+        borderRadius: 'var(--radius-sm)'
       }}
-      onClick={() => onNavigate?.(marker.time)}
-      title={tr('editorNavigate') || 'Naviguer'}
+      onClick={(e) => {
+        e.stopPropagation()
+        onNavigate?.(marker.time)
+      }}
+      title={tr?.('editorNavigate') || 'Naviguer'}
       >
         {formatTime(marker.time)}
       </span>
@@ -91,15 +100,18 @@ const MarkerItem = memo(({
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           autoFocus
+          onClick={(e) => e.stopPropagation()}
+          className="input-sm"
           style={{
             flex: 1,
             background: 'var(--bg-tertiary)',
             border: '1px solid var(--accent)',
             color: 'var(--text-primary)',
             fontSize: 11,
-            padding: '2px 6px',
-            borderRadius: 3,
-            outline: 'none'
+            padding: '4px 6px',
+            borderRadius: 'var(--radius-sm)',
+            outline: 'none',
+            minWidth: 40
           }}
         />
       ) : (
@@ -109,43 +121,68 @@ const MarkerItem = memo(({
             fontSize: 11,
             color: 'var(--text-primary)',
             cursor: 'text',
-            padding: '2px 4px',
-            borderRadius: 3,
+            padding: '4px 4px',
+            borderRadius: 'var(--radius-sm)',
             border: '1px solid transparent',
-            transition: 'border-color 0.15s'
+            transition: 'border-color 0.15s',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
           }}
-          onDoubleClick={handleDoubleClick}
-          title={tr('editorRenameMarker') || 'Double-clic pour renommer'}
+          onDoubleClick={(e) => {
+            e.stopPropagation()
+            handleDoubleClick()
+          }}
+          title={tr?.('editorRenameMarker') || 'Double-clic pour renommer'}
         >
           {marker.name}
         </span>
       )}
 
-      {/* Actions */}
-      <div style={{ display: 'flex', gap: 2 }}>
+      {/* Actions - Utilisation des classes btn */}
+      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
         <button
-          className="btn-ghost btn-sm"
-          onClick={() => onNavigate?.(marker.time)}
-          style={{
-            padding: '2px 4px',
-            fontSize: 10,
-            color: 'var(--text-secondary)',
-            borderRadius: 3
+          className="btn-ghost btn-sm btn-icon"
+          onClick={(e) => {
+            e.stopPropagation()
+            onNavigate?.(marker.time)
           }}
-          title={tr('editorNavigate') || 'Naviguer'}
+          style={{
+            padding: '4px 6px',
+            fontSize: 12,
+            color: 'var(--text-secondary)',
+            borderRadius: 'var(--radius-sm)',
+            minWidth: 24,
+            minHeight: 24,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: 0.6
+          }}
+          title={tr?.('editorNavigate') || 'Naviguer'}
         >
           <i className="ti ti-arrow-right" />
         </button>
         <button
-          className="btn-ghost btn-sm"
-          onClick={() => onRemove?.(marker.id)}
-          style={{
-            padding: '2px 4px',
-            fontSize: 10,
-            color: 'var(--danger)',
-            borderRadius: 3
+          className="btn-danger btn-sm btn-icon"
+          onClick={(e) => {
+            e.stopPropagation()
+            if (window.confirm(`Supprimer le marqueur "${marker.name}" ?`)) {
+              onRemove?.(marker.id)
+            }
           }}
-          title={tr('editorRemoveMarker') || 'Supprimer'}
+          style={{
+            padding: '4px 6px',
+            fontSize: 12,
+            borderRadius: 'var(--radius-sm)',
+            minWidth: 24,
+            minHeight: 24,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: 0.6
+          }}
+          title={tr?.('editorRemoveMarker') || 'Supprimer'}
         >
           <i className="ti ti-trash" />
         </button>

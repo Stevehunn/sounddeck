@@ -9,6 +9,7 @@ import TimelineRuler from './TimelineRuler'
 import TimelinePlayhead from './TimelinePlayhead'
 import TimelineLoop from './TimelineLoop'
 import TimelineZoomControls from './TimelineZoomControls'
+import MarkersPanel from '../Markers/MarkersPanel'
 
 const TRACK_HEAD_WIDTH = 200
 const BASE_PIXELS_PER_SECOND = 80
@@ -66,11 +67,18 @@ export default function EditorTimeline({
   onCopyClip,
   onCutClip,
   onPasteClip,
+  // ✅ Props pour les marqueurs
+  markers = [],
+  onAddMarker,
+  onRemoveMarker,
+  onUpdateMarker,
+  onNavigateToMarker,
 }) {
   console.log('🔍 [Timeline] Contexte:', {
     hasTracks: !!tracks,
     trackCount: tracks?.length || 0,
-    hasOnPlayClip: !!onPlayClip, // ✅ Vérifier que la prop est reçue
+    hasOnPlayClip: !!onPlayClip,
+    markersCount: markers?.length || 0,
   })
 
   const containerRef = useRef(null)
@@ -78,6 +86,8 @@ export default function EditorTimeline({
   const [isPanning, setIsPanning] = useState(false)
   const [panStartX, setPanStartX] = useState(0)
   const [scrollLeft, setScrollLeft] = useState(0)
+  // ✅ État pour afficher/cacher le panneau des marqueurs
+  const [showMarkersPanel, setShowMarkersPanel] = useState(true)
 
   const pixelsPerSecond = 80 * zoomLevel
   const totalWidth = Math.max(totalDuration * pixelsPerSecond + 100, 600)
@@ -125,6 +135,12 @@ export default function EditorTimeline({
     clipsContainer.addEventListener('wheel', onWheel, { passive: false })
     return () => clipsContainer.removeEventListener('wheel', onWheel)
   }, [zoomLevel, onZoomChange])
+
+  // ✅ Générer une clé pour chaque piste qui change quand les clips bougent
+  const getTrackKey = (track) => {
+    const clipPositions = track.clips.map(c => `${c.id}:${c.start.toFixed(3)}`).join('|')
+    return `${track.id}-${clipPositions}`
+  }
 
   return (
     <div
@@ -215,7 +231,7 @@ export default function EditorTimeline({
         </div>
       </div>
 
-      {/* Tracks */}
+      {/* Tracks + Markers Panel */}
       <div style={{
         display: 'flex',
         flex: 1,
@@ -308,9 +324,11 @@ export default function EditorTimeline({
           }}>
             {tracks.map((track, index) => {
               const trackColor = track.color || getTrackColor(index)
+              const trackKey = getTrackKey(track)
+              
               return (
                 <EditorTrack
-                  key={track.id}
+                  key={trackKey}
                   track={track}
                   trackIndex={index}
                   totalDuration={totalDuration}
@@ -333,7 +351,6 @@ export default function EditorTimeline({
                   trackColor={trackColor}
                   snapEnabled={snapEnabled}
                   tr={tr}
-                  // ✅ PASSER LES FONCTIONS REÇUES EN PROPS
                   onPlayClip={onPlayClip}
                   onStopClip={onStopClip}
                   onCopyClip={onCopyClip}
@@ -344,6 +361,120 @@ export default function EditorTimeline({
             })}
           </div>
         </div>
+
+        {/* ✅ PANEL DES MARQUEURS - côté droit avec plus d'espace */}
+        {showMarkersPanel && onAddMarker && (
+          <div style={{
+            width: 280,
+            minWidth: 280,
+            height: '100%',
+            background: 'var(--bg-secondary)',
+            borderLeft: '1px solid var(--border)',
+            zIndex: 3,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            {/* En-tête du panneau avec bouton de fermeture */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '6px 10px',
+              borderBottom: '1px solid var(--border)',
+              flexShrink: 0,
+              background: 'var(--bg-tertiary)'
+            }}>
+              <span style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: 'var(--text-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4
+              }}>
+                <i className="ti ti-flag" style={{ color: 'var(--accent)' }} />
+                {tr?.('editorMarkers') || 'Marqueurs'}
+                <span style={{
+                  fontSize: 9,
+                  fontWeight: 400,
+                  color: 'var(--text-tertiary)',
+                  marginLeft: 2
+                }}>
+                  ({markers?.length || 0})
+                </span>
+              </span>
+              <button
+                className="btn-ghost btn-sm btn-icon"
+                onClick={() => setShowMarkersPanel(false)}
+                style={{
+                  padding: '2px 4px',
+                  fontSize: 12,
+                  color: 'var(--text-tertiary)',
+                  minWidth: 20,
+                  minHeight: 20,
+                  borderRadius: 'var(--radius-sm)'
+                }}
+                title="Fermer le panneau des marqueurs"
+              >
+                <i className="ti ti-x" />
+              </button>
+            </div>
+
+            {/* Contenu du panneau */}
+            <div style={{
+              flex: 1,
+              overflow: 'auto',
+              padding: 8
+            }}>
+              <MarkersPanel
+                markers={markers}
+                onAddMarker={onAddMarker}
+                onRemoveMarker={onRemoveMarker}
+                onUpdateMarker={onUpdateMarker}
+                onNavigateToMarker={onNavigateToMarker}
+                currentTime={currentTime}
+                totalDuration={totalDuration}
+                tr={tr}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ✅ Bouton pour ouvrir le panneau des marqueurs s'il est caché - Utilisation des classes btn */}
+        {!showMarkersPanel && onAddMarker && (
+          <button
+            className="btn-secondary btn-sm"
+            onClick={() => setShowMarkersPanel(true)}
+            style={{
+              position: 'absolute',
+              right: 8,
+              top: 8,
+              zIndex: 10,
+              padding: '4px 8px',
+              fontSize: 11,
+              color: 'var(--accent)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              background: 'var(--bg-secondary)'
+            }}
+            title={tr?.('editorMarkers') || 'Afficher les marqueurs'}
+          >
+            <i className="ti ti-flag" />
+            {tr?.('editorMarkers') || 'Marqueurs'}
+            <span style={{
+              fontSize: 9,
+              color: 'var(--text-tertiary)'
+            }}>
+              ({markers?.length || 0})
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Zoom Controls */}

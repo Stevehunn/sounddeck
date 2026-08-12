@@ -28,7 +28,7 @@ export function EditorProvider({ children, store, addToast }) {
   const [isLoading, setIsLoading] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
   const [isAutoSaving, setIsAutoSaving] = useState(false)
-  const [stopAtTime, setStopAtTime] = useState(null) // ✅ NOUVEAU
+  const [stopAtTime, setStopAtTime] = useState(null)
   
   // ─── REFS ──────────────────────────────────────────────────────────────
   const isLoadingRef = useRef(false)
@@ -42,7 +42,7 @@ export function EditorProvider({ children, store, addToast }) {
   const isPlayingRef = useRef(false)
   const isPausedRef = useRef(false)
   const selectedClipIdRef = useRef(null)
-  const stopAtTimeRef = useRef(null) // ✅ NOUVEAU
+  const stopAtTimeRef = useRef(null)
 
   // Mettre à jour la ref quand le projet change
   useEffect(() => {
@@ -1565,7 +1565,6 @@ export function EditorProvider({ children, store, addToast }) {
 
   // ─── FONCTIONS LOOP ──────────────────────────────────────────────────
 
-  // ✅ CORRECTION : setLoopRegionFn est bien définie ici !
   const setLoopRegionFn = useCallback((start, end) => {
     console.log('🔄 [EditorContext] setLoopRegionFn:', start, end)
     setLoopRegion(prev => ({
@@ -1594,6 +1593,106 @@ export function EditorProvider({ children, store, addToast }) {
     console.log('🔍 [EditorContext] handleZoomChange:', newZoom)
     setZoomLevel(Math.max(0.05, Math.min(10, newZoom)))
   }, [])
+
+  // ─── FONCTIONS MARKERS ──────────────────────────────────────────────────
+
+  const addMarker = useCallback((markerData) => {
+    console.log('📍 [EditorContext] addMarker:', markerData)
+    
+    if (!project) {
+      console.error('❌ [EditorContext] Aucun projet')
+      return null
+    }
+    
+    const newMarker = {
+      id: `marker-${Date.now()}`,
+      name: markerData.name || `Marqueur ${(project.markers?.length || 0) + 1}`,
+      time: markerData.time || currentTime,
+      color: markerData.color || '#3b82f6'
+    }
+    
+    const updatedProject = {
+      ...project,
+      markers: [...(project.markers || []), newMarker],
+      updatedAt: Date.now()
+    }
+    
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    if (store?.updateEditorProject) {
+      store.updateEditorProject(updatedProject).catch(() => {})
+    }
+    
+    setIsDirty(true)
+    addToast?.(`Marqueur "${newMarker.name}" ajouté`, 'success')
+    return newMarker
+  }, [project, store, currentTime, addToast])
+
+  const removeMarker = useCallback((markerId) => {
+    console.log('🗑️ [EditorContext] removeMarker:', markerId)
+    
+    if (!project) {
+      console.error('❌ [EditorContext] Aucun projet')
+      return
+    }
+    
+    const markerToRemove = project.markers?.find(m => m.id === markerId)
+    if (!markerToRemove) {
+      console.error('❌ [EditorContext] Marqueur non trouvé:', markerId)
+      return
+    }
+    
+    const updatedProject = {
+      ...project,
+      markers: (project.markers || []).filter(m => m.id !== markerId),
+      updatedAt: Date.now()
+    }
+    
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    if (store?.updateEditorProject) {
+      store.updateEditorProject(updatedProject).catch(() => {})
+    }
+    
+    setIsDirty(true)
+    addToast?.(`Marqueur "${markerToRemove.name}" supprimé`, 'info')
+  }, [project, store, addToast])
+
+  const updateMarker = useCallback((markerId, updates) => {
+    console.log('✏️ [EditorContext] updateMarker:', markerId, updates)
+    
+    if (!project) {
+      console.error('❌ [EditorContext] Aucun projet')
+      return
+    }
+    
+    const updatedProject = {
+      ...project,
+      markers: (project.markers || []).map(marker => {
+        if (marker.id === markerId) {
+          return { ...marker, ...updates }
+        }
+        return marker
+      }),
+      updatedAt: Date.now()
+    }
+    
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    if (store?.updateEditorProject) {
+      store.updateEditorProject(updatedProject).catch(() => {})
+    }
+    
+    setIsDirty(true)
+  }, [project, store])
+
+  const navigateToMarker = useCallback((time) => {
+    console.log('📍 [EditorContext] navigateToMarker:', time)
+    seek(time)
+  }, [seek])
 
   // ─── VALUE ──────────────────────────────────────────────────────────────
 
@@ -1673,6 +1772,13 @@ export function EditorProvider({ children, store, addToast }) {
     
     // Zoom
     handleZoomChange,
+    
+    // Fonctions Markers
+    markers: project?.markers || [],
+    addMarker,
+    removeMarker,
+    updateMarker,
+    navigateToMarker,
     
     // Store
     store,

@@ -15,7 +15,7 @@ import ExportModal from './components/Modals/ExportModal'
 import ImportFileModal from './components/Modals/ImportFileModal'
 import { getClipById } from './utils'
 import { mixdownProject, exportMixdown } from '@shared/utils/mixdown'
-import useKeyboardShortcuts from './hooks/useKeyboardShortcuts' // ✅ AJOUTÉ
+import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
 
 console.log('📝 [Editor] Chargement du module Editor')
 
@@ -399,9 +399,46 @@ function EditorTimelineContent() {
     }
   }, [addToast, t])
 
+  // ─── HANDLERS MARKERS ──────────────────────────────────────────────────
+
+  const handleAddMarker = useCallback((markerData) => {
+    console.log('📍 [Editor] handleAddMarker:', markerData)
+    const { addMarker } = context
+    if (addMarker) {
+      addMarker(markerData)
+    } else {
+      addToast?.('Erreur: addMarker non disponible', 'error')
+    }
+  }, [context, addToast])
+
+  const handleRemoveMarker = useCallback((markerId) => {
+    console.log('🗑️ [Editor] handleRemoveMarker:', markerId)
+    const { removeMarker } = context
+    if (removeMarker) {
+      removeMarker(markerId)
+    }
+  }, [context])
+
+  const handleUpdateMarker = useCallback((markerId, updates) => {
+    console.log('✏️ [Editor] handleUpdateMarker:', markerId, updates)
+    const { updateMarker } = context
+    if (updateMarker) {
+      updateMarker(markerId, updates)
+    }
+  }, [context])
+
+  const handleNavigateToMarker = useCallback((time) => {
+    console.log('📍 [Editor] handleNavigateToMarker:', time)
+    const { navigateToMarker } = context
+    if (navigateToMarker) {
+      navigateToMarker(time)
+    } else {
+      seek(time)
+    }
+  }, [context, seek])
+
   // ─── RACCOURCIS CLAVIER ──────────────────────────────────────────────
 
-  // ✅ Récupérer les fonctions undo/redo depuis le store
   const undoEditor = store?.undoEditor || (() => {
     console.log('ℹ️ Undo non disponible')
     addToast?.('Undo non disponible', 'info')
@@ -415,8 +452,7 @@ function EditorTimelineContent() {
   const canUndo = store?.canUndoEditor || false
   const canRedo = store?.canRedoEditor || false
 
-  // ✅ Utiliser le hook de raccourcis clavier
-  const { shortcuts } = useKeyboardShortcuts({
+  useKeyboardShortcuts({
     onPlay: () => {
       console.log('⌨️ Play')
       if (isPlaying) {
@@ -462,7 +498,6 @@ function EditorTimelineContent() {
     onSplit: () => {
       console.log('⌨️ Split')
       if (selectedClipId && selectedTrackId) {
-        // TODO: Implémenter le split
         addToast?.('Split pas encore implémenté', 'info')
       } else {
         addToast?.('Aucun clip sélectionné', 'info')
@@ -487,8 +522,7 @@ function EditorTimelineContent() {
     return `${m}:${s.toString().padStart(2, '0')}`
   }
 
-  // ✅ Afficher les raccourcis dans la console pour débogage
-  console.log('⌨️ Raccourcis clavier actifs:', shortcuts)
+  console.log('⌨️ Raccourcis clavier actifs:', useKeyboardShortcuts({})?.shortcuts || {})
 
   return (
     <div style={{
@@ -542,11 +576,11 @@ function EditorTimelineContent() {
           zoomLevel={zoomLevel}
           onZoomChange={handleZoomChange}
           onClipSelect={handleClipSelect}
-          onClipMove={store?.moveClip || (() => {})}
+          onClipMove={store?.moveClip || context.moveClip || (() => {})}
           onClipUpdate={updateClip}
           onClipRemove={handleRemoveClip}
           onClipDuplicate={duplicateClip}
-          onClipFade={store?.setClipFade || (() => {})}
+          onClipFade={store?.setClipFade || context.setClipFade || (() => {})}
           onClipContextMenu={handleClipContextMenu}
           onDragCheckpoint={store?.pushEditorHistoryCheckpoint || (() => {})}
           onTrackRemove={handleRemoveTrack}
@@ -560,19 +594,23 @@ function EditorTimelineContent() {
           onClearLoop={clearLoop}
           onToggleLoop={toggleLoop}
           onUpdateClipDuration={handleUpdateClipDuration}
+          // ✅ Props pour les marqueurs
+          markers={context.markers}
+          onAddMarker={handleAddMarker}
+          onRemoveMarker={handleRemoveMarker}
+          onUpdateMarker={handleUpdateMarker}
+          onNavigateToMarker={handleNavigateToMarker}
           tr={t}
           addToast={addToast}
           onPlayClip={(clip, trackId) => {
             console.log('▶️ [Editor] Play clip (depuis Editor):', clip.name)
             console.log('📊 [Editor] isPlaying:', isPlaying, 'currentTime:', currentTime)
             
-            // ✅ Si la lecture est déjà en cours, ne pas reculer
             if (isPlaying) {
               console.log('⏸️ [Editor] Lecture déjà en cours, pas de changement')
               return
             }
             
-            // ✅ Se positionner au début du clip
             const clipStart = clip.start || 0
             const clipDuration = clipDurations[clip.id] || clip.duration || 3
             const clipEnd = clipStart + clipDuration
@@ -580,10 +618,8 @@ function EditorTimelineContent() {
             console.log('🎯 [Editor] Seek vers', clipStart)
             seek?.(clipStart)
             
-            // ✅ Enregistrer la position où arrêter la lecture
             context.setStopAtTime?.(clipEnd)
             
-            // ✅ Démarrer la lecture
             setTimeout(() => {
               console.log('▶️ [Editor] Démarrage playback, arrêt à', clipEnd)
               togglePlay?.()
@@ -603,8 +639,6 @@ function EditorTimelineContent() {
           toggleEffect,
           setClipFade
         } = context
-        
-        console.log('🎛️ [Editor] setClipFade est une fonction?', typeof setClipFade)
         
         return (
           <EditorEffectsPanel
@@ -811,8 +845,8 @@ function EditorTimelineContent() {
             removeClip(trackId, clipId)
             setClipMenu(null)
           }}
-          onFadeIn={store?.setClipFade || (() => {})}
-          onFadeOut={store?.setClipFade || (() => {})}
+          onFadeIn={context.setClipFade}
+          onFadeOut={context.setClipFade}
           onPreviewEffects={() => {}}
           isPlaying={isPlaying}
           isLoopEnabled={loopRegion.enabled}
