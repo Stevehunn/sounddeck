@@ -18,9 +18,8 @@ export default function ExportModal({
   const [profiles, setProfiles] = useState([])
   const [selectedProfiles, setSelectedProfiles] = useState(['all'])
   const [isExporting, setIsExporting] = useState(false)
-  const [exportLocation, setExportLocation] = useState('library') // 'library' | 'file' | 'both'
+  const [exportLocation, setExportLocation] = useState('library')
 
-  // ✅ Charger les profils depuis le store
   useEffect(() => {
     if (store?.profiles) {
       const allProfiles = store.profiles.filter(p => p.id !== 'all')
@@ -40,11 +39,9 @@ export default function ExportModal({
 
     setIsExporting(true)
     try {
-      // ✅ Générer un nom de fichier sécurisé
       const safeName = name.trim().replace(/[^a-zA-Z0-9]/g, '_')
       const outputPath = `${safeName}_${Date.now()}.${format === 'wav' ? 'wav' : format}`
       
-      // ✅ Passer les informations correctement
       const result = await onExport({
         name: name.trim(),
         format,
@@ -262,10 +259,41 @@ export default function ExportModal({
           </div>
 
           <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={onClose} disabled={isExporting}>
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              onClick={onClose} 
+              disabled={isExporting}
+              style={{
+                fontSize: 13,
+                padding: '8px 20px',
+                minWidth: 100,
+                minHeight: 40,
+                borderRadius: 'var(--radius-md)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6
+              }}
+            >
               {tr('cancel') || 'Annuler'}
             </button>
-            <button type="submit" className="btn-primary" disabled={isExporting || !name.trim()}>
+            <button 
+              type="submit" 
+              className="btn btn-primary" 
+              disabled={isExporting || !name.trim()}
+              style={{
+                fontSize: 13,
+                padding: '8px 20px',
+                minWidth: 100,
+                minHeight: 40,
+                borderRadius: 'var(--radius-md)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6
+              }}
+            >
               {isExporting ? (
                 <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('editorExporting') || 'Export...'}</>
               ) : (

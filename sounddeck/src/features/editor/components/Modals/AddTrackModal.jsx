@@ -5,8 +5,8 @@ export default function AddTrackModal({
   isOpen, 
   onClose,
   onCancel,
-  onConfirm,      // ✅ Remplacer onAddTrack par onConfirm
-  onAddTrack,     // ✅ Garder les deux pour compatibilité
+  onConfirm,
+  onAddTrack,
   defaultName,
   tr 
 }) {
@@ -19,7 +19,6 @@ export default function AddTrackModal({
     e.preventDefault()
     console.log('✅ [AddTrackModal] handleSubmit:', name, color)
     
-    // ✅ Utiliser onConfirm ou onAddTrack
     if (onConfirm) {
       onConfirm(name || undefined, color)
     } else if (onAddTrack) {
@@ -64,6 +63,7 @@ export default function AddTrackModal({
               onChange={(e) => setName(e.target.value)}
               placeholder={tr('editorTrackNamePlaceholder') || 'Ex: Batterie, Voix, Effets...'}
               autoFocus
+              className="input-lg"
               style={{
                 width: '100%',
                 padding: '8px 12px',
@@ -90,10 +90,39 @@ export default function AddTrackModal({
           </div>
 
           <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={handleClose}>
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              onClick={handleClose}
+              style={{
+                fontSize: 13,
+                padding: '8px 20px',
+                minWidth: 100,
+                minHeight: 40,
+                borderRadius: 'var(--radius-md)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6
+              }}
+            >
               {tr('cancel') || 'Annuler'}
             </button>
-            <button type="submit" className="btn-primary">
+            <button 
+              type="submit" 
+              className="btn btn-primary"
+              style={{
+                fontSize: 13,
+                padding: '8px 20px',
+                minWidth: 100,
+                minHeight: 40,
+                borderRadius: 'var(--radius-md)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6
+              }}
+            >
               <i className="ti ti-plus" /> {tr('add') || 'Ajouter'}
             </button>
           </div>

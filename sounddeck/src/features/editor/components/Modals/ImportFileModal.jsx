@@ -6,7 +6,7 @@ const SUPPORTED_FORMATS = ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'opus', 'w
 export default function ImportFileModal({ 
   isOpen, 
   onClose, 
-  onConfirm,  // ✅ Nouvelle prop pour confirmer l'import
+  onConfirm,
   tracks, 
   tr,
   fileName: defaultFileName = ''
@@ -18,7 +18,6 @@ export default function ImportFileModal({
   const [isProcessing, setIsProcessing] = useState(false)
   const fileInputRef = useRef(null)
 
-  // ✅ Réinitialiser quand le modal s'ouvre
   useEffect(() => {
     if (isOpen) {
       setTrackId(tracks?.[0]?.id || '')
@@ -65,7 +64,6 @@ export default function ImportFileModal({
     setIsProcessing(true)
     try {
       const arrayBuffer = await file.arrayBuffer()
-      // ✅ Utiliser onConfirm pour retourner les données au parent
       onConfirm?.({
         file: arrayBuffer,
         fileName: fileName || file.name,
@@ -157,6 +155,7 @@ export default function ImportFileModal({
               onChange={(e) => setFileName(e.target.value)}
               placeholder={tr('editorNamePlaceholder') || 'Nom du nouveau son'}
               required
+              className="input-lg"
             />
           </div>
 
@@ -170,6 +169,7 @@ export default function ImportFileModal({
                 value={trackId}
                 onChange={(e) => setTrackId(e.target.value)}
                 style={{ width: '100%' }}
+                className="input-lg"
                 required
               >
                 {tracks?.map((t) => (
@@ -190,16 +190,47 @@ export default function ImportFileModal({
                 onChange={(e) => setStartTime(Math.max(0, parseFloat(e.target.value) || 0))}
                 step={0.1}
                 min={0}
+                className="input-lg"
                 style={{ width: '100%' }}
               />
             </div>
           </div>
 
           <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={onClose}>
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              onClick={onClose}
+              style={{
+                fontSize: 13,
+                padding: '8px 20px',
+                minWidth: 100,
+                minHeight: 40,
+                borderRadius: 'var(--radius-md)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6
+              }}
+            >
               {tr('cancel') || 'Annuler'}
             </button>
-            <button type="submit" className="btn-primary" disabled={!file || isProcessing}>
+            <button 
+              type="submit" 
+              className="btn btn-primary" 
+              disabled={!file || isProcessing}
+              style={{
+                fontSize: 13,
+                padding: '8px 20px',
+                minWidth: 100,
+                minHeight: 40,
+                borderRadius: 'var(--radius-md)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6
+              }}
+            >
               {isProcessing ? (
                 <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('importing') || 'Import...'}</>
               ) : (
