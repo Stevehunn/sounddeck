@@ -1,5 +1,5 @@
 // src/features/editor/Editor.jsx
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { EditorProvider, useEditor } from './contexts/EditorContext'
@@ -102,6 +102,7 @@ function EditorTimelineContent() {
     removeClip,
     updateClip,
     duplicateClip,
+    splitClip,
     play,
     pause,
     stop,
@@ -140,6 +141,26 @@ function EditorTimelineContent() {
   const [selectedImportTrackId, setSelectedImportTrackId] = useState('')
   const [pendingImportFile, setPendingImportFile] = useState(null)
   const [pendingImportFileName, setPendingImportFileName] = useState('')
+
+  // ─── GUARD POUR LES MARQUEURS - Éviter les re-rendus intempestifs ────
+  // ✅ Ajouter un guard pour éviter les re-rendus intempestifs
+  const [markersState, setMarkersState] = useState(() => {
+    const markers = context.markers || []
+    const savedAutoOpen = localStorage.getItem('sounddeck_markers_auto_open')
+    const autoOpen = savedAutoOpen === null ? true : savedAutoOpen === 'true'
+    
+    return {
+      markers,
+      shouldAutoOpen: autoOpen,
+      hasInitialized: false
+    }
+  })
+
+  // ✅ Initialisation contrôlée (maintenant useEffect est importé)
+  useEffect(() => {
+    if (markersState.hasInitialized) return
+    setMarkersState(prev => ({ ...prev, hasInitialized: true }))
+  }, [markersState.hasInitialized])
 
   // ─── HANDLERS ──────────────────────────────────────────────────────────
 
@@ -312,10 +333,7 @@ function EditorTimelineContent() {
   }, [project, addToast, t])
 
   const handlePreviewEffects = useCallback(async (clip) => {
-    if (!clip || !clip.path) {
-      console.warn('⚠️ [Editor] Aucun clip à prévisualiser')
-      return
-    }
+    if (!clip || !clip.path) return
     
     try {
       const { applyEffectsToBuffer } = await import('@shared/utils/realTimeEffects')
@@ -325,9 +343,7 @@ function EditorTimelineContent() {
         : 'file:///' + clip.path.replace(/\\/g, '/')
       
       const response = await fetch(fileUrl)
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const arrayBuffer = await response.arrayBuffer()
       
       const audioContext = new (window.AudioContext || window.webkitAudioContext)()
@@ -449,7 +465,16 @@ function EditorTimelineContent() {
     },
     onSplit: () => {
       if (selectedClipId && selectedTrackId) {
-        addToast?.('Split pas encore implémenté', 'info')
+        const clip = getClipById(tracks, selectedClipId)
+        if (clip) {
+          const duration = clipDurations[clip.id] || clip.duration || 3
+          const start = clip.start || 0
+          if (currentTime > start && currentTime < start + duration) {
+            splitClip(selectedTrackId, selectedClipId, currentTime)
+          } else {
+            addToast?.('Le playhead doit être à l\'intérieur du clip', 'warning')
+          }
+        }
       } else {
         addToast?.('Aucun clip sélectionné', 'info')
       }
@@ -543,6 +568,9 @@ function EditorTimelineContent() {
           onClearLoop={clearLoop}
           onToggleLoop={toggleLoop}
           onUpdateClipDuration={handleUpdateClipDuration}
+          onSplitClip={(trackId, clipId, splitTime) => {
+            return splitClip?.(trackId, clipId, splitTime)
+          }}
           markers={context.markers}
           onAddMarker={handleAddMarker}
           onRemoveMarker={handleRemoveMarker}
@@ -557,6 +585,7 @@ function EditorTimelineContent() {
           onCopyClip={(clip) => {}}
           onCutClip={(clip) => {}}
           onPasteClip={(trackId) => {}}
+          store={store}
         />
       </div>
 
@@ -739,7 +768,16 @@ function EditorTimelineContent() {
             setSelectedClipForMenu(null)
             setSelectedTrackForMenu(null)
           }}
-          onSplit={store?.splitClip || (() => {})}
+          onSplit={(trackId, clipId, splitTime) => {
+            const clip = getClipById(tracks, clipId)
+            if (clip) {
+              const duration = clipDurations[clip.id] || clip.duration || 3
+              const start = clip.start || 0
+              const midPoint = start + duration / 2
+              splitClip(trackId, clipId, midPoint)
+            }
+            setClipMenu(null)
+          }}
           onLoop={() => {
             const clip = getClipById(tracks, selectedClipForMenu)
             if (clip) {

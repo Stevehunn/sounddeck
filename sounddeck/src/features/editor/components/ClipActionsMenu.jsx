@@ -22,6 +22,7 @@ export default function ClipActionsMenu({
   onPreviewEffects,
   isPlaying,
   isLoopEnabled,
+  clipDurations = {},
   tr
 }) {
   const { t } = useLanguage()
@@ -63,6 +64,17 @@ export default function ClipActionsMenu({
   if (!clip) return null
 
   const hasActiveEffects = clip.effects?.some(e => e.enabled) || false
+  const duration = clipDurations?.[clip.id] || clip.duration || 3
+
+  // ✅ Fonction pour split au milieu
+  const handleSplitMid = () => {
+    if (clip) {
+      const start = clip.start || 0
+      const midPoint = start + duration / 2
+      onSplit?.(trackId, clip.id, midPoint)
+      onClose()
+    }
+  }
 
   return (
     <div
@@ -107,7 +119,7 @@ export default function ClipActionsMenu({
           color: 'var(--text-tertiary)',
           fontFamily: 'monospace'
         }}>
-          {clip.duration?.toFixed(1)}s
+          {duration.toFixed(1)}s
         </span>
       </div>
 
@@ -151,7 +163,6 @@ export default function ClipActionsMenu({
             <MenuItem icon="ti-scissors" label={t('editorCut') || 'Couper'} onClick={() => onCut?.(clip.id, trackId)} shortcut="Ctrl+X" />
             <MenuItem icon="ti-copy" label={t('editorDuplicate') || 'Dupliquer'} onClick={() => onDuplicate?.(trackId, clip.id)} shortcut="Ctrl+D" />
             
-            {/* ✅ Bouton Supprimer générique dans le menu */}
             <div style={{ padding: '2px 4px' }}>
               <DeleteButton
                 onDelete={() => onDelete?.(trackId, clip.id)}
@@ -176,14 +187,15 @@ export default function ClipActionsMenu({
               onClick={() => { onTrim?.(clip.id); onClose() }} 
             />
             <MenuItem 
+              icon="ti-scissors" 
+              label={t('editorSplitAtMiddle') || 'Split au milieu'} 
+              onClick={handleSplitMid}
+              shortcut="S"
+            />
+            <MenuItem 
               icon="ti-wave" 
               label={t('editorNormalize') || 'Normaliser'} 
               onClick={() => { onNormalize?.(clip.id); onClose() }} 
-            />
-            <MenuItem 
-              icon="ti-scissors" 
-              label={t('editorSplit') || 'Split'} 
-              onClick={() => { onSplit?.(trackId, clip.id); onClose() }} 
             />
             <MenuItem 
               icon="ti-repeat" 

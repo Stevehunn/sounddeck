@@ -40,9 +40,26 @@ const EditorTrack = ({
   
   const [clipVersion, setClipVersion] = useState(0)
   const prevClipPositions = useRef({})
+  const prevClipIds = useRef(new Set())
 
   useEffect(() => {
     let changed = false
+    
+    // Vérifier si l'ensemble des IDs a changé (split, duplication, suppression)
+    const currentIds = new Set(track.clips.map(c => c.id))
+    if (prevClipIds.current.size !== currentIds.size) {
+      changed = true
+    } else {
+      for (const id of currentIds) {
+        if (!prevClipIds.current.has(id)) {
+          changed = true
+          break
+        }
+      }
+    }
+    prevClipIds.current = currentIds
+    
+    // Vérifier si les positions ont changé
     for (const clip of track.clips) {
       const key = clip.id
       const pos = clip.start
@@ -51,6 +68,7 @@ const EditorTrack = ({
         changed = true
       }
     }
+    
     if (changed) {
       setClipVersion(prev => prev + 1)
     }
@@ -167,7 +185,8 @@ const EditorTrack = ({
         const clipStart = clip.start || 0
         const isSelected = selectedClipId === clip.id
 
-        const clipKey = `${clip.id}-${clipStart.toFixed(4)}-${clipVersion}`
+        // ✅ CLÉ UNIQUE basée sur l'ID du clip + version
+        const clipKey = `${clip.id}-${clipVersion}`
 
         return (
           <EditorClip

@@ -1,5 +1,5 @@
 // src/features/editor/components/Markers/MarkersPanel.jsx
-import React, { useState, useCallback, memo, useEffect } from 'react'
+import React, { useState, useCallback, memo, useEffect, useRef } from 'react'
 import MarkerItem from './MarkerItem'
 
 const MARKER_COLORS = [
@@ -15,6 +15,8 @@ const MARKER_COLORS = [
   { id: 'brown', color: '#92400e' },
 ]
 
+const STORAGE_KEY_AUTO_OPEN = 'sounddeck_markers_auto_open'
+
 const MarkersPanel = memo(({
   markers = [],
   onAddMarker,
@@ -23,7 +25,8 @@ const MarkersPanel = memo(({
   onNavigateToMarker,
   currentTime = 0,
   totalDuration = 60,
-  tr
+  tr,
+  onAutoOpenChange,
 }) => {
   const [isAdding, setIsAdding] = useState(false)
   const [selectedColor, setSelectedColor] = useState('#3b82f6')
@@ -31,6 +34,45 @@ const MarkersPanel = memo(({
   const [markerName, setMarkerName] = useState('')
   const [markerTime, setMarkerTime] = useState(currentTime)
   const [useCurrentTime, setUseCurrentTime] = useState(true)
+  
+  // ✅ État auto-open avec valeur par défaut
+  const [autoOpen, setAutoOpen] = useState(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_AUTO_OPEN)
+    // ✅ Par défaut : false (l'utilisateur décide d'ouvrir)
+    return saved === null ? false : saved === 'true'
+  })
+  
+  // ✅ Ref pour suivre les interactions utilisateur
+  const isUserInteractionRef = useRef(false)
+  const hasInitializedRef = useRef(false)
+
+  // ✅ NE PAS notifier le parent à l'initialisation
+  useEffect(() => {
+    if (hasInitializedRef.current) return
+    hasInitializedRef.current = true
+    
+    console.log('📍 [MarkersPanel] Initialisation - autoOpen:', autoOpen)
+    // ✅ NE PAS appeler onAutoOpenChange ici
+  }, [autoOpen])
+
+  // ✅ Sauvegarder la préférence et notifier le parent UNIQUEMENT sur interaction utilisateur
+  const handleAutoOpenToggle = useCallback(() => {
+    const newValue = !autoOpen
+    setAutoOpen(newValue)
+    localStorage.setItem(STORAGE_KEY_AUTO_OPEN, String(newValue))
+    
+    // ✅ Marquer comme interaction utilisateur
+    isUserInteractionRef.current = true
+    
+    // ✅ Notifier le parent
+    onAutoOpenChange?.(newValue)
+    console.log('📍 [MarkersPanel] Auto-open (user toggle):', newValue)
+    
+    // ✅ Réinitialiser après un court délai
+    setTimeout(() => {
+      isUserInteractionRef.current = false
+    }, 200)
+  }, [autoOpen, onAutoOpenChange])
 
   const handleAddMarker = useCallback(() => {
     if (onAddMarker) {
@@ -60,14 +102,6 @@ const MarkersPanel = memo(({
     setUseCurrentTime(true)
   }, [markers?.length, currentTime])
 
-  // ✅ Ajouter un marqueur à la position de la souris sur la timeline
-  const handleAddAtMousePosition = useCallback((time) => {
-    setIsAdding(true)
-    setMarkerName(`Marker ${(markers?.length || 0) + 1}`)
-    setMarkerTime(time)
-    setUseCurrentTime(false)
-  }, [markers?.length])
-
   const sortedMarkers = markers ? [...markers].sort((a, b) => a.time - b.time) : []
 
   // Raccourci clavier Ctrl+M
@@ -81,20 +115,6 @@ const MarkersPanel = memo(({
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [handleAddAtCurrentTime])
-
-  // Exposer la fonction d'ajout à la position de la souris
-  useEffect(() => {
-    if (window.__editorMarkers) {
-      window.__editorMarkers.addAtPosition = handleAddAtMousePosition
-    } else {
-      window.__editorMarkers = { addAtPosition: handleAddAtMousePosition }
-    }
-    return () => {
-      if (window.__editorMarkers) {
-        delete window.__editorMarkers.addAtPosition
-      }
-    }
-  }, [handleAddAtMousePosition])
 
   if (!onAddMarker) {
     return (
@@ -325,7 +345,6 @@ const MarkersPanel = memo(({
                   title={c.id}
                 />
               ))}
-              {/* Sélecteur de couleur personnalisé */}
               <div style={{ position: 'relative' }}>
                 <button
                   onClick={() => setShowColorPicker(!showColorPicker)}
@@ -453,6 +472,61 @@ const MarkersPanel = memo(({
             tr={tr}
           />
         ))}
+      </div>
+
+      {/* ✅ Pied de panneau - Auto-open toggle */}
+      <div style={{
+        borderTop: '1px solid var(--border)',
+        paddingTop: 8,
+        marginTop: 4,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexShrink: 0
+      }}>
+        <label style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 11,
+          color: 'var(--text-secondary)',
+          cursor: 'pointer',
+          padding: '2px 4px',
+          borderRadius: 'var(--radius-sm)',
+          transition: 'background 0.15s',
+          userSelect: 'none'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'var(--bg-hover)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'transparent'
+        }}
+        >
+          <input
+            type="checkbox"
+            checked={autoOpen}
+            onChange={handleAutoOpenToggle}
+            style={{
+              width: 16,
+              height: 16,
+              accentColor: 'var(--accent)',
+              cursor: 'pointer',
+              borderRadius: 4
+            }}
+          />
+          <span>
+            <i className="ti ti-door-enter" style={{ fontSize: 12, marginRight: 4 }} />
+            {tr('markersAutoOpen') || 'Ouvrir automatiquement à l\'ouverture de l\'éditeur'}
+          </span>
+        </label>
+        <span style={{
+          fontSize: 9,
+          color: 'var(--text-tertiary)',
+          opacity: 0.6
+        }}>
+          {autoOpen ? '🟢 ON' : '🔴 OFF'}
+        </span>
       </div>
     </div>
   )

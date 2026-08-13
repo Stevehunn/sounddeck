@@ -13,6 +13,8 @@ import MarkersPanel from '../Markers/MarkersPanel'
 
 const TRACK_HEAD_WIDTH = 200
 const BASE_PIXELS_PER_SECOND = 80
+const STORAGE_KEY = 'sounddeck_markers_panel_open'
+const AUTO_OPEN_KEY = 'sounddeck_markers_auto_open'
 
 function formatTime(seconds) {
   if (!seconds || isNaN(seconds)) return '0:00'
@@ -57,8 +59,9 @@ export default function EditorTimeline({
   onToggleLoop,
   onUpdateClipDuration,
   onZoomChange,
+  onSplitClip,
   addToast,
-  store,
+  store: storeProp,
   setClipDurations,
   removeTrack,
   tr,
@@ -73,13 +76,28 @@ export default function EditorTimeline({
   onUpdateMarker,
   onNavigateToMarker,
 }) {
+  const editorContext = useEditor()
+  
   const containerRef = useRef(null)
   const clipsContainerRef = useRef(null)
   const rulerRef = useRef(null)
   const [isPanning, setIsPanning] = useState(false)
   const [panStartX, setPanStartX] = useState(0)
   const [scrollLeft, setScrollLeft] = useState(0)
-  const [showMarkersPanel, setShowMarkersPanel] = useState(true)
+  
+  const store = storeProp || editorContext?.store
+  
+  // ✅ CORRECTION : Utiliser une ref pour le chargement initial
+  const [showMarkersPanel, setShowMarkersPanel] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false)
+  const hasInitializedRef = useRef(false)
+  
+  // ✅ Récupérer la préférence d'auto-open depuis localStorage
+  const getAutoOpenPreference = useCallback(() => {
+    const saved = localStorage.getItem(AUTO_OPEN_KEY)
+    // ✅ Par défaut : false (l'utilisateur décide)
+    return saved === null ? false : saved === 'true'
+  }, [])
 
   const pixelsPerSecond = 80 * zoomLevel
   const totalWidth = Math.max(totalDuration * pixelsPerSecond + 100, 600)
@@ -97,6 +115,59 @@ export default function EditorTimeline({
     ]
     return colors[index % colors.length]
   }
+
+  // ✅ Chargement UNIQUE de la préférence
+  useEffect(() => {
+    // 🔒 Ne charger qu'une seule fois
+    if (hasInitializedRef.current) return
+    hasInitializedRef.current = true
+    
+    console.log('📍 [Timeline] Chargement initial UNIQUE de la préférence')
+    
+    // ✅ Vérifier si l'auto-open est activé
+    const autoOpen = getAutoOpenPreference()
+    
+    if (!autoOpen) {
+      console.log('📍 [Timeline] Auto-open désactivé, panneau fermé')
+      setShowMarkersPanel(false)
+      setIsInitialized(true)
+      return
+    }
+    
+    // ✅ Auto-open activé → le panneau s'ouvre TOUJOURS
+    console.log('📍 [Timeline] Auto-open activé, ouverture du panneau')
+    setShowMarkersPanel(true)
+    localStorage.setItem(STORAGE_KEY, 'true')
+    setIsInitialized(true)
+    
+  }, [onAddMarker, getAutoOpenPreference]) // ✅ Dépendances minimales
+
+  // ✅ Sauvegarder la préférence d'état du panneau
+  const handleToggleMarkersPanel = useCallback((show) => {
+    console.log('📍 [Timeline] handleToggleMarkersPanel:', show)
+    setShowMarkersPanel(show)
+    // ✅ Toujours sauvegarder l'état du panneau
+    localStorage.setItem(STORAGE_KEY, String(show))
+    console.log('📍 [Timeline] Préférence sauvegardée:', show)
+  }, [])
+
+  // ✅ Gestionnaire pour l'auto-open depuis MarkersPanel
+  const handleAutoOpenChange = useCallback((autoOpen) => {
+    console.log('📍 [Timeline] Auto-open changed:', autoOpen)
+    localStorage.setItem(AUTO_OPEN_KEY, String(autoOpen))
+    
+    if (autoOpen) {
+      // ✅ Si l'auto-open est activé, ouvrir le panneau
+      console.log('📍 [Timeline] Auto-open activé, ouverture du panneau')
+      setShowMarkersPanel(true)
+      localStorage.setItem(STORAGE_KEY, 'true')
+    } else {
+      // ✅ Si l'auto-open est désactivé, fermer le panneau
+      console.log('📍 [Timeline] Auto-open désactivé, fermeture du panneau')
+      setShowMarkersPanel(false)
+      localStorage.setItem(STORAGE_KEY, 'false')
+    }
+  }, [])
 
   const clientXToTime = useCallback((clientX, containerElement) => {
     const container = containerElement || clipsContainerRef.current
@@ -121,17 +192,32 @@ export default function EditorTimeline({
   }, [clientXToTime, totalDuration, onSeek])
 
   const handleRulerClick = useCallback((e) => {
-    if (e.detail === 2) {
-      const time = clientXToTime(e.clientX, rulerRef.current)
-      onSeek?.(time)
-      return
-    }
-    
     const time = clientXToTime(e.clientX, rulerRef.current)
     if (time >= 0 && time <= totalDuration) {
       onSeek?.(time)
     }
   }, [clientXToTime, totalDuration, onSeek])
+
+  const handleRulerDoubleClick = useCallback((e) => {
+    const time = clientXToTime(e.clientX, rulerRef.current)
+    if (time >= 0 && time <= totalDuration) {
+      onSeek?.(time)
+      
+      if (selectedClipId && selectedTrackId && onSplitClip) {
+        const allClips = tracks.flatMap(t => t.clips)
+        const clip = allClips.find(c => c.id === selectedClipId)
+        if (clip) {
+          const duration = clipDurations[clip.id] || clip.duration || 3
+          const start = clip.start || 0
+          const end = start + duration
+          if (time > start + 0.05 && time < end - 0.05) {
+            onSplitClip(selectedTrackId, selectedClipId, time)
+            addToast?.('Clip coupé à la position du curseur', 'success')
+          }
+        }
+      }
+    }
+  }, [clientXToTime, totalDuration, onSeek, selectedClipId, selectedTrackId, tracks, clipDurations, onSplitClip, addToast])
 
   const renderMarkerMarkers = () => {
     if (!markers || markers.length === 0) return null
@@ -230,6 +316,11 @@ export default function EditorTimeline({
     return `${track.id}-${clipPositions}`
   }
 
+  // ✅ Indicateur de chargement
+  const shouldShowPanel = isInitialized && showMarkersPanel && onAddMarker
+  
+  console.log('📍 [Timeline] Render - showMarkersPanel:', showMarkersPanel, 'initialized:', isInitialized)
+
   return (
     <div
       ref={containerRef}
@@ -270,6 +361,7 @@ export default function EditorTimeline({
             cursor: 'pointer'
           }}
           onClick={handleRulerClick}
+          onDoubleClick={handleRulerDoubleClick}
         >
           <TimelineRuler
             totalDuration={totalDuration}
@@ -474,8 +566,8 @@ export default function EditorTimeline({
           </div>
         </div>
 
-        {/* Markers Panel */}
-        {showMarkersPanel && onAddMarker && (
+        {/* ✅ PANEL DES MARQUEURS - Avec localStorage et auto-open contrôlé */}
+        {shouldShowPanel && (
           <div style={{
             width: 280,
             minWidth: 280,
@@ -517,7 +609,10 @@ export default function EditorTimeline({
               </span>
               <button
                 className="btn-ghost btn-sm btn-icon"
-                onClick={() => setShowMarkersPanel(false)}
+                onClick={() => {
+                  console.log('📍 [Timeline] Fermeture manuelle du panneau')
+                  handleToggleMarkersPanel(false)
+                }}
                 style={{
                   padding: '2px 4px',
                   fontSize: 12,
@@ -546,21 +641,26 @@ export default function EditorTimeline({
                 currentTime={currentTime}
                 totalDuration={totalDuration}
                 tr={tr}
+                onAutoOpenChange={handleAutoOpenChange}
               />
             </div>
           </div>
         )}
 
-        {!showMarkersPanel && onAddMarker && (
+        {/* ✅ Bouton pour ouvrir le panneau des marqueurs s'il est caché */}
+        {isInitialized && !showMarkersPanel && onAddMarker && (
           <button
             className="btn-secondary btn-sm"
-            onClick={() => setShowMarkersPanel(true)}
+            onClick={() => {
+              console.log('📍 [Timeline] Ouverture manuelle du panneau')
+              handleToggleMarkersPanel(true)
+            }}
             style={{
               position: 'absolute',
               right: 8,
               top: 8,
               zIndex: 10,
-              padding: '4px 8px',
+              padding: '4px 10px',
               fontSize: 11,
               color: 'var(--accent)',
               border: '1px solid var(--border)',
@@ -568,9 +668,18 @@ export default function EditorTimeline({
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: 4,
+              gap: 6,
               boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-              background: 'var(--bg-secondary)'
+              background: 'var(--bg-secondary)',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = 'var(--accent)'
+              e.currentTarget.style.background = 'var(--accent-light)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--border)'
+              e.currentTarget.style.background = 'var(--bg-secondary)'
             }}
             title={tr?.('editorMarkers') || 'Afficher les marqueurs'}
           >
@@ -578,9 +687,14 @@ export default function EditorTimeline({
             {tr?.('editorMarkers') || 'Marqueurs'}
             <span style={{
               fontSize: 9,
-              color: 'var(--text-tertiary)'
+              color: 'var(--text-tertiary)',
+              background: 'var(--bg-tertiary)',
+              padding: '0 6px',
+              borderRadius: 10,
+              minWidth: 16,
+              textAlign: 'center'
             }}>
-              ({markers?.length || 0})
+              {markers?.length || 0}
             </span>
           </button>
         )}

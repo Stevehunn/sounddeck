@@ -27,8 +27,6 @@ export function EditorProvider({ children, store, addToast }) {
   const [isDirty, setIsDirty] = useState(false)
   const [isAutoSaving, setIsAutoSaving] = useState(false)
   const [stopAtTime, setStopAtTime] = useState(null)
-  
-  // ✅ État pour le solo de lecture (indépendant de la sélection)
   const [soloPlayClipId, setSoloPlayClipId] = useState(null)
   
   // ─── REFS ──────────────────────────────────────────────────────────────
@@ -45,37 +43,23 @@ export function EditorProvider({ children, store, addToast }) {
   const selectedClipIdRef = useRef(null)
   const stopAtTimeRef = useRef(null)
   const soloPlayClipIdRef = useRef(null)
+  const idCounterRef = useRef(0)
 
-  // Mettre à jour les refs quand les états changent
-  useEffect(() => {
-    projectRef.current = project
-  }, [project])
-
-  useEffect(() => {
-    currentTimeRef.current = currentTime
-  }, [currentTime])
-
-  useEffect(() => {
-    isPlayingRef.current = isPlaying
-  }, [isPlaying])
-
-  useEffect(() => {
-    isPausedRef.current = isPaused
-  }, [isPaused])
-
-  useEffect(() => {
-    selectedClipIdRef.current = selectedClipId
-  }, [selectedClipId])
-
-  useEffect(() => {
-    stopAtTimeRef.current = stopAtTime
-  }, [stopAtTime])
-
-  useEffect(() => {
-    soloPlayClipIdRef.current = soloPlayClipId
-  }, [soloPlayClipId])
+  // Mettre à jour les refs
+  useEffect(() => { projectRef.current = project }, [project])
+  useEffect(() => { currentTimeRef.current = currentTime }, [currentTime])
+  useEffect(() => { isPlayingRef.current = isPlaying }, [isPlaying])
+  useEffect(() => { isPausedRef.current = isPaused }, [isPaused])
+  useEffect(() => { selectedClipIdRef.current = selectedClipId }, [selectedClipId])
+  useEffect(() => { stopAtTimeRef.current = stopAtTime }, [stopAtTime])
+  useEffect(() => { soloPlayClipIdRef.current = soloPlayClipId }, [soloPlayClipId])
 
   // ─── FONCTIONS HELPER ──────────────────────────────────────────────
+
+  const generateUniqueId = useCallback((prefix) => {
+    idCounterRef.current += 1
+    return `${prefix}-${Date.now()}-${idCounterRef.current}`
+  }, [])
 
   const findPreviousClip = useCallback((clip, track) => {
     if (!track || !track.clips) return null
@@ -242,6 +226,8 @@ export function EditorProvider({ children, store, addToast }) {
     }
   }, [])
 
+  // ─── FONCTIONS PLAYBACK ──────────────────────────────────────────────
+
   const playClip = useCallback(async (clip, track) => {
     if (!clip?.path) return
     
@@ -254,6 +240,7 @@ export function EditorProvider({ children, store, addToast }) {
       
       let sourceBuffer = buffer
       
+      // Appliquer les effets
       if (clip.effects && clip.effects.length > 0) {
         const activeEffects = clip.effects.filter(e => e.enabled)
         if (activeEffects.length > 0) {
@@ -274,6 +261,7 @@ export function EditorProvider({ children, store, addToast }) {
       const trackVolume = track?.volume || 1
       gainNode.gain.value = trackVolume
       
+      // Crossfade
       if (autoCrossfade) {
         const previousClip = findPreviousClip(clip, track)
         if (previousClip) {
@@ -299,18 +287,26 @@ export function EditorProvider({ children, store, addToast }) {
       source.connect(gainNode)
       gainNode.connect(ctx.destination)
       
-      const offset = Math.max(0, currentTime - (clip.start || 0))
-      const startTime = Math.min(offset, sourceBuffer.duration - 0.01)
+      // ✅ CORRECTION : Utiliser clip.offset pour la position de départ dans le fichier
+      const clipOffset = clip.offset || 0
+      const timeInClip = Math.max(0, currentTime - (clip.start || 0))
+      const offset = Math.min(clipOffset + timeInClip, sourceBuffer.duration - 0.01)
       
-      source.start(0, startTime)
+      console.log(`🎵 [playClip] ${clip.name}: offset=${clipOffset}, timeInClip=${timeInClip}, total=${offset}, duration=${sourceBuffer.duration}`)
+      
+      source.start(0, offset)
       audioSourcesRef.current[clip.id] = { source, gainNode }
       
       source.onended = () => {
         delete audioSourcesRef.current[clip.id]
       }
       
-    } catch (e) {}
+    } catch (e) {
+      console.error('❌ [playClip] Erreur:', e)
+    }
   }, [loadAudioBuffer, currentTime, autoCrossfade, findPreviousClip, calculateOverlap])
+
+  // ─── startPlaybackLoop ──────────────────────────────────────────────
 
   const startPlaybackLoop = useCallback(() => {
     if (animationRef.current) {
@@ -348,6 +344,7 @@ export function EditorProvider({ children, store, addToast }) {
             if (track.muted) continue
             
             for (const clip of track.clips) {
+              // ✅ Utiliser clipDurations pour la durée, ou clip.duration en fallback
               const duration = clipDurations[clip.id] || clip.duration || 3
               const start = clip.start || 0
               const end = start + duration
@@ -365,15 +362,29 @@ export function EditorProvider({ children, store, addToast }) {
               if (shouldPlay) {
                 activeClips.add(clip.id)
                 if (!lastPlayedClipsRef.current.has(clip.id)) {
+                  console.log(`▶️ [EditorContext] Lancement du clip: ${clip.name} (${clip.id}) à ${newTime.toFixed(2)}s, durée: ${duration.toFixed(2)}s, fin: ${end.toFixed(2)}s`)
                   playClip(clip, track)
                   lastPlayedClipsRef.current.add(clip.id)
                 }
               } else if (newTime >= end || (soloClipId && clip.id !== soloClipId)) {
-                lastPlayedClipsRef.current.delete(clip.id)
+                // ✅ Si le clip est terminé, le retirer des clips actifs
+                if (lastPlayedClipsRef.current.has(clip.id)) {
+                  console.log(`⏹️ [EditorContext] Arrêt du clip: ${clip.name} (${clip.id}) à ${newTime.toFixed(2)}s (fin: ${end.toFixed(2)}s)`)
+                  const entry = audioSourcesRef.current[clip.id]
+                  if (entry) {
+                    try { 
+                      entry.source.stop() 
+                      entry.source.disconnect() 
+                    } catch (e) {}
+                    delete audioSourcesRef.current[clip.id]
+                  }
+                  lastPlayedClipsRef.current.delete(clip.id)
+                }
               }
             }
           }
           
+          // ✅ Nettoyer les clips qui ne sont plus actifs
           for (const clipId of lastPlayedClipsRef.current) {
             if (!activeClips.has(clipId)) {
               const entry = audioSourcesRef.current[clipId]
@@ -389,10 +400,12 @@ export function EditorProvider({ children, store, addToast }) {
           }
         }
         
+        // ✅ VÉRIFIER SI ON DOIT S'ARRÊTER
         const shouldStop = (stopAtTimeRef.current !== null && newTime >= stopAtTimeRef.current) || newTime >= totalDuration
         
         if (shouldStop) {
           const stopPosition = stopAtTimeRef.current !== null ? stopAtTimeRef.current : totalDuration
+          console.log(`⏹️ [EditorContext] Fin de la lecture à ${newTime.toFixed(2)}s (arrêt programmé à ${stopPosition.toFixed(2)}s)`)
           setIsPlaying(false)
           setCurrentTime(stopPosition)
           setStopAtTime(null)
@@ -427,6 +440,7 @@ export function EditorProvider({ children, store, addToast }) {
     audioSourcesRef.current = {}
     
     animationRef.current = requestAnimationFrame(loop)
+    console.log('✅ [EditorContext] Animation démarrée')
   }, [totalDuration, playClip, clipDurations])
 
   // ─── PLAYBACK CONTROLS ──────────────────────────────────────────────
@@ -892,7 +906,7 @@ export function EditorProvider({ children, store, addToast }) {
       }
 
       const newClip = {
-        id: `clip-${Date.now()}`,
+        id: generateUniqueId('clip'),
         soundId: null,
         name: fileName,
         path: importResult.path,
@@ -945,7 +959,7 @@ export function EditorProvider({ children, store, addToast }) {
       addToast?.(e.message || 'Erreur lors de l\'import du fichier', 'error')
       return null
     }
-  }, [project, addToast, store, t, getAudioDuration])
+  }, [project, addToast, store, t, getAudioDuration, generateUniqueId])
 
   const removeClip = useCallback((trackId, clipId) => {
     if (!project) return
@@ -1031,11 +1045,15 @@ export function EditorProvider({ children, store, addToast }) {
     if (!clip) return null
     
     const duration = clipDurations[clip.id] || clip.duration || 3
+    
     const newClip = {
       ...clip,
-      id: `clip-${Date.now()}`,
+      id: generateUniqueId('clip'),
       start: (clip.start || 0) + duration + 0.5,
-      effects: (clip.effects || []).map(e => ({ ...e, id: `effect-${Date.now()}-${e.id || Math.random().toString(36).slice(2, 6)}` }))
+      effects: (clip.effects || []).map(e => ({ 
+        ...e, 
+        id: generateUniqueId('effect') 
+      }))
     }
     
     const updatedProject = {
@@ -1066,7 +1084,7 @@ export function EditorProvider({ children, store, addToast }) {
     setIsDirty(true)
     addToast?.('Clip dupliqué', 'success')
     return newClip
-  }, [project, clipDurations, addToast, store])
+  }, [project, clipDurations, addToast, store, generateUniqueId])
 
   const moveClip = useCallback((trackId, clipId, newStart, newTrackId, options = {}) => {
     if (!project) return
@@ -1145,13 +1163,150 @@ export function EditorProvider({ children, store, addToast }) {
     }
   }, [project, store, clipDurations])
 
+  // ─── FONCTIONS SELECTION ──────────────────────────────────────────────
+
+  const selectClip = useCallback((clipId, trackId) => {
+    setSelectedClipId(clipId)
+    setSelectedTrackId(trackId)
+  }, [])
+
+  const deselectClip = useCallback(() => {
+    setSelectedClipId(null)
+    setSelectedTrackId(null)
+  }, [])
+
+  // ─── SPLIT CLIP ──────────────────────────────────────────────────────
+
+  const splitClip = useCallback((trackId, clipId, splitTime) => {
+    if (!project) {
+      addToast?.('Aucun projet', 'error')
+      return null
+    }
+    
+    const track = project.tracks.find(t => t.id === trackId)
+    if (!track) {
+      addToast?.('Piste non trouvée', 'error')
+      return null
+    }
+    
+    const clipIndex = track.clips.findIndex(c => c.id === clipId)
+    if (clipIndex === -1) {
+      addToast?.('Clip non trouvé', 'error')
+      return null
+    }
+    
+    const clip = track.clips[clipIndex]
+    const duration = clipDurations[clip.id] || clip.duration || 3
+    const start = clip.start || 0
+    const end = start + duration
+    
+    const clampedSplitTime = Math.max(start + 0.05, Math.min(end - 0.05, splitTime))
+    
+    if (clampedSplitTime - start < 0.05 || end - clampedSplitTime < 0.05) {
+      addToast?.('Position de coupe trop proche du bord', 'warning')
+      return null
+    }
+    
+    const leftDuration = clampedSplitTime - start
+    const rightDuration = end - clampedSplitTime
+    const currentOffset = clip.offset || 0
+    
+    console.log('✂️ [splitClip] Split du clip:', {
+      name: clip.name,
+      start,
+      duration,
+      splitTime: clampedSplitTime,
+      leftDuration,
+      rightDuration,
+      currentOffset,
+      path: clip.path
+    })
+    
+    // ✅ Clip gauche : même offset que l'original
+    const leftClip = {
+      ...clip,
+      id: generateUniqueId('clip'),
+      duration: leftDuration,
+      offset: currentOffset,
+      start: start,
+      effects: clip.effects ? clip.effects.map(e => ({ ...e })) : [],
+    }
+    
+    // ✅ Clip droit : offset décalé de leftDuration
+    const rightClip = {
+      ...clip,
+      id: generateUniqueId('clip'),
+      duration: rightDuration,
+      offset: currentOffset + leftDuration,
+      start: clampedSplitTime,
+      effects: clip.effects ? clip.effects.map(e => ({ ...e })) : [],
+    }
+    
+    // ✅ Ajuster les fades si nécessaires
+    if (leftClip.effects) {
+      const fadeOutEffect = leftClip.effects.find(e => e.type === 'fadeOut')
+      if (fadeOutEffect && fadeOutEffect.params.duration > leftDuration * 0.5) {
+        fadeOutEffect.params.duration = Math.min(fadeOutEffect.params.duration, leftDuration * 0.5)
+      }
+    }
+    
+    if (rightClip.effects) {
+      const fadeInEffect = rightClip.effects.find(e => e.type === 'fadeIn')
+      if (fadeInEffect && fadeInEffect.params.duration > rightDuration * 0.5) {
+        fadeInEffect.params.duration = Math.min(fadeInEffect.params.duration, rightDuration * 0.5)
+      }
+    }
+    
+    const updatedProject = {
+      ...project,
+      tracks: project.tracks.map(t => {
+        if (t.id === trackId) {
+          const newClips = [
+            ...track.clips.slice(0, clipIndex),
+            leftClip,
+            rightClip,
+            ...track.clips.slice(clipIndex + 1)
+          ]
+          newClips.sort((a, b) => a.start - b.start)
+          return { ...t, clips: newClips }
+        }
+        return t
+      }),
+      updatedAt: Date.now()
+    }
+    
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    setClipDurations(prev => ({
+      ...prev,
+      [leftClip.id]: leftDuration,
+      [rightClip.id]: rightDuration,
+    }))
+    
+    if (store?.updateEditorProject) {
+      store.updateEditorProject(updatedProject).catch(() => {})
+    }
+    
+    setIsDirty(true)
+    addToast?.(`Clip "${clip.name}" coupé en deux`, 'success')
+    selectClip(leftClip.id, trackId)
+    
+    console.log('✅ [splitClip] Résultat:', {
+      left: { id: leftClip.id, offset: leftClip.offset, duration: leftClip.duration, start: leftClip.start },
+      right: { id: rightClip.id, offset: rightClip.offset, duration: rightClip.duration, start: rightClip.start }
+    })
+    
+    return { leftClip, rightClip }
+  }, [project, clipDurations, store, addToast, selectClip, generateUniqueId])
+
   // ─── FONCTIONS EFFETS ──────────────────────────────────────────────────
 
   const addEffectToClip = useCallback(async (trackId, clipId, effectType, params = {}) => {
     if (!project) return null
     
     const effect = {
-      id: `effect-${Date.now()}`,
+      id: generateUniqueId('effect'),
       type: effectType,
       params: params,
       enabled: true
@@ -1188,7 +1343,7 @@ export function EditorProvider({ children, store, addToast }) {
     
     setIsDirty(true)
     return effect
-  }, [project, store])
+  }, [project, store, generateUniqueId])
 
   const removeEffectFromClip = useCallback(async (trackId, clipId, effectId) => {
     if (!project) return
@@ -1344,7 +1499,7 @@ export function EditorProvider({ children, store, addToast }) {
                     effects: [
                       ...(clip.effects || []),
                       {
-                        id: `effect-${Date.now()}`,
+                        id: generateUniqueId('effect'),
                         type: effectType,
                         params: { duration: clampedDuration },
                         enabled: clampedDuration > 0.05
@@ -1370,19 +1525,7 @@ export function EditorProvider({ children, store, addToast }) {
     }
     
     setIsDirty(true)
-  }, [project, store])
-
-  // ─── FONCTIONS SELECTION ──────────────────────────────────────────────
-
-  const selectClip = useCallback((clipId, trackId) => {
-    setSelectedClipId(clipId)
-    setSelectedTrackId(trackId)
-  }, [])
-
-  const deselectClip = useCallback(() => {
-    setSelectedClipId(null)
-    setSelectedTrackId(null)
-  }, [])
+  }, [project, store, generateUniqueId])
 
   // ─── FONCTIONS LOOP ──────────────────────────────────────────────────
 
@@ -1417,11 +1560,12 @@ export function EditorProvider({ children, store, addToast }) {
     if (!project) return null
     
     const newMarker = {
-      id: `marker-${Date.now()}`,
+      id: `marker-${Date.now()}-${idCounterRef.current}`,
       name: markerData.name || `Marqueur ${(project.markers?.length || 0) + 1}`,
       time: markerData.time || currentTime,
       color: markerData.color || '#3b82f6'
     }
+    idCounterRef.current += 1
     
     const updatedProject = {
       ...project,
@@ -1542,6 +1686,7 @@ export function EditorProvider({ children, store, addToast }) {
     updateClip,
     duplicateClip,
     moveClip,
+    splitClip,
     addEffectToClip,
     removeEffectFromClip,
     updateEffectParam,
