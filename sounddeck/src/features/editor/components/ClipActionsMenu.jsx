@@ -31,9 +31,12 @@ export default function ClipActionsMenu({
   const [fadeDurations, setFadeDurations] = useState({ in: 0.5, out: 0.5 })
   const [activeTab, setActiveTab] = useState('edit')
 
+  console.log('📋 [ClipActionsMenu] Rendu du menu pour clip:', clip?.id, 'nom:', clip?.name)
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
+        console.log('📋 [ClipActionsMenu] Clic extérieur, fermeture')
         onClose()
       }
     }
@@ -61,12 +64,14 @@ export default function ClipActionsMenu({
     }
   }, [position])
 
-  if (!clip) return null
+  if (!clip) {
+    console.warn('📋 [ClipActionsMenu] clip est null/undefined, pas de rendu')
+    return null
+  }
 
   const hasActiveEffects = clip.effects?.some(e => e.enabled) || false
   const duration = clipDurations?.[clip.id] || clip.duration || 3
 
-  // ✅ Fonction pour split au milieu
   const handleSplitMid = () => {
     if (clip) {
       const start = clip.start || 0
@@ -159,13 +164,44 @@ export default function ClipActionsMenu({
       <div style={{ padding: '0 4px' }}>
         {activeTab === 'edit' && (
           <div className="menu-group">
-            <MenuItem icon="ti-copy" label={t('editorCopy') || 'Copier'} onClick={() => onCopy?.(clip.id, trackId)} shortcut="Ctrl+C" />
-            <MenuItem icon="ti-scissors" label={t('editorCut') || 'Couper'} onClick={() => onCut?.(clip.id, trackId)} shortcut="Ctrl+X" />
-            <MenuItem icon="ti-copy" label={t('editorDuplicate') || 'Dupliquer'} onClick={() => onDuplicate?.(trackId, clip.id)} shortcut="Ctrl+D" />
+            <MenuItem 
+              icon="ti-copy" 
+              label={t('editorCopy') || 'Copier'} 
+              onClick={() => { 
+                console.log('📋 [ClipActionsMenu] Copier:', clip.id)
+                onCopy?.(clip.id, trackId)
+                onClose() 
+              }} 
+              shortcut="Ctrl+C"
+            />
+            <MenuItem 
+              icon="ti-scissors" 
+              label={t('editorCut') || 'Couper'} 
+              onClick={() => { 
+                console.log('✂️ [ClipActionsMenu] Couper:', clip.id)
+                onCut?.(clip.id, trackId)
+                onClose() 
+              }} 
+              shortcut="Ctrl+X"
+            />
+            <MenuItem 
+              icon="ti-copy" 
+              label={t('editorDuplicate') || 'Dupliquer'} 
+              onClick={() => { 
+                console.log('📋 [ClipActionsMenu] Dupliquer:', clip.id)
+                onDuplicate?.(trackId, clip.id)
+                onClose() 
+              }} 
+              shortcut="Ctrl+D"
+            />
             
             <div style={{ padding: '2px 4px' }}>
               <DeleteButton
-                onDelete={() => onDelete?.(trackId, clip.id)}
+                onDelete={() => {
+                  console.log('🗑️ [ClipActionsMenu] Supprimer:', clip.id)
+                  onDelete?.(trackId, clip.id)
+                  onClose()
+                }}
                 confirmTitle={t('confirmDeleteClip') || 'Confirmer la suppression du clip'}
                 confirmMessage={t('confirmDeleteClipMessage') || 'Voulez-vous vraiment supprimer ce clip ?'}
                 itemName={clip.name}
@@ -184,7 +220,12 @@ export default function ClipActionsMenu({
             <MenuItem 
               icon="ti-cut" 
               label={t('editorTrim') || 'Rogner'} 
-              onClick={() => { onTrim?.(clip.id); onClose() }} 
+              onClick={() => { 
+                console.log('✂️ [ClipActionsMenu] Rogner:', clip.id)
+                onTrim?.(clip.id)
+                onClose() 
+              }} 
+              shortcut="Ctrl+R"
             />
             <MenuItem 
               icon="ti-scissors" 

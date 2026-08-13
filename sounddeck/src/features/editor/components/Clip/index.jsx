@@ -73,6 +73,18 @@ const EditorClip = ({
 
   const playheadPosition = Math.max(0, Math.min((currentTime - start) * pixelsPerSecond, clipWidth - 2))
 
+  const handleContextMenu = useCallback((e) => {
+    console.log('🖱️ [Clip] Clic droit DÉTECTÉ sur le clip:', clip.id, 'nom:', clip.name)
+    e.preventDefault()
+    e.stopPropagation()
+    if (onContextMenu) {
+      console.log('🖱️ [Clip] Appel de onContextMenu avec clipId:', clip.id)
+      onContextMenu(e, clip.id)  // ✅ Passer clip.id en second argument
+    } else {
+      console.warn('🖱️ [Clip] onContextMenu est undefined !')
+    }
+  }, [clip.id, clip.name, onContextMenu])
+
   const handleMouseDown = (e) => {
     if (e.button !== 0) return
     
@@ -253,10 +265,7 @@ const EditorClip = ({
         pointerEvents: 'auto',
       }}
       onMouseDown={handleMouseDown}
-      onContextMenu={(e) => {
-        e.preventDefault()
-        onContextMenu?.(e)
-      }}
+      onContextMenu={handleContextMenu}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >

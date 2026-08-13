@@ -42,10 +42,20 @@ const EditorTrack = ({
   const prevClipPositions = useRef({})
   const prevClipIds = useRef(new Set())
 
+  // ✅ LOG pour le clic droit
+  const handleClipContextMenu = useCallback((e, clipId) => {
+    console.log('🖱️ [Track] Clic droit reçu pour clip:', clipId, 'sur piste:', track.id)
+    if (onClipContextMenu) {
+      console.log('🖱️ [Track] Transmission à onClipContextMenu avec clipId:', clipId)
+      onClipContextMenu(e, clipId, track.id)
+    } else {
+      console.warn('🖱️ [Track] onClipContextMenu est undefined !')
+    }
+  }, [track.id, onClipContextMenu])
+
   useEffect(() => {
     let changed = false
     
-    // Vérifier si l'ensemble des IDs a changé (split, duplication, suppression)
     const currentIds = new Set(track.clips.map(c => c.id))
     if (prevClipIds.current.size !== currentIds.size) {
       changed = true
@@ -59,7 +69,6 @@ const EditorTrack = ({
     }
     prevClipIds.current = currentIds
     
-    // Vérifier si les positions ont changé
     for (const clip of track.clips) {
       const key = clip.id
       const pos = clip.start
@@ -185,7 +194,6 @@ const EditorTrack = ({
         const clipStart = clip.start || 0
         const isSelected = selectedClipId === clip.id
 
-        // ✅ CLÉ UNIQUE basée sur l'ID du clip + version
         const clipKey = `${clip.id}-${clipVersion}`
 
         return (
@@ -205,9 +213,7 @@ const EditorTrack = ({
             onRemove={handleClipRemove}
             onDuplicate={handleClipDuplicate}
             onFade={handleClipFade}
-            onContextMenu={(e) => {
-              onClipContextMenu?.(e, track.id, clip.id)
-            }}
+            onContextMenu={handleClipContextMenu}
             onUpdateDuration={handleUpdateClipDuration}
             waveformData={waveformData?.[clip.id]}
             isPlaying={isPlaying}

@@ -15,6 +15,9 @@ export function useKeyboardShortcuts({
   onZoomIn,
   onZoomOut,
   onZoomReset,
+  onCopy,
+  onCut,
+  onPaste,
   isPlaying,
   canUndo,
   canRedo,
@@ -23,13 +26,11 @@ export function useKeyboardShortcuts({
   const handleKeyDown = useCallback((e) => {
     if (!isEnabled) return
     
-    // ✅ Ne pas capturer si on est dans un input
     const target = e.target
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
       return
     }
 
-    // Ctrl / Cmd
     const ctrl = e.ctrlKey || e.metaKey
     const shift = e.shiftKey
     const alt = e.altKey
@@ -86,7 +87,31 @@ export function useKeyboardShortcuts({
       return
     }
 
-    // ✅ Delete / Backspace - Delete
+    // ✅ Ctrl+C - Copier
+    if (ctrl && e.key === 'c' && !shift) {
+      e.preventDefault()
+      console.log('⌨️ Ctrl+C: Copier')
+      onCopy?.()
+      return
+    }
+
+    // ✅ Ctrl+X - Couper
+    if (ctrl && e.key === 'x' && !shift) {
+      e.preventDefault()
+      console.log('⌨️ Ctrl+X: Couper')
+      onCut?.()
+      return
+    }
+
+    // ✅ Ctrl+V - Coller
+    if (ctrl && e.key === 'v' && !shift) {
+      e.preventDefault()
+      console.log('⌨️ Ctrl+V: Coller')
+      onPaste?.()
+      return
+    }
+
+    // ✅ Delete / Backspace - Supprimer
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault()
       console.log('⌨️ Delete: Supprimer')
@@ -149,6 +174,9 @@ export function useKeyboardShortcuts({
     onZoomIn,
     onZoomOut,
     onZoomReset,
+    onCopy,
+    onCut,
+    onPaste,
     canUndo,
     canRedo
   ])
@@ -160,7 +188,6 @@ export function useKeyboardShortcuts({
     }
   }, [handleKeyDown])
 
-  // ✅ Retourner la liste des raccourcis pour affichage
   const shortcuts = {
     'Space': 'Play/Pause',
     'Escape': 'Stop',
@@ -168,7 +195,10 @@ export function useKeyboardShortcuts({
     'Ctrl+Y': 'Redo',
     'Ctrl+T': 'Add Track',
     'Ctrl+M': 'Add Marker',
-    'Delete': 'Delete',
+    'Ctrl+C': 'Copier',
+    'Ctrl+X': 'Couper',
+    'Ctrl+V': 'Coller',
+    'Delete': 'Supprimer',
     'Ctrl+Shift+S': 'Toggle Snap',
     'Ctrl+=/+': 'Zoom In',
     'Ctrl+-': 'Zoom Out',

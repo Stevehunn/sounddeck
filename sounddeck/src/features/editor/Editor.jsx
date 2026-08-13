@@ -9,7 +9,7 @@ import EditorEffectsPanel from './components/EffectsPanel'
 import EditorMasterVolume from './components/MasterVolume'
 import ClipActionsMenu from './components/ClipActionsMenu'
 import AddTrackModal from './components/Modals/AddTrackModal'
-import TrimModal from './components/Modals/TrimModal'
+import TrimClipModal from './components/Modals/TrimClipModal'
 import ExportModal from './components/Modals/ExportModal'
 import ImportFileModal from './components/Modals/ImportFileModal'
 import { getClipById } from './utils'
@@ -142,8 +142,10 @@ function EditorTimelineContent() {
   const [pendingImportFile, setPendingImportFile] = useState(null)
   const [pendingImportFileName, setPendingImportFileName] = useState('')
 
-  // ─── GUARD POUR LES MARQUEURS - Éviter les re-rendus intempestifs ────
-  // ✅ Ajouter un guard pour éviter les re-rendus intempestifs
+  // ✅ PRESSE-PAPIERS POUR COPIE/COLLER
+  const [clipboard, setClipboard] = useState(null)
+
+  // ─── GUARD POUR LES MARQUEURS ──────────────────────────────────────────
   const [markersState, setMarkersState] = useState(() => {
     const markers = context.markers || []
     const savedAutoOpen = localStorage.getItem('sounddeck_markers_auto_open')
@@ -156,7 +158,6 @@ function EditorTimelineContent() {
     }
   })
 
-  // ✅ Initialisation contrôlée (maintenant useEffect est importé)
   useEffect(() => {
     if (markersState.hasInitialized) return
     setMarkersState(prev => ({ ...prev, hasInitialized: true }))
@@ -284,6 +285,7 @@ function EditorTimelineContent() {
   }, [addClipFromFile, addToast, t])
 
   const handleRemoveClip = useCallback((trackId, clipId) => {
+    console.log('🗑️ [Editor] removeClip appelé:', { trackId, clipId })
     removeClip(trackId, clipId)
   }, [removeClip])
 
@@ -292,11 +294,24 @@ function EditorTimelineContent() {
   }, [selectClip])
 
   const handleClipContextMenu = useCallback((e, clipId, trackId) => {
+    console.log('🖱️ [Editor] handleClipContextMenu appelé !')
+    console.log('🖱️ [Editor] clipId:', clipId, 'trackId:', trackId)
+    
     e.preventDefault()
-    setSelectedClipForMenu(clipId)
+    e.stopPropagation()
+    
+    const clip = getClipById(tracks, clipId)
+    console.log('🖱️ [Editor] clip trouvé:', clip?.name)
+    
+    if (!clip) {
+      console.warn('🖱️ [Editor] Clip non trouvé !')
+      return
+    }
+    
+    setSelectedClipForMenu(clip)
     setSelectedTrackForMenu(trackId)
     setClipMenu({ top: e.clientY, left: e.clientX })
-  }, [])
+  }, [tracks])
 
   const handleUpdateClipDuration = useCallback((clipId, newDuration) => {
     if (selectedTrackId) {
@@ -331,6 +346,164 @@ function EditorTimelineContent() {
     setExportName(project.name || 'Mon mix')
     setShowExportModal(true)
   }, [project, addToast, t])
+
+  // ─── HANDLERS COPIER/COUPER/COLLER ────────────────────────────────────
+
+  const handleCopyClip = useCallback((clip) => {
+    if (!clip) {
+      addToast?.('Aucun clip à copier', 'warning')
+      return
+    }
+    
+    console.log('📋 [Editor] Copie du clip:', clip.id, clip.name)
+    
+    setClipboard({
+      clip: {
+        ...clip,
+        _sourceId: clip.id,
+        _copiedAt: Date.now()
+      },
+      trackId: selectedTrackId
+    })
+    
+    addToast?.(`"${clip.name}" ${t('editorCopied')}`, 'success')
+  }, [selectedTrackId, addToast, t])
+
+  const handleCutClip = useCallback((clip) => {
+    if (!clip) {
+      addToast?.('Aucun clip à couper', 'warning')
+      return
+    }
+    
+    console.log('✂️ [Editor] Coupe du clip:', clip.id, clip.name)
+    
+    // Copier le clip dans le presse-papiers
+    setClipboard({
+      clip: {
+        ...clip,
+        _sourceId: clip.id,
+        _copiedAt: Date.now()
+      },
+      trackId: selectedTrackId
+    })
+    
+    // Supprimer le clip original
+    if (selectedTrackId && clip.id) {
+      removeClip(selectedTrackId, clip.id)
+      addToast?.(`"${clip.name}" ${t('editorCutAction')}`, 'info')
+    } else {
+      addToast?.('Impossible de couper le clip', 'error')
+    }
+  }, [selectedTrackId, removeClip, addToast, t])
+
+  const handlePasteClip = useCallback(async () => {
+    if (!clipboard) {
+      addToast?.(t('editorClipboardEmpty'), 'warning')
+      return
+    }
+    
+    // Vérifier l'expiration (5 minutes)
+    if (Date.now() - clipboard._copiedAt > 300000) {
+      setClipboard(null)
+      addToast?.(t('editorClipboardExpired'), 'warning')
+      return
+    }
+    
+    const { clip, trackId: sourceTrackId } = clipboard
+    if (!clip) {
+      addToast?.(t('editorClipboardEmpty'), 'warning')
+      return
+    }
+    
+    console.log('📋 [Editor] Collage du clip:', clip.id, clip.name)
+    
+    // Déterminer la piste cible
+    const targetTrackId = selectedTrackId || sourceTrackId || tracks[0]?.id
+    
+    if (!targetTrackId) {
+      addToast?.('Aucune piste disponible', 'error')
+      return
+    }
+    
+    if (!project || !store?.updateEditorProject) {
+      addToast?.('Impossible de coller le clip', 'error')
+      return
+    }
+    
+    // Créer un nouveau clip avec les données du presse-papiers
+    const newClip = {
+      id: `clip-${Date.now()}`,
+      name: clip.name || 'Clip collé',
+      path: clip.path,
+      start: (clip.start || 0) + 1,
+      duration: clip.duration || 3,
+      offset: clip.offset || 0,
+      volume: clip.volume || 0,
+      volumeDb: clip.volumeDb || 0,
+      effects: (clip.effects || []).map(e => ({
+        ...e,
+        id: `effect-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+      })),
+      fadeIn: clip.fadeIn || 0,
+      fadeOut: clip.fadeOut || 0,
+      pitch: clip.pitch || 0,
+      speed: clip.speed || 1,
+      isExternal: clip.isExternal || false
+    }
+    
+    // Ajouter le clip à la piste via le store
+    const updatedTracks = project.tracks.map(t => {
+      if (t.id === targetTrackId) {
+        const clips = [...t.clips, newClip]
+        clips.sort((a, b) => a.start - b.start)
+        return { ...t, clips }
+      }
+      return t
+    })
+    
+    const updatedProject = {
+      ...project,
+      tracks: updatedTracks,
+      updatedAt: Date.now()
+    }
+    
+    await store.updateEditorProject(updatedProject)
+    
+    // Mettre à jour les durées
+    setClipDurations(prev => ({
+      ...prev,
+      [newClip.id]: newClip.duration || 3
+    }))
+    
+    addToast?.(`"${newClip.name}" ${t('editorPasted')}`, 'success')
+    setSelectedClipId(newClip.id)
+    setSelectedTrackId(targetTrackId)
+    
+  }, [clipboard, selectedTrackId, tracks, project, store, setClipDurations, addToast, t])
+
+  // ─── HANDLER TRIM ──────────────────────────────────────────────────────
+
+  const handleTrimClip = useCallback(async (trackId, clipId, newPath, newDuration) => {
+    if (!trackId || !clipId) return
+    
+    console.log('✂️ [Editor] handleTrimClip:', { trackId, clipId, newPath, newDuration })
+    
+    try {
+      if (store?.updateClipWithPath) {
+        await store.updateClipWithPath(clipId, newPath)
+      }
+      
+      if (newDuration) {
+        updateClip(trackId, clipId, { duration: newDuration })
+        setClipDurations(prev => ({ ...prev, [clipId]: newDuration }))
+      }
+      
+      addToast?.(t('editorTrimSuccess') || 'Clip rogné avec succès', 'success')
+    } catch (e) {
+      console.error('❌ [Editor] Erreur lors du rognage:', e)
+      addToast?.(t('editorTrimError') || 'Erreur lors du rognage', 'error')
+    }
+  }, [store, updateClip, setClipDurations, addToast, t])
 
   const handlePreviewEffects = useCallback(async (clip) => {
     if (!clip || !clip.path) return
@@ -457,12 +630,30 @@ function EditorTimelineContent() {
     },
     onDelete: () => {
       if (selectedClipId && selectedTrackId) {
+        console.log('🗑️ [Keyboard] Suppression du clip:', selectedClipId)
         removeClip(selectedTrackId, selectedClipId)
         addToast?.('Clip supprimé', 'info')
       } else {
         addToast?.('Aucun clip sélectionné', 'info')
       }
     },
+    onCopy: () => {
+      const clip = getClipById(tracks, selectedClipId)
+      if (clip) {
+        handleCopyClip(clip)
+      } else {
+        addToast?.('Aucun clip sélectionné', 'warning')
+      }
+    },
+    onCut: () => {
+      const clip = getClipById(tracks, selectedClipId)
+      if (clip) {
+        handleCutClip(clip)
+      } else {
+        addToast?.('Aucun clip sélectionné', 'warning')
+      }
+    },
+    onPaste: handlePasteClip,
     onSplit: () => {
       if (selectedClipId && selectedTrackId) {
         const clip = getClipById(tracks, selectedClipId)
@@ -582,9 +773,9 @@ function EditorTimelineContent() {
             playClipOnly(clip, trackId)
           }}
           onStopClip={stop}
-          onCopyClip={(clip) => {}}
-          onCutClip={(clip) => {}}
-          onPasteClip={(trackId) => {}}
+          onCopyClip={handleCopyClip}
+          onCutClip={handleCutClip}
+          onPasteClip={handlePasteClip}
           store={store}
         />
       </div>
@@ -757,10 +948,35 @@ function EditorTimelineContent() {
         />
       )}
 
+      {/* MODAL TRIM */}
+      {showTrimModal && (() => {
+        const clip = getClipById(tracks, trimClipId)
+        if (!clip) return null
+        
+        const duration = clipDurations[clip.id] || clip.duration || 3
+        
+        return createPortal(
+          <TrimClipModal
+            isOpen={showTrimModal}
+            clip={clip}
+            trackId={selectedTrackId}
+            clipDuration={duration}
+            onClose={() => {
+              setShowTrimModal(false)
+              setTrimClipId(null)
+            }}
+            onTrim={handleTrimClip}
+            tr={t}
+            addToast={addToast}
+          />,
+          document.body
+        )
+      })()}
+
       {/* CLIP ACTIONS MENU */}
       {clipMenu && (
         <ClipActionsMenu
-          clip={selectedClipForMenu ? getClipById(tracks, selectedClipForMenu) : null}
+          clip={selectedClipForMenu}
           trackId={selectedTrackForMenu}
           position={clipMenu}
           onClose={() => {
@@ -779,7 +995,7 @@ function EditorTimelineContent() {
             setClipMenu(null)
           }}
           onLoop={() => {
-            const clip = getClipById(tracks, selectedClipForMenu)
+            const clip = selectedClipForMenu
             if (clip) {
               const duration = clipDurations[clip.id] || clip.duration || 3
               setLoopRegion(clip.start, clip.start + duration)
@@ -789,6 +1005,7 @@ function EditorTimelineContent() {
             setClipMenu(null)
           }}
           onTrim={(clipId) => {
+            console.log('✂️ [Editor] onTrim appelé avec clipId:', clipId)
             setTrimClipId(clipId)
             setShowTrimModal(true)
             setClipMenu(null)
@@ -799,12 +1016,24 @@ function EditorTimelineContent() {
             setClipMenu(null)
           }}
           onDuplicate={(trackId, clipId) => {
+            console.log('📋 [Editor] Dupliquer depuis menu:', { trackId, clipId })
             duplicateClip(trackId, clipId)
             setClipMenu(null)
           }}
-          onCopy={() => {}}
-          onCut={() => {}}
+          onCopy={(clipId, trackId) => {
+            console.log('📋 [Editor] Copier depuis menu:', { clipId, trackId })
+            const clip = getClipById(tracks, clipId)
+            if (clip) handleCopyClip(clip)
+            setClipMenu(null)
+          }}
+          onCut={(clipId, trackId) => {
+            console.log('✂️ [Editor] Couper depuis menu:', { clipId, trackId })
+            const clip = getClipById(tracks, clipId)
+            if (clip) handleCutClip(clip)
+            setClipMenu(null)
+          }}
           onDelete={(trackId, clipId) => {
+            console.log('🗑️ [Editor] Supprimer depuis menu:', { trackId, clipId })
             removeClip(trackId, clipId)
             setClipMenu(null)
           }}

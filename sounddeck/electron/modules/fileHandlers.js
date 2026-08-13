@@ -5,6 +5,49 @@ const fs = require('fs')
 const https = require('https')
 const http = require('http')
 
+// ─── FONCTION POUR TROUVER FFPROBE ───────────────────────────────────────
+
+function findFFmpeg() {
+  try {
+    // Essayer ffmpeg-installer
+    try {
+      const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg')
+      if (ffmpegInstaller && ffmpegInstaller.path) {
+        console.log('✅ ffmpeg trouvé via @ffmpeg-installer/ffmpeg:', ffmpegInstaller.path)
+        return ffmpegInstaller.path
+      }
+    } catch (e) {
+      // Silencieux
+    }
+
+    // Essayer ffmpeg-static
+    try {
+      const ffmpegStatic = require('ffmpeg-static')
+      if (ffmpegStatic) {
+        console.log('✅ ffmpeg trouvé via ffmpeg-static:', ffmpegStatic)
+        return ffmpegStatic
+      }
+    } catch (e) {
+      // Silencieux
+    }
+
+    // Essayer ffmpeg dans le PATH
+    try {
+      const { execSync } = require('child_process')
+      execSync('ffmpeg -version', { stdio: 'ignore' })
+      console.log('✅ ffmpeg trouvé dans le PATH')
+      return 'ffmpeg'
+    } catch (e) {
+      // Silencieux
+    }
+
+    return null
+  } catch (e) {
+    console.warn('⚠️ Erreur lors de la recherche de ffmpeg:', e.message)
+    return null
+  }
+}
+
 // ─── HANDLERS FICHIERS ──────────────────────────────────────────────────────
 
 function registerFileHandlers(mainWindow, soundsDir) {
@@ -263,6 +306,103 @@ function registerFileHandlers(mainWindow, soundsDir) {
     return doRequest(url, destPath)
   })
   console.log('  ✅ download-sound-url enregistré')
+
+  // ✅ AJOUT : ROGNER UN FICHIER SON AVEC FFMEG
+  ipcMain.handle('trim-sound-file', async (event, filePath, startTime, endTime) => {
+    console.log('✂️ [trim-sound-file] Appelé avec:', { filePath, startTime, endTime })
+    
+    try {
+      // Vérifier que le fichier existe
+      if (!fs.existsSync(filePath)) {
+        console.error('❌ [trim-sound-file] Fichier non trouvé:', filePath)
+        return { success: false, error: 'Fichier non trouvé' }
+      }
+
+      // Créer un nom pour le fichier rogné
+      const dir = path.dirname(filePath)
+      const ext = path.extname(filePath)
+      const baseName = path.basename(filePath, ext)
+      const newFileName = `${baseName}_trimmed_${Date.now()}${ext}`
+      const outputPath = path.join(dir, newFileName)
+
+      console.log(`✂️ [trim-sound-file] Output: ${outputPath}`)
+
+      // Calculer la durée du rognage
+      const duration = endTime - startTime
+      if (duration <= 0) {
+        return { success: false, error: 'Durée de rognage invalide' }
+      }
+
+      // Vérifier que ffmpeg est disponible
+      const ffmpegPath = findFFmpeg()
+      
+      if (!ffmpegPath) {
+        console.warn('⚠️ [trim-sound-file] ffmpeg non disponible, copie du fichier')
+        // Fallback : copier le fichier entier
+        fs.copyFileSync(filePath, outputPath)
+        return {
+          success: true,
+          path: outputPath,
+          warning: 'ffmpeg non disponible, fichier copié sans rognage (le rognage précis nécessite ffmpeg)'
+        }
+      }
+
+      // Commande ffmpeg pour rogner
+      const { execFile } = require('child_process')
+      
+      return new Promise((resolve) => {
+        const args = [
+          '-i', filePath,
+          '-ss', String(startTime),
+          '-t', String(duration),
+          '-c', 'copy',
+          '-y',
+          outputPath
+        ]
+
+        console.log(`✂️ [trim-sound-file] Commande ffmpeg: ${ffmpegPath} ${args.join(' ')}`)
+
+        execFile(ffmpegPath, args, { timeout: 60000 }, (error, stdout, stderr) => {
+          if (error) {
+            console.error('❌ [trim-sound-file] Erreur ffmpeg:', error.message)
+            console.error('  stderr:', stderr)
+            // Fallback : copier le fichier
+            try {
+              fs.copyFileSync(filePath, outputPath)
+              resolve({
+                success: true,
+                path: outputPath,
+                warning: `Erreur ffmpeg (${error.message}), fichier copié sans rognage`
+              })
+            } catch (e) {
+              resolve({ success: false, error: error.message })
+            }
+            return
+          }
+
+          // Vérifier que le fichier a été créé
+          if (!fs.existsSync(outputPath)) {
+            resolve({ success: false, error: 'Fichier de sortie non créé' })
+            return
+          }
+
+          const stats = fs.statSync(outputPath)
+          if (stats.size === 0) {
+            resolve({ success: false, error: 'Fichier de sortie vide' })
+            return
+          }
+
+          console.log(`✅ [trim-sound-file] Fichier rogné créé: ${outputPath} (${stats.size} bytes)`)
+          resolve({ success: true, path: outputPath })
+        })
+      })
+
+    } catch (e) {
+      console.error('❌ [trim-sound-file] Exception:', e)
+      return { success: false, error: e.message }
+    }
+  })
+  console.log('  ✅ trim-sound-file enregistré')
 
   console.log('✅ [fileHandlers] Tous les handlers fichiers enregistrés')
 }
