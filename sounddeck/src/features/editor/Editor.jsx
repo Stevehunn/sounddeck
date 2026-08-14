@@ -520,24 +520,90 @@ function EditorTimelineContent() {
   const handleTrimClip = useCallback(async (trackId, clipId, newPath, newDuration) => {
     if (!trackId || !clipId) return
     
-    console.log('✂️ [Editor] handleTrimClip:', { trackId, clipId, newPath, newDuration })
+    console.log('✂️ [Editor] handleTrimClip appelé:', { trackId, clipId, newPath, newDuration })
+    console.log('✂️ [Editor] project.tracks avant modification:', project?.tracks?.length)
     
     try {
+      // ✅ 1. Mettre à jour le clip dans le store (persistance)
       if (store?.updateClipWithPath) {
+        console.log('✂️ [Editor] Mise à jour du chemin dans le store')
         await store.updateClipWithPath(clipId, newPath)
       }
       
-      if (newDuration) {
-        updateClip(trackId, clipId, { duration: newDuration })
-        setClipDurations(prev => ({ ...prev, [clipId]: newDuration }))
+      // ✅ 2. Mettre à jour le clip LOCALEMENT dans project
+      console.log('✂️ [Editor] Mise à jour du clip dans le projet local')
+      
+      // Trouver le clip pour vérifier qu'il existe
+      const track = project.tracks.find(t => t.id === trackId)
+      const clip = track?.clips.find(c => c.id === clipId)
+      
+      if (!clip) {
+        console.warn('✂️ [Editor] Clip non trouvé dans le projet')
+        // Essayer de rafraîchir depuis le store
+        if (store?.editorProject) {
+          console.log('✂️ [Editor] Rafraîchissement depuis le store')
+          setProject(store.editorProject)
+        }
+        return
       }
       
+      console.log('✂️ [Editor] Clip trouvé:', clip.name, 'ancien chemin:', clip.path)
+      
+      const updatedTracks = project.tracks.map(t => {
+        if (t.id === trackId) {
+          return {
+            ...t,
+            clips: t.clips.map(c => {
+              if (c.id === clipId) {
+                const updatedClip = {
+                  ...c,
+                  path: newPath,
+                  duration: newDuration || c.duration,
+                  offset: c.offset || 0
+                }
+                console.log('✂️ [Editor] Clip mis à jour:', updatedClip)
+                return updatedClip
+              }
+              return c
+            })
+          }
+        }
+        return t
+      })
+      
+      const updatedProject = {
+        ...project,
+        tracks: updatedTracks,
+        updatedAt: Date.now()
+      }
+      
+      // ✅ 3. Mettre à jour l'état local
+      console.log('✂️ [Editor] Mise à jour du projet local')
+      setProject(updatedProject)
+      
+      // ✅ 4. Mettre à jour la durée dans clipDurations
+      if (newDuration) {
+        console.log('✂️ [Editor] Mise à jour de la durée:', newDuration)
+        setClipDurations(prev => ({ 
+          ...prev, 
+          [clipId]: newDuration 
+        }))
+      }
+      
+      // ✅ 5. Sauvegarder dans le store
+      if (store?.updateEditorProject) {
+        console.log('✂️ [Editor] Sauvegarde dans le store')
+        await store.updateEditorProject(updatedProject)
+      }
+      
+      console.log('✅ [Editor] Clip rogné avec succès')
       addToast?.(t('editorTrimSuccess') || 'Clip rogné avec succès', 'success')
+      
     } catch (e) {
       console.error('❌ [Editor] Erreur lors du rognage:', e)
       addToast?.(t('editorTrimError') || 'Erreur lors du rognage', 'error')
     }
-  }, [store, updateClip, setClipDurations, addToast, t])
+  }, [project, store, setProject, setClipDurations, addToast, t])
 
   const handlePreviewEffects = useCallback(async (clip) => {
     if (!clip || !clip.path) return
