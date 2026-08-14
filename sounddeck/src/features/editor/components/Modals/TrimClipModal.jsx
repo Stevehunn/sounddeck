@@ -11,7 +11,7 @@ export default function TrimClipModal({
   onClose,
   onTrim,
   tr,
-  addToast  // ✅ Ajout du paramètre addToast
+  addToast
 }) {
   const { t } = useLanguage()
   const [start, setStart] = useState(0)
@@ -24,7 +24,6 @@ export default function TrimClipModal({
   const audioContextRef = useRef(null)
   const sourceRef = useRef(null)
 
-  // ✅ Initialiser les valeurs
   useEffect(() => {
     if (isOpen && clip) {
       setStart(0)
@@ -35,12 +34,10 @@ export default function TrimClipModal({
     }
   }, [isOpen, clip, clipDuration])
 
-  // ✅ Charger l'audio pour la prévisualisation
   const loadAudio = useCallback(async () => {
     if (!clip?.path) return
     
     try {
-      // Nettoyer l'ancien contexte
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         await audioContextRef.current.close()
       }
@@ -62,7 +59,6 @@ export default function TrimClipModal({
       
       const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
       
-      // Stocker le buffer pour la lecture
       window.__trimAudioBuffer = audioBuffer
       
       console.log('✅ [TrimClipModal] Audio chargé, durée:', audioBuffer.duration)
@@ -73,7 +69,6 @@ export default function TrimClipModal({
     }
   }, [clip])
 
-  // ✅ Charger au montage
   useEffect(() => {
     if (isOpen && clip) {
       loadAudio()
@@ -91,7 +86,6 @@ export default function TrimClipModal({
     }
   }, [isOpen, clip, loadAudio])
 
-  // ✅ Jouer la sélection
   const togglePlay = useCallback(() => {
     const ctx = audioContextRef.current
     const audioBuffer = window.__trimAudioBuffer
@@ -114,7 +108,6 @@ export default function TrimClipModal({
     }
     
     try {
-      // Créer une nouvelle source
       const source = ctx.createBufferSource()
       source.buffer = audioBuffer
       sourceRef.current = source
@@ -129,7 +122,6 @@ export default function TrimClipModal({
       setIsPlaying(true)
       setCurrentTime(start)
       
-      // Mettre à jour le temps
       const startTime = ctx.currentTime
       const updateInterval = setInterval(() => {
         if (!isPlaying && !sourceRef.current) {
@@ -160,7 +152,6 @@ export default function TrimClipModal({
     }
   }, [isPlaying, start, end, addToast])
 
-  // ✅ Appliquer le rognage
   const handleTrim = async () => {
     if (!clip?.path) {
       setError('Aucun clip sélectionné')
@@ -248,7 +239,6 @@ export default function TrimClipModal({
             showHandles
             onSeek={(pos) => {
               setCurrentTime(pos)
-              // Si on seek pendant la lecture, arrêter
               if (isPlaying) {
                 if (sourceRef.current) {
                   try {
@@ -334,18 +324,37 @@ export default function TrimClipModal({
           </div>
         )}
 
-        {/* Boutons */}
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: 6 }}>
+        {/* ✅ Boutons - Annuler et Rogner à droite */}
+        <div style={{ 
+          display: 'flex', 
+          gap: 10, 
+          alignItems: 'center', 
+          flexWrap: 'wrap',
+          justifyContent: 'space-between'
+        }}>
+          {/* Groupe gauche */}
+          <div style={{ display: 'flex', gap: 8, flex: '1 1 auto' }}>
             <button
               onClick={togglePlay}
               className="btn-secondary"
-              style={{ borderRadius: 'var(--radius-md)', minHeight: 34 }}
               disabled={isProcessing}
+              style={{
+                borderRadius: 'var(--radius-md)',
+                minHeight: 40,
+                minWidth: 160,
+                padding: '8px 20px',
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                fontSize: 13
+              }}
             >
               <i className={`ti ${isPlaying ? 'ti-player-pause' : 'ti-player-play'}`} />
               {isPlaying ? tr('editorPause') : tr('listenSelection')}
             </button>
+            
             <button
               onClick={() => { 
                 setStart(0)
@@ -361,31 +370,66 @@ export default function TrimClipModal({
                 }
               }}
               className="btn-ghost"
-              style={{ borderRadius: 'var(--radius-md)', minHeight: 34 }}
               disabled={isProcessing}
+              style={{
+                borderRadius: 'var(--radius-md)',
+                minHeight: 40,
+                minWidth: 120,
+                padding: '8px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                fontSize: 13
+              }}
             >
               <i className="ti ti-refresh" /> {tr('selectAll')}
             </button>
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
+          
+          {/* ✅ Groupe droit - poussé à droite avec margin-left: auto */}
+          <div style={{ 
+            display: 'flex', 
+            gap: 8,
+            marginLeft: 'auto',
+            flexShrink: 0
+          }}>
             <button
               onClick={onClose}
               className="btn-secondary"
-              style={{ borderRadius: 'var(--radius-md)', minHeight: 34 }}
               disabled={isProcessing}
+              style={{
+                borderRadius: 'var(--radius-md)',
+                minHeight: 40,
+                minWidth: 120,
+                padding: '8px 20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                fontSize: 13
+              }}
             >
               {tr('cancel')}
             </button>
+            
             <button
               onClick={handleTrim}
               className="btn-primary"
+              disabled={isProcessing || (end - start) < 0.05}
               style={{
                 borderRadius: 'var(--radius-md)',
-                minHeight: 34,
+                minHeight: 40,
+                minWidth: 140,
+                padding: '8px 24px',
                 background: 'var(--accent)',
-                color: 'white'
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                fontSize: 13
               }}
-              disabled={isProcessing || (end - start) < 0.05}
             >
               {isProcessing ? (
                 <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('processing')}</>

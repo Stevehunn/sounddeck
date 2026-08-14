@@ -80,12 +80,9 @@ export default function ClipActionsMenu({
     }
   }
 
-  // ✅ HANDLER SUPPRESSION - Ferme le menu et appelle le handler parent (Editor)
   const handleDeleteClick = () => {
     console.log('🗑️ [ClipActionsMenu] Clic sur Supprimer pour:', clip.id)
-    // Fermer le menu immédiatement
     onClose()
-    // Le parent (Editor) gère la confirmation via useConfirm
     onDelete?.(trackId, clip.id)
   }
 
@@ -172,6 +169,7 @@ export default function ClipActionsMenu({
       <div style={{ padding: '0 4px' }}>
         {activeTab === 'edit' && (
           <div className="menu-group">
+            {/* ✅ Copier - style unifié */}
             <MenuItem 
               icon="ti-copy" 
               label={t('editorCopy') || 'Copier'} 
@@ -182,6 +180,8 @@ export default function ClipActionsMenu({
               }} 
               shortcut="Ctrl+C"
             />
+            
+            {/* ✅ Couper - style unifié */}
             <MenuItem 
               icon="ti-scissors" 
               label={t('editorCut') || 'Couper'} 
@@ -192,6 +192,8 @@ export default function ClipActionsMenu({
               }} 
               shortcut="Ctrl+X"
             />
+            
+            {/* ✅ Dupliquer - style unifié */}
             <MenuItem 
               icon="ti-copy" 
               label={t('editorDuplicate') || 'Dupliquer'} 
@@ -203,49 +205,20 @@ export default function ClipActionsMenu({
               shortcut="Ctrl+D"
             />
             
-            {/* ✅ BOUTON SUPPRIMER PERSONNALISÉ - SANS DeleteButton */}
-            <div style={{ padding: '2px 4px' }}>
-              <button
-                onClick={handleDeleteClick}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '6px 12px',
-                  background: 'transparent',
-                  border: 'none',
-                  borderRadius: 'var(--radius-sm)',
-                  color: 'var(--danger)',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                  fontFamily: 'inherit'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(224,82,82,0.1)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent'
-                }}
-              >
-                <i className="ti ti-trash" style={{ fontSize: 14, minWidth: 18 }} />
-                <span style={{ flex: 1, textAlign: 'left' }}>{t('editorDelete') || 'Supprimer'}</span>
-                <span style={{
-                  fontSize: 9,
-                  color: 'var(--text-tertiary)',
-                  fontFamily: 'monospace',
-                  opacity: 0.6
-                }}>
-                  Delete
-                </span>
-              </button>
-            </div>
+            {/* ✅ Supprimer - style unifié avec bouton danger */}
+            <MenuItem 
+              icon="ti-trash" 
+              label={t('editorDelete') || 'Supprimer'} 
+              onClick={handleDeleteClick}
+              shortcut="Delete"
+              danger
+            />
           </div>
         )}
 
         {activeTab === 'audio' && (
           <div className="menu-group">
+            {/* ✅ Rogner - style unifié */}
             <MenuItem 
               icon="ti-cut" 
               label={t('editorTrim') || 'Rogner'} 
@@ -256,24 +229,69 @@ export default function ClipActionsMenu({
               }} 
               shortcut="Ctrl+R"
             />
+            
+            {/* ✅ Split au milieu - style unifié */}
             <MenuItem 
               icon="ti-scissors" 
               label={t('editorSplitAtMiddle') || 'Split au milieu'} 
               onClick={handleSplitMid}
               shortcut="S"
             />
+            
+            {/* ✅ Normaliser - style unifié (handler à implémenter) */}
             <MenuItem 
               icon="ti-wave" 
               label={t('editorNormalize') || 'Normaliser'} 
-              onClick={() => { onNormalize?.(clip.id); onClose() }} 
+              onClick={() => { 
+                console.log('📊 [ClipActionsMenu] Normaliser:', clip.id)
+                onNormalize?.(clip.id)
+                onClose() 
+              }} 
             />
+            
+            {/* ✅ Boucle - style unifié (handler à implémenter) */}
             <MenuItem 
               icon="ti-repeat" 
               label={t('editorLoop') || 'Boucle'} 
-              onClick={() => { onLoop?.(clip.id); onClose() }} 
+              onClick={() => { 
+                console.log('🔄 [ClipActionsMenu] Boucle:', clip.id)
+                onLoop?.(clip.id)
+                onClose() 
+              }} 
               active={isLoopEnabled}
             />
             
+            {/* ❌ Fades SUPPRIMÉ - déplacé dans Effets */}
+          </div>
+        )}
+
+        {activeTab === 'effects' && (
+          <div className="menu-group">
+            {/* ✅ Ajouter un effet - style unifié */}
+            <MenuItem 
+              icon="ti-plus" 
+              label={t('editorAddEffect') || '+ Ajouter un effet'} 
+              onClick={() => { 
+                console.log('✨ [ClipActionsMenu] Ajouter un effet:', clip.id)
+                onAddEffect?.(trackId, clip.id)
+                onClose() 
+              }}
+              accent
+            />
+            
+            {/* ✅ Aperçu des effets - style unifié */}
+            <MenuItem 
+              icon="ti-wave" 
+              label={t('editorEffectPreview') || 'Aperçu des effets'} 
+              onClick={() => { 
+                console.log('👂 [ClipActionsMenu] Aperçu des effets:', clip.id)
+                onPreviewEffects?.(clip)
+                onClose() 
+              }}
+              disabled={!hasActiveEffects}
+            />
+            
+            {/* ✅ Fades - DÉPLACÉ ICI depuis Audio */}
             <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
             
             <MenuItem 
@@ -302,33 +320,24 @@ export default function ClipActionsMenu({
                 />
               </div>
             )}
-          </div>
-        )}
-
-        {activeTab === 'effects' && (
-          <div className="menu-group">
-            <MenuItem 
-              icon="ti-plus" 
-              label={t('editorAddEffect') || '+ Ajouter un effet'} 
-              onClick={() => { onAddEffect?.(trackId, clip.id); onClose() }}
-              accent
-            />
-            <MenuItem 
-              icon="ti-wave" 
-              label={t('editorEffectPreview') || 'Aperçu des effets'} 
-              onClick={() => { onPreviewEffects?.(clip); onClose() }}
-              disabled={!hasActiveEffects}
-            />
-            {clip.effects?.filter(e => e.enabled).map(effect => (
-              <MenuItem 
-                key={effect.id}
-                icon="ti-circle-filled"
-                label={`${effect.type} (${Object.values(effect.params).join(', ')})`}
-                onClick={() => {}}
-                small
-                muted
-              />
-            ))}
+            
+            {/* Liste des effets actifs */}
+            {clip.effects?.filter(e => e.enabled).length > 0 && (
+              <>
+                <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
+                {clip.effects.filter(e => e.enabled).map(effect => (
+                  <MenuItem 
+                    key={effect.id}
+                    icon="ti-circle-filled"
+                    label={`${effect.type} (${Object.values(effect.params).join(', ')})`}
+                    onClick={() => {}}
+                    small
+                    muted
+                  />
+                ))}
+              </>
+            )}
+            
             {!hasActiveEffects && (
               <div style={{
                 padding: '6px 12px',
@@ -354,12 +363,33 @@ export default function ClipActionsMenu({
   )
 }
 
-function MenuItem({ icon, label, onClick, shortcut, danger, accent, active, disabled, hasSubmenu, small, muted }) {
+// ✅ MenuItem avec style unifié et classes CSS globales
+function MenuItem({ 
+  icon, 
+  label, 
+  onClick, 
+  shortcut, 
+  danger, 
+  accent, 
+  active, 
+  disabled, 
+  hasSubmenu, 
+  small, 
+  muted 
+}) {
   const [hovered, setHovered] = useState(false)
+
+  // Déterminer la classe CSS en fonction des props
+  let className = 'menu-item'
+  if (danger) className += ' danger'
+  if (accent) className += ' accent'
+  if (active) className += ' active'
+  if (muted) className += ' muted'
+  if (disabled) className += ' disabled'
 
   return (
     <button
-      className={`menu-item ${danger ? 'danger' : ''} ${accent ? 'accent' : ''} ${active ? 'active' : ''}`}
+      className={className}
       onClick={onClick}
       disabled={disabled}
       onMouseEnter={() => setHovered(true)}
@@ -409,6 +439,7 @@ function MenuItem({ icon, label, onClick, shortcut, danger, accent, active, disa
   )
 }
 
+// ✅ FadeControl inchangé
 function FadeControl({ label, value, onChange }) {
   return (
     <div style={{
