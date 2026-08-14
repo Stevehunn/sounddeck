@@ -169,7 +169,6 @@ export default function ClipActionsMenu({
       <div style={{ padding: '0 4px' }}>
         {activeTab === 'edit' && (
           <div className="menu-group">
-            {/* ✅ Copier - style unifié */}
             <MenuItem 
               icon="ti-copy" 
               label={t('editorCopy') || 'Copier'} 
@@ -180,8 +179,6 @@ export default function ClipActionsMenu({
               }} 
               shortcut="Ctrl+C"
             />
-            
-            {/* ✅ Couper - style unifié */}
             <MenuItem 
               icon="ti-scissors" 
               label={t('editorCut') || 'Couper'} 
@@ -192,8 +189,6 @@ export default function ClipActionsMenu({
               }} 
               shortcut="Ctrl+X"
             />
-            
-            {/* ✅ Dupliquer - style unifié */}
             <MenuItem 
               icon="ti-copy" 
               label={t('editorDuplicate') || 'Dupliquer'} 
@@ -205,7 +200,6 @@ export default function ClipActionsMenu({
               shortcut="Ctrl+D"
             />
             
-            {/* ✅ Supprimer - style unifié avec bouton danger */}
             <MenuItem 
               icon="ti-trash" 
               label={t('editorDelete') || 'Supprimer'} 
@@ -218,7 +212,6 @@ export default function ClipActionsMenu({
 
         {activeTab === 'audio' && (
           <div className="menu-group">
-            {/* ✅ Rogner - style unifié */}
             <MenuItem 
               icon="ti-cut" 
               label={t('editorTrim') || 'Rogner'} 
@@ -230,7 +223,6 @@ export default function ClipActionsMenu({
               shortcut="Ctrl+R"
             />
             
-            {/* ✅ Split au milieu - style unifié */}
             <MenuItem 
               icon="ti-scissors" 
               label={t('editorSplitAtMiddle') || 'Split au milieu'} 
@@ -238,7 +230,7 @@ export default function ClipActionsMenu({
               shortcut="S"
             />
             
-            {/* ✅ Normaliser - style unifié (handler à implémenter) */}
+            {/* ✅ Normaliser - ouvre le modal */}
             <MenuItem 
               icon="ti-wave" 
               label={t('editorNormalize') || 'Normaliser'} 
@@ -249,7 +241,6 @@ export default function ClipActionsMenu({
               }} 
             />
             
-            {/* ✅ Boucle - style unifié (handler à implémenter) */}
             <MenuItem 
               icon="ti-repeat" 
               label={t('editorLoop') || 'Boucle'} 
@@ -260,14 +251,11 @@ export default function ClipActionsMenu({
               }} 
               active={isLoopEnabled}
             />
-            
-            {/* ❌ Fades SUPPRIMÉ - déplacé dans Effets */}
           </div>
         )}
 
         {activeTab === 'effects' && (
           <div className="menu-group">
-            {/* ✅ Ajouter un effet - style unifié */}
             <MenuItem 
               icon="ti-plus" 
               label={t('editorAddEffect') || '+ Ajouter un effet'} 
@@ -279,7 +267,6 @@ export default function ClipActionsMenu({
               accent
             />
             
-            {/* ✅ Aperçu des effets - style unifié */}
             <MenuItem 
               icon="ti-wave" 
               label={t('editorEffectPreview') || 'Aperçu des effets'} 
@@ -291,7 +278,6 @@ export default function ClipActionsMenu({
               disabled={!hasActiveEffects}
             />
             
-            {/* ✅ Fades - DÉPLACÉ ICI depuis Audio */}
             <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
             
             <MenuItem 
@@ -321,7 +307,6 @@ export default function ClipActionsMenu({
               </div>
             )}
             
-            {/* Liste des effets actifs */}
             {clip.effects?.filter(e => e.enabled).length > 0 && (
               <>
                 <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
@@ -363,7 +348,6 @@ export default function ClipActionsMenu({
   )
 }
 
-// ✅ MenuItem avec style unifié et classes CSS globales
 function MenuItem({ 
   icon, 
   label, 
@@ -379,17 +363,9 @@ function MenuItem({
 }) {
   const [hovered, setHovered] = useState(false)
 
-  // Déterminer la classe CSS en fonction des props
-  let className = 'menu-item'
-  if (danger) className += ' danger'
-  if (accent) className += ' accent'
-  if (active) className += ' active'
-  if (muted) className += ' muted'
-  if (disabled) className += ' disabled'
-
   return (
     <button
-      className={className}
+      className={`menu-item ${danger ? 'danger' : ''} ${accent ? 'accent' : ''} ${active ? 'active' : ''}`}
       onClick={onClick}
       disabled={disabled}
       onMouseEnter={() => setHovered(true)}
@@ -439,7 +415,6 @@ function MenuItem({
   )
 }
 
-// ✅ FadeControl inchangé
 function FadeControl({ label, value, onChange }) {
   return (
     <div style={{

@@ -10,10 +10,12 @@ import EditorMasterVolume from './components/MasterVolume'
 import ClipActionsMenu from './components/ClipActionsMenu'
 import AddTrackModal from './components/Modals/AddTrackModal'
 import TrimClipModal from './components/Modals/TrimClipModal'
+import NormalizeModal from './components/Modals/NormalizeModal'
 import ExportModal from './components/Modals/ExportModal'
 import ImportFileModal from './components/Modals/ImportFileModal'
 import { getClipById } from './utils'
 import { mixdownProject, exportMixdown } from '@shared/utils/mixdown'
+import { normalizeClip } from '@shared/utils/normalizeUtils'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
 import useConfirm from '@shared/hooks/useConfirm'
 
@@ -136,6 +138,8 @@ function EditorTimelineContent() {
   const [pendingTrackName, setPendingTrackName] = useState('')
   const [showTrimModal, setShowTrimModal] = useState(false)
   const [trimClipId, setTrimClipId] = useState(null)
+  const [showNormalizeModal, setShowNormalizeModal] = useState(false)
+  const [normalizeClipId, setNormalizeClipId] = useState(null)
   const [masterVolume, setMasterVolume] = useState(100)
   const [isMasterMuted, setIsMasterMuted] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
@@ -352,6 +356,98 @@ function EditorTimelineContent() {
     setShowExportModal(true)
   }, [project, addToast, t])
 
+  // ─── HANDLER NORMALISER AVEC OPTIONS ──────────────────────────────────
+
+  const handleNormalizeWithOptions = useCallback(async (clipId, options) => {
+    console.log('📊 [Editor] Normalisation avec options:', { clipId, options })
+    
+    const clip = getClipById(tracks, clipId)
+    if (!clip) {
+      console.warn('📊 [Editor] Clip non trouvé')
+      addToast?.('Clip non trouvé', 'error')
+      return
+    }
+    
+    const { method, target, maxGain, outputFormat = 'wav' } = options
+    
+    console.log('📊 [Editor] Clip trouvé:', clip.name)
+    addToast?.(`Normalisation de "${clip.name}" en cours...`, 'info')
+    
+    try {
+      const result = await normalizeClip(
+        clip,
+        target,
+        store,
+        {
+          outputFormat,
+          preserveOriginal: false,
+          maxGain: maxGain || 10,
+          minGain: 0.1,
+          useRMS: method === 'rms',
+          targetRMS: target * 0.3
+        }
+      )
+      
+      console.log('📊 [Editor] Résultat normalisation:', result)
+      
+      if (result?.normalized) {
+        console.log('✅ [Editor] Clip normalisé avec succès')
+        console.log('  Gain appliqué:', result.gain)
+        console.log('  Pic original:', result.originalPeak)
+        console.log('  Pic final:', result.finalPeak)
+        console.log('  Nouveau chemin:', result.newPath)
+        
+        // ✅ Mettre à jour le clip localement
+        if (result.newPath) {
+          const track = tracks.find(t => t.id === selectedTrackId)
+          if (track) {
+            const updatedTracks = tracks.map(t => {
+              if (t.id === selectedTrackId) {
+                return {
+                  ...t,
+                  clips: t.clips.map(c => {
+                    if (c.id === clipId) {
+                      return {
+                        ...c,
+                        path: result.newPath,
+                        duration: clip.duration
+                      }
+                    }
+                    return c
+                  })
+                }
+              }
+              return t
+            })
+            
+            const updatedProject = {
+              ...project,
+              tracks: updatedTracks,
+              updatedAt: Date.now()
+            }
+            
+            setProject(updatedProject)
+            
+            if (store?.updateEditorProject) {
+              await store.updateEditorProject(updatedProject)
+            }
+          }
+        }
+        
+        addToast?.(`"${clip.name}" normalisé avec succès (gain: ${result.gain.toFixed(2)}x)`, 'success')
+      } else if (result === null) {
+        console.warn('📊 [Editor] Échec de la normalisation')
+        addToast?.(`Erreur lors de la normalisation de "${clip.name}"`, 'error')
+      } else {
+        console.log('📊 [Editor] Clip déjà à un niveau optimal')
+        addToast?.(`"${clip.name}" est déjà à un niveau optimal`, 'info')
+      }
+    } catch (e) {
+      console.error('❌ [Editor] Erreur normalisation:', e)
+      addToast?.(`Erreur: ${e.message}`, 'error')
+    }
+  }, [tracks, selectedTrackId, project, store, setProject, addToast])
+
   // ─── HANDLERS COPIER/COUPER/COLLER ────────────────────────────────────
 
   const handleCopyClip = useCallback((clip) => {
@@ -497,7 +593,6 @@ function EditorTimelineContent() {
       return
     }
     
-    // ✅ Ouvrir la confirmation
     const confirmed = await confirm({
       title: t('confirmDeleteClip') || 'Confirmer la suppression du clip',
       message: t('confirmDeleteClipMessage') || `Voulez-vous vraiment supprimer le clip "${clip.name}" ?`,
@@ -524,22 +619,18 @@ function EditorTimelineContent() {
     console.log('✂️ [Editor] project.tracks avant modification:', project?.tracks?.length)
     
     try {
-      // ✅ 1. Mettre à jour le clip dans le store (persistance)
       if (store?.updateClipWithPath) {
         console.log('✂️ [Editor] Mise à jour du chemin dans le store')
         await store.updateClipWithPath(clipId, newPath)
       }
       
-      // ✅ 2. Mettre à jour le clip LOCALEMENT dans project
       console.log('✂️ [Editor] Mise à jour du clip dans le projet local')
       
-      // Trouver le clip pour vérifier qu'il existe
       const track = project.tracks.find(t => t.id === trackId)
       const clip = track?.clips.find(c => c.id === clipId)
       
       if (!clip) {
         console.warn('✂️ [Editor] Clip non trouvé dans le projet')
-        // Essayer de rafraîchir depuis le store
         if (store?.editorProject) {
           console.log('✂️ [Editor] Rafraîchissement depuis le store')
           setProject(store.editorProject)
@@ -577,11 +668,9 @@ function EditorTimelineContent() {
         updatedAt: Date.now()
       }
       
-      // ✅ 3. Mettre à jour l'état local
       console.log('✂️ [Editor] Mise à jour du projet local')
       setProject(updatedProject)
       
-      // ✅ 4. Mettre à jour la durée dans clipDurations
       if (newDuration) {
         console.log('✂️ [Editor] Mise à jour de la durée:', newDuration)
         setClipDurations(prev => ({ 
@@ -590,7 +679,6 @@ function EditorTimelineContent() {
         }))
       }
       
-      // ✅ 5. Sauvegarder dans le store
       if (store?.updateEditorProject) {
         console.log('✂️ [Editor] Sauvegarde dans le store')
         await store.updateEditorProject(updatedProject)
@@ -1072,6 +1160,27 @@ function EditorTimelineContent() {
         )
       })()}
 
+      {/* MODAL NORMALIZE */}
+      {showNormalizeModal && (() => {
+        const clip = getClipById(tracks, normalizeClipId)
+        if (!clip) return null
+        
+        return createPortal(
+          <NormalizeModal
+            isOpen={showNormalizeModal}
+            clip={clip}
+            trackId={selectedTrackId}
+            onClose={() => {
+              setShowNormalizeModal(false)
+              setNormalizeClipId(null)
+            }}
+            onNormalize={handleNormalizeWithOptions}
+            tr={t}
+          />,
+          document.body
+        )
+      })()}
+
       {/* CLIP ACTIONS MENU */}
       {clipMenu && (
         <ClipActionsMenu
@@ -1109,7 +1218,13 @@ function EditorTimelineContent() {
             setShowTrimModal(true)
             setClipMenu(null)
           }}
-          onNormalize={() => {}}
+          // ✅ Normaliser - ouvre le modal
+          onNormalize={(clipId) => {
+            console.log('📊 [Editor] Normaliser depuis menu:', clipId)
+            setNormalizeClipId(clipId)
+            setShowNormalizeModal(true)
+            setClipMenu(null)
+          }}
           onAddEffect={() => {
             setShowEffectsPanel(true)
             setClipMenu(null)
@@ -1131,7 +1246,6 @@ function EditorTimelineContent() {
             if (clip) handleCutClip(clip)
             setClipMenu(null)
           }}
-          // ✅ Nouveau handler pour la suppression
           onDelete={handleDeleteWithConfirm}
           onFadeIn={context.setClipFade}
           onFadeOut={context.setClipFade}
