@@ -79,9 +79,12 @@ function EditorTimelineContent() {
   
   const {
     project,
+    setProject,
     tracks,
     selectedClipId,
     selectedTrackId,
+    setSelectedClipId,
+    setSelectedTrackId,
     currentTime,
     isPlaying,
     isPaused,
@@ -377,7 +380,6 @@ function EditorTimelineContent() {
     
     console.log('✂️ [Editor] Coupe du clip:', clip.id, clip.name)
     
-    // Copier le clip dans le presse-papiers
     setClipboard({
       clip: {
         ...clip,
@@ -387,7 +389,6 @@ function EditorTimelineContent() {
       trackId: selectedTrackId
     })
     
-    // Supprimer le clip original
     if (selectedTrackId && clip.id) {
       removeClip(selectedTrackId, clip.id)
       addToast?.(`"${clip.name}" ${t('editorCutAction')}`, 'info')
@@ -402,7 +403,6 @@ function EditorTimelineContent() {
       return
     }
     
-    // Vérifier l'expiration (5 minutes)
     if (Date.now() - clipboard._copiedAt > 300000) {
       setClipboard(null)
       addToast?.(t('editorClipboardExpired'), 'warning')
@@ -417,7 +417,6 @@ function EditorTimelineContent() {
     
     console.log('📋 [Editor] Collage du clip:', clip.id, clip.name)
     
-    // Déterminer la piste cible
     const targetTrackId = selectedTrackId || sourceTrackId || tracks[0]?.id
     
     if (!targetTrackId) {
@@ -430,7 +429,6 @@ function EditorTimelineContent() {
       return
     }
     
-    // Créer un nouveau clip avec les données du presse-papiers
     const newClip = {
       id: `clip-${Date.now()}`,
       name: clip.name || 'Clip collé',
@@ -451,7 +449,9 @@ function EditorTimelineContent() {
       isExternal: clip.isExternal || false
     }
     
-    // Ajouter le clip à la piste via le store
+    console.log('📋 [Editor] Nouveau clip créé:', newClip.id, newClip.name)
+    
+    // Mettre à jour les pistes localement
     const updatedTracks = project.tracks.map(t => {
       if (t.id === targetTrackId) {
         const clips = [...t.clips, newClip]
@@ -467,7 +467,13 @@ function EditorTimelineContent() {
       updatedAt: Date.now()
     }
     
+    console.log('📋 [Editor] Sauvegarde du projet avec nouveau clip')
+    
+    // ✅ 1. Sauvegarder dans le store
     await store.updateEditorProject(updatedProject)
+    
+    // ✅ 2. Mettre à jour l'état local immédiatement
+    setProject(updatedProject)
     
     // Mettre à jour les durées
     setClipDurations(prev => ({
@@ -479,7 +485,9 @@ function EditorTimelineContent() {
     setSelectedClipId(newClip.id)
     setSelectedTrackId(targetTrackId)
     
-  }, [clipboard, selectedTrackId, tracks, project, store, setClipDurations, addToast, t])
+    console.log('📋 [Editor] Collage terminé avec succès')
+    
+  }, [clipboard, selectedTrackId, tracks, project, store, setProject, setClipDurations, setSelectedClipId, setSelectedTrackId, addToast, t])
 
   // ─── HANDLER TRIM ──────────────────────────────────────────────────────
 
