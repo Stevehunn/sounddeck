@@ -1,7 +1,6 @@
 // src/features/editor/components/ClipActionsMenu.jsx
 import React, { useState, useRef, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
-import { DeleteButton } from '@shared/components/ui'
 
 export default function ClipActionsMenu({
   clip,
@@ -79,6 +78,15 @@ export default function ClipActionsMenu({
       onSplit?.(trackId, clip.id, midPoint)
       onClose()
     }
+  }
+
+  // ✅ HANDLER SUPPRESSION - Ferme le menu et appelle le handler parent (Editor)
+  const handleDeleteClick = () => {
+    console.log('🗑️ [ClipActionsMenu] Clic sur Supprimer pour:', clip.id)
+    // Fermer le menu immédiatement
+    onClose()
+    // Le parent (Editor) gère la confirmation via useConfirm
+    onDelete?.(trackId, clip.id)
   }
 
   return (
@@ -195,22 +203,43 @@ export default function ClipActionsMenu({
               shortcut="Ctrl+D"
             />
             
+            {/* ✅ BOUTON SUPPRIMER PERSONNALISÉ - SANS DeleteButton */}
             <div style={{ padding: '2px 4px' }}>
-              <DeleteButton
-                onDelete={() => {
-                  console.log('🗑️ [ClipActionsMenu] Supprimer:', clip.id)
-                  onDelete?.(trackId, clip.id)
-                  onClose()
+              <button
+                onClick={handleDeleteClick}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '6px 12px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--danger)',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  fontFamily: 'inherit'
                 }}
-                confirmTitle={t('confirmDeleteClip') || 'Confirmer la suppression du clip'}
-                confirmMessage={t('confirmDeleteClipMessage') || 'Voulez-vous vraiment supprimer ce clip ?'}
-                itemName={clip.name}
-                size="sm"
-                variant="ghost"
-                icon="ti-trash"
-                label={t('editorDelete') || 'Supprimer'}
-                showLabel={true}
-              />
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(224,82,82,0.1)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                }}
+              >
+                <i className="ti ti-trash" style={{ fontSize: 14, minWidth: 18 }} />
+                <span style={{ flex: 1, textAlign: 'left' }}>{t('editorDelete') || 'Supprimer'}</span>
+                <span style={{
+                  fontSize: 9,
+                  color: 'var(--text-tertiary)',
+                  fontFamily: 'monospace',
+                  opacity: 0.6
+                }}>
+                  Delete
+                </span>
+              </button>
             </div>
           </div>
         )}

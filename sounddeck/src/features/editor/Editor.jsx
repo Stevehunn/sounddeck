@@ -15,6 +15,7 @@ import ImportFileModal from './components/Modals/ImportFileModal'
 import { getClipById } from './utils'
 import { mixdownProject, exportMixdown } from '@shared/utils/mixdown'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
+import useConfirm from '@shared/hooks/useConfirm'
 
 export default function Editor({ store, addToast }) {
   return (
@@ -74,8 +75,9 @@ function EditorContent() {
 }
 
 function EditorTimelineContent() {
-  const { t } = useLanguage()
+  const { t, currentLang } = useLanguage()
   const context = useEditor()
+  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
   
   const {
     project,
@@ -451,7 +453,6 @@ function EditorTimelineContent() {
     
     console.log('📋 [Editor] Nouveau clip créé:', newClip.id, newClip.name)
     
-    // Mettre à jour les pistes localement
     const updatedTracks = project.tracks.map(t => {
       if (t.id === targetTrackId) {
         const clips = [...t.clips, newClip]
@@ -469,13 +470,9 @@ function EditorTimelineContent() {
     
     console.log('📋 [Editor] Sauvegarde du projet avec nouveau clip')
     
-    // ✅ 1. Sauvegarder dans le store
     await store.updateEditorProject(updatedProject)
-    
-    // ✅ 2. Mettre à jour l'état local immédiatement
     setProject(updatedProject)
     
-    // Mettre à jour les durées
     setClipDurations(prev => ({
       ...prev,
       [newClip.id]: newClip.duration || 3
@@ -488,6 +485,35 @@ function EditorTimelineContent() {
     console.log('📋 [Editor] Collage terminé avec succès')
     
   }, [clipboard, selectedTrackId, tracks, project, store, setProject, setClipDurations, setSelectedClipId, setSelectedTrackId, addToast, t])
+
+  // ─── HANDLER SUPPRESSION AVEC CONFIRMATION ────────────────────────────
+
+  const handleDeleteWithConfirm = useCallback(async (trackId, clipId) => {
+    console.log('🗑️ [Editor] handleDeleteWithConfirm appelé:', { trackId, clipId })
+    
+    const clip = getClipById(tracks, clipId)
+    if (!clip) {
+      console.warn('🗑️ [Editor] Clip non trouvé')
+      return
+    }
+    
+    // ✅ Ouvrir la confirmation
+    const confirmed = await confirm({
+      title: t('confirmDeleteClip') || 'Confirmer la suppression du clip',
+      message: t('confirmDeleteClipMessage') || `Voulez-vous vraiment supprimer le clip "${clip.name}" ?`,
+      type: 'danger',
+      confirmText: t('editorDelete') || 'Supprimer',
+      cancelText: t('cancel') || 'Annuler'
+    })
+    
+    if (confirmed) {
+      console.log('🗑️ [Editor] Suppression confirmée pour:', clipId)
+      removeClip(trackId, clipId)
+      addToast?.('Clip supprimé', 'info')
+    } else {
+      console.log('🗑️ [Editor] Suppression annulée')
+    }
+  }, [tracks, removeClip, addToast, confirm, t])
 
   // ─── HANDLER TRIM ──────────────────────────────────────────────────────
 
@@ -639,8 +665,7 @@ function EditorTimelineContent() {
     onDelete: () => {
       if (selectedClipId && selectedTrackId) {
         console.log('🗑️ [Keyboard] Suppression du clip:', selectedClipId)
-        removeClip(selectedTrackId, selectedClipId)
-        addToast?.('Clip supprimé', 'info')
+        handleDeleteWithConfirm(selectedTrackId, selectedClipId)
       } else {
         addToast?.('Aucun clip sélectionné', 'info')
       }
@@ -1040,11 +1065,8 @@ function EditorTimelineContent() {
             if (clip) handleCutClip(clip)
             setClipMenu(null)
           }}
-          onDelete={(trackId, clipId) => {
-            console.log('🗑️ [Editor] Supprimer depuis menu:', { trackId, clipId })
-            removeClip(trackId, clipId)
-            setClipMenu(null)
-          }}
+          // ✅ Nouveau handler pour la suppression
+          onDelete={handleDeleteWithConfirm}
           onFadeIn={context.setClipFade}
           onFadeOut={context.setClipFade}
           onPreviewEffects={() => {}}
@@ -1053,6 +1075,9 @@ function EditorTimelineContent() {
           tr={t}
         />
       )}
+
+      {/* ✅ ConfirmWrapper - persistant pour les popups de confirmation */}
+      <ConfirmWrapper />
     </div>
   )
 }
