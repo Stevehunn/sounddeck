@@ -31,6 +31,8 @@ const EditorClip = ({
   onCopyClip,
   onCutClip,
   onPasteClip,
+  loopState = {},
+  totalDuration = 10,
 }) => {
   const [isDragging, setIsDragging] = useState(false)
   const [dragStartX, setDragStartX] = useState(0)
@@ -53,6 +55,18 @@ const EditorClip = ({
   const clipLeft = localStart * pixelsPerSecond
   const SNAP_VALUE = 0.01
   const DRAG_SENSITIVITY = 1.0
+
+  // ✅ Vérifier si le clip est en boucle
+  const isClipLooping = clip?.id && loopState?.clips?.[clip.id]?.enabled || false
+  const clipLoopData = clip?.id ? loopState?.clips?.[clip.id] : null
+  const loopVisual = clipLoopData?.visual || 'arrow'
+  const loopColor = clipLoopData?.arrowColor || '#22c55e'
+  const loopEnd = clipLoopData?.end || totalDuration
+  const loopMode = clipLoopData?.loopMode || 'endOfTrack'
+
+  // ✅ Calculer la position de la fin de boucle
+  const loopEndPosition = Math.min(loopEnd, totalDuration) * pixelsPerSecond
+  const clipEndPosition = (start + duration) * pixelsPerSecond
 
   useEffect(() => {
     if (!isDragging) {
@@ -79,7 +93,7 @@ const EditorClip = ({
     e.stopPropagation()
     if (onContextMenu) {
       console.log('🖱️ [Clip] Appel de onContextMenu avec clipId:', clip.id)
-      onContextMenu(e, clip.id)  // ✅ Passer clip.id en second argument
+      onContextMenu(e, clip.id)
     } else {
       console.warn('🖱️ [Clip] onContextMenu est undefined !')
     }
@@ -241,6 +255,89 @@ const EditorClip = ({
     onCutClip?.(clip)
   }
 
+  // ✅ Rendu de la flèche de boucle (Grisé supprimé)
+  const renderLoopArrow = () => {
+    if (!isClipLooping || loopVisual !== 'arrow') return null
+    if (loopEndPosition <= clipEndPosition) return null
+    
+    const arrowStart = clipEndPosition
+    const arrowWidth = loopEndPosition - clipEndPosition
+    const arrowHeight = 2
+    
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          top: '50%',
+          left: arrowStart,
+          width: arrowWidth,
+          height: arrowHeight,
+          background: loopColor,
+          transform: 'translateY(-50%)',
+          opacity: 0.6,
+          pointerEvents: 'none',
+          zIndex: 2,
+          display: 'flex',
+          alignItems: 'center'
+        }}
+      >
+        {/* Tireté pour la flèche */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: `repeating-linear-gradient(90deg, ${loopColor}, ${loopColor} 4px, transparent 4px, transparent 8px)`,
+          opacity: 0.8
+        }} />
+        
+        {/* Pointe de la flèche */}
+        <div style={{
+          position: 'absolute',
+          right: -6,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: 0,
+          height: 0,
+          borderLeft: `6px solid ${loopColor}`,
+          borderTop: '4px solid transparent',
+          borderBottom: '4px solid transparent'
+        }} />
+        
+        {/* Label "LOOP" */}
+        <div style={{
+          position: 'absolute',
+          top: -16,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          fontSize: 7,
+          fontWeight: 600,
+          color: loopColor,
+          background: 'var(--bg-secondary)',
+          padding: '0 4px',
+          borderRadius: 2,
+          opacity: 0.8,
+          whiteSpace: 'nowrap'
+        }}>
+          🔁 LOOP
+        </div>
+        
+        {/* Indicateur de fin de boucle */}
+        <div style={{
+          position: 'absolute',
+          right: 0,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: 2,
+          height: '200%',
+          background: loopColor,
+          opacity: 0.5
+        }} />
+      </div>
+    )
+  }
+
   return (
     <div
       ref={clipRef}
@@ -253,11 +350,11 @@ const EditorClip = ({
         width: clipWidth,
         minWidth: 10,
         background: getClipColor(trackColor),
-        border: `2px solid ${isSelected ? 'var(--accent)' : trackColor}`,
+        border: `2px solid ${isSelected ? 'var(--accent)' : isClipLooping ? 'var(--success)' : trackColor}`,
         borderRadius: 6,
         cursor: isDragging ? 'grabbing' : 'grab',
         transition: isDragging ? 'none' : 'border-color 0.15s, box-shadow 0.15s, left 0.05s ease',
-        boxShadow: isSelected ? '0 0 20px rgba(124,111,247,0.3)' : 'none',
+        boxShadow: isSelected ? '0 0 20px rgba(124,111,247,0.3)' : isClipLooping ? '0 0 15px rgba(34,197,94,0.2)' : 'none',
         zIndex: isDragging ? 10 : isSelected ? 3 : 2,
         opacity: isDragging ? 0.8 : 1,
         overflow: 'hidden',
@@ -269,11 +366,40 @@ const EditorClip = ({
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
+      {/* ✅ Badge de boucle */}
+      {isClipLooping && (
+        <div style={{
+          position: 'absolute',
+          top: 2,
+          left: 4,
+          zIndex: 8,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          background: 'rgba(0,0,0,0.7)',
+          padding: '1px 6px',
+          borderRadius: 3,
+          pointerEvents: 'none'
+        }}>
+          <span style={{ fontSize: 10 }}>🔁</span>
+          <span style={{
+            fontSize: 7,
+            fontWeight: 600,
+            color: 'var(--success)'
+          }}>
+            LOOP
+          </span>
+        </div>
+      )}
+
       <ClipWaveform
         waveformData={waveformData}
         trackColor={trackColor}
         duration={duration}
       />
+
+      {/* ✅ Flèche de boucle (Grisé supprimé) */}
+      {renderLoopArrow()}
 
       <div style={{
         position: 'absolute',
@@ -298,6 +424,16 @@ const EditorClip = ({
         }}>
           {duration.toFixed(1)}s
         </span>
+        {isClipLooping && (
+          <span style={{
+            marginLeft: 4,
+            fontSize: 7,
+            color: 'var(--success)',
+            opacity: 0.8
+          }}>
+            🔁
+          </span>
+        )}
       </div>
 
       {isHovering && (

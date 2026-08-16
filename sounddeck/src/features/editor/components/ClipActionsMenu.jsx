@@ -2,6 +2,26 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
+// ✅ Couleurs pour la flèche de boucle
+const ARROW_COLORS = [
+  { id: 'green', color: '#22c55e', label: 'Vert' },
+  { id: 'blue', color: '#3b82f6', label: 'Bleu' },
+  { id: 'purple', color: '#8b5cf6', label: 'Violet' },
+  { id: 'pink', color: '#ec4899', label: 'Rose' },
+  { id: 'red', color: '#ef4444', label: 'Rouge' },
+  { id: 'orange', color: '#f97316', label: 'Orange' },
+  { id: 'yellow', color: '#eab308', label: 'Jaune' },
+  { id: 'cyan', color: '#06b6d4', label: 'Cyan' },
+]
+
+// ✅ Options de fin de boucle
+const LOOP_END_OPTIONS = [
+  { id: 'endOfTrack', label: 'Jusqu\'à la fin de la piste', icon: 'ti-flag' },
+  { id: 'cycles', label: 'Nombre de cycles', icon: 'ti-repeat' },
+  { id: 'manualDuration', label: 'Durée manuelle', icon: 'ti-clock' },
+  { id: 'manualClick', label: 'Cliquer sur la timeline', icon: 'ti-mouse' },
+]
+
 export default function ClipActionsMenu({
   clip,
   trackId,
@@ -19,18 +39,32 @@ export default function ClipActionsMenu({
   onFadeIn,
   onFadeOut,
   onPreviewEffects,
+  onToggleClipLoop,
   isPlaying,
   isLoopEnabled,
   clipDurations = {},
+  loopState = {},
   tr
 }) {
   const { t } = useLanguage()
   const menuRef = useRef(null)
   const [showFadeSubmenu, setShowFadeSubmenu] = useState(false)
+  const [showLoopSubmenu, setShowLoopSubmenu] = useState(false)
   const [fadeDurations, setFadeDurations] = useState({ in: 0.5, out: 0.5 })
   const [activeTab, setActiveTab] = useState('edit')
+  
+  // ✅ État pour la boucle
+  const [loopColor, setLoopColor] = useState('#22c55e')
+  const [loopEndMode, setLoopEndMode] = useState('endOfTrack')
+  const [cycleCount, setCycleCount] = useState(3)
+  const [manualDuration, setManualDuration] = useState(10)
+  const [showColorPicker, setShowColorPicker] = useState(false)
 
   console.log('📋 [ClipActionsMenu] Rendu du menu pour clip:', clip?.id, 'nom:', clip?.name)
+
+  // ✅ Vérifier si le clip est déjà en boucle
+  const isClipLooping = clip?.id && loopState?.clips?.[clip.id]?.enabled || false
+  const clipLoopData = clip?.id ? loopState?.clips?.[clip.id] : null
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -63,6 +97,16 @@ export default function ClipActionsMenu({
     }
   }, [position])
 
+  // ✅ Charger les données de boucle existantes
+  useEffect(() => {
+    if (clipLoopData) {
+      setLoopColor(clipLoopData.arrowColor || '#22c55e')
+      setLoopEndMode(clipLoopData.loopMode || 'endOfTrack')
+      setCycleCount(clipLoopData.cycleCount || 3)
+      setManualDuration(clipLoopData.manualDuration || 10)
+    }
+  }, [clipLoopData])
+
   if (!clip) {
     console.warn('📋 [ClipActionsMenu] clip est null/undefined, pas de rendu')
     return null
@@ -84,6 +128,25 @@ export default function ClipActionsMenu({
     console.log('🗑️ [ClipActionsMenu] Clic sur Supprimer pour:', clip.id)
     onClose()
     onDelete?.(trackId, clip.id)
+  }
+
+  // ✅ Handler pour activer/désactiver la boucle
+  const handleToggleLoop = () => {
+    console.log('🔄 [ClipActionsMenu] Toggle boucle pour:', clip.id)
+    console.log('🔄 [ClipActionsMenu] Options:', {
+      arrowColor: loopColor,
+      loopMode: loopEndMode,
+      cycleCount: loopEndMode === 'cycles' ? cycleCount : undefined,
+      manualDuration: loopEndMode === 'manualDuration' ? manualDuration : undefined,
+    })
+    
+    onToggleClipLoop?.(clip.id, {
+      arrowColor: loopColor,
+      loopMode: loopEndMode,
+      cycleCount: loopEndMode === 'cycles' ? cycleCount : undefined,
+      manualDuration: loopEndMode === 'manualDuration' ? manualDuration : undefined,
+    })
+    onClose()
   }
 
   return (
@@ -230,7 +293,6 @@ export default function ClipActionsMenu({
               shortcut="S"
             />
             
-            {/* ✅ Normaliser - ouvre le modal */}
             <MenuItem 
               icon="ti-wave" 
               label={t('editorNormalize') || 'Normaliser'} 
@@ -241,16 +303,256 @@ export default function ClipActionsMenu({
               }} 
             />
             
-            <MenuItem 
-              icon="ti-repeat" 
-              label={t('editorLoop') || 'Boucle'} 
-              onClick={() => { 
-                console.log('🔄 [ClipActionsMenu] Boucle:', clip.id)
-                onLoop?.(clip.id)
-                onClose() 
-              }} 
-              active={isLoopEnabled}
-            />
+            {/* ✅ BOUCLE - Sous-menu simplifié (pas de choix de visuel) */}
+            <div style={{ padding: '2px 4px' }}>
+              <button
+                onClick={() => {
+                  if (isClipLooping) {
+                    handleToggleLoop()
+                  } else {
+                    setShowLoopSubmenu(!showLoopSubmenu)
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '6px 12px',
+                  background: isClipLooping ? 'var(--accent-light)' : 'transparent',
+                  border: `1px solid ${isClipLooping ? 'var(--success)' : 'transparent'}`,
+                  borderRadius: 'var(--radius-sm)',
+                  color: isClipLooping ? 'var(--success)' : 'var(--text-primary)',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  fontFamily: 'inherit'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isClipLooping) {
+                    e.currentTarget.style.background = 'var(--bg-hover)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isClipLooping) {
+                    e.currentTarget.style.background = 'transparent'
+                  }
+                }}
+              >
+                <i className={`ti ${isClipLooping ? 'ti-repeat' : 'ti-repeat-off'}`} style={{ fontSize: 14, minWidth: 18 }} />
+                <span style={{ flex: 1, textAlign: 'left' }}>
+                  {isClipLooping ? t('editorLoopActive') || 'Boucle active' : t('editorLoop') || 'Boucle'}
+                </span>
+                {isClipLooping && (
+                  <span style={{
+                    fontSize: 9,
+                    color: 'var(--success)',
+                    background: 'rgba(34,197,94,0.15)',
+                    padding: '1px 8px',
+                    borderRadius: 10
+                  }}>
+                    ON
+                  </span>
+                )}
+                <i className={`ti ${showLoopSubmenu ? 'ti-chevron-up' : 'ti-chevron-right'}`} style={{ fontSize: 12, color: 'var(--text-tertiary)' }} />
+              </button>
+              
+              {/* ✅ Sous-menu de la boucle simplifié */}
+              {showLoopSubmenu && (
+                <div style={{
+                  marginTop: 4,
+                  padding: '6px 8px',
+                  background: 'var(--bg-tertiary)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border)'
+                }}>
+                  {/* ✅ Sélecteur de couleur (flèche par défaut) */}
+                  <div style={{ marginBottom: 6 }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                      {t('editorLoopColor') || 'Couleur de la flèche'}
+                    </div>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {ARROW_COLORS.map(c => (
+                        <button
+                          key={c.id}
+                          onClick={() => setLoopColor(c.color)}
+                          style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: '50%',
+                            background: c.color,
+                            border: loopColor === c.color ? '2px solid var(--accent)' : '2px solid var(--border)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                            outline: 'none',
+                            flexShrink: 0
+                          }}
+                          title={c.label}
+                        />
+                      ))}
+                      <button
+                        onClick={() => setShowColorPicker(!showColorPicker)}
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: '50%',
+                          background: loopColor,
+                          border: '2px solid var(--border)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 10,
+                          color: 'white',
+                          textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                        }}
+                        title="Couleur personnalisée"
+                      >
+                        +
+                      </button>
+                    </div>
+                    {showColorPicker && (
+                      <div style={{
+                        marginTop: 4,
+                        padding: 4,
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-sm)'
+                      }}>
+                        <input
+                          type="color"
+                          value={loopColor}
+                          onChange={(e) => setLoopColor(e.target.value)}
+                          style={{
+                            width: '100%',
+                            height: 32,
+                            padding: 2,
+                            cursor: 'pointer',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--radius-sm)',
+                            background: 'transparent'
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ✅ Options de fin de boucle */}
+                  <div style={{ marginBottom: 6 }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                      {t('editorLoopEnd') || 'Fin de la boucle'}
+                    </div>
+                    
+                    {LOOP_END_OPTIONS.map(opt => (
+                      <label
+                        key={opt.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '3px 6px',
+                          borderRadius: 'var(--radius-sm)',
+                          background: loopEndMode === opt.id ? 'var(--accent-light)' : 'transparent',
+                          border: `1px solid ${loopEndMode === opt.id ? 'var(--accent)' : 'transparent'}`,
+                          cursor: 'pointer',
+                          fontSize: 10,
+                          marginBottom: 2
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="loopEndMode"
+                          checked={loopEndMode === opt.id}
+                          onChange={() => setLoopEndMode(opt.id)}
+                          style={{ width: 'auto', accentColor: 'var(--accent)', margin: 0 }}
+                        />
+                        <i className={`ti ${opt.icon}`} style={{ fontSize: 12, color: 'var(--text-secondary)' }} />
+                        <span style={{ flex: 1 }}>{opt.label}</span>
+                        
+                        {/* ✅ Champs supplémentaires selon l'option */}
+                        {opt.id === 'cycles' && loopEndMode === 'cycles' && (
+                          <input
+                            type="number"
+                            min="1"
+                            max="999"
+                            value={cycleCount}
+                            onChange={(e) => setCycleCount(Math.max(1, parseInt(e.target.value) || 1))}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              width: 40,
+                              padding: '1px 4px',
+                              fontSize: 10,
+                              borderRadius: 'var(--radius-sm)',
+                              border: '1px solid var(--border)',
+                              background: 'var(--bg-primary)',
+                              color: 'var(--text-primary)',
+                              textAlign: 'center'
+                            }}
+                          />
+                        )}
+                        
+                        {opt.id === 'manualDuration' && loopEndMode === 'manualDuration' && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <input
+                              type="number"
+                              min="0.1"
+                              max="999"
+                              step="0.1"
+                              value={manualDuration}
+                              onChange={(e) => setManualDuration(Math.max(0.1, parseFloat(e.target.value) || 0.1))}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                width: 50,
+                                padding: '1px 4px',
+                                fontSize: 10,
+                                borderRadius: 'var(--radius-sm)',
+                                border: '1px solid var(--border)',
+                                background: 'var(--bg-primary)',
+                                color: 'var(--text-primary)',
+                                textAlign: 'center'
+                              }}
+                            />
+                            <span style={{ fontSize: 9, color: 'var(--text-tertiary)' }}>s</span>
+                          </div>
+                        )}
+                        
+                        {opt.id === 'manualClick' && loopEndMode === 'manualClick' && (
+                          <span style={{
+                            fontSize: 9,
+                            color: 'var(--accent)',
+                            fontStyle: 'italic'
+                          }}>
+                            Cliquez sur la timeline
+                          </span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+
+                  {/* Bouton d'activation */}
+                  <button
+                    onClick={handleToggleLoop}
+                    className="btn-primary btn-sm"
+                    style={{
+                      width: '100%',
+                      justifyContent: 'center',
+                      fontSize: 11,
+                      padding: '4px 8px',
+                      minHeight: 28,
+                      borderRadius: 'var(--radius-sm)',
+                      background: 'var(--accent)',
+                      color: 'white'
+                    }}
+                  >
+                    <i className="ti ti-check" /> 
+                    {isClipLooping 
+                      ? (t('editorLoopUpdate') || 'Mettre à jour')
+                      : (t('editorLoopActivate') || 'Activer la boucle')
+                    }
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

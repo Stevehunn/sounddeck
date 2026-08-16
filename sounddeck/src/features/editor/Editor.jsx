@@ -128,6 +128,8 @@ function EditorTimelineContent() {
     autoCrossfade,
     setAutoCrossfade,
     playClipOnly,
+    loopState,
+    toggleClipLoop,
   } = context
 
   // ─── ÉTATS LOCAUX ──────────────────────────────────────────────────────
@@ -964,6 +966,8 @@ function EditorTimelineContent() {
           onCutClip={handleCutClip}
           onPasteClip={handlePasteClip}
           store={store}
+          loopState={loopState}
+          onToggleClipLoop={toggleClipLoop}
         />
       </div>
 
@@ -1253,6 +1257,8 @@ function EditorTimelineContent() {
           isPlaying={isPlaying}
           isLoopEnabled={loopRegion.enabled}
           tr={t}
+          onToggleClipLoop={toggleClipLoop}
+          loopState={loopState}
         />
       )}
 

@@ -18,6 +18,7 @@ export function useKeyboardShortcuts({
   onCopy,
   onCut,
   onPaste,
+  onToggleClipLoop,
   isPlaying,
   canUndo,
   canRedo,
@@ -158,6 +159,22 @@ export function useKeyboardShortcuts({
       onSplit?.()
       return
     }
+
+    // ✅ L - Toggle Loop (sans modificateur)
+    if (e.key === 'l' && !ctrl && !shift && !alt) {
+      e.preventDefault()
+      console.log('⌨️ L: Toggle Loop')
+      onToggleClipLoop?.()
+      return
+    }
+
+    // ✅ Ctrl+L - Toggle Loop (avec modificateur)
+    if (ctrl && e.key === 'l' && !shift) {
+      e.preventDefault()
+      console.log('⌨️ Ctrl+L: Toggle Loop')
+      onToggleClipLoop?.()
+      return
+    }
   }, [
     isEnabled,
     isPlaying,
@@ -177,6 +194,7 @@ export function useKeyboardShortcuts({
     onCopy,
     onCut,
     onPaste,
+    onToggleClipLoop,
     canUndo,
     canRedo
   ])
@@ -203,7 +221,8 @@ export function useKeyboardShortcuts({
     'Ctrl+=/+': 'Zoom In',
     'Ctrl+-': 'Zoom Out',
     'Ctrl+0': 'Zoom Reset',
-    'S': 'Split'
+    'S': 'Split',
+    'L / Ctrl+L': 'Toggle Loop'
   }
 
   return { shortcuts }

@@ -75,6 +75,7 @@ export default function EditorTimeline({
   onRemoveMarker,
   onUpdateMarker,
   onNavigateToMarker,
+  loopState = {},  // ✅ AJOUT
 }) {
   const editorContext = useEditor()
   
@@ -219,6 +220,85 @@ export default function EditorTimeline({
     }
   }, [clientXToTime, totalDuration, onSeek, selectedClipId, selectedTrackId, tracks, clipDurations, onSplitClip, addToast])
 
+  // ✅ Rendu des marqueurs de boucle
+  const renderLoopMarkers = () => {
+    if (!loopState?.clips) return null
+    
+    const markers = []
+    
+    for (const [clipId, loopData] of Object.entries(loopState.clips)) {
+      if (!loopData.enabled) continue
+      
+      // Trouver le clip correspondant
+      let clip = null
+      let clipStart = 0
+      let clipDuration = 0
+      let loopEnd = loopData.end || totalDuration
+      
+      for (const track of tracks) {
+        const found = track.clips.find(c => c.id === clipId)
+        if (found) {
+          clip = found
+          clipStart = found.start || 0
+          clipDuration = clipDurations[found.id] || found.duration || 3
+          break
+        }
+      }
+      
+      if (!clip) continue
+      
+      const clipEnd = clipStart + clipDuration
+      const loopEndPosition = Math.min(loopEnd, totalDuration) * pixelsPerSecond
+      
+      // Ne pas afficher si la boucle ne dépasse pas le clip
+      if (loopEndPosition <= clipEnd * pixelsPerSecond) continue
+      
+      // Marqueur à chaque fin de cycle
+      // Le cycle est la durée du clip
+      const cycleDuration = clipDuration
+      let currentEnd = clipEnd
+      
+      while (currentEnd < loopEnd) {
+        const position = currentEnd * pixelsPerSecond
+        if (position > totalDuration * pixelsPerSecond) break
+        
+        markers.push(
+          <div
+            key={`loop-marker-${clipId}-${currentEnd}`}
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: position,
+              width: 2,
+              background: loopData.arrowColor || '#22c55e',
+              zIndex: 3,
+              opacity: 0.4,
+              pointerEvents: 'none'
+            }}
+          >
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              fontSize: 8,
+              color: loopData.arrowColor || '#22c55e',
+              opacity: 0.6
+            }}>
+              🔄
+            </div>
+          </div>
+        )
+        
+        currentEnd += cycleDuration
+      }
+    }
+    
+    return markers
+  }
+
+  // ✅ Rendu des marqueurs (existants)
   const renderMarkerMarkers = () => {
     if (!markers || markers.length === 0) return null
     
@@ -378,6 +458,8 @@ export default function EditorTimeline({
             formatTime={formatTime}
           />
           {renderMarkerMarkers()}
+          {/* ✅ AJOUT 1 - Marqueurs de boucle sur la règle */}
+          {renderLoopMarkers()}
         </div>
       </div>
 
@@ -526,6 +608,9 @@ export default function EditorTimeline({
               )
             })}
             
+            {/* ✅ AJOUT 2 - Marqueurs de boucle sur les pistes */}
+            {renderLoopMarkers()}
+            
             {tracks.map((track, index) => {
               const trackColor = track.color || getTrackColor(index)
               const trackKey = getTrackKey(track)
@@ -566,7 +651,7 @@ export default function EditorTimeline({
           </div>
         </div>
 
-        {/* ✅ PANEL DES MARQUEURS - Avec localStorage et auto-open contrôlé */}
+        {/* ✅ PANEL DES MARQUEURS */}
         {shouldShowPanel && (
           <div style={{
             width: 280,
