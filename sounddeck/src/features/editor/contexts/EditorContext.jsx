@@ -1428,7 +1428,6 @@ export function EditorProvider({ children, store, addToast }) {
     
     if (loopMode === 'endOfTrack') {
       // Option 1 : Jusqu'à la fin de la piste
-      // Trouver la fin du dernier clip non-bouclé
       const normalClips = project.tracks.flatMap(t => t.clips)
         .filter(c => c.id !== clipId && !loopState.clips[c.id]?.enabled)
       
@@ -1442,7 +1441,9 @@ export function EditorProvider({ children, store, addToast }) {
         loopEnd = Math.max(totalDuration, start + duration * 4)
       }
     } else if (loopMode === 'cycles') {
-      // Option 2 : Nombre de cycles
+      // ✅ Option 2 : Nombre de cycles
+      // Le clip original compte comme cycle 1, donc on ajoute (cycleCount - 1) répétitions
+      // Exemple: cycleCount=3 → original + 2 répétitions = 3 cycles
       loopEnd = start + (duration * cycleCount)
     } else if (loopMode === 'manualDuration') {
       // Option 3 : Durée manuelle
@@ -1452,7 +1453,7 @@ export function EditorProvider({ children, store, addToast }) {
       loopEnd = Math.max(start + duration, totalDuration)
     }
     
-    console.log('🔄 [EditorContext] Activation de la boucle pour:', clip.name, 'loopEnd:', loopEnd, 'mode:', loopMode)
+    console.log('🔄 [EditorContext] Activation de la boucle pour:', clip.name, 'loopEnd:', loopEnd, 'mode:', loopMode, 'cycleCount:', cycleCount)
     
     const updatedLoopState = {
       ...loopState,
@@ -1470,6 +1471,8 @@ export function EditorProvider({ children, store, addToast }) {
           manualDuration: loopMode === 'manualDuration' ? manualDuration : undefined,
           manualEndTime: loopMode === 'manualClick' ? null : undefined,
           cycleCountCurrent: 0,
+          // ✅ Ajouter le nombre de cycles total pour référence
+          totalCycles: loopMode === 'cycles' ? cycleCount : undefined,
         }
       }
     }
@@ -1488,7 +1491,18 @@ export function EditorProvider({ children, store, addToast }) {
       store.updateEditorProject(updatedProject).catch(() => {})
     }
     
-    addToast?.(`Boucle activée sur "${clip.name}" (${loopMode})`, 'success')
+    // ✅ Message plus clair
+    let toastMessage = `Boucle activée sur "${clip.name}"`
+    if (loopMode === 'cycles') {
+      toastMessage += ` (${cycleCount} cycles)`
+    } else if (loopMode === 'endOfTrack') {
+      toastMessage += ` (jusqu'à la fin de la piste)`
+    } else if (loopMode === 'manualDuration') {
+      toastMessage += ` (${manualDuration}s)`
+    } else if (loopMode === 'manualClick') {
+      toastMessage += ` (clic sur la timeline)`
+    }
+    addToast?.(toastMessage, 'success')
   }, [project, loopState, clipDurations, totalDuration, store, addToast])
 
   // ✅ Mettre à jour les options de boucle d'un clip
