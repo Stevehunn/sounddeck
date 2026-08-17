@@ -987,7 +987,11 @@ function EditorTimelineContent() {
           onPasteClip={handlePasteClip}
           store={store}
           loopState={loopState}
-          onToggleClipLoop={toggleClipLoop}
+          onToggleClipLoop={(clipId, options) => {
+            console.log('🔄 [Editor] onToggleClipLoop appelé avec:', { clipId, options })
+            console.log('🔄 [Editor] Appel de toggleClipLoop du contexte')
+            toggleClipLoop(clipId, options)
+          }}
         />
       </div>
 
@@ -1275,7 +1279,11 @@ function EditorTimelineContent() {
           isPlaying={isPlaying}
           isLoopEnabled={loopRegion.enabled}
           tr={t}
-          onToggleClipLoop={toggleClipLoop}
+          onToggleClipLoop={(clipId, options) => {
+            console.log('🔄 [Editor] onToggleClipLoop appelé avec:', { clipId, options })
+            console.log('🔄 [Editor] Appel de toggleClipLoop du contexte')
+            toggleClipLoop(clipId, options)
+          }}
           loopState={loopState}
         />
       )}

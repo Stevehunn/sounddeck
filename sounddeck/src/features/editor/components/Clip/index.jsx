@@ -56,13 +56,16 @@ const EditorClip = ({
   const SNAP_VALUE = 0.01
   const DRAG_SENSITIVITY = 1.0
 
-  // ✅ Vérifier si le clip est en boucle
+  // ✅ Vérifier si le clip est en boucle - AVEC LOGS
   const isClipLooping = clip?.id && loopState?.clips?.[clip.id]?.enabled || false
   const clipLoopData = clip?.id ? loopState?.clips?.[clip.id] : null
   const loopVisual = clipLoopData?.visual || 'arrow'
   const loopColor = clipLoopData?.arrowColor || '#22c55e'
   const loopEnd = clipLoopData?.end || totalDuration
   const loopMode = clipLoopData?.loopMode || 'endOfTrack'
+
+  // ✅ LOG : Affichage de l'état de boucle
+  console.log(`🔁 [Clip] ${clip?.name || 'inconnu'} (${clip?.id}) - isClipLooping:`, isClipLooping, 'clipLoopData:', clipLoopData)
 
   // ✅ Calculer la position de la fin de boucle
   const loopEndPosition = Math.min(loopEnd, totalDuration) * pixelsPerSecond
@@ -255,10 +258,17 @@ const EditorClip = ({
     onCutClip?.(clip)
   }
 
-  // ✅ Rendu de la flèche de boucle (Grisé supprimé)
+  // ✅ Rendu de la flèche de boucle
   const renderLoopArrow = () => {
     if (!isClipLooping || loopVisual !== 'arrow') return null
     if (loopEndPosition <= clipEndPosition) return null
+    
+    console.log(`🔁 [Clip] Rendu de la flèche de boucle pour ${clip.name}:`, {
+      loopEndPosition,
+      clipEndPosition,
+      loopColor,
+      loopMode
+    })
     
     const arrowStart = clipEndPosition
     const arrowWidth = loopEndPosition - clipEndPosition
@@ -398,7 +408,7 @@ const EditorClip = ({
         duration={duration}
       />
 
-      {/* ✅ Flèche de boucle (Grisé supprimé) */}
+      {/* ✅ Flèche de boucle */}
       {renderLoopArrow()}
 
       <div style={{

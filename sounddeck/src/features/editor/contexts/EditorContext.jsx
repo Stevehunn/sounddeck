@@ -229,7 +229,7 @@ export function EditorProvider({ children, store, addToast }) {
 
   // ─── FONCTIONS PLAYBACK ──────────────────────────────────────────────
   
-  // ✅ 1. loadAudioBuffer - définie en premier
+  // ✅ 1. loadAudioBuffer
   const loadAudioBuffer = useCallback(async (filePath) => {
     try {
       if (!audioContextRef.current) {
@@ -255,7 +255,7 @@ export function EditorProvider({ children, store, addToast }) {
     }
   }, [])
 
-  // ✅ playClip - Avec logs pour diagnostiquer l'absence de son
+  // ✅ playClip
   const playClip = useCallback(async (clip, track) => {
     if (!clip?.path) {
       console.warn('⚠️ [playClip] clip.path est undefined pour:', clip?.name)
@@ -361,7 +361,7 @@ export function EditorProvider({ children, store, addToast }) {
     let accumulated = 0
     let isLoopRunning = true
 
-    // ✅ Suivi des derniers temps de lecture pour chaque clip
+    // ✅ Suivi des clips en lecture
     const lastPlayTimes = new Map()
 
     const loop = () => {
@@ -385,7 +385,6 @@ export function EditorProvider({ children, store, addToast }) {
         const loopStart = loopRegion.start || 0
         const loopEnd = loopRegion.end || totalDuration
         
-        // ✅ Gestion de la boucle GLOBALE (timeline)
         if (loopRegion.enabled && newTime >= loopEnd) {
           console.log(`🔄 [EditorContext] Boucle TIMELINE: retour à ${loopStart.toFixed(2)}s`)
           newTime = loopStart
@@ -413,11 +412,13 @@ export function EditorProvider({ children, store, addToast }) {
               
               // ✅ Vérifier si CE clip est en boucle
               const isClipLooping = loopState?.clips?.[clip.id]?.enabled || false
-              const clipLoopStart = loopState?.clips?.[clip.id]?.start || start
-              const clipLoopEnd = loopState?.clips?.[clip.id]?.end || end
+              const clipLoopData = loopState?.clips?.[clip.id]
+              const clipLoopStart = clipLoopData?.start || start
+              const clipLoopEnd = clipLoopData?.end || end
               
               let shouldPlay = false
               let clipTime = newTime
+              let shouldRestart = false
               
               // ✅ Si le clip est en boucle
               if (isClipLooping) {
@@ -435,11 +436,33 @@ export function EditorProvider({ children, store, addToast }) {
                     shouldPlay = true
                     clipTime = clipLoopStart + positionInClip
                     
-                    // ✅ Mettre à jour le temps de dernier lancement
-                    lastPlayTimes.set(clip.id, newTime)
+                    // ✅ Détecter le début d'un nouveau cycle
+                    const isCurrentlyPlaying = audioSourcesRef.current[clip.id] !== undefined
+                    const isNearCycleStart = positionInClip < 0.02 // 20ms de marge
+                    
+                    if (isNearCycleStart && isCurrentlyPlaying) {
+                      // ✅ Arrêter l'ancienne instance avant de relancer
+                      console.log(`🔄 [EditorContext] Nouveau cycle pour "${clip.name}", arrêt de l'ancien`)
+                      const entry = audioSourcesRef.current[clip.id]
+                      if (entry) {
+                        try { 
+                          entry.source.stop() 
+                          entry.source.disconnect() 
+                        } catch (e) {}
+                        delete audioSourcesRef.current[clip.id]
+                      }
+                      lastPlayedClipsRef.current.delete(clip.id)
+                      shouldRestart = true
+                    } else if (!isCurrentlyPlaying && lastPlayedClipsRef.current.has(clip.id)) {
+                      // ✅ Si le clip n'est plus en lecture mais devrait l'être
+                      shouldRestart = true
+                    } else if (!lastPlayedClipsRef.current.has(clip.id)) {
+                      // ✅ Premier lancement du clip
+                      shouldRestart = true
+                    }
                   }
                 } else if (newTime >= clipLoopEnd) {
-                  // ✅ On a dépassé la fin de la boucle, arrêter le clip
+                  // ✅ Fin de la boucle
                   if (lastPlayedClipsRef.current.has(clip.id)) {
                     console.log(`⏹️ [EditorContext] Fin de la boucle pour "${clip.name}" à ${newTime.toFixed(2)}s`)
                     const entry = audioSourcesRef.current[clip.id]
@@ -460,19 +483,22 @@ export function EditorProvider({ children, store, addToast }) {
                   shouldPlay = true
                 }
               } else if (newTime >= start && newTime < end) {
-                // Mode normal
+                // Mode normal - TOUS les clips peuvent jouer
                 shouldPlay = true
               }
               
               if (shouldPlay) {
                 activeClips.add(clip.id)
-                if (!lastPlayedClipsRef.current.has(clip.id)) {
-                  console.log(`▶️ [EditorContext] Lancement du clip: ${clip.name} (${clip.id}) à ${clipTime.toFixed(2)}s ${isClipLooping ? '[BOUCLE]' : ''}`)
+                
+                // ✅ Lancement ou relance du clip
+                if (shouldRestart || !lastPlayedClipsRef.current.has(clip.id)) {
+                  console.log(`▶️ [EditorContext] Lancement/relance du clip: ${clip.name} (${clip.id}) à ${clipTime.toFixed(2)}s ${isClipLooping ? '[BOUCLE]' : ''}`)
                   playClip(clip, track)
                   lastPlayedClipsRef.current.add(clip.id)
+                  lastPlayTimes.set(clip.id, clipTime)
                 }
               } else if (lastPlayedClipsRef.current.has(clip.id) && !isClipLooping) {
-                // Arrêter le clip s'il est terminé (sauf s'il est en boucle)
+                // ✅ Arrêter le clip s'il est terminé (sauf s'il est en boucle)
                 console.log(`⏹️ [EditorContext] Arrêt du clip: ${clip.name} (${clip.id}) à ${newTime.toFixed(2)}s`)
                 const entry = audioSourcesRef.current[clip.id]
                 if (entry) {
@@ -1299,7 +1325,7 @@ export function EditorProvider({ children, store, addToast }) {
 
   // ─── FONCTIONS BOUCLE ──────────────────────────────────────────────────
 
-  // ✅ Activer/désactiver la boucle sur un clip (SANS modifier loopRegion)
+  // ✅ Activer/désactiver la boucle sur un clip
   const toggleClipLoop = useCallback((clipId, options = {}) => {
     console.log('🔄 [EditorContext] toggleClipLoop appelé:', { clipId, options })
     
@@ -1327,8 +1353,8 @@ export function EditorProvider({ children, store, addToast }) {
     
     console.log('🔄 [EditorContext] Clip trouvé:', clip.name, 'durée:', duration, 'début:', start)
     
-    // Si la boucle est déjà activée, la désactiver
-    if (loopState.clips[clipId]?.enabled) {
+    // ✅ Si options.enabled === false, on désactive la boucle
+    if (options.enabled === false) {
       console.log('🔄 [EditorContext] Désactivation de la boucle pour:', clip.name)
       
       const updatedLoopState = {
@@ -1343,7 +1369,6 @@ export function EditorProvider({ children, store, addToast }) {
       }
       setLoopState(updatedLoopState)
       
-      // Mettre à jour le projet
       const updatedProject = {
         ...project,
         loops: updatedLoopState,
@@ -1356,8 +1381,37 @@ export function EditorProvider({ children, store, addToast }) {
         store.updateEditorProject(updatedProject).catch(() => {})
       }
       
-      // ✅ NE PAS modifier loopRegion ici
-      // La boucle de clip n'utilise pas loopRegion
+      addToast?.(`Boucle désactivée sur "${clip.name}"`, 'info')
+      return
+    }
+    
+    // ✅ Si la boucle est déjà activée, on la désactive (pour toggle)
+    if (loopState.clips[clipId]?.enabled) {
+      console.log('🔄 [EditorContext] Désactivation de la boucle (toggle) pour:', clip.name)
+      
+      const updatedLoopState = {
+        ...loopState,
+        clips: {
+          ...loopState.clips,
+          [clipId]: {
+            ...loopState.clips[clipId],
+            enabled: false
+          }
+        }
+      }
+      setLoopState(updatedLoopState)
+      
+      const updatedProject = {
+        ...project,
+        loops: updatedLoopState,
+        updatedAt: Date.now()
+      }
+      setProject(updatedProject)
+      projectRef.current = updatedProject
+      
+      if (store?.updateEditorProject) {
+        store.updateEditorProject(updatedProject).catch(() => {})
+      }
       
       addToast?.(`Boucle désactivée sur "${clip.name}"`, 'info')
       return
@@ -1374,27 +1428,28 @@ export function EditorProvider({ children, store, addToast }) {
     
     if (loopMode === 'endOfTrack') {
       // Option 1 : Jusqu'à la fin de la piste
+      // Trouver la fin du dernier clip non-bouclé
       const normalClips = project.tracks.flatMap(t => t.clips)
-        .filter(c => c.id !== clipId)
+        .filter(c => c.id !== clipId && !loopState.clips[c.id]?.enabled)
       
       if (normalClips.length > 0) {
         const lastNormalClip = normalClips.reduce((max, c) => {
           const end = (c.start || 0) + (clipDurations[c.id] || c.duration || 3)
           return end > max ? end : max
         }, 0)
-        loopEnd = Math.max(lastNormalClip, start + duration)
+        loopEnd = Math.max(lastNormalClip + 2, start + duration * 2)
       } else {
-        loopEnd = totalDuration
+        loopEnd = Math.max(totalDuration, start + duration * 4)
       }
     } else if (loopMode === 'cycles') {
       // Option 2 : Nombre de cycles
       loopEnd = start + (duration * cycleCount)
     } else if (loopMode === 'manualDuration') {
       // Option 3 : Durée manuelle
-      loopEnd = Math.max(start + duration, manualDuration)
+      loopEnd = Math.max(start + duration, start + manualDuration)
     } else if (loopMode === 'manualClick') {
       // Option 4 : Clic sur la timeline
-      loopEnd = totalDuration // Valeur temporaire
+      loopEnd = Math.max(start + duration, totalDuration)
     }
     
     console.log('🔄 [EditorContext] Activation de la boucle pour:', clip.name, 'loopEnd:', loopEnd, 'mode:', loopMode)
@@ -1432,9 +1487,6 @@ export function EditorProvider({ children, store, addToast }) {
     if (store?.updateEditorProject) {
       store.updateEditorProject(updatedProject).catch(() => {})
     }
-    
-    // ✅ NE PAS activer loopRegion ici !
-    // La boucle de clip est gérée dans startPlaybackLoop, pas par loopRegion
     
     addToast?.(`Boucle activée sur "${clip.name}" (${loopMode})`, 'success')
   }, [project, loopState, clipDurations, totalDuration, store, addToast])

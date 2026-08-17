@@ -136,22 +136,34 @@ export default function ClipActionsMenu({
     onDelete?.(trackId, clip.id)
   }
 
-  // ✅ Handler pour activer/désactiver la boucle
+  // ✅ Handler pour activer/désactiver la boucle - VERSION SIMPLIFIÉE
   const handleToggleLoop = () => {
     console.log('🔄 [ClipActionsMenu] Toggle boucle pour:', clip.id)
-    console.log('🔄 [ClipActionsMenu] Options:', {
-      arrowColor: loopColor,
-      loopMode: loopEndMode,
-      cycleCount: loopEndMode === 'cycles' ? cycleCount : undefined,
-      manualDuration: loopEndMode === 'manualDuration' ? manualDuration : undefined,
-    })
+    console.log('🔄 [ClipActionsMenu] Clip:', clip.name)
+    console.log('🔄 [ClipActionsMenu] isClipLooping actuel:', isClipLooping)
+    console.log('🔄 [ClipActionsMenu] loopState actuel:', loopState)
     
-    onToggleClipLoop?.(clip.id, {
+    // ✅ Si la boucle est déjà active, on la désactive
+    if (isClipLooping) {
+      console.log('🔄 [ClipActionsMenu] Désactivation de la boucle')
+      onToggleClipLoop?.(clip.id, {
+        enabled: false
+      })
+      onClose()
+      return
+    }
+    
+    // ✅ Sinon, on l'active avec les options
+    const options = {
       arrowColor: loopColor,
       loopMode: loopEndMode,
       cycleCount: loopEndMode === 'cycles' ? cycleCount : undefined,
       manualDuration: loopEndMode === 'manualDuration' ? manualDuration : undefined,
-    })
+    }
+    
+    console.log('🔄 [ClipActionsMenu] Activation de la boucle avec options:', options)
+    
+    onToggleClipLoop?.(clip.id, options)
     onClose()
   }
 
@@ -317,7 +329,6 @@ export default function ClipActionsMenu({
               shortcut="S"
             />
             
-            {/* ✅ Normaliser AVEC icône */}
             <MenuItem 
               icon="ti-adjustments-horizontal" 
               label={t('editorNormalize') || 'Normaliser'} 
