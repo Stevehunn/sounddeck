@@ -14,7 +14,6 @@ const ClipActions = memo(({
   const [isDeleting, setIsDeleting] = useState(false)
   const [showDeleteButton, setShowDeleteButton] = useState(false)
   const deleteTimeoutRef = useRef(null)
-  const buttonRef = useRef(null)
 
   console.log('🔄 [ClipActions] Render:', { isSelected, isHovering, isDeleting, showDeleteButton, clipId })
 
@@ -50,9 +49,8 @@ const ClipActions = memo(({
   const handleDeleteConfirm = () => {
     console.log('🗑️ [ClipActions] handleDeleteConfirm appelé avec:', { clipId, trackId })
     if (onRemove && clipId && trackId) {
-      // ✅ CORRECTION : onRemove attend (trackId, clipId)
       console.log('🗑️ [ClipActions] Appel de onRemove avec (trackId, clipId)')
-      onRemove(trackId, clipId)  // ✅ Bon ordre : trackId d'abord, clipId ensuite
+      onRemove(trackId, clipId)
     } else {
       console.warn('🗑️ [ClipActions] onRemove non disponible ou IDs manquants')
     }
@@ -107,7 +105,6 @@ const ClipActions = memo(({
 
       {shouldShowDeleteButton && (
         <DeleteButton
-          ref={buttonRef}
           onDelete={handleDeleteConfirm}
           confirmTitle={tr('confirmDeleteClip') || 'Confirmer la suppression du clip'}
           confirmMessage={tr('confirmDeleteClipMessage') || 'Voulez-vous vraiment supprimer ce clip ?'}
