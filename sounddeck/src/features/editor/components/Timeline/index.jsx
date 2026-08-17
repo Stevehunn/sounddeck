@@ -75,33 +75,54 @@ export default function EditorTimeline({
   onRemoveMarker,
   onUpdateMarker,
   onNavigateToMarker,
-  loopState = {},  // ✅ AJOUT
+  loopState = {},
 }) {
   const editorContext = useEditor()
   
   const containerRef = useRef(null)
   const clipsContainerRef = useRef(null)
-  const rulerRef = useRef(null)
+  const rulerContainerRef = useRef(null) // ✅ NOUVEAU : ref pour le conteneur de la règle
+  const rulerInnerRef = useRef(null)     // ✅ NOUVEAU : ref pour l'inner de la règle
   const [isPanning, setIsPanning] = useState(false)
   const [panStartX, setPanStartX] = useState(0)
   const [scrollLeft, setScrollLeft] = useState(0)
   
   const store = storeProp || editorContext?.store
   
-  // ✅ CORRECTION : Utiliser une ref pour le chargement initial
   const [showMarkersPanel, setShowMarkersPanel] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
   const hasInitializedRef = useRef(false)
   
-  // ✅ Récupérer la préférence d'auto-open depuis localStorage
   const getAutoOpenPreference = useCallback(() => {
     const saved = localStorage.getItem(AUTO_OPEN_KEY)
-    // ✅ Par défaut : false (l'utilisateur décide)
     return saved === null ? false : saved === 'true'
   }, [])
 
   const pixelsPerSecond = 80 * zoomLevel
   const totalWidth = Math.max(totalDuration * pixelsPerSecond + 100, 600)
+
+  // ✅ Synchronisation du scroll entre la règle et les clips
+  const handleClipsScroll = useCallback((e) => {
+    const scrollLeft = e.currentTarget.scrollLeft
+    // ✅ Faire défiler la règle en même temps
+    if (rulerInnerRef.current) {
+      rulerInnerRef.current.style.transform = `translateX(-${scrollLeft}px)`
+    }
+    // ✅ Mettre à jour le playhead si nécessaire
+    setScrollLeft(scrollLeft)
+  }, [])
+
+  // ✅ Synchronisation du scroll via la roulette sur la règle
+  const handleRulerWheel = useCallback((e) => {
+    // Si c'est un zoom (Ctrl+molette), on laisse faire
+    if (e.ctrlKey || e.metaKey) return
+    
+    // Sinon, on scroll les clips
+    if (clipsContainerRef.current) {
+      clipsContainerRef.current.scrollLeft += e.deltaY
+      e.preventDefault()
+    }
+  }, [])
 
   const getTrackColor = (index) => {
     const colors = [
@@ -119,13 +140,11 @@ export default function EditorTimeline({
 
   // ✅ Chargement UNIQUE de la préférence
   useEffect(() => {
-    // 🔒 Ne charger qu'une seule fois
     if (hasInitializedRef.current) return
     hasInitializedRef.current = true
     
     console.log('📍 [Timeline] Chargement initial UNIQUE de la préférence')
     
-    // ✅ Vérifier si l'auto-open est activé
     const autoOpen = getAutoOpenPreference()
     
     if (!autoOpen) {
@@ -135,35 +154,30 @@ export default function EditorTimeline({
       return
     }
     
-    // ✅ Auto-open activé → le panneau s'ouvre TOUJOURS
     console.log('📍 [Timeline] Auto-open activé, ouverture du panneau')
     setShowMarkersPanel(true)
     localStorage.setItem(STORAGE_KEY, 'true')
     setIsInitialized(true)
     
-  }, [onAddMarker, getAutoOpenPreference]) // ✅ Dépendances minimales
+  }, [onAddMarker, getAutoOpenPreference])
 
   // ✅ Sauvegarder la préférence d'état du panneau
   const handleToggleMarkersPanel = useCallback((show) => {
     console.log('📍 [Timeline] handleToggleMarkersPanel:', show)
     setShowMarkersPanel(show)
-    // ✅ Toujours sauvegarder l'état du panneau
     localStorage.setItem(STORAGE_KEY, String(show))
     console.log('📍 [Timeline] Préférence sauvegardée:', show)
   }, [])
 
-  // ✅ Gestionnaire pour l'auto-open depuis MarkersPanel
   const handleAutoOpenChange = useCallback((autoOpen) => {
     console.log('📍 [Timeline] Auto-open changed:', autoOpen)
     localStorage.setItem(AUTO_OPEN_KEY, String(autoOpen))
     
     if (autoOpen) {
-      // ✅ Si l'auto-open est activé, ouvrir le panneau
       console.log('📍 [Timeline] Auto-open activé, ouverture du panneau')
       setShowMarkersPanel(true)
       localStorage.setItem(STORAGE_KEY, 'true')
     } else {
-      // ✅ Si l'auto-open est désactivé, fermer le panneau
       console.log('📍 [Timeline] Auto-open désactivé, fermeture du panneau')
       setShowMarkersPanel(false)
       localStorage.setItem(STORAGE_KEY, 'false')
@@ -193,14 +207,14 @@ export default function EditorTimeline({
   }, [clientXToTime, totalDuration, onSeek])
 
   const handleRulerClick = useCallback((e) => {
-    const time = clientXToTime(e.clientX, rulerRef.current)
+    const time = clientXToTime(e.clientX, rulerContainerRef.current)
     if (time >= 0 && time <= totalDuration) {
       onSeek?.(time)
     }
   }, [clientXToTime, totalDuration, onSeek])
 
   const handleRulerDoubleClick = useCallback((e) => {
-    const time = clientXToTime(e.clientX, rulerRef.current)
+    const time = clientXToTime(e.clientX, rulerContainerRef.current)
     if (time >= 0 && time <= totalDuration) {
       onSeek?.(time)
       
@@ -229,7 +243,6 @@ export default function EditorTimeline({
     for (const [clipId, loopData] of Object.entries(loopState.clips)) {
       if (!loopData.enabled) continue
       
-      // Trouver le clip correspondant
       let clip = null
       let clipStart = 0
       let clipDuration = 0
@@ -250,11 +263,8 @@ export default function EditorTimeline({
       const clipEnd = clipStart + clipDuration
       const loopEndPosition = Math.min(loopEnd, totalDuration) * pixelsPerSecond
       
-      // Ne pas afficher si la boucle ne dépasse pas le clip
       if (loopEndPosition <= clipEnd * pixelsPerSecond) continue
       
-      // Marqueur à chaque fin de cycle
-      // Le cycle est la durée du clip
       const cycleDuration = clipDuration
       let currentEnd = clipEnd
       
@@ -371,6 +381,7 @@ export default function EditorTimeline({
     })
   }
 
+  // ✅ Gestion du scroll avec la molette sur les clips
   useEffect(() => {
     const clipsContainer = clipsContainerRef.current
     if (!clipsContainer) return
@@ -396,7 +407,6 @@ export default function EditorTimeline({
     return `${track.id}-${clipPositions}`
   }
 
-  // ✅ Indicateur de chargement
   const shouldShowPanel = isInitialized && showMarkersPanel && onAddMarker
   
   console.log('📍 [Timeline] Render - showMarkersPanel:', showMarkersPanel, 'initialized:', isInitialized)
@@ -423,43 +433,61 @@ export default function EditorTimeline({
         borderBottom: '1px solid var(--border)',
         flexShrink: 0,
         zIndex: 5,
-        position: 'relative'
+        position: 'relative',
+        overflow: 'hidden' // ✅ Cacher le débordement
       }}>
         <div style={{
           width: TRACK_HEAD_WIDTH,
           minWidth: TRACK_HEAD_WIDTH,
           flexShrink: 0,
           background: 'var(--bg-secondary)',
-          borderRight: '1px solid var(--border)'
+          borderRight: '1px solid var(--border)',
+          zIndex: 2,
+          position: 'relative'
         }} />
         <div
-          ref={rulerRef}
+          ref={rulerContainerRef}
           style={{
             flex: 1,
             position: 'relative',
-            overflow: 'hidden',
+            overflow: 'hidden', // ✅ Important pour le scroll
             cursor: 'pointer'
           }}
           onClick={handleRulerClick}
           onDoubleClick={handleRulerDoubleClick}
+          onWheel={handleRulerWheel} // ✅ Scroll avec la molette sur la règle
         >
-          <TimelineRuler
-            totalDuration={totalDuration}
-            pixelsPerSecond={pixelsPerSecond}
-            currentTime={currentTime}
-            isPlaying={isPlaying}
-            zoomLevel={zoomLevel}
-            formatTime={formatTime}
-          />
-          <TimelinePlayhead
-            currentTime={currentTime}
-            pixelsPerSecond={pixelsPerSecond}
-            isPlaying={isPlaying}
-            formatTime={formatTime}
-          />
-          {renderMarkerMarkers()}
-          {/* ✅ AJOUT 1 - Marqueurs de boucle sur la règle */}
-          {renderLoopMarkers()}
+          {/* ✅ Inner de la règle qui va se déplacer avec le scroll */}
+          <div
+            ref={rulerInnerRef}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              height: '100%',
+              width: Math.max(totalWidth, '100%'),
+              transform: 'translateX(0px)', // ✅ Géré par le scroll
+              transition: 'none',
+              willChange: 'transform'
+            }}
+          >
+            <TimelineRuler
+              totalDuration={totalDuration}
+              pixelsPerSecond={pixelsPerSecond}
+              currentTime={currentTime}
+              isPlaying={isPlaying}
+              zoomLevel={zoomLevel}
+              formatTime={formatTime}
+            />
+            <TimelinePlayhead
+              currentTime={currentTime}
+              pixelsPerSecond={pixelsPerSecond}
+              isPlaying={isPlaying}
+              formatTime={formatTime}
+            />
+            {renderMarkerMarkers()}
+            {renderLoopMarkers()}
+          </div>
         </div>
       </div>
 
@@ -471,25 +499,41 @@ export default function EditorTimeline({
         flexShrink: 0,
         background: 'var(--bg-tertiary)',
         borderBottom: '1px solid var(--border)',
-        position: 'relative'
+        position: 'relative',
+        overflow: 'hidden'
       }}>
         <div style={{
           width: TRACK_HEAD_WIDTH,
           minWidth: TRACK_HEAD_WIDTH,
           flexShrink: 0,
           background: 'var(--bg-tertiary)',
-          borderRight: '1px solid var(--border)'
+          borderRight: '1px solid var(--border)',
+          zIndex: 2,
+          position: 'relative'
         }} />
-        <div style={{ flex: 1, position: 'relative' }}>
-          <TimelineLoop
-            loopRegion={loopRegion}
-            pixelsPerSecond={pixelsPerSecond}
-            onSetLoopRegion={onSetLoopRegion}
-            onClearLoop={onClearLoop}
-            onToggleLoop={onToggleLoop}
-            tr={tr}
-            totalDuration={totalDuration}
-          />
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              height: '100%',
+              width: Math.max(totalWidth, '100%'),
+              transform: 'translateX(0px)',
+              transition: 'none',
+              willChange: 'transform'
+            }}
+          >
+            <TimelineLoop
+              loopRegion={loopRegion}
+              pixelsPerSecond={pixelsPerSecond}
+              onSetLoopRegion={onSetLoopRegion}
+              onClearLoop={onClearLoop}
+              onToggleLoop={onToggleLoop}
+              tr={tr}
+              totalDuration={totalDuration}
+            />
+          </div>
         </div>
       </div>
 
@@ -568,7 +612,7 @@ export default function EditorTimeline({
           })}
         </div>
 
-        {/* Clips */}
+        {/* Clips - Conteneur scrollable */}
         <div
           ref={clipsContainerRef}
           style={{
@@ -580,6 +624,7 @@ export default function EditorTimeline({
             cursor: 'pointer'
           }}
           onClick={handleTimelineClick}
+          onScroll={handleClipsScroll} // ✅ Synchronisation du scroll
         >
           <div style={{
             position: 'relative',
@@ -608,7 +653,6 @@ export default function EditorTimeline({
               )
             })}
             
-            {/* ✅ AJOUT 2 - Marqueurs de boucle sur les pistes */}
             {renderLoopMarkers()}
             
             {tracks.map((track, index) => {
@@ -651,7 +695,7 @@ export default function EditorTimeline({
           </div>
         </div>
 
-        {/* ✅ PANEL DES MARQUEURS */}
+        {/* Panel des marqueurs */}
         {shouldShowPanel && (
           <div style={{
             width: 280,
@@ -732,7 +776,7 @@ export default function EditorTimeline({
           </div>
         )}
 
-        {/* ✅ Bouton pour ouvrir le panneau des marqueurs s'il est caché */}
+        {/* Bouton pour ouvrir le panneau des marqueurs */}
         {isInitialized && !showMarkersPanel && onAddMarker && (
           <button
             className="btn-secondary btn-sm"
