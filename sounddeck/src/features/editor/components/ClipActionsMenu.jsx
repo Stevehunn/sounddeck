@@ -317,8 +317,9 @@ export default function ClipActionsMenu({
               shortcut="S"
             />
             
+            {/* ✅ Normaliser AVEC icône */}
             <MenuItem 
-              icon="ti-wave" 
+              icon="ti-adjustments-horizontal" 
               label={t('editorNormalize') || 'Normaliser'} 
               onClick={() => { 
                 console.log('📊 [ClipActionsMenu] Normaliser:', clip.id)
@@ -580,7 +581,6 @@ export default function ClipActionsMenu({
 
         {activeTab === 'effects' && (
           <div className="menu-group">
-            {/* ✅ Bouton Ajouter un effet - Sélectionne le clip et ouvre le panneau des effets */}
             <MenuItem 
               icon="ti-plus" 
               label={t('editorAddEffect') || 'Ouvrir le panneau des effets'} 
@@ -588,7 +588,6 @@ export default function ClipActionsMenu({
               accent
             />
             
-            {/* ✅ Bouton Aperçu des effets - Sélectionne le clip et ouvre le panneau des effets */}
             <MenuItem 
               icon="ti-wave" 
               label={t('editorEffectPreview') || 'Ouvrir le panneau des effets (aperçu)'} 
@@ -611,7 +610,6 @@ export default function ClipActionsMenu({
                   {t('editorActiveEffects') || 'Effets actifs'}
                 </div>
                 {clip.effects.filter(e => e.enabled).map(effect => {
-                  // ✅ Récupérer l'icône de l'effet
                   const effectIcon = EFFECT_ICON_MAP[effect.type] || 'ti-wand'
                   return (
                     <MenuItem 
