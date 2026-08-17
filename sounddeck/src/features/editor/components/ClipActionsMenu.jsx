@@ -22,6 +22,16 @@ const LOOP_END_OPTIONS = [
   { id: 'manualClick', label: 'Cliquer sur la timeline', icon: 'ti-mouse' },
 ]
 
+// ✅ Map des icônes pour l'affichage dans le menu contextuel
+const EFFECT_ICON_MAP = {
+  volume: 'ti-volume',
+  fadeIn: 'ti-sunrise',
+  fadeOut: 'ti-sunset',
+  speed: 'ti-gauge',
+  echo: 'ti-repeat',
+  reverb: 'ti-wave-sine',
+}
+
 export default function ClipActionsMenu({
   clip,
   trackId,
@@ -36,8 +46,6 @@ export default function ClipActionsMenu({
   onCopy,
   onCut,
   onDelete,
-  onFadeIn,
-  onFadeOut,
   onPreviewEffects,
   onToggleClipLoop,
   isPlaying,
@@ -48,9 +56,7 @@ export default function ClipActionsMenu({
 }) {
   const { t } = useLanguage()
   const menuRef = useRef(null)
-  const [showFadeSubmenu, setShowFadeSubmenu] = useState(false)
   const [showLoopSubmenu, setShowLoopSubmenu] = useState(false)
-  const [fadeDurations, setFadeDurations] = useState({ in: 0.5, out: 0.5 })
   const [activeTab, setActiveTab] = useState('edit')
   
   // ✅ État pour la boucle
@@ -147,6 +153,24 @@ export default function ClipActionsMenu({
       manualDuration: loopEndMode === 'manualDuration' ? manualDuration : undefined,
     })
     onClose()
+  }
+
+  // ✅ Handler pour ajouter un effet - Sélectionne le clip et ouvre le panneau des effets
+  const handleAddEffectClick = () => {
+    console.log('✨ [ClipActionsMenu] Ouvrir le panneau des effets pour:', clip.id, clip.name)
+    onClose()
+    if (onAddEffect) {
+      onAddEffect(clip.id, trackId)
+    }
+  }
+
+  // ✅ Handler pour l'aperçu des effets - Sélectionne le clip et ouvre le panneau des effets
+  const handlePreviewEffectsClick = () => {
+    console.log('👂 [ClipActionsMenu] Ouvrir le panneau des effets pour aperçu:', clip.id, clip.name)
+    onClose()
+    if (onAddEffect) {
+      onAddEffect(clip.id, trackId)
+    }
   }
 
   return (
@@ -303,7 +327,7 @@ export default function ClipActionsMenu({
               }} 
             />
             
-            {/* ✅ BOUCLE - Sous-menu simplifié (pas de choix de visuel) */}
+            {/* ✅ BOUCLE - Sous-menu simplifié */}
             <div style={{ padding: '2px 4px' }}>
               <button
                 onClick={() => {
@@ -366,7 +390,7 @@ export default function ClipActionsMenu({
                   borderRadius: 'var(--radius-sm)',
                   border: '1px solid var(--border)'
                 }}>
-                  {/* ✅ Sélecteur de couleur (flèche par défaut) */}
+                  {/* ✅ Sélecteur de couleur */}
                   <div style={{ marginBottom: 6 }}>
                     <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>
                       {t('editorLoopColor') || 'Couleur de la flèche'}
@@ -469,7 +493,6 @@ export default function ClipActionsMenu({
                         <i className={`ti ${opt.icon}`} style={{ fontSize: 12, color: 'var(--text-secondary)' }} />
                         <span style={{ flex: 1 }}>{opt.label}</span>
                         
-                        {/* ✅ Champs supplémentaires selon l'option */}
                         {opt.id === 'cycles' && loopEndMode === 'cycles' && (
                           <input
                             type="number"
@@ -529,7 +552,6 @@ export default function ClipActionsMenu({
                     ))}
                   </div>
 
-                  {/* Bouton d'activation */}
                   <button
                     onClick={handleToggleLoop}
                     className="btn-primary btn-sm"
@@ -558,76 +580,56 @@ export default function ClipActionsMenu({
 
         {activeTab === 'effects' && (
           <div className="menu-group">
+            {/* ✅ Bouton Ajouter un effet - Sélectionne le clip et ouvre le panneau des effets */}
             <MenuItem 
               icon="ti-plus" 
-              label={t('editorAddEffect') || '+ Ajouter un effet'} 
-              onClick={() => { 
-                console.log('✨ [ClipActionsMenu] Ajouter un effet:', clip.id)
-                onAddEffect?.(trackId, clip.id)
-                onClose() 
-              }}
+              label={t('editorAddEffect') || 'Ouvrir le panneau des effets'} 
+              onClick={handleAddEffectClick}
               accent
             />
             
+            {/* ✅ Bouton Aperçu des effets - Sélectionne le clip et ouvre le panneau des effets */}
             <MenuItem 
               icon="ti-wave" 
-              label={t('editorEffectPreview') || 'Aperçu des effets'} 
-              onClick={() => { 
-                console.log('👂 [ClipActionsMenu] Aperçu des effets:', clip.id)
-                onPreviewEffects?.(clip)
-                onClose() 
-              }}
+              label={t('editorEffectPreview') || 'Ouvrir le panneau des effets (aperçu)'} 
+              onClick={handlePreviewEffectsClick}
               disabled={!hasActiveEffects}
             />
             
             <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
             
-            <MenuItem 
-              icon="ti-sun" 
-              label={t('editorFades') || 'Fades'} 
-              onClick={() => setShowFadeSubmenu(!showFadeSubmenu)}
-              hasSubmenu={showFadeSubmenu}
-            />
-            {showFadeSubmenu && (
-              <div style={{ padding: '4px 8px 4px 32px' }}>
-                <FadeControl 
-                  label={t('editorFadeIn') || 'Fade In'} 
-                  value={fadeDurations.in} 
-                  onChange={(val) => {
-                    setFadeDurations(prev => ({ ...prev, in: val }))
-                    onFadeIn?.(trackId, clip.id, val)
-                  }}
-                />
-                <FadeControl 
-                  label={t('editorFadeOut') || 'Fade Out'} 
-                  value={fadeDurations.out} 
-                  onChange={(val) => {
-                    setFadeDurations(prev => ({ ...prev, out: val }))
-                    onFadeOut?.(trackId, clip.id, val)
-                  }}
-                />
-              </div>
-            )}
-            
             {clip.effects?.filter(e => e.enabled).length > 0 && (
               <>
-                <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
-                {clip.effects.filter(e => e.enabled).map(effect => (
-                  <MenuItem 
-                    key={effect.id}
-                    icon="ti-circle-filled"
-                    label={`${effect.type} (${Object.values(effect.params).join(', ')})`}
-                    onClick={() => {}}
-                    small
-                    muted
-                  />
-                ))}
+                <div style={{
+                  padding: '4px 8px',
+                  fontSize: 10,
+                  color: 'var(--text-tertiary)',
+                  fontWeight: 500,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  {t('editorActiveEffects') || 'Effets actifs'}
+                </div>
+                {clip.effects.filter(e => e.enabled).map(effect => {
+                  // ✅ Récupérer l'icône de l'effet
+                  const effectIcon = EFFECT_ICON_MAP[effect.type] || 'ti-wand'
+                  return (
+                    <MenuItem 
+                      key={effect.id}
+                      icon={effectIcon}
+                      label={`${effect.type} (${Object.values(effect.params).map(v => typeof v === 'number' ? v.toFixed(2) : v).join(', ')})`}
+                      onClick={() => {}}
+                      small
+                      muted
+                    />
+                  )
+                })}
               </>
             )}
             
             {!hasActiveEffects && (
               <div style={{
-                padding: '6px 12px',
+                padding: '8px 12px',
                 fontSize: 11,
                 color: 'var(--text-tertiary)',
                 fontStyle: 'italic',
@@ -714,36 +716,5 @@ function MenuItem({
         }} />
       )}
     </button>
-  )
-}
-
-function FadeControl({ label, value, onChange }) {
-  return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 6,
-      padding: '2px 0',
-      fontSize: 11
-    }}>
-      <span style={{ color: 'var(--text-secondary)', minWidth: 55 }}>{label}</span>
-      <input
-        type="range"
-        min={0.1}
-        max={5}
-        step={0.05}
-        value={value}
-        onChange={e => onChange(parseFloat(e.target.value))}
-        style={{ flex: 1, accentColor: 'var(--accent)', height: 3 }}
-      />
-      <span style={{
-        color: 'var(--text-tertiary)',
-        fontFamily: 'monospace',
-        minWidth: 30,
-        fontSize: 10
-      }}>
-        {value.toFixed(1)}s
-      </span>
-    </div>
   )
 }

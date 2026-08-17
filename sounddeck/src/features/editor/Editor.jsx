@@ -148,6 +148,7 @@ function EditorTimelineContent() {
   const [exportName, setExportName] = useState('')
   const [isExporting, setIsExporting] = useState(false)
   const [showEffectsPanel, setShowEffectsPanel] = useState(true)
+  const [showEffectsAddMenu, setShowEffectsAddMenu] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [selectedImportTrackId, setSelectedImportTrackId] = useState('')
   const [pendingImportFile, setPendingImportFile] = useState(null)
@@ -357,6 +358,25 @@ function EditorTimelineContent() {
     setExportName(project.name || 'Mon mix')
     setShowExportModal(true)
   }, [project, addToast, t])
+
+  // ─── HANDLER POUR AJOUTER UN EFFET DEPUIS LE MENU CONTEXTUEL ─────────
+
+  const handleAddEffectFromMenu = useCallback((clipId, trackId) => {
+    console.log('✨ [Editor] handleAddEffectFromMenu appelé pour:', clipId, trackId)
+    
+    // ✅ Sélectionner le clip pour que le panneau des effets s'affiche
+    selectClip(clipId, trackId)
+    
+    // ✅ S'assurer que le panneau des effets est ouvert
+    setShowEffectsPanel(true)
+    
+    // ✅ Ouvrir le sous-menu d'ajout d'effet
+    setShowEffectsAddMenu(true)
+    
+    // ✅ Petit toast informatif
+    const clipName = getClipById(tracks, clipId)?.name || 'clip'
+    addToast?.(`Panneau des effets ouvert pour "${clipName}"`, 'info')
+  }, [selectClip, tracks, addToast])
 
   // ─── HANDLER NORMALISER AVEC OPTIONS ──────────────────────────────────
 
@@ -994,6 +1014,8 @@ function EditorTimelineContent() {
             onClipUpdate={updateClip}
             onFadeUpdate={setClipFade}
             tr={t}
+            showAddMenu={showEffectsAddMenu}
+            onShowAddMenuChange={setShowEffectsAddMenu}
           />
         )
       })()}
@@ -1222,17 +1244,13 @@ function EditorTimelineContent() {
             setShowTrimModal(true)
             setClipMenu(null)
           }}
-          // ✅ Normaliser - ouvre le modal
           onNormalize={(clipId) => {
             console.log('📊 [Editor] Normaliser depuis menu:', clipId)
             setNormalizeClipId(clipId)
             setShowNormalizeModal(true)
             setClipMenu(null)
           }}
-          onAddEffect={() => {
-            setShowEffectsPanel(true)
-            setClipMenu(null)
-          }}
+          onAddEffect={handleAddEffectFromMenu}
           onDuplicate={(trackId, clipId) => {
             console.log('📋 [Editor] Dupliquer depuis menu:', { trackId, clipId })
             duplicateClip(trackId, clipId)
@@ -1253,7 +1271,7 @@ function EditorTimelineContent() {
           onDelete={handleDeleteWithConfirm}
           onFadeIn={context.setClipFade}
           onFadeOut={context.setClipFade}
-          onPreviewEffects={() => {}}
+          onPreviewEffects={handlePreviewEffects}
           isPlaying={isPlaying}
           isLoopEnabled={loopRegion.enabled}
           tr={t}

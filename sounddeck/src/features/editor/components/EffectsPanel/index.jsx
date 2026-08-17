@@ -1,15 +1,25 @@
 // src/features/editor/components/EffectsPanel/index.jsx
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-// ✅ Effets disponibles
+// ✅ Effets disponibles avec leurs icônes
 const EFFECT_TYPES = [
   { id: 'volume', label: 'Volume', icon: 'ti-volume', params: ['value'] },
-  { id: 'fadeIn', label: 'Fade In', icon: 'ti-sun', params: ['duration'] },
-  { id: 'fadeOut', label: 'Fade Out', icon: 'ti-moon', params: ['duration'] },
-  { id: 'speed', label: 'Vitesse', icon: 'ti-speedometer', params: ['value'] },
+  { id: 'fadeIn', label: 'Fade In', icon: 'ti-sunrise', params: ['duration'] },
+  { id: 'fadeOut', label: 'Fade Out', icon: 'ti-sunset', params: ['duration'] },
+  { id: 'speed', label: 'Vitesse', icon: 'ti-gauge', params: ['value'] },           // ✅ ti-gauge
   { id: 'echo', label: 'Écho', icon: 'ti-repeat', params: ['delay', 'decay', 'mix'] },
-  { id: 'reverb', label: 'Réverbération', icon: 'ti-wave', params: ['roomSize', 'mix'] },
+  { id: 'reverb', label: 'Réverbération', icon: 'ti-wave-sine', params: ['roomSize', 'mix'] },
 ]
+
+// ✅ Map des icônes pour l'affichage dans la liste des effets actifs
+const EFFECT_ICON_MAP = {
+  volume: 'ti-volume',
+  fadeIn: 'ti-sunrise',
+  fadeOut: 'ti-sunset',
+  speed: 'ti-gauge',        // ✅ ti-gauge
+  echo: 'ti-repeat',
+  reverb: 'ti-wave-sine',
+}
 
 const PARAM_LABELS = {
   value: 'Volume',
@@ -67,7 +77,9 @@ export default function EditorEffectsPanel({
   onPreview,
   isPreviewing: isPreviewingProp,
   tr,
-  lang
+  lang,
+  showAddMenu: showAddMenuProp = false,
+  onShowAddMenuChange
 }) {
   const [showAddEffect, setShowAddEffect] = useState(false)
   const [isProcessingPreview, setIsProcessingPreview] = useState(false)
@@ -80,10 +92,26 @@ export default function EditorEffectsPanel({
   const previewSourceRef = useRef(null)
   const previewContextRef = useRef(null)
   const previewProgressIntervalRef = useRef(null)
-  const autoPreviewTimerRef = useRef(null) // ✅ Timer pour le délai de 1s
-  const isUserInteractingRef = useRef(false) // ✅ Empêcher les déclenchements intempestifs
-  const PREVIEW_MAX_DURATION = 5 // ✅ Durée max de preview en secondes
-  const AUTO_PREVIEW_DELAY = 1000 // ✅ Délai de 1 seconde avant de jouer
+  const autoPreviewTimerRef = useRef(null)
+  const isUserInteractingRef = useRef(false)
+  const PREVIEW_MAX_DURATION = 5
+  const AUTO_PREVIEW_DELAY = 1000
+
+  // ✅ LOG pour vérifier que le panneau s'affiche
+  console.log('🎛️ [EffectsPanel] Rendu, clip:', clip?.id, clip?.name, 'trackId:', trackId)
+  console.log('🎛️ [EffectsPanel] showAddMenuProp:', showAddMenuProp)
+
+  // ✅ Synchroniser l'état du menu d'ajout avec la prop
+  useEffect(() => {
+    if (showAddMenuProp) {
+      console.log('🎛️ [EffectsPanel] Ouverture automatique du menu d\'ajout')
+      setShowAddEffect(true)
+      // ✅ Réinitialiser la prop après ouverture
+      if (onShowAddMenuChange) {
+        onShowAddMenuChange(false)
+      }
+    }
+  }, [showAddMenuProp, onShowAddMenuChange])
 
   // ✅ Vérifier que les handlers existent
   console.log('🎛️ [EffectsPanel] Handlers reçus:', {
@@ -131,7 +159,7 @@ export default function EditorEffectsPanel({
     setIsProcessingPreview(false)
   }, [])
 
-  // ✅ Jouer la prévisualisation (appelée uniquement quand on clique sur Écouter ou après le délai)
+  // ✅ Jouer la prévisualisation
   const playPreview = useCallback(async () => {
     if (!clip || !clip.path) {
       console.warn('⚠️ [EffectsPanel] Aucun clip à prévisualiser')
@@ -178,7 +206,6 @@ export default function EditorEffectsPanel({
       if (processedBuffer && processedBuffer !== audioBuffer) {
         console.log('✅ [EffectsPanel] Effets appliqués avec succès')
         
-        // ✅ Calculer la durée de preview (max 5 secondes ou la durée du clip)
         const actualDuration = Math.min(processedBuffer.duration, PREVIEW_MAX_DURATION)
         setPreviewDuration(actualDuration)
         
@@ -197,7 +224,6 @@ export default function EditorEffectsPanel({
         setPreviewProgress(0)
         setIsProcessingPreview(false)
         
-        // ✅ Mise à jour de la progression
         if (previewProgressIntervalRef.current) {
           clearInterval(previewProgressIntervalRef.current)
         }
@@ -241,18 +267,15 @@ export default function EditorEffectsPanel({
       return
     }
     
-    // ✅ Annuler le timer précédent
     if (autoPreviewTimerRef.current) {
       clearTimeout(autoPreviewTimerRef.current)
       autoPreviewTimerRef.current = null
     }
     
-    // ✅ Arrêter la preview en cours
     stopPreview()
     
     console.log(`⏳ [EffectsPanel] Planification de la preview dans ${AUTO_PREVIEW_DELAY}ms`)
     
-    // ✅ Démarrer un nouveau timer avec délai de 1s
     autoPreviewTimerRef.current = setTimeout(() => {
       console.log('▶️ [EffectsPanel] Déclenchement de l\'auto-preview après délai')
       playPreview()
@@ -266,7 +289,6 @@ export default function EditorEffectsPanel({
     if (onEffectUpdate) {
       onEffectUpdate(trackId, clip.id, effectId, param, value)
     }
-    // ✅ Planifier la preview après changement de paramètre
     schedulePreview()
   }
 
@@ -275,7 +297,6 @@ export default function EditorEffectsPanel({
     if (onEffectToggle) {
       onEffectToggle(trackId, clip.id, effectId, enabled)
     }
-    // ✅ Planifier la preview après activation/désactivation d'un effet
     schedulePreview()
   }
 
@@ -284,27 +305,16 @@ export default function EditorEffectsPanel({
     if (onEffectRemove) {
       onEffectRemove(trackId, clip.id, effectId)
     }
-    // ✅ Planifier la preview après suppression d'un effet
     schedulePreview()
   }
 
-  const handleFadeInChange = useCallback((duration) => {
-    console.log('🌅 [EffectsPanel] handleFadeInChange:', { duration, trackId, clipId: clip.id })
+  // ✅ Gestion des Fades
+  const handleFadeChange = useCallback((edge, duration) => {
+    console.log('🌅 [EffectsPanel] handleFadeChange:', { edge, duration, trackId, clipId: clip.id })
     const clampedDuration = Math.max(0.05, Math.min(10, duration))
     if (onFadeUpdate) {
-      onFadeUpdate(trackId, clip.id, 'in', clampedDuration)
+      onFadeUpdate(trackId, clip.id, edge, clampedDuration)
     }
-    // ✅ Planifier la preview après changement de fade
-    schedulePreview()
-  }, [onFadeUpdate, trackId, clip, schedulePreview])
-
-  const handleFadeOutChange = useCallback((duration) => {
-    console.log('🌇 [EffectsPanel] handleFadeOutChange:', { duration, trackId, clipId: clip.id })
-    const clampedDuration = Math.max(0.05, Math.min(10, duration))
-    if (onFadeUpdate) {
-      onFadeUpdate(trackId, clip.id, 'out', clampedDuration)
-    }
-    // ✅ Planifier la preview après changement de fade
     schedulePreview()
   }, [onFadeUpdate, trackId, clip, schedulePreview])
 
@@ -319,7 +329,7 @@ export default function EditorEffectsPanel({
     }
   }, [stopPreview])
 
-  // ✅ Quand un effet est ajouté, planifier la preview
+  // ✅ Quand un effet est ajouté
   const handleAddEffect = (effectType) => {
     console.log('➕ [EffectsPanel] handleAddEffect:', { effectType, trackId, clipId: clip.id })
     
@@ -338,7 +348,6 @@ export default function EditorEffectsPanel({
     onEffectAdd(trackId, clip.id, effectType, defaults)
     setShowAddEffect(false)
     
-    // ✅ Planifier la preview après ajout d'un effet
     schedulePreview()
   }
 
@@ -347,25 +356,22 @@ export default function EditorEffectsPanel({
     const newState = !autoPreview
     setAutoPreview(newState)
     if (!newState) {
-      // ✅ Si on désactive, arrêter la preview et annuler le timer
       if (autoPreviewTimerRef.current) {
         clearTimeout(autoPreviewTimerRef.current)
         autoPreviewTimerRef.current = null
       }
       stopPreview()
     } else {
-      // ✅ Si on active, planifier une preview
       schedulePreview()
     }
     console.log(`🔄 [EffectsPanel] Auto-preview: ${newState ? 'ON' : 'OFF'}`)
   }
 
-  // ✅ Toggle play/stop preview (manuel)
+  // ✅ Toggle play/stop preview
   const togglePlayPreview = () => {
     if (isPreviewPlaying) {
       stopPreview()
     } else {
-      // ✅ Annuler le timer auto-preview si on joue manuellement
       if (autoPreviewTimerRef.current) {
         clearTimeout(autoPreviewTimerRef.current)
         autoPreviewTimerRef.current = null
@@ -410,7 +416,6 @@ export default function EditorEffectsPanel({
         </div>
 
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* ✅ Bouton Play/Stop Preview */}
           <button
             className={`btn-${isPreviewPlaying ? 'danger' : 'success'} btn-sm`}
             onClick={togglePlayPreview}
@@ -429,7 +434,6 @@ export default function EditorEffectsPanel({
             {isPreviewPlaying ? 'Arrêter' : isProcessingPreview ? 'Génération...' : 'Écouter'}
           </button>
 
-          {/* ✅ Toggle Auto-Preview */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -467,7 +471,6 @@ export default function EditorEffectsPanel({
             </span>
           </div>
 
-          {/* ✅ Bouton Ajouter un effet */}
           <button
             className="btn-secondary btn-sm"
             onClick={() => setShowAddEffect(!showAddEffect)}
@@ -479,7 +482,6 @@ export default function EditorEffectsPanel({
         </div>
       </div>
 
-      {/* ✅ Barre de progression de la preview */}
       {isPreviewPlaying && (
         <div style={{
           marginBottom: 8,
@@ -513,7 +515,6 @@ export default function EditorEffectsPanel({
         </div>
       )}
 
-      {/* ✅ Indicateur de délai d'auto-preview */}
       {autoPreview && !isPreviewPlaying && !isProcessingPreview && clip.effects?.some(e => e.enabled) && (
         <div style={{
           marginBottom: 8,
@@ -537,6 +538,8 @@ export default function EditorEffectsPanel({
           if (!def) return null
 
           const isFade = effect.type === 'fadeIn' || effect.type === 'fadeOut'
+          // ✅ Récupérer l'icône de l'effet depuis EFFECT_ICON_MAP
+          const effectIcon = EFFECT_ICON_MAP[effect.type] || 'ti-wand'
 
           return (
             <div
@@ -558,7 +561,12 @@ export default function EditorEffectsPanel({
                 marginBottom: 4
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <i className={`ti ${def.icon}`} style={{ fontSize: 14, color: 'var(--accent)' }} />
+                  {/* ✅ Icône de l'effet à gauche */}
+                  <i className={`ti ${effectIcon}`} style={{ 
+                    fontSize: 14, 
+                    color: effect.enabled ? 'var(--accent)' : 'var(--text-tertiary)',
+                    minWidth: 16
+                  }} />
                   <span style={{ fontSize: 11, fontWeight: 500 }}>{def.label}</span>
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
@@ -620,7 +628,8 @@ export default function EditorEffectsPanel({
                         const newValue = parseFloat(e.target.value)
                         console.log(`🎛️ [EffectsPanel] Changement de ${param}: ${newValue}`)
                         if (isFade && param === 'duration') {
-                          handleFadeChange(newValue)
+                          const edge = effect.type === 'fadeIn' ? 'in' : 'out'
+                          handleFadeChange(edge, newValue)
                         } else {
                           handleParamChange(effect.id, param, newValue)
                         }
@@ -660,7 +669,7 @@ export default function EditorEffectsPanel({
         )}
       </div>
 
-      {/* Ajout d'effet */}
+      {/* ✅ Ajout d'effet */}
       {showAddEffect && (
         <div style={{
           display: 'flex',
@@ -689,7 +698,6 @@ export default function EditorEffectsPanel({
         </div>
       )}
 
-      {/* Indicateur de prévisualisation */}
       {(isProcessingPreview && !isPreviewPlaying) && (
         <div style={{
           marginTop: 8,
@@ -708,7 +716,6 @@ export default function EditorEffectsPanel({
         </div>
       )}
 
-      {/* ✅ Indicateur de lecture en cours */}
       {isPreviewPlaying && (
         <div style={{
           marginTop: 8,
