@@ -136,6 +136,7 @@ function EditorTimelineContent() {
     activateSplitManualClick,
     cancelPendingAction,
     executePendingAction,
+    moveClip,
   } = context
 
   // ─── ÉTATS LOCAUX ──────────────────────────────────────────────────────
@@ -799,6 +800,71 @@ function EditorTimelineContent() {
     }
   }, [context, seek])
 
+  // ─── FONCTIONS DE DÉPLACEMENT VERTICAL DES CLIPS ─────────────────────
+
+  const moveClipUp = useCallback((trackId, clipId) => {
+    console.log('⬆️ [Editor] Déplacement du clip vers le haut:', { trackId, clipId })
+    
+    const currentTrackIndex = tracks.findIndex(t => t.id === trackId)
+    if (currentTrackIndex <= 0) {
+      console.warn('⬆️ [Editor] Impossible de monter, piste déjà en haut')
+      return
+    }
+    
+    const targetTrackIndex = currentTrackIndex - 1
+    const targetTrack = tracks[targetTrackIndex]
+    
+    if (!targetTrack) {
+      console.warn('⬆️ [Editor] Piste cible non trouvée')
+      return
+    }
+    
+    // ✅ Déplacer le clip vers la piste du dessus
+    moveClip(trackId, clipId, 0, targetTrack.id)
+    
+    // ✅ Mettre à jour la sélection
+    setSelectedTrackId(targetTrack.id)
+    
+    addToast?.(t('editorClipMovedUp') || 'Clip déplacé vers le haut', 'info')
+  }, [tracks, moveClip, setSelectedTrackId, addToast, t])
+
+  const moveClipDown = useCallback((trackId, clipId) => {
+    console.log('⬇️ [Editor] Déplacement du clip vers le bas:', { trackId, clipId })
+    
+    const currentTrackIndex = tracks.findIndex(t => t.id === trackId)
+    if (currentTrackIndex >= tracks.length - 1) {
+      console.warn('⬇️ [Editor] Impossible de descendre, piste déjà en bas')
+      return
+    }
+    
+    const targetTrackIndex = currentTrackIndex + 1
+    const targetTrack = tracks[targetTrackIndex]
+    
+    if (!targetTrack) {
+      console.warn('⬇️ [Editor] Piste cible non trouvée')
+      return
+    }
+    
+    // ✅ Déplacer le clip vers la piste du dessous
+    moveClip(trackId, clipId, 0, targetTrack.id)
+    
+    // ✅ Mettre à jour la sélection
+    setSelectedTrackId(targetTrack.id)
+    
+    addToast?.(t('editorClipMovedDown') || 'Clip déplacé vers le bas', 'info')
+  }, [tracks, moveClip, setSelectedTrackId, addToast, t])
+
+  // ✅ Calculer si le clip peut être déplacé
+  const getCanMoveUp = useCallback((trackId) => {
+    const currentTrackIndex = tracks.findIndex(t => t.id === trackId)
+    return currentTrackIndex > 0
+  }, [tracks])
+
+  const getCanMoveDown = useCallback((trackId) => {
+    const currentTrackIndex = tracks.findIndex(t => t.id === trackId)
+    return currentTrackIndex < tracks.length - 1
+  }, [tracks])
+
   // ─── RACCOURCIS CLAVIER ──────────────────────────────────────────────
 
   const undoEditor = store?.undoEditor || (() => addToast?.('Undo non disponible', 'info'))
@@ -1290,6 +1356,11 @@ function EditorTimelineContent() {
           onActivateLoopManualClick={activateLoopManualClick}
           onActivateSplitManualClick={activateSplitManualClick}
           loopState={loopState}
+          // ✅ Déplacement vertical
+          onMoveUp={moveClipUp}
+          onMoveDown={moveClipDown}
+          canMoveUp={getCanMoveUp(selectedTrackForMenu)}
+          canMoveDown={getCanMoveDown(selectedTrackForMenu)}
         />
       )}
 

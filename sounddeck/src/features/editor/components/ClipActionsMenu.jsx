@@ -54,7 +54,12 @@ export default function ClipActionsMenu({
   isLoopEnabled,
   clipDurations = {},
   loopState = {},
-  tr
+  tr,
+  // ✅ NOUVEAUX PROPS POUR LE DÉPLACEMENT VERTICAL
+  onMoveUp,
+  onMoveDown,
+  canMoveUp,
+  canMoveDown
 }) {
   const { t } = useLanguage()
   const menuRef = useRef(null)
@@ -340,6 +345,41 @@ export default function ClipActionsMenu({
       <div style={{ padding: '0 4px' }}>
         {activeTab === 'edit' && (
           <div className="menu-group">
+            {/* ✅ BOUTONS DE DÉPLACEMENT VERTICAL */}
+            <div style={{
+              display: 'flex',
+              gap: 4,
+              padding: '2px 4px',
+              marginBottom: 4
+            }}>
+              <MenuItem 
+                icon="ti-arrow-up" 
+                label={t('editorMoveUp') || 'Monter'} 
+                onClick={() => { 
+                  console.log('⬆️ [ClipActionsMenu] Monter le clip:', clip.id)
+                  onMoveUp?.(trackId, clip.id)
+                  onClose() 
+                }}
+                disabled={!canMoveUp}
+                shortcut="↑"
+                style={{ flex: 1 }}
+              />
+              <MenuItem 
+                icon="ti-arrow-down" 
+                label={t('editorMoveDown') || 'Descendre'} 
+                onClick={() => { 
+                  console.log('⬇️ [ClipActionsMenu] Descendre le clip:', clip.id)
+                  onMoveDown?.(trackId, clip.id)
+                  onClose() 
+                }}
+                disabled={!canMoveDown}
+                shortcut="↓"
+                style={{ flex: 1 }}
+              />
+            </div>
+
+            <div style={{ height: 1, background: 'var(--border)', margin: '2px 8px' }} />
+
             <MenuItem 
               icon="ti-copy" 
               label={t('editorCopy') || 'Copier'} 
@@ -772,14 +812,15 @@ function MenuItem({
   disabled, 
   hasSubmenu, 
   small, 
-  muted 
+  muted,
+  style
 }) {
   const [hovered, setHovered] = useState(false)
 
   return (
     <button
       className={`menu-item ${danger ? 'danger' : ''} ${accent ? 'accent' : ''} ${active ? 'active' : ''}`}
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
       disabled={disabled}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -792,12 +833,13 @@ function MenuItem({
         background: hovered && !disabled ? 'var(--bg-hover)' : 'transparent',
         border: 'none',
         borderRadius: 'var(--radius-sm)',
-        color: danger ? 'var(--danger)' : accent ? 'var(--accent)' : muted ? 'var(--text-tertiary)' : 'var(--text-primary)',
+        color: danger ? 'var(--danger)' : accent ? 'var(--accent)' : muted ? 'var(--text-tertiary)' : disabled ? 'var(--text-tertiary)' : 'var(--text-primary)',
         fontSize: small ? 11 : 12,
         cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.4 : 1,
         transition: 'all 0.15s',
-        fontFamily: 'inherit'
+        fontFamily: 'inherit',
+        ...style
       }}
     >
       <i className={`ti ${icon}`} style={{ fontSize: small ? 12 : 14, minWidth: small ? 16 : 18 }} />
