@@ -48,6 +48,8 @@ export default function ClipActionsMenu({
   onDelete,
   onPreviewEffects,
   onToggleClipLoop,
+  onActivateLoopManualClick,
+  onActivateSplitManualClick,
   isPlaying,
   isLoopEnabled,
   clipDurations = {},
@@ -72,6 +74,7 @@ export default function ClipActionsMenu({
   const isClipLooping = clip?.id && loopState?.clips?.[clip.id]?.enabled || false
   const clipLoopData = clip?.id ? loopState?.clips?.[clip.id] : null
 
+  // ✅ Fermer le menu au clic extérieur
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
@@ -83,24 +86,74 @@ export default function ClipActionsMenu({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [onClose])
 
+  // ✅ POSITIONNEMENT DYNAMIQUE - Se repositionne à chaque render
   useEffect(() => {
     if (!menuRef.current) return
+    
     const rect = menuRef.current.getBoundingClientRect()
     let { top, left } = position
-
-    if (rect.bottom > window.innerHeight) {
-      top = position.top - rect.height
+    
+    // ✅ Marge de sécurité
+    const MARGIN = 10
+    
+    // ✅ Vérifier si le menu dépasse en bas
+    if (rect.bottom > window.innerHeight - MARGIN) {
+      top = position.top - rect.height - MARGIN
     }
-    if (rect.right > window.innerWidth) {
-      left = position.left - rect.width
+    
+    // ✅ Vérifier si le menu dépasse en haut
+    if (top < MARGIN) {
+      top = MARGIN
     }
-    if (top < 10) top = 10
-    if (left < 10) left = 10
-
+    
+    // ✅ Vérifier si le menu dépasse à droite
+    if (rect.right > window.innerWidth - MARGIN) {
+      left = position.left - rect.width - MARGIN
+    }
+    
+    // ✅ Vérifier si le menu dépasse à gauche
+    if (left < MARGIN) {
+      left = MARGIN
+    }
+    
+    // ✅ Appliquer la position
     if (top !== position.top || left !== position.left) {
       menuRef.current.style.top = top + 'px'
       menuRef.current.style.left = left + 'px'
     }
+  }, [position, showLoopSubmenu, activeTab]) // ✅ Se repositionne quand le sous-menu change
+
+  // ✅ RECALCULER LA POSITION AU REDIMENSIONNEMENT DE LA FENÊTRE
+  useEffect(() => {
+    const handleResize = () => {
+      if (!menuRef.current) return
+      
+      const rect = menuRef.current.getBoundingClientRect()
+      let { top, left } = position
+      const MARGIN = 10
+      
+      // ✅ Vérifier si le menu dépasse
+      if (rect.bottom > window.innerHeight - MARGIN) {
+        top = position.top - rect.height - MARGIN
+      }
+      if (top < MARGIN) {
+        top = MARGIN
+      }
+      if (rect.right > window.innerWidth - MARGIN) {
+        left = position.left - rect.width - MARGIN
+      }
+      if (left < MARGIN) {
+        left = MARGIN
+      }
+      
+      if (top !== position.top || left !== position.left) {
+        menuRef.current.style.top = top + 'px'
+        menuRef.current.style.left = left + 'px'
+      }
+    }
+    
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [position])
 
   // ✅ Charger les données de boucle existantes
@@ -136,14 +189,10 @@ export default function ClipActionsMenu({
     onDelete?.(trackId, clip.id)
   }
 
-  // ✅ Handler pour activer/désactiver la boucle - VERSION SIMPLIFIÉE
+  // ✅ Handler pour activer/désactiver la boucle
   const handleToggleLoop = () => {
     console.log('🔄 [ClipActionsMenu] Toggle boucle pour:', clip.id)
-    console.log('🔄 [ClipActionsMenu] Clip:', clip.name)
-    console.log('🔄 [ClipActionsMenu] isClipLooping actuel:', isClipLooping)
-    console.log('🔄 [ClipActionsMenu] loopState actuel:', loopState)
     
-    // ✅ Si la boucle est déjà active, on la désactive
     if (isClipLooping) {
       console.log('🔄 [ClipActionsMenu] Désactivation de la boucle')
       onToggleClipLoop?.(clip.id, {
@@ -153,7 +202,18 @@ export default function ClipActionsMenu({
       return
     }
     
-    // ✅ Sinon, on l'active avec les options
+    // ✅ Si le mode est "Cliquer sur la timeline", on active le mode d'attente
+    if (loopEndMode === 'manualClick') {
+      console.log('🖱️ [ClipActionsMenu] Activation du mode clic pour la boucle')
+      if (onActivateLoopManualClick) {
+        onActivateLoopManualClick(clip.id, trackId, {
+          arrowColor: loopColor,
+        })
+      }
+      onClose()
+      return
+    }
+    
     const options = {
       arrowColor: loopColor,
       loopMode: loopEndMode,
@@ -167,7 +227,16 @@ export default function ClipActionsMenu({
     onClose()
   }
 
-  // ✅ Handler pour ajouter un effet - Sélectionne le clip et ouvre le panneau des effets
+  // ✅ Handler pour l'option "Split avec clic"
+  const handleSplitWithClick = () => {
+    console.log('✂️ [ClipActionsMenu] Split avec clic sur la timeline')
+    if (onActivateSplitManualClick) {
+      onActivateSplitManualClick(clip.id, trackId)
+    }
+    onClose()
+  }
+
+  // ✅ Handler pour ajouter un effet
   const handleAddEffectClick = () => {
     console.log('✨ [ClipActionsMenu] Ouvrir le panneau des effets pour:', clip.id, clip.name)
     onClose()
@@ -176,7 +245,7 @@ export default function ClipActionsMenu({
     }
   }
 
-  // ✅ Handler pour l'aperçu des effets - Sélectionne le clip et ouvre le panneau des effets
+  // ✅ Handler pour l'aperçu des effets
   const handlePreviewEffectsClick = () => {
     console.log('👂 [ClipActionsMenu] Ouvrir le panneau des effets pour aperçu:', clip.id, clip.name)
     onClose()
@@ -202,7 +271,10 @@ export default function ClipActionsMenu({
         zIndex: 9999,
         padding: '8px 0',
         backdropFilter: 'blur(8px)',
-        animation: 'fadeIn 0.15s ease'
+        animation: 'fadeIn 0.15s ease',
+        // ✅ Limiter la hauteur max pour éviter de sortir de l'écran
+        maxHeight: `calc(100vh - 20px)`,
+        overflowY: 'auto'
       }}
     >
       <div style={{
@@ -327,6 +399,14 @@ export default function ClipActionsMenu({
               label={t('editorSplitAtMiddle') || 'Split au milieu'} 
               onClick={handleSplitMid}
               shortcut="S"
+            />
+            
+            {/* ✅ Split avec clic sur la timeline */}
+            <MenuItem 
+              icon="ti-scissors" 
+              label={t('editorSplitWithClick') || '✂️ Split avec clic'} 
+              onClick={handleSplitWithClick}
+              shortcut="C"
             />
             
             <MenuItem 
@@ -555,9 +635,29 @@ export default function ClipActionsMenu({
                           <span style={{
                             fontSize: 9,
                             color: 'var(--accent)',
-                            fontStyle: 'italic'
-                          }}>
-                            Cliquez sur la timeline
+                            fontStyle: 'italic',
+                            cursor: 'pointer',
+                            padding: '2px 6px',
+                            borderRadius: 'var(--radius-sm)',
+                            background: 'var(--accent-light)',
+                            border: '1px solid var(--accent)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            console.log('🖱️ [ClipActionsMenu] Clic sur "Cliquer pour définir"')
+                            if (onActivateLoopManualClick) {
+                              onActivateLoopManualClick(clip.id, trackId, {
+                                arrowColor: loopColor,
+                              })
+                            }
+                            onClose()
+                          }}
+                          >
+                            <i className="ti ti-click" style={{ fontSize: 10 }} />
+                            Cliquer pour définir
                           </span>
                         )}
                       </label>

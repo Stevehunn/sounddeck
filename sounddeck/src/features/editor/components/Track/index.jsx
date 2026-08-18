@@ -30,6 +30,8 @@ const EditorTrack = ({
   onCopyClip,
   onCutClip,
   onPasteClip,
+  // ✅ RECEVOIR loopState
+  loopState = {},
 }) => {
   const [isDragging, setIsDragging] = useState(false)
   const [dragStartX, setDragStartX] = useState(0)
@@ -42,7 +44,9 @@ const EditorTrack = ({
   const prevClipPositions = useRef({})
   const prevClipIds = useRef(new Set())
 
-  // ✅ LOG pour le clic droit
+  // ✅ LOG pour vérifier la réception de loopState
+  console.log(`🔁 [Track] ${track.name} - loopState reçu:`, loopState)
+
   const handleClipContextMenu = useCallback((e, clipId) => {
     console.log('🖱️ [Track] Clic droit reçu pour clip:', clipId, 'sur piste:', track.id)
     if (onClipContextMenu) {
@@ -194,7 +198,9 @@ const EditorTrack = ({
         const clipStart = clip.start || 0
         const isSelected = selectedClipId === clip.id
 
-        const clipKey = `${clip.id}-${clipVersion}`
+        // ✅ Clé qui change quand loopState change
+        const loopStateHash = Object.keys(loopState?.clips || {}).length
+        const clipKey = `${clip.id}-${clipVersion}-${loopStateHash}`
 
         return (
           <EditorClip
@@ -224,6 +230,9 @@ const EditorTrack = ({
             onCopyClip={onCopyClip}
             onCutClip={onCutClip}
             onPasteClip={onPasteClip}
+            // ✅ TRANSMETTRE loopState AU CLIP
+            loopState={loopState}
+            totalDuration={totalDuration}
           />
         )
       })}

@@ -76,13 +76,17 @@ export default function EditorTimeline({
   onUpdateMarker,
   onNavigateToMarker,
   loopState = {},
+  isPendingAction = false,
+  pendingAction = null,
+  onExecutePendingAction,
+  onCancelPendingAction,
 }) {
   const editorContext = useEditor()
   
   const containerRef = useRef(null)
   const clipsContainerRef = useRef(null)
-  const rulerContainerRef = useRef(null) // ✅ NOUVEAU : ref pour le conteneur de la règle
-  const rulerInnerRef = useRef(null)     // ✅ NOUVEAU : ref pour l'inner de la règle
+  const rulerContainerRef = useRef(null)
+  const rulerInnerRef = useRef(null)
   const [isPanning, setIsPanning] = useState(false)
   const [panStartX, setPanStartX] = useState(0)
   const [scrollLeft, setScrollLeft] = useState(0)
@@ -101,23 +105,16 @@ export default function EditorTimeline({
   const pixelsPerSecond = 80 * zoomLevel
   const totalWidth = Math.max(totalDuration * pixelsPerSecond + 100, 600)
 
-  // ✅ Synchronisation du scroll entre la règle et les clips
   const handleClipsScroll = useCallback((e) => {
     const scrollLeft = e.currentTarget.scrollLeft
-    // ✅ Faire défiler la règle en même temps
     if (rulerInnerRef.current) {
       rulerInnerRef.current.style.transform = `translateX(-${scrollLeft}px)`
     }
-    // ✅ Mettre à jour le playhead si nécessaire
     setScrollLeft(scrollLeft)
   }, [])
 
-  // ✅ Synchronisation du scroll via la roulette sur la règle
   const handleRulerWheel = useCallback((e) => {
-    // Si c'est un zoom (Ctrl+molette), on laisse faire
     if (e.ctrlKey || e.metaKey) return
-    
-    // Sinon, on scroll les clips
     if (clipsContainerRef.current) {
       clipsContainerRef.current.scrollLeft += e.deltaY
       e.preventDefault()
@@ -138,7 +135,6 @@ export default function EditorTimeline({
     return colors[index % colors.length]
   }
 
-  // ✅ Chargement UNIQUE de la préférence
   useEffect(() => {
     if (hasInitializedRef.current) return
     hasInitializedRef.current = true
@@ -161,7 +157,6 @@ export default function EditorTimeline({
     
   }, [onAddMarker, getAutoOpenPreference])
 
-  // ✅ Sauvegarder la préférence d'état du panneau
   const handleToggleMarkersPanel = useCallback((show) => {
     console.log('📍 [Timeline] handleToggleMarkersPanel:', show)
     setShowMarkersPanel(show)
@@ -195,6 +190,15 @@ export default function EditorTimeline({
   }, [totalWidth, pixelsPerSecond])
 
   const handleTimelineClick = useCallback((e) => {
+    if (isPendingAction) {
+      const time = clientXToTime(e.clientX)
+      if (time >= 0 && time <= totalDuration) {
+        console.log('🖱️ [Timeline] Clic en mode d\'attente à', time)
+        onExecutePendingAction?.(time)
+      }
+      return
+    }
+    
     const target = e.target
     if (target.closest?.('.editor-clip-wrapper') || target.closest?.('button')) {
       return
@@ -204,14 +208,23 @@ export default function EditorTimeline({
     if (time >= 0 && time <= totalDuration) {
       onSeek?.(time)
     }
-  }, [clientXToTime, totalDuration, onSeek])
+  }, [isPendingAction, clientXToTime, totalDuration, onExecutePendingAction, onSeek])
 
   const handleRulerClick = useCallback((e) => {
+    if (isPendingAction) {
+      const time = clientXToTime(e.clientX, rulerContainerRef.current)
+      if (time >= 0 && time <= totalDuration) {
+        console.log('🖱️ [Timeline] Clic sur règle en mode d\'attente à', time)
+        onExecutePendingAction?.(time)
+      }
+      return
+    }
+    
     const time = clientXToTime(e.clientX, rulerContainerRef.current)
     if (time >= 0 && time <= totalDuration) {
       onSeek?.(time)
     }
-  }, [clientXToTime, totalDuration, onSeek])
+  }, [isPendingAction, clientXToTime, totalDuration, onExecutePendingAction, onSeek])
 
   const handleRulerDoubleClick = useCallback((e) => {
     const time = clientXToTime(e.clientX, rulerContainerRef.current)
@@ -234,7 +247,17 @@ export default function EditorTimeline({
     }
   }, [clientXToTime, totalDuration, onSeek, selectedClipId, selectedTrackId, tracks, clipDurations, onSplitClip, addToast])
 
-  // ✅ Rendu des marqueurs de boucle
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isPendingAction) {
+        console.log('🖱️ [Timeline] Annulation du mode d\'attente (Escape)')
+        onCancelPendingAction?.()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isPendingAction, onCancelPendingAction])
+
   const renderLoopMarkers = () => {
     if (!loopState?.clips) return null
     
@@ -262,53 +285,128 @@ export default function EditorTimeline({
       
       const clipEnd = clipStart + clipDuration
       const loopEndPosition = Math.min(loopEnd, totalDuration) * pixelsPerSecond
+      const loopColor = loopData.arrowColor || '#22c55e'
+      const loopMode = loopData.loopMode || 'endOfTrack'
+      const totalCycles = loopData.totalCycles || loopData.cycleCount || 1
       
-      if (loopEndPosition <= clipEnd * pixelsPerSecond) continue
-      
-      const cycleDuration = clipDuration
-      let currentEnd = clipEnd
-      
-      while (currentEnd < loopEnd) {
-        const position = currentEnd * pixelsPerSecond
-        if (position > totalDuration * pixelsPerSecond) break
-        
+      if (loopEndPosition > clipEnd * pixelsPerSecond) {
         markers.push(
           <div
-            key={`loop-marker-${clipId}-${currentEnd}`}
+            key={`loop-end-${clipId}`}
             style={{
               position: 'absolute',
               top: 0,
               bottom: 0,
-              left: position,
-              width: 2,
-              background: loopData.arrowColor || '#22c55e',
-              zIndex: 3,
-              opacity: 0.4,
-              pointerEvents: 'none'
+              left: loopEndPosition,
+              zIndex: 6,
+              pointerEvents: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             <div style={{
               position: 'absolute',
-              top: 0,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              fontSize: 8,
-              color: loopData.arrowColor || '#22c55e',
-              opacity: 0.6
+              top: -4,
+              bottom: -4,
+              left: 0,
+              width: 2,
+              background: loopColor,
+              opacity: 0.6,
+              boxShadow: `0 0 12px ${loopColor}60`,
+            }} />
+            
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: 4,
+              transform: 'translateY(-50%)',
+              fontSize: 22,
+              fontWeight: 900,
+              color: loopColor,
+              opacity: 0.9,
+              textShadow: `0 0 20px ${loopColor}50, 0 0 40px ${loopColor}30`,
+              lineHeight: 1,
             }}>
-              🔄
+              ]
+            </div>
+            
+            <div style={{
+              position: 'absolute',
+              top: 20,
+              left: 4,
+              fontSize: 8,
+              fontWeight: 500,
+              color: loopColor,
+              background: 'rgba(0,0,0,0.8)',
+              padding: '2px 8px',
+              borderRadius: 3,
+              border: `1px solid ${loopColor}40`,
+              whiteSpace: 'nowrap',
+              fontFamily: 'monospace',
+              opacity: 0.8,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+            }}>
+              <span>🔚</span>
+              <span>FIN</span>
+              {loopMode === 'cycles' && totalCycles > 1 && (
+                <span style={{ opacity: 0.6 }}>({totalCycles}x)</span>
+              )}
+              <span style={{ opacity: 0.5 }}>{(loopEnd - clipStart).toFixed(1)}s</span>
             </div>
           </div>
         )
+      }
+      
+      if (loopMode === 'cycles' && totalCycles > 1) {
+        const cycleDuration = clipDuration
+        let cycleEnd = clipEnd
         
-        currentEnd += cycleDuration
+        for (let i = 1; i < totalCycles; i++) {
+          cycleEnd += cycleDuration
+          const position = cycleEnd * pixelsPerSecond
+          if (position >= loopEndPosition) break
+          
+          markers.push(
+            <div
+              key={`cycle-marker-${clipId}-${i}`}
+              style={{
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                left: position,
+                width: 1,
+                background: loopColor,
+                zIndex: 3,
+                opacity: 0.2,
+                pointerEvents: 'none',
+                borderLeft: `2px dashed ${loopColor}40`,
+              }}
+            >
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                fontSize: 7,
+                color: loopColor,
+                opacity: 0.4,
+                fontFamily: 'monospace'
+              }}>
+                {i+1}
+              </div>
+            </div>
+          )
+        }
       }
     }
     
     return markers
   }
 
-  // ✅ Rendu des marqueurs (existants)
   const renderMarkerMarkers = () => {
     if (!markers || markers.length === 0) return null
     
@@ -381,7 +479,73 @@ export default function EditorTimeline({
     })
   }
 
-  // ✅ Gestion du scroll avec la molette sur les clips
+  const renderPendingIndicator = () => {
+    if (!isPendingAction) return null
+    
+    const actionType = pendingAction?.type || 'action'
+    const label = actionType === 'loop' ? 'Boucle' : 'Split'
+    const icon = actionType === 'loop' ? '🔁' : '✂️'
+    const color = actionType === 'loop' ? 'var(--accent)' : 'var(--warning)'
+    
+    return (
+      <div style={{
+        position: 'absolute',
+        top: 8,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 20,
+        padding: '6px 20px',
+        background: color,
+        borderRadius: 'var(--radius-md)',
+        color: 'white',
+        fontSize: 13,
+        fontWeight: 500,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        boxShadow: `0 4px 20px ${color}66`,
+        animation: 'pulseIndicator 1.5s ease-in-out infinite'
+      }}>
+        <span style={{ fontSize: 16 }}>{icon}</span>
+        <span>Cliquez sur la timeline pour définir la {label}</span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onCancelPendingAction?.()
+          }}
+          style={{
+            background: 'rgba(255,255,255,0.2)',
+            border: 'none',
+            borderRadius: '50%',
+            color: 'white',
+            cursor: 'pointer',
+            padding: '2px 8px',
+            fontSize: 16,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background 0.15s'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.3)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.2)'
+          }}
+          title="Annuler (Escape)"
+        >
+          <i className="ti ti-x" />
+        </button>
+        <style>{`
+          @keyframes pulseIndicator {
+            0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
+            50% { opacity: 0.85; transform: translateX(-50%) scale(1.02); }
+          }
+        `}</style>
+      </div>
+    )
+  }
+
   useEffect(() => {
     const clipsContainer = clipsContainerRef.current
     if (!clipsContainer) return
@@ -434,7 +598,7 @@ export default function EditorTimeline({
         flexShrink: 0,
         zIndex: 5,
         position: 'relative',
-        overflow: 'hidden' // ✅ Cacher le débordement
+        overflow: 'hidden'
       }}>
         <div style={{
           width: TRACK_HEAD_WIDTH,
@@ -450,14 +614,15 @@ export default function EditorTimeline({
           style={{
             flex: 1,
             position: 'relative',
-            overflow: 'hidden', // ✅ Important pour le scroll
-            cursor: 'pointer'
+            overflow: 'hidden',
+            cursor: isPendingAction ? 'pointer' : 'pointer'
           }}
           onClick={handleRulerClick}
           onDoubleClick={handleRulerDoubleClick}
-          onWheel={handleRulerWheel} // ✅ Scroll avec la molette sur la règle
+          onWheel={handleRulerWheel}
         >
-          {/* ✅ Inner de la règle qui va se déplacer avec le scroll */}
+          {renderPendingIndicator()}
+          
           <div
             ref={rulerInnerRef}
             style={{
@@ -466,7 +631,7 @@ export default function EditorTimeline({
               left: 0,
               height: '100%',
               width: Math.max(totalWidth, '100%'),
-              transform: 'translateX(0px)', // ✅ Géré par le scroll
+              transform: 'translateX(0px)',
               transition: 'none',
               willChange: 'transform'
             }}
@@ -612,7 +777,7 @@ export default function EditorTimeline({
           })}
         </div>
 
-        {/* Clips - Conteneur scrollable */}
+        {/* Clips */}
         <div
           ref={clipsContainerRef}
           style={{
@@ -621,10 +786,10 @@ export default function EditorTimeline({
             overflow: 'auto',
             position: 'relative',
             background: 'var(--bg-primary)',
-            cursor: 'pointer'
+            cursor: isPendingAction ? 'pointer' : 'pointer'
           }}
           onClick={handleTimelineClick}
-          onScroll={handleClipsScroll} // ✅ Synchronisation du scroll
+          onScroll={handleClipsScroll}
         >
           <div style={{
             position: 'relative',
@@ -652,8 +817,6 @@ export default function EditorTimeline({
                 />
               )
             })}
-            
-            {renderLoopMarkers()}
             
             {tracks.map((track, index) => {
               const trackColor = track.color || getTrackColor(index)
@@ -689,6 +852,8 @@ export default function EditorTimeline({
                   onCopyClip={onCopyClip}
                   onCutClip={onCutClip}
                   onPasteClip={onPasteClip}
+                  // ✅ TRANSMETTRE loopState AU TRACK
+                  loopState={loopState}
                 />
               )
             })}

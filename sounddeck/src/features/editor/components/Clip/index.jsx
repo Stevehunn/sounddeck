@@ -43,6 +43,7 @@ const EditorClip = ({
   const [localStart, setLocalStart] = useState(start)
   
   const clipRef = useRef(null)
+  const clipContainerRef = useRef(null)
   const dragStartClipId = useRef(null)
   const frameIdRef = useRef(null)
   const dragStartTimeRef = useRef(start)
@@ -56,20 +57,28 @@ const EditorClip = ({
   const SNAP_VALUE = 0.01
   const DRAG_SENSITIVITY = 1.0
 
-  // ✅ Vérifier si le clip est en boucle - AVEC LOGS
+  // ✅ Vérifier si le clip est en boucle - AVEC LOGS DÉTAILLÉS
   const isClipLooping = clip?.id && loopState?.clips?.[clip.id]?.enabled || false
   const clipLoopData = clip?.id ? loopState?.clips?.[clip.id] : null
+  
+  // ✅ LOGS DÉTAILLÉS
+  console.log(`🔁 [Clip] ${clip?.name} (${clip?.id}) - loopState reçu:`, loopState)
+  console.log(`🔁 [Clip] ${clip?.name} - clipLoopData:`, clipLoopData)
+  console.log(`🔁 [Clip] ${clip?.name} - isClipLooping (calculé):`, isClipLooping)
+  
   const loopVisual = clipLoopData?.visual || 'arrow'
   const loopColor = clipLoopData?.arrowColor || '#22c55e'
   const loopEnd = clipLoopData?.end || totalDuration
   const loopMode = clipLoopData?.loopMode || 'endOfTrack'
 
-  // ✅ LOG : Affichage de l'état de boucle
-  console.log(`🔁 [Clip] ${clip?.name || 'inconnu'} (${clip?.id}) - isClipLooping:`, isClipLooping, 'clipLoopData:', clipLoopData)
+  // ✅ Calcul de la position de la zone de boucle
+  const clipEndPosition = clipWidth
+  const loopEndRelativePosition = Math.max(0, (loopEnd - start) * pixelsPerSecond)
+  const loopWidth = Math.max(0, loopEndRelativePosition - clipEndPosition)
 
-  // ✅ Calculer la position de la fin de boucle
-  const loopEndPosition = Math.min(loopEnd, totalDuration) * pixelsPerSecond
-  const clipEndPosition = (start + duration) * pixelsPerSecond
+  // ✅ Nombre de cycles
+  const cycleCount = clipLoopData?.cycleCount || 1
+  const totalCycles = clipLoopData?.totalCycles || 1
 
   useEffect(() => {
     if (!isDragging) {
@@ -258,92 +267,161 @@ const EditorClip = ({
     onCutClip?.(clip)
   }
 
-  // ✅ Rendu de la flèche de boucle
-  const renderLoopArrow = () => {
-    if (!isClipLooping || loopVisual !== 'arrow') return null
-    if (loopEndPosition <= clipEndPosition) return null
+  // ✅ Rendu de la zone de boucle
+  const renderLoopOverlay = () => {
+    if (!isClipLooping) return null
+    if (loopWidth <= 0) return null
     
-    console.log(`🔁 [Clip] Rendu de la flèche de boucle pour ${clip.name}:`, {
-      loopEndPosition,
-      clipEndPosition,
-      loopColor,
-      loopMode
-    })
-    
-    const arrowStart = clipEndPosition
-    const arrowWidth = loopEndPosition - clipEndPosition
-    const arrowHeight = 2
+    const loopStart = clipWidth
     
     return (
       <div
+        ref={clipContainerRef}
         style={{
           position: 'absolute',
-          top: '50%',
-          left: arrowStart,
-          width: arrowWidth,
-          height: arrowHeight,
-          background: loopColor,
-          transform: 'translateY(-50%)',
-          opacity: 0.6,
+          top: 0,
+          left: loopStart,
+          width: loopWidth,
+          height: '100%',
           pointerEvents: 'none',
-          zIndex: 2,
-          display: 'flex',
-          alignItems: 'center'
+          zIndex: 5,
+          background: `linear-gradient(90deg, ${loopColor}15, ${loopColor}05)`,
+          borderLeft: `2px dashed ${loopColor}50`,
+          borderRight: `2px solid ${loopColor}`,
+          borderRadius: '0 4px 4px 0',
         }}
       >
-        {/* Tireté pour la flèche */}
+        {/* ✅ "]" à la fin de la boucle */}
         <div style={{
           position: 'absolute',
+          right: -2,
           top: 0,
-          left: 0,
-          right: 0,
           bottom: 0,
-          background: `repeating-linear-gradient(90deg, ${loopColor}, ${loopColor} 4px, transparent 4px, transparent 8px)`,
-          opacity: 0.8
-        }} />
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+        }}>
+          <span style={{
+            fontSize: 34,
+            fontWeight: 900,
+            color: loopColor,
+            opacity: 0.9,
+            textShadow: `0 0 20px ${loopColor}60, 0 0 40px ${loopColor}30`,
+            lineHeight: 1,
+          }}>
+            ]
+          </span>
+        </div>
         
-        {/* Pointe de la flèche */}
+        {/* ✅ Label "FIN" en bas */}
         <div style={{
           position: 'absolute',
-          right: -6,
-          top: '50%',
-          transform: 'translateY(-50%)',
-          width: 0,
-          height: 0,
-          borderLeft: `6px solid ${loopColor}`,
-          borderTop: '4px solid transparent',
-          borderBottom: '4px solid transparent'
-        }} />
-        
-        {/* Label "LOOP" */}
-        <div style={{
-          position: 'absolute',
-          top: -16,
-          left: '50%',
-          transform: 'translateX(-50%)',
+          right: -2,
+          bottom: 4,
           fontSize: 7,
           fontWeight: 600,
           color: loopColor,
-          background: 'var(--bg-secondary)',
-          padding: '0 4px',
-          borderRadius: 2,
-          opacity: 0.8,
-          whiteSpace: 'nowrap'
+          opacity: 0.7,
+          background: 'rgba(0,0,0,0.8)',
+          padding: '2px 8px',
+          borderRadius: 3,
+          border: `1px solid ${loopColor}40`,
+          fontFamily: 'monospace',
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none'
         }}>
-          🔁 LOOP
+          FIN {(loopWidth / pixelsPerSecond).toFixed(1)}s
         </div>
         
-        {/* Indicateur de fin de boucle */}
+        {/* ✅ Flèche tiretée */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: 0,
+            width: loopWidth,
+            height: 2,
+            transform: 'translateY(-50%)',
+            pointerEvents: 'none',
+          }}
+        >
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: `repeating-linear-gradient(90deg, ${loopColor}, ${loopColor} 6px, transparent 6px, transparent 12px)`,
+            opacity: 0.4,
+          }} />
+          
+          <div style={{
+            position: 'absolute',
+            right: -6,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 0,
+            height: 0,
+            borderLeft: `6px solid ${loopColor}`,
+            borderTop: '4px solid transparent',
+            borderBottom: '4px solid transparent',
+            opacity: 0.6
+          }} />
+        </div>
+        
+        {/* ✅ Label "LOOP" avec infos */}
         <div style={{
           position: 'absolute',
-          right: 0,
-          top: '50%',
-          transform: 'translateY(-50%)',
-          width: 2,
-          height: '200%',
-          background: loopColor,
-          opacity: 0.5
-        }} />
+          top: -24,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          fontSize: 8,
+          fontWeight: 600,
+          color: loopColor,
+          background: 'rgba(0,0,0,0.9)',
+          padding: '2px 12px',
+          borderRadius: 4,
+          border: `1px solid ${loopColor}`,
+          whiteSpace: 'nowrap',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
+          pointerEvents: 'none',
+          zIndex: 6
+        }}>
+          <span>🔁 LOOP</span>
+          {loopMode === 'cycles' && totalCycles > 1 && (
+            <span style={{
+              fontSize: 7,
+              opacity: 0.7,
+              background: 'rgba(255,255,255,0.1)',
+              padding: '0 6px',
+              borderRadius: 2
+            }}>
+              {totalCycles}x
+            </span>
+          )}
+          {loopMode === 'manualDuration' && (
+            <span style={{
+              fontSize: 7,
+              opacity: 0.7,
+              fontFamily: 'monospace'
+            }}>
+              {(loopWidth / pixelsPerSecond).toFixed(1)}s
+            </span>
+          )}
+          <span style={{
+            fontSize: 7,
+            opacity: 0.5,
+            fontFamily: 'monospace',
+            borderLeft: '1px solid rgba(255,255,255,0.2)',
+            paddingLeft: 6
+          }}>
+            +{(loopWidth / pixelsPerSecond).toFixed(1)}s
+          </span>
+        </div>
       </div>
     )
   }
@@ -367,7 +445,7 @@ const EditorClip = ({
         boxShadow: isSelected ? '0 0 20px rgba(124,111,247,0.3)' : isClipLooping ? '0 0 15px rgba(34,197,94,0.2)' : 'none',
         zIndex: isDragging ? 10 : isSelected ? 3 : 2,
         opacity: isDragging ? 0.8 : 1,
-        overflow: 'hidden',
+        overflow: 'visible',
         userSelect: 'none',
         pointerEvents: 'auto',
       }}
@@ -376,7 +454,10 @@ const EditorClip = ({
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      {/* ✅ Badge de boucle */}
+      {/* ✅ Zone de boucle */}
+      {renderLoopOverlay()}
+
+      {/* ✅ Badge de boucle avec info */}
       {isClipLooping && (
         <div style={{
           position: 'absolute',
@@ -385,11 +466,12 @@ const EditorClip = ({
           zIndex: 8,
           display: 'flex',
           alignItems: 'center',
-          gap: 2,
-          background: 'rgba(0,0,0,0.7)',
-          padding: '1px 6px',
+          gap: 4,
+          background: 'rgba(0,0,0,0.8)',
+          padding: '1px 8px 1px 4px',
           borderRadius: 3,
-          pointerEvents: 'none'
+          pointerEvents: 'none',
+          border: `1px solid ${loopColor}40`
         }}>
           <span style={{ fontSize: 10 }}>🔁</span>
           <span style={{
@@ -399,6 +481,23 @@ const EditorClip = ({
           }}>
             LOOP
           </span>
+          {loopMode === 'cycles' && totalCycles > 1 && (
+            <span style={{
+              fontSize: 7,
+              color: 'var(--text-tertiary)',
+              opacity: 0.7
+            }}>
+              {totalCycles}x
+            </span>
+          )}
+          <span style={{
+            fontSize: 7,
+            color: 'var(--text-tertiary)',
+            opacity: 0.5,
+            fontFamily: 'monospace'
+          }}>
+            → {loopEnd.toFixed(1)}s
+          </span>
         </div>
       )}
 
@@ -407,9 +506,6 @@ const EditorClip = ({
         trackColor={trackColor}
         duration={duration}
       />
-
-      {/* ✅ Flèche de boucle */}
-      {renderLoopArrow()}
 
       <div style={{
         position: 'absolute',
@@ -442,6 +538,16 @@ const EditorClip = ({
             opacity: 0.8
           }}>
             🔁
+          </span>
+        )}
+        {isClipLooping && loopMode === 'cycles' && totalCycles > 1 && (
+          <span style={{
+            marginLeft: 4,
+            fontSize: 7,
+            color: 'var(--text-tertiary)',
+            opacity: 0.6
+          }}>
+            {totalCycles}x
           </span>
         )}
       </div>

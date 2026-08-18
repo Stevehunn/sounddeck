@@ -130,6 +130,12 @@ function EditorTimelineContent() {
     playClipOnly,
     loopState,
     toggleClipLoop,
+    isPendingAction,
+    pendingAction,
+    activateLoopManualClick,
+    activateSplitManualClick,
+    cancelPendingAction,
+    executePendingAction,
   } = context
 
   // ─── ÉTATS LOCAUX ──────────────────────────────────────────────────────
@@ -364,16 +370,10 @@ function EditorTimelineContent() {
   const handleAddEffectFromMenu = useCallback((clipId, trackId) => {
     console.log('✨ [Editor] handleAddEffectFromMenu appelé pour:', clipId, trackId)
     
-    // ✅ Sélectionner le clip pour que le panneau des effets s'affiche
     selectClip(clipId, trackId)
-    
-    // ✅ S'assurer que le panneau des effets est ouvert
     setShowEffectsPanel(true)
-    
-    // ✅ Ouvrir le sous-menu d'ajout d'effet
     setShowEffectsAddMenu(true)
     
-    // ✅ Petit toast informatif
     const clipName = getClipById(tracks, clipId)?.name || 'clip'
     addToast?.(`Panneau des effets ouvert pour "${clipName}"`, 'info')
   }, [selectClip, tracks, addToast])
@@ -419,7 +419,6 @@ function EditorTimelineContent() {
         console.log('  Pic final:', result.finalPeak)
         console.log('  Nouveau chemin:', result.newPath)
         
-        // ✅ Mettre à jour le clip localement
         if (result.newPath) {
           const track = tracks.find(t => t.id === selectedTrackId)
           if (track) {
@@ -989,9 +988,13 @@ function EditorTimelineContent() {
           loopState={loopState}
           onToggleClipLoop={(clipId, options) => {
             console.log('🔄 [Editor] onToggleClipLoop appelé avec:', { clipId, options })
-            console.log('🔄 [Editor] Appel de toggleClipLoop du contexte')
             toggleClipLoop(clipId, options)
           }}
+          // ✅ Mode d'attente
+          isPendingAction={isPendingAction}
+          pendingAction={pendingAction}
+          onExecutePendingAction={executePendingAction}
+          onCancelPendingAction={cancelPendingAction}
         />
       </div>
 
@@ -1281,14 +1284,16 @@ function EditorTimelineContent() {
           tr={t}
           onToggleClipLoop={(clipId, options) => {
             console.log('🔄 [Editor] onToggleClipLoop appelé avec:', { clipId, options })
-            console.log('🔄 [Editor] Appel de toggleClipLoop du contexte')
             toggleClipLoop(clipId, options)
           }}
+          // ✅ Mode d'attente
+          onActivateLoopManualClick={activateLoopManualClick}
+          onActivateSplitManualClick={activateSplitManualClick}
           loopState={loopState}
         />
       )}
 
-      {/* ✅ ConfirmWrapper - persistant pour les popups de confirmation */}
+      {/* ✅ ConfirmWrapper */}
       <ConfirmWrapper />
     </div>
   )
