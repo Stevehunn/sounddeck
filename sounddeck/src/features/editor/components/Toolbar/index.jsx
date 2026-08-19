@@ -28,7 +28,11 @@ export default function EditorToolbar({
   onRenameProject,
   onRefreshDurations,
   tr,
-  addToast
+  addToast,
+  // ✅ NOUVEAUX PROPS POUR LA BOUCLE GÉNÉRALE
+  loopState,
+  onToggleTimelineLoop,
+  onOpenLoopPanel
 }) {
   const [showAddClip, setShowAddClip] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
@@ -40,6 +44,8 @@ export default function EditorToolbar({
   const [pendingFileName, setPendingFileName] = useState('')
   const [isRefreshingDurations, setIsRefreshingDurations] = useState(false)
   const dropdownRef = useRef(null)
+
+  const timelineLoop = loopState?.timeline || { enabled: false }
 
   useEffect(() => {
     setNewProjectName(projectName || 'Nouveau projet')
@@ -113,11 +119,8 @@ export default function EditorToolbar({
       }
       
       if (tracks.length === 1) {
-        // Ajouter directement à la seule piste
-        // Ici on utilise onAddClip avec un fichier
         setPendingFile(filePath)
         setPendingFileName(fileName)
-        // Pour l'instant, on ouvre le modal pour choisir la piste
         setShowImportModal(true)
         return
       }
@@ -340,6 +343,55 @@ export default function EditorToolbar({
         )}
       </div>
 
+      <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
+
+      {/* ✅ BOUTONS BOUCLE GÉNÉRALE */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <button
+          className={timelineLoop.enabled ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+          onClick={onToggleTimelineLoop}
+          style={{
+            minHeight: 28,
+            padding: '2px 10px',
+            borderRadius: 'var(--radius-sm)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            fontSize: 11
+          }}
+          title={tr('toggleTimelineLoop') || 'Activer/désactiver la boucle générale'}
+        >
+          <i className="ti ti-repeat" />
+          <span>{tr('loop') || 'Boucle'}</span>
+          <span style={{
+            fontSize: 8,
+            padding: '1px 6px',
+            borderRadius: 10,
+            background: timelineLoop.enabled ? 'rgba(255,255,255,0.2)' : 'var(--bg-tertiary)',
+            color: timelineLoop.enabled ? 'white' : 'var(--text-tertiary)'
+          }}>
+            {timelineLoop.enabled ? 'ON' : 'OFF'}
+          </span>
+        </button>
+
+        <button
+          className="btn-secondary btn-sm"
+          onClick={onOpenLoopPanel}
+          style={{
+            minHeight: 28,
+            padding: '2px 8px',
+            borderRadius: 'var(--radius-sm)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 12
+          }}
+          title={tr('loopSettings') || 'Paramètres de la boucle'}
+        >
+          <i className="ti ti-settings" />
+        </button>
+      </div>
+
       <div style={{ flex: 1 }} />
 
       {/* Boutons d'action */}
@@ -495,9 +547,7 @@ export default function EditorToolbar({
           tracks={tracks}
           fileName={pendingFileName}
           onConfirm={(trackId) => {
-            // Ajouter le fichier à la piste sélectionnée
             console.log('📁 [Toolbar] Import fichier:', { trackId, file: pendingFile })
-            // Ici on utilise onAddClip avec un fichier
             setShowImportModal(false)
             setPendingFile(null)
             setPendingFileName('')

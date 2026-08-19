@@ -4,6 +4,21 @@ import { useLanguage } from '@core/i18n/LanguageContext'
 
 const EditorContext = createContext(null)
 
+// ✅ CONSTANTES POUR LA BOUCLE GÉNÉRALE
+const LOOP_START_MODES = {
+  TIMELINE_START: 'timelineStart',
+  PLAYHEAD: 'playhead',
+  MANUAL_CLICK: 'manualClick'
+}
+
+const LOOP_END_MODES = {
+  END_OF_TRACK: 'endOfTrack',
+  CYCLES: 'cycles',
+  MANUAL: 'manual',
+  MANUAL_CLICK: 'manualClick',
+  PLAYHEAD: 'playhead'
+}
+
 export function EditorProvider({ children, store, addToast }) {
   const { t } = useLanguage()
   
@@ -41,7 +56,13 @@ export function EditorProvider({ children, store, addToast }) {
       enabled: false,
       start: 0,
       end: 10,
-      color: '#7C6FF7'
+      color: '#7C6FF7',
+      startMode: LOOP_START_MODES.TIMELINE_START,
+      endMode: LOOP_END_MODES.END_OF_TRACK,
+      cycleCount: 3,
+      manualDuration: 10,
+      startManualTime: 0,
+      endManualTime: 10
     }
   })
   
@@ -70,7 +91,7 @@ export function EditorProvider({ children, store, addToast }) {
   useEffect(() => { stopAtTimeRef.current = stopAtTime }, [stopAtTime])
   useEffect(() => { soloPlayClipIdRef.current = soloPlayClipId }, [soloPlayClipId])
 
-  // ─── FONCTIONS HELPER ──────────────────────────────────────────────
+  // ─── FONCTIONS HELPER ──────────────────────────────────────────────────
 
   const generateUniqueId = useCallback((prefix) => {
     idCounterRef.current += 1
@@ -192,7 +213,18 @@ export function EditorProvider({ children, store, addToast }) {
               loops: {
                 clips: {},
                 tracks: {},
-                timeline: { enabled: false, start: 0, end: 10, color: '#7C6FF7' }
+                timeline: { 
+                  enabled: false, 
+                  start: 0, 
+                  end: 10, 
+                  color: '#7C6FF7',
+                  startMode: LOOP_START_MODES.TIMELINE_START,
+                  endMode: LOOP_END_MODES.END_OF_TRACK,
+                  cycleCount: 3,
+                  manualDuration: 10,
+                  startManualTime: 0,
+                  endManualTime: 10
+                }
               },
               createdAt: Date.now(),
               updatedAt: Date.now()
@@ -212,7 +244,18 @@ export function EditorProvider({ children, store, addToast }) {
           loops: {
             clips: {},
             tracks: {},
-            timeline: { enabled: false, start: 0, end: 10, color: '#7C6FF7' }
+            timeline: { 
+              enabled: false, 
+              start: 0, 
+              end: 10, 
+              color: '#7C6FF7',
+              startMode: LOOP_START_MODES.TIMELINE_START,
+              endMode: LOOP_END_MODES.END_OF_TRACK,
+              cycleCount: 3,
+              manualDuration: 10,
+              startManualTime: 0,
+              endManualTime: 10
+            }
           },
           createdAt: Date.now(),
           updatedAt: Date.now()
@@ -349,7 +392,7 @@ export function EditorProvider({ children, store, addToast }) {
     }
   }, [loadAudioBuffer, currentTime, autoCrossfade, findPreviousClip, calculateOverlap])
 
-  // ✅ startPlaybackLoop - CORRIGÉE (version finale avec gestion des lancements multiples)
+  // ✅ startPlaybackLoop - CORRIGÉE avec support de la boucle générale
   const startPlaybackLoop = useCallback(() => {
     console.log('[LOOP-FIX] 🔄 startPlaybackLoop() appelée')
     
@@ -369,6 +412,8 @@ export function EditorProvider({ children, store, addToast }) {
     const startingClips = new Set()
     // ✅ Suivi des clips démarrés dans ce frame
     const clipsStartedThisFrame = new Set()
+    // ✅ Suivi du nombre de cycles de boucle générale
+    let loopCycleCount = 0
 
     const loop = () => {
       // ✅ Vérifier l'état de lecture
@@ -392,25 +437,18 @@ export function EditorProvider({ children, store, addToast }) {
         // ✅ Réinitialiser les clips démarrés ce frame
         clipsStartedThisFrame.clear()
         
-        const loopStart = loopRegion.start || 0
-        const loopEnd = loopRegion.end || totalDuration
+        const timelineLoop = loopState?.timeline || { enabled: false, start: 0, end: 10 }
+        const loopStart = timelineLoop.start || 0
+        const loopEnd = timelineLoop.end || totalDuration
         
-        // ✅ Gestion de la boucle de la timeline
-        if (loopRegion.enabled && newTime >= loopEnd) {
-          console.log(`[LOOP-FIX] 🔄 Boucle TIMELINE: retour à ${loopStart.toFixed(2)}s`)
+        // ✅ Gestion de la boucle générale de la timeline
+        if (timelineLoop.enabled && newTime >= loopEnd) {
+          loopCycleCount++
+          console.log(`[LOOP-FIX] 🔄 Boucle TIMELINE #${loopCycleCount}: retour à ${loopStart.toFixed(2)}s`)
           newTime = loopStart
           
-          // ✅ Arrêter TOUTES les sources audio
-          for (const [id, entry] of Object.entries(audioSourcesRef.current)) {
-            try { 
-              console.log(`[LOOP-FIX]   - Arrêt de la source (timeline loop): ${id}`)
-              entry.source.stop() 
-              entry.source.disconnect()
-            } catch (e) {}
-          }
-          audioSourcesRef.current = {}
-          lastPlayedClipsRef.current = new Set()
-          startingClips.clear()
+          // ✅ Ne pas arrêter les sources audio, juste avancer le temps
+          // Les clips seront relancés normalement via la logique ci-dessous
         }
         
         if (projectRef.current?.tracks) {
@@ -421,10 +459,13 @@ export function EditorProvider({ children, store, addToast }) {
           // ✅ LOG : État des boucles à chaque frame (toutes les 10 frames)
           if (frameCount % 10 === 0) {
             console.log('[LOOP-FIX] 📊 État des boucles - frame', frameCount, {
+              timelineLoop: timelineLoop.enabled,
+              loopCycle: loopCycleCount,
               loopStateClips: Object.keys(loopState?.clips || {}).filter(k => loopState.clips[k]?.enabled),
               audioSources: Object.keys(audioSourcesRef.current),
               lastPlayed: Array.from(lastPlayedClipsRef.current),
-              startingClips: Array.from(startingClips)
+              startingClips: Array.from(startingClips),
+              currentTime: newTime.toFixed(2)
             })
           }
           
@@ -436,6 +477,11 @@ export function EditorProvider({ children, store, addToast }) {
               const start = clip.start || 0
               const end = start + duration
               
+              // ✅ Vérifier si le clip est dans la zone de boucle générale
+              const isInTimelineLoop = timelineLoop.enabled && 
+                newTime >= loopStart && 
+                newTime < loopEnd
+              
               const isClipLooping = loopState?.clips?.[clip.id]?.enabled || false
               const clipLoopData = loopState?.clips?.[clip.id]
               const clipLoopStart = clipLoopData?.start || start
@@ -445,7 +491,7 @@ export function EditorProvider({ children, store, addToast }) {
               let clipTime = newTime
               let shouldRestart = false
               
-              // ✅ Si le clip est en boucle
+              // ✅ Si le clip est en boucle individuelle
               if (isClipLooping) {
                 if (newTime >= clipLoopStart && newTime < clipLoopEnd) {
                   const elapsedInLoop = newTime - clipLoopStart
@@ -458,22 +504,17 @@ export function EditorProvider({ children, store, addToast }) {
                     shouldPlay = true
                     clipTime = clipLoopStart + positionInClip
                     
-                    // ✅ Vérifier si le clip est déjà en cours de lecture OU en cours de démarrage
                     const isCurrentlyPlaying = audioSourcesRef.current[clip.id] !== undefined
                     const isStarting = startingClips.has(clip.id)
                     const isNearCycleStart = positionInClip < 0.05
                     
-                    // ✅ LOG détaillé pour le clip bouclé
                     if (isNearCycleStart || !isCurrentlyPlaying) {
                       console.log(`[LOOP-FIX] 🔁 Clip "${clip.name}" - position: ${positionInClip.toFixed(3)}s, isPlaying: ${isCurrentlyPlaying}, isStarting: ${isStarting}, nearStart: ${isNearCycleStart}`)
                     }
                     
-                    // ✅ [FIX] - On ne relance le clip que s'il n'est PAS déjà en cours de lecture ET PAS en cours de démarrage
                     if (!isCurrentlyPlaying && !isStarting) {
-                      // ✅ Vérifier si le clip n'a pas déjà été démarré dans ce frame
                       if (!clipsStartedThisFrame.has(clip.id)) {
                         shouldRestart = true
-                        // ✅ Marquer le clip comme "en cours de démarrage"
                         startingClips.add(clip.id)
                         clipsStartedThisFrame.add(clip.id)
                         console.log(`[LOOP-FIX] 🚀 ${clip.name} - Nouveau lancement (cycle ${Math.floor(elapsedInLoop / clipDuration) + 1})`)
@@ -483,7 +524,6 @@ export function EditorProvider({ children, store, addToast }) {
                     }
                   }
                 } else if (newTime >= clipLoopEnd) {
-                  // ✅ Fin de la boucle - arrêter le clip
                   if (lastPlayedClipsRef.current.has(clip.id)) {
                     console.log(`[LOOP-FIX] 🛑 ${clip.name} - Fin de la boucle à ${newTime.toFixed(2)}s`)
                     const entry = audioSourcesRef.current[clip.id]
@@ -502,8 +542,13 @@ export function EditorProvider({ children, store, addToast }) {
                 if (clip.id === soloClipId && newTime >= start && newTime < end) {
                   shouldPlay = true
                 }
-              } else if (newTime >= start && newTime < end) {
-                shouldPlay = true
+              } else {
+                // ✅ Clip normal - vérifier s'il doit être joué
+                // S'il est dans la zone de boucle générale, on joue normalement
+                // Sinon, on ne joue que si le temps est entre start et end
+                if (isInTimelineLoop || (newTime >= start && newTime < end)) {
+                  shouldPlay = true
+                }
               }
               
               if (shouldPlay) {
@@ -520,7 +565,6 @@ export function EditorProvider({ children, store, addToast }) {
                   playClip(clip, track)
                   lastPlayedClipsRef.current.add(clip.id)
                   
-                  // ✅ Planifier la suppression du flag "en cours de démarrage" après un court délai
                   setTimeout(() => {
                     startingClips.delete(clip.id)
                   }, 100)
@@ -541,49 +585,10 @@ export function EditorProvider({ children, store, addToast }) {
               }
             }
           }
-          
-          // ✅ Nettoyer les clips qui ne sont plus actifs (sécurité supplémentaire)
-          for (const clipId of lastPlayedClipsRef.current) {
-            if (!activeClips.has(clipId) && !clipsStartedThisFrame.has(clipId)) {
-              const entry = audioSourcesRef.current[clipId]
-              if (entry) {
-                try { 
-                  entry.source.stop() 
-                  entry.source.disconnect()
-                } catch (e) {}
-                delete audioSourcesRef.current[clipId]
-              }
-              lastPlayedClipsRef.current.delete(clipId)
-              startingClips.delete(clipId)
-            }
-          }
         }
         
-        const shouldStopGlobal = (stopAtTimeRef.current !== null && newTime >= stopAtTimeRef.current) || newTime >= totalDuration
-        
-        if (shouldStopGlobal) {
-          const stopPosition = stopAtTimeRef.current !== null ? stopAtTimeRef.current : totalDuration
-          console.log(`[LOOP-FIX] ⏹️ Fin de la lecture globale à ${newTime.toFixed(2)}s`)
-          setIsPlaying(false)
-          setCurrentTime(stopPosition)
-          setStopAtTime(null)
-          stopAtTimeRef.current = null
-          setSoloPlayClipId(null)
-          soloPlayClipIdRef.current = null
-          for (const [id, entry] of Object.entries(audioSourcesRef.current)) {
-            try { 
-              console.log(`[LOOP-FIX]   - Arrêt de la source (fin globale): ${id}`)
-              entry.source.stop() 
-              entry.source.disconnect()
-            } catch (e) {}
-          }
-          audioSourcesRef.current = {}
-          lastPlayedClipsRef.current = new Set()
-          startingClips.clear()
-          isLoopRunning = false
-          return
-        }
-        
+        // ✅ La lecture continue même en boucle - on ne s'arrête pas
+        // Le temps continue d'avancer, la boucle est gérée par le reset du temps
         setCurrentTime(newTime)
       }
       
@@ -595,6 +600,7 @@ export function EditorProvider({ children, store, addToast }) {
     lastTime = performance.now()
     accumulated = 0
     isLoopRunning = true
+    loopCycleCount = 0
     
     // ✅ NETTOYER TOUT AVANT DE DÉMARRER
     console.log('[LOOP-FIX] 🧹 Nettoyage avant démarrage')
@@ -611,23 +617,23 @@ export function EditorProvider({ children, store, addToast }) {
     
     animationRef.current = requestAnimationFrame(loop)
     console.log('[LOOP-FIX] ✅ Animation démarrée')
-  }, [totalDuration, playClip, clipDurations, loopRegion, loopState])
+  }, [totalDuration, playClip, clipDurations, loopState])
 
   // ─── PLAYBACK CONTROLS ──────────────────────────────────────────────
 
-    const play = useCallback(async () => {
+  const play = useCallback(async () => {
     console.log('[LOOP-FIX] 🎬 play() appelé - RÉINITIALISATION TOTALE')
     
     setStopAtTime(null)
     stopAtTimeRef.current = null
     
     // ✅ RÉINITIALISER TOUT AVANT DE JOUER
-    // Arrêter tous les sons en cours
     console.log('[LOOP-FIX] 🔇 Arrêt de toutes les sources audio')
-    for (const [id, { source }] of Object.entries(audioSourcesRef.current)) {
+    for (const [id, entry] of Object.entries(audioSourcesRef.current)) {
       try { 
         console.log('[LOOP-FIX]   - Arrêt de la source:', id)
-        source.stop() 
+        entry.source.stop() 
+        entry.source.disconnect()
       } catch (e) {}
     }
     audioSourcesRef.current = {}
@@ -662,7 +668,6 @@ export function EditorProvider({ children, store, addToast }) {
       setIsPlaying(false)
     }
   }, [startPlaybackLoop])
-
 
   const playClipOnly = useCallback(async (clip, trackId) => {
     setSoloPlayClipId(clip.id)
@@ -729,8 +734,11 @@ export function EditorProvider({ children, store, addToast }) {
       audioContextRef.current.suspend().catch(() => {})
     }
     
-    for (const [id, { source }] of Object.entries(audioSourcesRef.current)) {
-      try { source.stop() } catch (e) {}
+    for (const [id, entry] of Object.entries(audioSourcesRef.current)) {
+      try { 
+        entry.source.stop() 
+        entry.source.disconnect()
+      } catch (e) {}
     }
     audioSourcesRef.current = {}
   }, [])
@@ -751,8 +759,11 @@ export function EditorProvider({ children, store, addToast }) {
       animationRef.current = null
     }
     
-    for (const [id, { source }] of Object.entries(audioSourcesRef.current)) {
-      try { source.stop() } catch (e) {}
+    for (const [id, entry] of Object.entries(audioSourcesRef.current)) {
+      try { 
+        entry.source.stop() 
+        entry.source.disconnect()
+      } catch (e) {}
     }
     audioSourcesRef.current = {}
   }, [])
@@ -762,10 +773,10 @@ export function EditorProvider({ children, store, addToast }) {
     setCurrentTime(clamped)
     currentTimeRef.current = clamped
     
-    for (const [id, { source }] of Object.entries(audioSourcesRef.current)) {
+    for (const [id, entry] of Object.entries(audioSourcesRef.current)) {
       try { 
-        source.stop() 
-        source.disconnect() 
+        entry.source.stop() 
+        entry.source.disconnect()
       } catch (e) {}
     }
     audioSourcesRef.current = {}
@@ -799,7 +810,18 @@ export function EditorProvider({ children, store, addToast }) {
           loops: {
             clips: {},
             tracks: {},
-            timeline: { enabled: false, start: 0, end: 10, color: '#7C6FF7' }
+            timeline: { 
+              enabled: false, 
+              start: 0, 
+              end: 10, 
+              color: '#7C6FF7',
+              startMode: LOOP_START_MODES.TIMELINE_START,
+              endMode: LOOP_END_MODES.END_OF_TRACK,
+              cycleCount: 3,
+              manualDuration: 10,
+              startManualTime: 0,
+              endManualTime: 10
+            }
           },
           createdAt: Date.now(),
           updatedAt: Date.now()
@@ -1725,7 +1747,7 @@ export function EditorProvider({ children, store, addToast }) {
     setIsDirty(true)
   }, [project, store, generateUniqueId])
 
-  // ─── FONCTIONS BOUCLE ──────────────────────────────────────────────────
+  // ─── FONCTIONS BOUCLE CLIP ──────────────────────────────────────────────────
 
   const toggleClipLoop = useCallback((clipId, options = {}) => {
     console.log('🔄 [EditorContext] toggleClipLoop appelé:', { clipId, options })
@@ -1921,6 +1943,83 @@ export function EditorProvider({ children, store, addToast }) {
     }
   }, [project, loopState, store])
 
+  // ─── FONCTIONS BOUCLE TIMELINE ──────────────────────────────────────────
+
+  const setTimelineLoop = useCallback((options) => {
+    console.log('🔄 [EditorContext] setTimelineLoop appelé:', options)
+    
+    if (!project) {
+      console.warn('🔄 [EditorContext] Aucun projet')
+      return
+    }
+    
+    const updatedLoopState = {
+      ...loopState,
+      timeline: {
+        ...loopState.timeline,
+        ...options
+      }
+    }
+    
+    setLoopState(updatedLoopState)
+    
+    const updatedProject = {
+      ...project,
+      loops: updatedLoopState,
+      updatedAt: Date.now()
+    }
+    setProject(updatedProject)
+    projectRef.current = updatedProject
+    
+    if (store?.updateEditorProject) {
+      store.updateEditorProject(updatedProject).catch(() => {})
+    }
+    
+    setIsDirty(true)
+  }, [project, loopState, store])
+
+  const toggleTimelineLoop = useCallback(() => {
+    const newEnabled = !loopState.timeline.enabled
+    console.log('🔄 [EditorContext] toggleTimelineLoop:', newEnabled)
+    
+    if (newEnabled) {
+      // Si on active la boucle, on s'assure que start < end
+      const start = loopState.timeline.start
+      const end = loopState.timeline.end
+      if (start >= end) {
+        setTimelineLoop({
+          enabled: true,
+          end: Math.max(start + 1, 10)
+        })
+        return
+      }
+    }
+    
+    setTimelineLoop({
+      enabled: newEnabled
+    })
+  }, [loopState.timeline, setTimelineLoop])
+
+  const activateTimelineLoopManualClick = useCallback((mode) => {
+    console.log('🖱️ [EditorContext] Activation du mode clic pour boucle timeline:', mode)
+    
+    if (isPendingAction) {
+      cancelPendingAction()
+    }
+    
+    setPendingAction({
+      type: 'timelineLoop',
+      mode: mode, // 'start' ou 'end'
+      options: {
+        color: loopState.timeline.color || '#7C6FF7'
+      }
+    })
+    setIsPendingAction(true)
+    
+    const label = mode === 'start' ? 'début' : 'fin'
+    addToast?.(`🖱️ Cliquez sur la timeline pour définir le ${label} de la boucle`, 'info')
+  }, [isPendingAction, loopState.timeline.color, addToast])
+
   // ─── FONCTIONS POUR LE MODE D'ATTENTE ──────────────────────────────────
 
   const activateLoopManualClick = useCallback((clipId, trackId, options = {}) => {
@@ -1968,16 +2067,45 @@ export function EditorProvider({ children, store, addToast }) {
     setIsPendingAction(false)
   }, [])
 
-  // ✅ executePendingAction - utilise toggleClipLoop qui est maintenant défini
+  // ✅ executePendingAction - supporte la boucle timeline
   const executePendingAction = useCallback((clickTime) => {
     if (!isPendingAction || !pendingAction) {
       return
     }
     
-    const { type, clipId, trackId, options } = pendingAction
+    const { type, clipId, trackId, options, mode } = pendingAction
     const clampedTime = Math.max(0, Math.min(clickTime, totalDuration))
     
     console.log(`🖱️ [EditorContext] Exécution de l'action ${type} à ${clampedTime}s`, { clipId, trackId })
+    
+    if (type === 'timelineLoop') {
+      // ✅ Boucle générale - définir le début ou la fin
+      if (mode === 'start') {
+        const end = loopState.timeline.end
+        if (clampedTime < end) {
+          setTimelineLoop({
+            start: clampedTime
+          })
+          addToast?.(`🖱️ Début de la boucle défini à ${clampedTime.toFixed(1)}s`, 'success')
+        } else {
+          addToast?.('⚠️ Le début doit être avant la fin de la boucle', 'warning')
+        }
+      } else if (mode === 'end') {
+        const start = loopState.timeline.start
+        if (clampedTime > start) {
+          setTimelineLoop({
+            end: clampedTime
+          })
+          addToast?.(`🖱️ Fin de la boucle définie à ${clampedTime.toFixed(1)}s`, 'success')
+        } else {
+          addToast?.('⚠️ La fin doit être après le début de la boucle', 'warning')
+        }
+      }
+      
+      setIsPendingAction(false)
+      setPendingAction(null)
+      return
+    }
     
     if (type === 'loop') {
       const clip = project?.tracks?.flatMap(t => t.clips).find(c => c.id === clipId)
@@ -2030,7 +2158,7 @@ export function EditorProvider({ children, store, addToast }) {
       setIsPendingAction(false)
       setPendingAction(null)
     }
-  }, [isPendingAction, pendingAction, totalDuration, project, clipDurations, toggleClipLoop, splitClip, addToast])
+  }, [isPendingAction, pendingAction, totalDuration, project, clipDurations, toggleClipLoop, splitClip, addToast, loopState.timeline, setTimelineLoop])
 
   // ─── FONCTIONS LOOP ──────────────────────────────────────────────────
 
@@ -2043,15 +2171,19 @@ export function EditorProvider({ children, store, addToast }) {
   }, [totalDuration])
 
   const toggleLoop = useCallback(() => {
-    setLoopRegion(prev => ({
-      ...prev,
-      enabled: !prev.enabled
-    }))
-  }, [])
+    // ✅ Utiliser la nouvelle fonction toggleTimelineLoop
+    toggleTimelineLoop()
+  }, [toggleTimelineLoop])
 
   const clearLoop = useCallback(() => {
     setLoopRegion({ enabled: false, start: 0, end: 10 })
-  }, [])
+    // ✅ Désactiver aussi la boucle timeline
+    setTimelineLoop({
+      enabled: false,
+      start: 0,
+      end: 10
+    })
+  }, [setTimelineLoop])
 
   // ─── ZOOM ─────────────────────────────────────────────────────────────
 
@@ -2184,6 +2316,10 @@ export function EditorProvider({ children, store, addToast }) {
     setLoopState,
     toggleClipLoop,
     updateClipLoopOptions,
+    // ✅ Boucle timeline
+    setTimelineLoop,
+    toggleTimelineLoop,
+    activateTimelineLoopManualClick,
     // ✅ Mode d'attente
     isPendingAction,
     pendingAction,

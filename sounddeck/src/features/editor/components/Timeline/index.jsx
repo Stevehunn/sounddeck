@@ -80,6 +80,13 @@ export default function EditorTimeline({
   pendingAction = null,
   onExecutePendingAction,
   onCancelPendingAction,
+  onToggleTimelineLoop,
+  onSetTimelineLoop,
+  onOpenLoopPanel,
+  onActivateTimelineLoopManualClick,
+  // ✅ MODE CLIC POUR LA BOUCLE TIMELINE
+  isTimelineClickModeActive = false,
+  onTimelineClickForLoop
 }) {
   const editorContext = useEditor()
   
@@ -190,6 +197,17 @@ export default function EditorTimeline({
   }, [totalWidth, pixelsPerSecond])
 
   const handleTimelineClick = useCallback((e) => {
+    // ✅ Si le mode clic de la boucle timeline est actif
+    if (isTimelineClickModeActive && onTimelineClickForLoop) {
+      const time = clientXToTime(e.clientX)
+      if (time >= 0 && time <= totalDuration) {
+        e.preventDefault()
+        e.stopPropagation()
+        onTimelineClickForLoop(time)
+      }
+      return
+    }
+
     if (isPendingAction) {
       const time = clientXToTime(e.clientX)
       if (time >= 0 && time <= totalDuration) {
@@ -208,9 +226,20 @@ export default function EditorTimeline({
     if (time >= 0 && time <= totalDuration) {
       onSeek?.(time)
     }
-  }, [isPendingAction, clientXToTime, totalDuration, onExecutePendingAction, onSeek])
+  }, [isPendingAction, isTimelineClickModeActive, onTimelineClickForLoop, clientXToTime, totalDuration, onExecutePendingAction, onSeek])
 
   const handleRulerClick = useCallback((e) => {
+    // ✅ Si le mode clic de la boucle timeline est actif
+    if (isTimelineClickModeActive && onTimelineClickForLoop) {
+      const time = clientXToTime(e.clientX, rulerContainerRef.current)
+      if (time >= 0 && time <= totalDuration) {
+        e.preventDefault()
+        e.stopPropagation()
+        onTimelineClickForLoop(time)
+      }
+      return
+    }
+
     if (isPendingAction) {
       const time = clientXToTime(e.clientX, rulerContainerRef.current)
       if (time >= 0 && time <= totalDuration) {
@@ -224,7 +253,7 @@ export default function EditorTimeline({
     if (time >= 0 && time <= totalDuration) {
       onSeek?.(time)
     }
-  }, [isPendingAction, clientXToTime, totalDuration, onExecutePendingAction, onSeek])
+  }, [isPendingAction, isTimelineClickModeActive, onTimelineClickForLoop, clientXToTime, totalDuration, onExecutePendingAction, onSeek])
 
   const handleRulerDoubleClick = useCallback((e) => {
     const time = clientXToTime(e.clientX, rulerContainerRef.current)
@@ -368,8 +397,7 @@ export default function EditorTimeline({
         for (let i = 1; i < totalCycles; i++) {
           cycleEnd += cycleDuration
           const position = cycleEnd * pixelsPerSecond
-          if (position >= loopEndPosition) break
-          
+          if (position >= loopEndPosition) break          
           markers.push(
             <div
               key={`cycle-marker-${clipId}-${i}`}
@@ -483,7 +511,7 @@ export default function EditorTimeline({
     if (!isPendingAction) return null
     
     const actionType = pendingAction?.type || 'action'
-    const label = actionType === 'loop' ? 'Boucle' : 'Split'
+    const label = actionType === 'loop' ? 'Boucle' : actionType === 'split' ? 'Split' : 'Action'
     const icon = actionType === 'loop' ? '🔁' : '✂️'
     const color = actionType === 'loop' ? 'var(--accent)' : 'var(--warning)'
     
@@ -615,13 +643,38 @@ export default function EditorTimeline({
             flex: 1,
             position: 'relative',
             overflow: 'hidden',
-            cursor: isPendingAction ? 'pointer' : 'pointer'
+            cursor: isPendingAction || isTimelineClickModeActive ? 'pointer' : 'pointer'
           }}
           onClick={handleRulerClick}
           onDoubleClick={handleRulerDoubleClick}
           onWheel={handleRulerWheel}
         >
           {renderPendingIndicator()}
+          
+          {/* ✅ Indicateur du mode clic timeline */}
+          {isTimelineClickModeActive && (
+            <div style={{
+              position: 'absolute',
+              top: 4,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 20,
+              padding: '4px 16px',
+              background: 'var(--accent)',
+              borderRadius: 'var(--radius-md)',
+              color: 'white',
+              fontSize: 11,
+              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              boxShadow: '0 4px 20px var(--accent)66',
+              animation: 'pulseIndicator 1.5s ease-in-out infinite'
+            }}>
+              <i className="ti ti-click" />
+              <span>{'🖱️ Mode clic - Cliquez sur la timeline'}</span>
+            </div>
+          )}
           
           <div
             ref={rulerInnerRef}
@@ -656,7 +709,7 @@ export default function EditorTimeline({
         </div>
       </div>
 
-      {/* Loop */}
+      {/* ✅ Loop - TimelineLoop avec nouvelles props */}
       <div style={{
         display: 'flex',
         height: 10,
@@ -692,11 +745,22 @@ export default function EditorTimeline({
             <TimelineLoop
               loopRegion={loopRegion}
               pixelsPerSecond={pixelsPerSecond}
-              onSetLoopRegion={onSetLoopRegion}
-              onClearLoop={onClearLoop}
-              onToggleLoop={onToggleLoop}
+              onSetLoopRegion={(start, end) => {
+                onSetLoopRegion?.(start, end)
+                onSetTimelineLoop?.({ start, end })
+              }}
+              onClearLoop={() => {
+                onClearLoop?.()
+                onSetTimelineLoop?.({ enabled: false, start: 0, end: 10 })
+              }}
+              onToggleLoop={() => {
+                onToggleTimelineLoop?.()
+              }}
               tr={tr}
               totalDuration={totalDuration}
+              loopState={loopState}
+              onOpenLoopPanel={onOpenLoopPanel}
+              onActivateManualClick={onActivateTimelineLoopManualClick}
             />
           </div>
         </div>
@@ -786,7 +850,7 @@ export default function EditorTimeline({
             overflow: 'auto',
             position: 'relative',
             background: 'var(--bg-primary)',
-            cursor: isPendingAction ? 'pointer' : 'pointer'
+            cursor: isPendingAction || isTimelineClickModeActive ? 'pointer' : 'pointer'
           }}
           onClick={handleTimelineClick}
           onScroll={handleClipsScroll}
@@ -852,7 +916,6 @@ export default function EditorTimeline({
                   onCopyClip={onCopyClip}
                   onCutClip={onCutClip}
                   onPasteClip={onPasteClip}
-                  // ✅ TRANSMETTRE loopState AU TRACK
                   loopState={loopState}
                 />
               )
