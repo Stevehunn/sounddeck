@@ -392,7 +392,7 @@ export function EditorProvider({ children, store, addToast }) {
     }
   }, [loadAudioBuffer, currentTime, autoCrossfade, findPreviousClip, calculateOverlap])
 
-  // ✅ startPlaybackLoop - CORRIGÉE avec support de la boucle générale
+  // ✅ startPlaybackLoop - CORRIGÉE avec boucle générale cyclique
   const startPlaybackLoop = useCallback(() => {
     console.log('[LOOP-FIX] 🔄 startPlaybackLoop() appelée')
     
@@ -412,8 +412,9 @@ export function EditorProvider({ children, store, addToast }) {
     const startingClips = new Set()
     // ✅ Suivi des clips démarrés dans ce frame
     const clipsStartedThisFrame = new Set()
-    // ✅ Suivi du nombre de cycles de boucle générale
-    let loopCycleCount = 0
+    // ✅ Suivi des clips déjà joués dans le cycle actuel
+    const clipsPlayedThisCycle = new Set()
+    let currentCycleNumber = -1
 
     const loop = () => {
       // ✅ Vérifier l'état de lecture
@@ -430,44 +431,86 @@ export function EditorProvider({ children, store, addToast }) {
       accumulated += delta
 
       if (accumulated >= 0.016) {
-        let newTime = currentTimeRef.current + accumulated
+        // ✅ Le temps global continue d'avancer
+        let globalTime = currentTimeRef.current + accumulated
         accumulated = 0
         frameCount++
         
         // ✅ Réinitialiser les clips démarrés ce frame
         clipsStartedThisFrame.clear()
         
-        const timelineLoop = loopState?.timeline || { enabled: false, start: 0, end: 10 }
-        const loopStart = timelineLoop.start || 0
-        const loopEnd = timelineLoop.end || totalDuration
+        const timelineLoop = loopState?.timeline || { 
+          enabled: false, 
+          start: 0, 
+          end: 10,
+          durationMode: 'cycles',
+          cycleCount: 3,
+          manualDuration: 10,
+          manualTime: 10
+        }
         
-        // ✅ Gestion de la boucle générale de la timeline
-        if (timelineLoop.enabled && newTime >= loopEnd) {
-          loopCycleCount++
-          console.log(`[LOOP-FIX] 🔄 Boucle TIMELINE #${loopCycleCount}: retour à ${loopStart.toFixed(2)}s`)
-          newTime = loopStart
+        const loopStart = timelineLoop.start || 0
+        const loopEnd = timelineLoop.end || 10
+        const loopTotalDuration = Math.max(0.1, loopEnd - loopStart)
+        
+        // ✅ Calcul de la durée maximale en fonction du mode
+        let maxLoopDuration = loopTotalDuration
+        const cycleCount = timelineLoop.cycleCount || 3
+        const manualDuration = timelineLoop.manualDuration || 10
+        
+        if (timelineLoop.durationMode === 'cycles') {
+          maxLoopDuration = loopTotalDuration * cycleCount
+        } else if (timelineLoop.durationMode === 'manualDuration') {
+          maxLoopDuration = manualDuration
+        } else if (timelineLoop.durationMode === 'manualTime') {
+          maxLoopDuration = timelineLoop.manualTime || 10
+        }
+        
+        // ✅ Vérifier si la boucle est active et si on est dans la zone
+        const elapsedSinceLoopStart = globalTime - loopStart
+        const isInLoopZone = timelineLoop.enabled && 
+          elapsedSinceLoopStart >= 0 && 
+          elapsedSinceLoopStart < maxLoopDuration
+        
+        // ✅ Calculer la position cyclique dans la boucle (pour les clips dans la zone)
+        let loopTime = globalTime
+        let currentCycle = -1
+        if (isInLoopZone) {
+          // ✅ Position cyclique dans la boucle
+          const positionInCycle = elapsedSinceLoopStart % loopTotalDuration
+          currentCycle = Math.floor(elapsedSinceLoopStart / loopTotalDuration)
+          loopTime = loopStart + positionInCycle
           
-          // ✅ Ne pas arrêter les sources audio, juste avancer le temps
-          // Les clips seront relancés normalement via la logique ci-dessous
+          // ✅ Si on change de cycle, réinitialiser les clips joués
+          if (currentCycle !== currentCycleNumber) {
+            currentCycleNumber = currentCycle
+            clipsPlayedThisCycle.clear()
+            console.log(`[LOOP-FIX] 🔄 Nouveau cycle ${currentCycle + 1} à ${globalTime.toFixed(2)}s, durée restante: ${(maxLoopDuration - elapsedSinceLoopStart).toFixed(2)}s`)
+          }
+        }
+        
+        // ✅ LOG pour debug (toutes les 30 frames)
+        if (frameCount % 30 === 0) {
+          console.log('[LOOP-FIX] 📊 Timeline loop:', {
+            enabled: timelineLoop.enabled,
+            globalTime: globalTime.toFixed(2),
+            loopTime: loopTime.toFixed(2),
+            loopStart: loopStart.toFixed(2),
+            loopEnd: loopEnd.toFixed(2),
+            maxDuration: maxLoopDuration.toFixed(2),
+            isInLoopZone,
+            elapsed: elapsedSinceLoopStart.toFixed(2),
+            positionInCycle: (elapsedSinceLoopStart % loopTotalDuration).toFixed(2),
+            currentCycle,
+            soloClipId: soloPlayClipIdRef.current,
+            clipsPlayedThisCycle: Array.from(clipsPlayedThisCycle)
+          })
         }
         
         if (projectRef.current?.tracks) {
           const tracks = projectRef.current.tracks
           const activeClips = new Set()
           const soloClipId = soloPlayClipIdRef.current
-          
-          // ✅ LOG : État des boucles à chaque frame (toutes les 10 frames)
-          if (frameCount % 10 === 0) {
-            console.log('[LOOP-FIX] 📊 État des boucles - frame', frameCount, {
-              timelineLoop: timelineLoop.enabled,
-              loopCycle: loopCycleCount,
-              loopStateClips: Object.keys(loopState?.clips || {}).filter(k => loopState.clips[k]?.enabled),
-              audioSources: Object.keys(audioSourcesRef.current),
-              lastPlayed: Array.from(lastPlayedClipsRef.current),
-              startingClips: Array.from(startingClips),
-              currentTime: newTime.toFixed(2)
-            })
-          }
           
           for (const track of tracks) {
             if (track.muted) continue
@@ -477,10 +520,36 @@ export function EditorProvider({ children, store, addToast }) {
               const start = clip.start || 0
               const end = start + duration
               
+              // ✅ Pour les clips hors zone, on utilise globalTime
+              // ✅ Pour les clips dans la zone, on utilise loopTime (cyclique)
+              let effectiveTime = globalTime
+              let isUsingLoopTime = false
+              
+              // ✅ Si on est dans la zone de boucle ET que le clip est dans la zone originale
+              if (isInLoopZone) {
+                // ✅ Vérifier si le clip est dans la zone de boucle originale
+                const isClipInOriginalZone = start >= loopStart && end <= loopEnd
+                const isClipOverlappingZone = (start >= loopStart && start < loopEnd) || 
+                                              (end > loopStart && end <= loopEnd) ||
+                                              (start <= loopStart && end >= loopEnd)
+                
+                // ✅ Si le clip est dans la zone originale ou la chevauche, on utilise loopTime
+                if (isClipInOriginalZone || isClipOverlappingZone) {
+                  effectiveTime = loopTime
+                  isUsingLoopTime = true
+                }
+                // ✅ Sinon, on utilise globalTime (pour les clips après la zone)
+              }
+              
               // ✅ Vérifier si le clip est dans la zone de boucle générale
-              const isInTimelineLoop = timelineLoop.enabled && 
-                newTime >= loopStart && 
-                newTime < loopEnd
+              const isClipInLoopZone = isUsingLoopTime && 
+                effectiveTime >= start && 
+                effectiveTime < end
+              
+              // ✅ Vérifier si le clip est hors zone mais doit être joué normalement
+              const isClipOutsideLoop = !isUsingLoopTime && 
+                effectiveTime >= start && 
+                effectiveTime < end
               
               const isClipLooping = loopState?.clips?.[clip.id]?.enabled || false
               const clipLoopData = loopState?.clips?.[clip.id]
@@ -488,13 +557,26 @@ export function EditorProvider({ children, store, addToast }) {
               const clipLoopEnd = clipLoopData?.end || end
               
               let shouldPlay = false
-              let clipTime = newTime
+              let clipTime = effectiveTime
               let shouldRestart = false
+              let isCurrentlyPlaying = false
+              let isOutsideLoop = false
               
-              // ✅ Si le clip est en boucle individuelle
-              if (isClipLooping) {
-                if (newTime >= clipLoopStart && newTime < clipLoopEnd) {
-                  const elapsedInLoop = newTime - clipLoopStart
+              // ✅ Si un clip est en mode solo, on ne joue que celui-ci
+              if (soloClipId) {
+                if (clip.id === soloClipId) {
+                  // ✅ Le clip solo est joué normalement avec le temps global
+                  if (globalTime >= start && globalTime < end) {
+                    shouldPlay = true
+                    clipTime = globalTime
+                    console.log(`[LOOP-FIX] 🎵 ${clip.name} - Lecture solo à ${clipTime.toFixed(2)}s`)
+                  }
+                }
+                // ✅ Les autres clips sont ignorés en mode solo
+              } else if (isClipLooping) {
+                // ✅ Si le clip est en boucle individuelle
+                if (effectiveTime >= clipLoopStart && effectiveTime < clipLoopEnd) {
+                  const elapsedInLoop = effectiveTime - clipLoopStart
                   const clipDuration = end - start
                   const positionInClip = elapsedInLoop % clipDuration
                   
@@ -504,28 +586,25 @@ export function EditorProvider({ children, store, addToast }) {
                     shouldPlay = true
                     clipTime = clipLoopStart + positionInClip
                     
-                    const isCurrentlyPlaying = audioSourcesRef.current[clip.id] !== undefined
+                    isCurrentlyPlaying = audioSourcesRef.current[clip.id] !== undefined
                     const isStarting = startingClips.has(clip.id)
-                    const isNearCycleStart = positionInClip < 0.05
                     
-                    if (isNearCycleStart || !isCurrentlyPlaying) {
-                      console.log(`[LOOP-FIX] 🔁 Clip "${clip.name}" - position: ${positionInClip.toFixed(3)}s, isPlaying: ${isCurrentlyPlaying}, isStarting: ${isStarting}, nearStart: ${isNearCycleStart}`)
-                    }
+                    const clipKey = `${clip.id}-cycle-${currentCycle}`
+                    const alreadyPlayedThisCycle = clipsPlayedThisCycle.has(clipKey)
                     
-                    if (!isCurrentlyPlaying && !isStarting) {
+                    if (!isCurrentlyPlaying && !isStarting && !alreadyPlayedThisCycle) {
                       if (!clipsStartedThisFrame.has(clip.id)) {
                         shouldRestart = true
                         startingClips.add(clip.id)
                         clipsStartedThisFrame.add(clip.id)
+                        clipsPlayedThisCycle.add(clipKey)
                         console.log(`[LOOP-FIX] 🚀 ${clip.name} - Nouveau lancement (cycle ${Math.floor(elapsedInLoop / clipDuration) + 1})`)
-                      } else {
-                        console.log(`[LOOP-FIX] ⏭️ ${clip.name} - Déjà lancé dans ce frame, ignoré`)
                       }
                     }
                   }
-                } else if (newTime >= clipLoopEnd) {
+                } else if (effectiveTime >= clipLoopEnd) {
                   if (lastPlayedClipsRef.current.has(clip.id)) {
-                    console.log(`[LOOP-FIX] 🛑 ${clip.name} - Fin de la boucle à ${newTime.toFixed(2)}s`)
+                    console.log(`[LOOP-FIX] 🛑 ${clip.name} - Fin de la boucle à ${effectiveTime.toFixed(2)}s`)
                     const entry = audioSourcesRef.current[clip.id]
                     if (entry) {
                       try { 
@@ -538,58 +617,105 @@ export function EditorProvider({ children, store, addToast }) {
                     startingClips.delete(clip.id)
                   }
                 }
-              } else if (soloClipId) {
-                if (clip.id === soloClipId && newTime >= start && newTime < end) {
-                  shouldPlay = true
+              } else if (isClipInLoopZone) {
+                // ✅ Clip dans la zone de boucle générale (pas en solo)
+                shouldPlay = true
+                clipTime = effectiveTime
+                
+                const clipKey = `${clip.id}-cycle-${currentCycle}`
+                const alreadyPlayedThisCycle = clipsPlayedThisCycle.has(clipKey)
+                
+                isCurrentlyPlaying = audioSourcesRef.current[clip.id] !== undefined
+                const isStarting = startingClips.has(clip.id)
+                
+                // ✅ Ne jouer que si le clip n'a pas déjà été joué dans ce cycle
+                if (!alreadyPlayedThisCycle && !isCurrentlyPlaying && !isStarting) {
+                  if (!clipsStartedThisFrame.has(clip.id)) {
+                    clipsPlayedThisCycle.add(clipKey)
+                    clipsStartedThisFrame.add(clip.id)
+                    console.log(`[LOOP-FIX] 🔄 ${clip.name} - Lancement en boucle générale (cycle ${currentCycle + 1}) à ${clipTime.toFixed(2)}s`)
+                    playClip(clip, track)
+                    lastPlayedClipsRef.current.add(clip.id)
+                  }
                 }
-              } else {
-                // ✅ Clip normal - vérifier s'il doit être joué
-                // S'il est dans la zone de boucle générale, on joue normalement
-                // Sinon, on ne joue que si le temps est entre start et end
-                if (isInTimelineLoop || (newTime >= start && newTime < end)) {
-                  shouldPlay = true
-                }
+              } else if (isClipOutsideLoop) {
+                // ✅ Clip hors zone de boucle - joué normalement
+                shouldPlay = true
+                clipTime = effectiveTime
+                isOutsideLoop = true
+                console.log(`[LOOP-FIX] ▶️ ${clip.name} (${clip.id}) - Lancement hors zone à ${clipTime.toFixed(2)}s`)
               }
               
-              if (shouldPlay) {
+              // ✅ Gestion des lancements et arrêts
+              if (shouldPlay && !isClipLooping && !soloClipId) {
                 activeClips.add(clip.id)
                 
-                if (!isClipLooping && !lastPlayedClipsRef.current.has(clip.id)) {
-                  // ✅ Clip normal - lancement unique
+                if (!lastPlayedClipsRef.current.has(clip.id)) {
                   console.log(`[LOOP-FIX] ▶️ ${clip.name} (${clip.id}) - Lancement à ${clipTime.toFixed(2)}s`)
                   playClip(clip, track)
                   lastPlayedClipsRef.current.add(clip.id)
-                } else if (isClipLooping && shouldRestart) {
-                  // ✅ Clip en boucle - relancement
-                  console.log(`[LOOP-FIX] ▶️ ${clip.name} (${clip.id}) - Lancement à ${clipTime.toFixed(2)}s [BOUCLE]`)
+                }
+              } else if (soloClipId && shouldPlay) {
+                // ✅ Clip solo - lancement
+                activeClips.add(clip.id)
+                if (!lastPlayedClipsRef.current.has(clip.id)) {
+                  console.log(`[LOOP-FIX] 🎵 ${clip.name} (${clip.id}) - Lancement solo à ${clipTime.toFixed(2)}s`)
                   playClip(clip, track)
                   lastPlayedClipsRef.current.add(clip.id)
-                  
-                  setTimeout(() => {
-                    startingClips.delete(clip.id)
-                  }, 100)
                 }
-              } else if (lastPlayedClipsRef.current.has(clip.id) && !isClipLooping) {
-                // ✅ Clip normal qui n'est plus actif - arrêt
-                console.log(`[LOOP-FIX] ⏹️ ${clip.name} - Arrêt (fini) à ${newTime.toFixed(2)}s`)
-                const entry = audioSourcesRef.current[clip.id]
-                if (entry) {
-                  try { 
-                    entry.source.stop() 
-                    entry.source.disconnect()
-                  } catch (e) {}
-                  delete audioSourcesRef.current[clip.id]
+              } else if (lastPlayedClipsRef.current.has(clip.id) && !isClipLooping && !soloClipId) {
+                // ✅ Clip qui n'est plus actif - arrêt
+                const isStillInLoopZone = isUsingLoopTime && 
+                  effectiveTime >= start && 
+                  effectiveTime < end
+                
+                const isStarting = startingClips.has(clip.id)
+                
+                if (!isStillInLoopZone && !isStarting && !isOutsideLoop) {
+                  console.log(`[LOOP-FIX] ⏹️ ${clip.name} - Arrêt (fini) à ${effectiveTime.toFixed(2)}s`)
+                  const entry = audioSourcesRef.current[clip.id]
+                  if (entry) {
+                    try { 
+                      entry.source.stop() 
+                      entry.source.disconnect()
+                    } catch (e) {}
+                    delete audioSourcesRef.current[clip.id]
+                  }
+                  lastPlayedClipsRef.current.delete(clip.id)
+                  startingClips.delete(clip.id)
                 }
-                lastPlayedClipsRef.current.delete(clip.id)
-                startingClips.delete(clip.id)
               }
             }
           }
         }
         
-        // ✅ La lecture continue même en boucle - on ne s'arrête pas
-        // Le temps continue d'avancer, la boucle est gérée par le reset du temps
-        setCurrentTime(newTime)
+        // ✅ Le temps global continue d'avancer
+        // ✅ Arrêter la lecture à la fin du projet
+        if (globalTime >= totalDuration) {
+          console.log(`[LOOP-FIX] ⏹️ Fin de la lecture globale à ${globalTime.toFixed(2)}s`)
+          setIsPlaying(false)
+          setCurrentTime(totalDuration)
+          setStopAtTime(null)
+          stopAtTimeRef.current = null
+          setSoloPlayClipId(null)
+          soloPlayClipIdRef.current = null
+          for (const [id, entry] of Object.entries(audioSourcesRef.current)) {
+            try { 
+              console.log(`[LOOP-FIX]   - Arrêt de la source (fin globale): ${id}`)
+              entry.source.stop() 
+              entry.source.disconnect()
+            } catch (e) {}
+          }
+          audioSourcesRef.current = {}
+          lastPlayedClipsRef.current = new Set()
+          startingClips.clear()
+          clipsPlayedThisCycle.clear()
+          isLoopRunning = false
+          return
+        }
+        
+        // ✅ Mettre à jour le temps global
+        setCurrentTime(globalTime)
       }
       
       if (isLoopRunning) {
@@ -600,12 +726,13 @@ export function EditorProvider({ children, store, addToast }) {
     lastTime = performance.now()
     accumulated = 0
     isLoopRunning = true
-    loopCycleCount = 0
+    currentCycleNumber = -1
     
     // ✅ NETTOYER TOUT AVANT DE DÉMARRER
     console.log('[LOOP-FIX] 🧹 Nettoyage avant démarrage')
     lastPlayedClipsRef.current = new Set()
     startingClips.clear()
+    clipsPlayedThisCycle.clear()
     for (const [id, entry] of Object.entries(audioSourcesRef.current)) {
       try { 
         console.log('[LOOP-FIX]   - Arrêt de la source:', id)
@@ -624,6 +751,9 @@ export function EditorProvider({ children, store, addToast }) {
   const play = useCallback(async () => {
     console.log('[LOOP-FIX] 🎬 play() appelé - RÉINITIALISATION TOTALE')
     
+    // ✅ S'assurer qu'on n'est pas en pause
+    setIsPaused(false)
+    isPausedRef.current = false
     setStopAtTime(null)
     stopAtTimeRef.current = null
     
@@ -631,7 +761,7 @@ export function EditorProvider({ children, store, addToast }) {
     console.log('[LOOP-FIX] 🔇 Arrêt de toutes les sources audio')
     for (const [id, entry] of Object.entries(audioSourcesRef.current)) {
       try { 
-        console.log('[LOOP-FIX]   - Arrêt de la source:', id)
+        console.log(`[LOOP-FIX]   - Arrêt de la source: ${id}`)
         entry.source.stop() 
         entry.source.disconnect()
       } catch (e) {}
@@ -650,12 +780,14 @@ export function EditorProvider({ children, store, addToast }) {
         await ctx.resume()
       }
       
-      // ✅ Remettre le temps à 0 si on joue depuis le début
+      // ✅ Remettre le temps à 0
       setCurrentTime(0)
       currentTimeRef.current = 0
       
       setIsPlaying(true)
+      isPlayingRef.current = true
       setIsPaused(false)
+      isPausedRef.current = false
       
       console.log('[LOOP-FIX] ▶️ Lecture démarrée, appel à startPlaybackLoop dans 50ms')
       
@@ -666,6 +798,7 @@ export function EditorProvider({ children, store, addToast }) {
     } catch (e) {
       console.error('[LOOP-FIX] ❌ Erreur dans play():', e)
       setIsPlaying(false)
+      isPlayingRef.current = false
     }
   }, [startPlaybackLoop])
 
@@ -694,7 +827,9 @@ export function EditorProvider({ children, store, addToast }) {
       }
       
       setIsPlaying(true)
+      isPlayingRef.current = true
       setIsPaused(false)
+      isPausedRef.current = false
       lastPlayedClipsRef.current = new Set()
       
       setTimeout(() => {
@@ -703,18 +838,46 @@ export function EditorProvider({ children, store, addToast }) {
       
     } catch (e) {
       setIsPlaying(false)
+      isPlayingRef.current = false
       setSoloPlayClipId(null)
       soloPlayClipIdRef.current = null
     }
   }, [clipDurations, startPlaybackLoop])
 
   const resume = useCallback(async () => {
-    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-      await audioContextRef.current.resume()
+    console.log('[LOOP-FIX] ▶️ resume() appelé - Reprise de la lecture')
+    console.log(`[LOOP-FIX]   - Position actuelle: ${currentTimeRef.current.toFixed(2)}s`)
+    console.log(`[LOOP-FIX]   - isPaused avant: ${isPausedRef.current}`)
+    
+    // ✅ S'assurer que le contexte audio est actif
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
     }
     
+    if (audioContextRef.current.state === 'suspended') {
+      await audioContextRef.current.resume()
+      console.log('[LOOP-FIX]   - AudioContext repris')
+    }
+    
+    // ✅ Mettre à jour les refs et les états
     setIsPaused(false)
+    isPausedRef.current = false
     setIsPlaying(true)
+    isPlayingRef.current = true
+    
+    // ✅ Réinitialiser les clips joués pour permettre un nouveau cycle
+    lastPlayedClipsRef.current = new Set()
+    
+    console.log(`[LOOP-FIX] ▶️ Reprise de la lecture à ${currentTimeRef.current.toFixed(2)}s`)
+    
+    // ✅ NE PAS réinitialiser le temps !
+    // ✅ NE PAS réinitialiser les sources audio !
+    
+    // ✅ Relancer la boucle d'animation
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current)
+      animationRef.current = null
+    }
     
     setTimeout(() => {
       startPlaybackLoop()
@@ -722,31 +885,45 @@ export function EditorProvider({ children, store, addToast }) {
   }, [startPlaybackLoop])
 
   const pause = useCallback(() => {
-    setIsPaused(true)
-    setIsPlaying(false)
+    console.log('[LOOP-FIX] ⏸️ pause() appelée')
+    console.log(`[LOOP-FIX]   - Position actuelle: ${currentTimeRef.current.toFixed(2)}s`)
+    console.log(`[LOOP-FIX]   - isPlaying avant: ${isPlayingRef.current}`)
     
+    // ✅ Mettre à jour les refs et les états
+    setIsPaused(true)
+    isPausedRef.current = true
+    setIsPlaying(false)
+    isPlayingRef.current = false
+    
+    // ✅ Arrêter l'animation
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current)
       animationRef.current = null
     }
     
+    // ✅ Suspendre le contexte audio mais garder les sources
     if (audioContextRef.current && audioContextRef.current.state === 'running') {
       audioContextRef.current.suspend().catch(() => {})
+      console.log('[LOOP-FIX]   - AudioContext suspendu')
     }
     
-    for (const [id, entry] of Object.entries(audioSourcesRef.current)) {
-      try { 
-        entry.source.stop() 
-        entry.source.disconnect()
-      } catch (e) {}
-    }
-    audioSourcesRef.current = {}
+    // ✅ IMPORTANT: Ne pas arrêter les sources audio en pause !
+    // Les sources restent en l'état pour pouvoir reprendre
+    
+    console.log(`[LOOP-FIX]   - isPausedRef après: ${isPausedRef.current}`)
+    console.log(`[LOOP-FIX]   - isPlayingRef après: ${isPlayingRef.current}`)
   }, [])
 
   const stop = useCallback(() => {
+    console.log('[LOOP-FIX] ⏹️ stop() appelée')
+    
+    // ✅ Mettre à jour les refs et les états
     setIsPlaying(false)
+    isPlayingRef.current = false
     setIsPaused(false)
+    isPausedRef.current = false
     setCurrentTime(0)
+    currentTimeRef.current = 0
     lastPlayedClipsRef.current = new Set()
     setStopAtTime(null)
     stopAtTimeRef.current = null
@@ -759,8 +936,10 @@ export function EditorProvider({ children, store, addToast }) {
       animationRef.current = null
     }
     
+    // ✅ Arrêter toutes les sources audio
     for (const [id, entry] of Object.entries(audioSourcesRef.current)) {
       try { 
+        console.log(`[LOOP-FIX]   - Arrêt de la source (stop): ${id}`)
         entry.source.stop() 
         entry.source.disconnect()
       } catch (e) {}
@@ -784,16 +963,38 @@ export function EditorProvider({ children, store, addToast }) {
   }, [totalDuration])
 
   const togglePlay = useCallback(() => {
-    if (isPlaying) {
+    console.log('[LOOP-FIX] 🔄 togglePlay() appelée')
+    console.log(`[LOOP-FIX]   - isPlayingRef: ${isPlayingRef.current}, isPausedRef: ${isPausedRef.current}`)
+    console.log(`[LOOP-FIX]   - isPlaying state: ${isPlaying}, isPaused state: ${isPaused}`)
+    
+    // ✅ Utiliser les refs pour l'état réel
+    const currentlyPlaying = isPlayingRef.current
+    const currentlyPaused = isPausedRef.current
+    
+    console.log(`[LOOP-FIX]   - currentlyPlaying: ${currentlyPlaying}, currentlyPaused: ${currentlyPaused}`)
+    
+    // ✅ Si on joue, on met en pause
+    if (currentlyPlaying) {
+      console.log('[LOOP-FIX]   ➜ Pause')
       pause()
-    } else if (isPaused) {
-      resume()
-    } else {
-      setSoloPlayClipId(null)
-      soloPlayClipIdRef.current = null
-      play()
+      return
     }
-  }, [isPlaying, isPaused, play, pause, resume])
+    
+    // ✅ Si on est en pause, on reprend
+    if (currentlyPaused) {
+      console.log('[LOOP-FIX]   ➜ Reprise')
+      resume()
+      return
+    }
+    
+    // ✅ Si on n'est ni en lecture ni en pause, on démarre depuis le début
+    console.log('[LOOP-FIX]   ➜ Démarrage depuis le début')
+    setSoloPlayClipId(null)
+    soloPlayClipIdRef.current = null
+    setCurrentTime(0)
+    currentTimeRef.current = 0
+    play()
+  }, [pause, resume, play])
 
   // ─── FONCTIONS TRACK ──────────────────────────────────────────────────
 
@@ -2289,6 +2490,10 @@ export function EditorProvider({ children, store, addToast }) {
     setIsPlaying,
     isPaused,
     setIsPaused,
+    // ✅ Exposer les refs pour que les composants enfants puissent lire l'état réel
+    isPlayingRef,
+    isPausedRef,
+    currentTimeRef,
     zoomLevel,
     setZoomLevel,
     snapEnabled,
@@ -2348,6 +2553,7 @@ export function EditorProvider({ children, store, addToast }) {
     setClipFade,
     play,
     pause,
+    resume,
     stop,
     seek,
     togglePlay,

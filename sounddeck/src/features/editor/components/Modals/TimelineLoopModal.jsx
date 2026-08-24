@@ -14,11 +14,10 @@ const LOOP_COLORS = [
   { id: 'yellow', color: '#eab308', label: 'Jaune' },
 ]
 
-// ✅ Options pour la durée (comme pour le clip)
+// ✅ Options pour la durée (simplifiée)
 const DURATION_OPTIONS = [
   { id: 'cycles', label: 'Nombre de cycles', icon: 'ti-repeat' },
   { id: 'manualDuration', label: 'Durée manuelle', icon: 'ti-clock' },
-  { id: 'manualTime', label: 'Temps manuel', icon: 'ti-pencil' },
 ]
 
 export default function TimelineLoopModal({
@@ -29,7 +28,6 @@ export default function TimelineLoopModal({
   currentTime,
   totalDuration,
   tr,
-  // ✅ Props pour le mode clic
   onActivateClickMode,
   isClickModeActive,
   clickModeData
@@ -44,7 +42,6 @@ export default function TimelineLoopModal({
     durationMode: 'cycles',
     cycleCount: 3,
     manualDuration: 10,
-    manualTime: 10
   }
 
   // ✅ États locaux
@@ -53,7 +50,6 @@ export default function TimelineLoopModal({
   const [durationMode, setDurationMode] = useState(timelineLoop.durationMode || 'cycles')
   const [cycleCount, setCycleCount] = useState(timelineLoop.cycleCount || 3)
   const [manualDuration, setManualDuration] = useState(timelineLoop.manualDuration || 10)
-  const [manualTime, setManualTime] = useState(timelineLoop.manualTime || 10)
   const [startValue, setStartValue] = useState(timelineLoop.start || 0)
   const [endValue, setEndValue] = useState(timelineLoop.end || 10)
   const [showColorPicker, setShowColorPicker] = useState(false)
@@ -67,9 +63,10 @@ export default function TimelineLoopModal({
       setDurationMode(timelineLoop.durationMode || 'cycles')
       setCycleCount(timelineLoop.cycleCount || 3)
       setManualDuration(timelineLoop.manualDuration || 10)
-      setManualTime(timelineLoop.manualTime || 10)
       setStartValue(timelineLoop.start || 0)
       setEndValue(timelineLoop.end || 10)
+      // ✅ Par défaut on est en mode manuel
+      setSelectionMode('manual')
     }
   }, [isOpen, timelineLoop])
 
@@ -83,17 +80,10 @@ export default function TimelineLoopModal({
         setEndValue(clickModeData.end)
       }
       if (clickModeData.duration !== undefined) {
-        // Si on a une durée, on la convertit en mode approprié
-        if (durationMode === 'cycles') {
-          // On garde le mode cycles mais on ajuste
-        } else if (durationMode === 'manualDuration') {
-          setManualDuration(clickModeData.duration)
-        } else if (durationMode === 'manualTime') {
-          setManualTime(clickModeData.duration)
-        }
+        setManualDuration(clickModeData.duration)
       }
     }
-  }, [clickModeData, isClickModeActive, durationMode])
+  }, [clickModeData, isClickModeActive])
 
   if (!isOpen) return null
 
@@ -103,34 +93,31 @@ export default function TimelineLoopModal({
   const effectiveDuration = Math.max(0.1, effectiveEnd - effectiveStart)
 
   // ✅ Calculer la durée en fonction du mode
-  const getDurationValue = () => {
+  const getTotalDuration = () => {
     switch (durationMode) {
       case 'cycles':
-        return manualDuration * cycleCount
+        return effectiveDuration * cycleCount
       case 'manualDuration':
         return manualDuration
-      case 'manualTime':
-        return manualTime
       default:
-        return 10
+        return effectiveDuration
     }
   }
 
   const handleApply = () => {
     const finalStart = startValue
     const finalEnd = Math.max(finalStart + 0.5, endValue)
-    const finalDuration = finalEnd - finalStart
+    const totalDurationValue = getTotalDuration()
     
     console.log('🔄 [TimelineLoopModal] Application:', {
       enabled,
       start: finalStart,
       end: finalEnd,
-      duration: finalDuration,
+      totalDuration: totalDurationValue,
       color,
       durationMode,
       cycleCount,
-      manualDuration,
-      manualTime
+      manualDuration
     })
     
     onApply({
@@ -141,7 +128,6 @@ export default function TimelineLoopModal({
       durationMode,
       cycleCount: durationMode === 'cycles' ? cycleCount : undefined,
       manualDuration: durationMode === 'manualDuration' || durationMode === 'cycles' ? manualDuration : undefined,
-      manualTime: durationMode === 'manualTime' ? manualTime : undefined
     })
     
     onClose()
@@ -162,7 +148,7 @@ export default function TimelineLoopModal({
     console.log('🖱️ [TimelineLoopModal] Activation du mode clic')
     setSelectionMode('click')
     if (onActivateClickMode) {
-      onActivateClickMode()
+      onActivateClickMode(true)
     }
   }
 
@@ -171,7 +157,6 @@ export default function TimelineLoopModal({
     console.log('🖱️ [TimelineLoopModal] Désactivation du mode clic')
     setSelectionMode('manual')
     if (onActivateClickMode) {
-      // On passe en mode manuel avec les valeurs du clic
       onActivateClickMode(false)
     }
   }
@@ -501,197 +486,155 @@ export default function TimelineLoopModal({
           )}
         </div>
 
-        {/* ✅ SECTION 3 : Durée de la boucle */}
-        <div style={{
-          background: 'var(--bg-tertiary)',
-          borderRadius: 'var(--radius-md)',
-          padding: 12,
-          marginBottom: 16
-        }}>
+        {/* ✅ SECTION 3 : Durée de la boucle (UNIQUEMENT en mode manuel) */}
+        {!isClickActive && (
           <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            marginBottom: 10
+            background: 'var(--bg-tertiary)',
+            borderRadius: 'var(--radius-md)',
+            padding: 12,
+            marginBottom: 16
           }}>
-            <i className="ti ti-clock" style={{ color: 'var(--accent)' }} />
-            <span style={{ fontSize: 13, fontWeight: 500 }}>
-              {tr('loopDuration') || 'Durée de la boucle'}
-            </span>
-            <span style={{
-              fontSize: 10,
-              color: 'var(--text-tertiary)',
-              fontFamily: 'monospace',
-              marginLeft: 'auto'
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 10
             }}>
-              {formatTime(effectiveDuration)}
-            </span>
-          </div>
+              <i className="ti ti-clock" style={{ color: 'var(--accent)' }} />
+              <span style={{ fontSize: 13, fontWeight: 500 }}>
+                {tr('loopDuration') || 'Durée de la boucle'}
+              </span>
+              <span style={{
+                fontSize: 10,
+                color: 'var(--text-tertiary)',
+                fontFamily: 'monospace',
+                marginLeft: 'auto'
+              }}>
+                {formatTime(getTotalDuration())}
+              </span>
+            </div>
 
-          {/* Options de durée */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {DURATION_OPTIONS.map(opt => (
-              <label
-                key={opt.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '3px 8px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: `1px solid ${durationMode === opt.id ? 'var(--accent)' : 'var(--border)'}`,
-                  background: durationMode === opt.id ? 'var(--accent-light)' : 'transparent',
-                  cursor: 'pointer',
-                  fontSize: 10,
-                  flex: 1,
-                  minWidth: 100
-                }}
-              >
+            {/* Options de durée simplifiées */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {DURATION_OPTIONS.map(opt => (
+                <label
+                  key={opt.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '3px 8px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: `1px solid ${durationMode === opt.id ? 'var(--accent)' : 'var(--border)'}`,
+                    background: durationMode === opt.id ? 'var(--accent-light)' : 'transparent',
+                    cursor: 'pointer',
+                    fontSize: 10,
+                    flex: 1,
+                    minWidth: 100
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="durationMode"
+                    checked={durationMode === opt.id}
+                    onChange={() => setDurationMode(opt.id)}
+                    style={{ width: 'auto', accentColor: 'var(--accent)', margin: 0 }}
+                  />
+                  <i className={`ti ${opt.icon}`} style={{ fontSize: 11, color: 'var(--text-secondary)' }} />
+                  <span>{opt.label}</span>
+                </label>
+              ))}
+            </div>
+
+            {/* ✅ Paramètres supplémentaires selon le mode */}
+            {durationMode === 'cycles' && (
+              <div style={{
+                marginTop: 8,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 10px',
+                background: 'var(--bg-secondary)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)'
+              }}>
+                <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                  {tr('cycleCount') || 'Nombre de cycles'}:
+                </span>
                 <input
-                  type="radio"
-                  name="durationMode"
-                  checked={durationMode === opt.id}
-                  onChange={() => setDurationMode(opt.id)}
-                  style={{ width: 'auto', accentColor: 'var(--accent)', margin: 0 }}
+                  type="number"
+                  min="1"
+                  max="999"
+                  value={cycleCount}
+                  onChange={(e) => setCycleCount(Math.max(1, parseInt(e.target.value) || 1))}
+                  style={{
+                    width: 60,
+                    padding: '2px 6px',
+                    fontSize: 11,
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    textAlign: 'center'
+                  }}
                 />
-                <i className={`ti ${opt.icon}`} style={{ fontSize: 11, color: 'var(--text-secondary)' }} />
-                <span>{opt.label}</span>
-              </label>
-            ))}
+                <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>cycles</span>
+                <span style={{
+                  fontSize: 9,
+                  color: 'var(--text-tertiary)',
+                  marginLeft: 'auto',
+                  fontFamily: 'monospace'
+                }}>
+                  → {formatTime(effectiveDuration * cycleCount)}
+                </span>
+              </div>
+            )}
+
+            {durationMode === 'manualDuration' && (
+              <div style={{
+                marginTop: 8,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 10px',
+                background: 'var(--bg-secondary)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)'
+              }}>
+                <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                  {tr('duration') || 'Durée totale (s)'}:
+                </span>
+                <input
+                  type="number"
+                  min="0.1"
+                  max="999"
+                  step="0.1"
+                  value={manualDuration}
+                  onChange={(e) => setManualDuration(Math.max(0.1, parseFloat(e.target.value) || 0.1))}
+                  style={{
+                    width: 80,
+                    padding: '2px 6px',
+                    fontSize: 11,
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    textAlign: 'center'
+                  }}
+                />
+                <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>secondes</span>
+                <span style={{
+                  fontSize: 9,
+                  color: 'var(--text-tertiary)',
+                  marginLeft: 'auto',
+                  fontFamily: 'monospace'
+                }}>
+                  → {formatTime(manualDuration)}
+                </span>
+              </div>
+            )}
           </div>
-
-          {/* ✅ Paramètres supplémentaires selon le mode */}
-          {durationMode === 'cycles' && (
-            <div style={{
-              marginTop: 8,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '6px 10px',
-              background: 'var(--bg-secondary)',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border)'
-            }}>
-              <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                {tr('cycleCount') || 'Nombre de cycles'}:
-              </span>
-              <input
-                type="number"
-                min="1"
-                max="999"
-                value={cycleCount}
-                onChange={(e) => setCycleCount(Math.max(1, parseInt(e.target.value) || 1))}
-                style={{
-                  width: 60,
-                  padding: '2px 6px',
-                  fontSize: 11,
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg-primary)',
-                  color: 'var(--text-primary)',
-                  textAlign: 'center'
-                }}
-              />
-              <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>cycles</span>
-              <span style={{
-                fontSize: 9,
-                color: 'var(--text-tertiary)',
-                marginLeft: 'auto',
-                fontFamily: 'monospace'
-              }}>
-                → {formatTime(manualDuration * cycleCount)}
-              </span>
-            </div>
-          )}
-
-          {durationMode === 'manualDuration' && (
-            <div style={{
-              marginTop: 8,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '6px 10px',
-              background: 'var(--bg-secondary)',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border)'
-            }}>
-              <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                {tr('duration') || 'Durée (s)'}:
-              </span>
-              <input
-                type="number"
-                min="0.1"
-                max="999"
-                step="0.1"
-                value={manualDuration}
-                onChange={(e) => setManualDuration(Math.max(0.1, parseFloat(e.target.value) || 0.1))}
-                style={{
-                  width: 80,
-                  padding: '2px 6px',
-                  fontSize: 11,
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg-primary)',
-                  color: 'var(--text-primary)',
-                  textAlign: 'center'
-                }}
-              />
-              <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>secondes</span>
-              <span style={{
-                fontSize: 9,
-                color: 'var(--text-tertiary)',
-                marginLeft: 'auto',
-                fontFamily: 'monospace'
-              }}>
-                → {formatTime(manualDuration)}
-              </span>
-            </div>
-          )}
-
-          {durationMode === 'manualTime' && (
-            <div style={{
-              marginTop: 8,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '6px 10px',
-              background: 'var(--bg-secondary)',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border)'
-            }}>
-              <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                {tr('manualTime') || 'Temps (s)'}:
-              </span>
-              <input
-                type="number"
-                min="0.1"
-                max={totalDuration}
-                step="0.1"
-                value={manualTime}
-                onChange={(e) => setManualTime(Math.max(0.1, Math.min(parseFloat(e.target.value) || 0.1, totalDuration)))}
-                style={{
-                  width: 80,
-                  padding: '2px 6px',
-                  fontSize: 11,
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg-primary)',
-                  color: 'var(--text-primary)',
-                  textAlign: 'center'
-                }}
-              />
-              <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>secondes</span>
-              <span style={{
-                fontSize: 9,
-                color: 'var(--text-tertiary)',
-                marginLeft: 'auto',
-                fontFamily: 'monospace'
-              }}>
-                → {formatTime(manualTime)}
-              </span>
-            </div>
-          )}
-        </div>
+        )}
 
         {/* ✅ Aperçu de la zone */}
         <div style={{
@@ -714,7 +657,7 @@ export default function TimelineLoopModal({
             {formatTime(effectiveStart)} → {formatTime(effectiveEnd)}
           </span>
           <span style={{ fontSize: 10, color, fontFamily: 'monospace' }}>
-            ⌛ {formatTime(effectiveDuration)}
+            ⌛ {formatTime(getTotalDuration())}
           </span>
         </div>
 
@@ -773,7 +716,7 @@ export default function TimelineLoopModal({
           gap: 6
         }}>
           <i className="ti ti-info-circle" style={{ color: 'var(--accent)' }} />
-          <span>{tr('timelineLoopNote') || 'La boucle répète tous les clips dans la zone définie. Le temps continue d\'avancer.'}</span>
+          <span>{tr('timelineLoopNote') || 'La boucle répète les clips dans la zone définie. Le temps continue d\'avancer.'}</span>
         </div>
       </div>
     </div>

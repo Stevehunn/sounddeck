@@ -87,10 +87,11 @@ function EditorTimelineContent() {
     setProject,
     tracks,
     selectedClipId,
-    selectedTrackId,
     setSelectedClipId,
+    selectedTrackId,
     setSelectedTrackId,
     currentTime,
+    setCurrentTime,
     isPlaying,
     isPaused,
     totalDuration,
@@ -113,6 +114,7 @@ function EditorTimelineContent() {
     splitClip,
     play,
     pause,
+    resume,
     stop,
     seek,
     togglePlay,
@@ -141,6 +143,12 @@ function EditorTimelineContent() {
     setTimelineLoop,
     toggleTimelineLoop,
     activateTimelineLoopManualClick,
+    // ✅ Récupérer les refs du contexte
+    isPlayingRef,
+    isPausedRef,
+    currentTimeRef,
+    // ✅ Récupérer setSoloPlayClipId
+    setSoloPlayClipId,
   } = context
 
   // ─── ÉTATS LOCAUX ──────────────────────────────────────────────────────
@@ -228,15 +236,35 @@ function EditorTimelineContent() {
     }
   }, [addTrack, addToast])
 
+  // ✅ handlePlayToggle CORRIGÉE - utilise les refs du contexte
   const handlePlayToggle = useCallback(() => {
-    if (isPlaying) {
+    console.log('[LOOP-FIX] 🎯 handlePlayToggle() appelée')
+    console.log(`[LOOP-FIX]   - isPlaying: ${isPlaying}, isPaused: ${isPaused}`)
+    
+    // ✅ Utiliser les refs du contexte pour avoir l'état réel
+    const currentlyPlaying = isPlayingRef?.current ?? isPlaying
+    const currentlyPaused = isPausedRef?.current ?? isPaused
+    
+    console.log(`[LOOP-FIX]   - currentlyPlaying: ${currentlyPlaying}, currentlyPaused: ${currentlyPaused}`)
+    
+    if (currentlyPlaying) {
+      // ✅ Si on joue, on met en pause
+      console.log('[LOOP-FIX]   ➜ Pause')
       pause()
-    } else if (isPaused) {
-      play()
+    } else if (currentlyPaused) {
+      // ✅ Si on est en pause, on reprend
+      console.log('[LOOP-FIX]   ➜ Reprise')
+      resume()
     } else {
+      // ✅ Si on n'est ni en lecture ni en pause, on démarre depuis le début
+      console.log('[LOOP-FIX]   ➜ Démarrage depuis le début')
+      // ✅ S'assurer qu'on est bien à 0
+      setCurrentTime(0)
+      if (currentTimeRef) currentTimeRef.current = 0
+      setSoloPlayClipId(null)
       play()
     }
-  }, [isPlaying, isPaused, play, pause])
+  }, [isPlaying, isPaused, pause, resume, play, isPlayingRef, isPausedRef, currentTimeRef, setCurrentTime, setSoloPlayClipId])
 
   const handleRemoveTrack = useCallback(async (trackId) => {
     try {
@@ -821,6 +849,15 @@ function EditorTimelineContent() {
       return
     }
     
+    // ✅ Récupérer le clip pour connaître sa position actuelle
+    const clip = getClipById(tracks, clipId)
+    if (!clip) {
+      console.warn('⬆️ [Editor] Clip non trouvé')
+      return
+    }
+    
+    const currentStart = clip.start || 0
+    
     const targetTrackIndex = currentTrackIndex - 1
     const targetTrack = tracks[targetTrackIndex]
     
@@ -829,8 +866,12 @@ function EditorTimelineContent() {
       return
     }
     
-    moveClip(trackId, clipId, 0, targetTrack.id)
+    // ✅ Déplacer le clip vers la piste du dessus en conservant sa position
+    moveClip(trackId, clipId, currentStart, targetTrack.id)
+    
+    // ✅ Mettre à jour la sélection
     setSelectedTrackId(targetTrack.id)
+    
     addToast?.(t('editorClipMovedUp') || 'Clip déplacé vers le haut', 'info')
   }, [tracks, moveClip, setSelectedTrackId, addToast, t])
 
@@ -843,6 +884,15 @@ function EditorTimelineContent() {
       return
     }
     
+    // ✅ Récupérer le clip pour connaître sa position actuelle
+    const clip = getClipById(tracks, clipId)
+    if (!clip) {
+      console.warn('⬇️ [Editor] Clip non trouvé')
+      return
+    }
+    
+    const currentStart = clip.start || 0
+    
     const targetTrackIndex = currentTrackIndex + 1
     const targetTrack = tracks[targetTrackIndex]
     
@@ -851,8 +901,12 @@ function EditorTimelineContent() {
       return
     }
     
-    moveClip(trackId, clipId, 0, targetTrack.id)
+    // ✅ Déplacer le clip vers la piste du dessous en conservant sa position
+    moveClip(trackId, clipId, currentStart, targetTrack.id)
+    
+    // ✅ Mettre à jour la sélection
     setSelectedTrackId(targetTrack.id)
+    
     addToast?.(t('editorClipMovedDown') || 'Clip déplacé vers le bas', 'info')
   }, [tracks, moveClip, setSelectedTrackId, addToast, t])
 
@@ -983,15 +1037,7 @@ function EditorTimelineContent() {
   const canRedo = store?.canRedoEditor || false
 
   useKeyboardShortcuts({
-    onPlay: () => {
-      if (isPlaying) {
-        pause()
-      } else if (isPaused) {
-        play()
-      } else {
-        play()
-      }
-    },
+    onPlay: handlePlayToggle,
     onPause: pause,
     onStop: stop,
     onUndo: undoEditor,
@@ -1170,7 +1216,6 @@ function EditorTimelineContent() {
           onSetTimelineLoop={handleSetTimelineLoop}
           onOpenLoopPanel={handleOpenLoopPanel}
           onActivateTimelineLoopManualClick={handleActivateTimelineLoopManualClick}
-          // ✅ MODE CLIC POUR LA BOUCLE TIMELINE
           isTimelineClickModeActive={isTimelineClickModeActive}
           onTimelineClickForLoop={handleTimelineClickForLoop}
         />
