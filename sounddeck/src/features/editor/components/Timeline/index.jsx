@@ -84,7 +84,6 @@ export default function EditorTimeline({
   onSetTimelineLoop,
   onOpenLoopPanel,
   onActivateTimelineLoopManualClick,
-  // ✅ MODE CLIC POUR LA BOUCLE TIMELINE
   isTimelineClickModeActive = false,
   onTimelineClickForLoop
 }) {
@@ -94,6 +93,7 @@ export default function EditorTimeline({
   const clipsContainerRef = useRef(null)
   const rulerContainerRef = useRef(null)
   const rulerInnerRef = useRef(null)
+  const loopContainerRef = useRef(null) // ✅ REF POUR LA BOUCLE
   const [isPanning, setIsPanning] = useState(false)
   const [panStartX, setPanStartX] = useState(0)
   const [scrollLeft, setScrollLeft] = useState(0)
@@ -114,10 +114,17 @@ export default function EditorTimeline({
 
   const handleClipsScroll = useCallback((e) => {
     const scrollLeft = e.currentTarget.scrollLeft
+    setScrollLeft(scrollLeft)
+    
+    // ✅ Synchroniser la règle
     if (rulerInnerRef.current) {
       rulerInnerRef.current.style.transform = `translateX(-${scrollLeft}px)`
     }
-    setScrollLeft(scrollLeft)
+    
+    // ✅ Synchroniser la boucle
+    if (loopContainerRef.current) {
+      loopContainerRef.current.style.transform = `translateX(-${scrollLeft}px)`
+    }
   }, [])
 
   const handleRulerWheel = useCallback((e) => {
@@ -397,7 +404,8 @@ export default function EditorTimeline({
         for (let i = 1; i < totalCycles; i++) {
           cycleEnd += cycleDuration
           const position = cycleEnd * pixelsPerSecond
-          if (position >= loopEndPosition) break          
+          if (position >= loopEndPosition) break
+          
           markers.push(
             <div
               key={`cycle-marker-${clipId}-${i}`}
@@ -651,7 +659,6 @@ export default function EditorTimeline({
         >
           {renderPendingIndicator()}
           
-          {/* ✅ Indicateur du mode clic timeline */}
           {isTimelineClickModeActive && (
             <div style={{
               position: 'absolute',
@@ -684,7 +691,7 @@ export default function EditorTimeline({
               left: 0,
               height: '100%',
               width: Math.max(totalWidth, '100%'),
-              transform: 'translateX(0px)',
+              transform: `translateX(-${scrollLeft}px)`,
               transition: 'none',
               willChange: 'transform'
             }}
@@ -709,7 +716,7 @@ export default function EditorTimeline({
         </div>
       </div>
 
-      {/* ✅ Loop - TimelineLoop avec nouvelles props */}
+      {/* ✅ Loop - TimelineLoop avec synchronisation du scroll */}
       <div style={{
         display: 'flex',
         height: 10,
@@ -731,13 +738,14 @@ export default function EditorTimeline({
         }} />
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <div
+            ref={loopContainerRef}
             style={{
               position: 'absolute',
               top: 0,
               left: 0,
               height: '100%',
               width: Math.max(totalWidth, '100%'),
-              transform: 'translateX(0px)',
+              transform: `translateX(-${scrollLeft}px)`,
               transition: 'none',
               willChange: 'transform'
             }}
