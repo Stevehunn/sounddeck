@@ -1,5 +1,5 @@
 // src/features/editor/components/Toolbar/index.jsx
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import EditorMetronome from './EditorMetronome'
 import ImportFileModal from '../Modals/ImportFileModal'
 
@@ -29,10 +29,14 @@ export default function EditorToolbar({
   onRefreshDurations,
   tr,
   addToast,
-  // ✅ NOUVEAUX PROPS POUR LA BOUCLE GÉNÉRALE
   loopState,
   onToggleTimelineLoop,
-  onOpenLoopPanel
+  onOpenLoopPanel,
+  // ✅ NOUVEAUX PROPS POUR LE MÉTRONOME
+  metronomeEnabled,
+  onToggleMetronome,
+  bpm,
+  onBpmChange,
 }) {
   const [showAddClip, setShowAddClip] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
@@ -342,6 +346,20 @@ export default function EditorToolbar({
           </span>
         )}
       </div>
+
+      <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
+
+      {/* ✅ MÉTRONOME */}
+      <EditorMetronome
+        bpm={bpm || 120}
+        onBpmChange={onBpmChange}
+        isPlaying={isPlaying || isPaused}
+        currentTime={currentTime}
+        totalDuration={totalDuration}
+        enabled={metronomeEnabled || false}
+        onToggle={onToggleMetronome}
+        tr={tr}
+      />
 
       <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
 

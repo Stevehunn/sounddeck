@@ -19,6 +19,8 @@ export function useKeyboardShortcuts({
   onCut,
   onPaste,
   onToggleClipLoop,
+  // ✅ NOUVEAU RACCOURCI MÉTRONOME
+  onToggleMetronome,
   isPlaying,
   canUndo,
   canRedo,
@@ -175,6 +177,22 @@ export function useKeyboardShortcuts({
       onToggleClipLoop?.()
       return
     }
+
+    // ✅ M - Toggle Métronome (sans modificateur)
+    if (e.key === 'm' && !ctrl && !shift && !alt) {
+      e.preventDefault()
+      console.log('⌨️ M: Toggle Métronome')
+      onToggleMetronome?.()
+      return
+    }
+
+    // ✅ Ctrl+Shift+M - Toggle Métronome (avec modificateur)
+    if (ctrl && shift && e.key === 'm') {
+      e.preventDefault()
+      console.log('⌨️ Ctrl+Shift+M: Toggle Métronome')
+      onToggleMetronome?.()
+      return
+    }
   }, [
     isEnabled,
     isPlaying,
@@ -195,6 +213,8 @@ export function useKeyboardShortcuts({
     onCut,
     onPaste,
     onToggleClipLoop,
+    // ✅ AJOUT
+    onToggleMetronome,
     canUndo,
     canRedo
   ])
@@ -222,7 +242,8 @@ export function useKeyboardShortcuts({
     'Ctrl+-': 'Zoom Out',
     'Ctrl+0': 'Zoom Reset',
     'S': 'Split',
-    'L / Ctrl+L': 'Toggle Loop'
+    'L / Ctrl+L': 'Toggle Loop',
+    'M / Ctrl+Shift+M': 'Toggle Métronome'
   }
 
   return { shortcuts }

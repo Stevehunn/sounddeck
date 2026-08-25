@@ -134,7 +134,6 @@ function EditorTimelineContent() {
     playClipOnly,
     loopState,
     toggleClipLoop,
-    // ✅ OVERLAY UNIFIÉ
     actionOverlay,
     isActionOverlayActive,
     cancelActionOverlay,
@@ -174,13 +173,31 @@ function EditorTimelineContent() {
   const [pendingImportFileName, setPendingImportFileName] = useState('')
   const [showTimelineLoopModal, setShowTimelineLoopModal] = useState(false)
 
-  // ✅ ÉTATS POUR LE MODE CLIC DE LA BOUCLE TIMELINE (pour le modal)
+  // ✅ ÉTATS POUR LE MODE CLIC DE LA BOUCLE TIMELINE
   const [isTimelineClickModeActive, setIsTimelineClickModeActive] = useState(false)
   const [timelineClickData, setTimelineClickData] = useState({ start: null, end: null, duration: null })
   const [timelineClickStep, setTimelineClickStep] = useState(0)
 
+  // ✅ ÉTATS POUR LE MÉTRONOME
+  const [metronomeEnabled, setMetronomeEnabled] = useState(false)
+  const [bpm, setBpm] = useState(120)
+
   // ✅ PRESSE-PAPIERS POUR COPIE/COLLER
   const [clipboard, setClipboard] = useState(null)
+
+  // ─── RESTAURATION DES PRÉFÉRENCES ────────────────────────────────────
+
+  useEffect(() => {
+    const savedEnabled = localStorage.getItem('sounddeck_metronome_enabled')
+    const savedBpm = localStorage.getItem('sounddeck_metronome_bpm')
+    
+    if (savedEnabled !== null) {
+      setMetronomeEnabled(savedEnabled === 'true')
+    }
+    if (savedBpm !== null) {
+      setBpm(parseInt(savedBpm, 10))
+    }
+  }, [])
 
   // ─── GUARD POUR LES MARQUEURS ──────────────────────────────────────────
   const [markersState, setMarkersState] = useState(() => {
@@ -397,6 +414,20 @@ function EditorTimelineContent() {
     setExportName(project.name || 'Mon mix')
     setShowExportModal(true)
   }, [project, addToast, t])
+
+  // ─── HANDLER MÉTRONOME ────────────────────────────────────────────────
+
+  const handleToggleMetronome = useCallback((enabled) => {
+    console.log(`🎵 Métronome: ${enabled ? 'ON' : 'OFF'}`)
+    setMetronomeEnabled(enabled)
+    localStorage.setItem('sounddeck_metronome_enabled', String(enabled))
+  }, [])
+
+  const handleBpmChange = useCallback((newBpm) => {
+    console.log(`🎵 BPM changé: ${newBpm}`)
+    setBpm(newBpm)
+    localStorage.setItem('sounddeck_metronome_bpm', String(newBpm))
+  }, [])
 
   // ─── HANDLER POUR AJOUTER UN EFFET DEPUIS LE MENU CONTEXTUEL ─────────
 
@@ -923,14 +954,12 @@ function EditorTimelineContent() {
     setShowTimelineLoopModal(true)
   }, [])
 
-  // ✅ Handler pour activer le mode clic de la boucle timeline (via le modal)
   const handleActivateTimelineClickMode = useCallback((active = true) => {
     console.log('🖱️ [Editor] handleActivateTimelineClickMode:', active)
     setIsTimelineClickModeActive(active)
     if (active) {
       setTimelineClickStep(0)
       setTimelineClickData({ start: null, end: null, duration: null })
-      // ✅ Active l'overlay via le contexte
       activateTimelineLoopManualClick()
     } else {
       setTimelineClickStep(0)
@@ -939,7 +968,6 @@ function EditorTimelineContent() {
     }
   }, [activateTimelineLoopManualClick, cancelActionOverlay])
 
-  // ✅ GÉRER LES CLICS SUR LA TIMELINE POUR LE MODE CLIC
   const handleTimelineClickForLoop = useCallback((time) => {
     if (!isTimelineClickModeActive) return
     
@@ -947,7 +975,6 @@ function EditorTimelineContent() {
     console.log('🖱️ [Editor]   - isTimelineClickModeActive:', isTimelineClickModeActive)
     console.log('🖱️ [Editor]   - actionOverlay.step:', actionOverlay?.step)
     
-    // ✅ DÉLÉGUER À executeActionOverlay qui gère le step
     if (executeActionOverlay) {
       console.log('🖱️ [Editor]   ➜ Délégation à executeActionOverlay')
       executeActionOverlay(time)
@@ -955,11 +982,8 @@ function EditorTimelineContent() {
       console.warn('🖱️ [Editor]   ❌ executeActionOverlay est undefined')
     }
     
-    // ✅ Les toasts sont gérés par executeActionOverlay
-    // On garde juste la mise à jour du step local pour le modal
     const clampedTime = Math.max(0, Math.min(time, totalDuration))
     
-    // Mettre à jour le step local (pour l'affichage dans le modal)
     if (timelineClickStep === 0) {
       setTimelineClickData(prev => ({ ...prev, start: clampedTime }))
       setTimelineClickStep(1)
@@ -972,7 +996,6 @@ function EditorTimelineContent() {
       const duration = clampedTime - timelineClickData.start
       if (duration > 0.1) {
         setTimelineClickData(prev => ({ ...prev, duration: duration }))
-        // Le reste est géré par executeActionOverlay
         setShowTimelineLoopModal(false)
       }
     }
@@ -1065,6 +1088,11 @@ function EditorTimelineContent() {
     onZoomIn: () => handleZoomChange(zoomLevel + 0.1),
     onZoomOut: () => handleZoomChange(zoomLevel - 0.1),
     onZoomReset: () => handleZoomChange(1),
+    // ✅ RACCOURCI MÉTRONOME
+    onToggleMetronome: () => {
+      console.log('⌨️ Toggle Métronome')
+      handleToggleMetronome(!metronomeEnabled)
+    },
     isPlaying: isPlaying || isPaused,
     canUndo: canUndo,
     canRedo: canRedo,
@@ -1110,6 +1138,11 @@ function EditorTimelineContent() {
         loopState={loopState}
         onToggleTimelineLoop={handleToggleTimelineLoop}
         onOpenLoopPanel={handleOpenLoopPanel}
+        // ✅ PROPS MÉTRONOME
+        metronomeEnabled={metronomeEnabled}
+        onToggleMetronome={handleToggleMetronome}
+        bpm={bpm}
+        onBpmChange={handleBpmChange}
       />
 
       <div style={{ 
@@ -1118,7 +1151,7 @@ function EditorTimelineContent() {
         position: 'relative',
         minHeight: '320px'
       }}>
-        {/* ✅ ACTION OVERLAY UNIFIÉ - SEUL OVERLAY (l'indicateur dans Timeline a été supprimé) */}
+        {/* ✅ ACTION OVERLAY UNIFIÉ */}
         {isActionOverlayActive && (
           <ActionOverlay
             isOpen={isActionOverlayActive}
@@ -1130,7 +1163,6 @@ function EditorTimelineContent() {
             tr={t}
           />
         )}
-
 
         <EditorTimeline
           tracks={tracks}
@@ -1188,7 +1220,6 @@ function EditorTimelineContent() {
             console.log('🔄 [Editor] onToggleClipLoop appelé avec:', { clipId, options })
             toggleClipLoop(clipId, options)
           }}
-          // ✅ OVERLAY UNIFIÉ - compatibilité
           isPendingAction={isActionOverlayActive}
           pendingAction={actionOverlay}
           onExecutePendingAction={executeActionOverlay}
@@ -1254,7 +1285,7 @@ function EditorTimelineContent() {
         </div>
       </div>
 
-      {/* MODAL ADD TRACK */}
+      {/* MODALS */}
       {showAddTrackModal && createPortal(
         <AddTrackModal
           isOpen={showAddTrackModal}
@@ -1266,7 +1297,6 @@ function EditorTimelineContent() {
         document.body
       )}
 
-      {/* MODAL IMPORT FILE */}
       {showImportModal && createPortal(
         <ImportFileModal
           isOpen={showImportModal}
@@ -1284,7 +1314,6 @@ function EditorTimelineContent() {
         document.body
       )}
 
-      {/* MODAL EXPORT */}
       {showExportModal && (
         <ExportModal
           isOpen={showExportModal}
@@ -1372,7 +1401,6 @@ function EditorTimelineContent() {
         />
       )}
 
-      {/* MODAL TRIM */}
       {showTrimModal && (() => {
         const clip = getClipById(tracks, trimClipId)
         if (!clip) return null
@@ -1397,7 +1425,6 @@ function EditorTimelineContent() {
         )
       })()}
 
-      {/* MODAL NORMALIZE */}
       {showNormalizeModal && (() => {
         const clip = getClipById(tracks, normalizeClipId)
         if (!clip) return null
@@ -1418,7 +1445,6 @@ function EditorTimelineContent() {
         )
       })()}
 
-      {/* ✅ MODAL BOUCLE TIMELINE */}
       {showTimelineLoopModal && createPortal(
         <TimelineLoopModal
           isOpen={showTimelineLoopModal}
@@ -1435,7 +1461,6 @@ function EditorTimelineContent() {
         document.body
       )}
 
-      {/* CLIP ACTIONS MENU */}
       {clipMenu && (
         <ClipActionsMenu
           clip={selectedClipForMenu}
@@ -1517,7 +1542,6 @@ function EditorTimelineContent() {
         />
       )}
 
-      {/* ✅ ConfirmWrapper */}
       <ConfirmWrapper />
     </div>
   )

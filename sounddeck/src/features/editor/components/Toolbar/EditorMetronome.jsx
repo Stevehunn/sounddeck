@@ -1,4 +1,4 @@
-// src/pages/editor/components/EditorToolbar/EditorMetronome.jsx
+// src/features/editor/components/Toolbar/EditorMetronome.jsx
 import { useState, useRef, useEffect, useCallback } from 'react'
 
 export default function EditorMetronome({
@@ -98,6 +98,22 @@ export default function EditorMetronome({
     }
   }, [volume, accentVolume, initAudioContext])
 
+  // ✅ Prévisualisation du métronome (jouer un clic à l'activation)
+  const previewClick = useCallback(() => {
+    if (!enabled) return
+    const success = generateClickSound(true)
+    if (success) {
+      console.log('🎵 Preview du métronome')
+    }
+  }, [enabled, generateClickSound])
+
+  // ✅ Effet pour preview au toggle
+  useEffect(() => {
+    if (enabled) {
+      setTimeout(previewClick, 100)
+    }
+  }, [enabled, previewClick])
+
   const playClick = useCallback((isAccent = false) => {
     const now = performance.now()
     
@@ -190,7 +206,12 @@ export default function EditorMetronome({
     setTempo(clamped)
     onBpmChange?.(clamped)
     setCount(0)
-  }, [onBpmChange])
+    
+    // ✅ Replay un clic pour feedback
+    if (enabled) {
+      setTimeout(() => generateClickSound(true), 50)
+    }
+  }, [onBpmChange, enabled, generateClickSound])
 
   useEffect(() => {
     if (enabled && isPlaying) {
@@ -223,27 +244,34 @@ export default function EditorMetronome({
     <div style={{
       display: 'flex',
       alignItems: 'center',
-      gap: 8,
-      padding: '2px 10px',
-      background: enabled ? 'var(--accent-light)' : 'var(--bg-tertiary)',
+      gap: 6,
+      padding: '2px 8px',
+      background: enabled ? 'rgba(124,111,247,0.08)' : 'var(--bg-tertiary)',
       borderRadius: 'var(--radius-sm)',
       border: `1px solid ${enabled ? 'var(--accent)' : 'var(--border)'}`,
-      transition: 'all 0.2s ease'
+      transition: 'all 0.2s ease',
+      height: 32,
     }}>
+      {/* Bouton Toggle avec icône plus visible */}
       <button
         className={enabled ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
         onClick={handleToggle}
         style={{
           fontSize: 11,
-          padding: '2px 8px',
+          padding: '2px 6px',
           minHeight: 24,
+          minWidth: 24,
           display: 'flex',
           alignItems: 'center',
-          gap: 4
+          justifyContent: 'center',
+          gap: 4,
+          background: enabled ? 'var(--accent)' : 'var(--bg-tertiary)',
+          borderColor: enabled ? 'var(--accent)' : 'var(--border)',
+          color: enabled ? 'white' : 'var(--text-secondary)'
         }}
         title={tr('editorMetronome') || 'Métronome'}
       >
-        <i className="ti ti-music" />
+        <i className="ti ti-music" style={{ fontSize: 14 }} />
         {enabled && isClicking && (
           <span style={{
             width: 6,
@@ -251,22 +279,33 @@ export default function EditorMetronome({
             borderRadius: '50%',
             background: 'var(--success)',
             display: 'inline-block',
-            animation: 'pulse 0.5s ease-in-out infinite'
+            animation: 'pulse 0.5s ease-in-out infinite',
+            marginLeft: 2
           }} />
         )}
       </button>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      {/* BPM avec contrôle plus compact */}
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: 4,
+        minWidth: 80
+      }}>
         <input
           type="range"
           min="40"
           max="240"
           value={tempo}
-          onChange={(e) => handleBpmChange(Number(e.target.value))}
+          onChange={(e) => {
+            const newBpm = Number(e.target.value)
+            handleBpmChange(newBpm)
+          }}
           style={{
-            width: 80,
+            width: 60,
             accentColor: 'var(--accent)',
-            height: 4
+            height: 3,
+            cursor: 'pointer'
           }}
           title={tr('editorTempo') || 'Tempo (BPM)'}
         />
@@ -274,15 +313,21 @@ export default function EditorMetronome({
           fontSize: 11,
           fontFamily: 'monospace',
           color: 'var(--text-secondary)',
-          minWidth: 35,
+          minWidth: 32,
           textAlign: 'center'
         }}>
           {tempo}
         </span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <i className="ti ti-volume" style={{ fontSize: 12, color: 'var(--text-tertiary)' }} />
+      {/* Volume (optionnel) */}
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: 4,
+        opacity: 0.7
+      }}>
+        <i className="ti ti-volume" style={{ fontSize: 11, color: 'var(--text-tertiary)' }} />
         <input
           type="range"
           min="0"
@@ -290,30 +335,49 @@ export default function EditorMetronome({
           value={volume}
           onChange={(e) => setVolume(Number(e.target.value))}
           style={{
-            width: 40,
+            width: 30,
             accentColor: 'var(--accent)',
-            height: 3
+            height: 3,
+            cursor: 'pointer'
           }}
           title={tr('editorMetronomeVolume') || 'Volume du métronome'}
         />
       </div>
 
+      {/* Indicateur de beat actuel */}
       {enabled && isClicking && (
         <span style={{
           fontSize: 9,
           color: 'var(--text-tertiary)',
           fontFamily: 'monospace',
-          minWidth: 20,
-          textAlign: 'center'
+          minWidth: 24,
+          textAlign: 'center',
+          background: 'var(--bg-tertiary)',
+          padding: '1px 6px',
+          borderRadius: 'var(--radius-sm)',
+          border: '1px solid var(--border)'
         }}>
           {count + 1}/{timeSignature.beats}
+        </span>
+      )}
+
+      {/* Info BPM au survol */}
+      {!enabled && (
+        <span style={{
+          fontSize: 9,
+          color: 'var(--text-tertiary)',
+          opacity: 0.5,
+          fontFamily: 'monospace',
+          padding: '0 4px'
+        }}>
+          {tempo} BPM
         </span>
       )}
 
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.3; transform: scale(0.6); }
+          50% { opacity: 0.3; transform: scale(0.7); }
         }
       `}</style>
     </div>
