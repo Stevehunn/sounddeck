@@ -1,5 +1,5 @@
 // src/features/editor/Editor.jsx
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { EditorProvider, useEditor } from './contexts/EditorContext'
@@ -148,6 +148,8 @@ function EditorTimelineContent() {
     isPausedRef,
     currentTimeRef,
     setSoloPlayClipId,
+    masterGain,
+    setMasterGain,
   } = context
 
   // ─── ÉTATS LOCAUX ──────────────────────────────────────────────────────
@@ -185,6 +187,9 @@ function EditorTimelineContent() {
   // ✅ PRESSE-PAPIERS POUR COPIE/COLLER
   const [clipboard, setClipboard] = useState(null)
 
+  // ✅ REF POUR LE VOLUME MAÎTRE
+  const masterVolumeRef = useRef(100)
+
   // ─── RESTAURATION DES PRÉFÉRENCES ────────────────────────────────────
 
   useEffect(() => {
@@ -197,7 +202,16 @@ function EditorTimelineContent() {
     if (savedBpm !== null) {
       setBpm(parseInt(savedBpm, 10))
     }
-  }, [])
+    
+    // Restaurer le volume maître
+    const savedVolume = localStorage.getItem('sounddeck_master_volume')
+    if (savedVolume !== null) {
+      const vol = parseInt(savedVolume, 10)
+      setMasterVolume(vol)
+      masterVolumeRef.current = vol
+      setMasterGain(vol / 100)
+    }
+  }, [setMasterGain])
 
   // ─── GUARD POUR LES MARQUEURS ──────────────────────────────────────────
   const [markersState, setMarkersState] = useState(() => {
@@ -414,6 +428,36 @@ function EditorTimelineContent() {
     setExportName(project.name || 'Mon mix')
     setShowExportModal(true)
   }, [project, addToast, t])
+
+  // ─── HANDLER VOLUME MAÎTRE ────────────────────────────────────────────
+
+  const handleMasterVolumeChange = useCallback((value) => {
+    const normalized = Math.max(0, Math.min(200, value))
+    setMasterVolume(normalized)
+    masterVolumeRef.current = normalized
+    const gain = normalized / 100
+    setMasterGain(gain)
+    localStorage.setItem('sounddeck_master_volume', String(normalized))
+    console.log(`🎚️ Volume maître: ${normalized}% (gain: ${gain.toFixed(2)})`)
+  }, [setMasterGain])
+
+  const handleMasterMuteToggle = useCallback(() => {
+    const newMuted = !isMasterMuted
+    setIsMasterMuted(newMuted)
+    if (newMuted) {
+      // Mute : sauvegarder la valeur actuelle et mettre à 0
+      const currentValue = masterVolumeRef.current
+      setMasterVolume(currentValue)
+      setMasterGain(0)
+      console.log(`🔇 Mute activé (volume sauvegardé: ${currentValue}%)`)
+    } else {
+      // Unmute : restaurer la valeur sauvegardée
+      const restoredValue = masterVolumeRef.current || 100
+      setMasterVolume(restoredValue)
+      setMasterGain(restoredValue / 100)
+      console.log(`🔊 Mute désactivé (volume restauré: ${restoredValue}%)`)
+    }
+  }, [isMasterMuted, setMasterGain])
 
   // ─── HANDLER MÉTRONOME ────────────────────────────────────────────────
 
@@ -1088,7 +1132,6 @@ function EditorTimelineContent() {
     onZoomIn: () => handleZoomChange(zoomLevel + 0.1),
     onZoomOut: () => handleZoomChange(zoomLevel - 0.1),
     onZoomReset: () => handleZoomChange(1),
-    // ✅ RACCOURCI MÉTRONOME
     onToggleMetronome: () => {
       console.log('⌨️ Toggle Métronome')
       handleToggleMetronome(!metronomeEnabled)
@@ -1138,7 +1181,6 @@ function EditorTimelineContent() {
         loopState={loopState}
         onToggleTimelineLoop={handleToggleTimelineLoop}
         onOpenLoopPanel={handleOpenLoopPanel}
-        // ✅ PROPS MÉTRONOME
         metronomeEnabled={metronomeEnabled}
         onToggleMetronome={handleToggleMetronome}
         bpm={bpm}
@@ -1151,7 +1193,6 @@ function EditorTimelineContent() {
         position: 'relative',
         minHeight: '320px'
       }}>
-        {/* ✅ ACTION OVERLAY UNIFIÉ */}
         {isActionOverlayActive && (
           <ActionOverlay
             isOpen={isActionOverlayActive}
@@ -1273,9 +1314,9 @@ function EditorTimelineContent() {
       }}>
         <EditorMasterVolume
           volume={isMasterMuted ? 0 : masterVolume}
-          onVolumeChange={setMasterVolume}
+          onVolumeChange={handleMasterVolumeChange}
           isMuted={isMasterMuted}
-          onMuteToggle={() => setIsMasterMuted(!isMasterMuted)}
+          onMuteToggle={handleMasterMuteToggle}
           tr={t}
         />
         <div style={{ fontSize: 10, color: 'var(--text-tertiary)', display: 'flex', gap: 12 }}>

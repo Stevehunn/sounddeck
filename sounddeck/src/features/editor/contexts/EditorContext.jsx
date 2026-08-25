@@ -56,6 +56,9 @@ export function EditorProvider({ children, store, addToast }) {
   const [stopAtTime, setStopAtTime] = useState(null)
   const [soloPlayClipId, setSoloPlayClipId] = useState(null)
 
+  // ✅ VOLUME MAÎTRE
+  const [masterGain, setMasterGain] = useState(1)
+
   // ✅ OVERLAY UNIFIÉ
   const [actionOverlay, setActionOverlay] = useState(INITIAL_OVERLAY_STATE)
 
@@ -92,6 +95,7 @@ export function EditorProvider({ children, store, addToast }) {
   const stopAtTimeRef = useRef(null)
   const soloPlayClipIdRef = useRef(null)
   const idCounterRef = useRef(0)
+  const masterGainRef = useRef(1)
 
   // Mettre à jour les refs
   useEffect(() => { projectRef.current = project }, [project])
@@ -101,6 +105,36 @@ export function EditorProvider({ children, store, addToast }) {
   useEffect(() => { selectedClipIdRef.current = selectedClipId }, [selectedClipId])
   useEffect(() => { stopAtTimeRef.current = stopAtTime }, [stopAtTime])
   useEffect(() => { soloPlayClipIdRef.current = soloPlayClipId }, [soloPlayClipId])
+
+  // ─── SYNC masterGain avec la ref et mettre à jour les sources ──────
+
+  // ✅ Fonction pour mettre à jour le gain de toutes les sources
+  const updateMasterGain = useCallback((newGain) => {
+    console.log(`🎚️ [EditorContext] Mise à jour du volume maître: ${newGain.toFixed(2)}`)
+    
+    for (const [clipId, entry] of Object.entries(audioSourcesRef.current)) {
+      if (entry?.gainNode) {
+        let trackVolume = 1
+        if (projectRef.current?.tracks) {
+          for (const track of projectRef.current.tracks) {
+            const clip = track.clips.find(c => c.id === clipId)
+            if (clip) {
+              trackVolume = track.volume || 1
+              break
+            }
+          }
+        }
+        const newGainValue = trackVolume * newGain
+        entry.gainNode.gain.value = newGainValue
+      }
+    }
+  }, [projectRef])
+
+  // ✅ Mettre à jour masterGainRef et toutes les sources quand masterGain change
+  useEffect(() => {
+    masterGainRef.current = masterGain
+    updateMasterGain(masterGain)
+  }, [masterGain, updateMasterGain])
 
   // ─── FONCTIONS HELPER ──────────────────────────────────────────────────
 
@@ -311,7 +345,7 @@ export function EditorProvider({ children, store, addToast }) {
     }
   }, [])
 
-  // ✅ playClip - CORRIGÉ AVEC GESTION PROPRE DES SOURCES
+  // ✅ playClip - AVEC VOLUME MAÎTRE ET OFFSET CORRECT
   const playClip = useCallback(async (clip, track, customOffset = null) => {
     if (!clip?.path) {
       console.warn('⚠️ [playClip] clip.path est undefined pour:', clip?.name)
@@ -370,7 +404,8 @@ export function EditorProvider({ children, store, addToast }) {
       
       const gainNode = ctx.createGain()
       const trackVolume = track?.volume || 1
-      gainNode.gain.value = trackVolume
+      const masterVolume = masterGainRef.current || 1
+      gainNode.gain.value = trackVolume * masterVolume
       
       if (autoCrossfade) {
         const previousClip = findPreviousClip(clip, track)
@@ -389,7 +424,7 @@ export function EditorProvider({ children, store, addToast }) {
             }
             
             gainNode.gain.setValueAtTime(0, now)
-            gainNode.gain.linearRampToValueAtTime(trackVolume, now + fadeDuration)
+            gainNode.gain.linearRampToValueAtTime(trackVolume * masterVolume, now + fadeDuration)
           }
         }
       }
@@ -397,10 +432,10 @@ export function EditorProvider({ children, store, addToast }) {
       source.connect(gainNode)
       gainNode.connect(ctx.destination)
       
-      // ✅ CALCULER L'OFFSET
+      // ✅ CALCULER L'OFFSET CORRECTEMENT
       let offset = 0
       if (customOffset !== null && customOffset !== undefined) {
-        // ✅ UTILISER L'OFFSET PERSONNALISÉ
+        // ✅ UTILISER L'OFFSET PERSONNALISÉ (prioritaire)
         offset = Math.max(0, Math.min(customOffset, sourceBuffer.duration - 0.01))
         console.log(`🎵 [playClip] Lecture avec offset personnalisé: ${offset.toFixed(2)}s`)
       } else {
@@ -408,7 +443,7 @@ export function EditorProvider({ children, store, addToast }) {
         const clipOffset = clip.offset || 0
         const timeInClip = Math.max(0, currentTime - (clip.start || 0))
         offset = Math.min(clipOffset + timeInClip, sourceBuffer.duration - 0.01)
-        console.log(`🎵 [playClip] Lecture avec offset calculé: ${offset.toFixed(2)}s (timeInClip=${timeInClip.toFixed(2)}s)`)
+        console.log(`🎵 [playClip] Lecture avec offset calculé: ${offset.toFixed(2)}s (clipOffset=${clipOffset.toFixed(2)}s, timeInClip=${timeInClip.toFixed(2)}s)`)
       }
       
       console.log(`🎵 [playClip] Lecture: ${clip.name} offset=${offset.toFixed(2)}s, duration=${sourceBuffer.duration.toFixed(2)}s`)
@@ -419,7 +454,6 @@ export function EditorProvider({ children, store, addToast }) {
       
       source.onended = () => {
         console.log(`⏹️ [playClip] Fin du clip: ${clip.name}`)
-        // ✅ NE PAS SUPPRIMER ICI - laisser le gestionnaire de boucle gérer
       }
       
     } catch (e) {
@@ -427,7 +461,7 @@ export function EditorProvider({ children, store, addToast }) {
     }
   }, [loadAudioBuffer, currentTime, autoCrossfade, findPreviousClip, calculateOverlap])
 
-  // ✅ startPlaybackLoop - VERSION CORRIGÉE (priorité + détection)
+  // ✅ startPlaybackLoop - VERSION CORRIGÉE POUR BOUCLE GÉNÉRALE
   const startPlaybackLoop = useCallback(() => {
     console.log('[LOOP-FIX] 🔄 startPlaybackLoop() appelée')
     
@@ -612,13 +646,9 @@ export function EditorProvider({ children, store, addToast }) {
               // ============================================================
               if (!isClipLooping && isInLoopZone) {
                 // ✅ VÉRIFIER SI LE CLIP EST DANS LA ZONE DE BOUCLE
-                // Un clip est dans la zone si :
-                // - Il commence DANS la zone (start >= loopStart && start < loopEnd)
-                // - Il se termine DANS la zone (end > loopStart && end <= loopEnd)
-                // - Il englobe la zone (start <= loopStart && end >= loopEnd)
                 const isClipInZone = (start >= loopStart && start < loopEnd) || 
-                                    (end > loopStart && end <= loopEnd) ||
-                                    (start <= loopStart && end >= loopEnd)
+                                     (end > loopStart && end <= loopEnd) ||
+                                     (start <= loopStart && end >= loopEnd)
                 
                 if (isClipInZone) {
                   // ✅ Calculer la position dans le clip en tenant compte de la boucle
@@ -655,7 +685,9 @@ export function EditorProvider({ children, store, addToast }) {
                 if (globalTime >= start && globalTime < end) {
                   shouldPlay = true
                   clipTime = globalTime
-                  customOffset = globalTime - start
+                  // ✅ CORRECTION : Utiliser l'offset du clip + le temps écoulé
+                  const clipOffset = clip.offset || 0
+                  customOffset = clipOffset + (globalTime - start)
                 }
               }
               
@@ -680,40 +712,34 @@ export function EditorProvider({ children, store, addToast }) {
             }
           }
           
-          // ✅ GESTION DES ARRÊTS (uniquement pour les clips qui ne sont plus actifs)
+          // ✅ GESTION DES ARRÊTS
           for (const clipId of playingClips) {
-            // ✅ Vérifier si le clip est toujours actif
             if (!activeClipsThisFrame.has(clipId)) {
-              // ✅ Récupérer le clip et vérifier si c'est une boucle individuelle
               let clip = null
-              let track = null
               let isClipLooping = false
               
               for (const t of tracks) {
                 const found = t.clips.find(c => c.id === clipId)
                 if (found) {
                   clip = found
-                  track = t
                   isClipLooping = loopState?.clips?.[clipId]?.enabled || false
                   break
                 }
               }
               
-              // ✅ Si c'est une boucle individuelle, on ne l'arrête pas ici
               if (isClipLooping) continue
               
-              // ✅ Vérifier si le clip est dans la zone de boucle générale et devrait continuer
               let shouldContinue = false
               if (isInLoopZone && clip) {
                 const start = clip.start || 0
-                const end = start + (clipDurations[clip.id] || clip.duration || 3)
+                const duration = clipDurations[clip.id] || clip.duration || 3
                 const isClipInZone = (start >= loopStart && start < loopEnd) || 
-                                    (end > loopStart && end <= loopEnd) ||
-                                    (start <= loopStart && end >= loopEnd)
+                                     (start + duration > loopStart && start + duration <= loopEnd) ||
+                                     (start <= loopStart && start + duration >= loopEnd)
                 if (isClipInZone) {
-                  const offsetInClip = (loopTime - start) % (clipDurations[clip.id] || clip.duration || 3)
-                  const positionInClip = Math.max(0, Math.min(clipDurations[clip.id] || clip.duration || 3, offsetInClip))
-                  if (positionInClip >= 0 && positionInClip < (clipDurations[clip.id] || clip.duration || 3)) {
+                  const offsetInClip = (loopTime - start) % duration
+                  const positionInClip = Math.max(0, Math.min(duration, offsetInClip))
+                  if (positionInClip >= 0 && positionInClip < duration) {
                     shouldContinue = true
                   }
                 }
@@ -750,7 +776,6 @@ export function EditorProvider({ children, store, addToast }) {
               }
             }
           } else {
-            // ✅ Si on est hors de la zone de boucle, nettoyer tout
             generalLoopClipsStarted.clear()
           }
         }
@@ -1684,8 +1709,11 @@ export function EditorProvider({ children, store, addToast }) {
     
     const leftDuration = clampedSplitTime - start
     const rightDuration = end - clampedSplitTime
+    
+    // ✅ RÉCUPÉRER L'OFFSET EXISTANT DU CLIP
     const currentOffset = clip.offset || 0
     
+    // ✅ CLIP GAUCHE : garde l'offset original
     const leftClip = {
       ...clip,
       id: generateUniqueId('clip'),
@@ -1695,6 +1723,7 @@ export function EditorProvider({ children, store, addToast }) {
       effects: clip.effects ? clip.effects.map(e => ({ ...e })) : [],
     }
     
+    // ✅ CLIP DROIT : offset décalé de la durée de gauche
     const rightClip = {
       ...clip,
       id: generateUniqueId('clip'),
@@ -1704,6 +1733,7 @@ export function EditorProvider({ children, store, addToast }) {
       effects: clip.effects ? clip.effects.map(e => ({ ...e })) : [],
     }
     
+    // ✅ AJUSTER LES FADES
     if (leftClip.effects) {
       const fadeOutEffect = leftClip.effects.find(e => e.type === 'fadeOut')
       if (fadeOutEffect && fadeOutEffect.params.duration > leftDuration * 0.5) {
@@ -1752,6 +1782,8 @@ export function EditorProvider({ children, store, addToast }) {
     setIsDirty(true)
     addToast?.(`Clip "${clip.name}" coupé en deux`, 'success')
     selectClip(leftClip.id, trackId)
+    
+    console.log(`✂️ Split: left ${leftDuration.toFixed(2)}s (offset ${leftClip.offset.toFixed(2)}s), right ${rightDuration.toFixed(2)}s (offset ${rightClip.offset.toFixed(2)}s)`)
     
     return { leftClip, rightClip }
   }, [project, clipDurations, store, addToast, selectClip, generateUniqueId])
@@ -2236,7 +2268,6 @@ export function EditorProvider({ children, store, addToast }) {
   }, [loopState.timeline, setTimelineLoop])
 
   // ─── FONCTIONS OVERLAY UNIFIÉES ──────────────────────────────────────────
-  // 🔍 Tous les logs sont taggés avec [OVERLAY]
 
   const isActionOverlayActive = actionOverlay.type !== null
 
@@ -2245,7 +2276,6 @@ export function EditorProvider({ children, store, addToast }) {
     setActionOverlay(INITIAL_OVERLAY_STATE)
   }, [])
 
-  // ✅ Activation de la boucle individuelle avec clic
   const activateLoopManualClick = useCallback((clipId, trackId, options = {}) => {
     console.log('🔍 [OVERLAY] activateLoopManualClick appelé:', { clipId, trackId, options })
     
@@ -2270,7 +2300,6 @@ export function EditorProvider({ children, store, addToast }) {
     addToast?.('🖱️ Mode clic activé', 'info')
   }, [project, addToast])
 
-  // ✅ Activation de la boucle générale avec clic (progression en 3 étapes)
   const activateTimelineLoopManualClick = useCallback(() => {
     console.log('🔍 [OVERLAY] activateTimelineLoopManualClick appelé')
     
@@ -2293,7 +2322,6 @@ export function EditorProvider({ children, store, addToast }) {
     addToast?.('🖱️ Mode clic activé - Étape 1/3', 'info')
   }, [addToast])
 
-  // ✅ Activation du split avec clic
   const activateSplitManualClick = useCallback((clipId, trackId) => {
     console.log('🔍 [OVERLAY] activateSplitManualClick appelé:', { clipId, trackId })
     
@@ -2314,7 +2342,6 @@ export function EditorProvider({ children, store, addToast }) {
     addToast?.('✂️ Mode clic activé', 'info')
   }, [project, addToast])
 
-  // ✅ Exécution de l'action en cours (clic sur la timeline)
   const executeActionOverlay = useCallback((clickTime) => {
     console.log('🔍 [OVERLAY] executeActionOverlay appelé')
     console.log(`🔍 [OVERLAY]   - actionOverlay.type: ${actionOverlay.type}`)
@@ -2332,7 +2359,6 @@ export function EditorProvider({ children, store, addToast }) {
     console.log(`🔍 [OVERLAY] Exécution action ${type} à ${clampedTime.toFixed(2)}s, étape ${step}`)
     
     if (type === 'loop-clip') {
-      // ✅ Boucle individuelle de clip - un seul clic
       console.log('🔍 [OVERLAY] 📦 loop-clip - un seul clic')
       const clip = project?.tracks?.flatMap(t => t.clips).find(c => c.id === clipId)
       if (!clip) {
@@ -2357,18 +2383,15 @@ export function EditorProvider({ children, store, addToast }) {
       toggleClipLoop(clipId, updatedOptions)
       addToast?.(`🔄 Boucle définie jusqu'à ${manualDuration.toFixed(1)}s`, 'success')
       
-      // ✅ Cacher l'overlay après le clic
       cancelActionOverlay()
       
     } else if (type === 'loop-timeline') {
-      // ✅ Boucle générale - progression en 3 étapes
       console.log(`🔍 [OVERLAY] 📦 loop-timeline - étape actuelle: ${step}`)
       
       const newStep = step + 1
       const newData = { ...data }
       
       if (step === 0) {
-        // 1er clic = Début
         newData.start = clampedTime
         console.log(`🔍 [OVERLAY]   📍 Étape 1: Début défini à ${clampedTime.toFixed(2)}s`)
         
@@ -2387,7 +2410,6 @@ export function EditorProvider({ children, store, addToast }) {
         addToast?.(`🖱️ Début défini à ${clampedTime.toFixed(1)}s (2/3)`, 'info')
         
       } else if (step === 1) {
-        // 2ème clic = Fin
         console.log(`🔍 [OVERLAY]   📍 Étape 2: Fin à ${clampedTime.toFixed(2)}s, start: ${data.start}`)
         
         if (clampedTime > data.start) {
@@ -2412,7 +2434,6 @@ export function EditorProvider({ children, store, addToast }) {
         }
         
       } else if (step === 2) {
-        // 3ème clic = Durée
         console.log(`🔍 [OVERLAY]   📍 Étape 3: Durée à ${clampedTime.toFixed(2)}s, start: ${data.start}`)
         
         const duration = clampedTime - data.start
@@ -2430,7 +2451,6 @@ export function EditorProvider({ children, store, addToast }) {
           console.log(`🔍 [OVERLAY]   ✅ Boucle définie: ${data.start.toFixed(2)}s → ${(data.end || clampedTime).toFixed(2)}s (${duration.toFixed(2)}s)`)
           addToast?.(`✅ Boucle définie: ${data.start.toFixed(1)}s → ${(data.end || clampedTime).toFixed(1)}s (${duration.toFixed(1)}s)`, 'success')
           
-          // ✅ Cacher l'overlay après le 3ème clic
           cancelActionOverlay()
         } else {
           console.warn('🔍 [OVERLAY]   ⚠️ Durée trop courte:', duration)
@@ -2439,7 +2459,6 @@ export function EditorProvider({ children, store, addToast }) {
       }
       
     } else if (type === 'split') {
-      // ✅ Split
       console.log('🔍 [OVERLAY] 📦 split')
       const clip = project?.tracks?.flatMap(t => t.clips).find(c => c.id === clipId)
       if (!clip) {
@@ -2619,6 +2638,9 @@ export function EditorProvider({ children, store, addToast }) {
     setStopAtTime,
     soloPlayClipId,
     setSoloPlayClipId,
+    // ✅ VOLUME MAÎTRE
+    masterGain,
+    setMasterGain,
     // ✅ OVERLAY UNIFIÉ
     actionOverlay,
     isActionOverlayActive,
