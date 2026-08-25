@@ -8,6 +8,7 @@ import EditorToolbar from './components/Toolbar'
 import EditorEffectsPanel from './components/EffectsPanel'
 import EditorMasterVolume from './components/MasterVolume'
 import ClipActionsMenu from './components/ClipActionsMenu'
+import ActionOverlay from './components/ActionOverlay'
 import AddTrackModal from './components/Modals/AddTrackModal'
 import TrimClipModal from './components/Modals/TrimClipModal'
 import NormalizeModal from './components/Modals/NormalizeModal'
@@ -133,21 +134,20 @@ function EditorTimelineContent() {
     playClipOnly,
     loopState,
     toggleClipLoop,
-    isPendingAction,
-    pendingAction,
+    // ✅ OVERLAY UNIFIÉ
+    actionOverlay,
+    isActionOverlayActive,
+    cancelActionOverlay,
+    executeActionOverlay,
     activateLoopManualClick,
     activateSplitManualClick,
-    cancelPendingAction,
-    executePendingAction,
+    activateTimelineLoopManualClick,
     moveClip,
     setTimelineLoop,
     toggleTimelineLoop,
-    activateTimelineLoopManualClick,
-    // ✅ Récupérer les refs du contexte
     isPlayingRef,
     isPausedRef,
     currentTimeRef,
-    // ✅ Récupérer setSoloPlayClipId
     setSoloPlayClipId,
   } = context
 
@@ -174,7 +174,7 @@ function EditorTimelineContent() {
   const [pendingImportFileName, setPendingImportFileName] = useState('')
   const [showTimelineLoopModal, setShowTimelineLoopModal] = useState(false)
 
-  // ✅ ÉTATS POUR LE MODE CLIC DE LA BOUCLE TIMELINE
+  // ✅ ÉTATS POUR LE MODE CLIC DE LA BOUCLE TIMELINE (pour le modal)
   const [isTimelineClickModeActive, setIsTimelineClickModeActive] = useState(false)
   const [timelineClickData, setTimelineClickData] = useState({ start: null, end: null, duration: null })
   const [timelineClickStep, setTimelineClickStep] = useState(0)
@@ -236,29 +236,23 @@ function EditorTimelineContent() {
     }
   }, [addTrack, addToast])
 
-  // ✅ handlePlayToggle CORRIGÉE - utilise les refs du contexte
   const handlePlayToggle = useCallback(() => {
     console.log('[LOOP-FIX] 🎯 handlePlayToggle() appelée')
     console.log(`[LOOP-FIX]   - isPlaying: ${isPlaying}, isPaused: ${isPaused}`)
     
-    // ✅ Utiliser les refs du contexte pour avoir l'état réel
     const currentlyPlaying = isPlayingRef?.current ?? isPlaying
     const currentlyPaused = isPausedRef?.current ?? isPaused
     
     console.log(`[LOOP-FIX]   - currentlyPlaying: ${currentlyPlaying}, currentlyPaused: ${currentlyPaused}`)
     
     if (currentlyPlaying) {
-      // ✅ Si on joue, on met en pause
       console.log('[LOOP-FIX]   ➜ Pause')
       pause()
     } else if (currentlyPaused) {
-      // ✅ Si on est en pause, on reprend
       console.log('[LOOP-FIX]   ➜ Reprise')
       resume()
     } else {
-      // ✅ Si on n'est ni en lecture ni en pause, on démarre depuis le début
       console.log('[LOOP-FIX]   ➜ Démarrage depuis le début')
-      // ✅ S'assurer qu'on est bien à 0
       setCurrentTime(0)
       if (currentTimeRef) currentTimeRef.current = 0
       setSoloPlayClipId(null)
@@ -849,7 +843,6 @@ function EditorTimelineContent() {
       return
     }
     
-    // ✅ Récupérer le clip pour connaître sa position actuelle
     const clip = getClipById(tracks, clipId)
     if (!clip) {
       console.warn('⬆️ [Editor] Clip non trouvé')
@@ -866,10 +859,7 @@ function EditorTimelineContent() {
       return
     }
     
-    // ✅ Déplacer le clip vers la piste du dessus en conservant sa position
     moveClip(trackId, clipId, currentStart, targetTrack.id)
-    
-    // ✅ Mettre à jour la sélection
     setSelectedTrackId(targetTrack.id)
     
     addToast?.(t('editorClipMovedUp') || 'Clip déplacé vers le haut', 'info')
@@ -884,7 +874,6 @@ function EditorTimelineContent() {
       return
     }
     
-    // ✅ Récupérer le clip pour connaître sa position actuelle
     const clip = getClipById(tracks, clipId)
     if (!clip) {
       console.warn('⬇️ [Editor] Clip non trouvé')
@@ -901,10 +890,7 @@ function EditorTimelineContent() {
       return
     }
     
-    // ✅ Déplacer le clip vers la piste du dessous en conservant sa position
     moveClip(trackId, clipId, currentStart, targetTrack.id)
-    
-    // ✅ Mettre à jour la sélection
     setSelectedTrackId(targetTrack.id)
     
     addToast?.(t('editorClipMovedDown') || 'Clip déplacé vers le bas', 'info')
@@ -937,88 +923,63 @@ function EditorTimelineContent() {
     setShowTimelineLoopModal(true)
   }, [])
 
-  const handleActivateTimelineLoopManualClick = useCallback((mode) => {
-    console.log('🖱️ [Editor] activateTimelineLoopManualClick:', mode)
-    activateTimelineLoopManualClick?.(mode)
-  }, [activateTimelineLoopManualClick])
-
-  // ✅ ACTIVER LE MODE CLIC POUR LA BOUCLE TIMELINE
+  // ✅ Handler pour activer le mode clic de la boucle timeline (via le modal)
   const handleActivateTimelineClickMode = useCallback((active = true) => {
     console.log('🖱️ [Editor] handleActivateTimelineClickMode:', active)
     setIsTimelineClickModeActive(active)
     if (active) {
       setTimelineClickStep(0)
       setTimelineClickData({ start: null, end: null, duration: null })
-      addToast?.('🖱️ Cliquez sur la timeline pour définir le début (1/3)', 'info')
+      // ✅ Active l'overlay via le contexte
+      activateTimelineLoopManualClick()
     } else {
       setTimelineClickStep(0)
       setTimelineClickData({ start: null, end: null, duration: null })
+      cancelActionOverlay()
     }
-  }, [addToast])
+  }, [activateTimelineLoopManualClick, cancelActionOverlay])
 
   // ✅ GÉRER LES CLICS SUR LA TIMELINE POUR LE MODE CLIC
   const handleTimelineClickForLoop = useCallback((time) => {
     if (!isTimelineClickModeActive) return
     
-    console.log('🖱️ [Editor] Clic timeline pour boucle:', time, 'étape:', timelineClickStep)
+    console.log('🖱️ [Editor] handleTimelineClickForLoop - time:', time)
+    console.log('🖱️ [Editor]   - isTimelineClickModeActive:', isTimelineClickModeActive)
+    console.log('🖱️ [Editor]   - actionOverlay.step:', actionOverlay?.step)
     
+    // ✅ DÉLÉGUER À executeActionOverlay qui gère le step
+    if (executeActionOverlay) {
+      console.log('🖱️ [Editor]   ➜ Délégation à executeActionOverlay')
+      executeActionOverlay(time)
+    } else {
+      console.warn('🖱️ [Editor]   ❌ executeActionOverlay est undefined')
+    }
+    
+    // ✅ Les toasts sont gérés par executeActionOverlay
+    // On garde juste la mise à jour du step local pour le modal
     const clampedTime = Math.max(0, Math.min(time, totalDuration))
     
+    // Mettre à jour le step local (pour l'affichage dans le modal)
     if (timelineClickStep === 0) {
-      // ✅ 1er clic = Début
       setTimelineClickData(prev => ({ ...prev, start: clampedTime }))
       setTimelineClickStep(1)
-      addToast?.(`🖱️ Début défini à ${formatTime(clampedTime)} - Cliquez pour la fin (2/3)`, 'info')
     } else if (timelineClickStep === 1) {
-      // ✅ 2ème clic = Fin
       if (clampedTime > timelineClickData.start) {
         setTimelineClickData(prev => ({ ...prev, end: clampedTime }))
         setTimelineClickStep(2)
-        const duration = clampedTime - timelineClickData.start
-        addToast?.(`🖱️ Fin définie à ${formatTime(clampedTime)} - Durée: ${formatTime(duration)} - Cliquez pour la durée (3/3)`, 'info')
-      } else {
-        addToast?.('⚠️ La fin doit être après le début', 'warning')
       }
     } else if (timelineClickStep === 2) {
-      // ✅ 3ème clic = Durée ou temps manuel
       const duration = clampedTime - timelineClickData.start
       if (duration > 0.1) {
         setTimelineClickData(prev => ({ ...prev, duration: duration }))
-        // ✅ Appliquer automatiquement
-        const start = timelineClickData.start
-        const end = timelineClickData.end
-        
-        // ✅ Mettre à jour le loopState
-        const updatedLoopState = {
-          ...loopState,
-          timeline: {
-            ...loopState.timeline,
-            start: start,
-            end: end,
-            manualDuration: duration,
-            durationMode: 'manualDuration'
-          }
-        }
-        
-        // ✅ Appliquer via le contexte
-        setTimelineLoop(updatedLoopState.timeline)
-        
-        addToast?.(`✅ Boucle définie: ${formatTime(start)} → ${formatTime(end)} (${formatTime(duration)})`, 'success')
-        
-        // ✅ Désactiver le mode clic
-        setIsTimelineClickModeActive(false)
-        setTimelineClickStep(0)
-        setTimelineClickData({ start: null, end: null, duration: null })
-        
-        // ✅ Fermer le modal
+        // Le reste est géré par executeActionOverlay
         setShowTimelineLoopModal(false)
-      } else {
-        addToast?.('⚠️ La durée doit être d\'au moins 0.1s', 'warning')
       }
     }
-  }, [isTimelineClickModeActive, timelineClickStep, timelineClickData, totalDuration, loopState, setTimelineLoop, addToast])
+  }, [isTimelineClickModeActive, executeActionOverlay, totalDuration, timelineClickStep, timelineClickData, setShowTimelineLoopModal])
 
-  // ✅ FORMATER LE TEMPS
+  // ─── FORMATER LE TEMPS ────────────────────────────────────────────────
+
   const formatTime = (seconds) => {
     if (!seconds || isNaN(seconds)) return '0:00'
     const m = Math.floor(seconds / 60)
@@ -1151,7 +1112,26 @@ function EditorTimelineContent() {
         onOpenLoopPanel={handleOpenLoopPanel}
       />
 
-      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+      <div style={{ 
+        flex: 1, 
+        overflow: 'hidden', 
+        position: 'relative',
+        minHeight: '320px'
+      }}>
+        {/* ✅ ACTION OVERLAY UNIFIÉ - SEUL OVERLAY (l'indicateur dans Timeline a été supprimé) */}
+        {isActionOverlayActive && (
+          <ActionOverlay
+            isOpen={isActionOverlayActive}
+            actionType={actionOverlay.type}
+            clipName={actionOverlay.clipName}
+            step={actionOverlay.step}
+            totalSteps={actionOverlay.totalSteps}
+            onCancel={cancelActionOverlay}
+            tr={t}
+          />
+        )}
+
+
         <EditorTimeline
           tracks={tracks}
           selectedClipId={selectedClipId}
@@ -1208,14 +1188,15 @@ function EditorTimelineContent() {
             console.log('🔄 [Editor] onToggleClipLoop appelé avec:', { clipId, options })
             toggleClipLoop(clipId, options)
           }}
-          isPendingAction={isPendingAction}
-          pendingAction={pendingAction}
-          onExecutePendingAction={executePendingAction}
-          onCancelPendingAction={cancelPendingAction}
+          // ✅ OVERLAY UNIFIÉ - compatibilité
+          isPendingAction={isActionOverlayActive}
+          pendingAction={actionOverlay}
+          onExecutePendingAction={executeActionOverlay}
+          onCancelPendingAction={cancelActionOverlay}
           onToggleTimelineLoop={handleToggleTimelineLoop}
           onSetTimelineLoop={handleSetTimelineLoop}
           onOpenLoopPanel={handleOpenLoopPanel}
-          onActivateTimelineLoopManualClick={handleActivateTimelineLoopManualClick}
+          onActivateTimelineLoopManualClick={activateTimelineLoopManualClick}
           isTimelineClickModeActive={isTimelineClickModeActive}
           onTimelineClickForLoop={handleTimelineClickForLoop}
         />

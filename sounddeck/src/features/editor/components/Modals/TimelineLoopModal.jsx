@@ -53,7 +53,7 @@ export default function TimelineLoopModal({
   const [startValue, setStartValue] = useState(timelineLoop.start || 0)
   const [endValue, setEndValue] = useState(timelineLoop.end || 10)
   const [showColorPicker, setShowColorPicker] = useState(false)
-  const [selectionMode, setSelectionMode] = useState('manual') // 'manual' | 'click'
+  const [selectionMode, setSelectionMode] = useState('manual')
 
   // ✅ Réinitialiser quand le modal s'ouvre
   useEffect(() => {
@@ -65,7 +65,6 @@ export default function TimelineLoopModal({
       setManualDuration(timelineLoop.manualDuration || 10)
       setStartValue(timelineLoop.start || 0)
       setEndValue(timelineLoop.end || 10)
-      // ✅ Par défaut on est en mode manuel
       setSelectionMode('manual')
     }
   }, [isOpen, timelineLoop])
@@ -143,10 +142,11 @@ export default function TimelineLoopModal({
     return `${s.toFixed(1)}s`
   }
 
-  // ✅ Activer le mode clic
+  // ✅ Activer le mode clic - utilise le nouveau système d'overlay
   const handleActivateClickMode = () => {
     console.log('🖱️ [TimelineLoopModal] Activation du mode clic')
     setSelectionMode('click')
+    // ✅ Appeler le handler du parent qui active l'overlay
     if (onActivateClickMode) {
       onActivateClickMode(true)
     }
@@ -334,7 +334,7 @@ export default function TimelineLoopModal({
               }}
             >
               <i className="ti ti-click" />
-              <span>{tr('clickToSelect') || 'Sélectionner par clics'}</span>
+              <span>{tr('clickToSelect') || '🖱️ Sélectionner par clics'}</span>
               {isClickActive && (
                 <span style={{
                   fontSize: 8,
@@ -373,46 +373,50 @@ export default function TimelineLoopModal({
             </button>
           </div>
 
-          {/* ✅ Mode clic - Instructions */}
+          {/* ✅ Mode clic - Instructions compactes */}
           {isClickActive && (
             <div style={{
-              padding: '8px 12px',
+              padding: '6px 10px',
               background: 'var(--bg-secondary)',
               borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--accent)',
               marginBottom: 8
             }}>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                <i className="ti ti-info-circle" style={{ color: 'var(--accent)', marginRight: 4 }} />
-                {tr('clickInstructions') || 'Cliquez sur la timeline pour définir :'}
-              </div>
-              <div style={{
+              <div style={{ 
+                fontSize: 11, 
+                color: 'var(--text-secondary)', 
                 display: 'flex',
-                gap: 12,
-                fontSize: 10,
-                color: 'var(--text-tertiary)'
+                alignItems: 'center',
+                gap: 8,
+                flexWrap: 'wrap'
               }}>
-                <span>1️⃣ {tr('clickStart') || 'Début'}</span>
-                <span>2️⃣ {tr('clickEnd') || 'Fin'}</span>
-                <span>3️⃣ {tr('clickDuration') || 'Durée'}</span>
-              </div>
-              <div style={{
-                marginTop: 6,
-                display: 'flex',
-                gap: 12,
-                fontSize: 9,
-                fontFamily: 'monospace',
-                color: 'var(--text-secondary)'
-              }}>
-                <span>Début: {formatTime(startValue)}</span>
-                <span>Fin: {formatTime(endValue)}</span>
-                <span>Durée: {formatTime(effectiveDuration)}</span>
+                <span>
+                  <i className="ti ti-info-circle" style={{ color: 'var(--accent)', marginRight: 4 }} />
+                  {tr('clickInstructions') || 'Cliquez sur la timeline :'}
+                </span>
+                <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                  1️⃣ {tr('clickStart') || 'Début'}
+                </span>
+                <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                  2️⃣ {tr('clickEnd') || 'Fin'}
+                </span>
+                <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                  3️⃣ {tr('clickDuration') || 'Durée'}
+                </span>
+                <span style={{
+                  fontSize: 9,
+                  fontFamily: 'monospace',
+                  color: 'var(--text-secondary)',
+                  marginLeft: 'auto'
+                }}>
+                  {formatTime(startValue)} → {formatTime(endValue)} ({formatTime(effectiveDuration)})
+                </span>
               </div>
               <button
                 onClick={handleDeactivateClickMode}
                 style={{
-                  marginTop: 6,
-                  padding: '2px 12px',
+                  marginTop: 4,
+                  padding: '2px 10px',
                   fontSize: 9,
                   borderRadius: 'var(--radius-sm)',
                   border: '1px solid var(--border)',
@@ -433,7 +437,6 @@ export default function TimelineLoopModal({
               gridTemplateColumns: '1fr 1fr',
               gap: 8
             }}>
-              {/* Début manuel */}
               <div>
                 <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
                   <i className="ti ti-arrow-right" style={{ marginRight: 4 }} />
@@ -457,8 +460,6 @@ export default function TimelineLoopModal({
                   }}
                 />
               </div>
-
-              {/* Fin manuelle */}
               <div>
                 <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
                   <i className="ti ti-arrow-left" style={{ marginRight: 4 }} />
@@ -514,7 +515,6 @@ export default function TimelineLoopModal({
               </span>
             </div>
 
-            {/* Options de durée simplifiées */}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {DURATION_OPTIONS.map(opt => (
                 <label
@@ -664,13 +664,13 @@ export default function TimelineLoopModal({
         {/* ✅ Boutons d'action */}
         <div className="modal-actions" style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button
-            className="btn-secondary"
+            className="btn-secondary btn-lg"
             onClick={onClose}
             style={{
               borderRadius: 'var(--radius-md)',
               minHeight: 40,
               minWidth: 120,
-              padding: '8px 24px',
+              padding: '8px 20px',
               fontSize: 13,
               display: 'flex',
               alignItems: 'center',
@@ -678,16 +678,16 @@ export default function TimelineLoopModal({
               gap: 6
             }}
           >
-            {t('cancel') || 'Annuler'}
+            <i className="ti ti-x" /> {t('cancel') || 'Annuler'}
           </button>
           <button
-            className="btn-primary"
+            className="btn-primary btn-lg"
             onClick={handleApply}
             style={{
               borderRadius: 'var(--radius-md)',
               minHeight: 40,
               minWidth: 140,
-              padding: '8px 24px',
+              padding: '8px 20px',
               background: 'var(--accent)',
               color: 'white',
               fontSize: 13,
@@ -697,8 +697,7 @@ export default function TimelineLoopModal({
               gap: 6
             }}
           >
-            <i className="ti ti-check" />
-            {t('apply') || 'Appliquer'}
+            <i className="ti ti-check" /> {t('apply') || 'Appliquer'}
           </button>
         </div>
 

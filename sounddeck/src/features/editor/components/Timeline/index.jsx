@@ -93,7 +93,7 @@ export default function EditorTimeline({
   const clipsContainerRef = useRef(null)
   const rulerContainerRef = useRef(null)
   const rulerInnerRef = useRef(null)
-  const loopContainerRef = useRef(null) // ✅ REF POUR LA BOUCLE
+  const loopContainerRef = useRef(null)
   const [isPanning, setIsPanning] = useState(false)
   const [panStartX, setPanStartX] = useState(0)
   const [scrollLeft, setScrollLeft] = useState(0)
@@ -116,12 +116,10 @@ export default function EditorTimeline({
     const scrollLeft = e.currentTarget.scrollLeft
     setScrollLeft(scrollLeft)
     
-    // ✅ Synchroniser la règle
     if (rulerInnerRef.current) {
       rulerInnerRef.current.style.transform = `translateX(-${scrollLeft}px)`
     }
     
-    // ✅ Synchroniser la boucle
     if (loopContainerRef.current) {
       loopContainerRef.current.style.transform = `translateX(-${scrollLeft}px)`
     }
@@ -204,7 +202,6 @@ export default function EditorTimeline({
   }, [totalWidth, pixelsPerSecond])
 
   const handleTimelineClick = useCallback((e) => {
-    // ✅ Si le mode clic de la boucle timeline est actif
     if (isTimelineClickModeActive && onTimelineClickForLoop) {
       const time = clientXToTime(e.clientX)
       if (time >= 0 && time <= totalDuration) {
@@ -236,7 +233,6 @@ export default function EditorTimeline({
   }, [isPendingAction, isTimelineClickModeActive, onTimelineClickForLoop, clientXToTime, totalDuration, onExecutePendingAction, onSeek])
 
   const handleRulerClick = useCallback((e) => {
-    // ✅ Si le mode clic de la boucle timeline est actif
     if (isTimelineClickModeActive && onTimelineClickForLoop) {
       const time = clientXToTime(e.clientX, rulerContainerRef.current)
       if (time >= 0 && time <= totalDuration) {
@@ -515,73 +511,6 @@ export default function EditorTimeline({
     })
   }
 
-  const renderPendingIndicator = () => {
-    if (!isPendingAction) return null
-    
-    const actionType = pendingAction?.type || 'action'
-    const label = actionType === 'loop' ? 'Boucle' : actionType === 'split' ? 'Split' : 'Action'
-    const icon = actionType === 'loop' ? '🔁' : '✂️'
-    const color = actionType === 'loop' ? 'var(--accent)' : 'var(--warning)'
-    
-    return (
-      <div style={{
-        position: 'absolute',
-        top: 8,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 20,
-        padding: '6px 20px',
-        background: color,
-        borderRadius: 'var(--radius-md)',
-        color: 'white',
-        fontSize: 13,
-        fontWeight: 500,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        boxShadow: `0 4px 20px ${color}66`,
-        animation: 'pulseIndicator 1.5s ease-in-out infinite'
-      }}>
-        <span style={{ fontSize: 16 }}>{icon}</span>
-        <span>Cliquez sur la timeline pour définir la {label}</span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onCancelPendingAction?.()
-          }}
-          style={{
-            background: 'rgba(255,255,255,0.2)',
-            border: 'none',
-            borderRadius: '50%',
-            color: 'white',
-            cursor: 'pointer',
-            padding: '2px 8px',
-            fontSize: 16,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'background 0.15s'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(255,255,255,0.3)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(255,255,255,0.2)'
-          }}
-          title="Annuler (Escape)"
-        >
-          <i className="ti ti-x" />
-        </button>
-        <style>{`
-          @keyframes pulseIndicator {
-            0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
-            50% { opacity: 0.85; transform: translateX(-50%) scale(1.02); }
-          }
-        `}</style>
-      </div>
-    )
-  }
-
   useEffect(() => {
     const clipsContainer = clipsContainerRef.current
     if (!clipsContainer) return
@@ -657,9 +586,8 @@ export default function EditorTimeline({
           onDoubleClick={handleRulerDoubleClick}
           onWheel={handleRulerWheel}
         >
-          {renderPendingIndicator()}
-          
-          {isTimelineClickModeActive && (
+          {/* ✅ INDICATEUR "Cliquez ici" - visible pour les DEUX modes (loop-clip ET loop-timeline) */}
+          {isPendingAction && (
             <div style={{
               position: 'absolute',
               top: 4,
@@ -676,10 +604,11 @@ export default function EditorTimeline({
               alignItems: 'center',
               gap: 8,
               boxShadow: '0 4px 20px var(--accent)66',
-              animation: 'pulseIndicator 1.5s ease-in-out infinite'
+              // ✅ EFFET DE PULSATION (grandir/rétrécir)
+              animation: 'clickHerePulse 1.2s ease-in-out infinite'
             }}>
               <i className="ti ti-click" />
-              <span>{'🖱️ Mode clic - Cliquez sur la timeline'}</span>
+              <span>🖱️ Cliquez ici</span>
             </div>
           )}
           
@@ -716,7 +645,7 @@ export default function EditorTimeline({
         </div>
       </div>
 
-      {/* ✅ Loop - TimelineLoop avec synchronisation du scroll */}
+      {/* Loop - TimelineLoop avec synchronisation du scroll */}
       <div style={{
         display: 'flex',
         height: 10,
@@ -816,8 +745,8 @@ export default function EditorTimeline({
               <div
                 key={`header-${track.id}`}
                 style={{
-                  height: 80,
-                  minHeight: 80,
+                  height: 96,
+                  minHeight: 96,
                   display: 'flex',
                   alignItems: 'center',
                   padding: '4px 8px',
@@ -1088,6 +1017,20 @@ export default function EditorTimeline({
           tr={tr}
         />
       </div>
+
+      {/* ✅ Animation pour "Cliquez ici" */}
+      <style>{`
+        @keyframes clickHerePulse {
+          0%, 100% { 
+            transform: translateX(-50%) scale(1);
+            opacity: 1;
+          }
+          50% { 
+            transform: translateX(-50%) scale(1.06);
+            opacity: 0.85;
+          }
+        }
+      `}</style>
     </div>
   )
 }

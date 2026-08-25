@@ -55,7 +55,6 @@ export default function ClipActionsMenu({
   clipDurations = {},
   loopState = {},
   tr,
-  // ✅ NOUVEAUX PROPS POUR LE DÉPLACEMENT VERTICAL
   onMoveUp,
   onMoveDown,
   canMoveUp,
@@ -91,44 +90,38 @@ export default function ClipActionsMenu({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [onClose])
 
-  // ✅ POSITIONNEMENT DYNAMIQUE - Se repositionne à chaque render
+  // ✅ POSITIONNEMENT DYNAMIQUE
   useEffect(() => {
     if (!menuRef.current) return
     
     const rect = menuRef.current.getBoundingClientRect()
     let { top, left } = position
     
-    // ✅ Marge de sécurité
     const MARGIN = 10
     
-    // ✅ Vérifier si le menu dépasse en bas
     if (rect.bottom > window.innerHeight - MARGIN) {
       top = position.top - rect.height - MARGIN
     }
     
-    // ✅ Vérifier si le menu dépasse en haut
     if (top < MARGIN) {
       top = MARGIN
     }
     
-    // ✅ Vérifier si le menu dépasse à droite
     if (rect.right > window.innerWidth - MARGIN) {
       left = position.left - rect.width - MARGIN
     }
     
-    // ✅ Vérifier si le menu dépasse à gauche
     if (left < MARGIN) {
       left = MARGIN
     }
     
-    // ✅ Appliquer la position
     if (top !== position.top || left !== position.left) {
       menuRef.current.style.top = top + 'px'
       menuRef.current.style.left = left + 'px'
     }
-  }, [position, showLoopSubmenu, activeTab]) // ✅ Se repositionne quand le sous-menu change
+  }, [position, showLoopSubmenu, activeTab])
 
-  // ✅ RECALCULER LA POSITION AU REDIMENSIONNEMENT DE LA FENÊTRE
+  // ✅ RECALCULER LA POSITION AU REDIMENSIONNEMENT
   useEffect(() => {
     const handleResize = () => {
       if (!menuRef.current) return
@@ -137,7 +130,6 @@ export default function ClipActionsMenu({
       let { top, left } = position
       const MARGIN = 10
       
-      // ✅ Vérifier si le menu dépasse
       if (rect.bottom > window.innerHeight - MARGIN) {
         top = position.top - rect.height - MARGIN
       }
@@ -207,7 +199,7 @@ export default function ClipActionsMenu({
       return
     }
     
-    // ✅ Si le mode est "Cliquer sur la timeline", on active le mode d'attente
+    // ✅ Si le mode est "Cliquer sur la timeline", on active le mode clic via l'overlay
     if (loopEndMode === 'manualClick') {
       console.log('🖱️ [ClipActionsMenu] Activation du mode clic pour la boucle')
       if (onActivateLoopManualClick) {
@@ -277,7 +269,6 @@ export default function ClipActionsMenu({
         padding: '8px 0',
         backdropFilter: 'blur(8px)',
         animation: 'fadeIn 0.15s ease',
-        // ✅ Limiter la hauteur max pour éviter de sortir de l'écran
         maxHeight: `calc(100vh - 20px)`,
         overflowY: 'auto'
       }}
@@ -688,6 +679,7 @@ export default function ClipActionsMenu({
                           onClick={(e) => {
                             e.stopPropagation()
                             console.log('🖱️ [ClipActionsMenu] Clic sur "Cliquer pour définir"')
+                            // ✅ Active l'overlay via le contexte
                             if (onActivateLoopManualClick) {
                               onActivateLoopManualClick(clip.id, trackId, {
                                 arrowColor: loopColor,
