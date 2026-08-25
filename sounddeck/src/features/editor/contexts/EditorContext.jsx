@@ -106,9 +106,9 @@ export function EditorProvider({ children, store, addToast }) {
   useEffect(() => { stopAtTimeRef.current = stopAtTime }, [stopAtTime])
   useEffect(() => { soloPlayClipIdRef.current = soloPlayClipId }, [soloPlayClipId])
 
-  // ─── SYNC masterGain avec la ref et mettre à jour les sources ──────
+  // ─── FONCTIONS VOLUME ──────────────────────────────────────────────────
 
-  // ✅ Fonction pour mettre à jour le gain de toutes les sources
+  // ✅ Fonction pour mettre à jour le gain de toutes les sources (volume maître)
   const updateMasterGain = useCallback((newGain) => {
     console.log(`🎚️ [EditorContext] Mise à jour du volume maître: ${newGain.toFixed(2)}`)
     
@@ -126,6 +126,30 @@ export function EditorProvider({ children, store, addToast }) {
         }
         const newGainValue = trackVolume * newGain
         entry.gainNode.gain.value = newGainValue
+      }
+    }
+  }, [projectRef])
+
+  // ✅ Fonction pour mettre à jour le volume d'une piste spécifique
+  const updateTrackVolume = useCallback((trackId, newVolume) => {
+    console.log(`🎚️ [EditorContext] Mise à jour du volume de la piste ${trackId}: ${newVolume.toFixed(2)}`)
+    
+    const masterVolume = masterGainRef.current || 1
+    
+    for (const [clipId, entry] of Object.entries(audioSourcesRef.current)) {
+      if (entry?.gainNode) {
+        if (projectRef.current?.tracks) {
+          for (const track of projectRef.current.tracks) {
+            if (track.id === trackId) {
+              const clip = track.clips.find(c => c.id === clipId)
+              if (clip) {
+                const newGainValue = newVolume * masterVolume
+                entry.gainNode.gain.value = newGainValue
+                break
+              }
+            }
+          }
+        }
       }
     }
   }, [projectRef])
@@ -1267,14 +1291,17 @@ export function EditorProvider({ children, store, addToast }) {
     setIsDirty(true)
   }, [project, store])
 
+  // ✅ MODIFIER setTrackVolume
   const setTrackVolume = useCallback((trackId, volume) => {
     if (!project) return
+    
+    const clampedVolume = Math.max(0, Math.min(5, volume))
     
     const updatedProject = {
       ...project,
       tracks: project.tracks.map(track => {
         if (track.id === trackId) {
-          return { ...track, volume }
+          return { ...track, volume: clampedVolume }
         }
         return track
       }),
@@ -1283,12 +1310,15 @@ export function EditorProvider({ children, store, addToast }) {
     setProject(updatedProject)
     projectRef.current = updatedProject
     
+    // ✅ Mettre à jour les sources audio en temps réel
+    updateTrackVolume(trackId, clampedVolume)
+    
     if (store?.updateEditorProject) {
       store.updateEditorProject(updatedProject).catch(() => {})
     }
     
     setIsDirty(true)
-  }, [project, store])
+  }, [project, store, updateTrackVolume])
 
   // ─── FONCTIONS CLIP ──────────────────────────────────────────────────
 

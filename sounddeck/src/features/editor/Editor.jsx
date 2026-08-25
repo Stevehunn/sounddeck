@@ -459,6 +459,51 @@ function EditorTimelineContent() {
     }
   }, [isMasterMuted, setMasterGain])
 
+  // ─── HANDLER RÉINITIALISER LES VOLUMES ──────────────────────────────
+
+  const handleResetVolumes = useCallback(() => {
+    console.log('🔄 [Editor] Réinitialisation de tous les volumes')
+    
+    // ✅ Réinitialiser le volume maître à 100%
+    setMasterVolume(100)
+    masterVolumeRef.current = 100
+    setMasterGain(1)
+    localStorage.setItem('sounddeck_master_volume', '100')
+    
+    // ✅ Réinitialiser toutes les pistes à 100%
+    if (project?.tracks) {
+      const updatedTracks = project.tracks.map(track => ({
+        ...track,
+        volume: 1
+      }))
+      
+      const updatedProject = {
+        ...project,
+        tracks: updatedTracks,
+        updatedAt: Date.now()
+      }
+      
+      setProject(updatedProject)
+      projectRef.current = updatedProject
+      
+      if (store?.updateEditorProject) {
+        store.updateEditorProject(updatedProject).catch(() => {})
+      }
+      
+      // ✅ Mettre à jour les sources audio en temps réel
+      if (context.setTrackVolume) {
+        for (const track of updatedTracks) {
+          context.setTrackVolume(track.id, 1)
+        }
+      }
+      
+      // ✅ Mettre à jour le volume maître pour toutes les sources
+      context.setMasterGain(1)
+      
+      addToast?.('✅ Tous les volumes réinitialisés à 100%', 'success')
+    }
+  }, [project, setProject, store, addToast, context, masterVolumeRef, setMasterVolume, setMasterGain])
+
   // ─── HANDLER MÉTRONOME ────────────────────────────────────────────────
 
   const handleToggleMetronome = useCallback((enabled) => {
@@ -1317,6 +1362,7 @@ function EditorTimelineContent() {
           onVolumeChange={handleMasterVolumeChange}
           isMuted={isMasterMuted}
           onMuteToggle={handleMasterMuteToggle}
+          onReset={handleResetVolumes}
           tr={t}
         />
         <div style={{ fontSize: 10, color: 'var(--text-tertiary)', display: 'flex', gap: 12 }}>

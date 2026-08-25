@@ -1,4 +1,4 @@
-// src/pages/editor/components/EditorMasterVolume/index.jsx
+// src/features/editor/components/MasterVolume/index.jsx
 import { useState, useCallback } from 'react'
 
 export default function EditorMasterVolume({
@@ -6,6 +6,7 @@ export default function EditorMasterVolume({
   onVolumeChange,
   isMuted = false,
   onMuteToggle,
+  onReset, // ✅ Nouveau prop
   peakMeter = 0,
   tr
 }) {
@@ -34,7 +35,7 @@ export default function EditorMasterVolume({
         background: 'var(--bg-tertiary)',
         borderRadius: 'var(--radius-sm)',
         border: '1px solid var(--border)',
-        minWidth: 160
+        minWidth: 180
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -105,6 +106,39 @@ export default function EditorMasterVolume({
       >
         {isMuted ? 'OFF' : `${Math.round(volume)}%`}
       </span>
+
+      {/* ✅ Bouton Réinitialiser */}
+      <button
+        className="btn-ghost btn-sm"
+        onClick={onReset}
+        style={{
+          fontSize: 12,
+          padding: '2px 6px',
+          color: 'var(--text-tertiary)',
+          cursor: 'pointer',
+          background: 'transparent',
+          border: 'none',
+          borderRadius: 'var(--radius-sm)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: 0.5,
+          transition: 'all 0.2s ease'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.opacity = '1'
+          e.currentTarget.style.color = 'var(--accent)'
+          e.currentTarget.style.background = 'var(--bg-hover)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = '0.5'
+          e.currentTarget.style.color = 'var(--text-tertiary)'
+          e.currentTarget.style.background = 'transparent'
+        }}
+        title={tr('editorResetVolumes') || 'Réinitialiser tous les volumes (maître + pistes) à 100%'}
+      >
+        <i className="ti ti-refresh" />
+      </button>
 
       {showTooltip && !isMuted && (
         <div style={{
