@@ -102,6 +102,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openDirectoryDialog: () => ipcRenderer.invoke('open-directory-dialog'),
   readFile: (filePath) => ipcRenderer.invoke('read-file', filePath),
 
+  // ─── PROJETS D'ÉDITION ────────────────────────────────────────────────────
+  saveEditorProject: (projectData) => ipcRenderer.invoke('save-editor-project', projectData),
+  loadEditorProject: (projectId) => ipcRenderer.invoke('load-editor-project', projectId),
+  getAllEditorProjects: () => ipcRenderer.invoke('get-all-editor-projects'),
+  getRecentEditorProjects: () => ipcRenderer.invoke('get-recent-editor-projects'),
+  deleteEditorProject: (projectId) => ipcRenderer.invoke('delete-editor-project', projectId),
+  renameEditorProject: (projectId, newName) => ipcRenderer.invoke('rename-editor-project', { projectId, newName }),
+  duplicateEditorProject: (projectId) => ipcRenderer.invoke('duplicate-editor-project', projectId),
+  exportEditorProject: (project, filePath) => ipcRenderer.invoke('export-editor-project', { project, filePath }),
+  importEditorProject: (filePath) => ipcRenderer.invoke('import-editor-project', filePath),
+
   // ─── DIVERS ──────────────────────────────────────────────────────────────
   isElectron: true,
 })

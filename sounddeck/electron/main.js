@@ -14,6 +14,7 @@ const {
   ipcHandlers,
   fileHandlers,
   diagnostic,
+  registerProjectHandlers,
 } = require('./modules')
 
 // ─── INITIALISATION ──────────────────────────────────────────────────────
@@ -61,6 +62,13 @@ function registerAllHandlers() {
   } else {
     console.error('❌ storeHandlers.registerStoreHandlers n\'est pas une fonction !')
   }
+  
+  // ✅ PROJETS - APRÈS storeHandlers
+  console.log('  📦 Enregistrement projectHandlers...')
+  const Store = require('electron-store')
+  const store = new Store()
+  registerProjectHandlers(store)
+  console.log('  ✅ projectHandlers enregistrés')
   
   console.log(`  📊 Handlers après store: ${ipcMain.eventNames().join(', ')}`)
   
@@ -128,10 +136,6 @@ function registerAllHandlers() {
     })
     console.log('  ✅ ipcHandlers.registerTrayUpdateHandler exécuté')
   }
-  
-  // ❌ SUPPRIMER LE DOUBLE ENREGISTREMENT DE fetch-myinstants
-  // Le handler est déjà enregistré dans ipcHandlers.registerSystemHandlers()
-  // Ne pas le réenregistrer ici !
   
   console.log('✅ Tous les handlers IPC enregistrés')
   console.log(`📊 Handlers finaux: ${ipcMain.eventNames().join(', ')}`)

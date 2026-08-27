@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import EditorMetronome from './EditorMetronome'
 import ImportFileModal from '../Modals/ImportFileModal'
+import ProjectControls from './ProjectControls'
 
 export default function EditorToolbar({
   tracks,
@@ -37,6 +38,21 @@ export default function EditorToolbar({
   onToggleMetronome,
   bpm,
   onBpmChange,
+  // ✅ PROPS PROJETS
+  project,
+  projectList,
+  recentProjects,
+  isSaving,
+  isLoading,
+  onSaveProject,
+  onLoadProject,
+  onCreateProject,
+  onDeleteProject,
+  onDuplicateProject,
+  onProjectRename,  // ← Pour le modal
+  onLoadProjectList,
+  onExportProject,
+  onImportProject,
 }) {
   const [showAddClip, setShowAddClip] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
@@ -358,6 +374,27 @@ export default function EditorToolbar({
         totalDuration={totalDuration}
         enabled={metronomeEnabled || false}
         onToggle={onToggleMetronome}
+        tr={tr}
+      />
+
+      <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
+
+      {/* ✅ PROJETS */}
+      <ProjectControls
+        project={project}
+        projectList={projectList}
+        recentProjects={recentProjects}
+        isSaving={isSaving}
+        isLoading={isLoading}
+        onSaveProject={onSaveProject}
+        onLoadProject={onLoadProject}
+        onCreateProject={onCreateProject}
+        onDeleteProject={onDeleteProject}
+        onDuplicateProject={onDuplicateProject}
+        onRenameProject={onProjectRename}  // ← Utilise onProjectRename
+        onLoadProjectList={onLoadProjectList}
+        onExportProject={onExportProject}
+        onImportProject={onImportProject}
         tr={tr}
       />
 

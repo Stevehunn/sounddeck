@@ -20,6 +20,7 @@ import { mixdownProject, exportMixdown } from '@shared/utils/mixdown'
 import { normalizeClip } from '@shared/utils/normalizeUtils'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
 import useConfirm from '@shared/hooks/useConfirm'
+import useProjectManager from './hooks/useProjectManager'
 
 export default function Editor({ store, addToast }) {
   return (
@@ -66,7 +67,31 @@ function EditorContent() {
         <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{t('editorNoProjectDesc')}</div>
         <button 
           className="btn-primary btn-sm"
-          onClick={() => context.store?.createEditorProject?.('Nouveau projet')}
+          onClick={() => {
+            const newProject = {
+              id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              name: 'Nouveau projet',
+              tracks: [],
+              markers: [],
+              loops: {
+                clips: {},
+                timeline: {
+                  enabled: false,
+                  start: 0,
+                  end: 10,
+                  color: '#7C6FF7',
+                  durationMode: 'cycles',
+                  cycleCount: 3,
+                  manualDuration: 10
+                }
+              },
+              duration: 60,
+              createdAt: Date.now(),
+              updatedAt: Date.now()
+            }
+            context.setProject(newProject)
+            context.store?.updateEditorProject?.(newProject)
+          }}
           style={{ marginTop: 8 }}
         >
           <i className="ti ti-plus" /> {t('editorCreateProject')}
@@ -189,6 +214,9 @@ function EditorTimelineContent() {
 
   // ✅ REF POUR LE VOLUME MAÎTRE
   const masterVolumeRef = useRef(100)
+
+  // ✅ HOOK DE GESTION DES PROJETS
+  const projectManager = useProjectManager(store, project, setProject, addToast)
 
   // ─── RESTAURATION DES PRÉFÉRENCES ────────────────────────────────────
 
@@ -445,13 +473,11 @@ function EditorTimelineContent() {
     const newMuted = !isMasterMuted
     setIsMasterMuted(newMuted)
     if (newMuted) {
-      // Mute : sauvegarder la valeur actuelle et mettre à 0
       const currentValue = masterVolumeRef.current
       setMasterVolume(currentValue)
       setMasterGain(0)
       console.log(`🔇 Mute activé (volume sauvegardé: ${currentValue}%)`)
     } else {
-      // Unmute : restaurer la valeur sauvegardée
       const restoredValue = masterVolumeRef.current || 100
       setMasterVolume(restoredValue)
       setMasterGain(restoredValue / 100)
@@ -464,13 +490,11 @@ function EditorTimelineContent() {
   const handleResetVolumes = useCallback(() => {
     console.log('🔄 [Editor] Réinitialisation de tous les volumes')
     
-    // ✅ Réinitialiser le volume maître à 100%
     setMasterVolume(100)
     masterVolumeRef.current = 100
     setMasterGain(1)
     localStorage.setItem('sounddeck_master_volume', '100')
     
-    // ✅ Réinitialiser toutes les pistes à 100%
     if (project?.tracks) {
       const updatedTracks = project.tracks.map(track => ({
         ...track,
@@ -484,22 +508,18 @@ function EditorTimelineContent() {
       }
       
       setProject(updatedProject)
-      projectRef.current = updatedProject
       
       if (store?.updateEditorProject) {
         store.updateEditorProject(updatedProject).catch(() => {})
       }
       
-      // ✅ Mettre à jour les sources audio en temps réel
       if (context.setTrackVolume) {
         for (const track of updatedTracks) {
           context.setTrackVolume(track.id, 1)
         }
       }
       
-      // ✅ Mettre à jour le volume maître pour toutes les sources
       context.setMasterGain(1)
-      
       addToast?.('✅ Tous les volumes réinitialisés à 100%', 'success')
     }
   }, [project, setProject, store, addToast, context, masterVolumeRef, setMasterVolume, setMasterGain])
@@ -1187,6 +1207,12 @@ function EditorTimelineContent() {
     isEnabled: true
   })
 
+  console.log('🔍 [Editor] Props passées à EditorToolbar:', {
+    hasOnRenameProject: typeof projectManager.renameProject === 'function',
+    projectId: project?.id,
+    projectName: project?.name
+  })
+
   // ─── RENDU ──────────────────────────────────────────────────────────────
 
   return (
@@ -1219,7 +1245,19 @@ function EditorTimelineContent() {
         autoCrossfade={autoCrossfade}
         onToggleCrossfade={() => setAutoCrossfade(!autoCrossfade)}
         projectName={project?.name || 'Nouveau projet'}
-        onRenameProject={store?.updateEditorProjectName || (() => {})}
+        // ✅ Renommage depuis la toolbar - wrapper qui passe project.id
+        onRenameProject={async (newName) => {
+          console.log('✏️ [TOOLBAR] Renommage depuis toolbar:', newName)
+          if (!newName || !newName.trim()) {
+            addToast?.('Nom invalide', 'warning')
+            return
+          }
+          const result = await projectManager.renameProject(project.id, newName.trim())
+          if (result) {
+            setProject(result)
+            addToast?.(`Projet renommé en "${newName}"`, 'success')
+          }
+        }}
         onRefreshDurations={handleRefreshDurations}
         tr={t}
         addToast={addToast}
@@ -1230,6 +1268,22 @@ function EditorTimelineContent() {
         onToggleMetronome={handleToggleMetronome}
         bpm={bpm}
         onBpmChange={handleBpmChange}
+        // ✅ PROPS PROJETS
+        project={project}
+        projectList={projectManager.projectList}
+        recentProjects={projectManager.recentProjects}
+        isSaving={projectManager.isSaving}
+        isLoading={projectManager.isLoading}
+        onSaveProject={projectManager.saveProject}
+        onLoadProject={projectManager.loadProject}
+        onCreateProject={projectManager.createProject}
+        onDeleteProject={projectManager.deleteProject}
+        onDuplicateProject={projectManager.duplicateProject}
+        // ✅ Pour le modal - on passe la fonction brute avec un nom différent
+        onProjectRename={projectManager.renameProject}
+        onLoadProjectList={projectManager.loadProjectList}
+        onExportProject={projectManager.exportProject}
+        onImportProject={projectManager.importProject}
       />
 
       <div style={{ 

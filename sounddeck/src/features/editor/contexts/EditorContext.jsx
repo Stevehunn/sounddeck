@@ -204,15 +204,26 @@ export function EditorProvider({ children, store, addToast }) {
   // ─── CHARGEMENT DU PROJET ──────────────────────────────────────────────
 
   const loadProject = useCallback(async (projectData) => {
+    console.log('📂 [EditorContext] loadProject appelé avec:', projectData?.id, projectData?.name)
+    console.log('📂 [EditorContext] projectData complet:', JSON.stringify(projectData, null, 2))
+    
     if (!projectData) {
+      console.log('📂 [EditorContext] projectData est null/undefined, initialisation terminée')
       setIsInitialized(true)
       return
     }
 
     if (project?.id === projectData.id && project?.tracks?.length === projectData.tracks?.length) {
+      console.log('📂 [EditorContext] Projet déjà chargé, skip')
       setIsInitialized(true)
       return
     }
+
+    if (!projectData.name) {
+      projectData.name = 'Nouveau projet'
+    }
+
+    console.log('📂 [EditorContext] Chargement du projet:', projectData.name)
 
     setProject(projectData)
     projectRef.current = projectData
@@ -224,6 +235,20 @@ export function EditorProvider({ children, store, addToast }) {
     setIsDurationsLoaded(false)
     setIsInitialized(true)
     setSoloPlayClipId(null)
+    
+    try {
+      // ✅ Sauvegarder l'ID du projet actuel dans le store
+      await window.electronAPI.storeSet?.('currentEditorProjectId', projectData.id)
+      console.log('💾 [EditorContext] currentEditorProjectId sauvegardé:', projectData.id)
+      
+      // ✅ Mettre à jour store.editorProject avec le projet chargé
+      if (store?.updateEditorProject) {
+        await store.updateEditorProject(projectData)
+        console.log('💾 [EditorContext] store.editorProject mis à jour avec:', projectData.name)
+      }
+    } catch (e) {
+      console.warn('⚠️ [EditorContext] Erreur lors de la sauvegarde:', e)
+    }
     
     if (projectData.loops) {
       console.log('🔄 [EditorContext] Chargement des boucles:', projectData.loops)
@@ -254,7 +279,9 @@ export function EditorProvider({ children, store, addToast }) {
       setClipDurations(durations)
       setIsDurationsLoaded(true)
     }
-  }, [project])
+    
+    console.log('✅ [EditorContext] Projet chargé avec succès:', projectData.name)
+  }, [project, store])
 
   // ─── INITIALISATION ──────────────────────────────────────────────────────
 
@@ -265,15 +292,40 @@ export function EditorProvider({ children, store, addToast }) {
     
     const init = async () => {
       try {
-        const editorProject = store?.editorProject
+        // ✅ Récupérer l'ID du projet actuel depuis le store
+        let currentProjectId = null
+        try {
+          currentProjectId = await window.electronAPI.storeGet?.('currentEditorProjectId')
+          console.log('📂 [EditorContext] currentEditorProjectId récupéré:', currentProjectId)
+        } catch (e) {
+          console.warn('Impossible de récupérer currentEditorProjectId:', e)
+        }
+        
+        // ✅ Essayer de charger depuis le store d'abord
+        let editorProject = store?.editorProject
+        
+        // ✅ Si pas de projet dans le store mais un ID existe, charger depuis l'ID
+        if (!editorProject && currentProjectId) {
+          try {
+            const result = await window.electronAPI.loadEditorProject?.(currentProjectId)
+            if (result?.success) {
+              editorProject = result.project
+              console.log('📂 [EditorContext] Projet chargé depuis ID:', editorProject?.name)
+            }
+          } catch (e) {
+            console.warn('Erreur chargement projet depuis ID:', e)
+          }
+        }
         
         if (editorProject) {
           await loadProject(editorProject)
         } else {
+          // ✅ Créer un nouveau projet par défaut
           const newProject = await store?.createEditorProject?.('Nouveau projet')
           if (newProject) {
             await loadProject(newProject)
           } else {
+            // Fallback
             const fallbackProject = {
               id: `project-${Date.now()}`,
               name: 'Nouveau projet',
@@ -305,6 +357,8 @@ export function EditorProvider({ children, store, addToast }) {
           }
         }
       } catch (e) {
+        console.error('❌ Erreur initialisation:', e)
+        // Fallback
         const fallbackProject = {
           id: `project-${Date.now()}`,
           name: 'Nouveau projet',
