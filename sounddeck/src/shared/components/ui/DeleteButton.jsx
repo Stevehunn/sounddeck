@@ -15,6 +15,7 @@ const DeleteButton = ({
   disabled = false,
   icon = 'ti-trash',
   label = 'Supprimer',
+  deleteLabel, // ✅ Personnalisation du texte du bouton
   showLabel = false,
   variant = 'ghost',
   type = 'danger',
@@ -25,6 +26,9 @@ const DeleteButton = ({
   const [isHovering, setIsHovering] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
 
+  // ✅ Utiliser deleteLabel s'il est fourni, sinon label, sinon la traduction par défaut
+  const displayLabel = deleteLabel || label || t('delete') || 'Supprimer'
+
   const handleClick = async (e) => {
     e?.stopPropagation?.()
     
@@ -34,11 +38,28 @@ const DeleteButton = ({
     }
     
     try {
+      // ✅ Construire le message : si itemName est déjà dans le message, ne pas le dupliquer
+      let finalMessage = confirmMessage
+      
+      // ✅ Vérifier si le message contient déjà le nom (via {name} ou "nom")
+      const hasNamePlaceholder = confirmMessage.includes('{name}')
+      const hasNameInMessage = confirmMessage.includes(`"${itemName}"`) || confirmMessage.includes(itemName)
+      
+      // ✅ Si itemName est fourni et que le message ne contient pas déjà le nom
+      if (itemName && !hasNamePlaceholder && !hasNameInMessage) {
+        // ✅ Si le message se termine par "?" ou ":", ajouter le nom entre guillemets
+        if (confirmMessage.endsWith('?') || confirmMessage.endsWith(':')) {
+          finalMessage = confirmMessage + ` "${itemName}"`
+        } else {
+          finalMessage = confirmMessage + ` "${itemName}"`
+        }
+      }
+      
       const confirmed = await confirm({
         title: confirmTitle,
-        message: confirmMessage + (itemName ? ` "${itemName}"` : ''),
+        message: finalMessage,
         type: type,
-        confirmText: label,
+        confirmText: displayLabel,
         cancelText: t('cancel') || 'Annuler',
       })
       
@@ -129,10 +150,10 @@ const DeleteButton = ({
           ...sizeStyles,
           ...style,
         }}
-        title={label}
+        title={displayLabel}
       >
         <i className={`ti ${icon}`} style={{ fontSize: size === 'sm' ? 12 : 14 }} />
-        {showLabel && <span>{label}</span>}
+        {showLabel && <span>{displayLabel}</span>}
       </button>
       
       <ConfirmWrapper />

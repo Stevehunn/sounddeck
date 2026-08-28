@@ -2,27 +2,24 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
-// ✅ Couleurs pour la flèche de boucle
 const ARROW_COLORS = [
-  { id: 'green', color: '#22c55e', label: 'Vert' },
-  { id: 'blue', color: '#3b82f6', label: 'Bleu' },
-  { id: 'purple', color: '#8b5cf6', label: 'Violet' },
-  { id: 'pink', color: '#ec4899', label: 'Rose' },
-  { id: 'red', color: '#ef4444', label: 'Rouge' },
-  { id: 'orange', color: '#f97316', label: 'Orange' },
-  { id: 'yellow', color: '#eab308', label: 'Jaune' },
-  { id: 'cyan', color: '#06b6d4', label: 'Cyan' },
+  { id: 'green', color: '#22c55e', labelKey: 'markerColorGreen' },
+  { id: 'blue', color: '#3b82f6', labelKey: 'markerColorBlue' },
+  { id: 'purple', color: '#8b5cf6', labelKey: 'markerColorPurple' },
+  { id: 'pink', color: '#ec4899', labelKey: 'markerColorPink' },
+  { id: 'red', color: '#ef4444', labelKey: 'markerColorRed' },
+  { id: 'orange', color: '#f97316', labelKey: 'markerColorOrange' },
+  { id: 'yellow', color: '#eab308', labelKey: 'markerColorYellow' },
+  { id: 'cyan', color: '#06b6d4', labelKey: 'markerColorCyan' },
 ]
 
-// ✅ Options de fin de boucle
 const LOOP_END_OPTIONS = [
-  { id: 'endOfTrack', label: 'Jusqu\'à la fin de la piste', icon: 'ti-flag' },
-  { id: 'cycles', label: 'Nombre de cycles', icon: 'ti-repeat' },
-  { id: 'manualDuration', label: 'Durée manuelle', icon: 'ti-clock' },
-  { id: 'manualClick', label: 'Cliquer sur la timeline', icon: 'ti-mouse' },
+  { id: 'endOfTrack', labelKey: 'editorLoopEndOfTrack', icon: 'ti-flag' },
+  { id: 'cycles', labelKey: 'editorLoopCycles', icon: 'ti-repeat' },
+  { id: 'manualDuration', labelKey: 'editorLoopManualDuration', icon: 'ti-clock' },
+  { id: 'manualClick', labelKey: 'editorLoopManualClick', icon: 'ti-mouse' },
 ]
 
-// ✅ Map des icônes pour l'affichage dans le menu contextuel
 const EFFECT_ICON_MAP = {
   volume: 'ti-volume',
   fadeIn: 'ti-sunrise',
@@ -64,25 +61,18 @@ export default function ClipActionsMenu({
   const menuRef = useRef(null)
   const [showLoopSubmenu, setShowLoopSubmenu] = useState(false)
   const [activeTab, setActiveTab] = useState('edit')
-  
-  // ✅ État pour la boucle
   const [loopColor, setLoopColor] = useState('#22c55e')
   const [loopEndMode, setLoopEndMode] = useState('endOfTrack')
   const [cycleCount, setCycleCount] = useState(3)
   const [manualDuration, setManualDuration] = useState(10)
   const [showColorPicker, setShowColorPicker] = useState(false)
 
-  console.log('📋 [ClipActionsMenu] Rendu du menu pour clip:', clip?.id, 'nom:', clip?.name)
-
-  // ✅ Vérifier si le clip est déjà en boucle
   const isClipLooping = clip?.id && loopState?.clips?.[clip.id]?.enabled || false
   const clipLoopData = clip?.id ? loopState?.clips?.[clip.id] : null
 
-  // ✅ Fermer le menu au clic extérieur
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
-        console.log('📋 [ClipActionsMenu] Clic extérieur, fermeture')
         onClose()
       }
     }
@@ -90,46 +80,35 @@ export default function ClipActionsMenu({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [onClose])
 
-  // ✅ POSITIONNEMENT DYNAMIQUE
   useEffect(() => {
     if (!menuRef.current) return
-    
     const rect = menuRef.current.getBoundingClientRect()
     let { top, left } = position
-    
     const MARGIN = 10
-    
     if (rect.bottom > window.innerHeight - MARGIN) {
       top = position.top - rect.height - MARGIN
     }
-    
     if (top < MARGIN) {
       top = MARGIN
     }
-    
     if (rect.right > window.innerWidth - MARGIN) {
       left = position.left - rect.width - MARGIN
     }
-    
     if (left < MARGIN) {
       left = MARGIN
     }
-    
     if (top !== position.top || left !== position.left) {
       menuRef.current.style.top = top + 'px'
       menuRef.current.style.left = left + 'px'
     }
   }, [position, showLoopSubmenu, activeTab])
 
-  // ✅ RECALCULER LA POSITION AU REDIMENSIONNEMENT
   useEffect(() => {
     const handleResize = () => {
       if (!menuRef.current) return
-      
       const rect = menuRef.current.getBoundingClientRect()
       let { top, left } = position
       const MARGIN = 10
-      
       if (rect.bottom > window.innerHeight - MARGIN) {
         top = position.top - rect.height - MARGIN
       }
@@ -142,18 +121,15 @@ export default function ClipActionsMenu({
       if (left < MARGIN) {
         left = MARGIN
       }
-      
       if (top !== position.top || left !== position.left) {
         menuRef.current.style.top = top + 'px'
         menuRef.current.style.left = left + 'px'
       }
     }
-    
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [position])
 
-  // ✅ Charger les données de boucle existantes
   useEffect(() => {
     if (clipLoopData) {
       setLoopColor(clipLoopData.arrowColor || '#22c55e')
@@ -163,10 +139,7 @@ export default function ClipActionsMenu({
     }
   }, [clipLoopData])
 
-  if (!clip) {
-    console.warn('📋 [ClipActionsMenu] clip est null/undefined, pas de rendu')
-    return null
-  }
+  if (!clip) return null
 
   const hasActiveEffects = clip.effects?.some(e => e.enabled) || false
   const duration = clipDurations?.[clip.id] || clip.duration || 3
@@ -180,75 +153,78 @@ export default function ClipActionsMenu({
     }
   }
 
+  // ✅ handleDeleteClick - Ferme le menu et appelle onDelete après un délai
   const handleDeleteClick = () => {
-    console.log('🗑️ [ClipActionsMenu] Clic sur Supprimer pour:', clip.id)
+    // ✅ Fermer le menu immédiatement
     onClose()
-    onDelete?.(trackId, clip.id)
+    
+    // ✅ Appeler onDelete après un court délai pour que le menu ait le temps de se fermer
+    setTimeout(() => {
+      if (onDelete) {
+        onDelete(trackId, clip.id, clip.name)
+      }
+    }, 50)
   }
 
-  // ✅ Handler pour activer/désactiver la boucle
   const handleToggleLoop = () => {
-    console.log('🔄 [ClipActionsMenu] Toggle boucle pour:', clip.id)
-    
     if (isClipLooping) {
-      console.log('🔄 [ClipActionsMenu] Désactivation de la boucle')
-      onToggleClipLoop?.(clip.id, {
-        enabled: false
-      })
+      onToggleClipLoop?.(clip.id, { enabled: false })
       onClose()
       return
     }
-    
-    // ✅ Si le mode est "Cliquer sur la timeline", on active le mode clic via l'overlay
+
     if (loopEndMode === 'manualClick') {
-      console.log('🖱️ [ClipActionsMenu] Activation du mode clic pour la boucle')
       if (onActivateLoopManualClick) {
-        onActivateLoopManualClick(clip.id, trackId, {
-          arrowColor: loopColor,
-        })
+        onActivateLoopManualClick(clip.id, trackId, { arrowColor: loopColor })
       }
       onClose()
       return
     }
-    
+
     const options = {
       arrowColor: loopColor,
       loopMode: loopEndMode,
       cycleCount: loopEndMode === 'cycles' ? cycleCount : undefined,
       manualDuration: loopEndMode === 'manualDuration' ? manualDuration : undefined,
     }
-    
-    console.log('🔄 [ClipActionsMenu] Activation de la boucle avec options:', options)
-    
+
     onToggleClipLoop?.(clip.id, options)
     onClose()
   }
 
-  // ✅ Handler pour l'option "Split avec clic"
   const handleSplitWithClick = () => {
-    console.log('✂️ [ClipActionsMenu] Split avec clic sur la timeline')
     if (onActivateSplitManualClick) {
       onActivateSplitManualClick(clip.id, trackId)
     }
     onClose()
   }
 
-  // ✅ Handler pour ajouter un effet
   const handleAddEffectClick = () => {
-    console.log('✨ [ClipActionsMenu] Ouvrir le panneau des effets pour:', clip.id, clip.name)
     onClose()
     if (onAddEffect) {
       onAddEffect(clip.id, trackId)
     }
   }
 
-  // ✅ Handler pour l'aperçu des effets
   const handlePreviewEffectsClick = () => {
-    console.log('👂 [ClipActionsMenu] Ouvrir le panneau des effets pour aperçu:', clip.id, clip.name)
     onClose()
     if (onAddEffect) {
       onAddEffect(clip.id, trackId)
     }
+  }
+
+  const colorLabels = {}
+  ARROW_COLORS.forEach(c => {
+    colorLabels[c.id] = tr(c.labelKey) || c.id
+  })
+
+  const effectLabels = {
+    volume: tr('editorEffectVolume') || 'Volume',
+    fadeIn: tr('editorEffectFadeIn') || 'Fade In',
+    fadeOut: tr('editorEffectFadeOut') || 'Fade Out',
+    speed: tr('editorEffectSpeed') || 'Vitesse',
+    echo: tr('editorEffectEcho') || 'Écho',
+    reverb: tr('editorEffectReverb') || 'Réverbération',
   }
 
   return (
@@ -269,7 +245,7 @@ export default function ClipActionsMenu({
         padding: '8px 0',
         backdropFilter: 'blur(8px)',
         animation: 'fadeIn 0.15s ease',
-        maxHeight: `calc(100vh - 20px)`,
+        maxHeight: 'calc(100vh - 20px)',
         overflowY: 'auto'
       }}
     >
@@ -307,9 +283,9 @@ export default function ClipActionsMenu({
         marginBottom: 4
       }}>
         {[
-          { id: 'edit', icon: 'ti-pencil', label: t('editorClipEdit') || 'Édition' },
-          { id: 'audio', icon: 'ti-volume', label: t('editorAudioEdit') || 'Audio' },
-          { id: 'effects', icon: 'ti-wand', label: t('editorEffects') || 'Effets' }
+          { id: 'edit', icon: 'ti-pencil', labelKey: 'editorClipEdit' },
+          { id: 'audio', icon: 'ti-volume', labelKey: 'editorAudioEdit' },
+          { id: 'effects', icon: 'ti-wand', labelKey: 'editorEffects' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -328,7 +304,7 @@ export default function ClipActionsMenu({
             }}
           >
             <i className={`ti ${tab.icon}`} style={{ marginRight: 4 }} />
-            {tab.label}
+            {tr(tab.labelKey) || tab.labelKey}
           </button>
         ))}
       </div>
@@ -336,7 +312,6 @@ export default function ClipActionsMenu({
       <div style={{ padding: '0 4px' }}>
         {activeTab === 'edit' && (
           <div className="menu-group">
-            {/* ✅ BOUTONS DE DÉPLACEMENT VERTICAL */}
             <div style={{
               display: 'flex',
               gap: 4,
@@ -345,27 +320,21 @@ export default function ClipActionsMenu({
             }}>
               <MenuItem 
                 icon="ti-arrow-up" 
-                label={t('editorMoveUp') || 'Monter'} 
-                onClick={() => { 
-                  console.log('⬆️ [ClipActionsMenu] Monter le clip:', clip.id)
-                  onMoveUp?.(trackId, clip.id)
-                  onClose() 
-                }}
+                labelKey="editorMoveUp"
+                onClick={() => { onMoveUp?.(trackId, clip.id); onClose() }}
                 disabled={!canMoveUp}
                 shortcut="↑"
                 style={{ flex: 1 }}
+                tr={tr}
               />
               <MenuItem 
                 icon="ti-arrow-down" 
-                label={t('editorMoveDown') || 'Descendre'} 
-                onClick={() => { 
-                  console.log('⬇️ [ClipActionsMenu] Descendre le clip:', clip.id)
-                  onMoveDown?.(trackId, clip.id)
-                  onClose() 
-                }}
+                labelKey="editorMoveDown"
+                onClick={() => { onMoveDown?.(trackId, clip.id); onClose() }}
                 disabled={!canMoveDown}
                 shortcut="↓"
                 style={{ flex: 1 }}
+                tr={tr}
               />
             </div>
 
@@ -373,41 +342,34 @@ export default function ClipActionsMenu({
 
             <MenuItem 
               icon="ti-copy" 
-              label={t('editorCopy') || 'Copier'} 
-              onClick={() => { 
-                console.log('📋 [ClipActionsMenu] Copier:', clip.id)
-                onCopy?.(clip.id, trackId)
-                onClose() 
-              }} 
+              labelKey="editorCopy"
+              onClick={() => { onCopy?.(clip.id, trackId); onClose() }}
               shortcut="Ctrl+C"
+              tr={tr}
             />
             <MenuItem 
               icon="ti-scissors" 
-              label={t('editorCut') || 'Couper'} 
-              onClick={() => { 
-                console.log('✂️ [ClipActionsMenu] Couper:', clip.id)
-                onCut?.(clip.id, trackId)
-                onClose() 
-              }} 
+              labelKey="editorCut"
+              onClick={() => { onCut?.(clip.id, trackId); onClose() }}
               shortcut="Ctrl+X"
+              tr={tr}
             />
             <MenuItem 
               icon="ti-copy" 
-              label={t('editorDuplicate') || 'Dupliquer'} 
-              onClick={() => { 
-                console.log('📋 [ClipActionsMenu] Dupliquer:', clip.id)
-                onDuplicate?.(trackId, clip.id)
-                onClose() 
-              }} 
+              labelKey="editorDuplicate"
+              onClick={() => { onDuplicate?.(trackId, clip.id); onClose() }}
               shortcut="Ctrl+D"
+              tr={tr}
             />
             
+            {/* ✅ MenuItem Delete - Utilise handleDeleteClick avec délai */}
             <MenuItem 
               icon="ti-trash" 
-              label={t('editorDelete') || 'Supprimer'} 
+              labelKey="editorDelete"
               onClick={handleDeleteClick}
               shortcut="Delete"
               danger
+              tr={tr}
             />
           </div>
         )}
@@ -416,41 +378,32 @@ export default function ClipActionsMenu({
           <div className="menu-group">
             <MenuItem 
               icon="ti-cut" 
-              label={t('editorTrim') || 'Rogner'} 
-              onClick={() => { 
-                console.log('✂️ [ClipActionsMenu] Rogner:', clip.id)
-                onTrim?.(clip.id)
-                onClose() 
-              }} 
+              labelKey="editorTrim"
+              onClick={() => { onTrim?.(clip.id); onClose() }}
               shortcut="Ctrl+R"
+              tr={tr}
             />
-            
             <MenuItem 
               icon="ti-scissors" 
-              label={t('editorSplitAtMiddle') || 'Split au milieu'} 
+              labelKey="editorSplitAtMiddle"
               onClick={handleSplitMid}
               shortcut="S"
+              tr={tr}
             />
-            
-            {/* ✅ Split avec clic sur la timeline */}
             <MenuItem 
               icon="ti-scissors" 
-              label={t('editorSplitWithClick') || '✂️ Split avec clic'} 
+              labelKey="editorSplitWithClick"
               onClick={handleSplitWithClick}
               shortcut="C"
+              tr={tr}
             />
-            
             <MenuItem 
               icon="ti-adjustments-horizontal" 
-              label={t('editorNormalize') || 'Normaliser'} 
-              onClick={() => { 
-                console.log('📊 [ClipActionsMenu] Normaliser:', clip.id)
-                onNormalize?.(clip.id)
-                onClose() 
-              }} 
+              labelKey="editorNormalize"
+              onClick={() => { onNormalize?.(clip.id); onClose() }}
+              tr={tr}
             />
             
-            {/* ✅ BOUCLE - Sous-menu simplifié */}
             <div style={{ padding: '2px 4px' }}>
               <button
                 onClick={() => {
@@ -488,7 +441,7 @@ export default function ClipActionsMenu({
               >
                 <i className={`ti ${isClipLooping ? 'ti-repeat' : 'ti-repeat-off'}`} style={{ fontSize: 14, minWidth: 18 }} />
                 <span style={{ flex: 1, textAlign: 'left' }}>
-                  {isClipLooping ? t('editorLoopActive') || 'Boucle active' : t('editorLoop') || 'Boucle'}
+                  {isClipLooping ? (tr('editorLoopActive') || 'Boucle active') : (tr('editorLoop') || 'Boucle')}
                 </span>
                 {isClipLooping && (
                   <span style={{
@@ -504,7 +457,6 @@ export default function ClipActionsMenu({
                 <i className={`ti ${showLoopSubmenu ? 'ti-chevron-up' : 'ti-chevron-right'}`} style={{ fontSize: 12, color: 'var(--text-tertiary)' }} />
               </button>
               
-              {/* ✅ Sous-menu de la boucle simplifié */}
               {showLoopSubmenu && (
                 <div style={{
                   marginTop: 4,
@@ -513,10 +465,9 @@ export default function ClipActionsMenu({
                   borderRadius: 'var(--radius-sm)',
                   border: '1px solid var(--border)'
                 }}>
-                  {/* ✅ Sélecteur de couleur */}
                   <div style={{ marginBottom: 6 }}>
                     <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                      {t('editorLoopColor') || 'Couleur de la flèche'}
+                      {tr('editorLoopColor') || 'Couleur de la flèche'}
                     </div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
                       {ARROW_COLORS.map(c => (
@@ -534,7 +485,7 @@ export default function ClipActionsMenu({
                             outline: 'none',
                             flexShrink: 0
                           }}
-                          title={c.label}
+                          title={colorLabels[c.id]}
                         />
                       ))}
                       <button
@@ -553,7 +504,7 @@ export default function ClipActionsMenu({
                           color: 'white',
                           textShadow: '0 1px 2px rgba(0,0,0,0.5)'
                         }}
-                        title="Couleur personnalisée"
+                        title={tr('customColor') || 'Couleur personnalisée'}
                       >
                         +
                       </button>
@@ -584,10 +535,9 @@ export default function ClipActionsMenu({
                     )}
                   </div>
 
-                  {/* ✅ Options de fin de boucle */}
                   <div style={{ marginBottom: 6 }}>
                     <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                      {t('editorLoopEnd') || 'Fin de la boucle'}
+                      {tr('editorLoopEnd') || 'Fin de la boucle'}
                     </div>
                     
                     {LOOP_END_OPTIONS.map(opt => (
@@ -614,7 +564,7 @@ export default function ClipActionsMenu({
                           style={{ width: 'auto', accentColor: 'var(--accent)', margin: 0 }}
                         />
                         <i className={`ti ${opt.icon}`} style={{ fontSize: 12, color: 'var(--text-secondary)' }} />
-                        <span style={{ flex: 1 }}>{opt.label}</span>
+                        <span style={{ flex: 1 }}>{tr(opt.labelKey) || opt.id}</span>
                         
                         {opt.id === 'cycles' && loopEndMode === 'cycles' && (
                           <input
@@ -678,18 +628,14 @@ export default function ClipActionsMenu({
                           }}
                           onClick={(e) => {
                             e.stopPropagation()
-                            console.log('🖱️ [ClipActionsMenu] Clic sur "Cliquer pour définir"')
-                            // ✅ Active l'overlay via le contexte
                             if (onActivateLoopManualClick) {
-                              onActivateLoopManualClick(clip.id, trackId, {
-                                arrowColor: loopColor,
-                              })
+                              onActivateLoopManualClick(clip.id, trackId, { arrowColor: loopColor })
                             }
                             onClose()
                           }}
                           >
                             <i className="ti ti-click" style={{ fontSize: 10 }} />
-                            Cliquer pour définir
+                            {tr('editorLoopClickToDefine') || 'Cliquer pour définir'}
                           </span>
                         )}
                       </label>
@@ -712,8 +658,8 @@ export default function ClipActionsMenu({
                   >
                     <i className="ti ti-check" /> 
                     {isClipLooping 
-                      ? (t('editorLoopUpdate') || 'Mettre à jour')
-                      : (t('editorLoopActivate') || 'Activer la boucle')
+                      ? (tr('editorLoopUpdate') || 'Mettre à jour')
+                      : (tr('editorLoopActivate') || 'Activer la boucle')
                     }
                   </button>
                 </div>
@@ -726,16 +672,18 @@ export default function ClipActionsMenu({
           <div className="menu-group">
             <MenuItem 
               icon="ti-plus" 
-              label={t('editorAddEffect') || 'Ouvrir le panneau des effets'} 
+              labelKey="editorOpenEffectsPanel"
               onClick={handleAddEffectClick}
               accent
+              tr={tr}
             />
             
             <MenuItem 
               icon="ti-wave" 
-              label={t('editorEffectPreview') || 'Ouvrir le panneau des effets (aperçu)'} 
+              labelKey="editorEffectPreview"
               onClick={handlePreviewEffectsClick}
               disabled={!hasActiveEffects}
+              tr={tr}
             />
             
             <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
@@ -750,18 +698,20 @@ export default function ClipActionsMenu({
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px'
                 }}>
-                  {t('editorActiveEffects') || 'Effets actifs'}
+                  {tr('editorActiveEffects') || 'Effets actifs'}
                 </div>
                 {clip.effects.filter(e => e.enabled).map(effect => {
                   const effectIcon = EFFECT_ICON_MAP[effect.type] || 'ti-wand'
+                  const effectLabel = effectLabels[effect.type] || effect.type
                   return (
                     <MenuItem 
                       key={effect.id}
                       icon={effectIcon}
-                      label={`${effect.type} (${Object.values(effect.params).map(v => typeof v === 'number' ? v.toFixed(2) : v).join(', ')})`}
+                      label={`${effectLabel} (${Object.values(effect.params).map(v => typeof v === 'number' ? v.toFixed(2) : v).join(', ')})`}
                       onClick={() => {}}
                       small
                       muted
+                      tr={tr}
                     />
                   )
                 })}
@@ -776,7 +726,7 @@ export default function ClipActionsMenu({
                 fontStyle: 'italic',
                 textAlign: 'center'
               }}>
-                {t('editorNoEffects') || 'Aucun effet actif'}
+                {tr('editorNoEffects') || 'Aucun effet actif'}
               </div>
             )}
           </div>
@@ -795,6 +745,7 @@ export default function ClipActionsMenu({
 
 function MenuItem({ 
   icon, 
+  labelKey, 
   label, 
   onClick, 
   shortcut, 
@@ -805,9 +756,11 @@ function MenuItem({
   hasSubmenu, 
   small, 
   muted,
-  style
+  style,
+  tr
 }) {
   const [hovered, setHovered] = useState(false)
+  const displayLabel = label || (labelKey ? tr(labelKey) : '')
 
   return (
     <button
@@ -835,7 +788,7 @@ function MenuItem({
       }}
     >
       <i className={`ti ${icon}`} style={{ fontSize: small ? 12 : 14, minWidth: small ? 16 : 18 }} />
-      <span style={{ flex: 1, textAlign: 'left' }}>{label}</span>
+      <span style={{ flex: 1, textAlign: 'left' }}>{displayLabel}</span>
       {shortcut && (
         <span style={{
           fontSize: 9,

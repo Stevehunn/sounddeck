@@ -62,7 +62,6 @@ export default function NormalizeModal({
           </span>
         </div>
 
-        {/* Méthode */}
         <div style={{ marginBottom: 16 }}>
           <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
             {tr('editorNormalizeMethod') || 'Méthode de normalisation'}
@@ -107,7 +106,6 @@ export default function NormalizeModal({
           </div>
         </div>
 
-        {/* Cible */}
         <div style={{ marginBottom: 16 }}>
           <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
             {tr('editorNormalizeTarget') || 'Niveau cible'}: {Math.round(target * 100)}% ({Math.round(20 * Math.log10(target) * 10) / 10} dB)
@@ -127,7 +125,6 @@ export default function NormalizeModal({
           </div>
         </div>
 
-        {/* Gain max */}
         <div style={{ marginBottom: 16 }}>
           <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
             {tr('editorNormalizeMaxGain') || 'Gain maximum'}: {maxGain}x ({Math.round(20 * Math.log10(maxGain) * 10) / 10} dB)
@@ -147,7 +144,6 @@ export default function NormalizeModal({
           </div>
         </div>
 
-        {/* Aperçu */}
         {previewGain !== null && (
           <div style={{
             padding: '8px 12px',
@@ -167,7 +163,6 @@ export default function NormalizeModal({
           </div>
         )}
 
-        {/* Actions - Bouton Annuler plus large */}
         <div className="modal-actions" style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button
             className="btn-secondary"
@@ -185,7 +180,7 @@ export default function NormalizeModal({
               gap: 6
             }}
           >
-            {t('cancel') || 'Annuler'}
+            {tr('cancel') || 'Annuler'}
           </button>
           <button
             className="btn-primary"
@@ -206,9 +201,9 @@ export default function NormalizeModal({
             }}
           >
             {isProcessing ? (
-              <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('editorNormalizing') || 'Normalisation...'}</>
+              <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('editorNormalizing') || 'Normalisation...'}</>
             ) : (
-              <><i className="ti ti-wave" /> {t('editorNormalize') || 'Normaliser'}</>
+              <><i className="ti ti-wave" /> {tr('editorNormalize') || 'Normaliser'}</>
             )}
           </button>
         </div>

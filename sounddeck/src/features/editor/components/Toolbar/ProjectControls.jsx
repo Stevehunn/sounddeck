@@ -13,14 +13,12 @@ export default function ProjectControls({
   onCreateProject,
   onDeleteProject,
   onDuplicateProject,
-  onRenameProject,  // ← UNE SEULE PROP - reçue du parent
+  onRenameProject,
   onLoadProjectList,
   onExportProject,
   onImportProject,
   tr
 }) {
-  console.log('🔍 [ProjectControls] onRenameProject est une fonction?', typeof onRenameProject === 'function')
-
   const [showProjectManager, setShowProjectManager] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
@@ -52,8 +50,6 @@ export default function ProjectControls({
         const filePath = result[0]
         if (filePath.endsWith('.sounddeck') || filePath.endsWith('.json')) {
           await onImportProject?.(filePath)
-        } else {
-          // addToast?.('Format de fichier non supporté. Utilisez .sounddeck ou .json', 'warning')
         }
       }
     } catch (e) {
@@ -108,7 +104,7 @@ export default function ProjectControls({
           ) : (
             <i className="ti ti-device-floppy" />
           )}
-          <span>{isSaving ? tr('saving') || 'Sauvegarde...' : tr('save') || 'Sauvegarder'}</span>
+          <span>{isSaving ? (tr('saving') || 'Sauvegarde...') : (tr('save') || 'Sauvegarder')}</span>
         </button>
 
         <div style={{ position: 'relative' }}>
@@ -157,7 +153,7 @@ export default function ProjectControls({
               >
                 <i className="ti ti-file-export" />
                 {isExporting ? (
-                  <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> Export...</>
+                  <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('exporting') || 'Export...'}</>
                 ) : (
                   tr('exportProject') || '📤 Exporter le projet'
                 )}
@@ -178,7 +174,7 @@ export default function ProjectControls({
               >
                 <i className="ti ti-file-import" />
                 {isImporting ? (
-                  <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> Import...</>
+                  <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('importing') || 'Import...'}</>
                 ) : (
                   tr('importProject') || '📥 Importer un projet'
                 )}
@@ -198,7 +194,7 @@ export default function ProjectControls({
         onCreateProject={onCreateProject}
         onDeleteProject={onDeleteProject}
         onDuplicateProject={onDuplicateProject}
-        onRenameProject={onRenameProject}  // ← Utilise la prop reçue
+        onRenameProject={onRenameProject}
         tr={tr}
       />
     </>

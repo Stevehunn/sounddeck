@@ -2,22 +2,20 @@
 import React, { useState, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
-// ✅ Couleurs pour la boucle générale
 const LOOP_COLORS = [
-  { id: 'purple', color: '#7C6FF7', label: 'Violet' },
-  { id: 'blue', color: '#3b82f6', label: 'Bleu' },
-  { id: 'green', color: '#22c55e', label: 'Vert' },
-  { id: 'cyan', color: '#06b6d4', label: 'Cyan' },
-  { id: 'pink', color: '#ec4899', label: 'Rose' },
-  { id: 'red', color: '#ef4444', label: 'Rouge' },
-  { id: 'orange', color: '#f97316', label: 'Orange' },
-  { id: 'yellow', color: '#eab308', label: 'Jaune' },
+  { id: 'purple', color: '#7C6FF7', labelKey: 'loopColorPurple' },
+  { id: 'blue', color: '#3b82f6', labelKey: 'loopColorBlue' },
+  { id: 'green', color: '#22c55e', labelKey: 'loopColorGreen' },
+  { id: 'cyan', color: '#06b6d4', labelKey: 'loopColorCyan' },
+  { id: 'pink', color: '#ec4899', labelKey: 'loopColorPink' },
+  { id: 'red', color: '#ef4444', labelKey: 'loopColorRed' },
+  { id: 'orange', color: '#f97316', labelKey: 'loopColorOrange' },
+  { id: 'yellow', color: '#eab308', labelKey: 'loopColorYellow' },
 ]
 
-// ✅ Options pour la durée (simplifiée)
 const DURATION_OPTIONS = [
-  { id: 'cycles', label: 'Nombre de cycles', icon: 'ti-repeat' },
-  { id: 'manualDuration', label: 'Durée manuelle', icon: 'ti-clock' },
+  { id: 'cycles', labelKey: 'loopDurationCycles', icon: 'ti-repeat' },
+  { id: 'manualDuration', labelKey: 'loopDurationManual', icon: 'ti-clock' },
 ]
 
 export default function TimelineLoopModal({
@@ -44,7 +42,6 @@ export default function TimelineLoopModal({
     manualDuration: 10,
   }
 
-  // ✅ États locaux
   const [enabled, setEnabled] = useState(timelineLoop.enabled || false)
   const [color, setColor] = useState(timelineLoop.color || '#7C6FF7')
   const [durationMode, setDurationMode] = useState(timelineLoop.durationMode || 'cycles')
@@ -55,7 +52,6 @@ export default function TimelineLoopModal({
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [selectionMode, setSelectionMode] = useState('manual')
 
-  // ✅ Réinitialiser quand le modal s'ouvre
   useEffect(() => {
     if (isOpen) {
       setEnabled(timelineLoop.enabled || false)
@@ -69,7 +65,6 @@ export default function TimelineLoopModal({
     }
   }, [isOpen, timelineLoop])
 
-  // ✅ Mettre à jour les valeurs depuis le mode clic
   useEffect(() => {
     if (clickModeData && isClickModeActive) {
       if (clickModeData.start !== undefined) {
@@ -86,12 +81,10 @@ export default function TimelineLoopModal({
 
   if (!isOpen) return null
 
-  // ✅ Calculer le début effectif
   const effectiveStart = startValue
   const effectiveEnd = Math.max(effectiveStart + 0.5, endValue)
   const effectiveDuration = Math.max(0.1, effectiveEnd - effectiveStart)
 
-  // ✅ Calculer la durée en fonction du mode
   const getTotalDuration = () => {
     switch (durationMode) {
       case 'cycles':
@@ -107,17 +100,6 @@ export default function TimelineLoopModal({
     const finalStart = startValue
     const finalEnd = Math.max(finalStart + 0.5, endValue)
     const totalDurationValue = getTotalDuration()
-    
-    console.log('🔄 [TimelineLoopModal] Application:', {
-      enabled,
-      start: finalStart,
-      end: finalEnd,
-      totalDuration: totalDurationValue,
-      color,
-      durationMode,
-      cycleCount,
-      manualDuration
-    })
     
     onApply({
       enabled,
@@ -142,27 +124,26 @@ export default function TimelineLoopModal({
     return `${s.toFixed(1)}s`
   }
 
-  // ✅ Activer le mode clic - utilise le nouveau système d'overlay
   const handleActivateClickMode = () => {
-    console.log('🖱️ [TimelineLoopModal] Activation du mode clic')
     setSelectionMode('click')
-    // ✅ Appeler le handler du parent qui active l'overlay
     if (onActivateClickMode) {
       onActivateClickMode(true)
     }
   }
 
-  // ✅ Désactiver le mode clic
   const handleDeactivateClickMode = () => {
-    console.log('🖱️ [TimelineLoopModal] Désactivation du mode clic')
     setSelectionMode('manual')
     if (onActivateClickMode) {
       onActivateClickMode(false)
     }
   }
 
-  // ✅ Voir si le mode clic est actif
   const isClickActive = selectionMode === 'click' && isClickModeActive
+
+  const colorLabels = {}
+  LOOP_COLORS.forEach(c => {
+    colorLabels[c.id] = tr(c.labelKey) || c.id
+  })
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -172,7 +153,6 @@ export default function TimelineLoopModal({
           {tr('timelineLoop') || 'Boucle générale'}
         </div>
 
-        {/* ✅ SECTION 1 : Activation et Couleur */}
         <div style={{
           background: 'var(--bg-tertiary)',
           borderRadius: 'var(--radius-md)',
@@ -210,7 +190,6 @@ export default function TimelineLoopModal({
             </button>
           </div>
 
-          {/* Couleur */}
           <div>
             <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
               {tr('loopColor') || 'Couleur'}
@@ -230,7 +209,7 @@ export default function TimelineLoopModal({
                     transition: 'all 0.15s',
                     outline: 'none'
                   }}
-                  title={c.label}
+                  title={colorLabels[c.id]}
                 />
               ))}
               <button
@@ -249,7 +228,7 @@ export default function TimelineLoopModal({
                   color: 'white',
                   textShadow: '0 1px 2px rgba(0,0,0,0.5)'
                 }}
-                title="Couleur personnalisée"
+                title={tr('customColor') || 'Couleur personnalisée'}
               >
                 +
               </button>
@@ -281,7 +260,6 @@ export default function TimelineLoopModal({
           </div>
         </div>
 
-        {/* ✅ SECTION 2 : Définir la zone de boucle */}
         <div style={{
           background: 'var(--bg-tertiary)',
           borderRadius: 'var(--radius-md)',
@@ -309,7 +287,6 @@ export default function TimelineLoopModal({
             </span>
           </div>
 
-          {/* ✅ Deux options : Cliquer ou Manuel */}
           <div style={{
             display: 'flex',
             gap: 8,
@@ -373,7 +350,6 @@ export default function TimelineLoopModal({
             </button>
           </div>
 
-          {/* ✅ Mode clic - Instructions compactes */}
           {isClickActive && (
             <div style={{
               padding: '6px 10px',
@@ -430,7 +406,6 @@ export default function TimelineLoopModal({
             </div>
           )}
 
-          {/* ✅ Mode manuel - Début et Fin avec inputs */}
           {!isClickActive && (
             <div style={{
               display: 'grid',
@@ -487,7 +462,6 @@ export default function TimelineLoopModal({
           )}
         </div>
 
-        {/* ✅ SECTION 3 : Durée de la boucle (UNIQUEMENT en mode manuel) */}
         {!isClickActive && (
           <div style={{
             background: 'var(--bg-tertiary)',
@@ -541,12 +515,11 @@ export default function TimelineLoopModal({
                     style={{ width: 'auto', accentColor: 'var(--accent)', margin: 0 }}
                   />
                   <i className={`ti ${opt.icon}`} style={{ fontSize: 11, color: 'var(--text-secondary)' }} />
-                  <span>{opt.label}</span>
+                  <span>{tr(opt.labelKey) || opt.id}</span>
                 </label>
               ))}
             </div>
 
-            {/* ✅ Paramètres supplémentaires selon le mode */}
             {durationMode === 'cycles' && (
               <div style={{
                 marginTop: 8,
@@ -636,7 +609,6 @@ export default function TimelineLoopModal({
           </div>
         )}
 
-        {/* ✅ Aperçu de la zone */}
         <div style={{
           padding: '8px 12px',
           background: `linear-gradient(90deg, ${color}20, ${color}05)`,
@@ -661,7 +633,6 @@ export default function TimelineLoopModal({
           </span>
         </div>
 
-        {/* ✅ Boutons d'action */}
         <div className="modal-actions" style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button
             className="btn-secondary btn-lg"
@@ -678,7 +649,7 @@ export default function TimelineLoopModal({
               gap: 6
             }}
           >
-            <i className="ti ti-x" /> {t('cancel') || 'Annuler'}
+            <i className="ti ti-x" /> {tr('cancel') || 'Annuler'}
           </button>
           <button
             className="btn-primary btn-lg"
@@ -697,11 +668,10 @@ export default function TimelineLoopModal({
               gap: 6
             }}
           >
-            <i className="ti ti-check" /> {t('apply') || 'Appliquer'}
+            <i className="ti ti-check" /> {tr('apply') || 'Appliquer'}
           </button>
         </div>
 
-        {/* ✅ Note */}
         <div style={{
           marginTop: 12,
           fontSize: 10,

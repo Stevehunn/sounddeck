@@ -151,18 +151,14 @@ export default function EditorTimeline({
     if (hasInitializedRef.current) return
     hasInitializedRef.current = true
     
-    console.log('📍 [Timeline] Chargement initial UNIQUE de la préférence')
-    
     const autoOpen = getAutoOpenPreference()
     
     if (!autoOpen) {
-      console.log('📍 [Timeline] Auto-open désactivé, panneau fermé')
       setShowMarkersPanel(false)
       setIsInitialized(true)
       return
     }
     
-    console.log('📍 [Timeline] Auto-open activé, ouverture du panneau')
     setShowMarkersPanel(true)
     localStorage.setItem(STORAGE_KEY, 'true')
     setIsInitialized(true)
@@ -170,22 +166,17 @@ export default function EditorTimeline({
   }, [onAddMarker, getAutoOpenPreference])
 
   const handleToggleMarkersPanel = useCallback((show) => {
-    console.log('📍 [Timeline] handleToggleMarkersPanel:', show)
     setShowMarkersPanel(show)
     localStorage.setItem(STORAGE_KEY, String(show))
-    console.log('📍 [Timeline] Préférence sauvegardée:', show)
   }, [])
 
   const handleAutoOpenChange = useCallback((autoOpen) => {
-    console.log('📍 [Timeline] Auto-open changed:', autoOpen)
     localStorage.setItem(AUTO_OPEN_KEY, String(autoOpen))
     
     if (autoOpen) {
-      console.log('📍 [Timeline] Auto-open activé, ouverture du panneau')
       setShowMarkersPanel(true)
       localStorage.setItem(STORAGE_KEY, 'true')
     } else {
-      console.log('📍 [Timeline] Auto-open désactivé, fermeture du panneau')
       setShowMarkersPanel(false)
       localStorage.setItem(STORAGE_KEY, 'false')
     }
@@ -215,7 +206,6 @@ export default function EditorTimeline({
     if (isPendingAction) {
       const time = clientXToTime(e.clientX)
       if (time >= 0 && time <= totalDuration) {
-        console.log('🖱️ [Timeline] Clic en mode d\'attente à', time)
         onExecutePendingAction?.(time)
       }
       return
@@ -246,7 +236,6 @@ export default function EditorTimeline({
     if (isPendingAction) {
       const time = clientXToTime(e.clientX, rulerContainerRef.current)
       if (time >= 0 && time <= totalDuration) {
-        console.log('🖱️ [Timeline] Clic sur règle en mode d\'attente à', time)
         onExecutePendingAction?.(time)
       }
       return
@@ -272,17 +261,16 @@ export default function EditorTimeline({
           const end = start + duration
           if (time > start + 0.05 && time < end - 0.05) {
             onSplitClip(selectedTrackId, selectedClipId, time)
-            addToast?.('Clip coupé à la position du curseur', 'success')
+            addToast?.(tr('editorSplitSuccess') || 'Clip coupé à la position du curseur', 'success')
           }
         }
       }
     }
-  }, [clientXToTime, totalDuration, onSeek, selectedClipId, selectedTrackId, tracks, clipDurations, onSplitClip, addToast])
+  }, [clientXToTime, totalDuration, onSeek, selectedClipId, selectedTrackId, tracks, clipDurations, onSplitClip, addToast, tr])
 
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && isPendingAction) {
-        console.log('🖱️ [Timeline] Annulation du mode d\'attente (Escape)')
         onCancelPendingAction?.()
       }
     }
@@ -383,7 +371,7 @@ export default function EditorTimeline({
               boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
             }}>
               <span>🔚</span>
-              <span>FIN</span>
+              <span>{tr('loopEndLabel') || 'FIN'}</span>
               {loopMode === 'cycles' && totalCycles > 1 && (
                 <span style={{ opacity: 0.6 }}>({totalCycles}x)</span>
               )}
@@ -537,8 +525,6 @@ export default function EditorTimeline({
   }
 
   const shouldShowPanel = isInitialized && showMarkersPanel && onAddMarker
-  
-  console.log('📍 [Timeline] Render - showMarkersPanel:', showMarkersPanel, 'initialized:', isInitialized)
 
   return (
     <div
@@ -586,7 +572,6 @@ export default function EditorTimeline({
           onDoubleClick={handleRulerDoubleClick}
           onWheel={handleRulerWheel}
         >
-          {/* ✅ INDICATEUR "Cliquez ici" - visible pour les DEUX modes (loop-clip ET loop-timeline) */}
           {isPendingAction && (
             <div style={{
               position: 'absolute',
@@ -604,11 +589,10 @@ export default function EditorTimeline({
               alignItems: 'center',
               gap: 8,
               boxShadow: '0 4px 20px var(--accent)66',
-              // ✅ EFFET DE PULSATION (grandir/rétrécir)
               animation: 'clickHerePulse 1.2s ease-in-out infinite'
             }}>
               <i className="ti ti-click" />
-              <span>🖱️ Cliquez ici</span>
+              <span>{tr('clickHere') || '🖱️ Cliquez ici'}</span>
             </div>
           )}
           
@@ -891,7 +875,7 @@ export default function EditorTimeline({
                 gap: 4
               }}>
                 <i className="ti ti-flag" style={{ color: 'var(--accent)' }} />
-                {tr?.('editorMarkers') || 'Marqueurs'}
+                {tr('editorMarkers') || 'Marqueurs'}
                 <span style={{
                   fontSize: 9,
                   fontWeight: 400,
@@ -904,7 +888,6 @@ export default function EditorTimeline({
               <button
                 className="btn-ghost btn-sm btn-icon"
                 onClick={() => {
-                  console.log('📍 [Timeline] Fermeture manuelle du panneau')
                   handleToggleMarkersPanel(false)
                 }}
                 style={{
@@ -915,7 +898,7 @@ export default function EditorTimeline({
                   minHeight: 20,
                   borderRadius: 'var(--radius-sm)'
                 }}
-                title="Fermer le panneau des marqueurs"
+                title={tr('close') || 'Fermer le panneau des marqueurs'}
               >
                 <i className="ti ti-x" />
               </button>
@@ -946,7 +929,6 @@ export default function EditorTimeline({
           <button
             className="btn-secondary btn-sm"
             onClick={() => {
-              console.log('📍 [Timeline] Ouverture manuelle du panneau')
               handleToggleMarkersPanel(true)
             }}
             style={{
@@ -975,10 +957,10 @@ export default function EditorTimeline({
               e.currentTarget.style.borderColor = 'var(--border)'
               e.currentTarget.style.background = 'var(--bg-secondary)'
             }}
-            title={tr?.('editorMarkers') || 'Afficher les marqueurs'}
+            title={tr('editorMarkers') || 'Afficher les marqueurs'}
           >
             <i className="ti ti-flag" />
-            {tr?.('editorMarkers') || 'Marqueurs'}
+            {tr('editorMarkers') || 'Marqueurs'}
             <span style={{
               fontSize: 9,
               color: 'var(--text-tertiary)',
@@ -1018,7 +1000,6 @@ export default function EditorTimeline({
         />
       </div>
 
-      {/* ✅ Animation pour "Cliquez ici" */}
       <style>{`
         @keyframes clickHerePulse {
           0%, 100% { 

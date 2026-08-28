@@ -1,7 +1,6 @@
 // src/features/editor/components/Modals/ProjectManagerModal.jsx
-
 import React, { useState, useEffect } from 'react'
-import { DeleteButton } from '@shared/components/ui'  // ✅ Garder l'import
+import { DeleteButton } from '@shared/components/ui'
 
 export default function ProjectManagerModal({
   isOpen,
@@ -44,42 +43,22 @@ export default function ProjectManagerModal({
     onClose()
   }
 
-  // ✅ Fonction handleDelete - Délègue entièrement à DeleteButton
   const handleDelete = (projectId) => {
-    // DeleteButton gère déjà la confirmation, on appelle juste onDeleteProject
     onDeleteProject?.(projectId)
   }
 
   const handleRename = (projectId, e) => {
-    console.log('🔍 [MODAL] handleRename appelé avec:', { 
-      projectId, 
-      isRenaming, 
-      renameValue,
-      'onRenameProject est une fonction?': typeof onRenameProject === 'function'
-    })
     e?.stopPropagation()
     
     if (isRenaming === projectId) {
       const trimmedName = renameValue.trim()
-      console.log('🔍 [MODAL] trimmedName:', trimmedName)
       if (trimmedName) {
-        console.log(`✏️ [MODAL] Renommage du projet ${projectId} en: "${trimmedName}"`)
-        console.log('🔍 [MODAL] Appel de onRenameProject avec:', { projectId, trimmedName })
-        
-        if (typeof onRenameProject === 'function') {
-          const result = onRenameProject(projectId, trimmedName)
-          console.log('📤 [MODAL] Résultat du renommage:', result)
-        } else {
-          console.error('❌ [MODAL] onRenameProject n\'est pas une fonction!', onRenameProject)
-        }
-      } else {
-        console.warn('⚠️ [MODAL] Nom invalide pour le renommage')
+        onRenameProject?.(projectId, trimmedName)
       }
       setIsRenaming(null)
       setRenameValue('')
     } else {
       const project = projects.find(p => p.id === projectId)
-      console.log('🔍 [MODAL] Passage en mode renommage pour:', project?.name)
       setIsRenaming(projectId)
       setRenameValue(project?.name || '')
     }
@@ -293,7 +272,6 @@ export default function ProjectManagerModal({
                         value={renameValue}
                         onChange={e => setRenameValue(e.target.value)}
                         onKeyDown={(e) => handleRenameKeyDown(e, p.id)}
-                        onBlur={() => {}}
                         autoFocus
                         style={{
                           fontSize: 13,
@@ -320,7 +298,7 @@ export default function ProjectManagerModal({
                           alignItems: 'center',
                           justifyContent: 'center'
                         }}
-                        title="Valider le renommage"
+                        title={tr('confirm') || 'Valider le renommage'}
                       >
                         <i className="ti ti-check" />
                       </button>
@@ -341,7 +319,7 @@ export default function ProjectManagerModal({
                           alignItems: 'center',
                           justifyContent: 'center'
                         }}
-                        title="Annuler le renommage"
+                        title={tr('cancel') || 'Annuler le renommage'}
                       >
                         <i className="ti ti-x" />
                       </button>
@@ -363,8 +341,8 @@ export default function ProjectManagerModal({
                         flexWrap: 'wrap'
                       }}>
                         <span>🕐 {formatDate(p.updatedAt || p.createdAt)}</span>
-                        <span>📊 {p.tracks?.length || 0} pistes</span>
-                        <span>🎵 {p.tracks?.flatMap(t => t.clips).length || 0} clips</span>
+                        <span>📊 {p.tracks?.length || 0} {tr('editorTracks') || 'pistes'}</span>
+                        <span>🎵 {p.tracks?.flatMap(t => t.clips).length || 0} {tr('editorClips') || 'clips'}</span>
                         {p.id === currentProjectId && (
                           <span style={{ color: 'var(--success)' }}>● {tr('current') || 'Actuel'}</span>
                         )}
@@ -406,15 +384,15 @@ export default function ProjectManagerModal({
                       >
                         <i className="ti ti-copy" />
                       </button>
-                      {/* ✅ Bouton Supprimer - DeleteButton gère la confirmation */}
+                      {/* ✅ Bouton Supprimer - CORRIGÉ avec deleteLabel */}
                       <DeleteButton
                         onDelete={() => onDeleteProject?.(p.id)}
                         confirmTitle={tr('confirmDeleteProject') || 'Confirmer la suppression du projet'}
-                        confirmMessage={tr('confirmDeleteProjectMessage') || `Voulez-vous vraiment supprimer définitivement le projet "${p.name}" ?`}
-                        itemName={p.name}
+                        confirmMessage={(tr('confirmDeleteProjectMessage') || 'Voulez-vous vraiment supprimer définitivement le projet "{name}" ?').replace('{name}', p.name)}
                         size="sm"
                         variant="ghost"
                         icon="ti-trash"
+                        deleteLabel={tr('delete') || 'Supprimer'}
                       />
                     </>
                   )}

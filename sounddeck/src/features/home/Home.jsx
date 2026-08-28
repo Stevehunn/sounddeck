@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+// src/features/home/Home.jsx
+import { useState, useEffect, useRef, useCallback } from 'react'
 import SoundCard from '@shared/components/audio/SoundCard'
 import AudioTrimmer from '@shared/components/audio/AudioTrimmer'
 import ProfileManagerModal from '@shared/components/modals/ProfileManagerModal'
@@ -44,7 +45,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
 
   const favoriteSoundsForProfile = currentSounds.filter(s => s.favorites?.includes(currentProfileId) || false)
 
-  // Calculer les colonnes en fonction de la taille des cartes
   useEffect(() => {
     const calculateColumns = () => {
       if (!gridRef.current) return
@@ -65,7 +65,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
     return () => window.removeEventListener('resize', calculateColumns)
   }, [store.cardSize])
 
-  // Filtrer les sons avec recherche par tags
   const filtered = searchTerm
     ? currentSounds.filter(s => {
         const nameMatch = s.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -96,7 +95,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
     return currentSounds.filter(s => s.favorites?.includes(currentProfileId) || false)
   }
 
-  // ─── Drag & Drop ──────────────────────────────────────────────────────────
   const handleDragStart = (e, soundId, index, source) => {
     if (sortBy !== 'custom') {
       addToast('Le drag and drop est disponible uniquement en tri "Personnalisé"', 'info')
@@ -225,7 +223,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
     addToast(t('soundMoved'), 'success')
   }
 
-  // ─── Import ──────────────────────────────────────────────────────────────
   const handleImportFiles = async (filePaths) => {
     setTotalFiles(filePaths.length)
     setImportProgress(0)
@@ -238,7 +235,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
       const fp = filePaths[i]
       let result = await window.electronAPI.importSoundFile(fp)
       
-      // Si la compression est activée, compresser le fichier
       if (result.success && compressOnImport) {
         try {
           const originalPath = result.path
@@ -351,7 +347,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
         }
         
         if (result.success) {
-          // Compression si activée
           if (compressOnImport) {
             try {
               const originalPath = result.path
@@ -690,6 +685,7 @@ function Section({ title, icon, iconColor, count, muted, children }) {
 
 function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLocally, store, addToast, lang, gridRef, draggable, onDragStart, onDragEnd, onDragOver, onDrop, draggedSoundId, dragOverIndex, dropTarget }) {
   const { t, currentLang } = useLanguage()
+  const { confirm } = useConfirm({ lang: currentLang })
   const cardSize = store.cardSize || 'medium'
   
   const cardSizes = {
@@ -698,6 +694,25 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLo
     large: 140
   }
   
+  // ✅ Fonction de suppression avec le nom du son
+  const handleDeleteSound = useCallback(async (soundId) => {
+    const sound = store.sounds.find(s => s.id === soundId)
+    if (!sound) return
+    
+    const confirmed = await confirm({
+      title: t('confirmDeleteSound') || 'Confirmer la suppression du son',
+      message: (t('confirmDeleteSoundMessage') || `Voulez-vous vraiment supprimer définitivement le son "{name}" ?`).replace('{name}', sound.name),
+      type: 'danger',
+      confirmText: t('delete') || 'Supprimer',
+      cancelText: t('cancel') || 'Annuler'
+    })
+    
+    if (confirmed) {
+      await store.deleteSound(soundId)
+      addToast(t('deleted'), 'info')
+    }
+  }, [store, confirm, addToast, t])
+
   return (
     <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${cardSizes[cardSize]}px, 1fr))`, gap: 10, position: 'relative', zIndex: 1 }}>
       {sounds.map((s, index) => {
@@ -750,7 +765,8 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLo
               onVolumeChange={store.updateSoundVolume}
               onPlay={store.incrementPlayCount}
               onRemoveFromProfile={async (id) => { await store.removeSoundFromProfile(id, store.currentProfileId); addToast(t('removedFromProfile'), 'info') }}
-              onDelete={async (id) => { await store.deleteSound(id); addToast(t('deleted'), 'info') }}
+              // ✅ onDelete avec confirmation et nom du son
+              onDelete={handleDeleteSound}
               onRename={(id, name) => store.updateSound(id, { name })}
               onChangeImage={store.updateSoundImage}
               onChangeEmoji={store.updateSoundEmoji}

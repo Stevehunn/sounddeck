@@ -17,16 +17,11 @@ export default function AddTrackModal({
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    console.log('✅ [AddTrackModal] handleSubmit:', name, color)
-    
     if (onConfirm) {
       onConfirm(name || undefined, color)
     } else if (onAddTrack) {
       onAddTrack(name || undefined, color)
-    } else {
-      console.warn('⚠️ [AddTrackModal] Aucun handler de confirmation')
     }
-    
     setName('')
     if (onClose) {
       onClose()

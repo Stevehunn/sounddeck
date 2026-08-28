@@ -6,7 +6,7 @@ export default function EditorMasterVolume({
   onVolumeChange,
   isMuted = false,
   onMuteToggle,
-  onReset, // ✅ Nouveau prop
+  onReset,
   peakMeter = 0,
   tr
 }) {
@@ -51,7 +51,7 @@ export default function EditorMasterVolume({
           background: 'transparent',
           border: 'none'
         }}
-        title={isMuted ? tr('editorUnmute') || 'Réactiver le son' : tr('editorMute') || 'Couper le son'}
+        title={isMuted ? (tr('editorUnmute') || 'Réactiver le son') : (tr('editorMute') || 'Couper le son')}
       >
         <i className={`ti ${isMuted ? 'ti-volume-off' : 'ti-volume'}`} />
       </button>
@@ -107,7 +107,6 @@ export default function EditorMasterVolume({
         {isMuted ? 'OFF' : `${Math.round(volume)}%`}
       </span>
 
-      {/* ✅ Bouton Réinitialiser */}
       <button
         className="btn-ghost btn-sm"
         onClick={onReset}

@@ -1,5 +1,5 @@
+// src/shared/components/modals/QuitConfirm.jsx
 import { useState } from 'react'
-// ✅ CORRIGER L'IMPORT
 import { useLanguage } from '@core/i18n/LanguageContext'
 
 export default function QuitConfirm({ onClose, lang = 'fr' }) {
@@ -12,7 +12,7 @@ export default function QuitConfirm({ onClose, lang = 'fr' }) {
     setProcessing(true)
     
     try {
-      // ✅ Si l'utilisateur choisit "Réduire", fermer la popup immédiatement
+      // Si l'utilisateur choisit "Réduire", fermer la popup immédiatement
       if (action === 'minimize') {
         onClose()
       }

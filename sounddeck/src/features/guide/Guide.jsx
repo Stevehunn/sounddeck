@@ -1,8 +1,8 @@
+// src/features/guide/Guide.jsx
 import { useState, useEffect } from 'react'
-// ✅ CORRIGER L'IMPORT
 import { useLanguage } from '@core/i18n/LanguageContext'
 
-export default function Guide() { // ✅ Supprimer le paramètre lang
+export default function Guide() {
   const { t, currentLang } = useLanguage()
   const [activeStep, setActiveStep] = useState('install')
   const [renderKey, setRenderKey] = useState(0)
@@ -224,7 +224,7 @@ export default function Guide() { // ✅ Supprimer le paramètre lang
             </div>
           </div>
 
-          {/* ✅ Boutons Tutoriels */}
+          {/* ✅ Boutons Tutoriels - TRADUITS */}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button
               className="btn-secondary btn-sm"
@@ -234,7 +234,7 @@ export default function Guide() { // ✅ Supprimer le paramètre lang
               }}
               style={{ fontSize: 11, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
             >
-              <i className="ti ti-book" /> {t('tutorialRestart')}
+              <i className="ti ti-book" /> {t('tutorialRestart') || 'Revoir le tutoriel'}
             </button>
             <button
               className="btn-primary btn-sm"
@@ -244,7 +244,7 @@ export default function Guide() { // ✅ Supprimer le paramètre lang
               }}
               style={{ fontSize: 11, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
             >
-              <i className="ti ti-rocket" /> {t('tutorialAdvanced')}
+              <i className="ti ti-rocket" /> {t('tutorialAdvanced') || 'Tutoriel avancé'}
             </button>
           </div>
 
@@ -304,6 +304,7 @@ function DownloadCard({ icon, name, desc, url, instructions }) {
 }
 
 function ConfigStep({ number, title, desc, icon, highlight }) {
+  const { t } = useLanguage()
   return (
     <div 
       className={`option-row ${highlight ? 'config-step-highlight' : ''}`} 

@@ -24,52 +24,46 @@ export default function ActionOverlay({
 
   if (!isOpen) return null
 
-  // ✅ Configuration selon le type d'action
   const getConfig = () => {
     switch (actionType) {
       case 'loop-clip':
         return {
           icon: 'ti-repeat',
-          title: t('editorLoopClipAction') || 'Boucle du clip',
+          title: tr('editorLoopClipAction') || 'Boucle du clip',
           color: 'var(--success)',
           bgColor: 'rgba(34, 197, 94, 0.12)',
-          // ✅ Texte fixe - NE BOUGE PAS
           instructions: clipName 
-            ? 'Cliquer sur la ligne de temps après le clip sélectionné pour définir la durée de la boucle.'
-            : 'Cliquer sur la ligne de temps pour définir la durée de la boucle.',
-          // ✅ Pas d'effet de pulsation
+            ? tr('editorLoopClipInstructions') || 'Cliquer sur la ligne de temps après le clip sélectionné pour définir la durée de la boucle.'
+            : tr('editorLoopClipInstructionsNoClip') || 'Cliquer sur la ligne de temps pour définir la durée de la boucle.',
           hasPulse: false
         }
       case 'loop-timeline':
-        // ✅ Texte fixe qui ne change pas - affiche toujours le même message
         return {
           icon: 'ti-repeat',
-          title: t('editorLoopTimelineAction') || 'Mode clic - Boucle générale',
+          title: tr('editorLoopTimelineAction') || 'Mode clic - Boucle générale',
           color: 'var(--accent)',
           bgColor: 'rgba(124, 111, 247, 0.12)',
-          // ✅ Texte FIXE - ne change jamais
-          instructions: 'Cliquez sur la ligne de temps pour définir la zone de boucle.',
-          // ✅ PAS d'effet de pulsation (statique)
+          instructions: tr('editorLoopTimelineInstructions') || 'Cliquez sur la ligne de temps pour définir la zone de boucle.',
           hasPulse: false
         }
       case 'split':
         return {
           icon: 'ti-scissors',
-          title: t('editorSplitAction') || 'Couper le clip',
+          title: tr('editorSplitAction') || 'Couper le clip',
           color: 'var(--warning)',
           bgColor: 'rgba(239, 159, 39, 0.12)',
           instructions: clipName 
-            ? `Cliquez sur la ligne de temps pour couper "${clipName}"`
-            : 'Cliquez sur la ligne de temps pour couper le clip',
+            ? tr('editorSplitInstructions').replace('{name}', clipName) || `Cliquez sur la ligne de temps pour couper "${clipName}"`
+            : tr('editorSplitInstructionsNoClip') || 'Cliquez sur la ligne de temps pour couper le clip',
           hasPulse: false
         }
       default:
         return {
           icon: 'ti-click',
-          title: t('editorAction') || 'Action',
+          title: tr('editorAction') || 'Action',
           color: 'var(--text-secondary)',
           bgColor: 'rgba(255, 255, 255, 0.05)',
-          instructions: t('editorClickTimeline') || 'Cliquez sur la ligne de temps',
+          instructions: tr('editorClickTimeline') || 'Cliquez sur la ligne de temps',
           hasPulse: false
         }
     }
@@ -102,7 +96,6 @@ export default function ActionOverlay({
         gap: 12
       }}
     >
-      {/* Icône */}
       <div style={{
         width: 32,
         height: 32,
@@ -120,7 +113,6 @@ export default function ActionOverlay({
         }} />
       </div>
 
-      {/* Texte - STATIQUE (pas de pulsation) */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ 
           fontSize: 13, 
@@ -145,7 +137,6 @@ export default function ActionOverlay({
             </span>
           )}
         </div>
-        {/* ✅ Texte d'instruction - TOUJOURS STATIQUE */}
         <div style={{
           fontSize: 12,
           color: 'var(--text-secondary)',
@@ -155,7 +146,6 @@ export default function ActionOverlay({
         </div>
       </div>
 
-      {/* Barre de progression */}
       {showProgress && (
         <div style={{
           display: 'flex',
@@ -180,7 +170,6 @@ export default function ActionOverlay({
         </div>
       )}
 
-      {/* Bouton Fermer (X) */}
       <button
         onClick={onCancel}
         style={{
@@ -208,7 +197,7 @@ export default function ActionOverlay({
           e.currentTarget.style.color = 'var(--text-tertiary)'
           e.currentTarget.style.borderColor = 'var(--border)'
         }}
-        title={t('cancel') || 'Annuler (Escape)'}
+        title={tr('cancel') || 'Annuler (Escape)'}
       >
         <i className="ti ti-x" />
       </button>

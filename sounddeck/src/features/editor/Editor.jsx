@@ -200,25 +200,21 @@ function EditorTimelineContent() {
   const [pendingImportFileName, setPendingImportFileName] = useState('')
   const [showTimelineLoopModal, setShowTimelineLoopModal] = useState(false)
 
-  // ✅ ÉTATS POUR LE MODE CLIC DE LA BOUCLE TIMELINE
   const [isTimelineClickModeActive, setIsTimelineClickModeActive] = useState(false)
   const [timelineClickData, setTimelineClickData] = useState({ start: null, end: null, duration: null })
   const [timelineClickStep, setTimelineClickStep] = useState(0)
 
-  // ✅ ÉTATS POUR LE MÉTRONOME
   const [metronomeEnabled, setMetronomeEnabled] = useState(false)
   const [bpm, setBpm] = useState(120)
 
-  // ✅ PRESSE-PAPIERS POUR COPIE/COLLER
   const [clipboard, setClipboard] = useState(null)
 
-  // ✅ REF POUR LE VOLUME MAÎTRE
+  // ✅ Flag pour empêcher les appels multiples de la confirmation de suppression
+  const [isDeletingClip, setIsDeletingClip] = useState(false)
+
   const masterVolumeRef = useRef(100)
 
-  // ✅ HOOK DE GESTION DES PROJETS
   const projectManager = useProjectManager(store, project, setProject, addToast)
-
-  // ─── RESTAURATION DES PRÉFÉRENCES ────────────────────────────────────
 
   useEffect(() => {
     const savedEnabled = localStorage.getItem('sounddeck_metronome_enabled')
@@ -231,7 +227,6 @@ function EditorTimelineContent() {
       setBpm(parseInt(savedBpm, 10))
     }
     
-    // Restaurer le volume maître
     const savedVolume = localStorage.getItem('sounddeck_master_volume')
     if (savedVolume !== null) {
       const vol = parseInt(savedVolume, 10)
@@ -241,7 +236,6 @@ function EditorTimelineContent() {
     }
   }, [setMasterGain])
 
-  // ─── GUARD POUR LES MARQUEURS ──────────────────────────────────────────
   const [markersState, setMarkersState] = useState(() => {
     const markers = context.markers || []
     const savedAutoOpen = localStorage.getItem('sounddeck_markers_auto_open')
@@ -258,8 +252,6 @@ function EditorTimelineContent() {
     if (markersState.hasInitialized) return
     setMarkersState(prev => ({ ...prev, hasInitialized: true }))
   }, [markersState.hasInitialized])
-
-  // ─── HANDLERS ──────────────────────────────────────────────────────────
 
   const handleAddTrack = useCallback(() => {
     try {
@@ -296,22 +288,14 @@ function EditorTimelineContent() {
   }, [addTrack, addToast])
 
   const handlePlayToggle = useCallback(() => {
-    console.log('[LOOP-FIX] 🎯 handlePlayToggle() appelée')
-    console.log(`[LOOP-FIX]   - isPlaying: ${isPlaying}, isPaused: ${isPaused}`)
-    
     const currentlyPlaying = isPlayingRef?.current ?? isPlaying
     const currentlyPaused = isPausedRef?.current ?? isPaused
     
-    console.log(`[LOOP-FIX]   - currentlyPlaying: ${currentlyPlaying}, currentlyPaused: ${currentlyPaused}`)
-    
     if (currentlyPlaying) {
-      console.log('[LOOP-FIX]   ➜ Pause')
       pause()
     } else if (currentlyPaused) {
-      console.log('[LOOP-FIX]   ➜ Reprise')
       resume()
     } else {
-      console.log('[LOOP-FIX]   ➜ Démarrage depuis le début')
       setCurrentTime(0)
       if (currentTimeRef) currentTimeRef.current = 0
       setSoloPlayClipId(null)
@@ -395,7 +379,6 @@ function EditorTimelineContent() {
   }, [addClipFromFile, addToast, t])
 
   const handleRemoveClip = useCallback((trackId, clipId) => {
-    console.log('🗑️ [Editor] removeClip appelé:', { trackId, clipId })
     removeClip(trackId, clipId)
   }, [removeClip])
 
@@ -404,19 +387,11 @@ function EditorTimelineContent() {
   }, [selectClip])
 
   const handleClipContextMenu = useCallback((e, clipId, trackId) => {
-    console.log('🖱️ [Editor] handleClipContextMenu appelé !')
-    console.log('🖱️ [Editor] clipId:', clipId, 'trackId:', trackId)
-    
     e.preventDefault()
     e.stopPropagation()
     
     const clip = getClipById(tracks, clipId)
-    console.log('🖱️ [Editor] clip trouvé:', clip?.name)
-    
-    if (!clip) {
-      console.warn('🖱️ [Editor] Clip non trouvé !')
-      return
-    }
+    if (!clip) return
     
     setSelectedClipForMenu(clip)
     setSelectedTrackForMenu(trackId)
@@ -457,8 +432,6 @@ function EditorTimelineContent() {
     setShowExportModal(true)
   }, [project, addToast, t])
 
-  // ─── HANDLER VOLUME MAÎTRE ────────────────────────────────────────────
-
   const handleMasterVolumeChange = useCallback((value) => {
     const normalized = Math.max(0, Math.min(200, value))
     setMasterVolume(normalized)
@@ -466,7 +439,6 @@ function EditorTimelineContent() {
     const gain = normalized / 100
     setMasterGain(gain)
     localStorage.setItem('sounddeck_master_volume', String(normalized))
-    console.log(`🎚️ Volume maître: ${normalized}% (gain: ${gain.toFixed(2)})`)
   }, [setMasterGain])
 
   const handleMasterMuteToggle = useCallback(() => {
@@ -476,20 +448,14 @@ function EditorTimelineContent() {
       const currentValue = masterVolumeRef.current
       setMasterVolume(currentValue)
       setMasterGain(0)
-      console.log(`🔇 Mute activé (volume sauvegardé: ${currentValue}%)`)
     } else {
       const restoredValue = masterVolumeRef.current || 100
       setMasterVolume(restoredValue)
       setMasterGain(restoredValue / 100)
-      console.log(`🔊 Mute désactivé (volume restauré: ${restoredValue}%)`)
     }
   }, [isMasterMuted, setMasterGain])
 
-  // ─── HANDLER RÉINITIALISER LES VOLUMES ──────────────────────────────
-
   const handleResetVolumes = useCallback(() => {
-    console.log('🔄 [Editor] Réinitialisation de tous les volumes')
-    
     setMasterVolume(100)
     masterVolumeRef.current = 100
     setMasterGain(1)
@@ -520,29 +486,21 @@ function EditorTimelineContent() {
       }
       
       context.setMasterGain(1)
-      addToast?.('✅ Tous les volumes réinitialisés à 100%', 'success')
+      addToast?.(t('editorResetVolumesSuccess') || '✅ Tous les volumes réinitialisés à 100%', 'success')
     }
-  }, [project, setProject, store, addToast, context, masterVolumeRef, setMasterVolume, setMasterGain])
-
-  // ─── HANDLER MÉTRONOME ────────────────────────────────────────────────
+  }, [project, setProject, store, addToast, context, masterVolumeRef, setMasterVolume, setMasterGain, t])
 
   const handleToggleMetronome = useCallback((enabled) => {
-    console.log(`🎵 Métronome: ${enabled ? 'ON' : 'OFF'}`)
     setMetronomeEnabled(enabled)
     localStorage.setItem('sounddeck_metronome_enabled', String(enabled))
   }, [])
 
   const handleBpmChange = useCallback((newBpm) => {
-    console.log(`🎵 BPM changé: ${newBpm}`)
     setBpm(newBpm)
     localStorage.setItem('sounddeck_metronome_bpm', String(newBpm))
   }, [])
 
-  // ─── HANDLER POUR AJOUTER UN EFFET DEPUIS LE MENU CONTEXTUEL ─────────
-
   const handleAddEffectFromMenu = useCallback((clipId, trackId) => {
-    console.log('✨ [Editor] handleAddEffectFromMenu appelé pour:', clipId, trackId)
-    
     selectClip(clipId, trackId)
     setShowEffectsPanel(true)
     setShowEffectsAddMenu(true)
@@ -551,21 +509,15 @@ function EditorTimelineContent() {
     addToast?.(`Panneau des effets ouvert pour "${clipName}"`, 'info')
   }, [selectClip, tracks, addToast])
 
-  // ─── HANDLER NORMALISER AVEC OPTIONS ──────────────────────────────────
-
   const handleNormalizeWithOptions = useCallback(async (clipId, options) => {
-    console.log('📊 [Editor] Normalisation avec options:', { clipId, options })
-    
     const clip = getClipById(tracks, clipId)
     if (!clip) {
-      console.warn('📊 [Editor] Clip non trouvé')
       addToast?.('Clip non trouvé', 'error')
       return
     }
     
     const { method, target, maxGain, outputFormat = 'wav' } = options
     
-    console.log('📊 [Editor] Clip trouvé:', clip.name)
     addToast?.(`Normalisation de "${clip.name}" en cours...`, 'info')
     
     try {
@@ -583,15 +535,7 @@ function EditorTimelineContent() {
         }
       )
       
-      console.log('📊 [Editor] Résultat normalisation:', result)
-      
       if (result?.normalized) {
-        console.log('✅ [Editor] Clip normalisé avec succès')
-        console.log('  Gain appliqué:', result.gain)
-        console.log('  Pic original:', result.originalPeak)
-        console.log('  Pic final:', result.finalPeak)
-        console.log('  Nouveau chemin:', result.newPath)
-        
         if (result.newPath) {
           const track = tracks.find(t => t.id === selectedTrackId)
           if (track) {
@@ -630,27 +574,20 @@ function EditorTimelineContent() {
         
         addToast?.(`"${clip.name}" normalisé avec succès (gain: ${result.gain.toFixed(2)}x)`, 'success')
       } else if (result === null) {
-        console.warn('📊 [Editor] Échec de la normalisation')
         addToast?.(`Erreur lors de la normalisation de "${clip.name}"`, 'error')
       } else {
-        console.log('📊 [Editor] Clip déjà à un niveau optimal')
         addToast?.(`"${clip.name}" est déjà à un niveau optimal`, 'info')
       }
     } catch (e) {
-      console.error('❌ [Editor] Erreur normalisation:', e)
       addToast?.(`Erreur: ${e.message}`, 'error')
     }
   }, [tracks, selectedTrackId, project, store, setProject, addToast])
-
-  // ─── HANDLERS COPIER/COUPER/COLLER ────────────────────────────────────
 
   const handleCopyClip = useCallback((clip) => {
     if (!clip) {
       addToast?.('Aucun clip à copier', 'warning')
       return
     }
-    
-    console.log('📋 [Editor] Copie du clip:', clip.id, clip.name)
     
     setClipboard({
       clip: {
@@ -669,8 +606,6 @@ function EditorTimelineContent() {
       addToast?.('Aucun clip à couper', 'warning')
       return
     }
-    
-    console.log('✂️ [Editor] Coupe du clip:', clip.id, clip.name)
     
     setClipboard({
       clip: {
@@ -707,8 +642,6 @@ function EditorTimelineContent() {
       return
     }
     
-    console.log('📋 [Editor] Collage du clip:', clip.id, clip.name)
-    
     const targetTrackId = selectedTrackId || sourceTrackId || tracks[0]?.id
     
     if (!targetTrackId) {
@@ -741,8 +674,6 @@ function EditorTimelineContent() {
       isExternal: clip.isExternal || false
     }
     
-    console.log('📋 [Editor] Nouveau clip créé:', newClip.id, newClip.name)
-    
     const updatedTracks = project.tracks.map(t => {
       if (t.id === targetTrackId) {
         const clips = [...t.clips, newClip]
@@ -758,8 +689,6 @@ function EditorTimelineContent() {
       updatedAt: Date.now()
     }
     
-    console.log('📋 [Editor] Sauvegarde du projet avec nouveau clip')
-    
     await store.updateEditorProject(updatedProject)
     setProject(updatedProject)
     
@@ -771,68 +700,63 @@ function EditorTimelineContent() {
     addToast?.(`"${newClip.name}" ${t('editorPasted')}`, 'success')
     setSelectedClipId(newClip.id)
     setSelectedTrackId(targetTrackId)
-    
-    console.log('📋 [Editor] Collage terminé avec succès')
-    
   }, [clipboard, selectedTrackId, tracks, project, store, setProject, setClipDurations, setSelectedClipId, setSelectedTrackId, addToast, t])
 
-  // ─── HANDLER SUPPRESSION AVEC CONFIRMATION ────────────────────────────
-
-  const handleDeleteWithConfirm = useCallback(async (trackId, clipId) => {
-    console.log('🗑️ [Editor] handleDeleteWithConfirm appelé:', { trackId, clipId })
+  // ✅ handleDeleteWithConfirm - Version corrigée avec flag anti-double-appel
+  const handleDeleteWithConfirm = useCallback(async (trackId, clipId, clipName) => {
+    // ✅ Empêcher les appels multiples (popup qui se ferme et se rouvre)
+    if (isDeletingClip) return
+    setIsDeletingClip(true)
     
-    const clip = getClipById(tracks, clipId)
-    if (!clip) {
-      console.warn('🗑️ [Editor] Clip non trouvé')
-      return
+    try {
+      let name = clipName
+      if (!name) {
+        const clip = getClipById(tracks, clipId)
+        name = clip?.name || 'ce clip'
+      }
+      
+      // ✅ Utiliser la traduction avec remplacement du placeholder
+      const message = (t('confirmDeleteClipMessage') || `Voulez-vous vraiment supprimer le clip "{name}" ?`).replace('{name}', name)
+      
+      const confirmed = await confirm({
+        title: t('confirmDeleteClip') || 'Confirmer la suppression du clip',
+        message: message,
+        type: 'danger',
+        confirmText: t('editorDelete') || 'Supprimer',
+        cancelText: t('cancel') || 'Annuler'
+      })
+      
+      if (confirmed) {
+        removeClip(trackId, clipId)
+        addToast?.(`Clip "${name}" supprimé`, 'info')
+      }
+    } catch (e) {
+      console.error('Erreur suppression clip:', e)
+    } finally {
+      // ✅ Réinitialiser le flag après un délai pour éviter les appels multiples
+      setTimeout(() => {
+        setIsDeletingClip(false)
+      }, 400)
     }
-    
-    const confirmed = await confirm({
-      title: t('confirmDeleteClip') || 'Confirmer la suppression du clip',
-      message: t('confirmDeleteClipMessage') || `Voulez-vous vraiment supprimer le clip "${clip.name}" ?`,
-      type: 'danger',
-      confirmText: t('editorDelete') || 'Supprimer',
-      cancelText: t('cancel') || 'Annuler'
-    })
-    
-    if (confirmed) {
-      console.log('🗑️ [Editor] Suppression confirmée pour:', clipId)
-      removeClip(trackId, clipId)
-      addToast?.('Clip supprimé', 'info')
-    } else {
-      console.log('🗑️ [Editor] Suppression annulée')
-    }
-  }, [tracks, removeClip, addToast, confirm, t])
-
-  // ─── HANDLER TRIM ──────────────────────────────────────────────────────
+  }, [tracks, removeClip, addToast, confirm, t, isDeletingClip])
 
   const handleTrimClip = useCallback(async (trackId, clipId, newPath, newDuration) => {
     if (!trackId || !clipId) return
     
-    console.log('✂️ [Editor] handleTrimClip appelé:', { trackId, clipId, newPath, newDuration })
-    console.log('✂️ [Editor] project.tracks avant modification:', project?.tracks?.length)
-    
     try {
       if (store?.updateClipWithPath) {
-        console.log('✂️ [Editor] Mise à jour du chemin dans le store')
         await store.updateClipWithPath(clipId, newPath)
       }
-      
-      console.log('✂️ [Editor] Mise à jour du clip dans le projet local')
       
       const track = project.tracks.find(t => t.id === trackId)
       const clip = track?.clips.find(c => c.id === clipId)
       
       if (!clip) {
-        console.warn('✂️ [Editor] Clip non trouvé dans le projet')
         if (store?.editorProject) {
-          console.log('✂️ [Editor] Rafraîchissement depuis le store')
           setProject(store.editorProject)
         }
         return
       }
-      
-      console.log('✂️ [Editor] Clip trouvé:', clip.name, 'ancien chemin:', clip.path)
       
       const updatedTracks = project.tracks.map(t => {
         if (t.id === trackId) {
@@ -840,14 +764,12 @@ function EditorTimelineContent() {
             ...t,
             clips: t.clips.map(c => {
               if (c.id === clipId) {
-                const updatedClip = {
+                return {
                   ...c,
                   path: newPath,
                   duration: newDuration || c.duration,
                   offset: c.offset || 0
                 }
-                console.log('✂️ [Editor] Clip mis à jour:', updatedClip)
-                return updatedClip
               }
               return c
             })
@@ -862,11 +784,9 @@ function EditorTimelineContent() {
         updatedAt: Date.now()
       }
       
-      console.log('✂️ [Editor] Mise à jour du projet local')
       setProject(updatedProject)
       
       if (newDuration) {
-        console.log('✂️ [Editor] Mise à jour de la durée:', newDuration)
         setClipDurations(prev => ({ 
           ...prev, 
           [clipId]: newDuration 
@@ -874,15 +794,12 @@ function EditorTimelineContent() {
       }
       
       if (store?.updateEditorProject) {
-        console.log('✂️ [Editor] Sauvegarde dans le store')
         await store.updateEditorProject(updatedProject)
       }
       
-      console.log('✅ [Editor] Clip rogné avec succès')
       addToast?.(t('editorTrimSuccess') || 'Clip rogné avec succès', 'success')
       
     } catch (e) {
-      console.error('❌ [Editor] Erreur lors du rognage:', e)
       addToast?.(t('editorTrimError') || 'Erreur lors du rognage', 'error')
     }
   }, [project, store, setProject, setClipDurations, addToast, t])
@@ -938,8 +855,6 @@ function EditorTimelineContent() {
     }
   }, [addToast, t])
 
-  // ─── HANDLERS MARKERS ──────────────────────────────────────────────────
-
   const handleAddMarker = useCallback((markerData) => {
     const { addMarker } = context
     if (addMarker) {
@@ -972,32 +887,21 @@ function EditorTimelineContent() {
     }
   }, [context, seek])
 
-  // ─── FONCTIONS DE DÉPLACEMENT VERTICAL DES CLIPS ─────────────────────
-
   const moveClipUp = useCallback((trackId, clipId) => {
-    console.log('⬆️ [Editor] Déplacement du clip vers le haut:', { trackId, clipId })
-    
     const currentTrackIndex = tracks.findIndex(t => t.id === trackId)
     if (currentTrackIndex <= 0) {
-      console.warn('⬆️ [Editor] Impossible de monter, piste déjà en haut')
       return
     }
     
     const clip = getClipById(tracks, clipId)
-    if (!clip) {
-      console.warn('⬆️ [Editor] Clip non trouvé')
-      return
-    }
+    if (!clip) return
     
     const currentStart = clip.start || 0
     
     const targetTrackIndex = currentTrackIndex - 1
     const targetTrack = tracks[targetTrackIndex]
     
-    if (!targetTrack) {
-      console.warn('⬆️ [Editor] Piste cible non trouvée')
-      return
-    }
+    if (!targetTrack) return
     
     moveClip(trackId, clipId, currentStart, targetTrack.id)
     setSelectedTrackId(targetTrack.id)
@@ -1006,29 +910,20 @@ function EditorTimelineContent() {
   }, [tracks, moveClip, setSelectedTrackId, addToast, t])
 
   const moveClipDown = useCallback((trackId, clipId) => {
-    console.log('⬇️ [Editor] Déplacement du clip vers le bas:', { trackId, clipId })
-    
     const currentTrackIndex = tracks.findIndex(t => t.id === trackId)
     if (currentTrackIndex >= tracks.length - 1) {
-      console.warn('⬇️ [Editor] Impossible de descendre, piste déjà en bas')
       return
     }
     
     const clip = getClipById(tracks, clipId)
-    if (!clip) {
-      console.warn('⬇️ [Editor] Clip non trouvé')
-      return
-    }
+    if (!clip) return
     
     const currentStart = clip.start || 0
     
     const targetTrackIndex = currentTrackIndex + 1
     const targetTrack = tracks[targetTrackIndex]
     
-    if (!targetTrack) {
-      console.warn('⬇️ [Editor] Piste cible non trouvée')
-      return
-    }
+    if (!targetTrack) return
     
     moveClip(trackId, clipId, currentStart, targetTrack.id)
     setSelectedTrackId(targetTrack.id)
@@ -1046,25 +941,19 @@ function EditorTimelineContent() {
     return currentTrackIndex < tracks.length - 1
   }, [tracks])
 
-  // ─── HANDLERS BOUCLE TIMELINE ─────────────────────────────────────────
-
   const handleSetTimelineLoop = useCallback((options) => {
-    console.log('🔄 [Editor] setTimelineLoop:', options)
     setTimelineLoop?.(options)
   }, [setTimelineLoop])
 
   const handleToggleTimelineLoop = useCallback(() => {
-    console.log('🔄 [Editor] toggleTimelineLoop')
     toggleTimelineLoop?.()
   }, [toggleTimelineLoop])
 
   const handleOpenLoopPanel = useCallback(() => {
-    console.log('🔄 [Editor] openLoopPanel')
     setShowTimelineLoopModal(true)
   }, [])
 
   const handleActivateTimelineClickMode = useCallback((active = true) => {
-    console.log('🖱️ [Editor] handleActivateTimelineClickMode:', active)
     setIsTimelineClickModeActive(active)
     if (active) {
       setTimelineClickStep(0)
@@ -1080,15 +969,8 @@ function EditorTimelineContent() {
   const handleTimelineClickForLoop = useCallback((time) => {
     if (!isTimelineClickModeActive) return
     
-    console.log('🖱️ [Editor] handleTimelineClickForLoop - time:', time)
-    console.log('🖱️ [Editor]   - isTimelineClickModeActive:', isTimelineClickModeActive)
-    console.log('🖱️ [Editor]   - actionOverlay.step:', actionOverlay?.step)
-    
     if (executeActionOverlay) {
-      console.log('🖱️ [Editor]   ➜ Délégation à executeActionOverlay')
       executeActionOverlay(time)
-    } else {
-      console.warn('🖱️ [Editor]   ❌ executeActionOverlay est undefined')
     }
     
     const clampedTime = Math.max(0, Math.min(time, totalDuration))
@@ -1110,8 +992,6 @@ function EditorTimelineContent() {
     }
   }, [isTimelineClickModeActive, executeActionOverlay, totalDuration, timelineClickStep, timelineClickData, setShowTimelineLoopModal])
 
-  // ─── FORMATER LE TEMPS ────────────────────────────────────────────────
-
   const formatTime = (seconds) => {
     if (!seconds || isNaN(seconds)) return '0:00'
     const m = Math.floor(seconds / 60)
@@ -1121,8 +1001,6 @@ function EditorTimelineContent() {
     }
     return `${s.toFixed(1)}s`
   }
-
-  // ─── RACCOURCIS CLAVIER ──────────────────────────────────────────────
 
   const undoEditor = store?.undoEditor || (() => addToast?.('Undo non disponible', 'info'))
   const redoEditor = store?.redoEditor || (() => addToast?.('Redo non disponible', 'info'))
@@ -1154,8 +1032,9 @@ function EditorTimelineContent() {
     },
     onDelete: () => {
       if (selectedClipId && selectedTrackId) {
-        console.log('🗑️ [Keyboard] Suppression du clip:', selectedClipId)
-        handleDeleteWithConfirm(selectedTrackId, selectedClipId)
+        const clip = getClipById(tracks, selectedClipId)
+        // ✅ Passer le nom du clip
+        handleDeleteWithConfirm(selectedTrackId, selectedClipId, clip?.name)
       } else {
         addToast?.('Aucun clip sélectionné', 'info')
       }
@@ -1198,7 +1077,6 @@ function EditorTimelineContent() {
     onZoomOut: () => handleZoomChange(zoomLevel - 0.1),
     onZoomReset: () => handleZoomChange(1),
     onToggleMetronome: () => {
-      console.log('⌨️ Toggle Métronome')
       handleToggleMetronome(!metronomeEnabled)
     },
     isPlaying: isPlaying || isPaused,
@@ -1206,14 +1084,6 @@ function EditorTimelineContent() {
     canRedo: canRedo,
     isEnabled: true
   })
-
-  console.log('🔍 [Editor] Props passées à EditorToolbar:', {
-    hasOnRenameProject: typeof projectManager.renameProject === 'function',
-    projectId: project?.id,
-    projectName: project?.name
-  })
-
-  // ─── RENDU ──────────────────────────────────────────────────────────────
 
   return (
     <div style={{
@@ -1245,9 +1115,7 @@ function EditorTimelineContent() {
         autoCrossfade={autoCrossfade}
         onToggleCrossfade={() => setAutoCrossfade(!autoCrossfade)}
         projectName={project?.name || 'Nouveau projet'}
-        // ✅ Renommage depuis la toolbar - wrapper qui passe project.id
         onRenameProject={async (newName) => {
-          console.log('✏️ [TOOLBAR] Renommage depuis toolbar:', newName)
           if (!newName || !newName.trim()) {
             addToast?.('Nom invalide', 'warning')
             return
@@ -1268,7 +1136,6 @@ function EditorTimelineContent() {
         onToggleMetronome={handleToggleMetronome}
         bpm={bpm}
         onBpmChange={handleBpmChange}
-        // ✅ PROPS PROJETS
         project={project}
         projectList={projectManager.projectList}
         recentProjects={projectManager.recentProjects}
@@ -1279,7 +1146,6 @@ function EditorTimelineContent() {
         onCreateProject={projectManager.createProject}
         onDeleteProject={projectManager.deleteProject}
         onDuplicateProject={projectManager.duplicateProject}
-        // ✅ Pour le modal - on passe la fonction brute avec un nom différent
         onProjectRename={projectManager.renameProject}
         onLoadProjectList={projectManager.loadProjectList}
         onExportProject={projectManager.exportProject}
@@ -1357,7 +1223,6 @@ function EditorTimelineContent() {
           store={store}
           loopState={loopState}
           onToggleClipLoop={(clipId, options) => {
-            console.log('🔄 [Editor] onToggleClipLoop appelé avec:', { clipId, options })
             toggleClipLoop(clipId, options)
           }}
           isPendingAction={isActionOverlayActive}
@@ -1426,7 +1291,6 @@ function EditorTimelineContent() {
         </div>
       </div>
 
-      {/* MODALS */}
       {showAddTrackModal && createPortal(
         <AddTrackModal
           isOpen={showAddTrackModal}
@@ -1633,31 +1497,26 @@ function EditorTimelineContent() {
             setClipMenu(null)
           }}
           onTrim={(clipId) => {
-            console.log('✂️ [Editor] onTrim appelé avec clipId:', clipId)
             setTrimClipId(clipId)
             setShowTrimModal(true)
             setClipMenu(null)
           }}
           onNormalize={(clipId) => {
-            console.log('📊 [Editor] Normaliser depuis menu:', clipId)
             setNormalizeClipId(clipId)
             setShowNormalizeModal(true)
             setClipMenu(null)
           }}
           onAddEffect={handleAddEffectFromMenu}
           onDuplicate={(trackId, clipId) => {
-            console.log('📋 [Editor] Dupliquer depuis menu:', { trackId, clipId })
             duplicateClip(trackId, clipId)
             setClipMenu(null)
           }}
           onCopy={(clipId, trackId) => {
-            console.log('📋 [Editor] Copier depuis menu:', { clipId, trackId })
             const clip = getClipById(tracks, clipId)
             if (clip) handleCopyClip(clip)
             setClipMenu(null)
           }}
           onCut={(clipId, trackId) => {
-            console.log('✂️ [Editor] Couper depuis menu:', { clipId, trackId })
             const clip = getClipById(tracks, clipId)
             if (clip) handleCutClip(clip)
             setClipMenu(null)
@@ -1670,7 +1529,6 @@ function EditorTimelineContent() {
           isLoopEnabled={loopRegion.enabled}
           tr={t}
           onToggleClipLoop={(clipId, options) => {
-            console.log('🔄 [Editor] onToggleClipLoop appelé avec:', { clipId, options })
             toggleClipLoop(clipId, options)
           }}
           onActivateLoopManualClick={activateLoopManualClick}

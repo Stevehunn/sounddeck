@@ -24,17 +24,8 @@ export default function TrimClipModal({
   const audioContextRef = useRef(null)
   const sourceRef = useRef(null)
 
-  // ✅ LOG : Initialisation du modal
-  console.log('🔍 [TrimClipModal] Composant monté, isOpen:', isOpen, 'clip:', clip?.id, clip?.name)
-
   useEffect(() => {
     if (isOpen && clip) {
-      console.log('🔍 [TrimClipModal] Initialisation des valeurs', {
-        clipId: clip.id,
-        clipName: clip.name,
-        clipPath: clip.path,
-        clipDuration
-      })
       setStart(0)
       setEnd(clipDuration || 3)
       setCurrentTime(0)
@@ -49,8 +40,6 @@ export default function TrimClipModal({
       return
     }
     
-    console.log('🔍 [TrimClipModal] loadAudio appelé avec path:', clip.path)
-    
     try {
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         await audioContextRef.current.close()
@@ -60,15 +49,11 @@ export default function TrimClipModal({
         ? clip.path
         : 'file:///' + clip.path.replace(/\\/g, '/')
       
-      console.log('🔍 [TrimClipModal] URL du fichier:', fileUrl)
-      
       const response = await fetch(fileUrl)
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
       }
       const arrayBuffer = await response.arrayBuffer()
-      
-      console.log('🔍 [TrimClipModal] Taille du fichier:', arrayBuffer.byteLength, 'bytes')
       
       const ctx = new (window.AudioContext || window.webkitAudioContext)()
       audioContextRef.current = ctx
@@ -77,13 +62,11 @@ export default function TrimClipModal({
       
       window.__trimAudioBuffer = audioBuffer
       
-      console.log('✅ [TrimClipModal] Audio chargé, durée:', audioBuffer.duration)
-      
     } catch (e) {
       console.error('❌ [TrimClipModal] Erreur chargement audio:', e)
-      setError('Impossible de charger l\'audio: ' + e.message)
+      setError(tr('editorFileImportError') || 'Impossible de charger l\'audio: ' + e.message)
     }
-  }, [clip])
+  }, [clip, tr])
 
   useEffect(() => {
     if (isOpen && clip) {
@@ -107,8 +90,7 @@ export default function TrimClipModal({
     const audioBuffer = window.__trimAudioBuffer
     
     if (!ctx || !audioBuffer) {
-      console.warn('⚠️ Audio non chargé')
-      if (addToast) addToast('Audio non chargé', 'warning')
+      if (addToast) addToast(tr('editorLoading') || 'Audio non chargé', 'warning')
       return
     }
     
@@ -134,7 +116,6 @@ export default function TrimClipModal({
       gain.connect(ctx.destination)
       
       const duration = end - start
-      console.log('🔍 [TrimClipModal] Lecture de la sélection:', { start, end, duration })
       
       source.start(0, start, duration)
       setIsPlaying(true)
@@ -166,43 +147,25 @@ export default function TrimClipModal({
       
     } catch (e) {
       console.error('❌ Erreur lecture:', e)
-      setError('Erreur de lecture: ' + e.message)
+      setError(tr('editorPlayError') || 'Erreur de lecture: ' + e.message)
     }
-  }, [isPlaying, start, end, addToast])
+  }, [isPlaying, start, end, addToast, tr])
 
-  // ✅ HANDLER TRIM AVEC LOGS DÉTAILLÉS
   const handleTrim = async () => {
-    console.log('✂️ [TrimClipModal] handleTrim appelé')
-    console.log('✂️ [TrimClipModal] clip:', clip?.id, clip?.name, clip?.path)
-    
     if (!clip?.path) {
-      console.error('❌ [TrimClipModal] clip.path est undefined')
-      setError('Aucun clip sélectionné')
+      setError(tr('editorNoSound') || 'Aucun clip sélectionné')
       return
     }
-    
-    console.log('✂️ [TrimClipModal] Paramètres:', {
-      path: clip.path,
-      start,
-      end,
-      duration: end - start
-    })
     
     setIsProcessing(true)
     setError(null)
     
     try {
-      // ✅ Vérifier que trimSoundFile existe
-      console.log('🔍 [TrimClipModal] window.electronAPI.trimSoundFile existe?', typeof window.electronAPI.trimSoundFile)
-      
       if (typeof window.electronAPI.trimSoundFile !== 'function') {
-        console.error('❌ [TrimClipModal] trimSoundFile n\'est pas une fonction !')
         setError('trimSoundFile non disponible')
         setIsProcessing(false)
         return
       }
-      
-      console.log('✂️ [TrimClipModal] Appel de trimSoundFile...')
       
       const result = await window.electronAPI.trimSoundFile(
         clip.path,
@@ -210,45 +173,33 @@ export default function TrimClipModal({
         end
       )
       
-      console.log('✂️ [TrimClipModal] Résultat reçu:', result)
-      
       if (result.success) {
-        console.log('✅ [TrimClipModal] Rognage réussi ! Nouveau chemin:', result.path)
-        if (result.warning) {
-          console.warn('⚠️ Trim warning:', result.warning)
-          if (addToast) {
-            addToast(result.warning, 'warning')
-          }
+        if (result.warning && addToast) {
+          addToast(result.warning, 'warning')
         }
         if (addToast) {
-          addToast('Clip rogné avec succès !', 'success')
+          addToast(tr('editorTrimSuccess') || 'Clip rogné avec succès !', 'success')
         }
         onTrim?.(trackId, clip.id, result.path, end - start)
         onClose()
       } else {
-        console.error('❌ [TrimClipModal] Échec du rognage:', result.error)
-        setError(result.error || 'Erreur lors du rognage')
+        setError(result.error || tr('editorTrimError') || 'Erreur lors du rognage')
         if (addToast) {
-          addToast('Erreur lors du rognage: ' + (result.error || 'Erreur inconnue'), 'error')
+          addToast(tr('editorTrimError') + ': ' + (result.error || 'Erreur inconnue'), 'error')
         }
       }
     } catch (e) {
       console.error('❌ [TrimClipModal] Exception lors du rognage:', e)
-      console.error('  Message:', e.message)
-      console.error('  Stack:', e.stack)
       setError(e.message)
       if (addToast) {
-        addToast('Erreur lors du rognage: ' + e.message, 'error')
+        addToast(tr('editorTrimError') + ': ' + e.message, 'error')
       }
     } finally {
       setIsProcessing(false)
     }
   }
 
-  if (!isOpen || !clip) {
-    console.log('🔍 [TrimClipModal] Modal non visible')
-    return null
-  }
+  if (!isOpen || !clip) return null
 
   const totalDuration = clipDuration || 3
 
@@ -268,7 +219,6 @@ export default function TrimClipModal({
           </span>
         </div>
 
-        {/* Waveform */}
         <div style={{ marginBottom: 16 }}>
           <Waveform
             filePath={clip.path}
@@ -295,7 +245,6 @@ export default function TrimClipModal({
           />
         </div>
 
-        {/* Informations de sélection */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -317,7 +266,6 @@ export default function TrimClipModal({
           </span>
         </div>
 
-        {/* Contrôles précis */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
           <div>
             <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
@@ -349,7 +297,6 @@ export default function TrimClipModal({
           </div>
         </div>
 
-        {/* Erreur */}
         {error && (
           <div style={{
             padding: '8px 12px',
@@ -365,7 +312,6 @@ export default function TrimClipModal({
           </div>
         )}
 
-        {/* Boutons */}
         <div style={{ 
           display: 'flex', 
           gap: 10, 
@@ -373,7 +319,6 @@ export default function TrimClipModal({
           flexWrap: 'wrap',
           justifyContent: 'space-between'
         }}>
-          {/* Groupe gauche */}
           <div style={{ display: 'flex', gap: 8, flex: '1 1 auto' }}>
             <button
               onClick={togglePlay}
@@ -393,7 +338,7 @@ export default function TrimClipModal({
               }}
             >
               <i className={`ti ${isPlaying ? 'ti-player-pause' : 'ti-player-play'}`} />
-              {isPlaying ? tr('editorPause') : tr('listenSelection')}
+              {isPlaying ? (tr('editorPause') || 'Pause') : (tr('listenSelection') || 'Écouter la sélection')}
             </button>
             
             <button
@@ -428,7 +373,6 @@ export default function TrimClipModal({
             </button>
           </div>
           
-          {/* Groupe droit */}
           <div style={{ 
             display: 'flex', 
             gap: 8,
@@ -481,7 +425,6 @@ export default function TrimClipModal({
           </div>
         </div>
 
-        {/* Note */}
         <div style={{
           marginTop: 12,
           fontSize: 11,

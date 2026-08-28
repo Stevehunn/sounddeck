@@ -80,7 +80,6 @@ export default function ExportModal({
         </div>
 
         <form onSubmit={handleSubmit}>
-          {/* Nom */}
           <div style={{ marginBottom: 12 }}>
             <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
               {tr('editorExportNamePlaceholder') || 'Nom du son'} *
@@ -97,7 +96,6 @@ export default function ExportModal({
             />
           </div>
 
-          {/* Format et Bitrate */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
@@ -138,7 +136,6 @@ export default function ExportModal({
             )}
           </div>
 
-          {/* Emplacement d'export */}
           <div style={{ marginBottom: 12 }}>
             <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
               {tr('exportLocation') || 'Emplacement d\'export'}
@@ -210,7 +207,6 @@ export default function ExportModal({
             </div>
           </div>
 
-          {/* Profils */}
           {profiles.length > 0 && exportLocation !== 'file' && (
             <div style={{ marginBottom: 12 }}>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
@@ -242,7 +238,6 @@ export default function ExportModal({
             </div>
           )}
 
-          {/* Note */}
           <div style={{
             fontSize: 11,
             color: 'var(--text-tertiary)',
@@ -253,9 +248,9 @@ export default function ExportModal({
             border: '1px solid var(--border)'
           }}>
             <i className="ti ti-info-circle" style={{ marginRight: 4 }} />
-            {exportLocation === 'file' && '📁 Le fichier sera sauvegardé dans votre dossier de téléchargements.'}
-            {exportLocation === 'library' && '📚 Le son sera ajouté à votre bibliothèque SoundDeck.'}
-            {exportLocation === 'both' && '📁📚 Le fichier sera sauvegardé ET ajouté à SoundDeck.'}
+            {exportLocation === 'file' && (tr('exportFileOnlyNote') || '📁 Le fichier sera sauvegardé dans votre dossier de téléchargements.')}
+            {exportLocation === 'library' && (tr('exportLibraryOnlyNote') || '📚 Le son sera ajouté à votre bibliothèque SoundDeck.')}
+            {exportLocation === 'both' && (tr('exportBothNote') || '📁📚 Le fichier sera sauvegardé ET ajouté à SoundDeck.')}
           </div>
 
           <div className="modal-actions">
