@@ -15,7 +15,6 @@ export default function ProfileManagerModal({
   const { t, currentLang } = useLanguage()
   const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
   const [selectedSounds, setSelectedSounds] = useState(new Set())
-  const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
   const toggleSound = (soundId) => {
@@ -36,12 +35,22 @@ export default function ProfileManagerModal({
     }
   }
 
+  // ✅ Utiliser useConfirm pour la confirmation de retrait
   const handleRemoveSelected = async () => {
     if (selectedSounds.size === 0) return
-    setShowConfirmDelete(true)
-  }
+    
+    const confirmed = await confirm({
+      title: t('profileManagerConfirmRemove'),
+      message: t('profileManagerConfirmMessage')
+        .replace('{count}', selectedSounds.size)
+        .replace('{name}', profileName),
+      type: 'warning',
+      confirmText: t('profileManagerRemoveSelected'),
+      cancelText: t('cancel')
+    })
+    
+    if (!confirmed) return
 
-  const confirmRemove = async () => {
     setIsDeleting(true)
     let removedCount = 0
     
@@ -51,22 +60,25 @@ export default function ProfileManagerModal({
     }
     
     setSelectedSounds(new Set())
-    setShowConfirmDelete(false)
     setIsDeleting(false)
     
     addToast(`${removedCount} ${t('profileManagerSoundsRemoved')} "${profileName}"`, 'success')
     onClose()
   }
 
+  // ✅ Fonction de suppression du profil avec useConfirm (UNIQUEMENT)
   const handleDeleteProfile = async () => {
-    if (sounds.length > 0) {
-      const confirmed = await confirm({
-        title: t('profileManagerDeleteConfirm'),
-        message: t('profileManagerDeleteMessage').replace('{name}', profileName).replace('{count}', sounds.length),
-        type: 'danger'
-      })
-      if (!confirmed) return
-    }
+    const confirmed = await confirm({
+      title: t('profileManagerDeleteConfirm'),
+      message: t('profileManagerDeleteMessage')
+        .replace('{name}', profileName)
+        .replace('{count}', sounds.length),
+      type: 'danger',
+      confirmText: t('profileManagerDeleteProfile') || 'Supprimer le profil',
+      cancelText: t('cancel') || 'Annuler'
+    })
+    
+    if (!confirmed) return
     
     await store.deleteProfile(profileId)
     addToast(`${t('profileManagerProfileDeleted')} "${profileName}"`, 'info')
@@ -124,18 +136,43 @@ export default function ProfileManagerModal({
 
             <div style={{ flex: 1 }} />
 
-            {/* ✅ Bouton Supprimer générique */}
-            <DeleteButton
-              onDelete={handleDeleteProfile}
-              confirmTitle={t('profileManagerDeleteConfirm') || 'Confirmer la suppression du profil'}
-              confirmMessage={t('profileManagerDeleteMessage')?.replace('{name}', profileName)?.replace('{count}', sounds.length) || `Voulez-vous vraiment supprimer le profil "${profileName}" avec ses ${sounds.length} sons ?`}
-              itemName={profileName}
-              size="sm"
-              variant="danger"
-              icon="ti-trash"
-              label={t('profileManagerDeleteProfile') || 'Supprimer le profil'}
-              showLabel={true}
-            />
+            {/* ✅ Bouton Supprimer le profil - Style DeleteButton avec bordure rouge */}
+            <button
+              onClick={handleDeleteProfile}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 4,
+                padding: '4px 10px',
+                fontSize: 12,
+                minHeight: 28,
+                borderRadius: 'var(--radius-sm)',
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                background: 'transparent',
+                color: 'var(--danger)',
+                border: '1px solid var(--danger)',
+                fontFamily: 'inherit',
+                fontWeight: 500
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--danger)'
+                e.currentTarget.style.color = 'white'
+                e.currentTarget.style.borderColor = 'var(--danger)'
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(224, 82, 82, 0.3)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.color = 'var(--danger)'
+                e.currentTarget.style.borderColor = 'var(--danger)'
+                e.currentTarget.style.boxShadow = 'none'
+              }}
+              title={t('profileManagerDeleteProfile')}
+            >
+              <i className="ti ti-trash" style={{ fontSize: 12 }} />
+              <span>{t('profileManagerDeleteProfile')}</span>
+            </button>
           </div>
 
           <div style={{ 
@@ -245,38 +282,6 @@ export default function ProfileManagerModal({
               <i className="ti ti-x" /> {t('close')}
             </button>
           </div>
-
-          {showConfirmDelete && (
-            <div className="modal-overlay" onClick={() => setShowConfirmDelete(false)} style={{ zIndex: 2000 }}>
-              <div className="modal fade-in" style={{ width: 400 }} onClick={e => e.stopPropagation()}>
-                <div className="modal-title" style={{ color: 'var(--warning)' }}>
-                  <i className="ti ti-alert-triangle" style={{ color: 'var(--warning)', marginRight: 8 }} />
-                  {t('profileManagerConfirmRemove')}
-                </div>
-                
-                <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.6 }}>
-                  {t('profileManagerConfirmMessage').replace('{count}', selectedSounds.size).replace('{name}', profileName)}
-                  <br /><br />
-                  <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
-                    {t('profileManagerConfirmSub')}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <button className="btn-secondary btn-lg" onClick={() => setShowConfirmDelete(false)} disabled={isDeleting} style={{ borderRadius: 'var(--radius-md)', minHeight: 40 }}>
-                    {t('cancel')}
-                  </button>
-                  <button className="btn-danger btn-lg" onClick={confirmRemove} disabled={isDeleting} style={{ borderRadius: 'var(--radius-md)', minHeight: 40 }}>
-                    {isDeleting ? (
-                      <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('profileManagerDeleting') || 'Suppression...'}</>
-                    ) : (
-                      <><i className="ti ti-check" /> {t('confirm')}</>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
       <ConfirmWrapper />

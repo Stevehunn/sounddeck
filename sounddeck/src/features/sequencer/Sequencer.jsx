@@ -45,12 +45,16 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
     setShowNewPlaylist(false)
   }
 
+  // ✅ Supprimer une playlist - UNE SEULE CONFIRMATION
   const deletePlaylist = async (id) => {
     const confirmed = await confirm({
-      title: t('deletePlaylist'),
-      message: t('deletePlaylistConfirm'),
-      type: 'danger'
+      title: t('deletePlaylist') || 'Confirmer la suppression de la playlist',
+      message: t('deletePlaylistConfirm') || 'Voulez-vous vraiment supprimer cette playlist ?',
+      type: 'danger',
+      confirmText: t('delete') || 'Supprimer',
+      cancelText: t('cancel') || 'Annuler'
     })
+    
     if (!confirmed) return
     
     const updated = playlists.filter(p => p.id !== id)
@@ -167,15 +171,34 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
                   {pl.items.length} {t('sounds')}
                 </div>
               </div>
-              <DeleteButton
-                onDelete={() => deletePlaylist(pl.id)}
-                confirmTitle={t('deletePlaylist') || 'Confirmer la suppression de la playlist'}
-                confirmMessage={t('deletePlaylistConfirm') || 'Voulez-vous vraiment supprimer cette playlist ?'}
-                itemName={pl.name}
-                size="sm"
-                variant="ghost"
-                icon="ti-trash"
-              />
+              {/* ✅ Bouton Supprimer - sans confirmation supplémentaire */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  deletePlaylist(pl.id)
+                }}
+                style={{
+                  padding: '4px 6px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-tertiary)',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  transition: 'all 0.15s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(224, 82, 82, 0.1)'
+                  e.currentTarget.style.color = 'var(--danger)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.color = 'var(--text-tertiary)'
+                }}
+                title={t('delete') || 'Supprimer'}
+              >
+                <i className="ti ti-trash" />
+              </button>
             </div>
           ))}
         </div>
@@ -197,7 +220,7 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
           <EmptyState lang={lang} />
         )}
       </div>
-      <ConfirmWrapper /> 
+      <ConfirmWrapper />
     </div>
   )
 }
@@ -337,7 +360,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
 
   useEffect(() => () => stopSequence(), [stopSequence])
 
-  // ─── DRAG & DROP AMÉLIORÉ ──────────────────────────────────────────────────
+  // ─── DRAG & DROP ──────────────────────────────────────────────────
   const handleDragStart = (e, idx) => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', String(idx))
@@ -587,7 +610,6 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
                 zIndex: isDragOver ? 10 : 1
               }}
             >
-              {/* Indicateur de drop */}
               {isDragOver && (
                 <div style={{
                   position: 'absolute',
@@ -655,15 +677,31 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
                 </div>
               </div>
 
-              <DeleteButton
-                onDelete={() => removeItem(idx)}
-                confirmTitle={t('deleteItem') || 'Confirmer la suppression'}
-                confirmMessage={t('deleteItemConfirm') || 'Voulez-vous vraiment supprimer cet élément de la playlist ?'}
-                itemName={sound?.name || 'Élément'}
-                size="sm"
-                variant="ghost"
-                icon="ti-trash"
-              />
+              {/* ✅ Bouton Supprimer un élément - sans confirmation supplémentaire */}
+              <button
+                onClick={() => removeItem(idx)}
+                style={{
+                  padding: '4px 6px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-tertiary)',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  transition: 'all 0.15s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(224, 82, 82, 0.1)'
+                  e.currentTarget.style.color = 'var(--danger)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.color = 'var(--text-tertiary)'
+                }}
+                title={t('delete') || 'Supprimer'}
+              >
+                <i className="ti ti-trash" />
+              </button>
             </div>
           )
         })}

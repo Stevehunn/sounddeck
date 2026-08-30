@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { playSound, stopSound, isPlaying, getSoundProgress } from '@core/services/AudioService'
 import ShortcutRecorder from "@shared/components/settings/ShortcutRecorder"
 import { useLanguage } from '@core/i18n/LanguageContext'
-import useConfirm from '@shared/hooks/useConfirm' // ✅ Ajout
+import useConfirm from '@shared/hooks/useConfirm'
 
 function fmtTime(s) {
   if (!s || isNaN(s)) return '0:00'
@@ -51,7 +51,7 @@ export default function SoundCard({
   size = 'medium'
 }) {
   const { t, currentLang } = useLanguage()
-  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang }) // ✅ Ajout
+  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
   const [playing, setPlaying] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showVolume, setShowVolume] = useState(false)
@@ -180,37 +180,27 @@ export default function SoundCard({
     const rect = buttonRef.current.getBoundingClientRect()
     const menuWidth = 220
     
-    // Position horizontale : alignée à gauche du bouton
     let left = rect.left - 10
-    
-    // Ajustement horizontal si le menu dépasse à droite
     const spaceRight = window.innerWidth - left - menuWidth
     if (spaceRight < 10) {
       left = Math.max(10, window.innerWidth - menuWidth - 10)
     }
     
-    // Si la hauteur du menu n'est pas encore connue, utiliser une estimation
     const estimatedHeight = menuHeight > 0 ? menuHeight : 300
-    
-    // Vérifier l'espace en bas
     const spaceBottom = window.innerHeight - rect.bottom - 6
     
     let top
     if (spaceBottom >= estimatedHeight) {
-      // Assez d'espace en bas → ouvrir vers le bas
       top = rect.bottom + 6
     } else {
-      // Pas assez d'espace en bas → essayer vers le haut
       const spaceTop = rect.top - 6
       if (spaceTop >= estimatedHeight) {
         top = rect.top - estimatedHeight - 6
       } else {
-        // Ni en haut ni en bas → centrer dans la fenêtre
         top = Math.max(10, (window.innerHeight - estimatedHeight) / 2)
       }
     }
     
-    // Ajustements finaux pour rester dans l'écran
     top = Math.max(10, Math.min(top, window.innerHeight - estimatedHeight - 10))
     left = Math.max(10, Math.min(left, window.innerWidth - menuWidth - 10))
     
@@ -224,7 +214,6 @@ export default function SoundCard({
       return
     }
     
-    // Calculer la position avec la hauteur estimée
     calculateMenuPosition()
     setShowMenu(true)
     setShowVolume(false)
@@ -277,7 +266,6 @@ export default function SoundCard({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showMenu])
 
-  // Recalculer la position quand la hauteur du menu change
   useEffect(() => {
     if (showMenu && menuHeight > 0) {
       calculateMenuPosition()
@@ -303,21 +291,35 @@ export default function SoundCard({
 
   const isFavorite = sound.favorites?.includes(currentProfileId) || false;
 
-  // ✅ Fonction de suppression avec confirmation
+  // ✅ Fonction de suppression avec confirmation - Délègue à onDelete
   const handleDeleteWithConfirm = async () => {
-    // Fermer le menu
     setShowMenu(false)
     
-    const confirmed = await confirm({
-      title: t('confirmDeleteSound') || 'Confirmer la suppression du son',
-      message: t('confirmDeleteSoundMessage') || 'Voulez-vous vraiment supprimer définitivement ce son ?',
-      type: 'danger',
-      confirmText: t('menuDelete') || 'Supprimer définitivement',
-      cancelText: t('cancel') || 'Annuler',
-    })
+    if (onDelete) {
+      onDelete(sound.id)
+    } else {
+      console.warn('⚠️ onDelete non fourni, suppression impossible')
+    }
+  }
+
+  // ✅ Fonction de retrait du profil avec confirmation
+  const handleRemoveFromProfileWithConfirm = async () => {
+    setShowMenu(false)
     
-    if (confirmed) {
-      onDelete?.(sound.id)
+    if (onRemoveFromProfile && currentProfileId !== 'all') {
+      const soundName = sound.name || 'ce son'
+      
+      const confirmed = await confirm({
+        title: t('confirmAction') || 'Confirmer le retrait',
+        message: `${t('menuRemoveFromProfile')} "${soundName}" ?`,
+        type: 'warning',
+        confirmText: t('remove') || 'Retirer',
+        cancelText: t('cancel') || 'Annuler'
+      })
+      
+      if (confirmed) {
+        onRemoveFromProfile(sound.id)
+      }
     }
   }
 
@@ -329,7 +331,7 @@ export default function SoundCard({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         data-sound-id={sound.id}
-        className={`sound-card sound-card-${size}`}
+        className={`sound-card sound-card-${size} ${playing ? 'playing-pulse' : ''}`}
         style={{
           background: 'var(--bg-secondary)',
           border: `1px solid ${fileError ? 'var(--danger)' : playing ? (loopEnabled ? 'var(--success)' : 'var(--accent)') : 'var(--border)'}`,
@@ -340,8 +342,7 @@ export default function SoundCard({
           cursor: draggable && !isDraggingVolume && !showVolume ? 'grab' : 'default',
           userSelect: isDraggingVolume || showVolume ? 'none' : 'auto',
           boxShadow: playing ? '0 0 20px rgba(124,111,247,0.15)' : 'none'
-        }} 
-        className={playing ? 'playing-pulse' : ''}
+        }}
       >
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -634,7 +635,8 @@ export default function SoundCard({
             position={menuPosition}
             lang={lang}
             onHeightMeasured={setMenuHeight}
-            onDeleteWithConfirm={handleDeleteWithConfirm} // ✅ Passer la fonction
+            onDeleteWithConfirm={handleDeleteWithConfirm}
+            onRemoveFromProfileWithConfirm={handleRemoveFromProfileWithConfirm}
           />
         </div>,
         document.body
@@ -737,7 +739,7 @@ export default function SoundCard({
         document.body
       )}
       
-      <ConfirmWrapper /> {/* ✅ Ajout du wrapper pour les confirmations */}
+      <ConfirmWrapper />
     </>
   )
 }
@@ -970,7 +972,7 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
   )
 }
 
-// ContextMenuPortal - avec bouton supprimer qui utilise la confirmation
+// ContextMenuPortal
 function ContextMenuPortal({ 
   sound, 
   currentProfileId, 
@@ -985,16 +987,15 @@ function ContextMenuPortal({
   position, 
   lang = 'fr',
   onHeightMeasured,
-  onDeleteWithConfirm // ✅ Ajout
+  onDeleteWithConfirm,
+  onRemoveFromProfileWithConfirm
 }) {
   const { t, currentLang } = useLanguage()
   const menuRef = useRef(null)
 
-  // Mesurer la hauteur réelle du menu après le rendu
   useEffect(() => {
     if (!menuRef.current) return
     
-    // Utiliser requestAnimationFrame pour s'assurer que le DOM est rendu
     requestAnimationFrame(() => {
       if (!menuRef.current) return
       const height = menuRef.current.getBoundingClientRect().height
@@ -1004,7 +1005,6 @@ function ContextMenuPortal({
     })
   }, [onHeightMeasured])
 
-  // Ajuster la position si le menu dépasse
   useEffect(() => {
     if (!menuRef.current) return
     
@@ -1014,27 +1014,22 @@ function ContextMenuPortal({
       const rect = menuRef.current.getBoundingClientRect()
       let { top, left } = position
       
-      // Ajuster si le menu dépasse à droite
       if (rect.right > window.innerWidth) {
         left = Math.max(10, window.innerWidth - rect.width - 10)
       }
       
-      // Ajuster si le menu dépasse en bas
       if (rect.bottom > window.innerHeight) {
         top = Math.max(10, window.innerHeight - rect.height - 10)
       }
       
-      // Ajuster si le menu dépasse à gauche
       if (left < 10) {
         left = 10
       }
       
-      // Ajuster si le menu dépasse en haut
       if (top < 10) {
         top = 10
       }
       
-      // Appliquer les positions si elles ont changé
       if (top !== position.top || left !== position.left) {
         menuRef.current.style.top = top + 'px'
         menuRef.current.style.left = left + 'px'
@@ -1108,7 +1103,7 @@ function ContextMenuPortal({
           <MenuItem 
             icon="ti-folder-minus" 
             label={t('menuRemoveFromProfile')} 
-            onClick={() => handleAction(onRemoveFromProfile)}
+            onClick={() => handleAction(onRemoveFromProfileWithConfirm)}
             warning 
             lang={lang}
           />
@@ -1116,13 +1111,10 @@ function ContextMenuPortal({
       )}
       <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
       
-      {/* ✅ Bouton Supprimer définitivement - avec confirmation */}
       <div style={{ padding: '2px 4px' }}>
         <button
           onClick={() => {
-            // Fermer le menu
             onClose()
-            // Appeler la fonction de suppression avec confirmation
             onDeleteWithConfirm?.()
           }}
           style={{

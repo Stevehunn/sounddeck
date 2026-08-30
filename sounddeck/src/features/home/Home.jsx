@@ -397,6 +397,25 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
 
   const currentProfile = store.profiles.find(p => p.id === currentProfileId)
 
+  // ✅ UNE SEULE FONCTION DE SUPPRESSION - DANS LE COMPOSANT HOME
+  const handleDeleteSound = useCallback(async (soundId) => {
+    const sound = store.sounds.find(s => s.id === soundId)
+    if (!sound) return
+    
+    const confirmed = await confirm({
+      title: t('confirmDeleteSound') || 'Confirmer la suppression du son',
+      message: (t('confirmDeleteSoundMessage') || `Voulez-vous vraiment supprimer définitivement le son "{name}" ?`).replace('{name}', sound.name),
+      type: 'danger',
+      confirmText: t('menuDelete') || 'Supprimer définitivement',
+      cancelText: t('cancel') || 'Annuler'
+    })
+    
+    if (confirmed) {
+      await store.deleteSound(soundId)
+      addToast(`"${sound.name}" ${t('deleted')}`, 'info')
+    }
+  }, [store, confirm, addToast, t])
+
   return (
     <>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -512,6 +531,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
                 draggedSoundId={draggedSoundId}
                 dragOverIndex={dragOverIndex}
                 dropTarget="favorites"
+                onDelete={handleDeleteSound}
               />
             </Section>
           )}
@@ -537,6 +557,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
                 draggedSoundId={draggedSoundId}
                 dragOverIndex={dragOverIndex}
                 dropTarget="profile"
+                onDelete={handleDeleteSound}
               />
               {filtered.length > itemsPerPage && (
                 <button className="btn-secondary btn-sm" onClick={() => setShowAll(!showAll)} style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}>
@@ -683,9 +704,8 @@ function Section({ title, icon, iconColor, count, muted, children }) {
   )
 }
 
-function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLocally, store, addToast, lang, gridRef, draggable, onDragStart, onDragEnd, onDragOver, onDrop, draggedSoundId, dragOverIndex, dropTarget }) {
+function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLocally, store, addToast, lang, gridRef, draggable, onDragStart, onDragEnd, onDragOver, onDrop, draggedSoundId, dragOverIndex, dropTarget, onDelete }) {
   const { t, currentLang } = useLanguage()
-  const { confirm } = useConfirm({ lang: currentLang })
   const cardSize = store.cardSize || 'medium'
   
   const cardSizes = {
@@ -693,25 +713,6 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLo
     medium: 110,
     large: 140
   }
-  
-  // ✅ Fonction de suppression avec le nom du son
-  const handleDeleteSound = useCallback(async (soundId) => {
-    const sound = store.sounds.find(s => s.id === soundId)
-    if (!sound) return
-    
-    const confirmed = await confirm({
-      title: t('confirmDeleteSound') || 'Confirmer la suppression du son',
-      message: (t('confirmDeleteSoundMessage') || `Voulez-vous vraiment supprimer définitivement le son "{name}" ?`).replace('{name}', sound.name),
-      type: 'danger',
-      confirmText: t('delete') || 'Supprimer',
-      cancelText: t('cancel') || 'Annuler'
-    })
-    
-    if (confirmed) {
-      await store.deleteSound(soundId)
-      addToast(t('deleted'), 'info')
-    }
-  }, [store, confirm, addToast, t])
 
   return (
     <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${cardSizes[cardSize]}px, 1fr))`, gap: 10, position: 'relative', zIndex: 1 }}>
@@ -765,8 +766,7 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLo
               onVolumeChange={store.updateSoundVolume}
               onPlay={store.incrementPlayCount}
               onRemoveFromProfile={async (id) => { await store.removeSoundFromProfile(id, store.currentProfileId); addToast(t('removedFromProfile'), 'info') }}
-              // ✅ onDelete avec confirmation et nom du son
-              onDelete={handleDeleteSound}
+              onDelete={onDelete}
               onRename={(id, name) => store.updateSound(id, { name })}
               onChangeImage={store.updateSoundImage}
               onChangeEmoji={store.updateSoundEmoji}
