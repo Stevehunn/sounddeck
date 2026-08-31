@@ -4,38 +4,75 @@ import { createPortal } from 'react-dom';
 import { useLanguage } from '@core/i18n/LanguageContext';
 
 /**
- * Trouve un élément DOM par sélecteur ou par fonction de recherche
+ * Trouve un élément DOM avec gestion des composants React
+ * Attend que l'élément soit visible et interactif
  */
 function findElement(selector, fallbackSelector) {
+  console.log('🔍 [Tutorial] Recherche de l\'élément cible...');
+  
+  // Si c'est une fonction, l'exécuter
   if (typeof selector === 'function') {
     try {
       const result = selector();
-      if (result) return result;
+      if (result) {
+        // Vérifier que l'élément est visible
+        if (result.offsetParent !== null || result.getClientRects().length > 0) {
+          console.log('✅ [Tutorial] Élément trouvé par fonction');
+          return result;
+        }
+        console.log('⚠️ [Tutorial] Élément trouvé mais non visible, tentative de fallback');
+      }
     } catch (e) {
-      console.warn('⚠️ [findElement] Function selector error:', e);
+      console.warn('⚠️ [Tutorial] Erreur dans la fonction selector:', e);
     }
   }
   
+  // Si c'est une chaîne, chercher avec querySelector
   if (typeof selector === 'string') {
     try {
       const el = document.querySelector(selector);
-      if (el) return el;
+      if (el && (el.offsetParent !== null || el.getClientRects().length > 0)) {
+        console.log('✅ [Tutorial] Élément trouvé par sélecteur:', selector);
+        return el;
+      }
     } catch (e) {}
   }
   
+  // Fallback
   if (fallbackSelector) {
+    console.log('🔍 [Tutorial] Tentative fallback...');
+    
     if (typeof fallbackSelector === 'function') {
       try {
         const result = fallbackSelector();
-        if (result) return result;
+        if (result && (result.offsetParent !== null || result.getClientRects().length > 0)) {
+          console.log('✅ [Tutorial] Élément trouvé par fallback fonction');
+          return result;
+        }
       } catch (e) {}
     }
+    
     try {
       const el = document.querySelector(fallbackSelector);
-      if (el) return el;
+      if (el && (el.offsetParent !== null || el.getClientRects().length > 0)) {
+        console.log('✅ [Tutorial] Élément trouvé par fallback sélecteur');
+        return el;
+      }
     } catch (e) {}
   }
   
+  // Dernier recours: chercher dans tout le DOM un élément avec data-testid
+  try {
+    const allTestIds = document.querySelectorAll('[data-testid]');
+    for (const el of allTestIds) {
+      if (el.offsetParent !== null) {
+        console.log('✅ [Tutorial] Élément trouvé par data-testid:', el.dataset.testid);
+        return el;
+      }
+    }
+  } catch (e) {}
+  
+  console.log('❌ [Tutorial] Aucun élément trouvé');
   return null;
 }
 
@@ -129,63 +166,6 @@ function openContextMenu(element) {
     element.dispatchEvent(downEvent);
     element.dispatchEvent(upEvent);
     console.log('  ✅ mousedown/mouseup dispatchés');
-    
-    // ✅ Méthode 4: PointerEvent
-    try {
-      const pointerEvent = new PointerEvent('click', {
-        view: window,
-        bubbles: true,
-        cancelable: true,
-        clientX: 0,
-        clientY: 0,
-        button: 0,
-        pointerType: 'mouse',
-      });
-      element.dispatchEvent(pointerEvent);
-      console.log('  ✅ PointerEvent dispatché');
-    } catch (e) {
-      console.log('  ⚠️ PointerEvent non supporté');
-    }
-    
-    // ✅ Méthode 5: Trouver le menu contextuel dans le DOM et le forcer à s'afficher
-    const menuSelectors = [
-      '.clip-actions-menu',
-      '.context-menu',
-      '.sound-card-menu',
-      '[class*="menu"]:not([class*="menu-item"])',
-    ];
-    
-    for (const selector of menuSelectors) {
-      try {
-        const menus = document.querySelectorAll(selector);
-        for (const menu of menus) {
-          const card = element.closest('.sound-card');
-          if (card && card.contains(menu)) {
-            menu.style.display = 'block';
-            menu.style.visibility = 'visible';
-            menu.style.opacity = '1';
-            menu.style.pointerEvents = 'auto';
-            console.log('  ✅ Menu contextuel trouvé et forcé à s\'afficher:', menu);
-            return true;
-          }
-        }
-      } catch (e) {}
-    }
-    
-    // ✅ Méthode 6: Simuler un clic sur l'icône avec un événement plus réaliste
-    try {
-      const rect = element.getBoundingClientRect();
-      const clickEvent2 = new MouseEvent('click', {
-        view: window,
-        bubbles: true,
-        cancelable: true,
-        clientX: rect.left + rect.width / 2,
-        clientY: rect.top + rect.height / 2,
-        button: 0,
-      });
-      element.dispatchEvent(clickEvent2);
-      console.log('  ✅ Clic avec position réaliste');
-    } catch (e) {}
     
     console.log('✅ [openContextMenu] Menu ouvert avec succès');
     return true;
@@ -284,7 +264,7 @@ export default function TutorialOverlay({
     if (!rect) return { top: 0, left: 0, arrow: 'bottom' };
     
     const bubbleWidth = 380;
-    const bubbleHeight = 240; // Augmenté pour plus de confort
+    const bubbleHeight = 240;
     const padding = 16;
     const gap = 16;
     const viewportWidth = window.innerWidth;
@@ -334,7 +314,6 @@ export default function TutorialOverlay({
     // Si l'élément est très proche du bord, centrer la bulle verticalement
     if (rect.top < bubbleHeight + gap * 2 && rect.bottom > viewportHeight - bubbleHeight - gap * 2) {
       top = viewportHeight / 2 - bubbleHeight / 2;
-      // Déterminer la flèche en fonction de la position horizontale
       if (rect.centerX < viewportWidth / 2) {
         bestPos.arrow = 'left';
         left = rect.right + gap;
@@ -342,14 +321,12 @@ export default function TutorialOverlay({
         bestPos.arrow = 'right';
         left = rect.left - bubbleWidth - gap;
       }
-      // Vérifier que la position horizontale est valide
       left = Math.max(padding, Math.min(left, viewportWidth - bubbleWidth - padding));
     }
     
     // Si l'élément est très proche des bords horizontaux, centrer la bulle horizontalement
     if (rect.left < bubbleWidth / 2 || rect.right > viewportWidth - bubbleWidth / 2) {
       left = viewportWidth / 2 - bubbleWidth / 2;
-      // Déterminer la flèche en fonction de la position verticale
       if (rect.centerY < viewportHeight / 2) {
         bestPos.arrow = 'top';
         top = rect.bottom + gap;
@@ -357,24 +334,19 @@ export default function TutorialOverlay({
         bestPos.arrow = 'bottom';
         top = rect.top - bubbleHeight - gap;
       }
-      // Vérifier que la position verticale est valide
       top = Math.max(padding, Math.min(top, viewportHeight - bubbleHeight - padding));
     }
     
-    // Ajustement final pour la flèche si la bulle est centrée
+    // Ajustement final pour la flèche
     let arrow = bestPos.arrow;
-    
-    // Si la bulle est en bas de l'écran, la flèche doit pointer vers le haut
     if (top + bubbleHeight > viewportHeight - padding * 2) {
       arrow = 'bottom';
     }
-    
-    // Si la bulle est en haut de l'écran, la flèche doit pointer vers le bas
     if (top < padding * 2) {
       arrow = 'top';
     }
     
-    console.log('📐 [Tutorial] Position calculée:', { top, left, arrow, viewportWidth, viewportHeight });
+    console.log('📐 [Tutorial] Position calculée:', { top, left, arrow });
     
     return { top, left, arrow };
   }, []);
@@ -501,7 +473,6 @@ export default function TutorialOverlay({
       background: 'var(--bg-secondary)',
     };
     
-    // Ajuster la position de la flèche en fonction de la position de la bulle
     const arrowOffset = '50%';
     
     switch (bubblePosition.arrow) {

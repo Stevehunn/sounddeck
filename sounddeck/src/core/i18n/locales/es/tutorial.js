@@ -95,17 +95,29 @@ export default {
   tutorialDiscoverStep3Hint: '💡 Consejo: Los sonidos ya en tu biblioteca están marcados como "Añadido" en verde.',
 
   // ─── TRIMMER ────────────────────────────────────────────────────────
-  tutorialTrimmerStep1Title: 'Seleccionar una porción',
-  tutorialTrimmerStep1Desc: 'Usa las asas en la waveform para seleccionar la porción del sonido a conservar.',
-  tutorialTrimmerStep1Hint: '💡 Consejo: También puedes ingresar valores manualmente en segundos.',
+  tutorialTrimmerStep1Title: 'Seleccionar un sonido',
+  tutorialTrimmerStep1Desc: 'Elige un sonido de la lista izquierda para empezar a recortarlo. La lista muestra todos tus sonidos disponibles.',
+  tutorialTrimmerStep1Hint: '💡 Consejo: Usa la barra de búsqueda para encontrar rápidamente un sonido específico.',
   
-  tutorialTrimmerStep2Title: 'Escuchar la selección',
-  tutorialTrimmerStep2Desc: 'Haz clic en "Escuchar selección" para previsualizar el resultado antes de recortar.',
-  tutorialTrimmerStep2Hint: '💡 Consejo: La barra de progreso te muestra dónde estás en el archivo.',
+  tutorialTrimmerStep2Title: 'Ver y seleccionar una parte',
+  tutorialTrimmerStep2Desc: 'El waveform muestra la forma del sonido. Usa las asas ═══ en los bordes para seleccionar la parte a conservar. También puedes ajustar los controles "Inicio" y "Fin" debajo.',
+  tutorialTrimmerStep2Hint: '💡 Consejo: Arrastra las asas o usa los controles para un ajuste preciso.',
   
-  tutorialTrimmerStep3Title: 'Recortar el archivo',
-  tutorialTrimmerStep3Desc: 'Haz clic en "Recortar" para crear un nuevo archivo de audio con solo la selección.',
-  tutorialTrimmerStep3Hint: '💡 Consejo: El archivo original se conserva, se crea un nuevo archivo.',
+  tutorialTrimmerStep3Title: 'Escuchar la selección',
+  tutorialTrimmerStep3Desc: 'Antes de recortar, escucha la selección para asegurarte de que tienes la parte correcta. Haz clic en "Escuchar selección" para previsualizar.',
+  tutorialTrimmerStep3Hint: '💡 Consejo: La barra de progreso debajo del waveform muestra tu posición en la reproducción.',
+  
+  tutorialTrimmerStep4Title: 'Personalizar tu sonido',
+  tutorialTrimmerStep4Desc: 'Dale un nombre a tu nuevo sonido, elige una imagen o emoji, y selecciona el o los perfiles donde añadirlo.',
+  tutorialTrimmerStep4Hint: '💡 Consejo: Una imagen hará que tu sonido sea más reconocible en la biblioteca.',
+  
+  tutorialTrimmerStep5Title: 'Crear el sonido',
+  tutorialTrimmerStep5Desc: 'Una vez que hayas configurado el nombre, la imagen y los perfiles, haz clic en "Crear sonido" para añadirlo permanentemente a tu biblioteca.',
+  tutorialTrimmerStep5Hint: '💡 Consejo: El sonido aparecerá inmediatamente en tu perfil y estará listo para reproducirse.',
+  
+  tutorialTrimmerStep6Title: 'Buscar un sonido',
+  tutorialTrimmerStep6Desc: 'Usa la barra de búsqueda en la parte superior de la lista para filtrar tus sonidos por nombre. Es útil cuando tienes muchos sonidos.',
+  tutorialTrimmerStep6Hint: '💡 Consejo: La búsqueda es instantánea, los resultados se actualizan mientras escribes.',
 
   // ─── OPTIONS ────────────────────────────────────────────────────────
   tutorialOptionsStep1Title: 'Personalizar apariencia',

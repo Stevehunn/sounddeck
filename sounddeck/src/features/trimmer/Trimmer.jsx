@@ -16,8 +16,8 @@ const EMOJIS = [
   '🚀','🛸','💎','💰','💵','💶','💷','💴','🪙','🧿','🔮','🪄','⚔️','🛡️','🏹'
 ]
 
-export default function Trimmer({ store, addToast }) { // ✅ Supprimer le paramètre lang
-  const { t, currentLang } = useLanguage() // ✅ Utiliser useLanguage
+export default function Trimmer({ store, addToast }) {
+  const { t, currentLang } = useLanguage()
   const [selectedSound, setSelectedSound] = useState(null)
   const [search, setSearch] = useState('')
 
@@ -42,6 +42,7 @@ export default function Trimmer({ store, addToast }) { // ✅ Supprimer le param
             placeholder={t('editorSearch')}
             className="input-sm"
             style={{ borderRadius: 'var(--radius-md)' }}
+            data-testid="trimmer-search-input"
           />
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
@@ -88,6 +89,9 @@ function SoundListItem({ sound, active, onClick }) {
       onClick={onClick} 
       className={`sidebar-item ${active ? 'active' : ''}`}
       style={{ borderLeft: `2px solid ${active ? 'var(--accent)' : 'transparent'}` }}
+      data-testid={`sound-list-item-${sound.id}`}
+      data-sound-id={sound.id}
+      data-active={active ? 'true' : 'false'}
     >
       <div style={{
         width: 28, height: 28, borderRadius: 6, background: 'var(--bg-tertiary)',
@@ -105,7 +109,7 @@ function SoundListItem({ sound, active, onClick }) {
   )
 }
 
-function EmptyState() { // ✅ Supprimer le paramètre lang
+function EmptyState() {
   const { t } = useLanguage()
   return (
     <div className="flex-center" style={{ flexDirection: 'column', height: '100%', gap: 12, color: 'var(--text-tertiary)' }}>
@@ -118,7 +122,7 @@ function EmptyState() { // ✅ Supprimer le paramètre lang
   )
 }
 
-function SoundEditor({ sound, store, addToast, onDone }) { // ✅ Supprimer le paramètre lang
+function SoundEditor({ sound, store, addToast, onDone }) {
   const { t, currentLang } = useLanguage()
   const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
   const [duration, setDuration] = useState(0)
@@ -251,7 +255,13 @@ function SoundEditor({ sound, store, addToast, onDone }) { // ✅ Supprimer le p
           <button className="btn-secondary btn-lg" onClick={onDone} style={{ borderRadius: 'var(--radius-md)' }}>
             <i className="ti ti-x" /> {t('cancel')}
           </button>
-          <button className="btn-primary btn-lg" onClick={handleSave} disabled={saving} style={{ borderRadius: 'var(--radius-md)' }}>
+          <button 
+            className="btn-primary btn-lg" 
+            onClick={handleSave} 
+            disabled={saving} 
+            style={{ borderRadius: 'var(--radius-md)' }}
+            data-testid="trimmer-create-button"
+          >
             {saving
               ? <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('creating')}</>
               : <><i className="ti ti-check" /> {t('createSound')}</>}
@@ -280,7 +290,7 @@ function SoundEditor({ sound, store, addToast, onDone }) { // ✅ Supprimer le p
               </span>
             </div>
 
-            <div style={{ marginBottom: 24 }}>
+            <div style={{ marginBottom: 24 }} data-testid="trimmer-waveform-container">
               <Waveform
                 filePath={sound.path}
                 start={start}
@@ -318,11 +328,22 @@ function SoundEditor({ sound, store, addToast, onDone }) { // ✅ Supprimer le p
             </div>
 
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <button onClick={togglePlay} className="btn-secondary btn-lg" style={{ flex: 1, justifyContent: 'center', borderRadius: 'var(--radius-md)', minWidth: 120 }}>
+              <button 
+                onClick={togglePlay} 
+                className="btn-secondary btn-lg" 
+                style={{ flex: 1, justifyContent: 'center', borderRadius: 'var(--radius-md)', minWidth: 120 }}
+                data-testid="trimmer-listen-button"
+              >
                 <i className={`ti ${playing ? 'ti-player-pause' : 'ti-player-play'}`} />
                 {playing ? t('trimmerPause') : t('listenSelection')}
               </button>
-              <button onClick={() => { setStart(0); setEnd(duration) }} className="btn-ghost btn-lg" title={t('selectAll')} style={{ borderRadius: 'var(--radius-md)' }}>
+              <button 
+                onClick={() => { setStart(0); setEnd(duration) }} 
+                className="btn-ghost btn-lg" 
+                title={t('selectAll')} 
+                style={{ borderRadius: 'var(--radius-md)' }}
+                data-testid="trimmer-reset-button"
+              >
                 <i className="ti ti-refresh" /> {t('selectAll')}
               </button>
             </div>
@@ -364,6 +385,7 @@ function SoundEditor({ sound, store, addToast, onDone }) { // ✅ Supprimer le p
                 placeholder={t('editorNamePlaceholder')}
                 className="input-lg"
                 style={{ fontSize: 13, borderRadius: 'var(--radius-md)' }}
+                data-testid="trimmer-name-input"
               />
             </div>
 

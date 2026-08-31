@@ -58,4 +58,6 @@ export default {
   trimmerExportPath: 'Export path',
   trimmerExportSuccess: 'File exported successfully',
   trimmerExportError: 'Error exporting',
-}
+  
+  editorSearch: 'Search for a sound...',
+};

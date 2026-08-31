@@ -95,17 +95,29 @@ export default {
   tutorialDiscoverStep3Hint: '💡 Astuce : Les sons déjà dans votre bibliothèque sont marqués "Ajouté" en vert.',
 
   // ─── TRIMMER ────────────────────────────────────────────────────────
-  tutorialTrimmerStep1Title: 'Sélectionner une portion',
-  tutorialTrimmerStep1Desc: 'Utilisez les poignées sur le waveform pour sélectionner la portion du son à conserver.',
-  tutorialTrimmerStep1Hint: '💡 Astuce : Vous pouvez aussi entrer les valeurs manuellement en secondes.',
+  tutorialTrimmerStep1Title: 'Sélectionner un son',
+  tutorialTrimmerStep1Desc: 'Choisissez un son dans la liste de gauche pour commencer à le rogner. La liste affiche tous vos sons disponibles.',
+  tutorialTrimmerStep1Hint: '💡 Astuce : Vous pouvez utiliser la barre de recherche pour trouver rapidement un son spécifique.',
   
-  tutorialTrimmerStep2Title: 'Écouter la sélection',
-  tutorialTrimmerStep2Desc: 'Cliquez sur "Écouter la sélection" pour prévisualiser le résultat avant de rogner.',
-  tutorialTrimmerStep2Hint: '💡 Astuce : La barre de progression vous montre où vous en êtes dans le fichier.',
+  tutorialTrimmerStep2Title: 'Visualiser et sélectionner une portion',
+  tutorialTrimmerStep2Desc: 'Le waveform affiche la forme d\'onde du son. Utilisez les poignées ═══ sur les bords pour sélectionner la portion à conserver. Vous pouvez aussi ajuster les curseurs "Début" et "Fin" en dessous.',
+  tutorialTrimmerStep2Hint: '💡 Astuce : Faites glisser les poignées ou utilisez les curseurs pour un réglage précis.',
   
-  tutorialTrimmerStep3Title: 'Rogner le fichier',
-  tutorialTrimmerStep3Desc: 'Cliquez sur "Rogner" pour créer un nouveau fichier audio avec uniquement la sélection.',
-  tutorialTrimmerStep3Hint: '💡 Astuce : Le fichier original est conservé, un nouveau fichier est créé.',
+  tutorialTrimmerStep3Title: 'Écouter la sélection',
+  tutorialTrimmerStep3Desc: 'Avant de rogner, écoutez la sélection pour vérifier que vous avez bien choisi la bonne portion. Cliquez sur "Écouter la sélection" pour prévisualiser.',
+  tutorialTrimmerStep3Hint: '💡 Astuce : La barre de progression en dessous du waveform vous montre où vous en êtes dans la lecture.',
+  
+  tutorialTrimmerStep4Title: 'Personnaliser votre son',
+  tutorialTrimmerStep4Desc: 'Donnez un nom à votre nouveau son, choisissez une image ou un emoji, et sélectionnez le ou les profils dans lesquels l\'ajouter.',
+  tutorialTrimmerStep4Hint: '💡 Astuce : Une image rendra votre son plus reconnaissable dans la bibliothèque.',
+  
+  tutorialTrimmerStep5Title: 'Créer le son',
+  tutorialTrimmerStep5Desc: 'Une fois que vous avez configuré le nom, l\'image et les profils, cliquez sur "Créer le son" pour l\'ajouter définitivement à votre bibliothèque.',
+  tutorialTrimmerStep5Hint: '💡 Astuce : Le son apparaîtra immédiatement dans votre profil et sera prêt à être joué.',
+  
+  tutorialTrimmerStep6Title: 'Rechercher un son',
+  tutorialTrimmerStep6Desc: 'Utilisez la barre de recherche en haut de la liste pour filtrer vos sons par nom. C\'est pratique quand vous avez beaucoup de sons.',
+  tutorialTrimmerStep6Hint: '💡 Astuce : La recherche est instantanée, les résultats se mettent à jour au fur et à mesure que vous tapez.',
 
   // ─── OPTIONS ────────────────────────────────────────────────────────
   tutorialOptionsStep1Title: 'Personnaliser l\'apparence',

@@ -32,9 +32,20 @@ const TUTORIALS = {
 export default function Tutorial({ pageId, onComplete }) {
   const { t } = useLanguage();
   const [currentStep, setCurrentStep] = useState(0);
+  const [isReady, setIsReady] = useState(false);
   
   const steps = TUTORIALS[pageId] ? TUTORIALS[pageId](t) : [];
   const hasSteps = steps && steps.length > 0;
+
+  // ✅ Attendre que le DOM soit prêt avant d'afficher le tutoriel
+  useEffect(() => {
+    // Donner le temps à React de rendre les composants
+    const timer = setTimeout(() => {
+      setIsReady(true);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [pageId]);
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
@@ -49,6 +60,25 @@ export default function Tutorial({ pageId, onComplete }) {
     localStorage.setItem(`sounddeck-tutorial-${pageId}-done`, 'true');
     onComplete();
   };
+
+  if (!isReady) {
+    return (
+      <div className="modal-overlay" onClick={onComplete}>
+        <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+          <div className="modal-title">
+            <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
+            {t('loading') || 'Chargement...'}
+          </div>
+          <style>{`
+            @keyframes spin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      </div>
+    );
+  }
 
   if (!hasSteps) {
     return (

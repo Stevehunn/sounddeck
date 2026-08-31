@@ -95,17 +95,29 @@ export default {
   tutorialDiscoverStep3Hint: '💡 Tip: Sounds already in your library are marked "Added" in green.',
 
   // ─── TRIMMER ────────────────────────────────────────────────────────
-  tutorialTrimmerStep1Title: 'Select a portion',
-  tutorialTrimmerStep1Desc: 'Use the handles on the waveform to select the portion of the sound to keep.',
-  tutorialTrimmerStep1Hint: '💡 Tip: You can also enter values manually in seconds.',
+  tutorialTrimmerStep1Title: 'Select a sound',
+  tutorialTrimmerStep1Desc: 'Choose a sound from the left list to start trimming it. The list shows all your available sounds.',
+  tutorialTrimmerStep1Hint: '💡 Tip: Use the search bar to quickly find a specific sound.',
   
-  tutorialTrimmerStep2Title: 'Listen to the selection',
-  tutorialTrimmerStep2Desc: 'Click "Listen to selection" to preview the result before trimming.',
-  tutorialTrimmerStep2Hint: '💡 Tip: The progress bar shows you where you are in the file.',
+  tutorialTrimmerStep2Title: 'View and select a portion',
+  tutorialTrimmerStep2Desc: 'The waveform shows the sound\'s shape. Use the ═══ handles on the edges to select the portion to keep. You can also adjust the "Start" and "End" sliders below.',
+  tutorialTrimmerStep2Hint: '💡 Tip: Drag the handles or use the sliders for precise adjustment.',
   
-  tutorialTrimmerStep3Title: 'Trim the file',
-  tutorialTrimmerStep3Desc: 'Click "Trim" to create a new audio file with only the selection.',
-  tutorialTrimmerStep3Hint: '💡 Tip: The original file is kept, a new file is created.',
+  tutorialTrimmerStep3Title: 'Listen to the selection',
+  tutorialTrimmerStep3Desc: 'Before trimming, listen to the selection to make sure you have the right portion. Click "Listen to selection" to preview.',
+  tutorialTrimmerStep3Hint: '💡 Tip: The progress bar below the waveform shows your playback position.',
+  
+  tutorialTrimmerStep4Title: 'Customize your sound',
+  tutorialTrimmerStep4Desc: 'Give your new sound a name, choose an image or emoji, and select the profile(s) to add it to.',
+  tutorialTrimmerStep4Hint: '💡 Tip: An image will make your sound more recognizable in the library.',
+  
+  tutorialTrimmerStep5Title: 'Create the sound',
+  tutorialTrimmerStep5Desc: 'Once you\'ve configured the name, image and profiles, click "Create sound" to permanently add it to your library.',
+  tutorialTrimmerStep5Hint: '💡 Tip: The sound will appear immediately in your profile and will be ready to play.',
+  
+  tutorialTrimmerStep6Title: 'Search for a sound',
+  tutorialTrimmerStep6Desc: 'Use the search bar at the top of the list to filter your sounds by name. This is handy when you have many sounds.',
+  tutorialTrimmerStep6Hint: '💡 Tip: The search is instant, results update as you type.',
 
   // ─── OPTIONS ────────────────────────────────────────────────────────
   tutorialOptionsStep1Title: 'Customize appearance',
