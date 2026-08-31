@@ -1,4 +1,5 @@
-import MyInstantsDiscover from './Discover'
+// src/plugins/myinstants/index.js
+import MyInstantsDiscover from './Discover.jsx'
 
 const MyInstantsPlugin = {
   id: 'myinstants',
@@ -19,9 +20,6 @@ const MyInstantsPlugin = {
       visible: true
     }
   ],
-
-  // ✅ Le plugin n'a plus besoin de ses propres traductions
-  // car il utilise le contexte global
 
   init(store, manager) {
     console.log('🔍 Plugin MyInstants initialisé')

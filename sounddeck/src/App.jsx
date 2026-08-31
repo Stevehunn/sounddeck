@@ -1,3 +1,4 @@
+// src/App.jsx
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useStore } from '@core/store'
 import { useLanguage } from '@core/i18n/LanguageContext'
@@ -14,7 +15,7 @@ import Toast from '@shared/components/ui/Toast'
 import QuitConfirm from '@shared/components/modals/QuitConfirm'
 import WelcomeScreen from '@features/welcome/WelcomeScreen'
 import Tutorial from '@shared/components/ui/Tutorial'
-import TutorialAdvanced from '@shared/components/ui/TutorialAdvanced'
+import HelpButton from '@shared/components/ui/HelpButton'
 
 // ✅ IMPORTS AUDIO CORRECTS
 import { playSound, stopAllSounds, setStoreRef } from '@core/services/AudioService'
@@ -36,6 +37,7 @@ function AppContent() {
   const [showTutorial, setShowTutorial] = useState(false)
   const [showAdvancedTutorial, setShowAdvancedTutorial] = useState(false)
   const [showQuitConfirm, setShowQuitConfirm] = useState(false)
+  const [tutorialPageId, setTutorialPageId] = useState('home')
 
   // ✅ Récupérer l'état des plugins
   const { isPluginPage, getPage, pages, loaded: pluginsLoaded, pluginManager } = usePlugins()
@@ -46,61 +48,6 @@ function AppContent() {
     loading: pluginLoading, 
     error: pluginError 
   } = usePluginPage(isPluginPage(currentPage) ? currentPage : null)
-
-  /*
-  // ✅ Charger les plugins automatiquement au démarrage
-  useEffect(() => {
-    const loadPlugins = async () => {
-      if (!pluginsLoaded) return
-      
-      // ─── 1. Plugin MyInstants ──────────────────────────────────────────────
-      if (!pluginManager.isPluginLoaded('myinstants')) {
-        try {
-          console.log('📦 Chargement automatique du plugin MyInstants...')
-          const pluginInfo = {
-            id: 'myinstants',
-            name: 'MyInstants Discovery',
-            version: '1.0.0',
-            path: './plugins/myinstants',
-            enabled: true
-          }
-          const result = await pluginManager.loadPlugin(pluginInfo)
-          if (result) {
-            console.log('✅ Plugin MyInstants chargé avec succès')
-          } else {
-            console.warn('⚠️ Échec du chargement du plugin MyInstants')
-          }
-        } catch (e) {
-          console.error('❌ Erreur lors du chargement du plugin MyInstants:', e)
-        }
-      }
-
-      // ─── 2. Plugin YouTube ──────────────────────────────────────────────────
-      if (!pluginManager.isPluginLoaded('youtube')) {
-        try {
-          console.log('📦 Chargement automatique du plugin YouTube...')
-          const pluginInfo = {
-            id: 'youtube',
-            name: 'YouTube Import',
-            version: '1.0.0',
-            path: './plugins/youtube',
-            enabled: true
-          }
-          const result = await pluginManager.loadPlugin(pluginInfo)
-          if (result) {
-            console.log('✅ Plugin YouTube chargé avec succès')
-          } else {
-            console.warn('⚠️ Échec du chargement du plugin YouTube')
-          }
-        } catch (e) {
-          console.error('❌ Erreur lors du chargement du plugin YouTube:', e)
-        }
-      }
-    }
-
-    loadPlugins()
-  }, [pluginsLoaded, pluginManager])
-  */
 
   const soundsRef = useRef([])
   const addToastRef = useRef(null)
@@ -140,6 +87,12 @@ function AppContent() {
   useEffect(() => { audioDeviceRef.current = store.audioDevice }, [store.audioDevice])
   useEffect(() => { volumeRef.current = store.volume }, [store.volume])
   useEffect(() => { setPresentationRef.current = setPresentationMode }, [setPresentationMode])
+
+  // ✅ Fonction pour ouvrir le tutoriel
+  const openTutorial = (pageId) => {
+    setTutorialPageId(pageId)
+    setShowTutorial(true)
+  }
 
   // ✅ Vérifier si c'est le premier lancement
   useEffect(() => {
@@ -421,30 +374,72 @@ function AppContent() {
 
   useEffect(() => { addToastRef.current = addToast }, [addToast])
 
+  // ✅ Wrapper pour ajouter le HelpButton à une page
+  const PageWrapper = ({ children, pageId }) => (
+    <div style={{ position: 'relative', height: '100%', width: '100%' }}>
+      {children}
+      <HelpButton onClick={() => openTutorial(pageId)} />
+    </div>
+  )
+
   // ✅ RENDU DES PAGES
   const renderPage = () => {
     if (currentPage === 'home') {
-      return <Home key={`home-${currentLang}`} store={store} addToast={addToast} loopEnabled={store.loopEnabled} />
+      return (
+        <PageWrapper pageId="home">
+          <Home key={`home-${currentLang}`} store={store} addToast={addToast} loopEnabled={store.loopEnabled} />
+        </PageWrapper>
+      )
     }
     if (currentPage === 'options') {
-      return <Options key={`options-${currentLang}`} store={store} addToast={addToast} />
+      return (
+        <PageWrapper pageId="options">
+          <Options key={`options-${currentLang}`} store={store} addToast={addToast} />
+        </PageWrapper>
+      )
     }
     if (currentPage === 'trimmer') {
-      return <Trimmer key={`trimmer-${currentLang}`} store={store} addToast={addToast} />
+      return (
+        <PageWrapper pageId="trimmer">
+          <Trimmer key={`trimmer-${currentLang}`} store={store} addToast={addToast} />
+        </PageWrapper>
+      )
     }
     if (currentPage === 'editor') {
-      return <Editor key={`editor-${currentLang}`} store={store} addToast={addToast} />
+      return (
+        <PageWrapper pageId="editor">
+          <Editor key={`editor-${currentLang}`} store={store} addToast={addToast} />
+        </PageWrapper>
+      )
     }
     if (currentPage === 'sequencer') {
-      return <Sequencer key={`sequencer-${currentLang}`} store={store} addToast={addToast} />
+      return (
+        <PageWrapper pageId="sequencer">
+          <Sequencer key={`sequencer-${currentLang}`} store={store} addToast={addToast} />
+        </PageWrapper>
+      )
     }
     if (currentPage === 'guide') {
-      return <Guide key={`guide-${currentLang}`} />
+      return (
+        <PageWrapper pageId="guide">
+          <Guide key={`guide-${currentLang}`} />
+        </PageWrapper>
+      )
     }
     if (currentPage === 'stats') {
-      return <Stats key={`stats-${currentLang}`} store={store} />
+      return (
+        <PageWrapper pageId="stats">
+          <Stats key={`stats-${currentLang}`} store={store} />
+        </PageWrapper>
+      )
     }
+    
+    // ✅ CORRECTION : La page "discover" est un plugin, pas un import direct
+    // Elle est gérée par le système de plugins plus bas
+    // On supprime ce bloc qui cause l'erreur
+    // if (currentPage === 'discover') { ... }
 
+    // ✅ Gestion des pages plugins (inclut discover, youtube, etc.)
     if (isPluginPage(currentPage)) {
       if (pluginLoading) {
         return (
@@ -489,7 +484,11 @@ function AppContent() {
       }
       
       if (PluginComponent) {
-        return <PluginComponent key={`plugin-${currentPage}-${currentLang}`} store={store} addToast={addToast} />
+        return (
+          <PageWrapper pageId={currentPage}>
+            <PluginComponent key={`plugin-${currentPage}-${currentLang}`} store={store} addToast={addToast} />
+          </PageWrapper>
+        )
       }
       
       return (
@@ -552,7 +551,7 @@ function AppContent() {
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg-primary)' }}>
       <Sidebar
-        key={`sidebar-${store.sidebarVersion}-${currentLang}`}  // ✅ Ajout de currentLang
+        key={`sidebar-${store.sidebarVersion}-${currentLang}`}
         profiles={store.profiles}
         currentProfileId={store.currentProfileId}
         currentPage={currentPage}
@@ -598,14 +597,8 @@ function AppContent() {
       {showTutorial && (
         <Tutorial 
           key={`tutorial-${currentLang}`}
+          pageId={tutorialPageId}
           onComplete={() => setShowTutorial(false)} 
-        />
-      )}
-
-      {showAdvancedTutorial && (
-        <TutorialAdvanced 
-          key={`tutorialadvanced-${currentLang}`}
-          onComplete={() => setShowAdvancedTutorial(false)} 
         />
       )}
 

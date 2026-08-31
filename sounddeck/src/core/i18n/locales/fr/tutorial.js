@@ -1,0 +1,153 @@
+// src/core/i18n/locales/fr/tutorial.js
+export default {
+  // ─── COMMUN ──────────────────────────────────────────────────────────
+  helpButtonLabel: 'Aide',
+  helpButtonTitle: 'Ouvrir le tutoriel',
+  tutorialSkip: 'Passer',
+  tutorialNext: 'Suivant',
+  tutorialFinish: 'Terminer',
+  tutorialNotFound: 'Aucun tutoriel disponible pour cette page',
+  tutorialRestart: 'Revoir le tutoriel',
+  tutorialAdvanced: 'Tutoriel avancé',
+
+  // ─── HOME ────────────────────────────────────────────────────────────
+  tutorialHomeStep1Title: 'Jouer un son',
+  tutorialHomeStep1Desc: 'Cliquez sur une carte pour lancer le son. Une barre de progression s\'affiche pour suivre la lecture.',
+  tutorialHomeStep1Hint: '💡 Astuce : Vous pouvez aussi utiliser les raccourcis clavier si vous en avez défini.',
+  
+  tutorialHomeStep2Title: 'Ajouter un son',
+  tutorialHomeStep2Desc: 'Cliquez sur le bouton "Ajouter un son" en haut de la page pour importer un fichier audio.',
+  tutorialHomeStep2Hint: '💡 Astuce : Les formats supportés sont MP3, WAV, OGG, FLAC, M4A et AAC.',
+  
+  tutorialHomeStep3Title: 'Ajouter aux favoris',
+  tutorialHomeStep3Desc: 'Cliquez sur l\'étoile ⭐ en haut à gauche de chaque carte pour ajouter le son à vos favoris. Les favoris apparaissent en haut de la page.',
+  tutorialHomeStep3Hint: '💡 Astuce : Les favoris sont spécifiques à chaque profil.',
+  
+  tutorialHomeStep4Title: 'Menu contextuel - options',
+  tutorialHomeStep4Desc: 'Vous y trouverez toutes les options pour gérer votre son : renommer, régler le volume, changer l\'image ou l\'emoji, et supprimer le son.',
+  tutorialHomeStep4Hint: '💡 Astuce : Ce menu est disponible sur chaque carte son. Cliquez sur les trois points pour l\'ouvrir.',
+  
+  tutorialHomeStep5Title: 'Gérer vos profils',
+  tutorialHomeStep5Desc: 'La section "Profils" dans la sidebar contient "Tous les sons", vos profils personnalisés et le bouton "+" pour en créer de nouveaux.',
+  tutorialHomeStep5Hint: '💡 Astuce : Chaque profil a ses propres sons et favoris. Changez de profil pour organiser vos sons par thème.',
+  
+  tutorialHomeStep6Title: 'Créer un nouveau profil',
+  tutorialHomeStep6Desc: 'Cliquez sur le bouton "+" en bas de la section "Profils" pour créer un nouveau profil. Donnez-lui un nom et commencez à y ajouter des sons.',
+  tutorialHomeStep6Hint: '💡 Astuce : Les profils vous permettent d\'organiser vos sons par thème : Gaming, Musique, Mèmes, etc.',
+  
+  tutorialHomeStep7Title: 'Ajouter un son depuis "Autres sons"',
+  tutorialHomeStep7Desc: 'La section "Autres sons" en bas de la page affiche les sons qui ne sont pas dans votre profil actuel. Cliquez sur le bouton "Ajouter" sur une carte pour l\'intégrer à votre profil.',
+  tutorialHomeStep7Hint: '💡 Astuce : C\'est un moyen rapide d\'ajouter des sons existants à votre profil sans les réimporter.',
+  
+  tutorialHomeStep8Title: 'Ajouter un tag',
+  tutorialHomeStep8Desc: 'Sur chaque carte son, cliquez sur "+ Tag" pour ajouter un tag. Les tags vous permettent de catégoriser et de rechercher vos sons plus facilement.',
+  tutorialHomeStep8Hint: '💡 Astuce : Utilisez des tags comme #meme, #gaming, #musique pour organiser vos sons.',
+  
+  tutorialHomeStep9Title: 'Recherche et tri des sons',
+  tutorialHomeStep9Desc: 'Utilisez la barre de recherche pour filtrer vos sons par nom ou tag. Le menu déroulant "Trier par" vous permet d\'organiser l\'affichage.',
+  tutorialHomeStep9Hint: '💡 Astuce : Le tri "Personnalisé" vous permet de glisser-déposer les sons dans l\'ordre de votre choix.',
+  
+  tutorialHomeStep10Title: 'Drag & Drop pour réorganiser',
+  tutorialHomeStep10Desc: 'Activez le tri "Personnalisé" puis glissez-déposez les sons pour les réorganiser dans l\'ordre de votre choix.',
+  tutorialHomeStep10Hint: '💡 Astuce : Le Drag & Drop fonctionne aussi pour les favoris et entre les sections.',
+
+  // ─── EDITOR ──────────────────────────────────────────────────────────
+  tutorialEditorStep1Title: 'Ajouter une piste',
+  tutorialEditorStep1Desc: 'Cliquez sur le bouton "Ajouter une piste" pour créer une nouvelle piste. Chaque piste peut contenir plusieurs clips audio.',
+  tutorialEditorStep1Hint: '💡 Astuce : Vous pouvez glisser-déposer des fichiers audio directement dans l\'éditeur.',
+  
+  tutorialEditorStep2Title: 'Déplacer et rogner un clip',
+  tutorialEditorStep2Desc: 'Faites glisser un clip pour le déplacer. Utilisez les poignées sur les bords pour rogner ou couper le clip.',
+  tutorialEditorStep2Hint: '💡 Astuce : Double-cliquez sur un clip pour l\'éditer rapidement.',
+  
+  tutorialEditorStep3Title: 'Ajouter des effets',
+  tutorialEditorStep3Desc: 'Sélectionnez un clip, puis ouvrez le panneau des effets. Vous pouvez ajouter Fade In/Out, écho, réverbération...',
+  tutorialEditorStep3Hint: '💡 Astuce : L\'auto-preview vous permet d\'entendre les effets en temps réel.',
+  
+  tutorialEditorStep4Title: 'Activer une boucle',
+  tutorialEditorStep4Desc: 'Cliquez sur la zone de boucle ou utilisez le bouton "Loop" pour répéter automatiquement une section.',
+  tutorialEditorStep4Hint: '💡 Astuce : Vous pouvez définir une boucle sur un clip individuel ou sur toute la timeline.',
+
+  // ─── SEQUENCER ──────────────────────────────────────────────────────
+  tutorialSequencerStep1Title: 'Créer une playlist',
+  tutorialSequencerStep1Desc: 'Cliquez sur "Nouvelle playlist" pour créer une playlist. Donnez-lui un nom et commencez à y ajouter des sons.',
+  tutorialSequencerStep1Hint: '💡 Astuce : Les playlists sont sauvegardées automatiquement.',
+  
+  tutorialSequencerStep2Title: 'Ajouter des sons à la playlist',
+  tutorialSequencerStep2Desc: 'Cliquez sur "Ajouter des sons" pour sélectionner des sons depuis votre bibliothèque. Vous pouvez définir un délai entre chaque son.',
+  tutorialSequencerStep2Hint: '💡 Astuce : Glissez-déposez les sons pour les réorganiser dans la playlist.',
+  
+  tutorialSequencerStep3Title: 'Lancer la séquence',
+  tutorialSequencerStep3Desc: 'Appuyez sur le bouton "Play" pour lancer la séquence. Utilisez les touches ← et → pour naviguer manuellement.',
+  tutorialSequencerStep3Hint: '💡 Astuce : Activez la boucle pour répéter la playlist en continu.',
+
+  // ─── DISCOVER ────────────────────────────────────────────────────────
+  tutorialDiscoverStep1Title: 'Explorer les catégories',
+  tutorialDiscoverStep1Desc: 'La barre des catégories vous permet de naviguer parmi des milliers de sons organisés par thème.',
+  tutorialDiscoverStep1Hint: '💡 Astuce : Vous pouvez personnaliser les catégories affichées via le bouton "Personnaliser".',
+  
+  tutorialDiscoverStep2Title: 'Rechercher des sons',
+  tutorialDiscoverStep2Desc: 'Utilisez la barre de recherche pour trouver un son spécifique par nom ou mot-clé.',
+  tutorialDiscoverStep2Hint: '💡 Astuce : La recherche est instantanée, pas besoin d\'appuyer sur Entrée !',
+  
+  tutorialDiscoverStep3Title: 'Ajouter un son à votre bibliothèque',
+  tutorialDiscoverStep3Desc: 'Cliquez sur "Ajouter" sur un son pour l\'importer dans votre bibliothèque. Vous pouvez choisir le profil de destination.',
+  tutorialDiscoverStep3Hint: '💡 Astuce : Les sons déjà dans votre bibliothèque sont marqués "Ajouté" en vert.',
+
+  // ─── TRIMMER ────────────────────────────────────────────────────────
+  tutorialTrimmerStep1Title: 'Sélectionner une portion',
+  tutorialTrimmerStep1Desc: 'Utilisez les poignées sur le waveform pour sélectionner la portion du son à conserver.',
+  tutorialTrimmerStep1Hint: '💡 Astuce : Vous pouvez aussi entrer les valeurs manuellement en secondes.',
+  
+  tutorialTrimmerStep2Title: 'Écouter la sélection',
+  tutorialTrimmerStep2Desc: 'Cliquez sur "Écouter la sélection" pour prévisualiser le résultat avant de rogner.',
+  tutorialTrimmerStep2Hint: '💡 Astuce : La barre de progression vous montre où vous en êtes dans le fichier.',
+  
+  tutorialTrimmerStep3Title: 'Rogner le fichier',
+  tutorialTrimmerStep3Desc: 'Cliquez sur "Rogner" pour créer un nouveau fichier audio avec uniquement la sélection.',
+  tutorialTrimmerStep3Hint: '💡 Astuce : Le fichier original est conservé, un nouveau fichier est créé.',
+
+  // ─── OPTIONS ────────────────────────────────────────────────────────
+  tutorialOptionsStep1Title: 'Personnaliser l\'apparence',
+  tutorialOptionsStep1Desc: 'Changez le thème (sombre, clair, personnalisé), la taille des cartes et la langue de l\'application.',
+  tutorialOptionsStep1Hint: '💡 Astuce : Le thème automatique s\'adapte à l\'heure de la journée.',
+  
+  tutorialOptionsStep2Title: 'Configurer l\'audio',
+  tutorialOptionsStep2Desc: 'Configurez le mixeur pour Discord, sélectionnez votre micro et réglez les volumes.',
+  tutorialOptionsStep2Hint: '💡 Astuce : Activez le monitoring pour vous entendre dans vos écouteurs.',
+  
+  tutorialOptionsStep3Title: 'Gérer les raccourcis',
+  tutorialOptionsStep3Desc: 'Définissez vos raccourcis clavier pour changer de profil, activer la boucle ou arrêter tous les sons.',
+  tutorialOptionsStep3Hint: '💡 Astuce : Le visualisateur de clavier montre toutes les touches utilisées.',
+
+  // ─── STATS ──────────────────────────────────────────────────────────
+  tutorialStatsStep1Title: 'Voir vos statistiques',
+  tutorialStatsStep1Desc: 'Consultez vos sons les plus joués, le nombre total de lectures et vos statistiques d\'utilisation.',
+  tutorialStatsStep1Hint: '💡 Astuce : Les statistiques sont mises à jour en temps réel.',
+  
+  tutorialStatsStep2Title: 'Filtrer par période',
+  tutorialStatsStep2Desc: 'Affichez les statistiques pour différentes périodes : aujourd\'hui, cette semaine, ce mois-ci ou tout le temps.',
+  tutorialStatsStep2Hint: '💡 Astuce : Les données sont conservées même après un redémarrage de l\'application.',
+
+  // ─── PRESENTATION ──────────────────────────────────────────────────
+  tutorialPresentationStep1Title: 'Mode présentation',
+  tutorialPresentationStep1Desc: 'Affichez vos sons en plein écran pour une présentation. Idéal pour les streams ou les réunions.',
+  tutorialPresentationStep1Hint: '💡 Astuce : Appuyez sur Échap pour quitter le mode présentation.',
+  
+  tutorialPresentationStep2Title: 'Naviguer entre les sons',
+  tutorialPresentationStep2Desc: 'Utilisez la souris ou les touches fléchées pour naviguer entre les sons en mode présentation.',
+  tutorialPresentationStep2Hint: '💡 Astuce : Les sons favoris sont affichés en premier.',
+
+  // ─── YOUTUBE ────────────────────────────────────────────────────────
+  tutorialYoutubeStep1Title: 'Coller un lien YouTube',
+  tutorialYoutubeStep1Desc: 'Collez l\'URL d\'une vidéo YouTube pour importer son audio dans SoundDeck.',
+  tutorialYoutubeStep1Hint: '💡 Astuce : Fonctionne aussi avec YouTube Music et d\'autres plateformes.',
+  
+  tutorialYoutubeStep2Title: 'Sélectionner une portion',
+  tutorialYoutubeStep2Desc: 'Choisissez la portion de la vidéo à importer en ajustant les curseurs de début et de fin.',
+  tutorialYoutubeStep2Hint: '💡 Astuce : Vous pouvez écouter la sélection avant de télécharger.',
+  
+  tutorialYoutubeStep3Title: 'Télécharger et configurer',
+  tutorialYoutubeStep3Desc: 'Téléchargez l\'audio, puis configurez le nom, l\'image et les profils avant de l\'ajouter à votre bibliothèque.',
+  tutorialYoutubeStep3Hint: '💡 Astuce : Vous pouvez ajouter une image personnalisée ou laisser l\'emoji par défaut.',
+};

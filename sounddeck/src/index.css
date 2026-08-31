@@ -2002,3 +2002,65 @@ body.focus-mode .sound-grid {
   font-size: 16px;
   color: var(--text-tertiary);
 }
+
+/* ─── HELP BUTTON ────────────────────────────────────────────────────── */
+.help-button {
+  position: fixed;
+  bottom: var(--space-xl);
+  right: var(--space-xl);
+  z-index: 50;
+  padding: var(--space-sm);
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  color: white;
+  font-size: 22px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-base) ease;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(124, 111, 247, 0.35);
+}
+
+.help-button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 24px rgba(124, 111, 247, 0.5);
+  background: var(--accent-hover);
+}
+
+.help-button:active {
+  transform: scale(0.95);
+}
+
+/* Version plus discrète si vous préférez (optionnel) */
+.help-button-subtle {
+  position: fixed;
+  bottom: var(--space-xl);
+  right: var(--space-xl);
+  z-index: 50;
+  padding: var(--space-sm);
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 20px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-base) ease;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.help-button-subtle:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: scale(1.05);
+  box-shadow: var(--shadow-md);
+}

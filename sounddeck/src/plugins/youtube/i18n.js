@@ -94,6 +94,14 @@ export default {
     error: 'Erreur',
     success: 'Succès',
     loading: 'Chargement...',
+
+    // ─── TUTORIEL YOUTUBE ──────────────────────────────────────────────────
+    tutorialYoutubeStep1Title: 'Coller un lien YouTube',
+    tutorialYoutubeStep1Desc: 'Collez l\'URL d\'une vidéo YouTube pour importer son audio.',
+    tutorialYoutubeStep2Title: 'Sélectionner une portion',
+    tutorialYoutubeStep2Desc: 'Choisissez la portion de la vidéo à importer.',
+    tutorialYoutubeStep3Title: 'Télécharger et configurer',
+    tutorialYoutubeStep3Desc: 'Téléchargez l\'audio et configurez le nom, l\'image et les profils.',
   },
   en: {
     // ─── MAIN PAGE ──────────────────────────────────────────────────────────
@@ -190,6 +198,14 @@ export default {
     error: 'Error',
     success: 'Success',
     loading: 'Loading...',
+
+    // ─── YOUTUBE TUTORIAL ──────────────────────────────────────────────────
+    tutorialYoutubeStep1Title: 'Paste a YouTube link',
+    tutorialYoutubeStep1Desc: 'Paste the URL of a YouTube video to import its audio.',
+    tutorialYoutubeStep2Title: 'Select a portion',
+    tutorialYoutubeStep2Desc: 'Choose the portion of the video to import.',
+    tutorialYoutubeStep3Title: 'Download and configure',
+    tutorialYoutubeStep3Desc: 'Download the audio and configure name, image and profiles.',
   },
   es: {
     // ─── PÁGINA PRINCIPAL ──────────────────────────────────────────────────
@@ -286,5 +302,13 @@ export default {
     error: 'Error',
     success: 'Éxito',
     loading: 'Cargando...',
+
+    // ─── TUTORIAL YOUTUBE ──────────────────────────────────────────────────
+    tutorialYoutubeStep1Title: 'Pegar un enlace de YouTube',
+    tutorialYoutubeStep1Desc: 'Pega la URL de un video de YouTube para importar su audio.',
+    tutorialYoutubeStep2Title: 'Seleccionar una porción',
+    tutorialYoutubeStep2Desc: 'Elige la porción del video para importar.',
+    tutorialYoutubeStep3Title: 'Descargar y configurar',
+    tutorialYoutubeStep3Desc: 'Descarga el audio y configura nombre, imagen y perfiles.',
   }
 }

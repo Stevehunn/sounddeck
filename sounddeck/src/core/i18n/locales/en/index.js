@@ -10,6 +10,7 @@ import stats from './stats.js'
 import guide from './guide.js'
 import presentation from './presentation.js'
 import welcome from './welcome.js'
+import tutorial from './tutorial.js'
 
 export default {
   ...common,
@@ -23,4 +24,5 @@ export default {
   ...guide,
   ...presentation,
   ...welcome,
+  ...tutorial,
 }

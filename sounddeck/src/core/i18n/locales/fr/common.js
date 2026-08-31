@@ -68,6 +68,7 @@ export default {
   profiles: 'Profils',
   newProfile: 'Nouveau profil',
   allSounds: 'Tous les sons',
+  otherSounds: 'Autres sons',
   profileManager: 'Gestionnaire de profils',
   profileManagerTitle: 'Gestion du profil',
   profileManagerSoundsRemoved: 'sons retirés de',
@@ -284,4 +285,4 @@ export default {
   normalizationTargetHigh: '-0.9 dB (Fort)',
   normalizationTargetVeryHigh: '-0.4 dB (Très fort)',
   normalizationTargetMax: '0 dB (Max)',
-}
+};
