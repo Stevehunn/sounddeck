@@ -16,11 +16,23 @@ function findElement(selectors) {
 }
 
 /**
+ * Recherche un élément avec data-testid
+ */
+function findByTestId(testId) {
+  return document.querySelector(`[data-testid="${testId}"]`);
+}
+
+/**
  * Recherche le premier son dans la grille
  */
 function findFirstSound() {
-  const card = document.querySelector('.sound-card:not([style*="display: none"])');
+  // Chercher par data-testid d'abord
+  const card = document.querySelector('[data-testid^="sound-card-"]');
   if (card) return card;
+  
+  // Fallback
+  const fallback = document.querySelector('.sound-card:not([style*="display: none"])');
+  if (fallback) return fallback;
   return document.querySelector('.sound-grid .sound-card:first-child, .sound-card:first-child');
 }
 
@@ -30,7 +42,14 @@ function findFirstSound() {
 function findAddSoundButton() {
   console.log('🔍 [Tutorial] Recherche du bouton "Ajouter un son"...');
   
-  // Recherche par texte
+  // Chercher par data-testid
+  const addBtn = document.querySelector('[data-testid="add-sound-button"]');
+  if (addBtn) {
+    console.log('✅ [Tutorial] Bouton "Ajouter un son" trouvé par data-testid');
+    return addBtn;
+  }
+  
+  // Fallback par texte
   const buttons = document.querySelectorAll('button');
   for (const btn of buttons) {
     const btnText = btn.textContent?.trim() || '';
@@ -40,7 +59,6 @@ function findAddSoundButton() {
       console.log('✅ [Tutorial] Bouton "Ajouter un son" trouvé par texte');
       return btn;
     }
-    // Recherche par icône + texte
     if (btn.querySelector('.ti-plus') && 
         (btnText.includes('Ajouter') || btnText.includes('Add') || btnText.includes('Agregar'))) {
       console.log('✅ [Tutorial] Bouton "Ajouter un son" trouvé par icône + texte');
@@ -48,14 +66,42 @@ function findAddSoundButton() {
     }
   }
   
-  // Recherche par classe ou attribut
-  const addBtn = document.querySelector('.btn-primary:has(.ti-plus), [data-action="add-sound"]');
-  if (addBtn) {
-    console.log('✅ [Tutorial] Bouton "Ajouter un son" trouvé par sélecteur');
-    return addBtn;
+  console.log('❌ [Tutorial] Aucun bouton "Ajouter un son" trouvé');
+  return null;
+}
+
+/**
+ * Recherche le bouton étoile (favoris) sur une carte
+ */
+function findFavoriteButton() {
+  console.log('🔍 [Tutorial] Recherche du bouton favoris...');
+  
+  // Chercher par data-testid
+  const favoriteBtn = document.querySelector('[data-testid="favorite-button"]');
+  if (favoriteBtn && favoriteBtn.offsetParent !== null) {
+    console.log('✅ [Tutorial] Bouton favoris trouvé par data-testid');
+    return favoriteBtn;
   }
   
-  console.log('❌ [Tutorial] Aucun bouton "Ajouter un son" trouvé');
+  // Fallback
+  const card = findFirstSound();
+  if (card) {
+    const starBtn = card.querySelector('.ti-star, .ti-star-filled, [class*="star"]');
+    if (starBtn) {
+      const btn = starBtn.closest('button') || starBtn;
+      console.log('✅ [Tutorial] Bouton favoris trouvé par fallback');
+      return btn;
+    }
+    const btns = card.querySelectorAll('button');
+    for (const btn of btns) {
+      if (btn.querySelector('.ti-star') || btn.querySelector('.ti-star-filled')) {
+        console.log('✅ [Tutorial] Bouton favoris trouvé par icône');
+        return btn;
+      }
+    }
+    return card;
+  }
+  console.log('❌ [Tutorial] Aucun bouton favoris trouvé');
   return null;
 }
 
@@ -64,13 +110,21 @@ function findAddSoundButton() {
  */
 function findDotsButton() {
   console.log('🔍 [Tutorial] Recherche du bouton menu contextuel...');
+  
+  // Chercher par data-testid
+  const dotsBtn = document.querySelector('[data-testid="dots-button"]');
+  if (dotsBtn && dotsBtn.offsetParent !== null) {
+    console.log('✅ [Tutorial] Bouton ⋮ trouvé par data-testid');
+    return dotsBtn;
+  }
+  
+  // Fallback
   const card = findFirstSound();
   if (card) {
-    console.log('📍 [Tutorial] Carte trouvée, recherche du bouton ⋮');
-    const dotsBtn = card.querySelector('.ti-dots-vertical, .ti-dots, [class*="dots"]');
-    if (dotsBtn) {
-      const btn = dotsBtn.closest('button') || dotsBtn;
-      console.log('✅ [Tutorial] Bouton ⋮ trouvé par classe');
+    const dotsBtnFallback = card.querySelector('.ti-dots-vertical, .ti-dots, [class*="dots"]');
+    if (dotsBtnFallback) {
+      const btn = dotsBtnFallback.closest('button') || dotsBtnFallback;
+      console.log('✅ [Tutorial] Bouton ⋮ trouvé par fallback');
       return btn;
     }
     const btns = card.querySelectorAll('button');
@@ -80,10 +134,48 @@ function findDotsButton() {
         return btn;
       }
     }
-    console.log('⚠️ [Tutorial] Aucun bouton ⋮ trouvé, retour de la carte');
     return card;
   }
-  console.log('❌ [Tutorial] Aucune carte trouvée');
+  console.log('❌ [Tutorial] Aucun bouton ⋮ trouvé');
+  return null;
+}
+
+/**
+ * Recherche la section "Profils" dans la sidebar
+ */
+function findProfilesSection() {
+  console.log('🔍 [Tutorial] Recherche de la section "Profils"...');
+  
+  // Chercher par data-testid
+  const section = document.querySelector('[data-testid="profiles-section"]');
+  if (section) {
+    console.log('✅ [Tutorial] Section "Profils" trouvée par data-testid');
+    return section;
+  }
+  
+  // Fallback
+  const sidebar = document.querySelector('.sidebar, aside');
+  if (sidebar) {
+    const sections = sidebar.querySelectorAll('[class*="section"], [class*="group"]');
+    for (const section of sections) {
+      const title = section.querySelector('[class*="title"], [class*="label"]');
+      if (title && title.textContent && 
+          (title.textContent.includes('Profils') || 
+           title.textContent.includes('Profiles') ||
+           title.textContent.includes('Perfiles'))) {
+        console.log('✅ [Tutorial] Section "Profils" trouvée par fallback');
+        return section;
+      }
+    }
+    const allSounds = sidebar.querySelector('[class*="item"]:has(.ti-stack)');
+    if (allSounds) {
+      const section = allSounds.closest('[class*="section"]');
+      if (section) return section;
+      return allSounds;
+    }
+    return sidebar;
+  }
+  console.log('❌ [Tutorial] Sidebar non trouvée');
   return null;
 }
 
@@ -93,15 +185,19 @@ function findDotsButton() {
 function findFirstOtherSoundAddButton() {
   console.log('🔍 [Tutorial] Recherche du bouton "Ajouter" dans une carte...');
   
-  const allCards = document.querySelectorAll('.sound-card, [class*="card"], .outside-card');
-  console.log(`📍 [Tutorial] ${allCards.length} cartes trouvées`);
+  // Chercher par data-testid
+  const addBtn = document.querySelector('[data-testid^="add-other-sound-"]');
+  if (addBtn && addBtn.offsetParent !== null) {
+    console.log('✅ [Tutorial] Bouton "Ajouter" trouvé par data-testid');
+    return addBtn;
+  }
   
+  // Fallback
+  const allCards = document.querySelectorAll('.sound-card, [class*="card"], .outside-card');
   for (const card of allCards) {
     const style = card.style.opacity || window.getComputedStyle(card).opacity;
     const isOtherSound = parseFloat(style) < 0.9;
-    
     if (isOtherSound) {
-      console.log('📍 [Tutorial] Carte "Autres sons" trouvée');
       const buttons = card.querySelectorAll('button');
       for (const btn of buttons) {
         const btnText = btn.textContent?.trim() || '';
@@ -123,23 +219,79 @@ function findFirstOtherSoundAddButton() {
     }
   }
   
-  console.log('🔍 [Tutorial] Recherche globale de boutons "Ajouter"...');
-  const allButtons = document.querySelectorAll('button');
-  for (const btn of allButtons) {
-    const btnText = btn.textContent?.trim() || '';
-    if ((btnText.includes('Ajouter') || btnText.includes('Add') || 
-         btnText.includes('Agregar') || btnText.includes('Añadir')) &&
-        !btnText.includes('Ajouter un son') && !btnText.includes('Add sound') &&
-        !btn.closest('.home-header') && !btn.closest('.header')) {
-      if (!btn.disabled) {
-        console.log('✅ [Tutorial] Bouton "Ajouter" trouvé en fallback');
-        return btn;
-      }
-    }
-  }
-  
   console.log('❌ [Tutorial] Aucun bouton "Ajouter" trouvé');
   return null;
+}
+
+/**
+ * Recherche le bouton "Nouveau profil"
+ */
+function findNewProfileButton() {
+  console.log('🔍 [Tutorial] Recherche du bouton "Nouveau profil"...');
+  
+  // Chercher par data-testid
+  const newProfileBtn = document.querySelector('[data-testid="new-profile-button"]');
+  if (newProfileBtn) {
+    console.log('✅ [Tutorial] Bouton "Nouveau profil" trouvé par data-testid');
+    return newProfileBtn;
+  }
+  
+  // Fallback
+  const sidebar = document.querySelector('.sidebar, aside');
+  if (sidebar) {
+    const btns = sidebar.querySelectorAll('button');
+    for (const btn of btns) {
+      const btnText = btn.textContent?.trim() || '';
+      if (btnText && 
+          (btnText.includes('Nouveau profil') || 
+           btnText.includes('New profile') ||
+           btnText.includes('Nuevo perfil'))) {
+        console.log('✅ [Tutorial] Bouton "Nouveau profil" trouvé par texte');
+        return btn;
+      }
+      if (btn.querySelector('.ti-plus')) {
+        const section = btn.closest('[class*="section"]');
+        if (section) {
+          const title = section.querySelector('[class*="title"], [class*="label"]');
+          if (title && title.textContent && 
+              (title.textContent.includes('Profils') || 
+               title.textContent.includes('Profiles') ||
+               title.textContent.includes('Perfiles'))) {
+            console.log('✅ [Tutorial] Bouton "Nouveau profil" trouvé par icône + contexte');
+            return btn;
+          }
+        }
+      }
+    }
+    const fallback = sidebar.querySelector('[class*="new-profile"]');
+    if (fallback) {
+      console.log('✅ [Tutorial] Bouton "Nouveau profil" trouvé par classe');
+      return fallback;
+    }
+  }
+  console.log('❌ [Tutorial] Aucun bouton "Nouveau profil" trouvé');
+  return null;
+}
+
+/**
+ * Recherche le bouton de tri ou la barre de recherche
+ */
+function findSearchOrSortElement() {
+  console.log('🔍 [Tutorial] Recherche de la barre de recherche ou du tri...');
+  
+  const searchInput = document.querySelector('[data-testid="search-input"], .search-bar input, input[type="search"], input[placeholder*="Rechercher"]');
+  if (searchInput) {
+    console.log('✅ [Tutorial] Barre de recherche trouvée');
+    return searchInput;
+  }
+  
+  const sortSelect = document.querySelector('[data-testid="sort-select"], select[class*="sort"]');
+  if (sortSelect) {
+    console.log('✅ [Tutorial] Sélecteur de tri trouvé');
+    return sortSelect;
+  }
+  
+  return document.querySelector('.home-header');
 }
 
 export const TUTORIAL_STEPS = (t) => [
@@ -165,28 +317,14 @@ export const TUTORIAL_STEPS = (t) => [
     fallbackTarget: '.btn-primary:has(.ti-plus)',
   },
 
-  // ─── ÉTAPE 3 : Favoris ────────────────────────────────────────────────
+  // ─── ÉTAPE 3 : Ajouter aux favoris ──────────────────────────────────
   {
     id: 'home-step3',
     icon: '⭐',
     title: t('tutorialHomeStep3Title'),
     description: t('tutorialHomeStep3Desc'),
     hint: t('tutorialHomeStep3Hint'),
-    target: () => {
-      const card = findFirstSound();
-      if (card) {
-        const starBtn = card.querySelector('.ti-star, .ti-star-filled, [class*="star"]');
-        if (starBtn) return starBtn.closest('button') || starBtn;
-        const btns = card.querySelectorAll('button');
-        for (const btn of btns) {
-          if (btn.querySelector('.ti-star') || btn.querySelector('.ti-star-filled')) {
-            return btn;
-          }
-        }
-        return card;
-      }
-      return null;
-    },
+    target: findFavoriteButton,
     fallbackTarget: '.sound-card:first-child button:has(.ti-star)',
   },
 
@@ -203,32 +341,14 @@ export const TUTORIAL_STEPS = (t) => [
     actionDelay: 800,
   },
 
-  // ─── ÉTAPE 5 : Profils ──────────────────────────────────────────────
+  // ─── ÉTAPE 5 : Gérer vos profils ──────────────────────────────────────
   {
     id: 'home-step5',
     icon: '📂',
     title: t('tutorialHomeStep5Title'),
     description: t('tutorialHomeStep5Desc'),
     hint: t('tutorialHomeStep5Hint'),
-    target: () => {
-      const sidebar = document.querySelector('.sidebar, aside');
-      if (sidebar) {
-        const sections = sidebar.querySelectorAll('[class*="section"], [class*="group"]');
-        for (const section of sections) {
-          const title = section.querySelector('[class*="title"], [class*="label"]');
-          if (title && title.textContent && 
-              (title.textContent.includes('Profils') || 
-               title.textContent.includes('Profiles') ||
-               title.textContent.includes('Perfiles'))) {
-            return section;
-          }
-        }
-        const allSounds = sidebar.querySelector('[class*="item"]:has(.ti-stack)');
-        if (allSounds) return allSounds.closest('[class*="section"]') || allSounds;
-        return sidebar;
-      }
-      return null;
-    },
+    target: findProfilesSection,
     fallbackTarget: '.sidebar .profiles-section',
   },
 
@@ -239,26 +359,7 @@ export const TUTORIAL_STEPS = (t) => [
     title: t('tutorialHomeStep6Title'),
     description: t('tutorialHomeStep6Desc'),
     hint: t('tutorialHomeStep6Hint'),
-    target: () => {
-      const sidebar = document.querySelector('.sidebar, aside');
-      if (sidebar) {
-        const btns = sidebar.querySelectorAll('button');
-        for (const btn of btns) {
-          if (btn.textContent && 
-              (btn.textContent.includes('Nouveau profil') || 
-               btn.textContent.includes('New profile') ||
-               btn.textContent.includes('Nuevo perfil'))) {
-            return btn;
-          }
-          if (btn.querySelector('.ti-plus') && 
-              btn.closest('[class*="section"]')?.querySelector('[class*="title"]')?.textContent?.includes('Profils')) {
-            return btn;
-          }
-        }
-        return sidebar.querySelector('[class*="new-profile"]');
-      }
-      return null;
-    },
+    target: findNewProfileButton,
     fallbackTarget: '.sidebar .new-profile-btn',
   },
 
@@ -305,13 +406,7 @@ export const TUTORIAL_STEPS = (t) => [
     title: t('tutorialHomeStep9Title'),
     description: t('tutorialHomeStep9Desc'),
     hint: t('tutorialHomeStep9Hint'),
-    target: () => {
-      const searchInput = document.querySelector('.search-bar input, input[type="search"], input[placeholder*="Rechercher"]');
-      if (searchInput) return searchInput;
-      const sortSelect = document.querySelector('select[class*="sort"]');
-      if (sortSelect) return sortSelect;
-      return document.querySelector('.home-header');
-    },
+    target: findSearchOrSortElement,
     fallbackTarget: '.search-bar, .home-header',
   },
 

@@ -2064,3 +2064,21 @@ body.focus-mode .sound-grid {
   transform: scale(1.05);
   box-shadow: var(--shadow-md);
 }
+
+/* ─── TUTORIAL HIGHLIGHT ─────────────────────────────────────────────── */
+.tutorial-highlight {
+  animation: tutorialPulse 1.5s ease-in-out infinite !important;
+  box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px rgba(124, 111, 247, 0.2), 0 0 30px rgba(124, 111, 247, 0.3) !important;
+  border-color: var(--accent) !important;
+  z-index: 100003 !important;
+  position: relative;
+}
+
+@keyframes tutorialPulse {
+  0%, 100% { 
+    box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px rgba(124, 111, 247, 0.2), 0 0 30px rgba(124, 111, 247, 0.3);
+  }
+  50% { 
+    box-shadow: 0 0 0 5px var(--accent), 0 0 0 10px rgba(124, 111, 247, 0.3), 0 0 50px rgba(124, 111, 247, 0.4);
+  }
+}

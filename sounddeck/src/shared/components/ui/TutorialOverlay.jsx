@@ -5,17 +5,14 @@ import { useLanguage } from '@core/i18n/LanguageContext';
 
 /**
  * Trouve un élément DOM avec gestion des composants React
- * Attend que l'élément soit visible et interactif
  */
 function findElement(selector, fallbackSelector) {
   console.log('🔍 [Tutorial] Recherche de l\'élément cible...');
   
-  // Si c'est une fonction, l'exécuter
   if (typeof selector === 'function') {
     try {
       const result = selector();
       if (result) {
-        // Vérifier que l'élément est visible
         if (result.offsetParent !== null || result.getClientRects().length > 0) {
           console.log('✅ [Tutorial] Élément trouvé par fonction');
           return result;
@@ -27,7 +24,6 @@ function findElement(selector, fallbackSelector) {
     }
   }
   
-  // Si c'est une chaîne, chercher avec querySelector
   if (typeof selector === 'string') {
     try {
       const el = document.querySelector(selector);
@@ -38,7 +34,6 @@ function findElement(selector, fallbackSelector) {
     } catch (e) {}
   }
   
-  // Fallback
   if (fallbackSelector) {
     console.log('🔍 [Tutorial] Tentative fallback...');
     
@@ -61,7 +56,6 @@ function findElement(selector, fallbackSelector) {
     } catch (e) {}
   }
   
-  // Dernier recours: chercher dans tout le DOM un élément avec data-testid
   try {
     const allTestIds = document.querySelectorAll('[data-testid]');
     for (const el of allTestIds) {
@@ -82,6 +76,14 @@ function findElement(selector, fallbackSelector) {
 function getElementRect(element) {
   if (!element) return null;
   const rect = element.getBoundingClientRect();
+  console.log('📐 [getElementRect] Rect:', {
+    top: rect.top,
+    left: rect.left,
+    width: rect.width,
+    height: rect.height,
+    right: rect.right,
+    bottom: rect.bottom
+  });
   return {
     top: rect.top + window.scrollY,
     left: rect.left + window.scrollX,
@@ -92,6 +94,61 @@ function getElementRect(element) {
     bottom: rect.bottom + window.scrollY,
     right: rect.right + window.scrollX,
   };
+}
+
+/**
+ * Récupère la position du menu contextuel s'il est ouvert
+ */
+function getContextMenuRect() {
+  console.log('🔍 [getContextMenuRect] Recherche du menu contextuel...');
+  
+  const menuSelectors = [
+    '[data-testid="context-menu"]',
+    '.context-menu',
+    '.sound-card-menu',
+    '[class*="context"]:not([style*="display: none"])',
+    '[class*="menu"]:not([style*="display: none"])',
+  ];
+  
+  for (const selector of menuSelectors) {
+    try {
+      const menu = document.querySelector(selector);
+      if (menu) {
+        const style = window.getComputedStyle(menu);
+        console.log(`  📐 Vérification du sélecteur "${selector}":`, {
+          display: style.display,
+          visibility: style.visibility,
+          opacity: style.opacity
+        });
+        if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+          const rect = menu.getBoundingClientRect();
+          console.log('✅ [getContextMenuRect] Menu trouvé:', {
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+            bottom: rect.bottom,
+            right: rect.right
+          });
+          return {
+            top: rect.top + window.scrollY,
+            left: rect.left + window.scrollX,
+            width: rect.width,
+            height: rect.height,
+            bottom: rect.bottom + window.scrollY,
+            right: rect.right + window.scrollX,
+            centerX: rect.left + rect.width / 2,
+            centerY: rect.top + rect.height / 2,
+          };
+        }
+      }
+    } catch (e) {
+      console.warn(`  ⚠️ Erreur avec le sélecteur "${selector}":`, e);
+    }
+  }
+  
+  console.log('❌ [getContextMenuRect] Aucun menu trouvé');
+  return null;
 }
 
 /**
@@ -119,7 +176,7 @@ function scrollToElement(element) {
 }
 
 /**
- * Ouvre le menu contextuel en trouvant et affichant le menu
+ * Ouvre le menu contextuel
  */
 function openContextMenu(element) {
   if (!element) {
@@ -130,11 +187,9 @@ function openContextMenu(element) {
   console.log('🖱️ [openContextMenu] Tentative d\'ouverture du menu sur:', element);
   
   try {
-    // ✅ Méthode 1: click() standard
     element.click();
     console.log('  ✅ click() exécuté');
     
-    // ✅ Méthode 2: MouseEvent avec bubbles
     const clickEvent = new MouseEvent('click', {
       view: window,
       bubbles: true,
@@ -146,7 +201,6 @@ function openContextMenu(element) {
     element.dispatchEvent(clickEvent);
     console.log('  ✅ MouseEvent dispatché');
     
-    // ✅ Méthode 3: mousedown + mouseup
     const downEvent = new MouseEvent('mousedown', {
       view: window,
       bubbles: true,
@@ -167,6 +221,20 @@ function openContextMenu(element) {
     element.dispatchEvent(upEvent);
     console.log('  ✅ mousedown/mouseup dispatchés');
     
+    try {
+      const rect = element.getBoundingClientRect();
+      const realisticClick = new MouseEvent('click', {
+        view: window,
+        bubbles: true,
+        cancelable: true,
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+        button: 0,
+      });
+      element.dispatchEvent(realisticClick);
+      console.log('  ✅ Clic avec position réaliste');
+    } catch (e) {}
+    
     console.log('✅ [openContextMenu] Menu ouvert avec succès');
     return true;
     
@@ -174,6 +242,43 @@ function openContextMenu(element) {
     console.error('❌ [openContextMenu] Erreur:', e);
     return false;
   }
+}
+
+/**
+ * Met le focus sur le menu contextuel
+ */
+function focusContextMenu() {
+  console.log('🔍 [Tutorial] Recherche du menu contextuel pour le focus...');
+  
+  const menuSelectors = [
+    '[data-testid="context-menu"]',
+    '.context-menu',
+    '.sound-card-menu',
+    '[class*="context"]:not([style*="display: none"])',
+    '[class*="menu"]:not([style*="display: none"])',
+  ];
+  
+  for (const selector of menuSelectors) {
+    try {
+      const menus = document.querySelectorAll(selector);
+      for (const menu of menus) {
+        const style = window.getComputedStyle(menu);
+        if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+          console.log('✅ [Tutorial] Menu contextuel trouvé et visible:', menu);
+          menu.classList.add('tutorial-highlight');
+          try { menu.focus(); } catch (e) {}
+          const firstButton = menu.querySelector('button:not([disabled]), [role="menuitem"]:not([disabled])');
+          if (firstButton) {
+            try { firstButton.focus(); } catch (e) {}
+          }
+          return menu;
+        }
+      }
+    } catch (e) {}
+  }
+  
+  console.log('❌ [Tutorial] Aucun menu contextuel trouvé');
+  return null;
 }
 
 export default function TutorialOverlay({ 
@@ -189,30 +294,36 @@ export default function TutorialOverlay({
   const [bubblePosition, setBubblePosition] = useState({ top: 0, left: 0, arrow: 'bottom' });
   const [isVisible, setIsVisible] = useState(false);
   const [isActionExecuted, setIsActionExecuted] = useState(false);
+  const [showBubble, setShowBubble] = useState(true);
+  const [menuRect, setMenuRect] = useState(null);
   const overlayRef = useRef(null);
   const bubbleRef = useRef(null);
   const rafRef = useRef(null);
   const stepData = steps[currentStep] || steps[0];
   const isLastStep = currentStep === steps.length - 1;
+  const hasAction = stepData?.action === 'click';
 
-  console.log('📌 [TutorialOverlay] Étape actuelle:', currentStep, stepData?.id, 'action:', stepData?.action, 'isActionExecuted:', isActionExecuted);
+  console.log('📌 [TutorialOverlay] Étape actuelle:', currentStep, stepData?.id, 'hasAction:', hasAction);
 
-  // ✅ Réinitialiser isActionExecuted à chaque changement d'étape
+  // ✅ Réinitialiser à chaque changement d'étape
   useEffect(() => {
     setIsActionExecuted(false);
+    setShowBubble(true);
+    setMenuRect(null);
   }, [currentStep]);
 
   // ✅ Exécuter l'action de l'étape
   useEffect(() => {
-    console.log('🔍 [TutorialOverlay] useEffect action - isOpen:', isOpen, 'hasAction:', !!stepData?.action, 'isActionExecuted:', isActionExecuted);
+    console.log('🔍 [TutorialOverlay] useEffect action - isOpen:', isOpen, 'hasAction:', hasAction, 'isActionExecuted:', isActionExecuted);
     
     if (!isOpen) {
       console.log('  ⏭️ isOpen est false');
       return;
     }
     
-    if (!stepData?.action) {
+    if (!hasAction) {
       console.log('  ⏭️ Pas d\'action dans stepData');
+      setShowBubble(true);
       return;
     }
     
@@ -229,6 +340,7 @@ export default function TutorialOverlay({
       
       if (!element) {
         console.log('❌ [Tutorial] Élément non trouvé');
+        setShowBubble(true);
         return;
       }
       
@@ -238,8 +350,47 @@ export default function TutorialOverlay({
         
         if (success) {
           console.log('✅ [Tutorial] Menu contextuel ouvert avec succès');
+          
+          let attempts = 0;
+          const maxAttempts = 10;
+          const attemptInterval = 200;
+          
+          const tryFocus = () => {
+            attempts++;
+            console.log(`🔍 [Tutorial] Tentative de focus ${attempts}/${maxAttempts}...`);
+            const menuElement = focusContextMenu();
+            if (menuElement) {
+              console.log('✅ [Tutorial] Menu contextuel focusé');
+              // ✅ Récupérer la position du menu
+              const menuRectData = getContextMenuRect();
+              if (menuRectData) {
+                setMenuRect(menuRectData);
+                console.log('📐 [Tutorial] Menu détecté:', menuRectData);
+              }
+              // ✅ Afficher la bulle et recalculer la position
+              setTimeout(() => {
+                setShowBubble(true);
+                console.log('🔄 [Tutorial] Recalcul de la position après ouverture du menu');
+                updateTargetWithMenu();
+              }, 300);
+            } else if (attempts < maxAttempts) {
+              setTimeout(tryFocus, attemptInterval);
+            } else {
+              console.log('❌ [Tutorial] Impossible de trouver le menu contextuel');
+              setShowBubble(true);
+              setTimeout(() => {
+                updateTargetWithMenu();
+              }, 500);
+            }
+          };
+          
+          setTimeout(tryFocus, 300);
         } else {
           console.log('⚠️ [Tutorial] Échec de l\'ouverture du menu');
+          setShowBubble(true);
+          setTimeout(() => {
+            updateTargetWithMenu();
+          }, 500);
         }
         
         setIsActionExecuted(true);
@@ -248,110 +399,235 @@ export default function TutorialOverlay({
         console.log(`⏳ [Tutorial] Attente de ${delay}ms pour la mise à jour...`);
         setTimeout(() => {
           console.log('🔄 [Tutorial] Mise à jour de la cible après clic');
-          updateTarget();
+          updateTargetWithMenu();
         }, delay);
       }
     };
     
     const timer = setTimeout(executeAction, 600);
     return () => clearTimeout(timer);
-  }, [isOpen, currentStep, stepData, isActionExecuted]);
+  }, [isOpen, currentStep, stepData, isActionExecuted, hasAction]);
 
   /**
-   * Calcule la position de la bulle en s'assurant qu'elle reste visible
+   * Calcule la position de la bulle en tenant compte du menu contextuel
    */
-  const calculateBubblePosition = useCallback((rect) => {
+  const calculateBubblePositionWithMenu = useCallback((rect) => {
+    console.log('📐 [calculateBubblePositionWithMenu] Début du calcul');
+    console.log('  📐 rect cible:', rect);
+    
     if (!rect) return { top: 0, left: 0, arrow: 'bottom' };
     
     const bubbleWidth = 380;
-    const bubbleHeight = 240;
-    const padding = 16;
-    const gap = 16;
+    const bubbleHeight = 250;
+    const padding = 20;
+    const gap = 20;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     
+    console.log('  📐 Viewport:', { viewportWidth, viewportHeight });
+    console.log('  📐 Paramètres:', { bubbleWidth, bubbleHeight, padding, gap });
+    
+    // Récupérer la position du menu contextuel
+    const menuRectData = menuRect || getContextMenuRect();
+    
+    console.log('  📐 menuRectData:', menuRectData);
+    
+    // Variables pour l'espace disponible
+    let availableTop = padding;
+    let availableBottom = viewportHeight - padding;
+    let menuBlocking = false;
+    let menuPosition = 'none';
+    
+    // Calculer l'espace disponible en tenant compte du menu
+    if (menuRectData) {
+      console.log('📐 [Tutorial] Menu contextuel détecté:', menuRectData);
+      
+      const menuGap = 20;
+      
+      // Calculer l'espace disponible en fonction de la position du menu
+      const spaceAboveMenu = menuRectData.top - padding;
+      const spaceBelowMenu = viewportHeight - menuRectData.bottom - padding;
+      const spaceLeftMenu = menuRectData.left - padding;
+      const spaceRightMenu = viewportWidth - menuRectData.right - padding;
+      
+      console.log('  📐 Espaces autour du menu:', { spaceAboveMenu, spaceBelowMenu, spaceLeftMenu, spaceRightMenu });
+      
+      // Déterminer où placer la bulle par rapport au menu
+      // Priorité: au-dessus ou en-dessous du menu (si assez de place)
+      // Sinon, à côté
+      
+      // Vérifier si la bulle peut être placée au-dessus du menu
+      if (spaceAboveMenu > bubbleHeight + gap) {
+        // Placer la bulle au-dessus du menu
+        availableTop = padding;
+        availableBottom = menuRectData.top - gap;
+        menuPosition = 'above_menu';
+        menuBlocking = true;
+        console.log('  📐 Bulle au-dessus du menu, availableBottom:', availableBottom);
+      }
+      // Sinon, vérifier si la bulle peut être placée en-dessous du menu
+      else if (spaceBelowMenu > bubbleHeight + gap) {
+        availableTop = menuRectData.bottom + gap;
+        availableBottom = viewportHeight - padding;
+        menuPosition = 'below_menu';
+        menuBlocking = true;
+        console.log('  📐 Bulle en-dessous du menu, availableTop:', availableTop);
+      }
+      // Sinon, vérifier si la bulle peut être placée à gauche du menu
+      else if (spaceLeftMenu > bubbleWidth + gap) {
+        // Placer la bulle à gauche du menu
+        const bubbleTop = Math.max(padding, Math.min(rect.centerY - bubbleHeight / 2, viewportHeight - bubbleHeight - padding));
+        return { 
+          top: Math.max(padding, Math.min(bubbleTop, viewportHeight - bubbleHeight - padding)), 
+          left: padding, 
+          arrow: 'right' 
+        };
+      }
+      // Sinon, vérifier si la bulle peut être placée à droite du menu
+      else if (spaceRightMenu > bubbleWidth + gap) {
+        const bubbleTop = Math.max(padding, Math.min(rect.centerY - bubbleHeight / 2, viewportHeight - bubbleHeight - padding));
+        return { 
+          top: Math.max(padding, Math.min(bubbleTop, viewportHeight - bubbleHeight - padding)), 
+          left: viewportWidth - bubbleWidth - padding, 
+          arrow: 'left' 
+        };
+      }
+      // Sinon, forcer une position au-dessus ou en-dessous de la cible
+      else {
+        const spaceAbove = rect.top - padding;
+        const spaceBelow = viewportHeight - rect.bottom - padding;
+        if (spaceAbove > spaceBelow) {
+          menuPosition = 'above';
+          availableTop = padding;
+          availableBottom = rect.top - gap;
+        } else {
+          menuPosition = 'below';
+          availableTop = rect.bottom + gap;
+          availableBottom = viewportHeight - padding;
+        }
+        menuBlocking = true;
+        console.log('  📐 Position forcée:', menuPosition);
+      }
+    }
+    
+    console.log('  📐 Position du menu:', menuPosition);
+    console.log('  📐 Espace disponible:', { availableTop, availableBottom, menuBlocking });
+    
     // Liste des positions possibles
-    const positions = [
-      { 
-        name: 'bottom', 
-        top: rect.bottom + gap, 
-        left: rect.centerX - bubbleWidth / 2,
+    const positions = [];
+    
+    // Position en bas (si assez de place)
+    const bottomSpace = availableBottom - rect.bottom - gap;
+    if (bottomSpace > bubbleHeight && menuPosition !== 'below' && menuPosition !== 'below_menu') {
+      positions.push({
+        name: 'bottom',
+        top: Math.min(availableBottom - bubbleHeight, rect.bottom + gap),
+        left: Math.max(padding, Math.min(rect.centerX - bubbleWidth / 2, viewportWidth - bubbleWidth - padding)),
         arrow: 'top',
-        available: (rect.bottom + gap + bubbleHeight) < viewportHeight - padding
-      },
-      { 
-        name: 'top', 
-        top: rect.top - bubbleHeight - gap, 
-        left: rect.centerX - bubbleWidth / 2,
+        priority: 1
+      });
+      console.log('  ✅ Position "bottom" ajoutée');
+    } else {
+      console.log('  ❌ Position "bottom" ignorée (bottomSpace:', bottomSpace, 'bubbleHeight:', bubbleHeight, 'menuPosition:', menuPosition);
+    }
+    
+    // Position en haut (si assez de place)
+    const topSpace = rect.top - gap - availableTop;
+    if (topSpace > bubbleHeight && menuPosition !== 'above' && menuPosition !== 'above_menu') {
+      positions.push({
+        name: 'top',
+        top: Math.max(availableTop, rect.top - bubbleHeight - gap),
+        left: Math.max(padding, Math.min(rect.centerX - bubbleWidth / 2, viewportWidth - bubbleWidth - padding)),
         arrow: 'bottom',
-        available: (rect.top - bubbleHeight - gap) > padding
-      },
-      { 
-        name: 'right', 
-        top: rect.centerY - bubbleHeight / 2, 
+        priority: 2
+      });
+      console.log('  ✅ Position "top" ajoutée');
+    } else {
+      console.log('  ❌ Position "top" ignorée (topSpace:', topSpace, 'bubbleHeight:', bubbleHeight, 'menuPosition:', menuPosition);
+    }
+    
+    // Position à droite (si assez de place)
+    const rightSpace = viewportWidth - rect.right - gap - padding;
+    if (rightSpace > bubbleWidth && menuPosition !== 'right') {
+      positions.push({
+        name: 'right',
+        top: Math.max(availableTop + padding, Math.min(rect.centerY - bubbleHeight / 2, availableBottom - bubbleHeight - padding)),
         left: rect.right + gap,
         arrow: 'left',
-        available: (rect.right + gap + bubbleWidth) < viewportWidth - padding
-      },
-      { 
-        name: 'left', 
-        top: rect.centerY - bubbleHeight / 2, 
+        priority: 3
+      });
+      console.log('  ✅ Position "right" ajoutée');
+    } else {
+      console.log('  ❌ Position "right" ignorée (rightSpace:', rightSpace, 'bubbleWidth:', bubbleWidth, 'menuPosition:', menuPosition);
+    }
+    
+    // Position à gauche (si assez de place)
+    const leftSpace = rect.left - gap - padding;
+    if (leftSpace > bubbleWidth && menuPosition !== 'left') {
+      positions.push({
+        name: 'left',
+        top: Math.max(availableTop + padding, Math.min(rect.centerY - bubbleHeight / 2, availableBottom - bubbleHeight - padding)),
         left: rect.left - bubbleWidth - gap,
         arrow: 'right',
-        available: (rect.left - bubbleWidth - gap) > padding
+        priority: 4
+      });
+      console.log('  ✅ Position "left" ajoutée');
+    } else {
+      console.log('  ❌ Position "left" ignorée (leftSpace:', leftSpace, 'bubbleWidth:', bubbleWidth, 'menuPosition:', menuPosition);
+    }
+    
+    console.log('  📐 Positions possibles:', positions.length);
+    
+    // Si aucune position n'est disponible, forcer une position
+    if (positions.length === 0) {
+      console.log('⚠️ [Tutorial] Aucune position disponible, utilisation d\'une position forcée');
+      
+      // Forcer la position qui a le plus d'espace
+      const spaceAbove = rect.top - availableTop;
+      const spaceBelow = availableBottom - rect.bottom;
+      
+      console.log('  📐 Espace forcé:', { spaceAbove, spaceBelow });
+      
+      if (spaceAbove > spaceBelow) {
+        positions.push({
+          name: 'top',
+          top: Math.max(availableTop, rect.top - bubbleHeight - gap),
+          left: Math.max(padding, Math.min(rect.centerX - bubbleWidth / 2, viewportWidth - bubbleWidth - padding)),
+          arrow: 'bottom',
+          priority: 1
+        });
+        console.log('  ✅ Position forcée "top"');
+      } else {
+        positions.push({
+          name: 'bottom',
+          top: Math.min(availableBottom - bubbleHeight, rect.bottom + gap),
+          left: Math.max(padding, Math.min(rect.centerX - bubbleWidth / 2, viewportWidth - bubbleWidth - padding)),
+          arrow: 'top',
+          priority: 1
+        });
+        console.log('  ✅ Position forcée "bottom"');
       }
-    ];
+    }
     
-    // Trouver la meilleure position disponible
-    let bestPos = positions.find(p => p.available) || positions[0];
+    // Trier par priorité
+    positions.sort((a, b) => a.priority - b.priority);
     
-    // Ajuster la position horizontale pour ne pas sortir de l'écran
+    // Prendre la meilleure position
+    let bestPos = positions[0];
+    console.log('  📐 Meilleure position choisie:', bestPos);
+    
+    // Vérifier que la position est valide
+    let top = Math.max(availableTop, Math.min(bestPos.top, availableBottom - bubbleHeight));
     let left = Math.max(padding, Math.min(bestPos.left, viewportWidth - bubbleWidth - padding));
     
-    // Ajuster la position verticale pour ne pas sortir de l'écran
-    let top = Math.max(padding, Math.min(bestPos.top, viewportHeight - bubbleHeight - padding));
+    console.log('  📐 Position finale ajustée:', { top, left, arrow: bestPos.arrow });
     
-    // Si l'élément est très proche du bord, centrer la bulle verticalement
-    if (rect.top < bubbleHeight + gap * 2 && rect.bottom > viewportHeight - bubbleHeight - gap * 2) {
-      top = viewportHeight / 2 - bubbleHeight / 2;
-      if (rect.centerX < viewportWidth / 2) {
-        bestPos.arrow = 'left';
-        left = rect.right + gap;
-      } else {
-        bestPos.arrow = 'right';
-        left = rect.left - bubbleWidth - gap;
-      }
-      left = Math.max(padding, Math.min(left, viewportWidth - bubbleWidth - padding));
-    }
-    
-    // Si l'élément est très proche des bords horizontaux, centrer la bulle horizontalement
-    if (rect.left < bubbleWidth / 2 || rect.right > viewportWidth - bubbleWidth / 2) {
-      left = viewportWidth / 2 - bubbleWidth / 2;
-      if (rect.centerY < viewportHeight / 2) {
-        bestPos.arrow = 'top';
-        top = rect.bottom + gap;
-      } else {
-        bestPos.arrow = 'bottom';
-        top = rect.top - bubbleHeight - gap;
-      }
-      top = Math.max(padding, Math.min(top, viewportHeight - bubbleHeight - padding));
-    }
-    
-    // Ajustement final pour la flèche
-    let arrow = bestPos.arrow;
-    if (top + bubbleHeight > viewportHeight - padding * 2) {
-      arrow = 'bottom';
-    }
-    if (top < padding * 2) {
-      arrow = 'top';
-    }
-    
-    console.log('📐 [Tutorial] Position calculée:', { top, left, arrow });
-    
-    return { top, left, arrow };
-  }, []);
+    return { top, left, arrow: bestPos.arrow };
+  }, [menuRect]);
 
-  const updateTarget = useCallback(() => {
+  const updateTargetWithMenu = useCallback(() => {
+    console.log('🔄 [updateTargetWithMenu] Début mise à jour');
+    
     if (!stepData?.target) {
       console.log('⚠️ [Tutorial] Pas de target pour l\'étape', currentStep);
       return;
@@ -371,17 +647,19 @@ export default function TutorialOverlay({
         setTargetRect(rect);
         
         if (rect) {
-          const pos = calculateBubblePosition(rect);
+          const pos = calculateBubblePositionWithMenu(rect);
+          console.log('📐 [updateTargetWithMenu] Position finale de la bulle:', pos);
           setBubblePosition(pos);
         }
       }, delay);
       
     } else {
       console.log('❌ [Tutorial] Élément NON trouvé pour l\'étape', currentStep);
-      setTimeout(updateTarget, 500);
+      setTimeout(updateTargetWithMenu, 500);
     }
-  }, [stepData, calculateBubblePosition, currentStep]);
+  }, [stepData, calculateBubblePositionWithMenu, currentStep]);
 
+  // Mise à jour initiale
   useEffect(() => {
     if (!isOpen) {
       setIsVisible(false);
@@ -389,19 +667,20 @@ export default function TutorialOverlay({
     }
     
     const timer = setTimeout(() => {
-      updateTarget();
+      updateTargetWithMenu();
       setIsVisible(true);
     }, 300);
     
     return () => clearTimeout(timer);
-  }, [isOpen, currentStep, updateTarget]);
+  }, [isOpen, currentStep, updateTargetWithMenu]);
 
+  // Mise à jour au resize
   useEffect(() => {
     if (!isOpen) return;
     
     const handleResize = () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(updateTarget);
+      rafRef.current = requestAnimationFrame(updateTargetWithMenu);
     };
     
     window.addEventListener('resize', handleResize);
@@ -412,7 +691,7 @@ export default function TutorialOverlay({
       window.removeEventListener('scroll', handleResize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [isOpen, updateTarget]);
+  }, [isOpen, updateTargetWithMenu]);
 
   if (!isOpen || !stepData) return null;
 
@@ -519,6 +798,8 @@ export default function TutorialOverlay({
 
   const arrowStyles = getArrowStyles();
 
+  const shouldShowBubble = showBubble && targetRect;
+
   return createPortal(
     <>
       <div
@@ -581,112 +862,114 @@ export default function TutorialOverlay({
         </>
       )}
 
-      <div style={bubbleStyle} ref={bubbleRef}>
-        <div style={arrowStyles} />
-        
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexShrink: 0 }}>
+      {shouldShowBubble && (
+        <div style={bubbleStyle} ref={bubbleRef}>
+          <div style={arrowStyles} />
+          
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexShrink: 0 }}>
+            <div style={{
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              background: 'var(--accent-light)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 20,
+              flexShrink: 0,
+            }}>
+              {stepData.icon || '📖'}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ 
+                fontWeight: 600, 
+                fontSize: 15, 
+                marginBottom: 4,
+                color: 'var(--accent)',
+              }}>
+                {stepData.title}
+              </div>
+              <div style={{ 
+                fontSize: 13, 
+                color: 'var(--text-secondary)', 
+                lineHeight: 1.6,
+                overflow: 'hidden',
+                display: '-webkit-box',
+                WebkitLineClamp: 4,
+                WebkitBoxOrient: 'vertical',
+              }}>
+                {stepData.description}
+              </div>
+              {stepData.hint && (
+                <div style={{
+                  marginTop: 6,
+                  padding: '4px 10px',
+                  background: 'var(--bg-tertiary)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: 11,
+                  color: 'var(--text-tertiary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  flexShrink: 0,
+                }}>
+                  <i className="ti ti-bulb" style={{ color: 'var(--warning)' }} />
+                  <span style={{ 
+                    overflow: 'hidden',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                  }}>
+                    {stepData.hint}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div style={{
-            width: 40,
-            height: 40,
-            borderRadius: '50%',
-            background: 'var(--accent-light)',
+            marginTop: 'auto',
+            paddingTop: 12,
+            borderTop: '1px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 20,
+            justifyContent: 'space-between',
             flexShrink: 0,
           }}>
-            {stepData.icon || '📖'}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ 
-              fontWeight: 600, 
-              fontSize: 15, 
-              marginBottom: 4,
-              color: 'var(--accent)',
-            }}>
-              {stepData.title}
+            <div style={{ display: 'flex', gap: 4 }}>
+              {steps.map((_, index) => (
+                <div
+                  key={index}
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: index <= currentStep ? 'var(--accent)' : 'var(--bg-tertiary)',
+                    transition: 'background 0.3s ease',
+                  }}
+                />
+              ))}
             </div>
-            <div style={{ 
-              fontSize: 13, 
-              color: 'var(--text-secondary)', 
-              lineHeight: 1.6,
-              overflow: 'hidden',
-              display: '-webkit-box',
-              WebkitLineClamp: 4,
-              WebkitBoxOrient: 'vertical',
-            }}>
-              {stepData.description}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                className="btn-secondary btn-sm"
+                onClick={onSkip}
+                style={{ fontSize: 11, padding: '4px 10px' }}
+              >
+                {t('tutorialSkip') || 'Passer'}
+              </button>
+              <button
+                className="btn-primary btn-sm"
+                onClick={handleNext}
+                style={{ fontSize: 11, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 4 }}
+              >
+                {isLastStep ? (t('tutorialFinish') || 'Terminer') : (t('tutorialNext') || 'Suivant')}
+                <i className={`ti ${isLastStep ? 'ti-check' : 'ti-arrow-right'}`} />
+              </button>
             </div>
-            {stepData.hint && (
-              <div style={{
-                marginTop: 6,
-                padding: '4px 10px',
-                background: 'var(--bg-tertiary)',
-                borderRadius: 'var(--radius-sm)',
-                fontSize: 11,
-                color: 'var(--text-tertiary)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                flexShrink: 0,
-              }}>
-                <i className="ti ti-bulb" style={{ color: 'var(--warning)' }} />
-                <span style={{ 
-                  overflow: 'hidden',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                }}>
-                  {stepData.hint}
-                </span>
-              </div>
-            )}
           </div>
         </div>
-
-        <div style={{
-          marginTop: 'auto',
-          paddingTop: 12,
-          borderTop: '1px solid var(--border)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexShrink: 0,
-        }}>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {steps.map((_, index) => (
-              <div
-                key={index}
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: index <= currentStep ? 'var(--accent)' : 'var(--bg-tertiary)',
-                  transition: 'background 0.3s ease',
-                }}
-              />
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button
-              className="btn-secondary btn-sm"
-              onClick={onSkip}
-              style={{ fontSize: 11, padding: '4px 10px' }}
-            >
-              {t('tutorialSkip') || 'Passer'}
-            </button>
-            <button
-              className="btn-primary btn-sm"
-              onClick={handleNext}
-              style={{ fontSize: 11, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 4 }}
-            >
-              {isLastStep ? (t('tutorialFinish') || 'Terminer') : (t('tutorialNext') || 'Suivant')}
-              <i className={`ti ${isLastStep ? 'ti-check' : 'ti-arrow-right'}`} />
-            </button>
-          </div>
-        </div>
-      </div>
+      )}
 
       <style>{`
         @keyframes highlightPulse {
@@ -714,6 +997,21 @@ export default function TutorialOverlay({
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
+        }
+        .tutorial-highlight {
+          animation: tutorialPulse 1.5s ease-in-out infinite !important;
+          box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px rgba(124,111,247,0.2), 0 0 30px rgba(124,111,247,0.3) !important;
+          border-color: var(--accent) !important;
+          z-index: 100003 !important;
+          position: relative;
+        }
+        @keyframes tutorialPulse {
+          0%, 100% { 
+            box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px rgba(124,111,247,0.2), 0 0 30px rgba(124,111,247,0.3);
+          }
+          50% { 
+            box-shadow: 0 0 0 5px var(--accent), 0 0 0 10px rgba(124,111,247,0.3), 0 0 50px rgba(124,111,247,0.4);
+          }
         }
       `}</style>
     </>,

@@ -331,6 +331,7 @@ export default function SoundCard({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         data-sound-id={sound.id}
+        data-testid={`sound-card-${sound.id}`}
         className={`sound-card sound-card-${size} ${playing ? 'playing-pulse' : ''}`}
         style={{
           background: 'var(--bg-secondary)',
@@ -346,7 +347,9 @@ export default function SoundCard({
       >
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-          <button onClick={e => { e.stopPropagation(); onToggleFavorite(sound.id) }}
+          <button 
+            onClick={e => { e.stopPropagation(); onToggleFavorite(sound.id) }}
+            data-testid="favorite-button"
             style={{
               background: isFavorite ? 'rgba(239,159,39,0.15)' : 'var(--bg-tertiary)',
               border: `1px solid ${isFavorite ? 'var(--warning)' : 'var(--border)'}`,
@@ -362,7 +365,10 @@ export default function SoundCard({
                 <i className="ti ti-repeat" />
               </span>
             )}
-            <button ref={buttonRef} onClick={handleMenuToggle}
+            <button 
+              ref={buttonRef} 
+              onClick={handleMenuToggle}
+              data-testid="dots-button"
               style={{
                 background: 'var(--bg-tertiary)', border: '1px solid var(--border)',
                 borderRadius: 6, color: 'var(--text-secondary)', padding: '3px 7px',
@@ -1050,6 +1056,7 @@ function ContextMenuPortal({
     <div 
       ref={menuRef} 
       onClick={handleMenuClick}
+      data-testid="context-menu"
       style={{
         position: 'fixed',
         top: position.top,
@@ -1058,7 +1065,7 @@ function ContextMenuPortal({
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius-md)',
         padding: 4,
-        zIndex: 9999,
+        zIndex: 999,
         minWidth: 200,
         boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
         backdropFilter: 'blur(4px)'
