@@ -15,7 +15,7 @@ const DeleteButton = ({
   disabled = false,
   icon = 'ti-trash',
   label = 'Supprimer',
-  deleteLabel, // ✅ Personnalisation du texte du bouton
+  deleteLabel,
   showLabel = false,
   variant = 'ghost',
   type = 'danger',
@@ -26,7 +26,6 @@ const DeleteButton = ({
   const [isHovering, setIsHovering] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
 
-  // ✅ Utiliser deleteLabel s'il est fourni, sinon label, sinon la traduction par défaut
   const displayLabel = deleteLabel || label || t('delete') || 'Supprimer'
 
   const handleClick = async (e) => {
@@ -38,16 +37,12 @@ const DeleteButton = ({
     }
     
     try {
-      // ✅ Construire le message : si itemName est déjà dans le message, ne pas le dupliquer
       let finalMessage = confirmMessage
       
-      // ✅ Vérifier si le message contient déjà le nom (via {name} ou "nom")
       const hasNamePlaceholder = confirmMessage.includes('{name}')
       const hasNameInMessage = confirmMessage.includes(`"${itemName}"`) || confirmMessage.includes(itemName)
       
-      // ✅ Si itemName est fourni et que le message ne contient pas déjà le nom
       if (itemName && !hasNamePlaceholder && !hasNameInMessage) {
-        // ✅ Si le message se termine par "?" ou ":", ajouter le nom entre guillemets
         if (confirmMessage.endsWith('?') || confirmMessage.endsWith(':')) {
           finalMessage = confirmMessage + ` "${itemName}"`
         } else {
@@ -95,7 +90,6 @@ const DeleteButton = ({
           borderColor: 'var(--danger)',
         }
       case 'danger':
-      default:
         return {
           backgroundColor: isHovering ? '#c0392b' : 'var(--danger)',
           color: 'white',
@@ -105,6 +99,27 @@ const DeleteButton = ({
           boxShadow: isHovering 
             ? '0 4px 15px rgba(224, 82, 82, 0.4)' 
             : '0 2px 8px rgba(224, 82, 82, 0.2)',
+        }
+      // ✅ NOUVEAU VARIANT : ghost-danger (comme dans Options.jsx)
+      case 'ghost-danger':
+        return {
+          backgroundColor: isHovering ? 'rgba(224, 82, 82, 0.1)' : 'transparent',
+          // ✅ Icône plus visible : text-secondary au lieu de text-tertiary
+          color: isHovering ? 'var(--danger)' : 'var(--text-secondary)',
+          borderWidth: '1px',
+          borderStyle: 'solid',
+          borderColor: isHovering ? 'var(--danger)' : 'transparent',
+          borderRadius: 'var(--radius-sm)',
+          padding: '4px 8px',
+          transition: 'all 0.15s ease',
+        }
+      default:
+        return {
+          backgroundColor: isHovering ? 'rgba(224, 82, 82, 0.1)' : 'transparent',
+          color: isHovering ? 'var(--danger)' : 'var(--text-secondary)',
+          borderWidth: '1px',
+          borderStyle: 'solid',
+          borderColor: isHovering ? 'var(--danger)' : 'transparent',
         }
     }
   }

@@ -15,7 +15,6 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
   const [newPlaylistName, setNewPlaylistName] = useState('')
   const activePlaylistIdRef = useRef(null)
   const playlistsRef = useRef(playlists)
-  const [, forceUpdate] = useState(0) // ✅ Force update pour la sidebar
   
   useEffect(() => {
     playlistsRef.current = playlists
@@ -101,7 +100,6 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
     }
   }
 
-  // ✅ Sauvegarde des items - Version simplifiée
   const savePlaylistItems = async (playlistId, items) => {
     const currentActiveId = activePlaylistIdRef.current || activePlaylistId
     
@@ -110,11 +108,9 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
       const updatedPlaylists = [...playlistsRef.current]
       updatedPlaylists[index] = { ...updatedPlaylists[index], items }
       
-      // ✅ Mettre à jour les playlists
       setPlaylists(updatedPlaylists)
       playlistsRef.current = updatedPlaylists
       
-      // ✅ GARANTIR que l'ID actif est restauré
       if (currentActiveId) {
         setActivePlaylistId(currentActiveId)
         activePlaylistIdRef.current = currentActiveId
@@ -129,7 +125,6 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
     activePlaylistIdRef.current = id
   }
 
-  // ✅ Rendu de la sidebar - utilisation d'une ref pour éviter les re-rendus
   const renderSidebar = useCallback(() => {
     return (
       <div style={{
@@ -221,7 +216,6 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
             </div>
           )}
           {playlists.map(pl => {
-            // ✅ Utiliser la ref pour la comparaison
             const isActive = activePlaylistId === pl.id || activePlaylistIdRef.current === pl.id
             return (
               <div 
@@ -244,33 +238,18 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
                     {pl.items.length} {t('sounds')}
                   </div>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    deletePlaylist(pl.id)
-                  }}
-                  style={{
-                    padding: '4px 6px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: 'none',
-                    background: 'transparent',
-                    color: 'var(--text-tertiary)',
-                    cursor: 'pointer',
-                    fontSize: 14,
-                    transition: 'all 0.15s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(224, 82, 82, 0.1)'
-                    e.currentTarget.style.color = 'var(--danger)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent'
-                    e.currentTarget.style.color = 'var(--text-tertiary)'
-                  }}
-                  title={t('delete') || 'Supprimer'}
-                >
-                  <i className="ti ti-trash" />
-                </button>
+                
+                {/* ✅ DeleteButton variant ghost-danger */}
+                <DeleteButton
+                  onDelete={() => deletePlaylist(pl.id)}
+                  confirmTitle={t('deletePlaylist') || 'Confirmer la suppression de la playlist'}
+                  confirmMessage={t('deletePlaylistConfirm') || 'Voulez-vous vraiment supprimer cette playlist ?'}
+                  itemName={pl.name}
+                  size="sm"
+                  variant="ghost-danger"
+                  icon="ti-trash"
+                  showLabel={false}
+                />
               </div>
             )
           })}
@@ -281,10 +260,8 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-      {/* Sidebar gauche - rendu direct */}
       {renderSidebar()}
 
-      {/* Contenu principal */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {activePlaylist ? (
           <PlaylistEditor
