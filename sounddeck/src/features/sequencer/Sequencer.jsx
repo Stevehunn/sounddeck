@@ -1,5 +1,5 @@
 // src/features/sequencer/Sequencer.jsx
-import { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react'
 import { Howl } from 'howler'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { DeleteButton } from '@shared/components/ui'
@@ -10,18 +10,45 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
   const { t, currentLang } = useLanguage()
   const { confirm, ConfirmWrapper } = useConfirm({ lang })
   const [playlists, setPlaylists] = useState([])
-  const [activePlaylist, setActivePlaylist] = useState(null)
+  const [activePlaylistId, setActivePlaylistId] = useState(null)
   const [showNewPlaylist, setShowNewPlaylist] = useState(false)
   const [newPlaylistName, setNewPlaylistName] = useState('')
+  const activePlaylistIdRef = useRef(null)
+  const playlistsRef = useRef(playlists)
+  const [, forceUpdate] = useState(0) // ✅ Force update pour la sidebar
+  
+  useEffect(() => {
+    playlistsRef.current = playlists
+  }, [playlists])
+
+  const activePlaylist = useMemo(() => {
+    if (!activePlaylistId) return null
+    return playlists.find(p => p.id === activePlaylistId) || null
+  }, [playlists, activePlaylistId])
+
+  useLayoutEffect(() => {
+    activePlaylistIdRef.current = activePlaylistId
+  }, [activePlaylistId])
 
   useEffect(() => {
     window.electronAPI.storeGet('playlists').then(saved => {
-      if (saved) setPlaylists(saved)
+      if (saved) {
+        setPlaylists(saved)
+        playlistsRef.current = saved
+        if (activePlaylistIdRef.current) {
+          const exists = saved.some(p => p.id === activePlaylistIdRef.current)
+          if (!exists) {
+            setActivePlaylistId(null)
+            activePlaylistIdRef.current = null
+          }
+        }
+      }
     })
   }, [])
 
   const savePlaylists = async (updated) => {
     setPlaylists(updated)
+    playlistsRef.current = updated
     await window.electronAPI.storeSet('playlists', updated)
   }
 
@@ -35,7 +62,8 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
     }
     const updated = [...playlists, playlist]
     await savePlaylists(updated)
-    setActivePlaylist(playlist)
+    setActivePlaylistId(playlist.id)
+    activePlaylistIdRef.current = playlist.id
     setNewPlaylistName('')
     setShowNewPlaylist(false)
   }
@@ -45,7 +73,6 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
     setShowNewPlaylist(false)
   }
 
-  // ✅ Supprimer une playlist - UNE SEULE CONFIRMATION
   const deletePlaylist = async (id) => {
     const confirmed = await confirm({
       title: t('deletePlaylist') || 'Confirmer la suppression de la playlist',
@@ -59,17 +86,52 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
     
     const updated = playlists.filter(p => p.id !== id)
     await savePlaylists(updated)
-    if (activePlaylist?.id === id) setActivePlaylist(null)
+    if (activePlaylistId === id) {
+      setActivePlaylistId(null)
+      activePlaylistIdRef.current = null
+    }
   }
 
   const updatePlaylist = async (updated) => {
-    const all = playlists.map(p => p.id === updated.id ? updated : p)
-    await savePlaylists(all)
-    setActivePlaylist(updated)
+    const index = playlists.findIndex(p => p.id === updated.id)
+    if (index !== -1) {
+      const updatedPlaylists = [...playlists]
+      updatedPlaylists[index] = updated
+      await savePlaylists(updatedPlaylists)
+    }
   }
 
-  return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+  // ✅ Sauvegarde des items - Version simplifiée
+  const savePlaylistItems = async (playlistId, items) => {
+    const currentActiveId = activePlaylistIdRef.current || activePlaylistId
+    
+    const index = playlistsRef.current.findIndex(p => p.id === playlistId)
+    if (index !== -1) {
+      const updatedPlaylists = [...playlistsRef.current]
+      updatedPlaylists[index] = { ...updatedPlaylists[index], items }
+      
+      // ✅ Mettre à jour les playlists
+      setPlaylists(updatedPlaylists)
+      playlistsRef.current = updatedPlaylists
+      
+      // ✅ GARANTIR que l'ID actif est restauré
+      if (currentActiveId) {
+        setActivePlaylistId(currentActiveId)
+        activePlaylistIdRef.current = currentActiveId
+      }
+      
+      await window.electronAPI.storeSet('playlists', updatedPlaylists)
+    }
+  }
+
+  const handleSelectPlaylist = (id) => {
+    setActivePlaylistId(id)
+    activePlaylistIdRef.current = id
+  }
+
+  // ✅ Rendu de la sidebar - utilisation d'une ref pour éviter les re-rendus
+  const renderSidebar = useCallback(() => {
+    return (
       <div style={{
         width: 220, flexShrink: 0, borderRight: '1px solid var(--border)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden'
@@ -127,6 +189,7 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
                     minHeight: 28,
                     opacity: newPlaylistName.trim() ? 1 : 0.5
                   }}
+                  data-testid="new-playlist-button"
                 >
                   <i className="ti ti-check" /> {t('add')}
                 </button>
@@ -144,6 +207,7 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
                 minHeight: 34
               }}
               onClick={() => setShowNewPlaylist(true)}
+              data-testid="new-playlist-button"
             >
               <i className="ti ti-plus" /> {t('newPlaylist')}
             </button>
@@ -156,54 +220,71 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
               {t('noPlaylist')}
             </div>
           )}
-          {playlists.map(pl => (
-            <div key={pl.id}
-              onClick={() => setActivePlaylist(pl)}
-              className={`sidebar-item ${activePlaylist?.id === pl.id ? 'active' : ''}`}
-              style={{ borderLeft: `2px solid ${activePlaylist?.id === pl.id ? 'var(--accent)' : 'transparent'}` }}
-            >
-              <i className="ti ti-playlist" style={{ color: activePlaylist?.id === pl.id ? 'var(--accent)' : 'var(--text-tertiary)', fontSize: 15 }} />
-              <div className="label">
-                <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: activePlaylist?.id === pl.id ? 'var(--accent)' : 'var(--text-primary)' }}>
-                  {pl.name}
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
-                  {pl.items.length} {t('sounds')}
-                </div>
-              </div>
-              {/* ✅ Bouton Supprimer - sans confirmation supplémentaire */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  deletePlaylist(pl.id)
+          {playlists.map(pl => {
+            // ✅ Utiliser la ref pour la comparaison
+            const isActive = activePlaylistId === pl.id || activePlaylistIdRef.current === pl.id
+            return (
+              <div 
+                key={pl.id}
+                onClick={() => handleSelectPlaylist(pl.id)}
+                className={`sidebar-item ${isActive ? 'active' : ''}`}
+                style={{ 
+                  borderLeft: `2px solid ${isActive ? 'var(--accent)' : 'transparent'}`,
+                  backgroundColor: isActive ? 'var(--accent-light)' : 'transparent',
+                  color: isActive ? 'var(--accent)' : undefined
                 }}
-                style={{
-                  padding: '4px 6px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: 'none',
-                  background: 'transparent',
-                  color: 'var(--text-tertiary)',
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  transition: 'all 0.15s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(224, 82, 82, 0.1)'
-                  e.currentTarget.style.color = 'var(--danger)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent'
-                  e.currentTarget.style.color = 'var(--text-tertiary)'
-                }}
-                title={t('delete') || 'Supprimer'}
+                data-testid={`playlist-item-${pl.id}`}
               >
-                <i className="ti ti-trash" />
-              </button>
-            </div>
-          ))}
+                <i className="ti ti-playlist" style={{ color: isActive ? 'var(--accent)' : 'var(--text-tertiary)', fontSize: 15 }} />
+                <div className="label">
+                  <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isActive ? 'var(--accent)' : 'var(--text-primary)' }}>
+                    {pl.name}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                    {pl.items.length} {t('sounds')}
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    deletePlaylist(pl.id)
+                  }}
+                  style={{
+                    padding: '4px 6px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--text-tertiary)',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(224, 82, 82, 0.1)'
+                    e.currentTarget.style.color = 'var(--danger)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent'
+                    e.currentTarget.style.color = 'var(--text-tertiary)'
+                  }}
+                  title={t('delete') || 'Supprimer'}
+                >
+                  <i className="ti ti-trash" />
+                </button>
+              </div>
+            )
+          })}
         </div>
       </div>
+    )
+  }, [playlists, activePlaylistId, showNewPlaylist, newPlaylistName, t, createPlaylist, cancelCreatePlaylist, deletePlaylist, handleSelectPlaylist])
 
+  return (
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      {/* Sidebar gauche - rendu direct */}
+      {renderSidebar()}
+
+      {/* Contenu principal */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {activePlaylist ? (
           <PlaylistEditor
@@ -213,8 +294,15 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
             audioDevice={store.audioDevice}
             volume={store.volume}
             onUpdate={updatePlaylist}
+            onSaveItems={savePlaylistItems}
             addToast={addToast}
             lang={lang}
+            onPlaylistChange={(playlist) => {
+              if (playlist && playlist.id) {
+                setActivePlaylistId(playlist.id)
+                activePlaylistIdRef.current = playlist.id
+              }
+            }}
           />
         ) : (
           <EmptyState lang={lang} />
@@ -238,7 +326,7 @@ function EmptyState({ lang = 'fr' }) {
   )
 }
 
-function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addToast, lang = 'fr' }) {
+function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, onSaveItems, addToast, lang = 'fr', onPlaylistChange }) {
   const { t, currentLang } = useLanguage()
   const [items, setItems] = useState(playlist.items || [])
   const [playing, setPlaying] = useState(false)
@@ -252,6 +340,11 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
   const [currentProgress, setCurrentProgress] = useState(null)
   const currentIdxRef = useRef(-1)
   const itemsRef = useRef(items)
+  const playlistIdRef = useRef(playlist.id)
+
+  useEffect(() => {
+    playlistIdRef.current = playlist.id
+  }, [playlist.id])
 
   useEffect(() => {
     if (!playing || currentIdx < 0) { setCurrentProgress(null); return }
@@ -276,9 +369,22 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
   useEffect(() => { currentIdxRef.current = currentIdx }, [currentIdx])
   useEffect(() => { itemsRef.current = items }, [items])
 
-  const saveItems = async (updated, loop = loopPlaylist) => {
-    setItems(updated)
-    await onUpdate({ ...playlist, items: updated, loop })
+  const saveItemsOnly = async (updatedItems) => {
+    setItems(updatedItems)
+    if (onSaveItems) {
+      await onSaveItems(playlistIdRef.current, updatedItems)
+    }
+    if (onPlaylistChange) {
+      onPlaylistChange({ ...playlist, items: updatedItems })
+    }
+  }
+
+  const saveItems = async (updatedItems, loop = loopPlaylist) => {
+    setItems(updatedItems)
+    await onUpdate({ ...playlist, items: updatedItems, loop })
+    if (onPlaylistChange) {
+      onPlaylistChange({ ...playlist, items: updatedItems, loop })
+    }
   }
 
   const playFrom = useCallback(async (idx) => {
@@ -364,6 +470,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
   const handleDragStart = (e, idx) => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', String(idx))
+    e.stopPropagation()
     setTimeout(() => {
       if (e.target) {
         e.target.style.opacity = '0.4'
@@ -378,6 +485,9 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
       e.target.classList.remove('dragging')
     }
     setDragOverIdx(null)
+    if (onPlaylistChange) {
+      onPlaylistChange(playlist)
+    }
   }
 
   const handleDragOver = (e, idx) => {
@@ -392,6 +502,8 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
 
   const handleDrop = (e, toIdx) => {
     e.preventDefault()
+    e.stopPropagation()
+    
     const fromIdx = parseInt(e.dataTransfer.getData('text/plain'))
     if (isNaN(fromIdx) || fromIdx === toIdx) {
       setDragOverIdx(null)
@@ -402,18 +514,25 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
     const [moved] = updated.splice(fromIdx, 1)
     updated.splice(toIdx, 0, moved)
     setDragOverIdx(null)
-    saveItems(updated)
+    
+    saveItemsOnly(updated)
     addToast(t('soundMoved'), 'success')
+    
+    if (onPlaylistChange) {
+      setTimeout(() => {
+        onPlaylistChange({ ...playlist, items: updated })
+      }, 50)
+    }
   }
 
   const updateItem = (idx, changes) => {
     const updated = items.map((item, i) => i === idx ? { ...item, ...changes } : item)
-    saveItems(updated)
+    saveItemsOnly(updated)
   }
 
   const removeItem = (idx) => {
     const updated = items.filter((_, i) => i !== idx)
-    saveItems(updated)
+    saveItemsOnly(updated)
   }
 
   const addSounds = (soundIds) => {
@@ -422,7 +541,8 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
       soundId: id,
       delay: 0
     }))
-    saveItems([...items, ...newItems])
+    const updated = [...items, ...newItems]
+    saveItems(updated)
     setShowAddSound(false)
   }
 
@@ -458,6 +578,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
             fontSize: 12,
             padding: '4px 10px'
           }}
+          data-testid="loop-sequence-button"
         >
           <i className="ti ti-repeat" style={{ fontSize: 14 }} /> {t('loop')}
         </button>
@@ -471,6 +592,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
             fontSize: 12
           }} 
           onClick={() => setShowAddSound(true)}
+          data-testid="add-sounds-button"
         >
           <i className="ti ti-plus" style={{ fontSize: 14 }} /> {t('addSounds')}
         </button>
@@ -520,6 +642,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
             className="btn-primary btn-sm" 
             onClick={startSequence} 
             style={{ borderRadius: 'var(--radius-sm)', minHeight: 28, padding: '4px 12px', fontSize: 12 }}
+            data-testid="play-sequence-button"
           >
             <i className="ti ti-player-play-filled" style={{ fontSize: 14 }} /> {t('start_seq')}
           </button>
@@ -598,6 +721,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, idx)}
               className={`sequencer-item ${isActive ? 'active' : ''} ${isDragOver ? 'drag-over' : ''}`}
+              data-testid={`playlist-item-${item.id}`}
               style={{ 
                 borderRadius: 'var(--radius-md)',
                 transform: isDragOver ? 'scale(1.02)' : 'scale(1)',
@@ -677,7 +801,6 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, addTo
                 </div>
               </div>
 
-              {/* ✅ Bouton Supprimer un élément - sans confirmation supplémentaire */}
               <button
                 onClick={() => removeItem(idx)}
                 style={{
@@ -756,6 +879,7 @@ function AddSoundModal({ sounds, existingIds, onAdd, onClose, lang = 'fr' }) {
           className="input-lg" 
           style={{ marginBottom: 10, borderRadius: 'var(--radius-md)' }} 
           autoFocus 
+          data-testid="add-sounds-search"
         />
 
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>

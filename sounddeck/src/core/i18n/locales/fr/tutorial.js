@@ -73,13 +73,29 @@ export default {
   tutorialSequencerStep1Desc: 'Cliquez sur "Nouvelle playlist" pour créer une playlist. Donnez-lui un nom et commencez à y ajouter des sons.',
   tutorialSequencerStep1Hint: '💡 Astuce : Les playlists sont sauvegardées automatiquement.',
   
-  tutorialSequencerStep2Title: 'Ajouter des sons à la playlist',
-  tutorialSequencerStep2Desc: 'Cliquez sur "Ajouter des sons" pour sélectionner des sons depuis votre bibliothèque. Vous pouvez définir un délai entre chaque son.',
-  tutorialSequencerStep2Hint: '💡 Astuce : Glissez-déposez les sons pour les réorganiser dans la playlist.',
+  tutorialSequencerStep2Title: 'Sélectionner une playlist',
+  tutorialSequencerStep2Desc: 'Cliquez sur une playlist dans la sidebar pour l\'ouvrir. Vous verrez son contenu et pourrez y ajouter des sons.',
+  tutorialSequencerStep2Hint: '💡 Astuce : Vous pouvez avoir plusieurs playlists pour organiser vos sons par thème.',
   
-  tutorialSequencerStep3Title: 'Lancer la séquence',
-  tutorialSequencerStep3Desc: 'Appuyez sur le bouton "Play" pour lancer la séquence. Utilisez les touches ← et → pour naviguer manuellement.',
-  tutorialSequencerStep3Hint: '💡 Astuce : Activez la boucle pour répéter la playlist en continu.',
+  tutorialSequencerStep3Title: 'Ajouter des sons à la playlist',
+  tutorialSequencerStep3Desc: 'Cliquez sur "Ajouter des sons" pour sélectionner des sons depuis votre bibliothèque. Vous pouvez définir un délai entre chaque son.',
+  tutorialSequencerStep3Hint: '💡 Astuce : Glissez-déposez les sons pour les réorganiser dans la playlist.',
+  
+  tutorialSequencerStep4Title: 'Réorganiser les sons (Drag & Drop)',
+  tutorialSequencerStep4Desc: 'Glissez-déposez les sons dans la playlist pour les réorganiser. Utilisez la poignée ☰ pour déplacer un son.',
+  tutorialSequencerStep4Hint: '💡 Astuce : Le Drag & Drop fonctionne dans toute la playlist.',
+  
+  tutorialSequencerStep5Title: 'Activer la boucle',
+  tutorialSequencerStep5Desc: 'Cliquez sur le bouton "Loop" pour répéter la playlist en continu. La boucle est utile pour les sessions de jeu ou les streams.',
+  tutorialSequencerStep5Hint: '💡 Astuce : Le bouton devient vert lorsque la boucle est active.',
+  
+  tutorialSequencerStep6Title: 'Lancer la séquence',
+  tutorialSequencerStep6Desc: 'Appuyez sur le bouton "Play" pour lancer la séquence. Les sons seront joués dans l\'ordre avec les délais définis.',
+  tutorialSequencerStep6Hint: '💡 Astuce : Utilisez les touches ← et → pour naviguer manuellement.',
+  
+  tutorialSequencerStep7Title: 'Navigation avec les touches ← et →',
+  tutorialSequencerStep7Desc: 'Pendant la lecture, utilisez les touches fléchées ← et → pour passer au son précédent ou suivant. Pratique pour contrôler la séquence sans souris.',
+  tutorialSequencerStep7Hint: '💡 Astuce : Appuyez sur Espace pour mettre en pause/reprendre la séquence.',
 
   // ─── DISCOVER ────────────────────────────────────────────────────────
   tutorialDiscoverStep1Title: 'Explorer les catégories',

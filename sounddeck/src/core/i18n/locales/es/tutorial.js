@@ -73,13 +73,29 @@ export default {
   tutorialSequencerStep1Desc: 'Haz clic en "Nueva lista" para crear una lista. Ponle un nombre y comienza a agregar sonidos.',
   tutorialSequencerStep1Hint: '💡 Consejo: Las listas se guardan automáticamente.',
   
-  tutorialSequencerStep2Title: 'Agregar sonidos a la lista',
-  tutorialSequencerStep2Desc: 'Haz clic en "Agregar sonidos" para seleccionar sonidos de tu biblioteca. Puedes definir un retraso entre cada sonido.',
-  tutorialSequencerStep2Hint: '💡 Consejo: Arrastra los sonidos para reorganizarlos en la lista.',
+  tutorialSequencerStep2Title: 'Seleccionar una lista',
+  tutorialSequencerStep2Desc: 'Haz clic en una lista en la barra lateral para abrirla. Verás su contenido y podrás agregar sonidos.',
+  tutorialSequencerStep2Hint: '💡 Consejo: Puedes tener múltiples listas para organizar tus sonidos por tema.',
   
-  tutorialSequencerStep3Title: 'Ejecutar la secuencia',
-  tutorialSequencerStep3Desc: 'Presiona "Reproducir" para ejecutar la secuencia. Usa ← y → para navegar manualmente.',
-  tutorialSequencerStep3Hint: '💡 Consejo: Activa el bucle para repetir la lista continuamente.',
+  tutorialSequencerStep3Title: 'Agregar sonidos a la lista',
+  tutorialSequencerStep3Desc: 'Haz clic en "Agregar sonidos" para seleccionar sonidos de tu biblioteca. Puedes definir un retraso entre cada sonido.',
+  tutorialSequencerStep3Hint: '💡 Consejo: Arrastra los sonidos para reorganizarlos en la lista.',
+  
+  tutorialSequencerStep4Title: 'Reorganizar sonidos (Drag & Drop)',
+  tutorialSequencerStep4Desc: 'Arrastra y suelta los sonidos en la lista para reorganizarlos. Usa el mango ☰ para mover un sonido.',
+  tutorialSequencerStep4Hint: '💡 Consejo: El Drag & Drop funciona en toda la lista.',
+  
+  tutorialSequencerStep5Title: 'Activar el bucle',
+  tutorialSequencerStep5Desc: 'Haz clic en el botón "Loop" para repetir la lista continuamente. El bucle es útil para sesiones de juego o streams.',
+  tutorialSequencerStep5Hint: '💡 Consejo: El botón se vuelve verde cuando el bucle está activo.',
+  
+  tutorialSequencerStep6Title: 'Ejecutar la secuencia',
+  tutorialSequencerStep6Desc: 'Presiona "Reproducir" para ejecutar la secuencia. Los sonidos se reproducirán en orden con los retrasos definidos.',
+  tutorialSequencerStep6Hint: '💡 Consejo: Usa ← y → para navegar manualmente.',
+  
+  tutorialSequencerStep7Title: 'Navegar con las teclas ← y →',
+  tutorialSequencerStep7Desc: 'Durante la reproducción, usa las teclas ← y → para ir al sonido anterior o siguiente. Práctico para controlar la secuencia sin mouse.',
+  tutorialSequencerStep7Hint: '💡 Consejo: Presiona Espacio para pausar/reanudar la secuencia.',
 
   // ─── DISCOVER ────────────────────────────────────────────────────────
   tutorialDiscoverStep1Title: 'Explorar categorías',

@@ -73,13 +73,29 @@ export default {
   tutorialSequencerStep1Desc: 'Click "New Playlist" to create a playlist. Give it a name and start adding sounds.',
   tutorialSequencerStep1Hint: '💡 Tip: Playlists are automatically saved.',
   
-  tutorialSequencerStep2Title: 'Add sounds to the playlist',
-  tutorialSequencerStep2Desc: 'Click "Add Sounds" to select sounds from your library. You can set a delay between each sound.',
-  tutorialSequencerStep2Hint: '💡 Tip: Drag and drop sounds to reorder them in the playlist.',
+  tutorialSequencerStep2Title: 'Select a playlist',
+  tutorialSequencerStep2Desc: 'Click on a playlist in the sidebar to open it. You will see its content and can add sounds to it.',
+  tutorialSequencerStep2Hint: '💡 Tip: You can have multiple playlists to organize your sounds by theme.',
   
-  tutorialSequencerStep3Title: 'Run the sequence',
-  tutorialSequencerStep3Desc: 'Press the "Play" button to run the sequence. Use ← and → to navigate manually.',
-  tutorialSequencerStep3Hint: '💡 Tip: Enable loop to repeat the playlist continuously.',
+  tutorialSequencerStep3Title: 'Add sounds to the playlist',
+  tutorialSequencerStep3Desc: 'Click "Add Sounds" to select sounds from your library. You can set a delay between each sound.',
+  tutorialSequencerStep3Hint: '💡 Tip: Drag and drop sounds to reorder them in the playlist.',
+  
+  tutorialSequencerStep4Title: 'Reorder sounds (Drag & Drop)',
+  tutorialSequencerStep4Desc: 'Drag and drop sounds in the playlist to reorder them. Use the ☰ handle to move a sound.',
+  tutorialSequencerStep4Hint: '💡 Tip: Drag & Drop works throughout the playlist.',
+  
+  tutorialSequencerStep5Title: 'Enable loop',
+  tutorialSequencerStep5Desc: 'Click the "Loop" button to repeat the playlist continuously. Loop is useful for gaming sessions or streams.',
+  tutorialSequencerStep5Hint: '💡 Tip: The button turns green when loop is active.',
+  
+  tutorialSequencerStep6Title: 'Run the sequence',
+  tutorialSequencerStep6Desc: 'Press the "Play" button to run the sequence. Sounds will play in order with the defined delays.',
+  tutorialSequencerStep6Hint: '💡 Tip: Use ← and → keys to navigate manually.',
+  
+  tutorialSequencerStep7Title: 'Navigate with ← and → keys',
+  tutorialSequencerStep7Desc: 'During playback, use the ← and → arrow keys to go to the previous or next sound. Convenient for controlling the sequence without a mouse.',
+  tutorialSequencerStep7Hint: '💡 Tip: Press Space to pause/resume the sequence.',
 
   // ─── DISCOVER ────────────────────────────────────────────────────────
   tutorialDiscoverStep1Title: 'Explore categories',
