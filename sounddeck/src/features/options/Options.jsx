@@ -417,13 +417,7 @@ export default function Options({ store, addToast }) {
   }, [confirm, t, addToast])
 
   const handlePluginUninstall = useCallback(async (plugin) => {
-    const confirmed = await confirm({
-      title: t('pluginsUninstall'),
-      message: t('pluginsUninstallConfirm').replace('{name}', plugin.name),
-      type: 'danger'
-    })
-    if (!confirmed) return
-    
+    // La confirmation est déjà gérée par DeleteButton
     const result = await window.electronAPI.uninstallPlugin?.(plugin.id)
     if (result?.success) {
       addToast(t('pluginsUninstallSuccess').replace('{name}', plugin.name), 'info')
@@ -431,7 +425,25 @@ export default function Options({ store, addToast }) {
     } else {
       addToast(t('pluginsUninstallError') + ': ' + (result?.error || ''), 'error')
     }
-  }, [confirm, t, addToast, loadPlugins])
+  }, [t, addToast, loadPlugins])
+
+  // ✅ Fonction de suppression de sauvegarde
+  const handleDeleteBackup = useCallback(async (index) => {
+    try {
+      const { deleteBackup } = await import('../../shared/utils/backupManager.js')
+      const result = await deleteBackup(index)
+      if (result.success) {
+        addToast('✅ Sauvegarde supprimée', 'success')
+        // Recharger la liste des sauvegardes via BackupSettings
+        const event = new CustomEvent('refresh-backups')
+        window.dispatchEvent(event)
+      } else {
+        addToast('❌ Erreur: ' + result.error, 'error')
+      }
+    } catch (e) {
+      addToast('❌ Erreur: ' + e.message, 'error')
+    }
+  }, [addToast])
 
   // ─── RENDU ──────────────────────────────────────────────────────────────────
 
@@ -1425,15 +1437,17 @@ export default function Options({ store, addToast }) {
                     >
                       <i className="ti ti-refresh" />
                     </button>
-                    {/* ✅ Bouton Supprimer générique */}
+                    
+                    {/* ✅ Bouton Supprimer avec DeleteButton */}
                     <DeleteButton
                       onDelete={() => handlePluginUninstall(plugin)}
                       confirmTitle={t('pluginsUninstall') || 'Confirmer la suppression du plugin'}
                       confirmMessage={t('pluginsUninstallConfirm')?.replace('{name}', plugin.name) || `Voulez-vous vraiment supprimer le plugin "${plugin.name}" ?`}
                       itemName={plugin.name}
                       size="sm"
-                      variant="ghost"
+                      variant="ghost-danger"
                       icon="ti-trash"
+                      showLabel={false}
                     />
                   </div>
                 </div>
@@ -1550,16 +1564,15 @@ export default function Options({ store, addToast }) {
               >
                 <i className="ti ti-file-text" /> {t('exportLogs')}
               </button>
-              {/* ✅ Bouton Supprimer générique */}
               <DeleteButton
                 onDelete={handleClearLogs}
                 confirmTitle={t('clearLogs') || 'Confirmer la suppression des logs'}
                 confirmMessage={t('clearLogsConfirm') || 'Voulez-vous vraiment supprimer tous les logs d\'erreur ?'}
                 size="sm"
-                variant="danger"
+                variant="ghost-danger"
                 icon="ti-trash"
-                label={t('clearLogs') || 'Effacer'}
                 showLabel={true}
+                deleteLabel={t('clearLogs') || 'Effacer'}
               />
             </div>
           </OptionRow>
@@ -1604,9 +1617,6 @@ export default function Options({ store, addToast }) {
           </OptionRow>
         </Section>
 
-        {/* ============================ */}
-        {/* SECTION 9 : SAUVEGARDE */}
-        {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['backup'] = el}
           id="backup"
@@ -1783,7 +1793,7 @@ export default function Options({ store, addToast }) {
                 <i className="ti ti-package-export" /> {t('exportProfile')}
               </button>
               {!p.isDefault && (
-                // ✅ Bouton Supprimer générique
+                /* ✅ Bouton Supprimer avec DeleteButton */
                 <DeleteButton
                   onDelete={async () => {
                     await store.deleteProfile(p.id)
@@ -1793,8 +1803,9 @@ export default function Options({ store, addToast }) {
                   confirmMessage={t('confirmDeleteProfileMessage') || 'Voulez-vous vraiment supprimer ce profil ?'}
                   itemName={p.name}
                   size="sm"
-                  variant="ghost"
+                  variant="ghost-danger"
                   icon="ti-trash"
+                  showLabel={false}
                 />
               )}
             </div>

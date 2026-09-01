@@ -1,3 +1,4 @@
+// src/shared/utils/backupManager.js
 // Gestionnaire de sauvegarde automatique
 
 let backupInterval = null
@@ -219,6 +220,31 @@ export async function restoreBackup(store, index) {
 }
 
 /**
+ * Supprime une sauvegarde spécifique
+ */
+export function deleteBackup(index) {
+  console.log('🗑️ [backupManager] deleteBackup appelé pour l\'index:', index)
+  try {
+    const backups = getBackupList()
+    console.log('📋 [backupManager] Sauvegardes avant suppression:', backups.length)
+    
+    if (index < 0 || index >= backups.length) {
+      console.error('❌ [backupManager] Index invalide:', index)
+      return { success: false, error: 'Index invalide' }
+    }
+    
+    backups.splice(index, 1)
+    localStorage.setItem('sounddeck-backups', JSON.stringify(backups))
+    console.log('📋 [backupManager] Sauvegardes après suppression:', backups.length)
+    
+    return { success: true }
+  } catch (e) {
+    console.error('❌ [backupManager] Erreur deleteBackup:', e)
+    return { success: false, error: e.message }
+  }
+}
+
+/**
  * Vérifie et restaure automatiquement la dernière sauvegarde
  */
 async function checkAndRestoreBackup(store) {
@@ -284,6 +310,7 @@ export default {
   getBackupList,
   getBackup,
   restoreBackup,
+  deleteBackup,
   exportBackups,
   importBackups
 }

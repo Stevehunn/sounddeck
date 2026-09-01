@@ -26,9 +26,12 @@ const DeleteButton = ({
   const [isHovering, setIsHovering] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
 
+  console.log('🔘 [DeleteButton] Rendu - variant:', variant, 'itemName:', itemName)
+
   const displayLabel = deleteLabel || label || t('delete') || 'Supprimer'
 
   const handleClick = async (e) => {
+    console.log('🖱️ [DeleteButton] handleClick - itemName:', itemName)
     e?.stopPropagation?.()
     
     setIsConfirming(true)
@@ -50,6 +53,8 @@ const DeleteButton = ({
         }
       }
       
+      console.log('📋 [DeleteButton] Confirmation - title:', confirmTitle, 'message:', finalMessage)
+      
       const confirmed = await confirm({
         title: confirmTitle,
         message: finalMessage,
@@ -58,11 +63,16 @@ const DeleteButton = ({
         cancelText: t('cancel') || 'Annuler',
       })
       
+      console.log('📋 [DeleteButton] Résultat confirmation:', confirmed)
+      
       if (confirmed) {
+        console.log('✅ [DeleteButton] Exécution de onDelete')
         onDelete?.()
+      } else {
+        console.log('❌ [DeleteButton] Annulé par l\'utilisateur')
       }
     } catch (err) {
-      // Ignorer les erreurs
+      console.error('❌ [DeleteButton] Erreur:', err)
     } finally {
       setIsConfirming(false)
       if (onConfirmEnd) {
@@ -100,11 +110,9 @@ const DeleteButton = ({
             ? '0 4px 15px rgba(224, 82, 82, 0.4)' 
             : '0 2px 8px rgba(224, 82, 82, 0.2)',
         }
-      // ✅ NOUVEAU VARIANT : ghost-danger (comme dans Options.jsx)
       case 'ghost-danger':
         return {
           backgroundColor: isHovering ? 'rgba(224, 82, 82, 0.1)' : 'transparent',
-          // ✅ Icône plus visible : text-secondary au lieu de text-tertiary
           color: isHovering ? 'var(--danger)' : 'var(--text-secondary)',
           borderWidth: '1px',
           borderStyle: 'solid',

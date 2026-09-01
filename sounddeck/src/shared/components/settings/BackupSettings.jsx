@@ -1,14 +1,14 @@
 // src/shared/components/settings/BackupSettings.jsx
 import { useState, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
-import { DeleteButton } from '@shared/components/ui' // ✅ Ajout
+import { DeleteButton } from '@shared/components/ui'
 import {
   getBackupList,
   restoreBackup,
   exportBackups,
   importBackups,
   performBackup,
-  getBackup
+  deleteBackup
 } from '../../utils/backupManager.js'
 import useConfirm from '../../hooks/useConfirm.jsx'
 
@@ -18,73 +18,97 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
   const [backups, setBackups] = useState([])
   const [isLoading, setIsLoading] = useState(false)
 
+  const loadBackups = () => {
+    console.log('🔄 [BackupSettings] loadBackups appelé')
+    try {
+      const list = getBackupList()
+      console.log('📋 [BackupSettings] Liste des sauvegardes:', list.length)
+      setBackups(list)
+    } catch (e) {
+      console.error('❌ [BackupSettings] Erreur loadBackups:', e)
+      setBackups([])
+    }
+  }
+
   useEffect(() => {
     loadBackups()
+    
+    const handleRefresh = () => {
+      console.log('🔄 [BackupSettings] Événement refresh-backups reçu')
+      loadBackups()
+    }
+    window.addEventListener('refresh-backups', handleRefresh)
+    return () => window.removeEventListener('refresh-backups', handleRefresh)
   }, [])
-
-  const loadBackups = () => {
-    const list = getBackupList()
-    setBackups(list)
-  }
 
   const handleBackupNow = async () => {
     setIsLoading(true)
-    const result = await performBackup(store)
-    setIsLoading(false)
-    
-    if (result.success) {
-      addToast('✅ Sauvegarde effectuée', 'success')
-      loadBackups()
-    } else {
-      addToast('❌ Erreur sauvegarde: ' + result.error, 'error')
+    try {
+      const result = await performBackup(store)
+      if (result.success) {
+        addToast('✅ Sauvegarde effectuée', 'success')
+        loadBackups()
+      } else {
+        addToast('❌ Erreur sauvegarde: ' + (result.error || 'Erreur inconnue'), 'error')
+      }
+    } catch (e) {
+      console.error('❌ [BackupSettings] Erreur backup:', e)
+      addToast('❌ Erreur: ' + e.message, 'error')
     }
+    setIsLoading(false)
   }
 
   const handleRestore = async (index) => {
     const confirmed = await confirm({
-      title: t('restoreBackup'),
-      message: t('restoreBackupConfirm'),
+      title: t('restoreBackup') || 'Restaurer la sauvegarde',
+      message: t('restoreBackupConfirm') || 'Voulez-vous vraiment restaurer cette sauvegarde ?',
       type: 'warning'
     })
     if (!confirmed) return
     
     setIsLoading(true)
-    const result = await restoreBackup(store, index)
-    setIsLoading(false)
-    
-    if (result.success) {
-      addToast('✅ Sauvegarde restaurée', 'success')
-      window.location.reload()
-    } else {
-      addToast('❌ Erreur restauration: ' + result.error, 'error')
+    try {
+      const result = await restoreBackup(store, index)
+      if (result.success) {
+        addToast('✅ Sauvegarde restaurée', 'success')
+        setTimeout(() => window.location.reload(), 500)
+      } else {
+        addToast('❌ Erreur restauration: ' + (result.error || 'Erreur inconnue'), 'error')
+      }
+    } catch (e) {
+      console.error('❌ [BackupSettings] Erreur restore:', e)
+      addToast('❌ Erreur: ' + e.message, 'error')
     }
+    setIsLoading(false)
   }
 
   const handleDelete = async (index) => {
-    const confirmed = await confirm({
-      title: t('deleteBackup'),
-      message: t('deleteBackupConfirm'),
-      type: 'danger'
-    })
-    if (!confirmed) return
-    
+    console.log('🗑️ [BackupSettings] handleDelete appelé pour l\'index:', index)
     try {
-      const { deleteBackup } = await import('../../utils/backupManager.js')
       const result = await deleteBackup(index)
+      console.log('📤 [BackupSettings] Résultat deleteBackup:', result)
       if (result.success) {
         addToast('✅ Sauvegarde supprimée', 'success')
         loadBackups()
+        window.dispatchEvent(new CustomEvent('refresh-backups'))
+        console.log('🔄 [BackupSettings] Liste rafraîchie après suppression')
       } else {
-        addToast('❌ Erreur: ' + result.error, 'error')
+        addToast('❌ Erreur: ' + (result.error || 'Erreur inconnue'), 'error')
       }
     } catch (e) {
+      console.error('❌ [BackupSettings] Erreur delete:', e)
       addToast('❌ Erreur: ' + e.message, 'error')
     }
   }
 
   const handleExport = () => {
-    exportBackups()
-    addToast('✅ Sauvegardes exportées', 'success')
+    try {
+      exportBackups()
+      addToast('✅ Sauvegardes exportées', 'success')
+    } catch (e) {
+      console.error('❌ [BackupSettings] Erreur export:', e)
+      addToast('❌ Erreur: ' + e.message, 'error')
+    }
   }
 
   const handleImport = () => {
@@ -100,9 +124,12 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
         if (result.success) {
           addToast(`✅ ${result.count} sauvegardes importées`, 'success')
           loadBackups()
+        } else {
+          addToast('❌ Erreur import: ' + (result.error || 'Erreur inconnue'), 'error')
         }
       } catch (err) {
-        addToast('❌ Erreur import: ' + err.message, 'error')
+        console.error('❌ [BackupSettings] Erreur import:', err)
+        addToast('❌ Erreur: ' + err.message, 'error')
       }
     }
     input.click()
@@ -224,15 +251,15 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
                 >
                   <i className="ti ti-refresh" /> {t('restore')}
                 </button>
-                {/* ✅ Bouton Supprimer générique */}
                 <DeleteButton
                   onDelete={() => handleDelete(index)}
                   confirmTitle={t('deleteBackup') || 'Confirmer la suppression de la sauvegarde'}
                   confirmMessage={t('deleteBackupConfirm') || 'Voulez-vous vraiment supprimer cette sauvegarde ?'}
                   itemName={formatDate(backup.timestamp)}
                   size="sm"
-                  variant="ghost"
+                  variant="ghost-danger"
                   icon="ti-trash"
+                  showLabel={false}
                 />
               </div>
             </div>
