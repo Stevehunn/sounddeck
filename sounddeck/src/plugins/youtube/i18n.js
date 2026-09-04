@@ -1,8 +1,9 @@
+// src/plugins/youtube/i18n.js
 export default {
   fr: {
     // ─── PAGE PRINCIPALE ──────────────────────────────────────────────────────
     youtubeTitle: 'Import YouTube',
-    youtubeSub: 'Extraire l\'audio depuis une vidéo YouTube',
+    youtubeSub: "Extraire l'audio depuis une vidéo YouTube",
     pasteUrl: 'Collez le lien YouTube',
     ytUrlPlaceholder: 'https://www.youtube.com/watch?v=...',
     ytUrlNote: 'Fonctionne avec YouTube, YouTube Music, et la plupart des sites vidéo supportés par yt-dlp.',
@@ -16,13 +17,13 @@ export default {
     ytPreciseStart: 'Début précis (secondes)',
     ytPreciseEnd: 'Fin précise (secondes)',
     ytBack: 'Retour',
-    downloadAudio: 'Télécharger l\'audio',
+    downloadAudio: "Télécharger l'audio",
     ytDownloading: 'Téléchargement...',
     ytAudioDownloading: 'Téléchargement audio en cours...',
     ytAudioReady: 'Audio téléchargé ! Configurez le son.',
     ytDownloadError: 'Erreur téléchargement :',
     configSound: 'Configurer le son',
-    ytSaveSubtitle: 'Dernière étape avant l\'ajout à votre bibliothèque',
+    ytSaveSubtitle: "Dernière étape avant l'ajout à votre bibliothèque",
     ytSuccessTitle: 'Audio téléchargé avec succès',
     ytSuccessSource: 'Source :',
     ytSoundNamePlaceholder: 'Nom du son',
@@ -34,6 +35,33 @@ export default {
     ytImageAdded: '✅ Image ajoutée',
     ytImageChange: 'Changer',
     ytImageAdd: 'Ajouter une image',
+    unknownError: 'Erreur inconnue',
+    unknownTitle: 'Titre inconnu',
+    unknownArtist: 'Artiste inconnu',
+    videoThumbnail: 'Vignette de la vidéo',
+
+    // ─── PROGRESSION ───────────────────────────────────────────────────────────
+    extractingAudio: 'Extraction de l\'audio...',
+    convertingToMp3: 'Conversion en MP3...',
+    finalizing: 'Finalisation...',
+    downloadComplete: 'Téléchargement terminé',
+    downloadInProgress: 'Téléchargement en cours',
+    preparingAudio: 'Préparation de l\'audio...',
+    pleaseWait: 'Veuillez patienter...',
+    processing: 'Traitement en cours...',
+    saving: 'Sauvegarde en cours...',
+    saveComplete: 'Sauvegarde terminée !',
+
+    // ─── IMAGE ─────────────────────────────────────────────────────────────────
+    image: 'Image (optionnel)',
+    customImage: 'Image personnalisée',
+    noImageSelected: 'Aucune image sélectionnée',
+    youtubeThumbnail: 'Miniature YouTube',
+    useThumbnail: 'Utiliser la miniature',
+    thumbnailActive: 'Miniature activée ✅',
+    delete: 'Supprimer',
+    deleteImageConfirm: 'Supprimer l\'image',
+    deleteImageMessage: 'Voulez-vous vraiment supprimer l\'image sélectionnée ?',
 
     // ─── YT-DLP ──────────────────────────────────────────────────────────────
     ytdlpRequired: 'yt-dlp requis',
@@ -83,10 +111,9 @@ export default {
     soundName: 'Nom du son',
     start: 'Début',
     end: 'Fin',
-    image: 'Image (optionnel)',
     preview: 'Prévisualiser',
-    stop: ' Arrêter',
-    listen: ' Écouter',
+    stop: 'Arrêter',
+    listen: 'Écouter',
     cancel: 'Annuler',
     confirm: 'Confirmer',
     add: 'Ajouter',
@@ -94,15 +121,35 @@ export default {
     error: 'Erreur',
     success: 'Succès',
     loading: 'Chargement...',
+    upload: 'Télécharger',
+    editorNameRequired: 'Veuillez entrer un nom pour le son',
 
     // ─── TUTORIEL YOUTUBE ──────────────────────────────────────────────────
     tutorialYoutubeStep1Title: 'Coller un lien YouTube',
-    tutorialYoutubeStep1Desc: 'Collez l\'URL d\'une vidéo YouTube pour importer son audio.',
-    tutorialYoutubeStep2Title: 'Sélectionner une portion',
-    tutorialYoutubeStep2Desc: 'Choisissez la portion de la vidéo à importer.',
-    tutorialYoutubeStep3Title: 'Télécharger et configurer',
-    tutorialYoutubeStep3Desc: 'Téléchargez l\'audio et configurez le nom, l\'image et les profils.',
+    tutorialYoutubeStep1Desc: 'Collez l\'URL d\'une vidéo YouTube pour importer son audio dans SoundDeck.',
+    tutorialYoutubeStep1Hint: '💡 Astuce : Fonctionne aussi avec YouTube Music, Spotify et SoundCloud.',
+    
+    tutorialYoutubeStep2Title: 'Chargement des informations',
+    tutorialYoutubeStep2Desc: 'SoundDeck récupère automatiquement les informations de la vidéo (titre, durée, vignette).',
+    tutorialYoutubeStep2Hint: '💡 Astuce : Le chargement peut prendre quelques secondes selon la connexion.',
+    
+    tutorialYoutubeStep3Title: 'Sélectionner une portion',
+    tutorialYoutubeStep3Desc: 'Choisissez la portion de la vidéo à importer en ajustant les curseurs de début et de fin.',
+    tutorialYoutubeStep3Hint: '💡 Astuce : Vous pouvez écouter la sélection avant de télécharger.',
+    
+    tutorialYoutubeStep4Title: 'Télécharger l\'audio',
+    tutorialYoutubeStep4Desc: 'Cliquez sur "Télécharger l\'audio" pour extraire la portion sélectionnée.',
+    tutorialYoutubeStep4Hint: '💡 Astuce : Le téléchargement peut prendre quelques secondes selon la durée de la vidéo.',
+    
+    tutorialYoutubeStep5Title: 'Configurer le son',
+    tutorialYoutubeStep5Desc: 'Après le téléchargement, personnalisez le nom, l\'image et les profils du son.',
+    tutorialYoutubeStep5Hint: '💡 Astuce : Vous pouvez ajouter une image personnalisée ou laisser l\'emoji par défaut.',
+    
+    tutorialYoutubeStep6Title: 'Ajouter à la bibliothèque',
+    tutorialYoutubeStep6Desc: 'Cliquez sur "Ajouter à la bibliothèque" pour enregistrer le son dans vos profils.',
+    tutorialYoutubeStep6Hint: '💡 Astuce : Le son sera disponible dans la page d\'accueil et dans les profils sélectionnés.',
   },
+
   en: {
     // ─── MAIN PAGE ──────────────────────────────────────────────────────────
     youtubeTitle: 'YouTube Import',
@@ -138,6 +185,33 @@ export default {
     ytImageAdded: '✅ Image added',
     ytImageChange: 'Change',
     ytImageAdd: 'Add image',
+    unknownError: 'Unknown error',
+    unknownTitle: 'Unknown title',
+    unknownArtist: 'Unknown artist',
+    videoThumbnail: 'Video thumbnail',
+
+    // ─── PROGRESS ────────────────────────────────────────────────────────────
+    extractingAudio: 'Extracting audio...',
+    convertingToMp3: 'Converting to MP3...',
+    finalizing: 'Finalizing...',
+    downloadComplete: 'Download complete',
+    downloadInProgress: 'Download in progress',
+    preparingAudio: 'Preparing audio...',
+    pleaseWait: 'Please wait...',
+    processing: 'Processing...',
+    saving: 'Saving...',
+    saveComplete: 'Save complete!',
+
+    // ─── IMAGE ─────────────────────────────────────────────────────────────────
+    image: 'Image (optional)',
+    customImage: 'Custom image',
+    noImageSelected: 'No image selected',
+    youtubeThumbnail: 'YouTube thumbnail',
+    useThumbnail: 'Use thumbnail',
+    thumbnailActive: 'Thumbnail active ✅',
+    delete: 'Delete',
+    deleteImageConfirm: 'Delete image',
+    deleteImageMessage: 'Are you sure you want to delete the selected image?',
 
     // ─── YT-DLP ──────────────────────────────────────────────────────────────
     ytdlpRequired: 'yt-dlp required',
@@ -187,10 +261,9 @@ export default {
     soundName: 'Sound name',
     start: 'Start',
     end: 'End',
-    image: 'Image (optional)',
     preview: 'Preview',
-    stop: ' Stop',
-    listen: ' Listen',
+    stop: 'Stop',
+    listen: 'Listen',
     cancel: 'Cancel',
     confirm: 'Confirm',
     add: 'Add',
@@ -198,15 +271,35 @@ export default {
     error: 'Error',
     success: 'Success',
     loading: 'Loading...',
+    upload: 'Upload',
+    editorNameRequired: 'Please enter a name for the sound',
 
     // ─── YOUTUBE TUTORIAL ──────────────────────────────────────────────────
     tutorialYoutubeStep1Title: 'Paste a YouTube link',
-    tutorialYoutubeStep1Desc: 'Paste the URL of a YouTube video to import its audio.',
-    tutorialYoutubeStep2Title: 'Select a portion',
-    tutorialYoutubeStep2Desc: 'Choose the portion of the video to import.',
-    tutorialYoutubeStep3Title: 'Download and configure',
-    tutorialYoutubeStep3Desc: 'Download the audio and configure name, image and profiles.',
+    tutorialYoutubeStep1Desc: 'Paste the URL of a YouTube video to import its audio into SoundDeck.',
+    tutorialYoutubeStep1Hint: '💡 Tip: Also works with YouTube Music, Spotify and SoundCloud.',
+    
+    tutorialYoutubeStep2Title: 'Loading information',
+    tutorialYoutubeStep2Desc: 'SoundDeck automatically retrieves video information (title, duration, thumbnail).',
+    tutorialYoutubeStep2Hint: '💡 Tip: Loading may take a few seconds depending on your connection.',
+    
+    tutorialYoutubeStep3Title: 'Select a portion',
+    tutorialYoutubeStep3Desc: 'Choose the portion of the video to import by adjusting the start and end sliders.',
+    tutorialYoutubeStep3Hint: '💡 Tip: You can listen to the selection before downloading.',
+    
+    tutorialYoutubeStep4Title: 'Download audio',
+    tutorialYoutubeStep4Desc: 'Click "Download audio" to extract the selected portion.',
+    tutorialYoutubeStep4Hint: '💡 Tip: Download may take a few seconds depending on the video length.',
+    
+    tutorialYoutubeStep5Title: 'Configure the sound',
+    tutorialYoutubeStep5Desc: 'After downloading, customize the name, image and profiles of the sound.',
+    tutorialYoutubeStep5Hint: '💡 Tip: You can add a custom image or keep the default emoji.',
+    
+    tutorialYoutubeStep6Title: 'Add to library',
+    tutorialYoutubeStep6Desc: 'Click "Add to library" to save the sound to your profiles.',
+    tutorialYoutubeStep6Hint: '💡 Tip: The sound will be available on the home page and in selected profiles.',
   },
+
   es: {
     // ─── PÁGINA PRINCIPAL ──────────────────────────────────────────────────
     youtubeTitle: 'Importar YouTube',
@@ -242,6 +335,33 @@ export default {
     ytImageAdded: '✅ Imagen añadida',
     ytImageChange: 'Cambiar',
     ytImageAdd: 'Añadir imagen',
+    unknownError: 'Error desconocido',
+    unknownTitle: 'Título desconocido',
+    unknownArtist: 'Artista desconocido',
+    videoThumbnail: 'Miniatura del video',
+
+    // ─── PROGRESIÓN ──────────────────────────────────────────────────────────
+    extractingAudio: 'Extrayendo audio...',
+    convertingToMp3: 'Convirtiendo a MP3...',
+    finalizing: 'Finalizando...',
+    downloadComplete: 'Descarga completada',
+    downloadInProgress: 'Descarga en curso',
+    preparingAudio: 'Preparando audio...',
+    pleaseWait: 'Por favor espera...',
+    processing: 'Procesando...',
+    saving: 'Guardando...',
+    saveComplete: '¡Guardado completado!',
+
+    // ─── IMAGEN ──────────────────────────────────────────────────────────────
+    image: 'Imagen (opcional)',
+    customImage: 'Imagen personalizada',
+    noImageSelected: 'Ninguna imagen seleccionada',
+    youtubeThumbnail: 'Miniatura de YouTube',
+    useThumbnail: 'Usar miniatura',
+    thumbnailActive: 'Miniatura activada ✅',
+    delete: 'Eliminar',
+    deleteImageConfirm: 'Eliminar imagen',
+    deleteImageMessage: '¿Estás seguro de que quieres eliminar la imagen seleccionada?',
 
     // ─── YT-DLP ──────────────────────────────────────────────────────────────
     ytdlpRequired: 'yt-dlp requerido',
@@ -291,10 +411,9 @@ export default {
     soundName: 'Nombre del sonido',
     start: 'Inicio',
     end: 'Fin',
-    image: 'Imagen (opcional)',
     preview: 'Previsualizar',
-    stop: ' Detener',
-    listen: ' Escuchar',
+    stop: 'Detener',
+    listen: 'Escuchar',
     cancel: 'Cancelar',
     confirm: 'Confirmar',
     add: 'Añadir',
@@ -302,13 +421,32 @@ export default {
     error: 'Error',
     success: 'Éxito',
     loading: 'Cargando...',
+    upload: 'Subir',
+    editorNameRequired: 'Por favor ingresa un nombre para el sonido',
 
     // ─── TUTORIAL YOUTUBE ──────────────────────────────────────────────────
     tutorialYoutubeStep1Title: 'Pegar un enlace de YouTube',
-    tutorialYoutubeStep1Desc: 'Pega la URL de un video de YouTube para importar su audio.',
-    tutorialYoutubeStep2Title: 'Seleccionar una porción',
-    tutorialYoutubeStep2Desc: 'Elige la porción del video para importar.',
-    tutorialYoutubeStep3Title: 'Descargar y configurar',
-    tutorialYoutubeStep3Desc: 'Descarga el audio y configura nombre, imagen y perfiles.',
+    tutorialYoutubeStep1Desc: 'Pega la URL de un video de YouTube para importar su audio a SoundDeck.',
+    tutorialYoutubeStep1Hint: '💡 Consejo: También funciona con YouTube Music, Spotify y SoundCloud.',
+    
+    tutorialYoutubeStep2Title: 'Cargando información',
+    tutorialYoutubeStep2Desc: 'SoundDeck recupera automáticamente la información del video (título, duración, miniatura).',
+    tutorialYoutubeStep2Hint: '💡 Consejo: La carga puede tardar unos segundos dependiendo de tu conexión.',
+    
+    tutorialYoutubeStep3Title: 'Seleccionar una porción',
+    tutorialYoutubeStep3Desc: 'Elige la porción del video para importar ajustando los controles de inicio y fin.',
+    tutorialYoutubeStep3Hint: '💡 Consejo: Puedes escuchar la selección antes de descargar.',
+    
+    tutorialYoutubeStep4Title: 'Descargar audio',
+    tutorialYoutubeStep4Desc: 'Haz clic en "Descargar audio" para extraer la porción seleccionada.',
+    tutorialYoutubeStep4Hint: '💡 Consejo: La descarga puede tardar unos segundos según la duración del video.',
+    
+    tutorialYoutubeStep5Title: 'Configurar el sonido',
+    tutorialYoutubeStep5Desc: 'Después de descargar, personaliza el nombre, la imagen y los perfiles del sonido.',
+    tutorialYoutubeStep5Hint: '💡 Consejo: Puedes añadir una imagen personalizada o mantener el emoji por defecto.',
+    
+    tutorialYoutubeStep6Title: 'Añadir a la biblioteca',
+    tutorialYoutubeStep6Desc: 'Haz clic en "Añadir a la biblioteca" para guardar el sonido en tus perfiles.',
+    tutorialYoutubeStep6Hint: '💡 Consejo: El sonido estará disponible en la página de inicio y en los perfiles seleccionados.',
   }
 }

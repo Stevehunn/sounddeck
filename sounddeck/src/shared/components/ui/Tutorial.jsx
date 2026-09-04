@@ -14,7 +14,8 @@ import { TUTORIAL_STEPS as PresentationSteps } from '@features/presentation/tuto
 
 // ✅ Importer les tutoriels des plugins
 import { TUTORIAL_STEPS as DiscoverSteps } from '@plugins/myinstants/tutorialSteps';
-import { TUTORIAL_STEPS as YoutubeSteps } from '@plugins/youtube/tutorialSteps';
+// ❌ SUPPRIMER L'IMPORT YOUTUBE
+// import { TUTORIAL_STEPS as YoutubeSteps } from '@plugins/youtube/tutorialSteps';
 
 const TUTORIALS = {
   home: HomeSteps,
@@ -25,7 +26,8 @@ const TUTORIALS = {
   stats: StatsSteps,
   presentation: PresentationSteps,
   discover: DiscoverSteps,
-  youtube: YoutubeSteps,
+  // ❌ SUPPRIMER LA RÉFÉRENCE YOUTUBE
+  // youtube: YoutubeSteps,
   guide: null,
 };
 

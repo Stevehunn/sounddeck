@@ -1,6 +1,6 @@
+// src/shared/components/ui/Toast.jsx
 import { useState, useEffect } from 'react'
 
-// Compteur global pour générer des IDs uniques
 let toastCounter = 0
 
 export default function Toast({ toasts }) {
@@ -14,7 +14,8 @@ export default function Toast({ toasts }) {
             t.type === 'success' ? 'ti-check' :
             t.type === 'error' ? 'ti-x' : 'ti-info-circle'
           }`} />
-          {t.message}
+          {/* ✅ Support pour les éléments React */}
+          {typeof t.message === 'string' ? t.message : t.message}
         </div>
       ))}
     </div>
