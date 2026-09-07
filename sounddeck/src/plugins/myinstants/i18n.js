@@ -4,6 +4,7 @@
  */
 export default {
   fr: {
+    // ─── PAGE PRINCIPALE ──────────────────────────────────────────────────────
     myinstantsTitle: 'Découverte',
     myinstantsSub: 'Sons disponibles',
     myinstantsSearch: 'Rechercher ',
@@ -22,7 +23,7 @@ export default {
     myinstantsCategories: 'Catégories',
     myinstantsAllCategories: 'Toutes les catégories',
     myinstantsCategory: 'Catégorie',
-    myinstantsRefresh: ' Actualiser',
+    myinstantsRefresh: 'Actualiser',
     myinstantsClearSearch: 'Effacer la recherche',
     myinstantsSoundsAvailable: 'sons disponibles',
     myinstantsResultsFor: 'Résultats pour',
@@ -35,7 +36,7 @@ export default {
     myinstantsShowMore: 'Voir toutes les catégories',
     myinstantsShowLess: 'Voir moins',
 
-    // Catégories
+    // ─── CATÉGORIES ──────────────────────────────────────────────────────────
     category_trending: 'Tendances',
     category_best: 'Meilleurs',
     category_popular: 'Populaires',
@@ -48,7 +49,7 @@ export default {
     category_streaming: 'Streaming',
     category_gaming: 'Gaming',
     category_anime: 'Anime',
-    category_anime_sounds: 'Sons d\'anime',
+    category_anime_sounds: "Sons d'anime",
     category_naruto: 'Naruto',
     category_one_piece: 'One Piece',
     category_dragon_ball: 'Dragon Ball',
@@ -77,7 +78,8 @@ export default {
     category_impacts: 'Impacts',
     category_transitions: 'Transitions',
     category_new: 'Nouveautés',
-    // Éditeur de catégories
+
+    // ─── ÉDITEUR DE CATÉGORIES ──────────────────────────────────────────────
     myinstantsCategoryEditor: 'Personnaliser les catégories',
     myinstantsCategoryEditorDesc: 'Choisissez les catégories affichées par défaut',
     myinstantsCategoryEditorSave: 'Sauvegarder',
@@ -86,30 +88,52 @@ export default {
     myinstantsCategoryEditorDeselectAll: 'Tout désélectionner',
     myinstantsCategoryEditorSaved: '✅ Catégories sauvegardées !',
     myinstantsCategoryEditorResetConfirm: 'Voulez-vous vraiment réinitialiser les catégories par défaut ?',
-    myinstantsSearch: 'Rechercher',
-    myinstantsClearSearch: 'Effacer la recherche',
-    myinstantsNoCategories: 'Aucune catégorie sélectionnée',
     myinstantsCategoryEditorCancel: 'Annuler',
+    myinstantsNoCategories: 'Aucune catégorie sélectionnée',
+
+    // ─── ACTIONS ─────────────────────────────────────────────────────────────
     myinstantsCancel: 'Annuler',
-    myinstantsAllCategories: 'Toutes les catégories',
-    myinstantsStop: 'Arrêter',
-    myinstantsPlaying: 'Lecture en cours...',
-    myinstantsSelectCategory: 'Sélectionnez une catégorie ou faites une recherche',
-    myinstantsTryDifferentSearch: 'Essayez une autre recherche',
-    myinstantsPreloading: 'Préchargement des catégories...',
-    myinstantsCategoriesLoaded: 'Catégories chargées',
-    myinstantsAllCategoriesLoaded: 'Toutes les catégories sont préchargées !',
-    myinstantsSoundsAvailable: 'sons disponibles',
-    myinstantsResultsFor: 'Résultats pour',
-    myinstantsShowMore: 'Voir toutes les catégories',
-    myinstantsShowLess: 'Voir moins',
-    myinstantsPreviewError: 'Impossible de prévisualiser ce son',
-    myinstantsAddToLibrary: 'Ajouter à la bibliothèque',
-    myinstantsAdded: 'Son ajouté à la bibliothèque !',
-    myinstantsDownloading: 'Téléchargement...',
-    myinstantsAlreadyAdded: 'Déjà ajouté',
+    myinstantsSearch: 'Rechercher',
+    myinstantsLoadingMore: '📥 Chargement de plus de sons...',
+    myinstantsSelectAtLeastOneCategory: 'Sélectionnez au moins une catégorie',
+    selected: 'sélectionnées',
+
+    // ─── TUTORIEL DÉCOUVERTE ──────────────────────────────────────────────────
+    tutorialDiscoverStep1Title: 'Bienvenue dans la découverte',
+    tutorialDiscoverStep1Desc: 'Explorez une vaste bibliothèque de sons populaires depuis MyInstants.',
+    tutorialDiscoverStep1Hint: '💡 Astuce : Utilisez la barre de recherche pour trouver des sons spécifiques.',
+    
+    tutorialDiscoverStep2Title: 'Rechercher des sons',
+    tutorialDiscoverStep2Desc: 'Tapez un mot-clé pour trouver des sons correspondants sur MyInstants.',
+    tutorialDiscoverStep2Hint: '💡 Astuce : Essayez des mots-clés comme "laugh", "applause" ou "bruh".',
+    
+    tutorialDiscoverStep3Title: 'Parcourir les catégories',
+    tutorialDiscoverStep3Desc: 'Naviguez à travers les différentes catégories pour découvrir de nouveaux sons.',
+    tutorialDiscoverStep3Hint: '💡 Astuce : Les catégories vous aident à trouver des sons par thème.',
+    
+    tutorialDiscoverStep4Title: 'Personnaliser vos catégories',
+    tutorialDiscoverStep4Desc: 'Cliquez sur le bouton "Personnaliser les catégories" pour choisir les catégories que vous voulez voir.',
+    tutorialDiscoverStep4Hint: '💡 Astuce : Vous pouvez choisir les catégories qui vous intéressent le plus pour une navigation personnalisée.',
+    
+    tutorialDiscoverStep5Title: 'Choisir vos catégories',
+    tutorialDiscoverStep5Desc: 'Sélectionnez ou désélectionnez les catégories que vous souhaitez afficher dans la page Découverte.',
+    tutorialDiscoverStep5Hint: '💡 Astuce : Vous pouvez sélectionner toutes les catégories ou seulement celles qui vous intéressent.',
+    
+    tutorialDiscoverStep6Title: 'Écouter un son',
+    tutorialDiscoverStep6Desc: 'Cliquez sur le bouton "Écouter" pour prévisualiser le son avant de l\'importer.',
+    tutorialDiscoverStep6Hint: '💡 Astuce : Vous pouvez écouter le son en entier avant de décider de l\'importer.',
+    
+    tutorialDiscoverStep7Title: 'Ajouter un son à votre bibliothèque',
+    tutorialDiscoverStep7Desc: 'Cliquez sur le bouton "Ajouter" pour importer le son dans votre bibliothèque SoundDeck.',
+    tutorialDiscoverStep7Hint: '💡 Astuce : Le son sera téléchargé et ajouté à votre bibliothèque. Vous pourrez ensuite le personnaliser.',
+    
+    tutorialDiscoverStep8Title: 'Explorer plus de sons',
+    tutorialDiscoverStep8Desc: 'Continuez à explorer et à importer des sons pour enrichir votre bibliothèque !',
+    tutorialDiscoverStep8Hint: '💡 Astuce : Plus vous explorez, plus vous trouverez de sons pour vos projets !',
   },
+
   en: {
+    // ─── MAIN PAGE ──────────────────────────────────────────────────────────
     myinstantsTitle: 'Discovery',
     myinstantsSub: 'Sounds available',
     myinstantsSearch: 'Search ',
@@ -128,7 +152,7 @@ export default {
     myinstantsCategories: 'Categories',
     myinstantsAllCategories: 'All categories',
     myinstantsCategory: 'Category',
-    myinstantsRefresh: ' Refresh',
+    myinstantsRefresh: 'Refresh',
     myinstantsClearSearch: 'Clear search',
     myinstantsSoundsAvailable: 'sounds available',
     myinstantsResultsFor: 'Results for',
@@ -141,7 +165,7 @@ export default {
     myinstantsShowMore: 'See all categories',
     myinstantsShowLess: 'Show less',
 
-    // Categories
+    // ─── CATEGORIES ──────────────────────────────────────────────────────────
     category_trending: 'Trending',
     category_best: 'Best',
     category_popular: 'Popular',
@@ -184,7 +208,7 @@ export default {
     category_transitions: 'Transitions',
     category_new: 'New',
 
-    // Category editor
+    // ─── CATEGORY EDITOR ─────────────────────────────────────────────────────
     myinstantsCategoryEditor: 'Customize categories',
     myinstantsCategoryEditorDesc: 'Choose which categories are shown by default',
     myinstantsCategoryEditorSave: 'Save',
@@ -193,31 +217,52 @@ export default {
     myinstantsCategoryEditorDeselectAll: 'Deselect all',
     myinstantsCategoryEditorSaved: '✅ Categories saved!',
     myinstantsCategoryEditorResetConfirm: 'Do you really want to reset categories to default?',
-
-    myinstantsSearch: 'Search',
-    myinstantsClearSearch: 'Clear search',
-    myinstantsNoCategories: 'No categories selected',
     myinstantsCategoryEditorCancel: 'Cancel',
+    myinstantsNoCategories: 'No categories selected',
+
+    // ─── ACTIONS ─────────────────────────────────────────────────────────────
     myinstantsCancel: 'Cancel',
-    myinstantsAllCategories: 'All categories',
-    myinstantsStop: 'Stop',
-    myinstantsPlaying: 'Playing...',
-    myinstantsSelectCategory: 'Select a category or search',
-    myinstantsTryDifferentSearch: 'Try a different search',
-    myinstantsPreloading: 'Preloading categories...',
-    myinstantsCategoriesLoaded: 'Categories loaded',
-    myinstantsAllCategoriesLoaded: 'All categories are preloaded!',
-    myinstantsSoundsAvailable: 'sounds available',
-    myinstantsResultsFor: 'Results for',
-    myinstantsShowMore: 'See all categories',
-    myinstantsShowLess: 'Show less',
-    myinstantsPreviewError: 'Unable to preview this sound',
-    myinstantsAddToLibrary: 'Add to library',
-    myinstantsAdded: 'Sound added to library!',
-    myinstantsDownloading: 'Downloading...',
-    myinstantsAlreadyAdded: 'Already added',
+    myinstantsSearch: 'Search',
+    myinstantsLoadingMore: '📥 Loading more sounds...',
+    myinstantsSelectAtLeastOneCategory: 'Select at least one category',
+    selected: 'selected',
+
+    // ─── DISCOVER TUTORIAL ──────────────────────────────────────────────────
+    tutorialDiscoverStep1Title: 'Welcome to Discovery',
+    tutorialDiscoverStep1Desc: 'Explore a vast library of popular sounds from MyInstants.',
+    tutorialDiscoverStep1Hint: '💡 Tip: Use the search bar to find specific sounds.',
+    
+    tutorialDiscoverStep2Title: 'Search for sounds',
+    tutorialDiscoverStep2Desc: 'Type a keyword to find matching sounds on MyInstants.',
+    tutorialDiscoverStep2Hint: '💡 Tip: Try keywords like "laugh", "applause" or "bruh".',
+    
+    tutorialDiscoverStep3Title: 'Browse categories',
+    tutorialDiscoverStep3Desc: 'Navigate through different categories to discover new sounds.',
+    tutorialDiscoverStep3Hint: '💡 Tip: Categories help you find sounds by theme.',
+    
+    tutorialDiscoverStep4Title: 'Customize your categories',
+    tutorialDiscoverStep4Desc: 'Click the "Customize categories" button to choose which categories you want to see.',
+    tutorialDiscoverStep4Hint: '💡 Tip: You can choose the categories that interest you most for a personalized navigation.',
+    
+    tutorialDiscoverStep5Title: 'Choose your categories',
+    tutorialDiscoverStep5Desc: 'Select or deselect the categories you want to display on the Discovery page.',
+    tutorialDiscoverStep5Hint: '💡 Tip: You can select all categories or only the ones that interest you.',
+    
+    tutorialDiscoverStep6Title: 'Listen to a sound',
+    tutorialDiscoverStep6Desc: 'Click the "Preview" button to preview the sound before importing it.',
+    tutorialDiscoverStep6Hint: '💡 Tip: You can listen to the entire sound before deciding to import it.',
+    
+    tutorialDiscoverStep7Title: 'Add a sound to your library',
+    tutorialDiscoverStep7Desc: 'Click the "Add" button to import the sound into your SoundDeck library.',
+    tutorialDiscoverStep7Hint: '💡 Tip: The sound will be downloaded and added to your library. You can then customize it.',
+    
+    tutorialDiscoverStep8Title: 'Explore more sounds',
+    tutorialDiscoverStep8Desc: 'Continue exploring and importing sounds to enrich your library!',
+    tutorialDiscoverStep8Hint: '💡 Tip: The more you explore, the more sounds you\'ll find for your projects!',
   },
+
   es: {
+    // ─── PÁGINA PRINCIPAL ──────────────────────────────────────────────────
     myinstantsTitle: 'Descubrimiento',
     myinstantsSub: 'Sonidos disponibles',
     myinstantsSearch: 'Buscar ',
@@ -236,7 +281,7 @@ export default {
     myinstantsCategories: 'Categorías',
     myinstantsAllCategories: 'Todas las categorías',
     myinstantsCategory: 'Categoría',
-    myinstantsRefresh: ' Actualizar',
+    myinstantsRefresh: 'Actualizar',
     myinstantsClearSearch: 'Limpiar búsqueda',
     myinstantsSoundsAvailable: 'sonidos disponibles',
     myinstantsResultsFor: 'Resultados para',
@@ -249,7 +294,7 @@ export default {
     myinstantsShowMore: 'Ver todas las categorías',
     myinstantsShowLess: 'Ver menos',
 
-    // Categorías
+    // ─── CATEGORÍAS ──────────────────────────────────────────────────────────
     category_trending: 'Tendencias',
     category_best: 'Mejores',
     category_popular: 'Populares',
@@ -292,7 +337,7 @@ export default {
     category_transitions: 'Transiciones',
     category_new: 'Nuevo',
 
-    // Editor de categorías
+    // ─── EDITOR DE CATEGORÍAS ──────────────────────────────────────────────
     myinstantsCategoryEditor: 'Personalizar categorías',
     myinstantsCategoryEditorDesc: 'Elige las categorías que se muestran por defecto',
     myinstantsCategoryEditorSave: 'Guardar',
@@ -301,28 +346,47 @@ export default {
     myinstantsCategoryEditorDeselectAll: 'Deseleccionar todo',
     myinstantsCategoryEditorSaved: '✅ ¡Categorías guardadas!',
     myinstantsCategoryEditorResetConfirm: '¿Realmente quieres restablecer las categorías por defecto?',
-
-    myinstantsSearch: 'Buscar',
-    myinstantsClearSearch: 'Limpiar búsqueda',
-    myinstantsNoCategories: 'No hay categorías seleccionadas',
     myinstantsCategoryEditorCancel: 'Cancelar',
+    myinstantsNoCategories: 'No hay categorías seleccionadas',
+
+    // ─── ACCIONES ────────────────────────────────────────────────────────────
     myinstantsCancel: 'Cancelar',
-    myinstantsAllCategories: 'Todas las categorías',
-    myinstantsStop: 'Detener',
-    myinstantsPlaying: 'Reproduciendo...',
-    myinstantsSelectCategory: 'Selecciona una categoría o busca',
-    myinstantsTryDifferentSearch: 'Prueba otra búsqueda',
-    myinstantsPreloading: 'Precargando categorías...',
-    myinstantsCategoriesLoaded: 'Categorías cargadas',
-    myinstantsAllCategoriesLoaded: '¡Todas las categorías están precargadas!',
-    myinstantsSoundsAvailable: 'sonidos disponibles',
-    myinstantsResultsFor: 'Resultados para',
-    myinstantsShowMore: 'Ver todas las categorías',
-    myinstantsShowLess: 'Ver menos',
-    myinstantsPreviewError: 'No se puede previsualizar este sonido',
-    myinstantsAddToLibrary: 'Añadir a la biblioteca',
-    myinstantsAdded: '¡Sonido añadido a la biblioteca!',
-    myinstantsDownloading: 'Descargando...',
-    myinstantsAlreadyAdded: 'Ya añadido',
+    myinstantsSearch: 'Buscar',
+    myinstantsLoadingMore: '📥 Cargando más sonidos...',
+    myinstantsSelectAtLeastOneCategory: 'Selecciona al menos una categoría',
+    selected: 'seleccionadas',
+
+    // ─── TUTORIAL DESCUBRIMIENTO ──────────────────────────────────────────
+    tutorialDiscoverStep1Title: 'Bienvenido al descubrimiento',
+    tutorialDiscoverStep1Desc: 'Explora una vasta biblioteca de sonidos populares de MyInstants.',
+    tutorialDiscoverStep1Hint: '💡 Consejo: Usa la barra de búsqueda para encontrar sonidos específicos.',
+    
+    tutorialDiscoverStep2Title: 'Buscar sonidos',
+    tutorialDiscoverStep2Desc: 'Escribe una palabra clave para encontrar sonidos en MyInstants.',
+    tutorialDiscoverStep2Hint: '💡 Consejo: Prueba palabras clave como "laugh", "applause" o "bruh".',
+    
+    tutorialDiscoverStep3Title: 'Explorar categorías',
+    tutorialDiscoverStep3Desc: 'Navega a través de las diferentes categorías para descubrir nuevos sonidos.',
+    tutorialDiscoverStep3Hint: '💡 Consejo: Las categorías te ayudan a encontrar sonidos por tema.',
+    
+    tutorialDiscoverStep4Title: 'Personalizar tus categorías',
+    tutorialDiscoverStep4Desc: 'Haz clic en el botón "Personalizar categorías" para elegir las categorías que quieres ver.',
+    tutorialDiscoverStep4Hint: '💡 Consejo: Puedes elegir las categorías que más te interesan para una navegación personalizada.',
+    
+    tutorialDiscoverStep5Title: 'Elegir tus categorías',
+    tutorialDiscoverStep5Desc: 'Selecciona o deselecciona las categorías que quieres mostrar en la página de Descubrimiento.',
+    tutorialDiscoverStep5Hint: '💡 Consejo: Puedes seleccionar todas las categorías o solo las que te interesan.',
+    
+    tutorialDiscoverStep6Title: 'Escuchar un sonido',
+    tutorialDiscoverStep6Desc: 'Haz clic en el botón "Escuchar" para previsualizar el sonido antes de importarlo.',
+    tutorialDiscoverStep6Hint: '💡 Consejo: Puedes escuchar el sonido completo antes de decidir importarlo.',
+    
+    tutorialDiscoverStep7Title: 'Añadir un sonido a tu biblioteca',
+    tutorialDiscoverStep7Desc: 'Haz clic en el botón "Añadir" para importar el sonido a tu biblioteca SoundDeck.',
+    tutorialDiscoverStep7Hint: '💡 Consejo: El sonido se descargará y añadirá a tu biblioteca. Luego podrás personalizarlo.',
+    
+    tutorialDiscoverStep8Title: 'Explorar más sonidos',
+    tutorialDiscoverStep8Desc: '¡Continúa explorando e importando sonidos para enriquecer tu biblioteca!',
+    tutorialDiscoverStep8Hint: '💡 Consejo: ¡Cuanto más explores, más sonidos encontrarás para tus proyectos!',
   }
 }

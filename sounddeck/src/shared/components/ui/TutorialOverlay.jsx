@@ -67,7 +67,6 @@ function findElement(selector, fallbackSelector) {
         }
     } catch (e) {}
     
-    // ✅ NE PAS CRÉER D'ÉLÉMENT FACTICE - retourner null
     console.log('❌ [Tutorial] Aucun élément trouvé');
     return null;
 }
@@ -290,7 +289,8 @@ export default function TutorialOverlay({
     onNext, 
     onSkip, 
     onComplete,
-    isOpen 
+    isOpen,
+    pageId = '' // ✅ Ajout de pageId en paramètre avec valeur par défaut
 }) {
     const { t } = useLanguage();
     const [targetRect, setTargetRect] = useState(null);
@@ -373,7 +373,7 @@ export default function TutorialOverlay({
                             setTimeout(() => {
                                 setShowBubble(true);
                                 console.log('🔄 [Tutorial] Recalcul de la position après ouverture du menu');
-                                updateTargetWithMenu();
+                                updateTarget();
                             }, 300);
                         } else if (attempts < maxAttempts) {
                             setTimeout(tryFocus, attemptInterval);
@@ -381,7 +381,7 @@ export default function TutorialOverlay({
                             console.log('❌ [Tutorial] Impossible de trouver le menu contextuel');
                             setShowBubble(true);
                             setTimeout(() => {
-                                updateTargetWithMenu();
+                                updateTarget();
                             }, 500);
                         }
                     };
@@ -391,7 +391,7 @@ export default function TutorialOverlay({
                     console.log('⚠️ [Tutorial] Échec de l\'ouverture du menu');
                     setShowBubble(true);
                     setTimeout(() => {
-                        updateTargetWithMenu();
+                        updateTarget();
                     }, 500);
                 }
                 
@@ -401,7 +401,7 @@ export default function TutorialOverlay({
                 console.log(`⏳ [Tutorial] Attente de ${delay}ms pour la mise à jour...`);
                 setTimeout(() => {
                     console.log('🔄 [Tutorial] Mise à jour de la cible après clic');
-                    updateTargetWithMenu();
+                    updateTarget();
                 }, delay);
             }
         };
@@ -411,11 +411,12 @@ export default function TutorialOverlay({
     }, [isOpen, currentStep, stepData, isActionExecuted, hasAction]);
 
     /**
-     * Calcule la position de la bulle
+     * Calcule la position de la bulle avec position forcée possible
      */
-    const calculateBubblePosition = useCallback((rect) => {
+    const calculateBubblePosition = useCallback((rect, forcePosition) => {
         console.log('📐 [calculateBubblePosition] Début du calcul');
         console.log('  📐 rect cible:', rect);
+        console.log('  📐 forcePosition:', forcePosition);
         
         if (!rect) return { top: window.innerHeight / 2 - 125, left: window.innerWidth / 2 - 190, arrow: 'bottom' };
         
@@ -429,7 +430,52 @@ export default function TutorialOverlay({
         console.log('  📐 Viewport:', { viewportWidth, viewportHeight });
         console.log('  📐 Paramètres:', { bubbleWidth, bubbleHeight, padding, gap });
         
-        // Liste des positions possibles
+        // ✅ Si une position est forcée, l'utiliser en priorité
+        if (forcePosition) {
+            console.log(`  📐 Position forcée: ${forcePosition}`);
+            switch (forcePosition) {
+                case 'right':
+                    // Position à droite de l'élément
+                    const rightSpace = viewportWidth - rect.right - gap - padding;
+                    if (rightSpace > bubbleWidth) {
+                        return {
+                            top: Math.max(padding, Math.min(rect.centerY - bubbleHeight / 2, viewportHeight - bubbleHeight - padding)),
+                            left: rect.right + gap,
+                            arrow: 'left'
+                        };
+                    }
+                    // Fallback: position en bas
+                    const bottomSpace = viewportHeight - rect.bottom - gap - padding;
+                    if (bottomSpace > bubbleHeight) {
+                        return {
+                            top: Math.min(viewportHeight - bubbleHeight - padding, rect.bottom + gap),
+                            left: Math.max(padding, Math.min(rect.centerX - bubbleWidth / 2, viewportWidth - bubbleWidth - padding)),
+                            arrow: 'top'
+                        };
+                    }
+                    // Fallback: position à gauche
+                    return {
+                        top: Math.max(padding, Math.min(rect.centerY - bubbleHeight / 2, viewportHeight - bubbleHeight - padding)),
+                        left: Math.max(padding, rect.left - bubbleWidth - gap),
+                        arrow: 'right'
+                    };
+                case 'top':
+                    return {
+                        top: Math.max(padding, rect.top - bubbleHeight - gap),
+                        left: Math.max(padding, Math.min(rect.centerX - bubbleWidth / 2, viewportWidth - bubbleWidth - padding)),
+                        arrow: 'bottom'
+                    };
+                case 'bottom':
+                default:
+                    return {
+                        top: Math.min(viewportHeight - bubbleHeight - padding, rect.bottom + gap),
+                        left: Math.max(padding, Math.min(rect.centerX - bubbleWidth / 2, viewportWidth - bubbleWidth - padding)),
+                        arrow: 'top'
+                    };
+            }
+        }
+        
+        // Liste des positions possibles (calcul automatique)
         const positions = [];
         
         // Position en bas
@@ -530,7 +576,8 @@ export default function TutorialOverlay({
                 setTargetRect(rect);
                 
                 if (rect) {
-                    const pos = calculateBubblePosition(rect);
+                    // ✅ Passer la position forcée si définie
+                    const pos = calculateBubblePosition(rect, stepData.position);
                     console.log('📐 [updateTarget] Position finale de la bulle:', pos);
                     setBubblePosition(pos);
                 }
@@ -538,7 +585,6 @@ export default function TutorialOverlay({
             
         } else {
             console.log('❌ [Tutorial] Élément NON trouvé pour l\'étape', currentStep);
-            // ✅ Position centrée si élément non trouvé
             setTargetRect(null);
             setBubblePosition({
                 top: window.innerHeight / 2 - 125,
@@ -590,15 +636,25 @@ export default function TutorialOverlay({
         };
     }, [isOpen, updateTarget]);
 
+    // ✅ Fonction pour fermer le menu si onLeave est défini
+    const handleLeave = useCallback(() => {
+        if (stepData?.onLeave && typeof stepData.onLeave === 'function') {
+            console.log('🔚 [Tutorial] Exécution de onLeave pour l\'étape', currentStep);
+            stepData.onLeave();
+        }
+    }, [stepData, currentStep]);
+
     if (!isOpen || !stepData) return null;
 
     const handleNext = () => {
+        // ✅ Appeler onLeave avant de passer à l'étape suivante
+        handleLeave();
+        
         if (isLastStep) {
             onComplete?.();
         } else {
             onNext?.();
             
-            // ✅ Exécuter afterShow pour la prochaine étape
             const nextStep = steps[currentStep + 1];
             if (nextStep?.afterShow && typeof nextStep.afterShow === 'function') {
                 console.log('🎬 [Tutorial] Exécution de afterShow pour l\'étape suivante', currentStep + 1);
@@ -607,6 +663,15 @@ export default function TutorialOverlay({
                 }, 600);
             }
         }
+    };
+
+    const handleSkip = () => {
+        // ✅ Appeler onLeave avant de passer
+        handleLeave();
+        if (pageId) {
+            localStorage.setItem(`sounddeck-tutorial-${pageId}-done`, 'true');
+        }
+        onComplete?.();
     };
 
     const highlightStyle = targetRect ? {
@@ -859,7 +924,7 @@ export default function TutorialOverlay({
                         <div style={{ display: 'flex', gap: 6 }}>
                             <button
                                 className="btn-secondary btn-sm"
-                                onClick={onSkip}
+                                onClick={handleSkip}
                                 style={{ fontSize: 11, padding: '4px 10px' }}
                             >
                                 {t('tutorialSkip') || 'Passer'}

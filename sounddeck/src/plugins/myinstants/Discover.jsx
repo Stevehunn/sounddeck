@@ -35,11 +35,11 @@ export default function MyInstantsDiscover({ store, addToast }) {
   const checkApi = useCallback(() => {
     if (!window.electronAPI?.fetchMyinstants) {
       console.error('❌ [Discover] window.electronAPI.fetchMyinstants non disponible')
-      setError('API MyInstants non disponible')
+      setError(t('myinstantsError') || 'API MyInstants non disponible')
       return false
     }
     return true
-  }, [])
+  }, [t])
 
   // ─── FONCTIONS DE CACHE ──────────────────────────────────────────────────
 
@@ -451,7 +451,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
 
   const saveCategoryEditor = () => {
     if (tempSelectedCategories.length === 0) {
-      addToast('Sélectionnez au moins une catégorie', 'error')
+      addToast(t('myinstantsSelectAtLeastOneCategory') || 'Sélectionnez au moins une catégorie', 'error')
       return
     }
     
@@ -503,7 +503,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
           fontSize: 12
         }}>
           <i className="ti ti-category" style={{ marginRight: 4 }} />
-          {t('myinstantsNoCategories') || 'Aucune catégorie sélectionnée'}
+          {t('myinstantsNoCategories')}
         </div>
       )
     }
@@ -528,6 +528,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
             <button
+              data-testid="discover-category-editor-button"
               className="btn-ghost btn-sm"
               onClick={openCategoryEditor}
               style={{ fontSize: 10, color: 'var(--text-tertiary)' }}
@@ -546,13 +547,17 @@ export default function MyInstantsDiscover({ store, addToast }) {
           </div>
         </div>
 
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 4,
-          maxHeight: showAllCategories ? 'none' : '80px',
-          overflow: 'hidden'
-        }}>
+        <div 
+          className="categories-container"
+          data-testid="discover-categories"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 4,
+            maxHeight: showAllCategories ? 'none' : '80px',
+            overflow: 'hidden'
+          }}
+        >
           {displayCategories.map(cat => {
             const isActive = activeCategory === cat.id
             const isCached = cacheInfo[cat.id]?.count > 0
@@ -627,7 +632,12 @@ export default function MyInstantsDiscover({ store, addToast }) {
 
     return (
       <div className="modal-overlay" onClick={closeCategoryEditor}>
-        <div className="modal" style={{ width: 480, maxHeight: '80vh' }} onClick={e => e.stopPropagation()}>
+        <div 
+          className="modal" 
+          data-testid="discover-category-editor-modal"
+          style={{ width: 480, maxHeight: '80vh' }} 
+          onClick={e => e.stopPropagation()}
+        >
           <div className="modal-title">
             <i className="ti ti-edit" style={{ color: 'var(--accent)' }} />
             {t('myinstantsCategoryEditor')}
@@ -636,7 +646,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>
             {t('myinstantsCategoryEditorDesc')}
             <span style={{ marginLeft: 8, color: 'var(--text-tertiary)' }}>
-              ({tempSelectedCategories.length} sélectionnées)
+              ({tempSelectedCategories.length} {t('selected') || 'sélectionnées'})
             </span>
           </div>
 
@@ -705,7 +715,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
 
           <div className="modal-actions" style={{ marginTop: 16 }}>
             <button className="btn-secondary btn-lg" onClick={closeCategoryEditor}>
-              <i className="ti ti-x" /> {t('myinstantsCategoryEditorCancel') || 'Annuler'}
+              <i className="ti ti-x" /> {t('myinstantsCategoryEditorCancel')}
             </button>
             <button className="btn-primary btn-lg" onClick={saveCategoryEditor}>
               <i className="ti ti-check" /> {t('myinstantsCategoryEditorSave')}
@@ -856,6 +866,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
       }}>
         <div style={{ flex: 1, minWidth: 200, display: 'flex', gap: 8 }}>
           <input
+            data-testid="discover-search"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={t('myinstantsSearchPlaceholder')}
@@ -1004,7 +1015,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
             gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
             gap: 12
           }}>
-            {results.map(sound => {
+            {results.map((sound, index) => {
               const owned = isSoundOwned(sound.name)
               const isDownloading = downloading[sound.id]
               const isPreviewing = previewing === sound.id
@@ -1012,6 +1023,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
               return (
                 <div
                   key={sound.id}
+                  data-testid={index === 0 ? "discover-sound-card" : undefined}
                   style={{
                     background: 'var(--bg-secondary)',
                     border: `1px solid ${owned ? 'var(--success)' : isPreviewing ? 'var(--accent)' : 'var(--border)'}`,
@@ -1043,6 +1055,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button
+                      data-testid={index === 0 ? "discover-preview-button" : undefined}
                       className={`btn-${isPreviewing ? 'danger' : 'secondary'} btn-sm`}
                       style={{ flex: 1 }}
                       onClick={() => togglePreview(sound)}
@@ -1051,6 +1064,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
                       <i className={`ti ${isPreviewing ? 'ti-player-stop-filled' : 'ti-player-play'}`} />
                     </button>
                     <button
+                      data-testid={index === 0 ? "discover-add-button" : undefined}
                       className={`btn-${owned ? 'success' : 'primary'} btn-sm`}
                       style={{ flex: 1 }}
                       onClick={() => openProfileModal(sound)}
@@ -1086,6 +1100,35 @@ export default function MyInstantsDiscover({ store, addToast }) {
                 </div>
               )
             })}
+          </div>
+        )}
+        
+        {/* Bouton "Charger plus" */}
+        {!loading && results.length > 0 && results.length >= 20 && (
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '20px 0 10px 0',
+            borderTop: '1px solid var(--border)',
+            marginTop: 16
+          }}>
+            <button
+              data-testid="discover-load-more"
+              className="btn-secondary"
+              onClick={() => {
+                addToast(t('myinstantsLoadingMore') || '📥 Chargement de plus de sons...', 'info')
+              }}
+              style={{
+                fontSize: 12,
+                padding: '6px 20px',
+                borderRadius: 'var(--radius-md)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6
+              }}
+            >
+              <i className="ti ti-chevron-down" />
+              {t('myinstantsShowMore')}
+            </button>
           </div>
         )}
       </div>
@@ -1138,7 +1181,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
             </div>
             <div className="modal-actions" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
               <button className="btn-secondary btn-lg" onClick={() => setShowProfileModal(null)} style={{ borderRadius: 'var(--radius-md)', minHeight: 40, padding: '8px 20px' }}>
-                <i className="ti ti-x" /> {t('myinstantsCancel') || 'Annuler'}
+                <i className="ti ti-x" /> {t('myinstantsCancel')}
               </button>
               <button className="btn-primary btn-lg" onClick={confirmAddSound} style={{ borderRadius: 'var(--radius-md)', minHeight: 40, padding: '8px 20px' }}>
                 <i className="ti ti-download" /> {t('myinstantsAdd')}
