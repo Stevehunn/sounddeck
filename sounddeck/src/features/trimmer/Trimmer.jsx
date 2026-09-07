@@ -16,6 +16,24 @@ const EMOJIS = [
   '🚀','🛸','💎','💰','💵','💶','💷','💴','🪙','🧿','🔮','🪄','⚔️','🛡️','🏹'
 ]
 
+// ✅ Fonction utilitaire pour obtenir l'URL correcte de l'image
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return null
+  
+  // ✅ Si c'est déjà une URL HTTP(S), la retourner directement
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath
+  }
+  
+  // ✅ Si c'est déjà une URL file://, la retourner directement
+  if (imagePath.startsWith('file://')) {
+    return imagePath
+  }
+  
+  // ✅ Sinon, la traiter comme un chemin local
+  return `file:///${imagePath.replace(/\\/g, '/')}`
+}
+
 export default function Trimmer({ store, addToast }) {
   const { t, currentLang } = useLanguage()
   const [selectedSound, setSelectedSound] = useState(null)
@@ -80,9 +98,7 @@ export default function Trimmer({ store, addToast }) {
 }
 
 function SoundListItem({ sound, active, onClick }) {
-  const imageUrl = sound.image
-    ? (sound.image.startsWith('file://') ? sound.image : `file:///${sound.image.replace(/\\/g, '/')}`)
-    : null
+  const imageUrl = sound.image ? getImageUrl(sound.image) : null
 
   return (
     <button 
@@ -99,7 +115,7 @@ function SoundListItem({ sound, active, onClick }) {
         fontSize: 14, flexShrink: 0, overflow: 'hidden'
       }}>
         {imageUrl
-          ? <img src={imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ? <img src={imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none' }} />
           : sound.emoji || '🔊'}
       </div>
       <span className="label" style={{ fontSize: 12 }}>
@@ -186,9 +202,7 @@ function SoundEditor({ sound, store, addToast, onDone }) {
       const result = await window.electronAPI.importImageFile(imgPath)
       if (result.success) {
         setImage(result.path)
-        setImagePreview(result.path.startsWith('file://')
-          ? result.path
-          : `file:///${result.path.replace(/\\/g, '/')}`)
+        setImagePreview(getImageUrl(result.path))
       }
     }
   }
@@ -243,6 +257,9 @@ function SoundEditor({ sound, store, addToast, onDone }) {
     setSaving(false)
     onDone()
   }
+
+  // ✅ Aperçu de l'image avec gestion des URLs
+  const previewImageUrl = imagePreview ? getImageUrl(imagePreview) : null
 
   return (
     <>
@@ -367,8 +384,8 @@ function SoundEditor({ sound, store, addToast, onDone }) {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 32, overflow: 'hidden', border: '1px solid var(--border)'
                 }}>
-                  {imagePreview
-                    ? <img src={imagePreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {previewImageUrl
+                    ? <img src={previewImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none' }} />
                     : emoji}
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 500, textAlign: 'center', color: 'var(--text-primary)' }}>
