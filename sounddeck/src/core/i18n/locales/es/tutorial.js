@@ -52,21 +52,41 @@ export default {
   tutorialHomeStep10Hint: '💡 Consejo: Arrastrar y soltar también funciona para favoritos y entre secciones.',
 
   // ─── EDITOR ──────────────────────────────────────────────────────────
-  tutorialEditorStep1Title: 'Agregar una pista',
-  tutorialEditorStep1Desc: 'Haz clic en "Agregar pista" para crear una nueva pista. Cada pista puede contener varios clips.',
-  tutorialEditorStep1Hint: '💡 Consejo: Puedes arrastrar y soltar archivos de audio directamente en el editor.',
-  
-  tutorialEditorStep2Title: 'Mover y recortar un clip',
-  tutorialEditorStep2Desc: 'Arrastra un clip para moverlo. Usa las asas en los bordes para recortar o dividir el clip.',
-  tutorialEditorStep2Hint: '💡 Consejo: Haz doble clic en un clip para editarlo rápidamente.',
-  
-  tutorialEditorStep3Title: 'Agregar efectos de audio',
-  tutorialEditorStep3Desc: 'Selecciona un clip y abre el panel de efectos. Puedes agregar Fade In/Out, eco, reverberación...',
-  tutorialEditorStep3Hint: '💡 Consejo: La previsualización automática te permite escuchar efectos en tiempo real.',
-  
-  tutorialEditorStep4Title: 'Activar un bucle',
-  tutorialEditorStep4Desc: 'Haz clic en la zona de bucle o usa el botón "Loop" para repetir automáticamente una sección.',
-  tutorialEditorStep4Hint: '💡 Consejo: Puedes definir un bucle en un clip individual o en toda la línea de tiempo.',
+  tutorialEditorStep1Title: 'La barra de herramientas',
+  tutorialEditorStep1Desc: 'En la parte superior de la pantalla se encuentra la barra de herramientas. Aquí es donde administras tus proyectos, agregas pistas, importas archivos y controlas la reproducción.',
+  tutorialEditorStep1Hint: '💡 Consejo: El metrónomo (🎵) te ayuda a mantener el tempo.',
+
+  tutorialEditorStep2Title: 'Agregar un sonido a tu proyecto',
+  tutorialEditorStep2Desc: 'Haz clic en "Agregar sonido" en la barra de herramientas para importar un sonido desde tu biblioteca SoundDeck a la línea de tiempo.',
+  tutorialEditorStep2Hint: '💡 Consejo: También puedes importar un archivo de audio externo con "Importar archivo".',
+
+  tutorialEditorStep3Title: 'La línea de tiempo y las pistas',
+  tutorialEditorStep3Desc: 'En el centro se encuentra la línea de tiempo con tus pistas. Cada pista contiene clips (sonidos) que puedes mover arrastrándolos o ajustar su duración arrastrando los bordes.',
+  tutorialEditorStep3Hint: '💡 Consejo: Las pistas te permiten organizar tus sonidos por categoría (batería, voces, efectos...).',
+
+  tutorialEditorStep4Title: 'El menú contextual del clip',
+  tutorialEditorStep4Desc: 'Haz clic derecho en un clip para abrir un menú contextual. Encontrarás todas las acciones: cortar, duplicar, agregar efectos, activar bucle, y mucho más.',
+  tutorialEditorStep4Hint: '💡 Consejo: El menú contextual es la herramienta principal para administrar tus clips.',
+
+  tutorialEditorStep5Title: 'Efectos de audio',
+  tutorialEditorStep5Desc: 'Selecciona un clip, luego abre el panel de efectos en la parte inferior de la pantalla. Haz clic en "Agregar efecto" para personalizar tu sonido.',
+  tutorialEditorStep5Hint: '💡 Consejo: La previsualización automática reproduce los efectos 1 segundo después de cada modificación.',
+
+  tutorialEditorStep6Title: 'Personalizar con efectos',
+  tutorialEditorStep6Desc: 'Una vez abierto el panel de efectos, puedes ajustar cada parámetro. Por ejemplo, para el efecto "Volumen", arrastra el control deslizante para aumentar o disminuir el volumen.',
+  tutorialEditorStep6Hint: '💡 Consejo: Cada efecto tiene parámetros únicos. ¡Explóralos para descubrir todas las posibilidades!',
+
+  tutorialEditorStep7Title: 'Zoom de la línea de tiempo',
+  tutorialEditorStep7Desc: 'Usa los controles de zoom en la parte inferior de la pantalla para ampliar o reducir la línea de tiempo. Esto te permite trabajar en detalles precisos o ver todo tu proyecto.',
+  tutorialEditorStep7Hint: '💡 Consejo: Usa Ctrl+Rueda o Ctrl+{/* */}+/- para hacer zoom rápidamente.',
+
+  tutorialEditorStep8Title: 'Volumen maestro',
+  tutorialEditorStep8Desc: 'A la derecha de los controles de zoom, encontrarás el control de volumen maestro. Ajusta el nivel de sonido general de tu proyecto. También puedes silenciarlo con el botón de la izquierda.',
+  tutorialEditorStep8Hint: '💡 Consejo: El volumen maestro afecta a todos los sonidos del proyecto, no solo a las pistas.',
+
+  tutorialEditorStep9Title: 'Exportar tu proyecto',
+  tutorialEditorStep9Desc: 'Una vez que tu proyecto esté completo, haz clic en "Exportar" en la barra de herramientas para guardar tu creación en MP3, WAV u otros formatos.',
+  tutorialEditorStep9Hint: '💡 Consejo: MP3 para un tamaño más pequeño, WAV para calidad sin pérdida.',
 
   // ─── SEQUENCER ──────────────────────────────────────────────────────
   tutorialSequencerStep1Title: 'Crear una lista de reproducción',

@@ -52,21 +52,41 @@ export default {
   tutorialHomeStep10Hint: '💡 Tip: Drag & Drop also works for favorites and between sections.',
 
   // ─── EDITOR ──────────────────────────────────────────────────────────
-  tutorialEditorStep1Title: 'Add a track',
-  tutorialEditorStep1Desc: 'Click the "Add Track" button to create a new track. Each track can hold multiple audio clips.',
-  tutorialEditorStep1Hint: '💡 Tip: You can drag and drop audio files directly into the editor.',
-  
-  tutorialEditorStep2Title: 'Move and trim a clip',
-  tutorialEditorStep2Desc: 'Drag a clip to move it. Use the handles on the edges to trim or cut the clip.',
-  tutorialEditorStep2Hint: '💡 Tip: Double-click on a clip to edit it quickly.',
-  
-  tutorialEditorStep3Title: 'Add audio effects',
-  tutorialEditorStep3Desc: 'Select a clip, then open the effects panel. You can add Fade In/Out, echo, reverb and more.',
-  tutorialEditorStep3Hint: '💡 Tip: Auto-preview lets you hear effects in real time.',
-  
-  tutorialEditorStep4Title: 'Enable a loop',
-  tutorialEditorStep4Desc: 'Click on the loop zone or use the "Loop" button to automatically repeat a section.',
-  tutorialEditorStep4Hint: '💡 Tip: You can set a loop on an individual clip or on the entire timeline.',
+  tutorialEditorStep1Title: 'The toolbar',
+  tutorialEditorStep1Desc: 'At the top of the screen is the toolbar. This is where you manage your projects, add tracks, import files, and control playback.',
+  tutorialEditorStep1Hint: '💡 Tip: The metronome (🎵) helps you keep the tempo.',
+
+  tutorialEditorStep2Title: 'Add a sound to your project',
+  tutorialEditorStep2Desc: 'Click "Add sound" in the toolbar to import a sound from your SoundDeck library to the timeline.',
+  tutorialEditorStep2Hint: '💡 Tip: You can also import an external audio file with "Import file".',
+
+  tutorialEditorStep3Title: 'The timeline and tracks',
+  tutorialEditorStep3Desc: 'In the center is the timeline with your tracks. Each track contains clips (sounds) that you can move by dragging, or adjust their duration by dragging the edges.',
+  tutorialEditorStep3Hint: '💡 Tip: Tracks allow you to organize your sounds by category (drums, vocals, effects...).',
+
+  tutorialEditorStep4Title: 'The clip context menu',
+  tutorialEditorStep4Desc: 'Right-click on a clip to open a context menu. You\'ll find all actions: cut, duplicate, add effects, enable loop, and much more.',
+  tutorialEditorStep4Hint: '💡 Tip: The context menu is the main tool for managing your clips.',
+
+  tutorialEditorStep5Title: 'Audio effects',
+  tutorialEditorStep5Desc: 'Select a clip, then open the effects panel at the bottom of the screen. Click "Add effect" to customize your sound.',
+  tutorialEditorStep5Hint: '💡 Tip: Auto-preview plays effects 1 second after each modification.',
+
+  tutorialEditorStep6Title: 'Customize with effects',
+  tutorialEditorStep6Desc: 'Once the effects panel is open, you can adjust each parameter. For example, for the "Volume" effect, drag the slider to increase or decrease the volume.',
+  tutorialEditorStep6Hint: '💡 Tip: Each effect has unique parameters. Explore them to discover all possibilities!',
+
+  tutorialEditorStep7Title: 'Timeline zoom',
+  tutorialEditorStep7Desc: 'Use the zoom controls at the bottom of the screen to zoom in or out on the timeline. This allows you to work on precise details or see your entire project.',
+  tutorialEditorStep7Hint: '💡 Tip: Use Ctrl+Scroll or Ctrl+{/* */}+/- to zoom quickly.',
+
+  tutorialEditorStep8Title: 'Master volume',
+  tutorialEditorStep8Desc: 'To the right of the zoom controls, you\'ll find the master volume control. It adjusts the overall volume of your project. You can also mute it with the button on the left.',
+  tutorialEditorStep8Hint: '💡 Tip: The master volume affects all sounds in the project, not just tracks.',
+
+  tutorialEditorStep9Title: 'Export your project',
+  tutorialEditorStep9Desc: 'Once your project is complete, click "Export" in the toolbar to save your creation in MP3, WAV, or other formats.',
+  tutorialEditorStep9Hint: '💡 Tip: MP3 for smaller size, WAV for lossless quality.',
 
   // ─── SEQUENCER ──────────────────────────────────────────────────────
   tutorialSequencerStep1Title: 'Create a playlist',

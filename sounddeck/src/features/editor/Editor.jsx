@@ -1007,6 +1007,49 @@ function EditorTimelineContent() {
   const canUndo = store?.canUndoEditor || false
   const canRedo = store?.canRedoEditor || false
 
+  // ✅ Gestionnaire pour le toggle du panneau des effets
+  const handleToggleEffectsPanel = useCallback((show) => {
+    setShowEffectsPanel(show)
+    if (!show) {
+      setShowEffectsAddMenu(false)
+    }
+  }, [])
+
+  // ✅ Exposer les fonctions pour le tutoriel
+  useEffect(() => {
+    // Exposer la fonction de sélection de clip via window pour le tutoriel
+    window.__editorSelectClip = (clipId) => {
+      console.log(`🔍 [Editor] Sélection du clip via tutoriel: ${clipId}`)
+      // Trouver le clip et le sélectionner
+      for (const track of tracks) {
+        const clip = track.clips.find(c => c.id === clipId)
+        if (clip) {
+          selectClip(clipId, track.id)
+          setShowEffectsPanel(true)
+          console.log(`✅ [Editor] Clip sélectionné: ${clip.name}`)
+          return true
+        }
+      }
+      console.warn(`⚠️ [Editor] Clip non trouvé: ${clipId}`)
+      return false
+    }
+    
+    // Exposer une fonction pour récupérer le premier clip ID
+    window.__editorGetFirstClipId = () => {
+      for (const track of tracks) {
+        if (track.clips && track.clips.length > 0) {
+          return track.clips[0].id
+        }
+      }
+      return null
+    }
+    
+    return () => {
+      delete window.__editorSelectClip
+      delete window.__editorGetFirstClipId
+    }
+  }, [tracks, selectClip, setShowEffectsPanel])
+
   useKeyboardShortcuts({
     onPlay: handlePlayToggle,
     onPause: pause,
@@ -1086,13 +1129,16 @@ function EditorTimelineContent() {
   })
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      overflow: 'hidden',
-      background: 'var(--bg-primary)'
-    }}>
+    <div 
+      data-testid="editor-container"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflow: 'hidden',
+        background: 'var(--bg-primary)'
+      }}
+    >
       <EditorToolbar
         tracks={tracks}
         sounds={store?.sounds || []}
@@ -1150,6 +1196,9 @@ function EditorTimelineContent() {
         onLoadProjectList={projectManager.loadProjectList}
         onExportProject={projectManager.exportProject}
         onImportProject={projectManager.importProject}
+        // ✅ NOUVEAUX PROPS pour le panneau des effets
+        showEffectsPanel={showEffectsPanel}
+        onToggleEffectsPanel={handleToggleEffectsPanel}
       />
 
       <div style={{ 

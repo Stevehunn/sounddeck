@@ -290,7 +290,7 @@ export default function TutorialOverlay({
     onSkip, 
     onComplete,
     isOpen,
-    pageId = '' // ✅ Ajout de pageId en paramètre avec valeur par défaut
+    pageId = ''
 }) {
     const { t } = useLanguage();
     const [targetRect, setTargetRect] = useState(null);
@@ -309,14 +309,12 @@ export default function TutorialOverlay({
 
     console.log('📌 [TutorialOverlay] Étape actuelle:', currentStep, stepData?.id, 'hasAction:', hasAction, 'hasAfterShow:', hasAfterShow);
 
-    // ✅ Réinitialiser à chaque changement d'étape
     useEffect(() => {
         setIsActionExecuted(false);
         setShowBubble(true);
         setMenuRect(null);
     }, [currentStep]);
 
-    // ✅ Exécuter l'action de l'étape
     useEffect(() => {
         console.log('🔍 [TutorialOverlay] useEffect action - isOpen:', isOpen, 'hasAction:', hasAction, 'isActionExecuted:', isActionExecuted);
         
@@ -435,7 +433,6 @@ export default function TutorialOverlay({
             console.log(`  📐 Position forcée: ${forcePosition}`);
             switch (forcePosition) {
                 case 'right':
-                    // Position à droite de l'élément
                     const rightSpace = viewportWidth - rect.right - gap - padding;
                     if (rightSpace > bubbleWidth) {
                         return {
@@ -444,7 +441,6 @@ export default function TutorialOverlay({
                             arrow: 'left'
                         };
                     }
-                    // Fallback: position en bas
                     const bottomSpace = viewportHeight - rect.bottom - gap - padding;
                     if (bottomSpace > bubbleHeight) {
                         return {
@@ -453,13 +449,22 @@ export default function TutorialOverlay({
                             arrow: 'top'
                         };
                     }
-                    // Fallback: position à gauche
                     return {
                         top: Math.max(padding, Math.min(rect.centerY - bubbleHeight / 2, viewportHeight - bubbleHeight - padding)),
                         left: Math.max(padding, rect.left - bubbleWidth - gap),
                         arrow: 'right'
                     };
                 case 'top':
+                    const topSpaceAvailable = rect.top - padding - gap;
+                    
+                    if (topSpaceAvailable < bubbleHeight) {
+                        return {
+                            top: padding,
+                            left: Math.max(padding, Math.min(rect.centerX - bubbleWidth / 2, viewportWidth - bubbleWidth - padding)),
+                            arrow: 'bottom'
+                        };
+                    }
+                    
                     return {
                         top: Math.max(padding, rect.top - bubbleHeight - gap),
                         left: Math.max(padding, Math.min(rect.centerX - bubbleWidth / 2, viewportWidth - bubbleWidth - padding)),
@@ -478,9 +483,8 @@ export default function TutorialOverlay({
         // Liste des positions possibles (calcul automatique)
         const positions = [];
         
-        // Position en bas
-        const bottomSpace = viewportHeight - rect.bottom - gap - padding;
-        if (bottomSpace > bubbleHeight) {
+        const bottomSpaceCalc = viewportHeight - rect.bottom - gap - padding;
+        if (bottomSpaceCalc > bubbleHeight) {
             positions.push({
                 name: 'bottom',
                 top: Math.min(viewportHeight - bubbleHeight - padding, rect.bottom + gap),
@@ -491,9 +495,8 @@ export default function TutorialOverlay({
             console.log('  ✅ Position "bottom" ajoutée');
         }
         
-        // Position en haut
-        const topSpace = rect.top - gap - padding;
-        if (topSpace > bubbleHeight) {
+        const topSpaceCalc = rect.top - gap - padding;
+        if (topSpaceCalc > bubbleHeight) {
             positions.push({
                 name: 'top',
                 top: Math.max(padding, rect.top - bubbleHeight - gap),
@@ -504,9 +507,8 @@ export default function TutorialOverlay({
             console.log('  ✅ Position "top" ajoutée');
         }
         
-        // Position à droite
-        const rightSpace = viewportWidth - rect.right - gap - padding;
-        if (rightSpace > bubbleWidth) {
+        const rightSpaceCalc = viewportWidth - rect.right - gap - padding;
+        if (rightSpaceCalc > bubbleWidth) {
             positions.push({
                 name: 'right',
                 top: Math.max(padding, Math.min(rect.centerY - bubbleHeight / 2, viewportHeight - bubbleHeight - padding)),
@@ -517,9 +519,8 @@ export default function TutorialOverlay({
             console.log('  ✅ Position "right" ajoutée');
         }
         
-        // Position à gauche
-        const leftSpace = rect.left - gap - padding;
-        if (leftSpace > bubbleWidth) {
+        const leftSpaceCalc = rect.left - gap - padding;
+        if (leftSpaceCalc > bubbleWidth) {
             positions.push({
                 name: 'left',
                 top: Math.max(padding, Math.min(rect.centerY - bubbleHeight / 2, viewportHeight - bubbleHeight - padding)),
@@ -532,7 +533,6 @@ export default function TutorialOverlay({
         
         console.log('  📐 Positions possibles:', positions.length);
         
-        // Si aucune position n'est disponible, position centrale
         if (positions.length === 0) {
             console.log('⚠️ [Tutorial] Aucune position disponible, utilisation d\'une position centrale');
             return {
@@ -542,7 +542,6 @@ export default function TutorialOverlay({
             };
         }
         
-        // Trier par priorité
         positions.sort((a, b) => a.priority - b.priority);
         const bestPos = positions[0];
         console.log('  📐 Meilleure position choisie:', bestPos);
@@ -576,7 +575,6 @@ export default function TutorialOverlay({
                 setTargetRect(rect);
                 
                 if (rect) {
-                    // ✅ Passer la position forcée si définie
                     const pos = calculateBubblePosition(rect, stepData.position);
                     console.log('📐 [updateTarget] Position finale de la bulle:', pos);
                     setBubblePosition(pos);
@@ -605,14 +603,13 @@ export default function TutorialOverlay({
             updateTarget();
             setIsVisible(true);
             
-            // ✅ Exécuter afterShow si présent
             if (hasAfterShow) {
                 console.log('🎬 [Tutorial] Exécution de afterShow pour l\'étape', currentStep);
                 setTimeout(() => {
                     stepData.afterShow();
-                }, 500);
+                }, 600);
             }
-        }, 300);
+        }, 400);
         
         return () => clearTimeout(timer);
     }, [isOpen, currentStep, updateTarget, hasAfterShow, stepData]);
@@ -636,7 +633,6 @@ export default function TutorialOverlay({
         };
     }, [isOpen, updateTarget]);
 
-    // ✅ Fonction pour fermer le menu si onLeave est défini
     const handleLeave = useCallback(() => {
         if (stepData?.onLeave && typeof stepData.onLeave === 'function') {
             console.log('🔚 [Tutorial] Exécution de onLeave pour l\'étape', currentStep);
@@ -647,7 +643,6 @@ export default function TutorialOverlay({
     if (!isOpen || !stepData) return null;
 
     const handleNext = () => {
-        // ✅ Appeler onLeave avant de passer à l'étape suivante
         handleLeave();
         
         if (isLastStep) {
@@ -666,7 +661,6 @@ export default function TutorialOverlay({
     };
 
     const handleSkip = () => {
-        // ✅ Appeler onLeave avant de passer
         handleLeave();
         if (pageId) {
             localStorage.setItem(`sounddeck-tutorial-${pageId}-done`, 'true');
@@ -770,6 +764,22 @@ export default function TutorialOverlay({
     const arrowStyles = getArrowStyles();
 
     const shouldShowBubble = showBubble;
+
+    console.log('🎯 [TutorialOverlay] Affichage de l\'étape:', currentStep)
+    console.log('  - Titre:', stepData?.title)
+    console.log('  - Description:', stepData?.description)
+    console.log('  - Hint:', stepData?.hint)
+    console.log('  - Icon:', stepData?.icon)
+
+    useEffect(() => {
+        if (isOpen) {
+            window.__tutorialUpdateTarget = updateTarget
+            
+            return () => {
+                delete window.__tutorialUpdateTarget
+            }
+        }
+    }, [isOpen, updateTarget])
 
     return createPortal(
         <>

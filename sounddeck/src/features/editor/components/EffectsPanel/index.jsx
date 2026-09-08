@@ -331,14 +331,17 @@ export default function EditorEffectsPanel({
   if (!clip) return null
 
   return (
-    <div style={{
-      padding: '10px 16px',
-      borderTop: '1px solid var(--border)',
-      background: 'var(--bg-secondary)',
-      flexShrink: 0,
-      maxHeight: 280,
-      overflowY: 'auto'
-    }}>
+    <div 
+      data-testid="editor-effects-panel"
+      style={{
+        padding: '10px 16px',
+        borderTop: '1px solid var(--border)',
+        background: 'var(--bg-secondary)',
+        flexShrink: 0,
+        maxHeight: 280,
+        overflowY: 'auto'
+      }}
+    >
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -365,6 +368,7 @@ export default function EditorEffectsPanel({
 
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <button
+            data-testid="editor-preview-effects-button"
             className={`btn-${isPreviewPlaying ? 'danger' : 'success'} btn-sm`}
             onClick={togglePlayPreview}
             disabled={isProcessingPreview && !isPreviewPlaying}
@@ -419,7 +423,9 @@ export default function EditorEffectsPanel({
             </span>
           </div>
 
+          {/* ✅ Bouton "Ajouter un effet" avec data-testid */}
           <button
+            data-testid="editor-add-effect-button"
             className="btn-secondary btn-sm"
             onClick={() => setShowAddEffect(!showAddEffect)}
             style={{ fontSize: 11, padding: '4px 10px' }}
@@ -490,6 +496,8 @@ export default function EditorEffectsPanel({
           return (
             <div
               key={effect.id}
+              data-testid="editor-effect-item"
+              className="effect-item-wrapper"
               style={{
                 background: effect.enabled ? 'var(--accent-light)' : 'var(--bg-tertiary)',
                 border: `1px solid ${effect.enabled ? 'var(--accent)' : 'var(--border)'}`,
@@ -527,6 +535,7 @@ export default function EditorEffectsPanel({
                     <i className={`ti ${effect.enabled ? 'ti-eye' : 'ti-eye-off'}`} />
                   </button>
                   <button
+                    data-testid="editor-effect-delete"
                     className="btn-ghost btn-sm"
                     onClick={() => handleEffectRemove(effect.id)}
                     style={{
@@ -623,6 +632,7 @@ export default function EditorEffectsPanel({
           {EFFECT_TYPES.map(effect => (
             <button
               key={effect.id}
+              data-testid={`effect-type-${effect.id}`}
               className="btn-secondary btn-sm"
               onClick={() => handleAddEffect(effect.id)}
               style={{

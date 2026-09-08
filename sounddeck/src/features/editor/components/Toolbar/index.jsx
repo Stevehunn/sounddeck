@@ -33,12 +33,10 @@ export default function EditorToolbar({
   loopState,
   onToggleTimelineLoop,
   onOpenLoopPanel,
-  // ✅ NOUVEAUX PROPS POUR LE MÉTRONOME
   metronomeEnabled,
   onToggleMetronome,
   bpm,
   onBpmChange,
-  // ✅ PROPS PROJETS
   project,
   projectList,
   recentProjects,
@@ -49,10 +47,12 @@ export default function EditorToolbar({
   onCreateProject,
   onDeleteProject,
   onDuplicateProject,
-  onProjectRename,  // ← Pour le modal
+  onProjectRename,
   onLoadProjectList,
   onExportProject,
   onImportProject,
+  showEffectsPanel,
+  onToggleEffectsPanel,
 }) {
   const [showAddClip, setShowAddClip] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
@@ -165,17 +165,20 @@ export default function EditorToolbar({
   const buttonState = getButtonState()
 
   return (
-    <div style={{
-      padding: '8px 16px',
-      borderBottom: '1px solid var(--border)',
-      background: 'var(--bg-secondary)',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10,
-      flexWrap: 'wrap',
-      flexShrink: 0,
-      position: 'relative'
-    }}>
+    <div 
+      data-testid="editor-toolbar"
+      style={{
+        padding: '8px 16px',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--bg-secondary)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        flexWrap: 'wrap',
+        flexShrink: 0,
+        position: 'relative'
+      }}
+    >
       {/* Nom du projet */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 120 }}>
         {isRenaming ? (
@@ -234,6 +237,7 @@ export default function EditorToolbar({
       {/* Contrôles de lecture */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <button
+          data-testid="editor-play-button"
           className="btn-primary btn-sm"
           onClick={onPlay}
           style={{
@@ -327,7 +331,7 @@ export default function EditorToolbar({
           title={tr('editorAutoCrossfade') || 'Crossfade automatique'}
         >
           <i className="ti ti-transition-right" />
-          {autoCrossfade ? 'Crossfade ON' : 'Crossfade OFF'}
+          {autoCrossfade ? tr('crossfadeOn') || 'Crossfade ON' : tr('crossfadeOff') || 'Crossfade OFF'}
         </button>
 
         <span style={{ 
@@ -365,7 +369,7 @@ export default function EditorToolbar({
 
       <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
 
-      {/* ✅ MÉTRONOME */}
+      {/* Métronome */}
       <EditorMetronome
         bpm={bpm || 120}
         onBpmChange={onBpmChange}
@@ -379,7 +383,7 @@ export default function EditorToolbar({
 
       <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
 
-      {/* ✅ PROJETS */}
+      {/* Projets */}
       <ProjectControls
         project={project}
         projectList={projectList}
@@ -391,7 +395,7 @@ export default function EditorToolbar({
         onCreateProject={onCreateProject}
         onDeleteProject={onDeleteProject}
         onDuplicateProject={onDuplicateProject}
-        onRenameProject={onProjectRename}  // ← Utilise onProjectRename
+        onRenameProject={onProjectRename}
         onLoadProjectList={onLoadProjectList}
         onExportProject={onExportProject}
         onImportProject={onImportProject}
@@ -400,9 +404,43 @@ export default function EditorToolbar({
 
       <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
 
-      {/* ✅ BOUTONS BOUCLE GÉNÉRALE */}
+      {/* ✅ BOUTON EFFETS - CORRIGÉ AVEC LA BONNE CLÉ */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <button
+          data-testid="editor-effects-panel-toggle"
+          className={showEffectsPanel ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+          onClick={() => onToggleEffectsPanel?.(!showEffectsPanel)}
+          style={{
+            minHeight: 28,
+            padding: '2px 10px',
+            borderRadius: 'var(--radius-sm)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            fontSize: 11
+          }}
+          title={showEffectsPanel ? tr('hideEffectsPanel') || 'Masquer le panneau des effets' : tr('showEffectsPanel') || 'Afficher le panneau des effets'}
+        >
+          <i className="ti ti-wand" />
+          <span>{tr('editorEffects') || 'Effets'}</span>
+          <span style={{
+            fontSize: 8,
+            padding: '1px 6px',
+            borderRadius: 10,
+            background: showEffectsPanel ? 'rgba(255,255,255,0.2)' : 'var(--bg-tertiary)',
+            color: showEffectsPanel ? 'white' : 'var(--text-tertiary)'
+          }}>
+            {showEffectsPanel ? 'ON' : 'OFF'}
+          </span>
+        </button>
+      </div>
+
+      <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
+
+      {/* Boutons boucle générale */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <button
+          data-testid="editor-loop-toggle-button"
           className={timelineLoop.enabled ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
           onClick={onToggleTimelineLoop}
           style={{
@@ -430,6 +468,7 @@ export default function EditorToolbar({
         </button>
 
         <button
+          data-testid="editor-loop-settings-button"
           className="btn-secondary btn-sm"
           onClick={onOpenLoopPanel}
           style={{
@@ -452,6 +491,7 @@ export default function EditorToolbar({
       {/* Boutons d'action */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button
+          data-testid="editor-add-track-button"
           className="btn-secondary btn-sm"
           onClick={onAddTrack}
           style={{ fontSize: 12 }}
@@ -460,6 +500,7 @@ export default function EditorToolbar({
         </button>
 
         <button
+          data-testid="editor-add-clip-button"
           className="btn-secondary btn-sm"
           onClick={() => setShowAddClip(!showAddClip)}
           style={{ fontSize: 12 }}
@@ -468,6 +509,7 @@ export default function EditorToolbar({
         </button>
 
         <button
+          data-testid="editor-import-file-button"
           className="btn-secondary btn-sm"
           onClick={onAddFile}
           style={{ fontSize: 12 }}
@@ -476,6 +518,7 @@ export default function EditorToolbar({
         </button>
 
         <button
+          data-testid="editor-export-button"
           className="btn-primary btn-sm"
           onClick={onExport}
           style={{ fontSize: 12 }}

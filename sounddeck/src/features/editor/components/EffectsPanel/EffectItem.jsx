@@ -89,15 +89,19 @@ const EffectItem = memo(({
   }
 
   return (
-    <div style={{
-      background: 'var(--bg-tertiary)',
-      border: `1px solid ${effect.enabled ? 'var(--accent)' : 'var(--border)'}`,
-      borderRadius: 'var(--radius-md)',
-      padding: 8,
-      marginBottom: 4,
-      opacity: effect.enabled ? 1 : 0.5,
-      transition: 'all 0.15s'
-    }}>
+    <div
+      data-testid="editor-effect-item"
+      className="effect-item"
+      style={{
+        background: 'var(--bg-tertiary)',
+        border: `1px solid ${effect.enabled ? 'var(--accent)' : 'var(--border)'}`,
+        borderRadius: 'var(--radius-md)',
+        padding: 8,
+        marginBottom: 4,
+        opacity: effect.enabled ? 1 : 0.5,
+        transition: 'all 0.15s'
+      }}
+    >
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -126,8 +130,9 @@ const EffectItem = memo(({
             <i className={`ti ${effect.enabled ? 'ti-check' : 'ti-x'}`} />
           </button>
           
-          {/* ✅ Bouton Supprimer générique */}
+          {/* ✅ Bouton Supprimer avec data-testid */}
           <DeleteButton
+            data-testid="editor-effect-delete"
             onDelete={() => onRemove?.(effect.id)}
             confirmTitle={tr('confirmDeleteEffect') || 'Confirmer la suppression de l\'effet'}
             confirmMessage={tr('confirmDeleteEffectMessage') || 'Voulez-vous vraiment supprimer cet effet ?'}

@@ -19,23 +19,26 @@ const TimelineZoomControls = memo(({
   }
 
   return (
-    <div style={{
-      position: 'sticky',
-      bottom: 8,
-      left: '50%',
-      transform: 'translateX(-50%)',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 6,
-      padding: '4px 12px',
-      background: 'rgba(0,0,0,0.8)',
-      backdropFilter: 'blur(8px)',
-      borderRadius: 'var(--radius-md)',
-      border: '1px solid var(--border)',
-      zIndex: 20,
-      marginTop: 8,
-      width: 'fit-content'
-    }}>
+    <div 
+      data-testid="editor-zoom-controls"
+      style={{
+        position: 'sticky',
+        bottom: 8,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '4px 12px',
+        background: 'rgba(0,0,0,0.8)',
+        backdropFilter: 'blur(8px)',
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--border)',
+        zIndex: 20,
+        marginTop: 8,
+        width: 'fit-content'
+      }}
+    >
       <button
         className="btn-ghost btn-sm"
         onClick={() => onZoomChange?.(Math.max(0.05, zoomLevel - 0.1))}

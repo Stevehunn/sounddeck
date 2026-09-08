@@ -27,6 +27,7 @@ export default function EditorMasterVolume({
 
   return (
     <div
+      data-testid="editor-master-volume"
       style={{
         display: 'flex',
         alignItems: 'center',

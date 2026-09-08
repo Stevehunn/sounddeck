@@ -57,14 +57,9 @@ const EditorClip = ({
   const SNAP_VALUE = 0.01
   const DRAG_SENSITIVITY = 1.0
 
-  // ✅ Vérifier si le clip est en boucle - AVEC LOGS DÉTAILLÉS
+  // ✅ Vérifier si le clip est en boucle
   const isClipLooping = clip?.id && loopState?.clips?.[clip.id]?.enabled || false
   const clipLoopData = clip?.id ? loopState?.clips?.[clip.id] : null
-  
-  // ✅ LOGS DÉTAILLÉS
-  console.log(`🔁 [Clip] ${clip?.name} (${clip?.id}) - loopState reçu:`, loopState)
-  console.log(`🔁 [Clip] ${clip?.name} - clipLoopData:`, clipLoopData)
-  console.log(`🔁 [Clip] ${clip?.name} - isClipLooping (calculé):`, isClipLooping)
   
   const loopVisual = clipLoopData?.visual || 'arrow'
   const loopColor = clipLoopData?.arrowColor || '#22c55e'
@@ -76,7 +71,6 @@ const EditorClip = ({
   const loopEndRelativePosition = Math.max(0, (loopEnd - start) * pixelsPerSecond)
   const loopWidth = Math.max(0, loopEndRelativePosition - clipEndPosition)
 
-  // ✅ Nombre de cycles
   const cycleCount = clipLoopData?.cycleCount || 1
   const totalCycles = clipLoopData?.totalCycles || 1
 
@@ -291,7 +285,7 @@ const EditorClip = ({
           borderRadius: '0 4px 4px 0',
         }}
       >
-        {/* ✅ "]" à la fin de la boucle */}
+        {/* "]" à la fin de la boucle */}
         <div style={{
           position: 'absolute',
           right: -2,
@@ -314,7 +308,7 @@ const EditorClip = ({
           </span>
         </div>
         
-        {/* ✅ Label "FIN" en bas */}
+        {/* Label "FIN" en bas */}
         <div style={{
           position: 'absolute',
           right: -2,
@@ -334,7 +328,7 @@ const EditorClip = ({
           FIN {(loopWidth / pixelsPerSecond).toFixed(1)}s
         </div>
         
-        {/* ✅ Flèche tiretée */}
+        {/* Flèche tiretée */}
         <div
           style={{
             position: 'absolute',
@@ -370,7 +364,7 @@ const EditorClip = ({
           }} />
         </div>
         
-        {/* ✅ Label "LOOP" avec infos */}
+        {/* Label "LOOP" avec infos */}
         <div style={{
           position: 'absolute',
           top: -24,
@@ -429,6 +423,7 @@ const EditorClip = ({
   return (
     <div
       ref={clipRef}
+      data-testid="editor-clip"
       className="editor-clip-wrapper"
       style={{
         position: 'absolute',
@@ -454,10 +449,10 @@ const EditorClip = ({
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      {/* ✅ Zone de boucle */}
+      {/* Zone de boucle */}
       {renderLoopOverlay()}
 
-      {/* ✅ Badge de boucle avec info */}
+      {/* Badge de boucle avec info */}
       {isClipLooping && (
         <div style={{
           position: 'absolute',

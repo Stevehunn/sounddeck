@@ -765,6 +765,7 @@ export default function EditorTimeline({
         {/* Clips */}
         <div
           ref={clipsContainerRef}
+          data-testid="editor-timeline"
           style={{
             flex: 1,
             height: '100%',
@@ -927,6 +928,7 @@ export default function EditorTimeline({
         {/* Bouton pour ouvrir le panneau des marqueurs */}
         {isInitialized && !showMarkersPanel && onAddMarker && (
           <button
+            data-testid="editor-add-marker-button"
             className="btn-secondary btn-sm"
             onClick={() => {
               handleToggleMarkersPanel(true)
@@ -977,20 +979,22 @@ export default function EditorTimeline({
       </div>
 
       {/* Zoom Controls */}
-      <div style={{
-        position: 'sticky',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        display: 'flex',
-        justifyContent: 'center',
-        padding: '4px 0',
-        background: 'rgba(0,0,0,0.8)',
-        backdropFilter: 'blur(8px)',
-        borderTop: '1px solid var(--border)',
-        zIndex: 20,
-        flexShrink: 0
-      }}>
+      <div 
+        data-testid="editor-zoom-controls"
+        style={{
+          position: 'sticky',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          justifyContent: 'center',
+          padding: '4px 0',
+          background: 'rgba(0,0,0,0.8)',
+          backdropFilter: 'blur(8px)',
+          borderTop: '1px solid var(--border)',
+          zIndex: 20,
+          flexShrink: 0
+        }}>
         <TimelineZoomControls
           zoomLevel={zoomLevel}
           onZoomChange={onZoomChange}
