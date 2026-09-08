@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react'
-// ✅ CORRIGER L'IMPORT
 import { useLanguage } from '@core/i18n/LanguageContext'
 
 export default function Stats({ store }) {
@@ -72,15 +71,18 @@ export default function Stats({ store }) {
     return profile.name
   }
 
-  const StatCard = ({ icon, label, value, sub, color = 'var(--accent)' }) => (
-    <div style={{
-      padding: '16px',
-      background: 'var(--bg-secondary)',
-      borderRadius: 'var(--radius-md)',
-      border: '1px solid var(--border)',
-      flex: 1,
-      minWidth: 120
-    }}>
+  const StatCard = ({ icon, label, value, sub, color = 'var(--accent)', testId }) => (
+    <div 
+      data-testid={testId || 'stat-card'}
+      style={{
+        padding: '16px',
+        background: 'var(--bg-secondary)',
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--border)',
+        flex: 1,
+        minWidth: 120
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <i className={`ti ${icon}`} style={{ color }} />
         <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{label}</span>
@@ -91,12 +93,15 @@ export default function Stats({ store }) {
   )
 
   return (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'column', 
-      height: '100%', 
-      overflow: 'hidden',
-    }}>
+    <div 
+      data-testid="stats-container"
+      style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        height: '100%', 
+        overflow: 'hidden',
+      }}
+    >
       {/* Header - Fixe */}
       <div style={{
         display: 'flex',
@@ -117,7 +122,10 @@ export default function Stats({ store }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div 
+          data-testid="stats-filters"
+          style={{ display: 'flex', gap: 6 }}
+        >
           {['all', 'week', 'month'].map(range => (
             <button
               key={range}
@@ -146,16 +154,20 @@ export default function Stats({ store }) {
         padding: '20px',
       }}>
         {/* Stats Cards */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-          gap: 10,
-          marginBottom: 20
-        }}>
+        <div 
+          className="stats-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+            gap: 10,
+            marginBottom: 20
+          }}
+        >
           <StatCard 
             icon="ti-music" 
             label={t('statsTotalSounds')} 
-            value={stats.totalSounds} 
+            value={stats.totalSounds}
+            testId="stat-card-total"
           />
           <StatCard 
             icon="ti-player-play" 
@@ -163,40 +175,48 @@ export default function Stats({ store }) {
             value={stats.totalPlays} 
             sub={`${stats.recentPlays} ${t('statsRecent')}`}
             color="var(--success)"
+            testId="stat-card-plays"
           />
           <StatCard 
             icon="ti-users" 
             label={t('statsProfiles')} 
-            value={stats.profileCount} 
+            value={stats.profileCount}
+            testId="stat-card-profiles"
           />
           <StatCard 
             icon="ti-tag" 
             label={t('statsTags')} 
             value={stats.tagCount} 
             color="var(--warning)"
+            testId="stat-card-tags"
           />
           <StatCard 
             icon="ti-star" 
             label={t('statsFavorites')} 
             value={stats.favoriteCount} 
             color="var(--warning)"
+            testId="stat-card-favorites"
           />
           <StatCard 
             icon="ti-user-check" 
             label={t('statsPlayedSounds')} 
-            value={`${stats.playedSounds}/${stats.totalSounds}`} 
+            value={`${stats.playedSounds}/${stats.totalSounds}`}
+            testId="stat-card-played"
           />
         </div>
 
         {/* Top Sons */}
         {stats.topSounds.length > 0 && (
-          <div style={{
-            background: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--border)',
-            padding: '16px',
-            marginBottom: 16
-          }}>
+          <div 
+            data-testid="stats-top-sounds"
+            style={{
+              background: 'var(--bg-secondary)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border)',
+              padding: '16px',
+              marginBottom: 16
+            }}
+          >
             <div style={{
               fontSize: 13,
               fontWeight: 600,
@@ -247,13 +267,16 @@ export default function Stats({ store }) {
 
         {/* Sons par profil */}
         {stats.soundsByProfile.length > 1 && (
-          <div style={{
-            background: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--border)',
-            padding: '16px',
-            marginBottom: 16
-          }}>
+          <div 
+            data-testid="stats-profiles"
+            style={{
+              background: 'var(--bg-secondary)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border)',
+              padding: '16px',
+              marginBottom: 16
+            }}
+          >
             <div style={{
               fontSize: 13,
               fontWeight: 600,
@@ -280,7 +303,7 @@ export default function Stats({ store }) {
                   }}
                 >
                   <span style={{ fontSize: 12 }}>
-                    {getProfileName(profile)} {/* ✅ Utiliser la fonction de traduction */}
+                    {getProfileName(profile)}
                   </span>
                   <span style={{
                     fontSize: 10,

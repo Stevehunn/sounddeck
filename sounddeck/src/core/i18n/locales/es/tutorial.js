@@ -169,13 +169,25 @@ export default {
   tutorialOptionsStep3Hint: '💡 Consejo: El visualizador de teclado muestra todas las teclas utilizadas.',
 
   // ─── STATS ──────────────────────────────────────────────────────────
-  tutorialStatsStep1Title: 'Ver tus estadísticas',
-  tutorialStatsStep1Desc: 'Consulta tus sonidos más reproducidos, el total de reproducciones y estadísticas de uso.',
-  tutorialStatsStep1Hint: '💡 Consejo: Las estadísticas se actualizan en tiempo real.',
-  
-  tutorialStatsStep2Title: 'Filtrar por período',
-  tutorialStatsStep2Desc: 'Muestra estadísticas para diferentes períodos: hoy, esta semana, este mes o todo el tiempo.',
-  tutorialStatsStep2Hint: '💡 Consejo: Los datos se conservan incluso después de reiniciar la aplicación.',
+  tutorialStatsStep1Title: 'Vista general de estadísticas',
+  tutorialStatsStep1Desc: 'Esta página muestra todas tus estadísticas de uso: número total de sonidos, reproducciones, perfiles, etiquetas y favoritos.',
+  tutorialStatsStep1Hint: '💡 Consejo: Las estadísticas se actualizan en tiempo real con cada reproducción.',
+
+  tutorialStatsStep2Title: 'Tarjetas de estadísticas',
+  tutorialStatsStep2Desc: 'Cada tarjeta muestra una estadística clave: total de sonidos, reproducciones, perfiles, etiquetas y favoritos.',
+  tutorialStatsStep2Hint: '💡 Consejo: Las tarjetas con icono 🎵 muestran el total de sonidos, 🏆 los más reproducidos.',
+
+  tutorialStatsStep3Title: 'Filtrar por período',
+  tutorialStatsStep3Desc: 'Usa los botones de filtro para mostrar estadísticas de diferentes períodos: Todo, Semana o Mes.',
+  tutorialStatsStep3Hint: '💡 Consejo: Los datos se conservan incluso después de reiniciar la aplicación.',
+
+  tutorialStatsStep4Title: 'Top 10 de sonidos más reproducidos',
+  tutorialStatsStep4Desc: 'Esta sección muestra tus 10 sonidos más escuchados. ¡El número 1 es tu sonido más popular!',
+  tutorialStatsStep4Hint: '💡 Consejo: Los sonidos están ordenados por número de reproducciones decreciente.',
+
+  tutorialStatsStep5Title: 'Distribución de sonidos por perfil',
+  tutorialStatsStep5Desc: 'Visualiza la distribución de tus sonidos entre tus diferentes perfiles. Cada perfil muestra el número de sonidos que contiene.',
+  tutorialStatsStep5Hint: '💡 Consejo: El perfil "Todos los sonidos" muestra el total de todos tus sonidos.',
 
   // ─── PRESENTATION ──────────────────────────────────────────────────
   tutorialPresentationStep1Title: 'Modo presentación',

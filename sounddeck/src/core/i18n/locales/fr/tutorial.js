@@ -169,13 +169,25 @@ export default {
   tutorialOptionsStep3Hint: '💡 Astuce : Le visualisateur de clavier montre toutes les touches utilisées.',
 
   // ─── STATS ──────────────────────────────────────────────────────────
-  tutorialStatsStep1Title: 'Voir vos statistiques',
-  tutorialStatsStep1Desc: 'Consultez vos sons les plus joués, le nombre total de lectures et vos statistiques d\'utilisation.',
-  tutorialStatsStep1Hint: '💡 Astuce : Les statistiques sont mises à jour en temps réel.',
-  
-  tutorialStatsStep2Title: 'Filtrer par période',
-  tutorialStatsStep2Desc: 'Affichez les statistiques pour différentes périodes : aujourd\'hui, cette semaine, ce mois-ci ou tout le temps.',
-  tutorialStatsStep2Hint: '💡 Astuce : Les données sont conservées même après un redémarrage de l\'application.',
+  tutorialStatsStep1Title: 'Vue d\'ensemble des statistiques',
+  tutorialStatsStep1Desc: 'Cette page affiche toutes vos statistiques d\'utilisation : nombre total de sons, lectures, profils, tags et favoris.',
+  tutorialStatsStep1Hint: '💡 Astuce : Les statistiques sont mises à jour en temps réel à chaque lecture.',
+
+  tutorialStatsStep2Title: 'Cartes de statistiques',
+  tutorialStatsStep2Desc: 'Chaque carte affiche une statistique clé : nombre total de sons, lectures, profils, tags et favoris.',
+  tutorialStatsStep2Hint: '💡 Astuce : Les cartes avec une icône 🎵 montrent le total des sons, 🏆 les plus joués.',
+
+  tutorialStatsStep3Title: 'Filtrer par période',
+  tutorialStatsStep3Desc: 'Utilisez les boutons de filtre pour afficher les statistiques sur différentes périodes : Tout, Semaine ou Mois.',
+  tutorialStatsStep3Hint: '💡 Astuce : Les données sont conservées même après un redémarrage de l\'application.',
+
+  tutorialStatsStep4Title: 'Top 10 des sons les plus joués',
+  tutorialStatsStep4Desc: 'Cette section affiche vos 10 sons les plus écoutés. Le numéro 1 est votre son le plus populaire !',
+  tutorialStatsStep4Hint: '💡 Astuce : Les sons sont triés par nombre de lectures décroissant.',
+
+  tutorialStatsStep5Title: 'Répartition des sons par profil',
+  tutorialStatsStep5Desc: 'Visualisez la répartition de vos sons entre vos différents profils. Chaque profil affiche le nombre de sons qu\'il contient.',
+  tutorialStatsStep5Hint: '💡 Astuce : Le profil "Tous les sons" affiche le total de tous vos sons.',
 
   // ─── PRESENTATION ──────────────────────────────────────────────────
   tutorialPresentationStep1Title: 'Mode présentation',

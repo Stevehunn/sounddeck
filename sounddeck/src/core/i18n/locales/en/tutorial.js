@@ -169,13 +169,25 @@ export default {
   tutorialOptionsStep3Hint: '💡 Tip: The keyboard visualizer shows all used keys.',
 
   // ─── STATS ──────────────────────────────────────────────────────────
-  tutorialStatsStep1Title: 'View your statistics',
-  tutorialStatsStep1Desc: 'Check your most played sounds, total play count and usage statistics.',
-  tutorialStatsStep1Hint: '💡 Tip: Statistics are updated in real time.',
-  
-  tutorialStatsStep2Title: 'Filter by period',
-  tutorialStatsStep2Desc: 'Display statistics for different periods: today, this week, this month or all time.',
-  tutorialStatsStep2Hint: '💡 Tip: Data is kept even after restarting the application.',
+  tutorialStatsStep1Title: 'Statistics overview',
+  tutorialStatsStep1Desc: 'This page displays all your usage statistics: total sounds, plays, profiles, tags and favorites.',
+  tutorialStatsStep1Hint: '💡 Tip: Statistics are updated in real-time with each playback.',
+
+  tutorialStatsStep2Title: 'Statistics cards',
+  tutorialStatsStep2Desc: 'Each card displays a key statistic: total sounds, plays, profiles, tags and favorites.',
+  tutorialStatsStep2Hint: '💡 Tip: Cards with 🎵 icon show total sounds, 🏆 show most played.',
+
+  tutorialStatsStep3Title: 'Filter by period',
+  tutorialStatsStep3Desc: 'Use the filter buttons to display statistics for different periods: All, Week or Month.',
+  tutorialStatsStep3Hint: '💡 Tip: Data is preserved even after restarting the application.',
+
+  tutorialStatsStep4Title: 'Top 10 most played sounds',
+  tutorialStatsStep4Desc: 'This section displays your 10 most listened sounds. Number 1 is your most popular sound!',
+  tutorialStatsStep4Hint: '💡 Tip: Sounds are sorted by decreasing play count.',
+
+  tutorialStatsStep5Title: 'Sound distribution by profile',
+  tutorialStatsStep5Desc: 'View the distribution of your sounds across your different profiles. Each profile shows the number of sounds it contains.',
+  tutorialStatsStep5Hint: '💡 Tip: The "All sounds" profile shows the total of all your sounds.',
 
   // ─── PRESENTATION ──────────────────────────────────────────────────
   tutorialPresentationStep1Title: 'Presentation mode',
