@@ -191,12 +191,28 @@ export default {
 
   // ─── PRESENTATION ──────────────────────────────────────────────────
   tutorialPresentationStep1Title: 'Presentation mode',
-  tutorialPresentationStep1Desc: 'Display your sounds in full screen for a presentation. Perfect for streams or meetings.',
-  tutorialPresentationStep1Hint: '💡 Tip: Press Escape to exit presentation mode.',
-  
-  tutorialPresentationStep2Title: 'Navigate between sounds',
-  tutorialPresentationStep2Desc: 'Use the mouse or arrow keys to navigate between sounds in presentation mode.',
-  tutorialPresentationStep2Hint: '💡 Tip: Favorite sounds are displayed first.',
+  tutorialPresentationStep1Desc: 'Presentation mode displays your sounds in full screen. Perfect for streams, meetings or demonstrations.',
+  tutorialPresentationStep1Hint: '💡 Tip: Press Escape (Esc) to exit presentation mode at any time.',
+
+  tutorialPresentationStep2Title: 'Search bar',
+  tutorialPresentationStep2Desc: 'Use the search bar to quickly find a sound by name.',
+  tutorialPresentationStep2Hint: '💡 Tip: Search is instant, results update in real-time.',
+
+  tutorialPresentationStep3Title: 'Favorites first',
+  tutorialPresentationStep3Desc: 'Favorite sounds are displayed first, in a dedicated section at the top of the presentation.',
+  tutorialPresentationStep3Hint: '💡 Tip: Add sounds to favorites from the home page to find them easily here.',
+
+  tutorialPresentationStep4Title: 'Play a sound',
+  tutorialPresentationStep4Desc: 'Click on a card to play the sound. During playback, a progress bar and animated waves appear.',
+  tutorialPresentationStep4Hint: '💡 Tip: Click again on the currently playing sound to stop it.',
+
+  tutorialPresentationStep5Title: 'Card size',
+  tutorialPresentationStep5Desc: 'Card size automatically adapts to your preferences (Small, Medium or Large).',
+  tutorialPresentationStep5Hint: '💡 Tip: Adjust card size in SoundDeck options.',
+
+  tutorialPresentationStep6Title: 'Keyboard shortcuts',
+  tutorialPresentationStep6Desc: 'Each card displays its keyboard shortcut if you have defined one. Perfect for launching your sounds without a mouse!',
+  tutorialPresentationStep6Hint: '💡 Tip: Define your shortcuts in the Options page for even faster use.',
 
   // ─── YOUTUBE ────────────────────────────────────────────────────────
   tutorialYoutubeStep1Title: 'Paste a YouTube link',

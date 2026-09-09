@@ -429,7 +429,13 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
               </div>
             )}
           </div>
-          <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="input-sm" style={{ width: 'auto', minWidth: 120 }}>
+          <select 
+            data-testid="sort-select"
+            value={sortBy} 
+            onChange={e => setSortBy(e.target.value)} 
+            className="input-sm" 
+            style={{ width: 'auto', minWidth: 120 }}
+          >
             <option value="custom">{t('sortCustom')}</option>
             <option value="default">{t('sortDefault')}</option>
             <option value="popular">{t('sortPopular')}</option>
@@ -437,6 +443,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
             <option value="alpha">{t('sortAlpha')}</option>
           </select>
           <input 
+            data-testid="search-input"
             value={localSearch} 
             onChange={e => setLocalSearch(e.target.value)} 
             placeholder={t('search')} 
@@ -444,7 +451,12 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
             style={{ width: 160, minWidth: 120 }} 
           />
           
-          <button className="btn-primary btn-sm" onClick={() => setShowImport(true)} style={{ minHeight: 34 }}>
+          <button 
+            data-testid="add-sound-button"
+            className="btn-primary btn-sm" 
+            onClick={() => setShowImport(true)} 
+            style={{ minHeight: 34 }}
+          >
             <i className="ti ti-plus" /> {t('addSound')}
           </button>
           
@@ -510,8 +522,15 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
             </div>
           )}
 
+          {/* ✅ SECTION FAVORIS AVEC data-testid */}
           {favoriteSoundsForProfile.length > 0 && (
-            <Section title={t('favorites')} icon="ti-star-filled" iconColor="var(--warning)" count={favoriteSoundsForProfile.length}>
+            <Section 
+              title={t('favorites')} 
+              icon="ti-star-filled" 
+              iconColor="var(--warning)" 
+              count={favoriteSoundsForProfile.length}
+              testId="favorites-section"
+            >
               <SoundGrid 
                 sounds={favoriteSoundsForProfile} 
                 shortcuts={shortcuts} 
@@ -532,12 +551,19 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
                 dragOverIndex={dragOverIndex}
                 dropTarget="favorites"
                 onDelete={handleDeleteSound}
+                testId="favorites-grid"
               />
             </Section>
           )}
 
+          {/* ✅ SECTION SONS DU PROFIL AVEC data-testid */}
           {filtered.length > 0 && (
-            <Section title={t('profileSounds')} icon="ti-music" count={filtered.length}>
+            <Section 
+              title={t('profileSounds')} 
+              icon="ti-music" 
+              count={filtered.length}
+              testId="profile-sounds-section"
+            >
               <SoundGrid 
                 sounds={displayed} 
                 shortcuts={shortcuts} 
@@ -558,6 +584,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
                 dragOverIndex={dragOverIndex}
                 dropTarget="profile"
                 onDelete={handleDeleteSound}
+                testId="profile-sounds-grid"
               />
               {filtered.length > itemsPerPage && (
                 <button className="btn-secondary btn-sm" onClick={() => setShowAll(!showAll)} style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}>
@@ -568,17 +595,30 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
             </Section>
           )}
 
+          {/* ✅ SECTION AUTRES SONS AVEC data-testid */}
           {soundsOutsideProfile.length > 0 && (
-            <Section title={t('otherSounds')} icon="ti-circle-plus" iconColor="var(--text-tertiary)" count={soundsOutsideProfile.length} muted>
+            <Section 
+              title={t('otherSounds')} 
+              icon="ti-circle-plus" 
+              iconColor="var(--text-tertiary)" 
+              count={soundsOutsideProfile.length} 
+              muted
+              testId="other-sounds-section"
+            >
               <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>
                 {t('clickToAdd')}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
                 {displayedOther.map(s => (
-                  <OutsideCard key={s.id} sound={s} onAdd={async () => {
-                    await store.addSoundToProfile(s.id, currentProfileId)
-                    addToast(`"${s.name}" ${t('addedToProfile')}`, 'success')
-                  }} lang={lang} />
+                  <OutsideCard 
+                    key={s.id} 
+                    sound={s} 
+                    onAdd={async () => {
+                      await store.addSoundToProfile(s.id, currentProfileId)
+                      addToast(`"${s.name}" ${t('addedToProfile')}`, 'success')
+                    }} 
+                    lang={lang} 
+                  />
                 ))}
               </div>
               {soundsOutsideProfile.length > itemsPerPage && (
@@ -683,9 +723,13 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
 
 // ─── SOUS-COMPOSANTS ──────────────────────────────────────────────────────────
 
-function Section({ title, icon, iconColor, count, muted, children }) {
+// ✅ Section avec data-testid
+function Section({ title, icon, iconColor, count, muted, children, testId }) {
   return (
-    <section style={{ marginBottom: 24 }}>
+    <section 
+      data-testid={testId || 'section'}
+      style={{ marginBottom: 24 }}
+    >
       <div style={{ 
         fontSize: 12, 
         fontWeight: 500, 
@@ -704,7 +748,29 @@ function Section({ title, icon, iconColor, count, muted, children }) {
   )
 }
 
-function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLocally, store, addToast, lang, gridRef, draggable, onDragStart, onDragEnd, onDragOver, onDrop, draggedSoundId, dragOverIndex, dropTarget, onDelete }) {
+// ✅ SoundGrid avec data-testid
+function SoundGrid({ 
+  sounds, 
+  shortcuts, 
+  audioDevice, 
+  volume, 
+  loopEnabled, 
+  playLocally, 
+  store, 
+  addToast, 
+  lang, 
+  gridRef, 
+  draggable, 
+  onDragStart, 
+  onDragEnd, 
+  onDragOver, 
+  onDrop, 
+  draggedSoundId, 
+  dragOverIndex, 
+  dropTarget, 
+  onDelete,
+  testId
+}) {
   const { t, currentLang } = useLanguage()
   const cardSize = store.cardSize || 'medium'
   
@@ -715,7 +781,17 @@ function SoundGrid({ sounds, shortcuts, audioDevice, volume, loopEnabled, playLo
   }
 
   return (
-    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${cardSizes[cardSize]}px, 1fr))`, gap: 10, position: 'relative', zIndex: 1 }}>
+    <div 
+      ref={gridRef} 
+      data-testid={testId || 'sound-grid'}
+      style={{ 
+        display: 'grid', 
+        gridTemplateColumns: `repeat(auto-fill, minmax(${cardSizes[cardSize]}px, 1fr))`, 
+        gap: 10, 
+        position: 'relative', 
+        zIndex: 1 
+      }}
+    >
       {sounds.map((s, index) => {
         const isDragging = draggedSoundId === s.id
         const isDragOver = dragOverIndex === index && !isDragging
@@ -804,7 +880,12 @@ function OutsideCard({ sound, onAdd, lang }) {
         {imageUrl ? <img src={imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : sound.emoji}
       </div>
       <div style={{ fontSize: 11, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 6 }}>{sound.name}</div>
-      <button onClick={onAdd} className="btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center' }}>
+      <button 
+        data-testid={`add-other-sound-${sound.id}`}
+        onClick={onAdd} 
+        className="btn-primary btn-sm" 
+        style={{ width: '100%', justifyContent: 'center' }}
+      >
         <i className="ti ti-circle-plus" /> {t('addToProfile')}
       </button>
     </div>

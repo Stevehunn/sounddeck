@@ -191,12 +191,28 @@ export default {
 
   // ─── PRESENTATION ──────────────────────────────────────────────────
   tutorialPresentationStep1Title: 'Modo presentación',
-  tutorialPresentationStep1Desc: 'Muestra tus sonidos en pantalla completa para una presentación. Ideal para streams o reuniones.',
-  tutorialPresentationStep1Hint: '💡 Consejo: Presiona Escape para salir del modo presentación.',
-  
-  tutorialPresentationStep2Title: 'Navegar entre sonidos',
-  tutorialPresentationStep2Desc: 'Usa el mouse o las teclas de flecha para navegar entre sonidos en modo presentación.',
-  tutorialPresentationStep2Hint: '💡 Consejo: Los sonidos favoritos se muestran primero.',
+  tutorialPresentationStep1Desc: 'El modo presentación muestra tus sonidos en pantalla completa. Ideal para streams, reuniones o demostraciones.',
+  tutorialPresentationStep1Hint: '💡 Consejo: Presiona Escape (Esc) para salir del modo presentación en cualquier momento.',
+
+  tutorialPresentationStep2Title: 'Barra de búsqueda',
+  tutorialPresentationStep2Desc: 'Usa la barra de búsqueda para encontrar rápidamente un sonido por nombre.',
+  tutorialPresentationStep2Hint: '💡 Consejo: La búsqueda es instantánea, los resultados se actualizan en tiempo real.',
+
+  tutorialPresentationStep3Title: 'Favoritos primero',
+  tutorialPresentationStep3Desc: 'Los sonidos favoritos se muestran primero, en una sección dedicada en la parte superior de la presentación.',
+  tutorialPresentationStep3Hint: '💡 Consejo: Agrega sonidos a favoritos desde la página de inicio para encontrarlos fácilmente aquí.',
+
+  tutorialPresentationStep4Title: 'Reproducir un sonido',
+  tutorialPresentationStep4Desc: 'Haz clic en una tarjeta para reproducir el sonido. Durante la reproducción, aparecen una barra de progreso y ondas animadas.',
+  tutorialPresentationStep4Hint: '💡 Consejo: Haz clic nuevamente en el sonido que se está reproduciendo para detenerlo.',
+
+  tutorialPresentationStep5Title: 'Tamaño de las tarjetas',
+  tutorialPresentationStep5Desc: 'El tamaño de las tarjetas se adapta automáticamente a tus preferencias (Pequeño, Mediano o Grande).',
+  tutorialPresentationStep5Hint: '💡 Consejo: Ajusta el tamaño de las tarjetas en las opciones de SoundDeck.',
+
+  tutorialPresentationStep6Title: 'Atajos de teclado',
+  tutorialPresentationStep6Desc: 'Cada tarjeta muestra su atajo de teclado si has definido uno. ¡Perfecto para lanzar tus sonidos sin mouse!',
+  tutorialPresentationStep6Hint: '💡 Consejo: Define tus atajos en la página de Opciones para un uso aún más rápido.',
 
   // ─── YOUTUBE ────────────────────────────────────────────────────────
   tutorialYoutubeStep1Title: 'Pegar un enlace de YouTube',

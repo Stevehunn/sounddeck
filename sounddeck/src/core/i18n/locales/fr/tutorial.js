@@ -191,12 +191,28 @@ export default {
 
   // ─── PRESENTATION ──────────────────────────────────────────────────
   tutorialPresentationStep1Title: 'Mode présentation',
-  tutorialPresentationStep1Desc: 'Affichez vos sons en plein écran pour une présentation. Idéal pour les streams ou les réunions.',
-  tutorialPresentationStep1Hint: '💡 Astuce : Appuyez sur Échap pour quitter le mode présentation.',
-  
-  tutorialPresentationStep2Title: 'Naviguer entre les sons',
-  tutorialPresentationStep2Desc: 'Utilisez la souris ou les touches fléchées pour naviguer entre les sons en mode présentation.',
-  tutorialPresentationStep2Hint: '💡 Astuce : Les sons favoris sont affichés en premier.',
+  tutorialPresentationStep1Desc: 'Le mode présentation affiche vos sons en plein écran. Idéal pour les streams, les réunions ou les démonstrations.',
+  tutorialPresentationStep1Hint: '💡 Astuce : Appuyez sur Échap (Esc) pour quitter le mode présentation à tout moment.',
+
+  tutorialPresentationStep2Title: 'Barre de recherche',
+  tutorialPresentationStep2Desc: 'Utilisez la barre de recherche pour trouver rapidement un son par nom.',
+  tutorialPresentationStep2Hint: '💡 Astuce : La recherche est instantanée, les résultats se mettent à jour en temps réel.',
+
+  tutorialPresentationStep3Title: 'Favoris en avant',
+  tutorialPresentationStep3Desc: 'Les sons favoris sont affichés en premier, dans une section dédiée en haut de la présentation.',
+  tutorialPresentationStep3Hint: '💡 Astuce : Ajoutez des sons aux favoris depuis la page d\'accueil pour les retrouver facilement ici.',
+
+  tutorialPresentationStep4Title: 'Jouer un son',
+  tutorialPresentationStep4Desc: 'Cliquez sur une carte pour lancer le son. Pendant la lecture, une barre de progression et des ondes animées apparaissent.',
+  tutorialPresentationStep4Hint: '💡 Astuce : Cliquez à nouveau sur le son en cours de lecture pour l\'arrêter.',
+
+  tutorialPresentationStep5Title: 'Taille des cartes',
+  tutorialPresentationStep5Desc: 'La taille des cartes s\'adapte automatiquement à vos préférences (Petite, Moyenne ou Grande).',
+  tutorialPresentationStep5Hint: '💡 Astuce : Ajustez la taille des cartes dans les options de SoundDeck.',
+
+  tutorialPresentationStep6Title: 'Raccourcis clavier',
+  tutorialPresentationStep6Desc: 'Chaque carte affiche son raccourci clavier si vous en avez défini un. Pratique pour lancer vos sons sans souris !',
+  tutorialPresentationStep6Hint: '💡 Astuce : Définissez vos raccourcis dans la page Options pour une utilisation encore plus rapide.',
 
   // ─── YOUTUBE ────────────────────────────────────────────────────────
   tutorialYoutubeStep1Title: 'Coller un lien YouTube',

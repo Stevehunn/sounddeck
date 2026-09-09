@@ -1,20 +1,84 @@
-import { useState, useEffect, useRef } from 'react'
-// ✅ CORRIGER LES IMPORTS
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { playSound, stopSound, isPlaying, getSoundProgress } from '@core/services/AudioService'
+import HelpButton from '@shared/components/ui/HelpButton'
 
 export default function Presentation({ store, onExit, lang = 'fr' }) {
   const { t, currentLang } = useLanguage()
   const [playingId, setPlayingId] = useState(null)
   const [search, setSearch] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
 
-  const { currentSounds, favoriteSounds, shortcuts, audioDevice, volume, loopEnabled } = store
+  console.log('🎬 [Presentation] RENDER - refreshKey:', refreshKey)
+
+  const currentSounds = store.currentSounds || []
+  
+  // ✅ RÉCUPÉRER LES FAVORIS DIRECTEMENT DEPUIS LES SONS
+  const currentProfileId = store.currentProfileId
+  const favoriteSounds = (store.sounds || []).filter(s => 
+    s.favorites && s.favorites.includes(currentProfileId)
+  )
+  
+  const shortcuts = store.shortcuts || {}
+  const audioDevice = store.audioDevice || 'default'
+  const volume = store.volume || 80
+  const loopEnabled = store.loopEnabled || false
+
+  console.log('🎬 [Presentation] favoriteSounds:', favoriteSounds.length, favoriteSounds.map(s => s.name))
 
   const filtered = search
-    ? currentSounds.filter(s => s.name.toLowerCase().includes(search.toLowerCase()))
+    ? currentSounds.filter(s => s.name?.toLowerCase().includes(search.toLowerCase()))
     : currentSounds
 
-  const currentProfile = store.profiles.find(p => p.id === store.currentProfileId)
+  const currentProfile = store.profiles?.find(p => p.id === currentProfileId)
+
+  // ✅ Exposer le store pour le tutoriel
+  useEffect(() => {
+    console.log('📦 [Presentation] Expose store')
+    window.__storeRef = { current: store }
+    return () => {
+      delete window.__storeRef
+    }
+  }, [store])
+
+  // ✅ FORCER UN RE-RENDER QUAND LES FAVORIS CHANGENT
+  useEffect(() => {
+    console.log('🔄 [Presentation] Setup listeners')
+
+    const refresh = () => {
+      console.log('🔄 [Presentation] REFRESH appelé')
+      setRefreshKey(prev => prev + 1)
+    }
+
+    const handleStoreUpdate = (e) => {
+      console.log('📡 [Presentation] store-update event:', e.detail)
+      if (e.detail?.type === 'favorites' || e.detail?.type === 'sound') {
+        refresh()
+      }
+    }
+    window.addEventListener('store-update', handleStoreUpdate)
+
+    let lastCount = favoriteSounds.length
+    console.log('📊 [Presentation] Initial favorite count:', lastCount)
+    
+    const interval = setInterval(() => {
+      const currentFavorites = (store.sounds || []).filter(s => 
+        s.favorites && s.favorites.includes(currentProfileId)
+      )
+      const currentCount = currentFavorites.length
+      if (currentCount !== lastCount) {
+        console.log('📊 [Presentation] Favorite count changed:', lastCount, '->', currentCount)
+        lastCount = currentCount
+        refresh()
+      }
+    }, 200)
+
+    return () => {
+      console.log('🧹 [Presentation] Cleanup listeners')
+      window.removeEventListener('store-update', handleStoreUpdate)
+      clearInterval(interval)
+    }
+  }, [store, currentProfileId, favoriteSounds.length])
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onExit() }
@@ -42,14 +106,29 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
     }
     if (playingId) stopSound(playingId)
     playSound(sound, audioDevice, volume, loopEnabled, store.playLocally)
-    store.incrementPlayCount(sound.id)
+    if (store.incrementPlayCount) {
+      store.incrementPlayCount(sound.id)
+    }
     setPlayingId(sound.id)
   }
 
   const cardSize = store.cardSize || 'medium'
 
+  const handleHelpClick = () => {
+    console.log('❓ [Presentation] Help button clicked')
+    if (window.__startTutorial) {
+      window.__startTutorial('presentation');
+    }
+  }
+
+  console.log('⭐ [Presentation] currentFavorites:', favoriteSounds.length, favoriteSounds.map(s => s.name))
+
   return (
-    <div className="presentation-overlay">
+    <div 
+      data-testid="presentation-container"
+      className="presentation-overlay"
+      key={refreshKey}
+    >
       <div className="presentation-header">
         <i className="ti ti-speakerphone" style={{ fontSize: 22, color: 'var(--accent)' }} />
         <div style={{ flex: 1 }}>
@@ -62,6 +141,7 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
         </div>
 
         <input
+          data-testid="presentation-search"
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder={t('presentationSearch')}
@@ -82,13 +162,20 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
           )}
         </div>
 
+        <HelpButton onClick={handleHelpClick} />
+
         <button className="btn-secondary btn-lg" onClick={onExit} style={{ minWidth: 120 }}>
           <i className="ti ti-x" /> {t('presentationExit')}
         </button>
       </div>
 
+      {/* ✅ SECTION FAVORIS */}
+      {console.log('📌 [Presentation] Rendu section favoris - favoriteSounds.length:', favoriteSounds.length, 'search:', search)}
       {favoriteSounds.length > 0 && !search && (
-        <div className="presentation-favorites">
+        <div 
+          data-testid="presentation-favorites"
+          className="presentation-favorites"
+        >
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--warning)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
             <i className="ti ti-star-filled" /> {t('favorites')}
           </div>
@@ -97,7 +184,7 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
               <PresentationCard
                 key={s.id}
                 sound={s}
-                shortcut={store.shortcuts[s.id]}
+                shortcut={shortcuts[s.id]}
                 playing={playingId === s.id}
                 onPlay={() => handlePlay(s)}
                 size="large"
@@ -115,16 +202,19 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
             {t('noSounds')}
           </div>
         )}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: `repeat(auto-fill, minmax(${cardSize === 'small' ? 130 : cardSize === 'large' ? 180 : 150}px, 1fr))`, 
-          gap: 12 
-        }}>
+        <div 
+          data-testid="presentation-grid"
+          style={{ 
+            display: 'grid', 
+            gridTemplateColumns: `repeat(auto-fill, minmax(${cardSize === 'small' ? 130 : cardSize === 'large' ? 180 : 150}px, 1fr))`, 
+            gap: 12 
+          }}
+        >
           {filtered.map(s => (
             <PresentationCard
               key={s.id}
               sound={s}
-              shortcut={store.shortcuts[s.id]}
+              shortcut={shortcuts[s.id]}
               playing={playingId === s.id}
               onPlay={() => handlePlay(s)}
               size={cardSize}
@@ -200,6 +290,7 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size, lang }) {
 
   return (
     <div
+      data-testid="presentation-card"
       className={`presentation-card ${playing ? 'playing' : ''}`}
       onClick={onPlay}
       style={{ width: cardSize }}

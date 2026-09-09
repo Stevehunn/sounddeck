@@ -10,12 +10,10 @@ import { TUTORIAL_STEPS as SequencerSteps } from '@features/sequencer/tutorialSt
 import { TUTORIAL_STEPS as TrimmerSteps } from '@features/trimmer/tutorialSteps';
 import { TUTORIAL_STEPS as OptionsSteps } from '@features/options/tutorialSteps';
 import { TUTORIAL_STEPS as StatsSteps } from '@features/stats/tutorialSteps';
-import { TUTORIAL_STEPS as PresentationSteps } from '@features/presentation/tutorialSteps';
+import { TUTORIAL_STEPS as PresentationSteps, cleanupTutorialFavorites } from '@features/presentation/tutorialSteps';
 
 // ✅ Importer les tutoriels des plugins
 import { TUTORIAL_STEPS as DiscoverSteps } from '@plugins/myinstants/tutorialSteps';
-// ❌ SUPPRIMER L'IMPORT YOUTUBE
-// import { TUTORIAL_STEPS as YoutubeSteps } from '@plugins/youtube/tutorialSteps';
 
 const TUTORIALS = {
   home: HomeSteps,
@@ -26,8 +24,6 @@ const TUTORIALS = {
   stats: StatsSteps,
   presentation: PresentationSteps,
   discover: DiscoverSteps,
-  // ❌ SUPPRIMER LA RÉFÉRENCE YOUTUBE
-  // youtube: YoutubeSteps,
   guide: null,
 };
 
@@ -41,7 +37,6 @@ export default function Tutorial({ pageId, onComplete }) {
 
   // ✅ Attendre que le DOM soit prêt avant d'afficher le tutoriel
   useEffect(() => {
-    // Donner le temps à React de rendre les composants
     const timer = setTimeout(() => {
       setIsReady(true);
     }, 500);
@@ -53,12 +48,22 @@ export default function Tutorial({ pageId, onComplete }) {
     if (currentStep < steps.length - 1) {
       setCurrentStep(prev => prev + 1);
     } else {
+      // ✅ Nettoyer les favoris temporaires à la fin du tutoriel
+      if (pageId === 'presentation') {
+        const store = window.__storeRef?.current
+        cleanupTutorialFavorites(store)
+      }
       localStorage.setItem(`sounddeck-tutorial-${pageId}-done`, 'true');
       onComplete();
     }
   };
 
   const handleSkip = () => {
+    // ✅ Nettoyer les favoris temporaires si l'utilisateur saute
+    if (pageId === 'presentation') {
+      const store = window.__storeRef?.current
+      cleanupTutorialFavorites(store)
+    }
     localStorage.setItem(`sounddeck-tutorial-${pageId}-done`, 'true');
     onComplete();
   };
@@ -108,6 +113,7 @@ export default function Tutorial({ pageId, onComplete }) {
       onSkip={handleSkip}
       onComplete={onComplete}
       isOpen={true}
+      pageId={pageId}
     />
   );
 }

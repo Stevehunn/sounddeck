@@ -8,20 +8,16 @@ import { useLanguage } from '@core/i18n/LanguageContext';
  * ✅ NE CRÉE PAS D'ÉLÉMENT FACTICE - retourne null si non trouvé
  */
 function findElement(selector, fallbackSelector) {
-    console.log('🔍 [Tutorial] Recherche de l\'élément cible...');
-    
     if (typeof selector === 'function') {
         try {
             const result = selector();
             if (result) {
                 if (result.offsetParent !== null || result.getClientRects().length > 0) {
-                    console.log('✅ [Tutorial] Élément trouvé par fonction');
                     return result;
                 }
-                console.log('⚠️ [Tutorial] Élément trouvé mais non visible');
             }
         } catch (e) {
-            console.warn('⚠️ [Tutorial] Erreur dans la fonction selector:', e);
+            // Ignorer
         }
     }
     
@@ -29,20 +25,16 @@ function findElement(selector, fallbackSelector) {
         try {
             const el = document.querySelector(selector);
             if (el && (el.offsetParent !== null || el.getClientRects().length > 0)) {
-                console.log('✅ [Tutorial] Élément trouvé par sélecteur:', selector);
                 return el;
             }
         } catch (e) {}
     }
     
     if (fallbackSelector) {
-        console.log('🔍 [Tutorial] Tentative fallback...');
-        
         if (typeof fallbackSelector === 'function') {
             try {
                 const result = fallbackSelector();
                 if (result && (result.offsetParent !== null || result.getClientRects().length > 0)) {
-                    console.log('✅ [Tutorial] Élément trouvé par fallback fonction');
                     return result;
                 }
             } catch (e) {}
@@ -51,7 +43,6 @@ function findElement(selector, fallbackSelector) {
         try {
             const el = document.querySelector(fallbackSelector);
             if (el && (el.offsetParent !== null || el.getClientRects().length > 0)) {
-                console.log('✅ [Tutorial] Élément trouvé par fallback sélecteur');
                 return el;
             }
         } catch (e) {}
@@ -61,13 +52,11 @@ function findElement(selector, fallbackSelector) {
         const allTestIds = document.querySelectorAll('[data-testid]');
         for (const el of allTestIds) {
             if (el.offsetParent !== null) {
-                console.log('✅ [Tutorial] Élément trouvé par data-testid:', el.dataset.testid);
                 return el;
             }
         }
     } catch (e) {}
     
-    console.log('❌ [Tutorial] Aucun élément trouvé');
     return null;
 }
 
@@ -76,16 +65,7 @@ function findElement(selector, fallbackSelector) {
  */
 function getElementRect(element) {
     if (!element) return null;
-    
     const rect = element.getBoundingClientRect();
-    console.log('📐 [getElementRect] Rect:', {
-        top: rect.top,
-        left: rect.left,
-        width: rect.width,
-        height: rect.height,
-        right: rect.right,
-        bottom: rect.bottom
-    });
     return {
         top: rect.top + window.scrollY,
         left: rect.left + window.scrollX,
@@ -102,8 +82,6 @@ function getElementRect(element) {
  * Récupère la position du menu contextuel s'il est ouvert
  */
 function getContextMenuRect() {
-    console.log('🔍 [getContextMenuRect] Recherche du menu contextuel...');
-    
     const menuSelectors = [
         '[data-testid="context-menu"]',
         '.context-menu',
@@ -117,21 +95,8 @@ function getContextMenuRect() {
             const menu = document.querySelector(selector);
             if (menu) {
                 const style = window.getComputedStyle(menu);
-                console.log(`  📐 Vérification du sélecteur "${selector}":`, {
-                    display: style.display,
-                    visibility: style.visibility,
-                    opacity: style.opacity
-                });
                 if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
                     const rect = menu.getBoundingClientRect();
-                    console.log('✅ [getContextMenuRect] Menu trouvé:', {
-                        top: rect.top,
-                        left: rect.left,
-                        width: rect.width,
-                        height: rect.height,
-                        bottom: rect.bottom,
-                        right: rect.right
-                    });
                     return {
                         top: rect.top + window.scrollY,
                         left: rect.left + window.scrollX,
@@ -144,12 +109,9 @@ function getContextMenuRect() {
                     };
                 }
             }
-        } catch (e) {
-            console.warn(`  ⚠️ Erreur avec le sélecteur "${selector}":`, e);
-        }
+        } catch (e) {}
     }
     
-    console.log('❌ [getContextMenuRect] Aucun menu trouvé');
     return null;
 }
 
@@ -158,11 +120,9 @@ function getContextMenuRect() {
  */
 function scrollToElement(element) {
     if (!element) return false;
-    
     try {
         const rect = element.getBoundingClientRect();
         const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
-        
         if (!isVisible) {
             element.scrollIntoView({ 
                 behavior: 'smooth', 
@@ -181,17 +141,10 @@ function scrollToElement(element) {
  * Ouvre le menu contextuel
  */
 function openContextMenu(element) {
-    if (!element) {
-        console.log('❌ [openContextMenu] Élément null');
-        return false;
-    }
-    
-    console.log('🖱️ [openContextMenu] Tentative d\'ouverture du menu sur:', element);
+    if (!element) return false;
     
     try {
         element.click();
-        console.log('  ✅ click() exécuté');
-        
         const clickEvent = new MouseEvent('click', {
             view: window,
             bubbles: true,
@@ -201,7 +154,6 @@ function openContextMenu(element) {
             button: 0,
         });
         element.dispatchEvent(clickEvent);
-        console.log('  ✅ MouseEvent dispatché');
         
         const downEvent = new MouseEvent('mousedown', {
             view: window,
@@ -221,7 +173,6 @@ function openContextMenu(element) {
         });
         element.dispatchEvent(downEvent);
         element.dispatchEvent(upEvent);
-        console.log('  ✅ mousedown/mouseup dispatchés');
         
         try {
             const rect = element.getBoundingClientRect();
@@ -234,14 +185,10 @@ function openContextMenu(element) {
                 button: 0,
             });
             element.dispatchEvent(realisticClick);
-            console.log('  ✅ Clic avec position réaliste');
         } catch (e) {}
         
-        console.log('✅ [openContextMenu] Menu ouvert avec succès');
         return true;
-        
     } catch (e) {
-        console.error('❌ [openContextMenu] Erreur:', e);
         return false;
     }
 }
@@ -250,8 +197,6 @@ function openContextMenu(element) {
  * Met le focus sur le menu contextuel
  */
 function focusContextMenu() {
-    console.log('🔍 [Tutorial] Recherche du menu contextuel pour le focus...');
-    
     const menuSelectors = [
         '[data-testid="context-menu"]',
         '.context-menu',
@@ -266,7 +211,6 @@ function focusContextMenu() {
             for (const menu of menus) {
                 const style = window.getComputedStyle(menu);
                 if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
-                    console.log('✅ [Tutorial] Menu contextuel trouvé et visible:', menu);
                     menu.classList.add('tutorial-highlight');
                     try { menu.focus(); } catch (e) {}
                     const firstButton = menu.querySelector('button:not([disabled]), [role="menuitem"]:not([disabled])');
@@ -279,7 +223,6 @@ function focusContextMenu() {
         } catch (e) {}
     }
     
-    console.log('❌ [Tutorial] Aucun menu contextuel trouvé');
     return null;
 }
 
@@ -307,8 +250,6 @@ export default function TutorialOverlay({
     const hasAction = stepData?.action === 'click';
     const hasAfterShow = stepData?.afterShow && typeof stepData.afterShow === 'function';
 
-    console.log('📌 [TutorialOverlay] Étape actuelle:', currentStep, stepData?.id, 'hasAction:', hasAction, 'hasAfterShow:', hasAfterShow);
-
     useEffect(() => {
         setIsActionExecuted(false);
         setShowBubble(true);
@@ -316,67 +257,51 @@ export default function TutorialOverlay({
     }, [currentStep]);
 
     useEffect(() => {
-        console.log('🔍 [TutorialOverlay] useEffect action - isOpen:', isOpen, 'hasAction:', hasAction, 'isActionExecuted:', isActionExecuted);
-        
         if (!isOpen) {
-            console.log('  ⏭️ isOpen est false');
+            setShowBubble(true);
             return;
         }
         
         if (!hasAction) {
-            console.log('  ⏭️ Pas d\'action dans stepData');
             setShowBubble(true);
             return;
         }
         
         if (isActionExecuted) {
-            console.log('  ⏭️ Action déjà exécutée');
             return;
         }
         
-        console.log('🎬 [TutorialOverlay] Exécution de l\'action pour l\'étape:', stepData.id);
-        
         const executeAction = () => {
-            console.log('🔍 [TutorialOverlay] Recherche de l\'élément cible...');
             const element = findElement(stepData.target, stepData.fallbackTarget);
             
             if (!element) {
-                console.log('❌ [Tutorial] Élément non trouvé');
                 setShowBubble(true);
                 return;
             }
             
             if (stepData.action === 'click') {
-                console.log('🖱️ [Tutorial] Ouverture du menu contextuel sur:', element);
                 const success = openContextMenu(element);
                 
                 if (success) {
-                    console.log('✅ [Tutorial] Menu contextuel ouvert avec succès');
-                    
                     let attempts = 0;
                     const maxAttempts = 10;
                     const attemptInterval = 200;
                     
                     const tryFocus = () => {
                         attempts++;
-                        console.log(`🔍 [Tutorial] Tentative de focus ${attempts}/${maxAttempts}...`);
                         const menuElement = focusContextMenu();
                         if (menuElement) {
-                            console.log('✅ [Tutorial] Menu contextuel focusé');
                             const menuRectData = getContextMenuRect();
                             if (menuRectData) {
                                 setMenuRect(menuRectData);
-                                console.log('📐 [Tutorial] Menu détecté:', menuRectData);
                             }
                             setTimeout(() => {
                                 setShowBubble(true);
-                                console.log('🔄 [Tutorial] Recalcul de la position après ouverture du menu');
                                 updateTarget();
                             }, 300);
                         } else if (attempts < maxAttempts) {
                             setTimeout(tryFocus, attemptInterval);
                         } else {
-                            console.log('❌ [Tutorial] Impossible de trouver le menu contextuel');
                             setShowBubble(true);
                             setTimeout(() => {
                                 updateTarget();
@@ -386,7 +311,6 @@ export default function TutorialOverlay({
                     
                     setTimeout(tryFocus, 300);
                 } else {
-                    console.log('⚠️ [Tutorial] Échec de l\'ouverture du menu');
                     setShowBubble(true);
                     setTimeout(() => {
                         updateTarget();
@@ -396,9 +320,7 @@ export default function TutorialOverlay({
                 setIsActionExecuted(true);
                 
                 const delay = stepData.actionDelay || 800;
-                console.log(`⏳ [Tutorial] Attente de ${delay}ms pour la mise à jour...`);
                 setTimeout(() => {
-                    console.log('🔄 [Tutorial] Mise à jour de la cible après clic');
                     updateTarget();
                 }, delay);
             }
@@ -412,10 +334,6 @@ export default function TutorialOverlay({
      * Calcule la position de la bulle avec position forcée possible
      */
     const calculateBubblePosition = useCallback((rect, forcePosition) => {
-        console.log('📐 [calculateBubblePosition] Début du calcul');
-        console.log('  📐 rect cible:', rect);
-        console.log('  📐 forcePosition:', forcePosition);
-        
         if (!rect) return { top: window.innerHeight / 2 - 125, left: window.innerWidth / 2 - 190, arrow: 'bottom' };
         
         const bubbleWidth = 380;
@@ -425,12 +343,7 @@ export default function TutorialOverlay({
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
         
-        console.log('  📐 Viewport:', { viewportWidth, viewportHeight });
-        console.log('  📐 Paramètres:', { bubbleWidth, bubbleHeight, padding, gap });
-        
-        // ✅ Si une position est forcée, l'utiliser en priorité
         if (forcePosition) {
-            console.log(`  📐 Position forcée: ${forcePosition}`);
             switch (forcePosition) {
                 case 'right':
                     const rightSpace = viewportWidth - rect.right - gap - padding;
@@ -456,7 +369,6 @@ export default function TutorialOverlay({
                     };
                 case 'top':
                     const topSpaceAvailable = rect.top - padding - gap;
-                    
                     if (topSpaceAvailable < bubbleHeight) {
                         return {
                             top: padding,
@@ -464,7 +376,6 @@ export default function TutorialOverlay({
                             arrow: 'bottom'
                         };
                     }
-                    
                     return {
                         top: Math.max(padding, rect.top - bubbleHeight - gap),
                         left: Math.max(padding, Math.min(rect.centerX - bubbleWidth / 2, viewportWidth - bubbleWidth - padding)),
@@ -480,7 +391,6 @@ export default function TutorialOverlay({
             }
         }
         
-        // Liste des positions possibles (calcul automatique)
         const positions = [];
         
         const bottomSpaceCalc = viewportHeight - rect.bottom - gap - padding;
@@ -492,7 +402,6 @@ export default function TutorialOverlay({
                 arrow: 'top',
                 priority: 1
             });
-            console.log('  ✅ Position "bottom" ajoutée');
         }
         
         const topSpaceCalc = rect.top - gap - padding;
@@ -504,7 +413,6 @@ export default function TutorialOverlay({
                 arrow: 'bottom',
                 priority: 2
             });
-            console.log('  ✅ Position "top" ajoutée');
         }
         
         const rightSpaceCalc = viewportWidth - rect.right - gap - padding;
@@ -516,7 +424,6 @@ export default function TutorialOverlay({
                 arrow: 'left',
                 priority: 3
             });
-            console.log('  ✅ Position "right" ajoutée');
         }
         
         const leftSpaceCalc = rect.left - gap - padding;
@@ -528,13 +435,9 @@ export default function TutorialOverlay({
                 arrow: 'right',
                 priority: 4
             });
-            console.log('  ✅ Position "left" ajoutée');
         }
         
-        console.log('  📐 Positions possibles:', positions.length);
-        
         if (positions.length === 0) {
-            console.log('⚠️ [Tutorial] Aucune position disponible, utilisation d\'une position centrale');
             return {
                 top: viewportHeight / 2 - bubbleHeight / 2,
                 left: viewportWidth / 2 - bubbleWidth / 2,
@@ -544,7 +447,6 @@ export default function TutorialOverlay({
         
         positions.sort((a, b) => a.priority - b.priority);
         const bestPos = positions[0];
-        console.log('  📐 Meilleure position choisie:', bestPos);
         
         return {
             top: Math.max(padding, Math.min(bestPos.top, viewportHeight - bubbleHeight - padding)),
@@ -554,19 +456,12 @@ export default function TutorialOverlay({
     }, []);
 
     const updateTarget = useCallback(() => {
-        console.log('🔄 [updateTarget] Début mise à jour');
-        
         if (!stepData?.target) {
-            console.log('⚠️ [Tutorial] Pas de target pour l\'étape', currentStep);
             return;
         }
         
-        console.log('🔍 [Tutorial] Recherche de la cible pour l\'étape', currentStep);
-        
         const element = findElement(stepData.target, stepData.fallbackTarget);
         if (element) {
-            console.log('✅ [Tutorial] Élément trouvé:', element);
-            
             const wasScrolled = scrollToElement(element);
             const delay = wasScrolled ? 400 : 0;
             
@@ -576,13 +471,10 @@ export default function TutorialOverlay({
                 
                 if (rect) {
                     const pos = calculateBubblePosition(rect, stepData.position);
-                    console.log('📐 [updateTarget] Position finale de la bulle:', pos);
                     setBubblePosition(pos);
                 }
             }, delay);
-            
         } else {
-            console.log('❌ [Tutorial] Élément NON trouvé pour l\'étape', currentStep);
             setTargetRect(null);
             setBubblePosition({
                 top: window.innerHeight / 2 - 125,
@@ -604,7 +496,6 @@ export default function TutorialOverlay({
             setIsVisible(true);
             
             if (hasAfterShow) {
-                console.log('🎬 [Tutorial] Exécution de afterShow pour l\'étape', currentStep);
                 setTimeout(() => {
                     stepData.afterShow();
                 }, 600);
@@ -635,7 +526,6 @@ export default function TutorialOverlay({
 
     const handleLeave = useCallback(() => {
         if (stepData?.onLeave && typeof stepData.onLeave === 'function') {
-            console.log('🔚 [Tutorial] Exécution de onLeave pour l\'étape', currentStep);
             stepData.onLeave();
         }
     }, [stepData, currentStep]);
@@ -652,7 +542,6 @@ export default function TutorialOverlay({
             
             const nextStep = steps[currentStep + 1];
             if (nextStep?.afterShow && typeof nextStep.afterShow === 'function') {
-                console.log('🎬 [Tutorial] Exécution de afterShow pour l\'étape suivante', currentStep + 1);
                 setTimeout(() => {
                     nextStep.afterShow();
                 }, 600);
@@ -764,12 +653,6 @@ export default function TutorialOverlay({
     const arrowStyles = getArrowStyles();
 
     const shouldShowBubble = showBubble;
-
-    console.log('🎯 [TutorialOverlay] Affichage de l\'étape:', currentStep)
-    console.log('  - Titre:', stepData?.title)
-    console.log('  - Description:', stepData?.description)
-    console.log('  - Hint:', stepData?.hint)
-    console.log('  - Icon:', stepData?.icon)
 
     useEffect(() => {
         if (isOpen) {

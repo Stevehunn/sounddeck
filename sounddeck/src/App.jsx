@@ -89,10 +89,20 @@ function AppContent() {
   useEffect(() => { setPresentationRef.current = setPresentationMode }, [setPresentationMode])
 
   // ✅ Fonction pour ouvrir le tutoriel
-  const openTutorial = (pageId) => {
+  const openTutorial = useCallback((pageId) => {
+    console.log('📖 [App] Ouverture du tutoriel pour la page:', pageId)
     setTutorialPageId(pageId)
     setShowTutorial(true)
-  }
+  }, [])
+
+  // ✅ Exposer la fonction globalement pour les pages
+  useEffect(() => {
+    window.__startTutorial = openTutorial
+    console.log('📖 [App] window.__startTutorial exposé')
+    return () => {
+      delete window.__startTutorial
+    }
+  }, [openTutorial])
 
   // ✅ Vérifier si c'est le premier lancement
   useEffect(() => {
@@ -375,12 +385,20 @@ function AppContent() {
   useEffect(() => { addToastRef.current = addToast }, [addToast])
 
   // ✅ Wrapper pour ajouter le HelpButton à une page
-  const PageWrapper = ({ children, pageId }) => (
-    <div style={{ position: 'relative', height: '100%', width: '100%' }}>
-      {children}
-      <HelpButton onClick={() => openTutorial(pageId)} />
-    </div>
-  )
+  const PageWrapper = ({ children, pageId }) => {
+    // ✅ Fonction handleHelpClick qui utilise openTutorial
+    const handleHelpClick = () => {
+      console.log('📖 [PageWrapper] Clic sur HelpButton pour la page:', pageId)
+      openTutorial(pageId)
+    }
+
+    return (
+      <div style={{ position: 'relative', height: '100%', width: '100%' }}>
+        {children}
+        <HelpButton onClick={handleHelpClick} />
+      </div>
+    )
+  }
 
   // ✅ RENDU DES PAGES
   const renderPage = () => {
@@ -434,11 +452,6 @@ function AppContent() {
       )
     }
     
-    // ✅ CORRECTION : La page "discover" est un plugin, pas un import direct
-    // Elle est gérée par le système de plugins plus bas
-    // On supprime ce bloc qui cause l'erreur
-    // if (currentPage === 'discover') { ... }
-
     // ✅ Gestion des pages plugins (inclut discover, youtube, etc.)
     if (isPluginPage(currentPage)) {
       if (pluginLoading) {
