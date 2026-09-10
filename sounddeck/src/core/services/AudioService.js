@@ -1,21 +1,71 @@
+// src/core/services/AudioService.js
 import { Howl } from 'howler'
-// ✅ Ces imports doivent exister
 import { audioCache } from './AudioCache'
 import * as AudioMixerService from './AudioMixerService'
 
 const soundCache = {}
-
-// Cache pour les gains normalisés
 const gainCache = {}
-
-// Référence au store pour accéder à l'état du mixeur
 let storeRef = null
 
 export function setStoreRef(store) {
   storeRef = store
 }
 
-// Construit une URL file:// correcte pour Windows et les chemins avec espaces
+// ─── SYSTÈME D'ÉVÉNEMENTS DE LECTURE ─────────────────────────────────────────
+const playbackListeners = new Set()
+let currentPlayingId = null
+
+export function subscribeToPlayback(callback) {
+  playbackListeners.add(callback)
+  try {
+    callback({ id: currentPlayingId })
+  } catch (e) {
+    console.error('[AudioService] Erreur callback initial:', e)
+  }
+  return () => playbackListeners.delete(callback)
+}
+
+function notifyPlaybackListeners(id) {
+  currentPlayingId = id
+  playbackListeners.forEach(cb => {
+    try {
+      cb({ id })
+    } catch (e) {
+      console.error('[AudioService] Erreur callback playback:', e)
+    }
+  })
+}
+
+// ─── OVERRIDE POUR LECTEURS EXTERNES (séquenceur, etc.) ────────────────────
+let manualOverrideId = null
+let manualProgress = { id: null, current: 0, duration: 0, ratio: 0 }
+
+/**
+ * Utilisé par les lecteurs audio externes (séquenceur, etc.) pour signaler
+ * qu'un son est en cours de lecture SANS passer par soundCache.
+ */
+export function setCurrentPlayingSound(soundId) {
+  manualOverrideId = soundId || null
+  if (!soundId) {
+    manualProgress = { id: null, current: 0, duration: 0, ratio: 0 }
+  }
+  notifyPlaybackListeners(soundId || null)
+}
+
+/**
+ * Met à jour la progression pour le son en cours dans l'override manuel.
+ */
+export function setCurrentPlayingProgress(soundId, current, duration) {
+  if (manualOverrideId !== soundId) return
+  manualProgress = {
+    id: soundId,
+    current: current || 0,
+    duration: duration || 0,
+    ratio: duration > 0 ? Math.min(1, (current || 0) / duration) : 0
+  }
+}
+
+// ─── BUILD FILE URL ────────────────────────────────────────────────────────
 function buildFileUrl(filePath) {
   if (!filePath) return null
   if (filePath.startsWith('file://') || filePath.startsWith('http')) return filePath
@@ -24,14 +74,13 @@ function buildFileUrl(filePath) {
   const parts = normalized.split('/')
   const encodedParts = parts.map((part, i) => {
     if (part === '' || /^[A-Za-z]:$/.test(part)) return part
-    return encodeURIComponent(part)
-      .replace(/%2F/gi, '/')
+    return encodeURIComponent(part).replace(/%2F/gi, '/')
   })
 
   return 'file:///' + encodedParts.join('/')
 }
 
-// Analyse le gain normalisé d'un fichier audio
+// ─── ANALYSE GAIN ──────────────────────────────────────────────────────────
 export async function analyzeGain(filePath, sampleCount = 200) {
   if (gainCache[filePath]) return gainCache[filePath]
   
@@ -52,10 +101,8 @@ export async function analyzeGain(filePath, sampleCount = 200) {
     }
     
     const rms = Math.sqrt(sumSquares / (channelData.length / step))
-    
     const defaultTarget = 0.2
     const targetRMS = gainCache.targetRMS || defaultTarget
-    
     const gain = rms > 0.001 ? targetRMS / rms : 1
     const gainDb = 20 * Math.log10(Math.min(gain, 20))
     
@@ -67,27 +114,37 @@ export async function analyzeGain(filePath, sampleCount = 200) {
   }
 }
 
-// Fonction pour définir la cible de normalisation
 export function setNormalizationTarget(targetRMS) {
   gainCache.targetRMS = targetRMS
 }
 
-// Calcule le volume final avec normalisation + ajustement individuel
 function calculateFinalVolume(globalVolume, soundVolumeDb, gainDb = 0) {
   const normalizedGlobal = globalVolume / 100
   const globalRatio = Math.pow(normalizedGlobal, 1.8)
-  
   const individualGain = (soundVolumeDb || 0)
   const normalizationGain = gainDb || 0
   const totalGainDb = individualGain + normalizationGain
   const linearGain = Math.pow(10, totalGainDb / 20)
   const finalVolume = Math.min(1, globalRatio * linearGain)
-  
   return Math.max(0.0001, finalVolume)
 }
 
-// ─── Mode Normal (sans mixeur) ─────────────────────────────────────────────
+/**
+ * ✅ Calcule le volume final à utiliser pour un son donné, de manière identique
+ * au lecteur principal. Utilisé par les lecteurs externes (séquenceur, etc.)
+ * 
+ * @param {object} sound - Le son (avec .path, .volume/.volumeDb)
+ * @param {number} globalVolume - Volume maître 0-100
+ * @returns {number} Volume final entre 0.0001 et 1
+ */
+export function getFinalVolumeForSound(sound, globalVolume = 80) {
+  if (!sound) return 1
+  const gainDb = gainCache[sound.path] || 0
+  const soundVolumeDb = sound.volumeDb ?? sound.volume ?? 0
+  return calculateFinalVolume(globalVolume, soundVolumeDb, gainDb)
+}
 
+// ─── Mode Normal (sans mixeur) ─────────────────────────────────────────────
 function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
   const gainDb = gainCache[sound.path] || 0
   const volumeRatio = calculateFinalVolume(globalVolume, sound.volume ?? 0, gainDb)
@@ -115,9 +172,21 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
       html5: false,
       loop,
       format: [format],
-      onend: () => { if (!loop) delete soundCache[sound.id] },
-      onstop: () => { delete soundCache[sound.id] },
-      onloaderror: (id, err) => { console.error('Erreur:', err); delete soundCache[sound.id] }
+      onend: () => { 
+        if (!loop) {
+          delete soundCache[sound.id] 
+          if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
+        }
+      },
+      onstop: () => { 
+        delete soundCache[sound.id]
+        if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
+      },
+      onloaderror: (id, err) => { 
+        console.error('Erreur:', err)
+        delete soundCache[sound.id] 
+        if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
+      }
     })
     soundCache[sound.id] = howl
     howl.play()
@@ -133,8 +202,16 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
       html5: true,
       loop,
       format: [format],
-      onend: () => { if (!loop) delete soundCache[sound.id] },
-      onstop: () => { delete soundCache[sound.id] },
+      onend: () => { 
+        if (!loop) {
+          delete soundCache[sound.id] 
+          if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
+        }
+      },
+      onstop: () => { 
+        delete soundCache[sound.id]
+        if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
+      },
       onloaderror: (id, err) => { console.error('Erreur device virtuel:', err) }
     })
 
@@ -181,8 +258,7 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
   }
 }
 
-// ─── Mode Mixeur (VB-Cable) - OPTIMISÉ ────────────────────────────────────
-
+// ─── Mode Mixeur ───────────────────────────────────────────────────────────
 async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true) {
   const soundVolumeDb = sound.volumeDb ?? sound.volume ?? 0
   let soundRatio = Math.pow(10, soundVolumeDb / 20)
@@ -199,29 +275,26 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
     return
   }
   
-  // ✅ OPTIMISATION : Chargement avec préfetch
   const audioBuffer = await loadAudioBuffer(fileUrl)
   if (!audioBuffer) {
     console.warn('⚠️ Impossible de charger le son:', fileUrl)
     return
   }
   
-  // ✅ OPTIMISATION : Jouer le son avec un gain direct
   const source = playSoundInMixer(audioBuffer, volumeRatio)
   
   if (source) {
     soundCache[sound.id] = source
-    // ✅ OPTIMISATION : Utiliser la propriété loop du source
     if (loop) {
       source.loop = true
     } else {
       source.onended = () => {
         delete soundCache[sound.id]
+        if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
       }
     }
   }
   
-  // ✅ Jouer aussi en local si playLocally est activé OU monitoring activé
   const shouldPlayLocally = playLocally || storeRef?.monitoringEnabled || false
   
   if (shouldPlayLocally) {
@@ -262,10 +335,10 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
   }
 }
 
-// ─── Version principale de playSound ──────────────────────────────────────
-
+// ─── API PRINCIPALE ────────────────────────────────────────────────────────
 export function playSound(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
   if (!sound?.path) return
+  notifyPlaybackListeners(sound.id)
   
   const mixerEnabled = storeRef?.mixerEnabled || false
   if (mixerEnabled && isMixerActive()) {
@@ -275,9 +348,9 @@ export function playSound(sound, audioDevice = 'default', globalVolume = 80, loo
   }
 }
 
-// Version asynchrone de playSound avec normalisation
 export async function playSoundAsync(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
   if (!sound?.path) return
+  notifyPlaybackListeners(sound.id)
 
   let gainDb = 0
   if (sound.path && !gainCache[sound.path]) {
@@ -315,9 +388,21 @@ export async function playSoundAsync(sound, audioDevice = 'default', globalVolum
       html5: false,
       loop,
       format: [format],
-      onend: () => { if (!loop) delete soundCache[sound.id] },
-      onstop: () => { delete soundCache[sound.id] },
-      onloaderror: (id, err) => { console.error('Erreur:', err); delete soundCache[sound.id] }
+      onend: () => { 
+        if (!loop) {
+          delete soundCache[sound.id] 
+          if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
+        }
+      },
+      onstop: () => { 
+        delete soundCache[sound.id]
+        if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
+      },
+      onloaderror: (id, err) => { 
+        console.error('Erreur:', err)
+        delete soundCache[sound.id] 
+        if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
+      }
     })
     soundCache[sound.id] = howl
     howl.play()
@@ -333,8 +418,16 @@ export async function playSoundAsync(sound, audioDevice = 'default', globalVolum
       html5: true,
       loop,
       format: [format],
-      onend: () => { if (!loop) delete soundCache[sound.id] },
-      onstop: () => { delete soundCache[sound.id] },
+      onend: () => { 
+        if (!loop) {
+          delete soundCache[sound.id] 
+          if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
+        }
+      },
+      onstop: () => { 
+        delete soundCache[sound.id]
+        if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
+      },
       onloaderror: (id, err) => { console.error('Erreur device virtuel:', err) }
     })
 
@@ -381,7 +474,6 @@ export async function playSoundAsync(sound, audioDevice = 'default', globalVolum
   }
 }
 
-// Analyse tous les sons d'un coup
 export async function analyzeAllGains(sounds, onProgress) {
   const total = sounds.length
   let done = 0
@@ -403,6 +495,14 @@ export async function analyzeAllGains(sounds, onProgress) {
 }
 
 export function stopSound(soundId) {
+  if (currentPlayingId === soundId) {
+    notifyPlaybackListeners(null)
+  }
+  if (manualOverrideId === soundId) {
+    manualOverrideId = null
+    manualProgress = { id: null, current: 0, duration: 0, ratio: 0 }
+  }
+  
   const cached = soundCache[soundId]
   if (cached) {
     if (Array.isArray(cached)) {
@@ -426,6 +526,8 @@ export function stopAllSounds() {
 }
 
 export function isPlaying(soundId) {
+  if (manualOverrideId === soundId) return true
+
   const cached = soundCache[soundId]
   if (!cached) return false
   
@@ -445,6 +547,15 @@ export function isPlaying(soundId) {
 }
 
 export function getSoundProgress(soundId) {
+  if (manualOverrideId === soundId && manualProgress.id === soundId) {
+    if (manualProgress.duration <= 0) return null
+    return {
+      current: manualProgress.current,
+      duration: manualProgress.duration,
+      ratio: manualProgress.ratio
+    }
+  }
+
   const cached = soundCache[soundId]
   if (!cached) return null
   
@@ -482,7 +593,6 @@ export function clearSoundCache(soundId) {
   else stopAllSounds()
 }
 
-// Exporter les fonctions pour usage externe
 export { calculateFinalVolume, gainCache }
 
 export default {
@@ -499,4 +609,8 @@ export default {
   getSoundDuration,
   clearSoundCache,
   analyzeAllGains,
+  subscribeToPlayback,
+  setCurrentPlayingSound,
+  setCurrentPlayingProgress,
+  getFinalVolumeForSound,
 }

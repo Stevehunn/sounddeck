@@ -584,6 +584,7 @@ function AppContent() {
         sidebarVersion={store.sidebarVersion}
         pluginPages={pages}
         isPluginPage={isPluginPage}
+        sounds={store.sounds}
       />
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>

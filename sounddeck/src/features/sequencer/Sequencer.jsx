@@ -3,7 +3,14 @@ import React, { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffe
 import { Howl } from 'howler'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { DeleteButton } from '@shared/components/ui'
-import { registerStopSequencerCallback, getSoundProgress } from '@core/services/AudioService'
+import { 
+  registerStopSequencerCallback, 
+  getSoundProgress,
+  setCurrentPlayingSound,
+  setCurrentPlayingProgress,
+  getFinalVolumeForSound,
+  analyzeGain,
+} from '@core/services/AudioService'
 import useConfirm from '@shared/hooks/useConfirm'
 
 export default function Sequencer({ store, addToast, lang = 'fr' }) {
@@ -239,7 +246,6 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
                   </div>
                 </div>
                 
-                {/* ✅ DeleteButton variant ghost-danger */}
                 <DeleteButton
                   onDelete={() => deletePlaylist(pl.id)}
                   confirmTitle={t('deletePlaylist') || 'Confirmer la suppression de la playlist'}
@@ -328,12 +334,12 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, onSav
     const item = items[currentIdx]
     if (!item) return
     const interval = setInterval(() => {
-      const p = getSoundProgress(item.soundId + '_seq') || getSoundProgress(item.soundId)
       if (howlRef.current && howlRef.current.playing()) {
         const seek = howlRef.current.seek()
         const duration = howlRef.current.duration()
         if (typeof seek === 'number' && typeof duration === 'number' && duration > 0) {
           setCurrentProgress({ current: seek, duration, ratio: Math.min(1, seek / duration) })
+          setCurrentPlayingProgress(item.soundId, seek, duration)
         }
       } else {
         setCurrentProgress(null)
@@ -369,6 +375,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, onSav
       if (loopPlaylist) { playFrom(0); return }
       setPlaying(false)
       setCurrentIdx(-1)
+      setCurrentPlayingSound(null)
       return
     }
 
@@ -377,10 +384,19 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, onSav
     const sound = sounds.find(s => s.id === item.soundId)
     if (!sound) { playFrom(idx + 1); return }
 
+    // ✅ Notifier la sidebar qu'un nouveau son démarre
+    setCurrentPlayingSound(item.soundId)
+
     const fileUrl = sound.path.startsWith('file://')
       ? sound.path : 'file:///' + sound.path.replace(/\\/g, '/')
 
-    const volumeRatio = ((sound.volume ?? 100) / 100) * (volume / 100)
+    // ✅ Analyser le gain en arrière-plan (peuple le cache de normalisation)
+    if (sound.path) {
+      analyzeGain(sound.path).catch(() => {})
+    }
+
+    // ✅ Volume identique à la page Mes sons (normalisation + courbe ^1.8 + dB)
+    const volumeRatio = getFinalVolumeForSound(sound, volume)
 
     if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload() }
 
@@ -410,6 +426,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, onSav
     playingRef.current = false
     if (sequenceRef.current) { clearTimeout(sequenceRef.current); sequenceRef.current = null }
     if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload(); howlRef.current = null }
+    setCurrentPlayingSound(null)
   }, [])
 
   useEffect(() => {
@@ -443,7 +460,6 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, onSav
 
   useEffect(() => () => stopSequence(), [stopSequence])
 
-  // ─── DRAG & DROP ──────────────────────────────────────────────────
   const handleDragStart = (e, idx) => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', String(idx))
@@ -524,7 +540,6 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, onSav
   }
 
   const totalDuration = items.reduce((acc, item) => {
-    const sound = sounds.find(s => s.id === item.soundId)
     return acc + (item.delay || 0)
   }, 0)
 

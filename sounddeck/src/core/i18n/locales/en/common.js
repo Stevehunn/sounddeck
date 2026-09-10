@@ -48,6 +48,7 @@ export default {
   deleting: 'Deleting...',
   ready: 'Ready',
   playing: 'Playing',
+  nowPlaying: 'Now playing',
   paused: 'Paused',
   stopped: 'Stopped',
   error: 'Error',

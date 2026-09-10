@@ -48,6 +48,7 @@ export default {
   deleting: 'Suppression...',
   ready: 'Prêt',
   playing: 'Lecture en cours',
+  nowPlaying: 'En lecture',
   paused: 'En pause',
   stopped: 'Arrêté',
   error: 'Erreur',

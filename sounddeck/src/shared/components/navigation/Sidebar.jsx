@@ -1,7 +1,7 @@
 // src/shared/components/navigation/Sidebar.jsx
 import { useState, useEffect, useMemo, useRef, memo } from 'react'
-// ✅ CORRIGER L'IMPORT
 import { useLanguage } from '@core/i18n/LanguageContext'
+import { useCurrentPlaying } from '@shared/hooks/useCurrentPlaying'
 
 // IDs des éléments qui sont toujours des actions
 const ACTION_IDS = ['loop', 'shortcuts', 'presentation']
@@ -54,10 +54,19 @@ const DEFAULT_ICONS = {
   stats: 'ti-chart-bar',
 }
 
+// ✅ Helper pour formater le temps
+function fmtTime(s) {
+  if (!s || isNaN(s)) return '0:00'
+  const m = Math.floor(s / 60)
+  const sec = Math.floor(s % 60)
+  return `${m}:${sec.toString().padStart(2, '0')}`
+}
+
 // ─── COMPOSANT PRINCIPAL AVEC MEMO ──────────────────────────────────────────
 
 const Sidebar = memo(function Sidebar({
   profiles,
+  sounds,
   currentProfileId,
   currentPage,
   onSwitchProfile,
@@ -85,6 +94,10 @@ const Sidebar = memo(function Sidebar({
   const [draggedProfileId, setDraggedProfileId] = useState(null)
   const [dragOverProfileId, setDragOverProfileId] = useState(null)
 
+  // ✅ Hook pour le son en cours de lecture
+  const { sound: playingSound, progress } = useCurrentPlaying(sounds)
+  const showNowPlaying = (currentPage === 'home' || currentPage === 'sequencer') && playingSound
+
   // ─── REFS POUR STOCKER LES VALEURS STABLES ──────────────────────────────
   const stableVisibleItemsRef = useRef({ pinned: [], groups: {} })
   const [visibleItems, setVisibleItems] = useState({ pinned: [], groups: {} })
@@ -104,7 +117,7 @@ const Sidebar = memo(function Sidebar({
     }
   }, [])
 
-  // ─── CALCUL DES visibleItems UNIQUEMENT QUAND LES DONNÉES CHANGENT VRAIMENT ─
+  // ─── CALCUL DES visibleItems ─────────────────────────────────────────────
   useEffect(() => {
     if (!sidebarConfig || !sidebarConfig.items) {
       const empty = { pinned: [], groups: {} }
@@ -774,17 +787,125 @@ const Sidebar = memo(function Sidebar({
       flexShrink: 0,
       height: '100vh'
     }}>
-      {/* Logo */}
+      {/* ✅ Logo OU Now Playing */}
       <div style={{
-        padding: '16px 16px 12px',
+        padding: '14px 14px 12px',
         display: 'flex',
         alignItems: 'center',
         gap: 8,
         borderBottom: '1px solid var(--border)',
-        flexShrink: 0
+        flexShrink: 0,
+        minHeight: 58,
+        transition: 'background 0.2s ease'
       }}>
-        <i className="ti ti-speakerphone" style={{ fontSize: 22, color: 'var(--accent)' }} />
-        <span style={{ fontWeight: 600, fontSize: 15 }}>SoundDeck</span>
+        {showNowPlaying ? (
+          <div style={{ width: '100%', minWidth: 0 }}>
+            {/* Label "En lecture" */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              marginBottom: 6
+            }}>
+              <i className="ti ti-volume" style={{
+                fontSize: 11,
+                color: 'var(--accent)',
+                animation: 'pulse 1.2s ease-in-out infinite'
+              }} />
+              <span style={{
+                fontSize: 9,
+                fontWeight: 600,
+                color: 'var(--accent)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em'
+              }}>
+                {t('nowPlaying')}
+              </span>
+            </div>
+
+            {/* Nom du son avec miniature */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 8,
+              minWidth: 0
+            }}>
+              {playingSound.image ? (
+                <img
+                  src={playingSound.image.startsWith('file://')
+                    ? playingSound.image
+                    : `file:///${playingSound.image.replace(/\\/g, '/')}`}
+                  alt=""
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 5,
+                    objectFit: 'cover',
+                    flexShrink: 0,
+                    border: '1px solid var(--border)'
+                  }}
+                  onError={(e) => { e.target.style.display = 'none' }}
+                />
+              ) : (
+                <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1 }}>
+                  {playingSound.emoji || '🔊'}
+                </span>
+              )}
+              <span style={{
+                fontSize: 12,
+                fontWeight: 500,
+                color: 'var(--text-primary)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                minWidth: 0
+              }}>
+                {playingSound.name}
+              </span>
+            </div>
+
+            {/* Barre de progression (si son > 2s) */}
+            {progress ? (
+              <>
+                <div style={{
+                  height: 3,
+                  background: 'var(--bg-tertiary)',
+                  borderRadius: 2,
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${(progress.ratio || 0) * 100}%`,
+                    background: 'var(--accent)',
+                    borderRadius: 2,
+                    transition: 'width 0.1s linear'
+                  }} />
+                </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: 9,
+                  color: 'var(--text-tertiary)',
+                  marginTop: 3,
+                  fontVariantNumeric: 'tabular-nums'
+                }}>
+                  <span>{fmtTime(progress.current)}</span>
+                  <span>{fmtTime(progress.duration)}</span>
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+                ▶️ {t('playing')}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <i className="ti ti-speakerphone" style={{ fontSize: 22, color: 'var(--accent)' }} />
+            <span style={{ fontWeight: 600, fontSize: 15 }}>SoundDeck</span>
+          </>
+        )}
       </div>
 
       {/* Volume maître */}
@@ -841,6 +962,7 @@ const Sidebar = memo(function Sidebar({
     prevProps.currentProfileId === nextProps.currentProfileId &&
     prevProps.loopEnabled === nextProps.loopEnabled &&
     prevProps.volume === nextProps.volume &&
+    prevProps.sounds === nextProps.sounds &&
     JSON.stringify(prevProps.profiles) === JSON.stringify(nextProps.profiles) &&
     JSON.stringify(prevProps.sidebarConfig) === JSON.stringify(nextProps.sidebarConfig) &&
     JSON.stringify(prevProps.pluginPages) === JSON.stringify(nextProps.pluginPages)
@@ -863,7 +985,6 @@ function SidebarItem({
   isProfile = false,
   isPlugin = false 
 }) {
-  // ✅ Utiliser useLanguage pour les traductions si nécessaire
   const { t } = useLanguage()
   const isActive = active || false
   
