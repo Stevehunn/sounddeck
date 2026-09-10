@@ -1,7 +1,10 @@
 // src/shared/components/ui/LoadingOverlay.jsx
 import { createPortal } from 'react-dom'
+import { useLanguage } from '@core/i18n/LanguageContext'
 
 export default function LoadingOverlay({ message, visible }) {
+  const { t } = useLanguage()
+
   if (!visible) return null
 
   return createPortal(
@@ -39,13 +42,13 @@ export default function LoadingOverlay({ message, visible }) {
           color: 'var(--text-primary)',
           marginBottom: 8
         }}>
-          {message || 'Chargement...'}
+          {message || t('loading')}
         </div>
         <div style={{
           fontSize: 13,
           color: 'var(--text-secondary)'
         }}>
-          Veuillez patienter, l'opération peut prendre quelques secondes.
+          {t('loadingSubtitle')}
         </div>
       </div>
       <style>{`

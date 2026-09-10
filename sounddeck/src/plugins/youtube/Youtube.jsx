@@ -7,6 +7,18 @@ import useConfirm from '@shared/hooks/useConfirm'
 import LoadingOverlay from '@shared/components/ui/LoadingOverlay'
 import { DeleteButton } from '@shared/components/ui'
 
+// ✅ Importer les fonctions du tutoriel
+import { 
+  mockFetchVideoInfo, 
+  mockDownloadAudio, 
+  mockSaveSound,
+  isYoutubeTutorialActive,
+  getTutorialState,
+  getMockVideoInfo,
+  setTutorialStep,
+  getTutorialStep
+} from './tutorialSteps'
+
 const EMOJIS = ['🎵','🎤','🎸','🎹','🥁','🎺','🎻','🎼','🔊','💥','😂','🔥']
 
 // ✅ ÉTAT GLOBAL POUR YT-DLP
@@ -41,6 +53,7 @@ export default function YouTube({ store, addToast }) {
         return 'checking'
     })
     const [forceRender, setForceRender] = useState(0)
+    const [resetKey, setResetKey] = useState(0)
     const [downloading, setDownloading] = useState(false)
     const [downloadProgress, setDownloadProgress] = useState(0)
     const [downloadStatus, setDownloadStatus] = useState('')
@@ -74,6 +87,11 @@ export default function YouTube({ store, addToast }) {
     const hasCompletedSave = useRef(false)
     const hideProgressTimeoutRef = useRef(null)
 
+    // ✅ Détecter si on est en mode tutoriel
+    const isTutorialMode = useCallback(() => {
+        return isYoutubeTutorialActive()
+    }, [])
+
     // ─── VALEUR DÉRIVÉE POUR LE RENDU ────────────────────────────────────────
     const effectiveStatus = globalCheckDone ? (globalYtdlpStatus ?? 'missing') : ytdlpStatus
 
@@ -95,8 +113,61 @@ export default function YouTube({ store, addToast }) {
         }
     }, [step, showProgress, toastShown, addToast, t])
 
+    // ✅ ÉCOUTER L'ÉVÉNEMENT DE FORCE RESET
+    useEffect(() => {
+        const handleForceReset = () => {
+            console.log('🔄 [YouTube] Force reset reçu - isTutorialMode:', isYoutubeTutorialActive())
+            
+            // ✅ Reset complet incluant l'URL
+            setUrl('')
+            setVideoInfo(null)
+            setDownloadedPath(null)
+            setStep('url')
+            setSoundName('')
+            setStart(0)
+            setEnd(0)
+            setTargetProfiles(['all'])
+            setPlatform(null)
+            setCustomImage(null)
+            setUseThumbnail(false)
+            setShowProgress(false)
+            setIsProcessing(false)
+            setImporting(false)
+            setDownloadProgress(0)
+            setDownloadStatus('')
+            setToastShown(false)
+            setLoadingInfo(false)
+            setResetKey(prev => prev + 1)
+            
+            // ✅ Reset des globales (y compris url via step)
+            globalStep = 'url'
+            globalVideoInfo = null
+            globalSoundName = ''
+            globalEnd = 0
+            globalDownloadedPath = null
+            globalPlatform = null
+            
+            // ✅ Reset des refs
+            hasCompletedSave.current = false
+            savingRef.current = false
+            isProcessingRef = false
+            fetchingRef.current = false
+        }
+        
+        window.addEventListener('youtube-force-reset', handleForceReset)
+        return () => window.removeEventListener('youtube-force-reset', handleForceReset)
+    }, [])
+
     // ─── VÉRIFICATION DE yt-dlp ──────────────────────────────────────────────
     const checkYtdlp = useCallback(async () => {
+        if (isTutorialMode()) {
+            console.log('🎬 [YouTube Tutorial] yt-dlp simulé comme disponible')
+            globalYtdlpStatus = 'available'
+            globalCheckDone = true
+            setYtdlpStatus('available')
+            return 'available'
+        }
+
         if (globalCheckDone) {
             if (ytdlpStatus !== globalYtdlpStatus) {
                 setYtdlpStatus(globalYtdlpStatus ?? 'missing')
@@ -145,7 +216,7 @@ export default function YouTube({ store, addToast }) {
         } catch (error) {
             return 'missing'
         }
-    }, [ytdlpStatus])
+    }, [ytdlpStatus, isTutorialMode])
 
     // ─── INITIALISATION ──────────────────────────────────────────────────────
     useEffect(() => {
@@ -163,23 +234,44 @@ export default function YouTube({ store, addToast }) {
         }
         forceUpdateListeners.push(listener)
 
-        if (globalVideoInfo) {
+        if (isTutorialMode()) {
+            console.log('🎬 [YouTube Tutorial] Initialisation avec données mock')
+            const mockInfo = getMockVideoInfo()
+            const tutorialState = getTutorialState()
+            
+            if (mockInfo) {
+                setVideoInfo(mockInfo)
+                setSoundName(mockInfo.title || '')
+                setEnd(mockInfo.duration || 0)
+                setStep(tutorialState.step || 'url')
+            }
+            
+            setTimeout(() => {
+                setForceRender(prev => prev + 1)
+            }, 100)
+        }
+
+        if (globalVideoInfo && !isTutorialMode()) {
             setVideoInfo(globalVideoInfo)
             setSoundName(globalSoundName)
             setEnd(globalEnd)
             setStep(globalStep)
             setPlatform(globalPlatform)
         }
-        if (globalDownloadedPath) {
+        if (globalDownloadedPath && !isTutorialMode()) {
             setDownloadedPath(globalDownloadedPath)
             setStep(globalStep)
         }
 
         if (globalCheckDone) {
             setYtdlpStatus(globalYtdlpStatus ?? 'missing')
-        } else if (!globalCheckStarted) {
+        } else if (!globalCheckStarted && !isTutorialMode()) {
             globalCheckStarted = true
             checkYtdlp()
+        } else if (isTutorialMode()) {
+            globalYtdlpStatus = 'available'
+            globalCheckDone = true
+            setYtdlpStatus('available')
         }
 
         return () => {
@@ -197,7 +289,7 @@ export default function YouTube({ store, addToast }) {
                 hideProgressTimeoutRef.current = null
             }
         }
-    }, [checkYtdlp])
+    }, [checkYtdlp, isTutorialMode])
 
     // ─── NETTOYAGE PREVIEW ──────────────────────────────────────────────────
     useEffect(() => {
@@ -281,7 +373,7 @@ export default function YouTube({ store, addToast }) {
     const handleFetchInfo = useCallback(async () => {
         if (fetchingRef.current) return
         
-        if (!url?.trim()) {
+        if (!url?.trim() && !isTutorialMode()) {
             addToast(t('pasteUrl'), 'warning')
             return
         }
@@ -294,17 +386,24 @@ export default function YouTube({ store, addToast }) {
         setCustomImage(null)
 
         try {
-            const detected = detectPlatform(url.trim())
-            setPlatform(detected)
-            globalPlatform = detected
-
             let result
-            if (detected === 'spotify') {
-                result = await getSpotifyTrack(url.trim())
-            } else if (detected === 'soundcloud') {
-                result = await getSoundCloudTrack(url.trim())
+            
+            if (isTutorialMode()) {
+                console.log('🎬 [YouTube Tutorial] Mode tutoriel actif, utilisation des données mock')
+                result = await mockFetchVideoInfo()
+                setTutorialStep('trim')
             } else {
-                result = await window.electronAPI.youtubeInfo(url.trim())
+                const detected = detectPlatform(url.trim())
+                setPlatform(detected)
+                globalPlatform = detected
+
+                if (detected === 'spotify') {
+                    result = await getSpotifyTrack(url.trim())
+                } else if (detected === 'soundcloud') {
+                    result = await getSoundCloudTrack(url.trim())
+                } else {
+                    result = await window.electronAPI.youtubeInfo(url.trim())
+                }
             }
 
             if (result?.success) {
@@ -314,8 +413,8 @@ export default function YouTube({ store, addToast }) {
                     duration: data.duration || 0,
                     thumbnail: data.thumbnail || data.cover || null,
                     uploader: data.uploader || data.artist || t('unknownArtist'),
-                    url: url.trim(),
-                    platform: detected || 'youtube',
+                    url: isTutorialMode() ? 'https://www.youtube.com/watch?v=a5uQMwRMHcs' : url.trim(),
+                    platform: data.platform || 'youtube',
                     id: data.id || Date.now().toString()
                 }
 
@@ -323,7 +422,7 @@ export default function YouTube({ store, addToast }) {
                 globalSoundName = info.title?.slice(0, 50) || ''
                 globalEnd = info.duration || 0
                 globalStep = 'trim'
-                globalPlatform = detected || 'youtube'
+                globalPlatform = info.platform || 'youtube'
 
                 setVideoInfo(info)
                 setSoundName(globalSoundName)
@@ -331,7 +430,14 @@ export default function YouTube({ store, addToast }) {
                 setStep('trim')
                 setPlatform(globalPlatform)
                 
-                addToast(`✅ ${t('platformDetected').replace('{platform}', detected || t('platformYoutube'))}`, 'success')
+                if (isTutorialMode()) {
+                    setTutorialStep('trim')
+                    setTimeout(() => {
+                        setForceRender(prev => prev + 1)
+                    }, 100)
+                }
+                
+                addToast(`✅ ${t('platformDetected').replace('{platform}', info.platform || t('platformYoutube'))}`, 'success')
             } else {
                 addToast('❌ ' + t('ytFetchError') + (result?.error || t('unknownError')), 'error')
             }
@@ -343,7 +449,7 @@ export default function YouTube({ store, addToast }) {
         setLoadingInfo(false)
         fetchingRef.current = false
         setIsProcessing(false)
-    }, [url, addToast, t])
+    }, [url, addToast, t, isTutorialMode])
 
     // ─── PRÉVISUALISATION ─────────────────────────────────────────────────────
     const togglePreview = (filePath) => {
@@ -405,36 +511,51 @@ export default function YouTube({ store, addToast }) {
         startProgressSimulation()
 
         try {
-            const soundsDir = await window.electronAPI.getSoundsDir()
-            const safeName = sanitizeFilename(soundName || currentVideoInfo.title || 'audio') + '_' + Date.now() + '.mp3'
-            const outputPath = `${soundsDir}/${safeName}`
-
             let result
-            if (currentPlatform === 'spotify') {
-                result = await window.electronAPI.downloadPlatformTrack({
-                    platform: 'spotify',
-                    url: `https://open.spotify.com/track/${currentVideoInfo.id}`,
-                    trackId: currentVideoInfo.id,
-                    outputPath: outputPath,
-                    title: currentVideoInfo.title,
-                    artist: currentVideoInfo.uploader
-                })
-            } else if (currentPlatform === 'soundcloud') {
-                result = await window.electronAPI.downloadPlatformTrack({
-                    platform: 'soundcloud',
-                    url: `https://soundcloud.com/${currentVideoInfo.uploader || 'artist'}/${currentVideoInfo.id}`,
-                    trackId: currentVideoInfo.id,
-                    outputPath: outputPath,
-                    title: currentVideoInfo.title,
-                    artist: currentVideoInfo.uploader
-                })
-            } else {
-                result = await window.electronAPI.youtubeDownload(
+            
+            if (isTutorialMode()) {
+                console.log('🎬 [YouTube Tutorial] Téléchargement simulé')
+                result = await mockDownloadAudio(
                     currentVideoInfo.url,
                     start,
                     end > 0 ? end : currentVideoInfo.duration || 0,
-                    currentVideoInfo.title
+                    soundName || currentVideoInfo.title
                 )
+                setTutorialStep('save')
+                setTimeout(() => {
+                    setForceRender(prev => prev + 1)
+                }, 100)
+            } else {
+                const soundsDir = await window.electronAPI.getSoundsDir()
+                const safeName = sanitizeFilename(soundName || currentVideoInfo.title || 'audio') + '_' + Date.now() + '.mp3'
+                const outputPath = `${soundsDir}/${safeName}`
+
+                if (currentPlatform === 'spotify') {
+                    result = await window.electronAPI.downloadPlatformTrack({
+                        platform: 'spotify',
+                        url: `https://open.spotify.com/track/${currentVideoInfo.id}`,
+                        trackId: currentVideoInfo.id,
+                        outputPath: outputPath,
+                        title: currentVideoInfo.title,
+                        artist: currentVideoInfo.uploader
+                    })
+                } else if (currentPlatform === 'soundcloud') {
+                    result = await window.electronAPI.downloadPlatformTrack({
+                        platform: 'soundcloud',
+                        url: `https://soundcloud.com/${currentVideoInfo.uploader || 'artist'}/${currentVideoInfo.id}`,
+                        trackId: currentVideoInfo.id,
+                        outputPath: outputPath,
+                        title: currentVideoInfo.title,
+                        artist: currentVideoInfo.uploader
+                    })
+                } else {
+                    result = await window.electronAPI.youtubeDownload(
+                        currentVideoInfo.url,
+                        start,
+                        end > 0 ? end : currentVideoInfo.duration || 0,
+                        currentVideoInfo.title
+                    )
+                }
             }
 
             stopProgressSimulation()
@@ -452,6 +573,13 @@ export default function YouTube({ store, addToast }) {
                 
                 setDownloadedPath(result.path)
                 setStep('save')
+                
+                if (isTutorialMode()) {
+                    setTutorialStep('save')
+                    setTimeout(() => {
+                        setForceRender(prev => prev + 1)
+                    }, 100)
+                }
             } else {
                 setShowProgress(false)
                 setIsProcessing(false)
@@ -466,7 +594,7 @@ export default function YouTube({ store, addToast }) {
             setIsProcessing(false)
             addToast('❌ ' + t('ytDownloadError') + error.message, 'error')
         }
-    }, [videoInfo, platform, soundName, start, end, addToast, t, startProgressSimulation, stopProgressSimulation])
+    }, [videoInfo, platform, soundName, start, end, addToast, t, startProgressSimulation, stopProgressSimulation, isTutorialMode])
 
     // ─── SAUVEGARDE ──────────────────────────────────────────────────────────
     const handleSave = useCallback(async () => {
@@ -489,7 +617,7 @@ export default function YouTube({ store, addToast }) {
         }
 
         const existingSound = store.sounds.find(s => s.name.toLowerCase() === currentSoundName.trim().toLowerCase())
-        if (existingSound) {
+        if (existingSound && !isTutorialMode()) {
             const confirmed = await confirm({
                 title: t('soundExists'),
                 message: t('soundExistsConfirm').replace('{name}', currentSoundName.trim()),
@@ -517,33 +645,38 @@ export default function YouTube({ store, addToast }) {
         }, 200)
 
         try {
-            let imageToSave = finalImage
-            
-            if (useThumbnail && videoInfo?.thumbnail) {
-                try {
-                    if (window.electronAPI.downloadThumbnail) {
-                        const result = await window.electronAPI.downloadThumbnail(videoInfo.thumbnail, currentSoundName)
-                        if (result?.success) {
-                            imageToSave = result.path
+            if (isTutorialMode()) {
+                console.log('🎬 [YouTube Tutorial] Sauvegarde simulée')
+                await mockSaveSound()
+            } else {
+                let imageToSave = finalImage
+                
+                if (useThumbnail && videoInfo?.thumbnail) {
+                    try {
+                        if (window.electronAPI.downloadThumbnail) {
+                            const result = await window.electronAPI.downloadThumbnail(videoInfo.thumbnail, currentSoundName)
+                            if (result?.success) {
+                                imageToSave = result.path
+                            } else {
+                                imageToSave = videoInfo.thumbnail
+                            }
                         } else {
                             imageToSave = videoInfo.thumbnail
                         }
-                    } else {
+                    } catch (e) {
+                        console.warn('⚠️ Erreur téléchargement miniature:', e.message)
                         imageToSave = videoInfo.thumbnail
                     }
-                } catch (e) {
-                    console.warn('⚠️ Erreur téléchargement miniature:', e.message)
-                    imageToSave = videoInfo.thumbnail
                 }
-            }
 
-            await store.addSound({
-                name: currentSoundName.trim(),
-                path: currentDownloadedPath,
-                emoji,
-                image: imageToSave || null,
-                profiles: targetProfiles
-            })
+                await store.addSound({
+                    name: currentSoundName.trim(),
+                    path: currentDownloadedPath,
+                    emoji,
+                    image: imageToSave || null,
+                    profiles: targetProfiles
+                })
+            }
 
             clearInterval(saveInterval)
             savingRef.current = false
@@ -561,17 +694,25 @@ export default function YouTube({ store, addToast }) {
             globalDownloadedPath = null
             globalPlatform = null
 
-            setUrl('')
-            setVideoInfo(null)
-            setDownloadedPath(null)
-            setStep('url')
-            setSoundName('')
-            setStart(0)
-            setEnd(0)
-            setTargetProfiles(['all'])
-            setPlatform(null)
-            setCustomImage(null)
-            setUseThumbnail(false)
+            if (isTutorialMode()) {
+                setStep('url')
+                setTutorialStep('url')
+                setTimeout(() => {
+                    setForceRender(prev => prev + 1)
+                }, 100)
+            } else {
+                setUrl('')
+                setVideoInfo(null)
+                setDownloadedPath(null)
+                setStep('url')
+                setSoundName('')
+                setStart(0)
+                setEnd(0)
+                setTargetProfiles(['all'])
+                setPlatform(null)
+                setCustomImage(null)
+                setUseThumbnail(false)
+            }
 
             if (previewHowl) {
                 previewHowl.stop()
@@ -597,7 +738,7 @@ export default function YouTube({ store, addToast }) {
             setDownloadStatus('')
             addToast('❌ ' + t('error') + ': ' + error.message, 'error')
         }
-    }, [soundName, downloadedPath, getFinalImage, useThumbnail, videoInfo, targetProfiles, store, addToast, t, confirm, previewHowl, emoji])
+    }, [soundName, downloadedPath, getFinalImage, useThumbnail, videoInfo, targetProfiles, store, addToast, t, confirm, previewHowl, emoji, isTutorialMode])
 
     // ─── FORMATAGE ────────────────────────────────────────────────────────────
     const fmt = (s) => {
@@ -616,15 +757,16 @@ export default function YouTube({ store, addToast }) {
 
     if (effectiveStatus === 'checking') {
         return (
-            <div className="flex-center" style={{ flex: 1, gap: 10, color: 'var(--text-tertiary)' }}>
-                <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
-                {t('ytdlpChecking')}
-                <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
-            </div>
+            <>
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                    <PageHeader title={t('youtubeTitle')} sub={t('youtubeSub')} />
+                </div>
+                <LoadingOverlay visible={true} message={t('ytdlpChecking')} />
+            </>
         )
     }
 
-    if (effectiveStatus === 'missing') {
+    if (effectiveStatus === 'missing' && !isTutorialMode()) {
         return (
             <>
                 <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -665,28 +807,30 @@ export default function YouTube({ store, addToast }) {
     if (currentStep === 'url') {
         return (
             <>
-                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-                    <PageHeader title={t('youtubeTitle')} sub={t('pasteUrl')} />
+                <div key={resetKey} style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                    <PageHeader title={t('youtubeTitle')} sub={isTutorialMode() ? '🎬 ' + t('tutorialMode') + ' - ' + t('pasteUrl') : t('pasteUrl')} />
                     <div className="flex-center" style={{ flex: 1, padding: 40 }}>
                         <div style={{ width: '100%', maxWidth: 560 }}>
                             <div style={{ fontSize: 56, textAlign: 'center', marginBottom: 20 }}>▶️</div>
                             <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 16, textAlign: 'center' }}>
-                                {t('pasteUrl')}
+                                {isTutorialMode() ? '🔗 ' + t('ytUrlPlaceholder') : t('pasteUrl')}
                             </div>
                             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                                 <input
-                                    value={url}
-                                    onChange={e => setUrl(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && handleFetchInfo()}
+                                    data-testid="youtube-url-input"
+                                    className="youtube-url-input"
+                                    value={isTutorialMode() ? 'https://www.youtube.com/watch?v=a5uQMwRMHcs' : url}
+                                    onChange={e => !isTutorialMode() && setUrl(e.target.value)}
                                     placeholder={t('ytUrlPlaceholder')}
-                                    className="input-lg"
                                     style={{ flex: 1, fontSize: 13, borderRadius: 'var(--radius-md)' }}
                                     autoFocus
+                                    disabled={isTutorialMode()}
                                 />
                                 <button
-                                    className="btn-primary btn-lg"
+                                    data-testid="youtube-load-button"
+                                    className="youtube-load-button btn-primary btn-lg"
                                     onClick={handleFetchInfo}
-                                    disabled={!url.trim() || loadingInfo}
+                                    disabled={isTutorialMode() ? false : (!url.trim() || loadingInfo)}
                                     style={{ flexShrink: 0, borderRadius: 'var(--radius-md)', minWidth: 120 }}
                                 >
                                     {loadingInfo
@@ -696,7 +840,7 @@ export default function YouTube({ store, addToast }) {
                             </div>
                             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.6, padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
                                 <i className="ti ti-shield-check" style={{ marginRight: 4, color: 'var(--success)' }} />
-                                {t('ytUrlNote')}
+                                {isTutorialMode() ? '🎬 ' + t('tutorialMode') + ' - ' + t('ytUrlNote') : t('ytUrlNote')}
                             </div>
                         </div>
                     </div>
@@ -720,10 +864,16 @@ export default function YouTube({ store, addToast }) {
                 <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
                     <PageHeader
                         title={t('selectPortion')}
-                        sub={`${t('youtubeTitle')} : ${info?.title?.slice(0, 60) || '...'}`}
+                        sub={`${isTutorialMode() ? '🎬 ' + t('tutorialMode') + ' - ' : ''}${info?.title?.slice(0, 60) || '...'}`}
                         onBack={() => {
-                            globalStep = 'url'
-                            setStep('url')
+                            if (!isTutorialMode()) {
+                                globalStep = 'url'
+                                setStep('url')
+                            } else {
+                                setTutorialStep('url')
+                                globalStep = 'url'
+                                setStep('url')
+                            }
                         }}
                     />
                     <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
@@ -755,7 +905,7 @@ export default function YouTube({ store, addToast }) {
                             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                 {t('ytTrimTitle')}
                             </div>
-                            <div style={{ padding: '12px 16px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
+                            <div data-testid="youtube-trim-controls" className="youtube-trim-controls" style={{ padding: '12px 16px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
                                     <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                                         {t('ytTrimDuration')} <strong style={{ color: 'var(--accent)' }}>{fmt(end - start)}</strong>
@@ -833,15 +983,22 @@ export default function YouTube({ store, addToast }) {
                             <button 
                                 className="btn-secondary btn-lg" 
                                 onClick={() => {
-                                    globalStep = 'url'
-                                    setStep('url')
+                                    if (!isTutorialMode()) {
+                                        globalStep = 'url'
+                                        setStep('url')
+                                    } else {
+                                        setTutorialStep('url')
+                                        globalStep = 'url'
+                                        setStep('url')
+                                    }
                                 }} 
                                 style={{ borderRadius: 'var(--radius-md)', minWidth: 120 }}
                             >
                                 <i className="ti ti-arrow-left" /> {t('ytBack')}
                             </button>
                             <button 
-                                className="btn-primary btn-lg" 
+                                data-testid="youtube-download-button"
+                                className="youtube-download-button btn-primary btn-lg" 
                                 onClick={handleDownloadAudio} 
                                 disabled={importing || !info} 
                                 style={{ borderRadius: 'var(--radius-md)', minWidth: 180 }}
@@ -938,12 +1095,22 @@ export default function YouTube({ store, addToast }) {
         return (
             <>
                 <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-                    <PageHeader title={t('configSound')} sub={t('ytSaveSubtitle')} onBack={() => {
-                        if (!savingRef.current) {
-                            globalStep = 'trim'
-                            setStep('trim')
-                        }
-                    }} />
+                    <PageHeader 
+                        title={isTutorialMode() ? '🎬 ' + t('tutorialMode') + ' - ' + t('configSound') : t('configSound')} 
+                        sub={t('ytSaveSubtitle')} 
+                        onBack={() => {
+                            if (!savingRef.current) {
+                                if (!isTutorialMode()) {
+                                    globalStep = 'trim'
+                                    setStep('trim')
+                                } else {
+                                    setTutorialStep('trim')
+                                    globalStep = 'trim'
+                                    setStep('trim')
+                                }
+                            }
+                        }} 
+                    />
                     <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
                         <div style={{ maxWidth: 560, margin: '0 auto' }}>
                             <div className="option-row" style={{ borderColor: 'var(--success)', marginBottom: 20, padding: '12px 16px', background: 'rgba(29,158,117,0.1)', borderRadius: 'var(--radius-md)' }}>
@@ -975,16 +1142,22 @@ export default function YouTube({ store, addToast }) {
                                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                     {t('soundName')}
                                 </label>
-                                <input value={soundName} onChange={e => setSoundName(e.target.value)} placeholder={t('ytSoundNamePlaceholder')} className="input-lg" style={{ fontSize: 13, borderRadius: 'var(--radius-md)' }} autoFocus />
+                                <input 
+                                    data-testid="youtube-save-controls"
+                                    className="youtube-save-controls" 
+                                    value={soundName} 
+                                    onChange={e => setSoundName(e.target.value)} 
+                                    placeholder={t('ytSoundNamePlaceholder')} 
+                                    style={{ fontSize: 13, borderRadius: 'var(--radius-md)' }} 
+                                    autoFocus 
+                                />
                             </div>
 
-                            {/* SECTION IMAGE AVEC MINIATURE */}
                             <div style={{ marginBottom: 14 }}>
                                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                     {t('image')}
                                 </label>
                                 
-                                {/* Aperçu de l'image */}
                                 <div style={{ 
                                     display: 'flex', 
                                     alignItems: 'center', 
@@ -1030,9 +1203,7 @@ export default function YouTube({ store, addToast }) {
                                     </div>
                                 </div>
 
-                                {/* Boutons d'action */}
                                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                    {/* Bouton "Utiliser la miniature" */}
                                     {videoInfo?.thumbnail && (
                                         <button 
                                             className={`btn-${useThumbnail ? 'primary' : 'secondary'} btn-sm`}
@@ -1056,7 +1227,6 @@ export default function YouTube({ store, addToast }) {
                                         </button>
                                     )}
 
-                                    {/* Bouton "Ajouter une image" */}
                                     <button 
                                         className="btn-secondary btn-sm" 
                                         onClick={async () => {
@@ -1083,7 +1253,6 @@ export default function YouTube({ store, addToast }) {
                                         {customImage ? t('ytImageChange') : t('ytImageAdd')}
                                     </button>
 
-                                    {/* Bouton Supprimer avec DeleteButton */}
                                     {(customImage || useThumbnail) && (
                                         <DeleteButton
                                             onDelete={() => {
@@ -1137,14 +1306,21 @@ export default function YouTube({ store, addToast }) {
                             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                                 <button className="btn-secondary btn-lg" onClick={() => {
                                     if (!savingRef.current) {
-                                        globalStep = 'trim'
-                                        setStep('trim')
+                                        if (!isTutorialMode()) {
+                                            globalStep = 'trim'
+                                            setStep('trim')
+                                        } else {
+                                            setTutorialStep('trim')
+                                            globalStep = 'trim'
+                                            setStep('trim')
+                                        }
                                     }
                                 }} style={{ borderRadius: 'var(--radius-md)', minWidth: 120 }}>
                                     <i className="ti ti-arrow-left" /> {t('ytBack')}
                                 </button>
                                 <button 
-                                    className="btn-primary btn-lg" 
+                                    data-testid="youtube-save-button"
+                                    className="youtube-save-button btn-primary btn-lg" 
                                     onClick={handleSave} 
                                     disabled={isProcessing || !soundName.trim() || !currentPath || savingRef.current} 
                                     style={{ borderRadius: 'var(--radius-md)', minWidth: 200 }}

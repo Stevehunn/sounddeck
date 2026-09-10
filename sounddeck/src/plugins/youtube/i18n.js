@@ -124,6 +124,16 @@ export default {
     upload: 'Télécharger',
     editorNameRequired: 'Veuillez entrer un nom pour le son',
 
+    // ─── GÉNÉRIQUE / TUTORIEL ────────────────────────────────────────────────
+    tutorialMode: 'Mode tutoriel',
+    loadingSubtitle: 'Veuillez patienter, l\'opération peut prendre quelques secondes.',
+    tutorialSkip: 'Passer',
+    tutorialNext: 'Suivant',
+    tutorialFinish: 'Terminer',
+    tutorialNotFound: 'Tutoriel non disponible pour cette page',
+    allSounds: 'Tous les sons',
+    close: 'Fermer',
+
     // ─── TUTORIEL YOUTUBE ──────────────────────────────────────────────────
     tutorialYoutubeStep1Title: 'Coller un lien YouTube',
     tutorialYoutubeStep1Desc: 'Collez l\'URL d\'une vidéo YouTube pour importer son audio dans SoundDeck.',
@@ -274,6 +284,16 @@ export default {
     upload: 'Upload',
     editorNameRequired: 'Please enter a name for the sound',
 
+    // ─── GENERIC / TUTORIAL ──────────────────────────────────────────────────
+    tutorialMode: 'Tutorial mode',
+    loadingSubtitle: 'Please wait, the operation may take a few seconds.',
+    tutorialSkip: 'Skip',
+    tutorialNext: 'Next',
+    tutorialFinish: 'Finish',
+    tutorialNotFound: 'Tutorial not available for this page',
+    allSounds: 'All sounds',
+    close: 'Close',
+
     // ─── YOUTUBE TUTORIAL ──────────────────────────────────────────────────
     tutorialYoutubeStep1Title: 'Paste a YouTube link',
     tutorialYoutubeStep1Desc: 'Paste the URL of a YouTube video to import its audio into SoundDeck.',
@@ -423,6 +443,16 @@ export default {
     loading: 'Cargando...',
     upload: 'Subir',
     editorNameRequired: 'Por favor ingresa un nombre para el sonido',
+
+    // ─── GENÉRICO / TUTORIAL ─────────────────────────────────────────────────
+    tutorialMode: 'Modo tutorial',
+    loadingSubtitle: 'Por favor espera, la operación puede tardar unos segundos.',
+    tutorialSkip: 'Saltar',
+    tutorialNext: 'Siguiente',
+    tutorialFinish: 'Finalizar',
+    tutorialNotFound: 'Tutorial no disponible para esta página',
+    allSounds: 'Todos los sonidos',
+    close: 'Cerrar',
 
     // ─── TUTORIAL YOUTUBE ──────────────────────────────────────────────────
     tutorialYoutubeStep1Title: 'Pegar un enlace de YouTube',
