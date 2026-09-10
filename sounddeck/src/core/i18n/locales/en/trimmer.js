@@ -22,6 +22,7 @@ export default {
   trimmerProcessing: 'Trimming...',
   trimmerSuccess: 'File trimmed successfully',
   trimmerError: 'Error trimming',
+  trimmerPause: 'Pause',
   
   // ─── WAVEFORM ──────────────────────────────────────────────────────
   trimmerWaveformLoading: 'Generating waveform...',

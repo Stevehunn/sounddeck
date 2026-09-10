@@ -103,6 +103,8 @@ export default {
   toastProfileExporting: 'Création de l\'archive du profil...',
   toggleShortcutSet: 'Raccourci toggle défini :',
   toggleShortcutRemoved: 'Raccourci toggle supprimé',
+  mixerResynced: 'Mixeur resynchronisé',
+  backupDeleted: 'Sauvegarde supprimée',
   
   // ─── MENU ─────────────────────────────────────────────────────────────
   menuFavoriteAdd: 'Ajouter aux favoris',

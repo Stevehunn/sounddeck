@@ -81,11 +81,11 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
 
   const deletePlaylist = async (id) => {
     const confirmed = await confirm({
-      title: t('deletePlaylist') || 'Confirmer la suppression de la playlist',
-      message: t('deletePlaylistConfirm') || 'Voulez-vous vraiment supprimer cette playlist ?',
+      title: t('deletePlaylist'),
+      message: t('deletePlaylistConfirm'),
       type: 'danger',
-      confirmText: t('delete') || 'Supprimer',
-      cancelText: t('cancel') || 'Annuler'
+      confirmText: t('delete'),
+      cancelText: t('cancel')
     })
     
     if (!confirmed) return
@@ -248,8 +248,8 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
                 
                 <DeleteButton
                   onDelete={() => deletePlaylist(pl.id)}
-                  confirmTitle={t('deletePlaylist') || 'Confirmer la suppression de la playlist'}
-                  confirmMessage={t('deletePlaylistConfirm') || 'Voulez-vous vraiment supprimer cette playlist ?'}
+                  confirmTitle={t('deletePlaylist')}
+                  confirmMessage={t('deletePlaylistConfirm')}
                   itemName={pl.name}
                   size="sm"
                   variant="ghost-danger"
@@ -648,7 +648,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, onSav
               <i className="ti ti-music" style={{ color: 'var(--accent)' }} />
               {currentIdx >= 0 && items[currentIdx] && (() => {
                 const s = sounds.find(s => s.id === items[currentIdx].soundId)
-                return s?.name || 'Son inconnu'
+                return s?.name || t('unknownSound')
               })()}
             </span>
             <span style={{ fontFamily: 'monospace' }}>
@@ -813,7 +813,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, onSav
                   e.currentTarget.style.background = 'transparent'
                   e.currentTarget.style.color = 'var(--text-tertiary)'
                 }}
-                title={t('delete') || 'Supprimer'}
+                title={t('delete')}
               >
                 <i className="ti ti-trash" />
               </button>

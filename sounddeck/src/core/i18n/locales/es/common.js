@@ -103,6 +103,8 @@ export default {
   toastProfileExporting: 'Creando archivo del perfil...',
   toggleShortcutSet: 'Atajo de alternancia definido:',
   toggleShortcutRemoved: 'Atajo de alternancia eliminado',
+  mixerResynced: 'Mezclador resincronizado',
+  backupDeleted: 'Copia de seguridad eliminada',
   
   // ─── MENÚ ─────────────────────────────────────────────────────────────
   menuFavoriteAdd: 'Añadir a favoritos',

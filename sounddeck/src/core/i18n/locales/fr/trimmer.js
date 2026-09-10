@@ -22,6 +22,7 @@ export default {
   trimmerProcessing: 'Rognage en cours...',
   trimmerSuccess: 'Fichier rogné avec succès',
   trimmerError: 'Erreur lors du rognage',
+  trimmerPause: 'Pause',
   
   // ─── WAVEFORM ──────────────────────────────────────────────────────
   trimmerWaveformLoading: 'Génération de la waveform...',

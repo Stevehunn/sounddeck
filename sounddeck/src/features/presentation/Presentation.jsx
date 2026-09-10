@@ -1,3 +1,4 @@
+// src/features/presentation/Presentation.jsx
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { playSound, stopSound, isPlaying, getSoundProgress } from '@core/services/AudioService'
@@ -8,8 +9,6 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
   const [playingId, setPlayingId] = useState(null)
   const [search, setSearch] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
-
-  console.log('🎬 [Presentation] RENDER - refreshKey:', refreshKey)
 
   const currentSounds = store.currentSounds || []
   
@@ -24,8 +23,6 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
   const volume = store.volume || 80
   const loopEnabled = store.loopEnabled || false
 
-  console.log('🎬 [Presentation] favoriteSounds:', favoriteSounds.length, favoriteSounds.map(s => s.name))
-
   const filtered = search
     ? currentSounds.filter(s => s.name?.toLowerCase().includes(search.toLowerCase()))
     : currentSounds
@@ -34,7 +31,6 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
 
   // ✅ Exposer le store pour le tutoriel
   useEffect(() => {
-    console.log('📦 [Presentation] Expose store')
     window.__storeRef = { current: store }
     return () => {
       delete window.__storeRef
@@ -43,15 +39,11 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
 
   // ✅ FORCER UN RE-RENDER QUAND LES FAVORIS CHANGENT
   useEffect(() => {
-    console.log('🔄 [Presentation] Setup listeners')
-
     const refresh = () => {
-      console.log('🔄 [Presentation] REFRESH appelé')
       setRefreshKey(prev => prev + 1)
     }
 
     const handleStoreUpdate = (e) => {
-      console.log('📡 [Presentation] store-update event:', e.detail)
       if (e.detail?.type === 'favorites' || e.detail?.type === 'sound') {
         refresh()
       }
@@ -59,7 +51,6 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
     window.addEventListener('store-update', handleStoreUpdate)
 
     let lastCount = favoriteSounds.length
-    console.log('📊 [Presentation] Initial favorite count:', lastCount)
     
     const interval = setInterval(() => {
       const currentFavorites = (store.sounds || []).filter(s => 
@@ -67,14 +58,12 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
       )
       const currentCount = currentFavorites.length
       if (currentCount !== lastCount) {
-        console.log('📊 [Presentation] Favorite count changed:', lastCount, '->', currentCount)
         lastCount = currentCount
         refresh()
       }
     }, 200)
 
     return () => {
-      console.log('🧹 [Presentation] Cleanup listeners')
       window.removeEventListener('store-update', handleStoreUpdate)
       clearInterval(interval)
     }
@@ -115,13 +104,10 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
   const cardSize = store.cardSize || 'medium'
 
   const handleHelpClick = () => {
-    console.log('❓ [Presentation] Help button clicked')
     if (window.__startTutorial) {
       window.__startTutorial('presentation');
     }
   }
-
-  console.log('⭐ [Presentation] currentFavorites:', favoriteSounds.length, favoriteSounds.map(s => s.name))
 
   return (
     <div 
@@ -170,7 +156,6 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
       </div>
 
       {/* ✅ SECTION FAVORIS */}
-      {console.log('📌 [Presentation] Rendu section favoris - favoriteSounds.length:', favoriteSounds.length, 'search:', search)}
       {favoriteSounds.length > 0 && !search && (
         <div 
           data-testid="presentation-favorites"

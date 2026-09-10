@@ -96,7 +96,7 @@ export default {
     myinstantsSearch: 'Rechercher',
     myinstantsLoadingMore: '📥 Chargement de plus de sons...',
     myinstantsSelectAtLeastOneCategory: 'Sélectionnez au moins une catégorie',
-    selected: 'sélectionnées',
+    myinstantsSelected: 'sélectionnées',
 
     // ─── TUTORIEL DÉCOUVERTE ──────────────────────────────────────────────────
     tutorialDiscoverStep1Title: 'Bienvenue dans la découverte',
@@ -225,7 +225,7 @@ export default {
     myinstantsSearch: 'Search',
     myinstantsLoadingMore: '📥 Loading more sounds...',
     myinstantsSelectAtLeastOneCategory: 'Select at least one category',
-    selected: 'selected',
+    myinstantsSelected: 'selected',
 
     // ─── DISCOVER TUTORIAL ──────────────────────────────────────────────────
     tutorialDiscoverStep1Title: 'Welcome to Discovery',
@@ -354,7 +354,7 @@ export default {
     myinstantsSearch: 'Buscar',
     myinstantsLoadingMore: '📥 Cargando más sonidos...',
     myinstantsSelectAtLeastOneCategory: 'Selecciona al menos una categoría',
-    selected: 'seleccionadas',
+    myinstantsSelected: 'seleccionadas',
 
     // ─── TUTORIAL DESCUBRIMIENTO ──────────────────────────────────────────
     tutorialDiscoverStep1Title: 'Bienvenido al descubrimiento',

@@ -44,6 +44,7 @@ export default {
   sequencerExportSuccess: 'Sequence exported successfully',
   sequencerImportError: 'Error importing sequence',
   sequencerExportError: 'Error exporting sequence',
+  unknownSound: 'Unknown sound',
   
   // ─── STATUS ──────────────────────────────────────────────────────────
   sequencerStatusReady: 'Ready',

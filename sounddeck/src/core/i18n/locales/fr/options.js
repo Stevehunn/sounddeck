@@ -348,4 +348,56 @@ export default {
   
   // ─── INTÉGRATIONS ──────────────────────────────────────────────────
   integrations: 'Intégrations',
-}
+
+  // ─── SIDEBAR EDITOR ────────────────────────────────────────────────
+  sidebarCustomization: 'Personnalisation de la barre latérale',
+  sidebarCustomizationDesc: 'Réorganisez, épinglez ou masquez les éléments du menu',
+  sidebarCustomized: 'Personnalisée',
+  sidebarDefault: 'Par défaut',
+  sidebarEditorOpen: 'Ouvrir l\'éditeur',
+  sidebarEditorClose: 'Fermer l\'éditeur',
+  sidebarEditorSaved: 'Sidebar sauvegardée',
+  sidebarEditorResetConfirm: 'Voulez-vous vraiment réinitialiser la sidebar ?',
+  sidebarEditorResetSuccess: 'Sidebar réinitialisée',
+
+  // ─── COLLAPSIBLE SECTIONS ──────────────────────────────────────────
+  collapseHide: 'Masquer',
+  collapseShow: 'Afficher',
+
+  // ─── TUTORIELS (OPTIONS) ───────────────────────────────────────────
+  tutorialRestartDesc: 'Rejouer le tutoriel principal depuis le début',
+  tutorialAdvancedDesc: 'Découvrir les fonctionnalités avancées',
+  guideAvailable: 'Tutoriels disponibles',
+  guideAvailableTip: 'Ces tutoriels vous aident à découvrir toutes les fonctionnalités de SoundDeck.',
+
+  // ─── PLUGINS ───────────────────────────────────────────────────────
+  pluginsInstall: 'Installer un plugin',
+  pluginsInstallDesc: 'Ajoutez de nouvelles fonctionnalités à SoundDeck',
+  pluginsInstallBtn: 'Installer',
+  pluginsInstalledTitle: 'Plugins installés',
+  pluginsCount: 'plugin(s)',
+  pluginsNoPluginsInstalled: 'Aucun plugin installé',
+  pluginsInstallDesc2: 'Cliquez sur "Installer un plugin" pour commencer',
+  pluginsBy: 'par',
+  pluginsUnknownAuthor: 'Auteur inconnu',
+  pluginsPages: 'page(s)',
+  pluginsActivated: 'Activé',
+  pluginsReloadTooltip: 'Recharger l\'application pour appliquer les changements',
+  pluginsUninstall: 'Désinstaller le plugin',
+  pluginsUninstallConfirm: 'Voulez-vous vraiment désinstaller le plugin "{name}" ?',
+  pluginsUninstallSuccess: 'Plugin "{name}" désinstallé',
+  pluginsUninstallError: 'Erreur lors de la désinstallation',
+  pluginsWhereToFind: 'Où trouver des plugins ?',
+  pluginsDescription: 'Les plugins sont des extensions qui ajoutent de nouvelles fonctionnalités à SoundDeck, comme l\'import YouTube ou la découverte MyInstants.',
+  pluginsCommunityTip: 'Consultez la communauté SoundDeck pour découvrir des plugins créés par d\'autres utilisateurs.',
+
+  // ─── FEEDBACK ──────────────────────────────────────────────────────
+  feedback: 'Envoyer un feedback',
+  feedbackDesc: 'Signalez un bug ou proposez une idée',
+
+  // ─── SAUVEGARDE AUTOMATIQUE ────────────────────────────────────────
+  autoBackup: 'Sauvegarde automatique',
+  autoBackupDesc: 'Sauvegardez automatiquement votre configuration',
+  autoBackupEnabled: 'Sauvegarde automatique activée',
+  autoBackupDisabled: 'Sauvegarde automatique désactivée',
+};

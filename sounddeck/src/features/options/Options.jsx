@@ -263,8 +263,7 @@ export default function Options({ store, addToast }) {
         
         if (!store.mixerEnabled && isActive) {
           await stopMixer()
-          addToast('🔄 Mixeur resynchronisé', 'info')
-        }
+          addToast('🔄 ' + t('mixerResynced'), 'info')        }
       } catch (e) {
         // Silencieux
       }
@@ -433,16 +432,15 @@ export default function Options({ store, addToast }) {
       const { deleteBackup } = await import('../../shared/utils/backupManager.js')
       const result = await deleteBackup(index)
       if (result.success) {
-        addToast('✅ Sauvegarde supprimée', 'success')
-        // Recharger la liste des sauvegardes via BackupSettings
+        addToast('✅ ' + t('backupDeleted'), 'success')
         const event = new CustomEvent('refresh-backups')
         window.dispatchEvent(event)
       } else {
-        addToast('❌ Erreur: ' + result.error, 'error')
+        addToast('❌ ' + t('error') + ': ' + result.error, 'error')
       }
-    } catch (e) {
-      addToast('❌ Erreur: ' + e.message, 'error')
-    }
+      } catch (e) {
+        addToast('❌ ' + t('error') + ': ' + e.message, 'error')
+      }
   }, [addToast])
 
   // ─── RENDU ──────────────────────────────────────────────────────────────────

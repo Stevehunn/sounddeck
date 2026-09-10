@@ -348,4 +348,56 @@ export default {
   
   // ─── INTEGRATIONS ──────────────────────────────────────────────────
   integrations: 'Integrations',
-}
+
+  // ─── SIDEBAR EDITOR ────────────────────────────────────────────────
+  sidebarCustomization: 'Sidebar customization',
+  sidebarCustomizationDesc: 'Reorder, pin or hide menu items',
+  sidebarCustomized: 'Customized',
+  sidebarDefault: 'Default',
+  sidebarEditorOpen: 'Open editor',
+  sidebarEditorClose: 'Close editor',
+  sidebarEditorSaved: 'Sidebar saved',
+  sidebarEditorResetConfirm: 'Do you really want to reset the sidebar?',
+  sidebarEditorResetSuccess: 'Sidebar reset',
+
+  // ─── COLLAPSIBLE SECTIONS ──────────────────────────────────────────
+  collapseHide: 'Hide',
+  collapseShow: 'Show',
+
+  // ─── TUTORIALS (OPTIONS) ───────────────────────────────────────────
+  tutorialRestartDesc: 'Replay the main tutorial from the beginning',
+  tutorialAdvancedDesc: 'Discover advanced features',
+  guideAvailable: 'Available tutorials',
+  guideAvailableTip: 'These tutorials help you discover all the features of SoundDeck.',
+
+  // ─── PLUGINS ───────────────────────────────────────────────────────
+  pluginsInstall: 'Install a plugin',
+  pluginsInstallDesc: 'Add new features to SoundDeck',
+  pluginsInstallBtn: 'Install',
+  pluginsInstalledTitle: 'Installed plugins',
+  pluginsCount: 'plugin(s)',
+  pluginsNoPluginsInstalled: 'No plugins installed',
+  pluginsInstallDesc2: 'Click "Install a plugin" to get started',
+  pluginsBy: 'by',
+  pluginsUnknownAuthor: 'Unknown author',
+  pluginsPages: 'page(s)',
+  pluginsActivated: 'Active',
+  pluginsReloadTooltip: 'Reload the app to apply changes',
+  pluginsUninstall: 'Uninstall plugin',
+  pluginsUninstallConfirm: 'Do you really want to uninstall the plugin "{name}"?',
+  pluginsUninstallSuccess: 'Plugin "{name}" uninstalled',
+  pluginsUninstallError: 'Error uninstalling',
+  pluginsWhereToFind: 'Where to find plugins?',
+  pluginsDescription: 'Plugins are extensions that add new features to SoundDeck, such as YouTube import or MyInstants discovery.',
+  pluginsCommunityTip: 'Check out the SoundDeck community to discover plugins made by other users.',
+
+  // ─── FEEDBACK ──────────────────────────────────────────────────────
+  feedback: 'Send feedback',
+  feedbackDesc: 'Report a bug or suggest an idea',
+
+  // ─── AUTO BACKUP ───────────────────────────────────────────────────
+  autoBackup: 'Auto backup',
+  autoBackupDesc: 'Automatically save your configuration',
+  autoBackupEnabled: 'Auto backup enabled',
+  autoBackupDisabled: 'Auto backup disabled',
+};

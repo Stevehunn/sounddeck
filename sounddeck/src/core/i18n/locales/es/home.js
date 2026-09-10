@@ -42,6 +42,8 @@ export default {
   homeDropSupported: 'Formatos soportados: MP3, WAV, OGG, FLAC, M4A, AAC',
   homeDropError: 'Error al importar los archivos',
   homeDropSuccess: '{count} archivo(s) importado(s) con éxito',
+  dragDropCustomOnly: 'Arrastrar y soltar solo está disponible en orden "Personalizado"',
+  profile: 'Perfil',
   
   // ─── EMPTY STATES ──────────────────────────────────────────────────
   homeEmptyTitle: 'Sin sonidos',

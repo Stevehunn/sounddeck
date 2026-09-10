@@ -97,7 +97,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
 
   const handleDragStart = (e, soundId, index, source) => {
     if (sortBy !== 'custom') {
-      addToast('Le drag and drop est disponible uniquement en tri "Personnalisé"', 'info')
+      addToast(t('dragDropCustomOnly'), 'info')
       e.preventDefault()
       return
     }
@@ -705,7 +705,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
         {showProfileManager && (
           <ProfileManagerModal
             profileId={currentProfileId}
-            profileName={currentProfile?.name || 'Profil'}
+            profileName={currentProfile?.name || t('profile')}
             sounds={currentSounds}
             store={store}
             onClose={() => setShowProfileManager(false)}
