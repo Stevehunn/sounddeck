@@ -25,9 +25,6 @@ const DeleteButton = ({
   const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
   const [isHovering, setIsHovering] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
-
-  console.log('🔘 [DeleteButton] Rendu - variant:', variant, 'itemName:', itemName)
-
   const displayLabel = deleteLabel || label || t('delete') || 'Supprimer'
 
   const handleClick = async (e) => {

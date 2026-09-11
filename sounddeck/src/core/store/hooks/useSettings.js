@@ -34,16 +34,23 @@ export function useSettings(initialState = {}, save) {
   const [stopAllShortcut, setStopAllShortcut] = useState(initialState.stopAllShortcut || '')
   const [presentationShortcut, setPresentationShortcut] = useState(initialState.presentationShortcut || '')
 
+
   const updateTheme = useCallback(async (newTheme) => {
     setTheme(newTheme)
-    await save('theme', newTheme)
+    try {
+      await save('theme', newTheme)
+    } catch (e) {
+      console.error('🎨 [useSettings] ❌ Erreur save("theme"):', e)
+    }
   }, [save])
 
   const updateCustomTheme = useCallback(async (colors) => {
     setCustomTheme(colors)
-    setTheme('custom')
+    if (colors) {
+      setTheme('custom')
+      await save('theme', 'custom')
+    }
     await save('customTheme', colors)
-    await save('theme', 'custom')
   }, [save])
 
   const updateLang = useCallback(async (newLang) => {

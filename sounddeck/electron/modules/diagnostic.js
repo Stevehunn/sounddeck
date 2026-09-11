@@ -3,9 +3,7 @@ const { ipcMain, app, dialog } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const os = require('os')
-const Store = require('electron-store')
-
-const store = new Store()
+const store = require('../store')
 
 // ─── LISTE DES HANDLERS ATTENDUS (pour référence) ──────────────────────────
 

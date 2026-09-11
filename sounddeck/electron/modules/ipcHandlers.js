@@ -2,13 +2,12 @@
 const { ipcMain, dialog, shell } = require('electron')
 const path = require('path')
 const fs = require('fs')
-const Store = require('electron-store')
 const https = require('https')
+const store = require('../store')
 
 console.log('🔧 [ipcHandlers] Fichier chargé')
 console.log(`🔧 [ipcHandlers] ipcMain existe: ${!!ipcMain}`)
 
-const store = new Store()
 
 // ─── HANDLERS SYSTÈME ────────────────────────────────────────────────────────
 

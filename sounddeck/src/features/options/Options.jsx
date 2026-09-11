@@ -37,7 +37,6 @@ import useConfirm from '@shared/hooks/useConfirm'
 const SECTIONS = [
   { id: 'appearance', icon: 'ti-palette', labelKey: 'optionsAppearance' },
   { id: 'audio', icon: 'ti-volume', labelKey: 'optionsAudio' },
-  { id: 'guide', icon: 'ti-book', labelKey: 'guideTitle' },
   { id: 'shortcuts', icon: 'ti-keyboard', labelKey: 'optionsShortcuts' },
   { id: 'soundManagement', icon: 'ti-music', labelKey: 'soundManagement' },
   { id: 'plugins', icon: 'ti-puzzle', labelKey: 'optionsPlugins' },
@@ -263,7 +262,8 @@ export default function Options({ store, addToast }) {
         
         if (!store.mixerEnabled && isActive) {
           await stopMixer()
-          addToast('🔄 ' + t('mixerResynced'), 'info')        }
+          addToast('🔄 ' + t('mixerResynced'), 'info')
+        }
       } catch (e) {
         // Silencieux
       }
@@ -416,7 +416,6 @@ export default function Options({ store, addToast }) {
   }, [confirm, t, addToast])
 
   const handlePluginUninstall = useCallback(async (plugin) => {
-    // La confirmation est déjà gérée par DeleteButton
     const result = await window.electronAPI.uninstallPlugin?.(plugin.id)
     if (result?.success) {
       addToast(t('pluginsUninstallSuccess').replace('{name}', plugin.name), 'info')
@@ -426,7 +425,6 @@ export default function Options({ store, addToast }) {
     }
   }, [t, addToast, loadPlugins])
 
-  // ✅ Fonction de suppression de sauvegarde
   const handleDeleteBackup = useCallback(async (index) => {
     try {
       const { deleteBackup } = await import('../../shared/utils/backupManager.js')
@@ -438,10 +436,10 @@ export default function Options({ store, addToast }) {
       } else {
         addToast('❌ ' + t('error') + ': ' + result.error, 'error')
       }
-      } catch (e) {
-        addToast('❌ ' + t('error') + ': ' + e.message, 'error')
-      }
-  }, [addToast])
+    } catch (e) {
+      addToast('❌ ' + t('error') + ': ' + e.message, 'error')
+    }
+  }, [addToast, t])
 
   // ─── RENDU ──────────────────────────────────────────────────────────────────
 
@@ -970,63 +968,7 @@ export default function Options({ store, addToast }) {
         </Section>
 
         {/* ============================ */}
-        {/* SECTION 3 : GUIDE */}
-        {/* ============================ */}
-        <Section 
-          ref={el => sectionRefs.current['guide'] = el}
-          id="guide"
-          title={t('guideTitle')} 
-          icon="ti-book"
-        >
-          <OptionRow label={t('tutorialRestart')} sub={t('tutorialRestartDesc')}>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button
-                className="btn-secondary btn-sm"
-                onClick={() => {
-                  localStorage.removeItem('sounddeck-tutorial-done')
-                  window.location.reload()
-                }}
-                style={{ fontSize: 12, minHeight: 34, padding: '6px 16px', borderRadius: 'var(--radius-md)' }}
-              >
-                <i className="ti ti-book" /> {t('tutorialRestart')}
-              </button>
-              <button
-                className="btn-primary btn-sm"
-                onClick={() => {
-                  const event = new CustomEvent('open-advanced-tutorial')
-                  window.dispatchEvent(event)
-                }}
-                style={{ fontSize: 12, minHeight: 34, padding: '6px 16px', borderRadius: 'var(--radius-md)' }}
-              >
-                <i className="ti ti-rocket" /> {t('tutorialAdvanced')}
-              </button>
-            </div>
-          </OptionRow>
-
-          <div style={{ 
-            fontSize: 12, 
-            color: 'var(--text-tertiary)', 
-            background: 'var(--bg-tertiary)', 
-            padding: '12px 14px', 
-            borderRadius: 'var(--radius-md)', 
-            lineHeight: 1.6,
-            border: '1px solid var(--border)'
-          }}>
-            <i className="ti ti-info-circle" style={{ marginRight: 6, color: 'var(--accent)' }} />
-            <strong>{t('guideAvailable')}</strong>
-            <br />
-            • <strong>{t('tutorialRestart')}</strong> : {t('tutorialRestartDesc')}
-            <br />
-            • <strong>{t('tutorialAdvanced')}</strong> : {t('tutorialAdvancedDesc')}
-            <br />
-            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-              💡 {t('guideAvailableTip')}
-            </span>
-          </div>
-        </Section>
-
-        {/* ============================ */}
-        {/* SECTION 4 : RACCOURCIS CLAVIER */}
+        {/* SECTION 3 : RACCOURCIS CLAVIER */}
         {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['shortcuts'] = el}
@@ -1130,7 +1072,7 @@ export default function Options({ store, addToast }) {
         </Section>
 
         {/* ============================ */}
-        {/* SECTION 5 : GESTION DES SONS */}
+        {/* SECTION 4 : GESTION DES SONS */}
         {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['soundManagement'] = el}
@@ -1294,7 +1236,7 @@ export default function Options({ store, addToast }) {
         </Section>
 
         {/* ============================ */}
-        {/* SECTION 6 : PLUGINS */}
+        {/* SECTION 5 : PLUGINS */}
         {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['plugins'] = el}
@@ -1303,7 +1245,6 @@ export default function Options({ store, addToast }) {
           icon="ti-puzzle"
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* Bouton d'installation */}
             <div className="option-row" style={{ padding: '12px 14px' }}>
               <div>
                 <div className="label">{t('pluginsInstall')}</div>
@@ -1318,7 +1259,6 @@ export default function Options({ store, addToast }) {
               </button>
             </div>
 
-            {/* Liste des plugins installés */}
             <div style={{ 
               border: '1px solid var(--border)', 
               borderRadius: 'var(--radius-md)',
@@ -1436,11 +1376,10 @@ export default function Options({ store, addToast }) {
                       <i className="ti ti-refresh" />
                     </button>
                     
-                    {/* ✅ Bouton Supprimer avec DeleteButton */}
                     <DeleteButton
                       onDelete={() => handlePluginUninstall(plugin)}
-                      confirmTitle={t('pluginsUninstall') || 'Confirmer la suppression du plugin'}
-                      confirmMessage={t('pluginsUninstallConfirm')?.replace('{name}', plugin.name) || `Voulez-vous vraiment supprimer le plugin "${plugin.name}" ?`}
+                      confirmTitle={t('pluginsUninstall')}
+                      confirmMessage={t('pluginsUninstallConfirm').replace('{name}', plugin.name)}
                       itemName={plugin.name}
                       size="sm"
                       variant="ghost-danger"
@@ -1452,7 +1391,6 @@ export default function Options({ store, addToast }) {
               ))}
             </div>
 
-            {/* Info sur les plugins */}
             <div style={{ 
               fontSize: 11, 
               color: 'var(--text-tertiary)',
@@ -1473,7 +1411,6 @@ export default function Options({ store, addToast }) {
             </div>
           </div>
 
-          {/* Modal d'installation */}
           {showPluginInstaller && (
             <PluginInstaller
               onClose={() => setShowPluginInstaller(false)}
@@ -1487,7 +1424,7 @@ export default function Options({ store, addToast }) {
         </Section>
 
         {/* ============================ */}
-        {/* SECTION 7 : INTÉGRATIONS */}
+        {/* SECTION 6 : INTÉGRATIONS */}
         {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['integrations'] = el}
@@ -1499,7 +1436,7 @@ export default function Options({ store, addToast }) {
         </Section>
 
         {/* ============================ */}
-        {/* SECTION 8 : AVANCÉ */}
+        {/* SECTION 7 : AVANCÉ */}
         {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['advanced'] = el}
@@ -1507,7 +1444,6 @@ export default function Options({ store, addToast }) {
           title={t('advancedOptions')} 
           icon="ti-gauge"
         >
-          {/* Compression à l'import */}
           <OptionRow label={t('compressOnImport')} sub={t('compressOnImportDesc')}>
             <Toggle 
               value={store.compressOnImport || false}
@@ -1539,7 +1475,6 @@ export default function Options({ store, addToast }) {
 
           <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
 
-          {/* Logs d'erreur */}
           <OptionRow label={t('errorLogs')} sub={t('errorLogsDesc')}>
             <div style={{ display: 'flex', gap: 6 }}>
               <button 
@@ -1564,20 +1499,19 @@ export default function Options({ store, addToast }) {
               </button>
               <DeleteButton
                 onDelete={handleClearLogs}
-                confirmTitle={t('clearLogs') || 'Confirmer la suppression des logs'}
-                confirmMessage={t('clearLogsConfirm') || 'Voulez-vous vraiment supprimer tous les logs d\'erreur ?'}
+                confirmTitle={t('clearLogs')}
+                confirmMessage={t('clearLogsConfirm')}
                 size="sm"
                 variant="ghost-danger"
                 icon="ti-trash"
                 showLabel={true}
-                deleteLabel={t('clearLogs') || 'Effacer'}
+                deleteLabel={t('clearLogs')}
               />
             </div>
           </OptionRow>
 
           <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
 
-          {/* Feedback */}
           <OptionRow label={t('feedback')} sub={t('feedbackDesc')}>
             <button
               className="btn-primary btn-sm"
@@ -1615,13 +1549,15 @@ export default function Options({ store, addToast }) {
           </OptionRow>
         </Section>
 
+        {/* ============================ */}
+        {/* SECTION 8 : SAUVEGARDE */}
+        {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['backup'] = el}
           id="backup"
           title={t('optionsBackup')} 
           icon="ti-cloud"
         >
-          {/* Auto backup */}
           <OptionRow label={t('autoBackup')} sub={t('autoBackupDesc')}>
             <Toggle 
               value={store.autoBackupEnabled || false}
@@ -1667,7 +1603,6 @@ export default function Options({ store, addToast }) {
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-            {/* Config seule */}
             <div className="option-row" style={{ padding: '12px 14px', flexWrap: 'wrap', gap: 8 }}>
               <div style={{ fontSize: 20, flexShrink: 0 }}>📄</div>
               <div style={{ flex: 1, padding: '0 14px', minWidth: 150 }}>
@@ -1687,7 +1622,6 @@ export default function Options({ store, addToast }) {
               </button>
             </div>
 
-            {/* Archive complète */}
             <div className="option-row" style={{ padding: '12px 14px', flexWrap: 'wrap', gap: 8 }}>
               <div style={{ fontSize: 20, flexShrink: 0 }}>📦</div>
               <div style={{ flex: 1, padding: '0 14px', minWidth: 150 }}>
@@ -1708,7 +1642,6 @@ export default function Options({ store, addToast }) {
               </button>
             </div>
 
-            {/* Sons uniquement */}
             <div className="option-row" style={{ padding: '12px 14px', flexWrap: 'wrap', gap: 8 }}>
               <div style={{ fontSize: 20, flexShrink: 0 }}>🎵</div>
               <div style={{ flex: 1, padding: '0 14px', minWidth: 150 }}>
@@ -1763,7 +1696,7 @@ export default function Options({ store, addToast }) {
         </Section>
 
         {/* ============================ */}
-        {/* SECTION 10 : PROFILS */}
+        {/* SECTION 9 : PROFILS */}
         {/* ============================ */}
         <Section 
           ref={el => sectionRefs.current['profiles'] = el}
@@ -1791,14 +1724,13 @@ export default function Options({ store, addToast }) {
                 <i className="ti ti-package-export" /> {t('exportProfile')}
               </button>
               {!p.isDefault && (
-                /* ✅ Bouton Supprimer avec DeleteButton */
                 <DeleteButton
                   onDelete={async () => {
                     await store.deleteProfile(p.id)
                     addToast(t('profileDeleted'), 'info')
                   }}
-                  confirmTitle={t('confirmDeleteProfile') || 'Confirmer la suppression du profil'}
-                  confirmMessage={t('confirmDeleteProfileMessage') || 'Voulez-vous vraiment supprimer ce profil ?'}
+                  confirmTitle={t('confirmDeleteProfile')}
+                  confirmMessage={t('confirmDeleteProfileMessage')}
                   itemName={p.name}
                   size="sm"
                   variant="ghost-danger"

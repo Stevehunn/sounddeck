@@ -3,6 +3,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react
 import { useLanguage } from '@core/i18n/LanguageContext';
 import TutorialOverlay from './TutorialOverlay';
 
+// ✅ Importer les tutoriels des pages core
 import { TUTORIAL_STEPS as HomeSteps } from '@features/home/tutorialSteps';
 import { TUTORIAL_STEPS as EditorSteps } from '@features/editor/tutorialSteps';
 import { TUTORIAL_STEPS as SequencerSteps } from '@features/sequencer/tutorialSteps';
@@ -11,13 +12,9 @@ import { TUTORIAL_STEPS as OptionsSteps } from '@features/options/tutorialSteps'
 import { TUTORIAL_STEPS as StatsSteps } from '@features/stats/tutorialSteps';
 import { TUTORIAL_STEPS as PresentationSteps, cleanupTutorialFavorites } from '@features/presentation/tutorialSteps';
 
+// ✅ Importer les tutoriels des plugins
 import { TUTORIAL_STEPS as DiscoverSteps } from '@plugins/myinstants/tutorialSteps';
-import { 
-  TUTORIAL_STEPS as YoutubeSteps, 
-  startYoutubeTutorial, 
-  cleanupYoutubeTutorial,
-  finishYoutubeTutorial
-} from '@plugins/youtube/tutorialSteps';
+import { TUTORIAL_STEPS as YoutubeSteps, startYoutubeTutorial, cleanupYoutubeTutorial, finishYoutubeTutorial } from '@plugins/youtube/tutorialSteps';
 
 const TUTORIALS = {
   home: HomeSteps,
@@ -41,15 +38,13 @@ export default function Tutorial({ pageId, onComplete }) {
   const steps = TUTORIALS[pageId] ? TUTORIALS[pageId](t) : [];
   const hasSteps = steps && steps.length > 0;
 
-  // ✅ useLayoutEffect : UNIQUEMENT pour le démarrage - PAS de cleanup ici !
+  // ✅ useLayoutEffect : activer le mode tutoriel AVANT le rendu
   useLayoutEffect(() => {
     if (pageId === 'youtube' && !startCalledRef.current) {
       console.log('📖 [Tutorial] useLayoutEffect - Activation du mode tutoriel YouTube')
       startYoutubeTutorial();
       startCalledRef.current = true;
     }
-    // ⚠️ PAS de return () => {} ici : React StrictMode déclencherait le cleanup
-    // immédiatement après le mount, ce qui désactiverait le mode tutoriel.
   }, [pageId]);
 
   useEffect(() => {
@@ -72,11 +67,12 @@ export default function Tutorial({ pageId, onComplete }) {
         cleanupTutorialFavorites(store);
       }
       if (pageId === 'youtube') {
-        console.log('📖 [Tutorial] Fin du tutoriel YouTube')
-        // ✅ Désactive les flags + dispatch reset sur le composant YouTube
+        console.log('📖 [Tutorial] Fin du tutoriel YouTube - désactivation immédiate')
         finishYoutubeTutorial();
       }
+      // ✅ Marqueurs de fin de tutoriel (par page + global)
       localStorage.setItem(`sounddeck-tutorial-${pageId}-done`, 'true');
+      localStorage.setItem('sounddeck-tutorial-done', 'true');
       onComplete();
     }
   }, [currentStep, steps.length, pageId, onComplete]);
@@ -87,10 +83,12 @@ export default function Tutorial({ pageId, onComplete }) {
       cleanupTutorialFavorites(store);
     }
     if (pageId === 'youtube') {
-      console.log('📖 [Tutorial] Skip du tutoriel YouTube')
+      console.log('📖 [Tutorial] Skip du tutoriel YouTube - désactivation immédiate')
       finishYoutubeTutorial();
     }
+    // ✅ Marqueurs de fin de tutoriel (par page + global)
     localStorage.setItem(`sounddeck-tutorial-${pageId}-done`, 'true');
+    localStorage.setItem('sounddeck-tutorial-done', 'true');
     onComplete();
   }, [pageId, onComplete]);
 

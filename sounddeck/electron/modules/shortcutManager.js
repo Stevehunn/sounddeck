@@ -1,24 +1,14 @@
 // electron/modules/shortcutManager.js
 const { globalShortcut, ipcMain } = require('electron')
-const Store = require('electron-store')
+const store = require('../store')
 
-const store = new Store()
 let globalShortcutsEnabled = store.get('globalShortcutsEnabled', true)
 let registeredShortcuts = []
 let currentToggleWindowShortcut = 'CommandOrControl+Shift+S'
 
-// ─── ENREGISTREMENT ──────────────────────────────────────────────────────────
-
 function safeRegister(accelerator, callback) {
   if (!accelerator) return false
   try {
-    const isFn = /^F\d+$/.test(accelerator)
-    const hasMod = accelerator.includes('+')
-    if (!isFn && !hasMod) {
-      const ok = globalShortcut.register(accelerator, callback)
-      if (ok) registeredShortcuts.push(accelerator)
-      return ok
-    }
     const ok = globalShortcut.register(accelerator, callback)
     if (ok) registeredShortcuts.push(accelerator)
     return ok
@@ -130,9 +120,6 @@ function registerToggleShortcut(mainWindow) {
       if (mainWindow) {
         mainWindow.webContents.send('shortcuts-toggle', globalShortcutsEnabled)
       }
-
-      const state = globalShortcutsEnabled ? 'activés' : 'désactivés'
-      console.log(`🔇 Raccourcis ${state}`)
     })
 
     if (ok) {
@@ -195,93 +182,67 @@ function cleanupShortcuts() {
   globalShortcut.unregisterAll()
 }
 
-// ─── HANDLERS IPC POUR LES RACCOURCIS ──────────────────────────────────────
-
 function registerShortcutHandlers() {
   console.log('🔧 [shortcutManager] Enregistrement des handlers IPC...')
   
-  // ✅ VÉRIFIER SI LE HANDLER EXISTE DÉJÀ AVANT DE L'ENREGISTRER
   if (!ipcMain.eventNames().includes('update-shortcuts')) {
     ipcMain.handle('update-shortcuts', (event, shortcuts) => {
-      console.log('📤 update-shortcuts')
       store.set('shortcuts', shortcuts)
       return true
     })
-    console.log('  ✅ update-shortcuts enregistré')
   }
   
   if (!ipcMain.eventNames().includes('update-profile-shortcut')) {
     ipcMain.handle('update-profile-shortcut', (event, accelerator) => {
-      console.log('📤 update-profile-shortcut:', accelerator)
       store.set('profileShortcut', accelerator)
       return true
     })
-    console.log('  ✅ update-profile-shortcut enregistré')
   }
   
   if (!ipcMain.eventNames().includes('update-loop-shortcut')) {
     ipcMain.handle('update-loop-shortcut', (event, accelerator) => {
-      console.log('📤 update-loop-shortcut:', accelerator)
       store.set('loopShortcut', accelerator)
       return true
     })
-    console.log('  ✅ update-loop-shortcut enregistré')
   }
   
   if (!ipcMain.eventNames().includes('update-stop-all-shortcut')) {
     ipcMain.handle('update-stop-all-shortcut', (event, accelerator) => {
-      console.log('📤 update-stop-all-shortcut:', accelerator)
       store.set('stopAllShortcut', accelerator)
       return true
     })
-    console.log('  ✅ update-stop-all-shortcut enregistré')
   }
   
   if (!ipcMain.eventNames().includes('update-presentation-shortcut')) {
     ipcMain.handle('update-presentation-shortcut', (event, accelerator) => {
-      console.log('📤 update-presentation-shortcut:', accelerator)
       store.set('presentationShortcut', accelerator)
       return true
     })
-    console.log('  ✅ update-presentation-shortcut enregistré')
   }
   
   if (!ipcMain.eventNames().includes('update-toggle-shortcuts-accelerator')) {
     ipcMain.handle('update-toggle-shortcuts-accelerator', (event, accelerator) => {
-      console.log('📤 update-toggle-shortcuts-accelerator:', accelerator)
       store.set('toggleShortcutsAccelerator', accelerator)
       return true
     })
-    console.log('  ✅ update-toggle-shortcuts-accelerator enregistré')
   }
   
   if (!ipcMain.eventNames().includes('update-toggle-window-shortcut')) {
     ipcMain.handle('update-toggle-window-shortcut', (event, accelerator) => {
-      console.log('📤 update-toggle-window-shortcut:', accelerator)
       store.set('toggleWindowShortcut', accelerator)
       return true
     })
-    console.log('  ✅ update-toggle-window-shortcut enregistré')
   }
   
   if (!ipcMain.eventNames().includes('toggle-global-shortcuts')) {
     ipcMain.handle('toggle-global-shortcuts', () => {
-      console.log('📤 toggle-global-shortcuts')
       const mainWindow = require('./windowManager').getMainWindow()
-      const result = toggleGlobalShortcuts(mainWindow)
-      return result
+      return toggleGlobalShortcuts(mainWindow)
     })
-    console.log('  ✅ toggle-global-shortcuts enregistré')
   }
-  
-  // ⚠️ ATTENTION: get-global-shortcuts-state est déjà enregistré dans storeHandlers
-  // On ne le réenregistre pas ici pour éviter le double handler
-  console.log('  ⏭️ get-global-shortcuts-state déjà enregistré dans storeHandlers')
   
   console.log('✅ [shortcutManager] Handlers IPC enregistrés')
 }
-
-// ─── EXPORTS ──────────────────────────────────────────────────────────────────
 
 module.exports = {
   registerShortcuts,

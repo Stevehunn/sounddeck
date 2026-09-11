@@ -1,6 +1,6 @@
+// src/shared/components/ui/CustomThemeEditor.jsx
 import { useState, useEffect } from 'react'
 
-// Valeurs par défaut basées sur le thème sombre
 const DEFAULTS = {
   bgPrimary:    '#111113',
   bgSecondary:  '#1a1a1e',
@@ -18,11 +18,8 @@ const DEFAULTS = {
   danger:       '#E05252',
 }
 
-// Presets de palettes prédéfinies
 const PRESETS = [
-  {
-    name: 'Violet (défaut)', colors: { ...DEFAULTS }
-  },
+  { name: 'Violet (défaut)', colors: { ...DEFAULTS } },
   {
     name: 'Minuit Bleu',
     colors: {
@@ -84,6 +81,18 @@ const COLOR_FIELDS = [
 
 const GROUPS = ['Arrière-plans', 'Textes', 'Accents', 'États']
 
+// ✅ Helper pour convertir une clé camelCase en variable CSS
+const keyToCssVar = (key) => {
+  return '--' + key.replace(/([A-Z])/g, '-$1').toLowerCase()
+}
+
+// ✅ Nettoie TOUTES les variables custom du :root
+const cleanupInlineStyles = () => {
+  COLOR_FIELDS.forEach(f => {
+    document.documentElement.style.removeProperty(keyToCssVar(f.key))
+  })
+}
+
 export default function CustomThemeEditor({ current, onSave }) {
   const [colors, setColors] = useState(current || DEFAULTS)
   const [activeGroup, setActiveGroup] = useState('Accents')
@@ -93,15 +102,20 @@ export default function CustomThemeEditor({ current, onSave }) {
     if (current) setColors(current)
   }, [])
 
+  // ✅ CLEANUP : retire les styles inline quand le composant est démonté
+  // (c'est-à-dire quand l'utilisateur change de thème)
+  useEffect(() => {
+    return () => {
+      cleanupInlineStyles()
+    }
+  }, [])
+
   const handleChange = (key, value) => {
     const updated = { ...colors, [key]: value }
     setColors(updated)
     setChanged(true)
     // Aperçu en temps réel : on applique directement sur :root
-    document.documentElement.style.setProperty(
-      '--' + key.replace(/([A-Z])/g, '-$1').toLowerCase().replace('bg-', 'bg-').replace('text-', 'text-').replace('accent-', 'accent-'),
-      value
-    )
+    document.documentElement.style.setProperty(keyToCssVar(key), value)
   }
 
   const applyPreset = (preset) => {
@@ -112,12 +126,9 @@ export default function CustomThemeEditor({ current, onSave }) {
   const handleSave = () => {
     onSave(colors)
     setChanged(false)
-    // Nettoyer les styles inline
-    COLOR_FIELDS.forEach(f => {
-      document.documentElement.style.removeProperty(
-        '--' + f.key.replace(/([A-Z])/g, '-$1').toLowerCase()
-      )
-    })
+    // ✅ Nettoyer les styles inline APRÈS avoir sauvegardé
+    // (le thème custom s'appliquera via App.jsx)
+    cleanupInlineStyles()
   }
 
   const handleReset = () => {
@@ -132,7 +143,6 @@ export default function CustomThemeEditor({ current, onSave }) {
       marginTop: 12, border: '1px solid var(--accent)', borderRadius: 'var(--radius-lg)',
       overflow: 'hidden', background: 'var(--bg-primary)'
     }}>
-      {/* Header */}
       <div style={{
         padding: '10px 14px', background: 'var(--accent-light)',
         borderBottom: '1px solid var(--accent)',
@@ -156,7 +166,6 @@ export default function CustomThemeEditor({ current, onSave }) {
       </div>
 
       <div style={{ padding: '14px' }}>
-        {/* Presets */}
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Palettes prédéfinies
@@ -172,7 +181,6 @@ export default function CustomThemeEditor({ current, onSave }) {
                 }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
                 onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
-                {/* Mini aperçu de la palette */}
                 <div style={{ display: 'flex', gap: 2 }}>
                   {[preset.colors.bgPrimary, preset.colors.accent, preset.colors.textPrimary].map((c, i) => (
                     <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: c, border: '1px solid rgba(255,255,255,0.1)' }} />
@@ -184,7 +192,6 @@ export default function CustomThemeEditor({ current, onSave }) {
           </div>
         </div>
 
-        {/* Onglets de groupes */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 12, background: 'var(--bg-tertiary)', borderRadius: 8, padding: 4 }}>
           {GROUPS.map(group => (
             <button key={group} onClick={() => setActiveGroup(group)}
@@ -199,7 +206,6 @@ export default function CustomThemeEditor({ current, onSave }) {
           ))}
         </div>
 
-        {/* Color pickers */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {fieldsInGroup.map(({ key, label }) => (
             <div key={key} style={{
@@ -235,7 +241,6 @@ export default function CustomThemeEditor({ current, onSave }) {
           ))}
         </div>
 
-        {/* Aperçu */}
         <div style={{ marginTop: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Aperçu
@@ -244,7 +249,6 @@ export default function CustomThemeEditor({ current, onSave }) {
             padding: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)',
             background: colors.bgPrimary, display: 'flex', gap: 10, alignItems: 'center'
           }}>
-            {/* Mini carte son */}
             <div style={{
               width: 60, background: colors.bgSecondary, border: `1px solid ${colors.border}`,
               borderRadius: 8, padding: 8, textAlign: 'center'
@@ -256,7 +260,6 @@ export default function CustomThemeEditor({ current, onSave }) {
                 borderRadius: 3, padding: '1px 4px', color: colors.textTertiary, fontFamily: 'monospace'
               }}>F1</div>
             </div>
-            {/* Mini infos */}
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: colors.textPrimary, marginBottom: 4 }}>SoundDeck</div>
               <div style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 6 }}>Aperçu du thème</div>

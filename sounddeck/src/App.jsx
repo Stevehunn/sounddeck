@@ -109,11 +109,13 @@ function AppContent() {
     const checkFirstLaunch = async () => {
       try {
         const hasLaunchedBefore = await window.electronAPI.storeGet('hasLaunchedBefore')
-        const tutorialDone = localStorage.getItem('sounddeck-tutorial-done')
+        
+        // ✅ Vérifier la clé 'home' (celle qui est réellement créée par Tutorial.jsx)
+        const tutorialHomeDone = localStorage.getItem('sounddeck-tutorial-home-done')
         
         if (!hasLaunchedBefore) {
           setIsFirstLaunch(true)
-        } else if (!tutorialDone) {
+        } else if (!tutorialHomeDone) {
           setTimeout(() => {
             setShowTutorial(true)
           }, 500)
@@ -223,12 +225,72 @@ function AppContent() {
     }
   }, [showQuitConfirm])
 
+  // ✅ SYNC #1 : Au démarrage, LIRE le thème depuis electron-store
+  // et aligner React si nécessaire. ⚠️ AUCUNE ÉCRITURE SUR LE DISQUE ICI
+  // (le cas corrompu 'custom sans couleurs' est géré visuellement par le useEffect "Appliquer le thème")
+  useEffect(() => {
+    if (store.loading) return
+    
+    const syncThemeFromDisk = async () => {
+      try {
+        const diskTheme = await window.electronAPI.storeGet('theme')
+        const diskCustomTheme = await window.electronAPI.storeGet('customTheme')
+        
+        if (diskTheme === 'custom' && !diskCustomTheme) {
+          console.log('🎨 [App] Fallback visuel custom→dark (store intact)')
+          return
+        }
+        
+        // ✅ Sinon : si le disque diffère du React, aligner React sur le disque
+        if (diskTheme && diskTheme !== store.theme) {
+          console.log(`🎨 [App] CORRECTION: ${store.theme} -> ${diskTheme}`)
+          store.updateTheme(diskTheme)
+        }
+      } catch (e) {
+        console.warn('⚠️ Erreur sync theme:', e)
+      }
+    }
+    syncThemeFromDisk()
+  }, [store.loading])
+
+  useEffect(() => {
+    if (store.loading) return
+    if (!store.theme) return
+    
+    window.electronAPI.storeSet('theme', store.theme).catch(e => {
+      console.warn('⚠️ Erreur persist theme:', e)
+    })
+  }, [store.theme, store.loading])
+
   // Appliquer le thème
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', store.theme)
+    if (store.loading) return
 
+    const effectiveTheme =
+      (store.theme === 'custom' && !store.customTheme) ? 'dark' : (store.theme || 'dark')
+
+    console.log('🎨 [App] Theme applied:', effectiveTheme,
+                '| store.theme:', store.theme,
+                '| customTheme:', !!store.customTheme)
+
+    document.documentElement.setAttribute('data-theme', effectiveTheme)
+
+    // ✅ Nettoyer les styles inline résiduels du CustomThemeEditor
+    if (effectiveTheme !== 'custom') {
+      const colorKeys = [
+        'bg-primary', 'bg-secondary', 'bg-tertiary', 'bg-hover', 'border',
+        'text-primary', 'text-secondary', 'text-tertiary',
+        'accent', 'accent-light', 'accent-hover',
+        'success', 'warning', 'danger'
+      ]
+      colorKeys.forEach(key => {
+        document.documentElement.style.removeProperty(`--${key}`)
+      })
+    }
+
+    // ✅ Injecter les CSS custom UNIQUEMENT si on est en mode custom ET qu'on a des couleurs
     const existing = document.getElementById('custom-theme-style')
-    if (store.theme === 'custom' && store.customTheme) {
+    if (effectiveTheme === 'custom' && store.customTheme) {
       const c = store.customTheme
       const css = `
         [data-theme="custom"] {
@@ -259,7 +321,7 @@ function AppContent() {
     } else if (existing) {
       existing.remove()
     }
-  }, [store.theme, store.customTheme])
+  }, [store.theme, store.customTheme, store.loading])
 
   // Mettre à jour le menu du tray quand la langue change
   useEffect(() => {
@@ -386,7 +448,6 @@ function AppContent() {
 
   // ✅ Wrapper pour ajouter le HelpButton à une page
   const PageWrapper = ({ children, pageId }) => {
-    // ✅ Fonction handleHelpClick qui utilise openTutorial
     const handleHelpClick = () => {
       console.log('📖 [PageWrapper] Clic sur HelpButton pour la page:', pageId)
       openTutorial(pageId)
@@ -566,6 +627,7 @@ function AppContent() {
       <Sidebar
         key={`sidebar-${store.sidebarVersion}-${currentLang}`}
         profiles={store.profiles}
+        sounds={store.sounds}
         currentProfileId={store.currentProfileId}
         currentPage={currentPage}
         onSwitchProfile={store.switchProfile}
@@ -584,7 +646,6 @@ function AppContent() {
         sidebarVersion={store.sidebarVersion}
         pluginPages={pages}
         isPluginPage={isPluginPage}
-        sounds={store.sounds}
       />
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -631,7 +692,6 @@ function AppContent() {
 export default function App() {
   const store = useStore()
   
-  // Ne pas rendre l'app tant que le store n'est pas chargé
   if (store.loading) {
     return (
       <div style={{

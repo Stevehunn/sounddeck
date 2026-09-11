@@ -2,10 +2,9 @@
 const { Tray, Menu, nativeImage } = require('electron')
 const path = require('path')
 const fs = require('fs')
-const Store = require('electron-store')
 const { LANGUAGES } = require('../i18n')
+const store = require('../store')
 
-const store = new Store()
 let tray = null
 let trayInstance = null
 

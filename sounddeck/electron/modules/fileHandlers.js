@@ -7,6 +7,7 @@ const http = require('http')
 const { pipeline } = require('stream')
 const { promisify } = require('util')
 const streamPipeline = promisify(pipeline)
+const store = require('../store')
 
 // ─── FONCTION POUR TROUVER FFPROBE ───────────────────────────────────────
 
@@ -99,13 +100,11 @@ function downloadFile(url, outputPath) {
       console.log(`📥 [downloadFile] GET ${currentUrl} (redirection ${redirectCount})`)
       
       const req = https.get(currentUrl, options, (response) => {
-        // Gérer les redirections
         if (response.statusCode === 302 || response.statusCode === 301 || 
             response.statusCode === 307 || response.statusCode === 308) {
           const redirectUrl = response.headers.location
           if (redirectUrl) {
             console.log(`🔄 [downloadFile] Redirection vers: ${redirectUrl}`)
-            // Ne pas fermer le stream ici, il sera fermé dans la nouvelle requête
             request(redirectUrl, redirectCount + 1)
             return
           }
@@ -116,7 +115,6 @@ function downloadFile(url, outputPath) {
           return
         }
 
-        // Créer le stream d'écriture APRÈS avoir reçu une réponse 200
         const fileStream = fs.createWriteStream(outputPath)
         let downloadedBytes = 0
 
@@ -147,7 +145,6 @@ function downloadFile(url, outputPath) {
           reject(e)
         })
 
-        // Pipeline avec gestion d'erreur
         response.pipe(fileStream)
       })
 
@@ -173,7 +170,6 @@ async function downloadYtDlp() {
     const userDataPath = app.getPath('userData')
     const ytdlpPath = path.join(userDataPath, 'yt-dlp.exe')
     
-    // Vérifier si déjà présent et fonctionnel
     if (fs.existsSync(ytdlpPath)) {
       try {
         const { execFile } = require('child_process')
@@ -207,7 +203,6 @@ async function downloadYtDlp() {
       try {
         await downloadFile(url, ytdlpPath)
         
-        // Vérifier que le fichier est fonctionnel
         try {
           const { execFile } = require('child_process')
           await new Promise((resolve, reject) => {
@@ -644,13 +639,12 @@ function registerFileHandlers(mainWindow, soundsDir) {
       const { execFile } = require('child_process')
       
       return new Promise((resolve) => {
-        // ✅ AJOUTER --no-playlist POUR ÉVITER LES OBJETS JSON MULTIPLES
         const args = [
           '--no-warnings',
           '--dump-json',
           '--no-download',
           '--flat-playlist',
-          '--no-playlist',  // ✅ ESSENTIEL : empêche le parsing de playlist
+          '--no-playlist',
           url
         ]
 
@@ -669,10 +663,8 @@ function registerFileHandlers(mainWindow, soundsDir) {
             return resolve({ success: false, error: error.message })
           }
 
-          // ✅ NETTOYER LA SORTIE - Prendre uniquement le premier objet JSON
           let cleanOutput = stdout.trim()
           
-          // ✅ Extraire le premier objet JSON complet
           let jsonStr = ''
           let braceCount = 0
           let inString = false
@@ -706,7 +698,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
                 braceCount--
                 jsonStr += char
                 if (braceCount === 0) {
-                  // ✅ Premier objet JSON complet trouvé
                   break
                 }
                 continue
@@ -721,7 +712,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
           try {
             const data = JSON.parse(jsonStr)
             
-            // ✅ VÉRIFIER QUE LES DONNÉES SONT VALIDES
             if (!data.id || !data.title) {
               console.error('❌ [youtube-info] Données incomplètes:', data)
               return resolve({ 
@@ -775,7 +765,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
         }
       }
 
-      // ✅ RÉCUPÉRER LE CHEMIN DE FFMEG
       const ffmpegPath = findFFmpeg()
       console.log(`📥 [youtube-download] ffmpeg trouvé: ${ffmpegPath || 'NON TROUVÉ'}`)
 
@@ -797,7 +786,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
           '--no-warnings'
         ]
 
-        // ✅ AJOUTER LE CHEMIN DE FFMEG SI DISPONIBLE
         if (ffmpegPath) {
           args.push('--ffmpeg-location', ffmpegPath)
           console.log(`📥 [youtube-download] Utilisation de ffmpeg: ${ffmpegPath}`)
@@ -855,7 +843,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
     }
   })
   console.log('  ✅ youtube-download enregistré')
-  console.log('  ✅ youtube-download enregistré')
 
   // ─── EXPORT / IMPORT ──────────────────────────────────────────────────────
 
@@ -863,8 +850,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
     console.log('📥 [export-config] Export de la configuration...')
     try {
       const { app } = require('electron')
-      const Store = require('electron-store')
-      const store = new Store()
+      // ✅ Utilise l'instance partagée (plus de new Store())
       
       const data = {
         profiles: store.get('profiles', []),
@@ -906,8 +892,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
     console.log('📥 [export-full] Export de l\'archive complète...')
     try {
       const { app } = require('electron')
-      const Store = require('electron-store')
-      const store = new Store()
+      // ✅ Utilise l'instance partagée (plus de new Store())
       const archiver = require('archiver')
       
       const result = await dialog.showSaveDialog({
@@ -979,8 +964,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
     console.log('📥 [export-sounds-only] Export des sons uniquement...')
     try {
       const { app } = require('electron')
-      const Store = require('electron-store')
-      const store = new Store()
+      // ✅ Utilise l'instance partagée (plus de new Store())
       const archiver = require('archiver')
       
       const result = await dialog.showSaveDialog({
@@ -1034,8 +1018,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
     console.log('📥 [import-backup] Import d\'une sauvegarde...')
     try {
       const { app } = require('electron')
-      const Store = require('electron-store')
-      const store = new Store()
+      // ✅ Utilise l'instance partagée (plus de new Store())
       const unzipper = require('unzipper')
 
       const result = await dialog.showOpenDialog({
@@ -1130,8 +1113,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
     console.log('📥 [export-profile] Export du profil:', profileId)
     try {
       const { app } = require('electron')
-      const Store = require('electron-store')
-      const store = new Store()
+      // ✅ Utilise l'instance partagée (plus de new Store())
       
       const profiles = store.get('profiles', [])
       const profile = profiles.find(p => p.id === profileId)
@@ -1177,8 +1159,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
     console.log('📥 [import-profile] Import d\'un profil...')
     try {
       const { app } = require('electron')
-      const Store = require('electron-store')
-      const store = new Store()
+      // ✅ Utilise l'instance partagée (plus de new Store())
 
       const result = await dialog.showOpenDialog({
         title: 'Importer un profil',

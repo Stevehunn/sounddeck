@@ -2,7 +2,6 @@
 const { app, Menu, ipcMain } = require('electron')
 const path = require('path')
 const fs = require('fs')
-const Store = require('electron-store')
 
 // ─── IMPORTS DES MODULES ──────────────────────────────────────────────────
 
@@ -17,12 +16,13 @@ const {
   registerProjectHandlers,
 } = require('./modules')
 
+const store = require('./store')
+
 // ─── INITIALISATION ──────────────────────────────────────────────────────
 
 // Supprimer la barre de menu native
 Menu.setApplicationMenu(null)
 
-const store = new Store()
 let mainWindow = null
 let isQuitting = false
 
@@ -65,8 +65,6 @@ function registerAllHandlers() {
   
   // ✅ PROJETS - APRÈS storeHandlers
   console.log('  📦 Enregistrement projectHandlers...')
-  const Store = require('electron-store')
-  const store = new Store()
   registerProjectHandlers(store)
   console.log('  ✅ projectHandlers enregistrés')
   
