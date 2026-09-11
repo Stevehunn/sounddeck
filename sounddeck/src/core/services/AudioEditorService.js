@@ -1,6 +1,5 @@
 // src/core/services/AudioEditorService.js
 import { audioCache } from './AudioCache'
-import * as AudioMixerService from './AudioMixerService'
 
 // ─── ÉTAT ──────────────────────────────────────────────────────────────────
 
@@ -50,8 +49,8 @@ async function loadBuffer(filePath) {
     const ctx = getAudioContext()
     if (!ctx) throw new Error('AudioContext non disponible')
 
-    const fileUrl = filePath.startsWith('file://') 
-      ? filePath 
+    const fileUrl = filePath.startsWith('file://')
+      ? filePath
       : 'file:///' + filePath.replace(/\\/g, '/')
 
     const response = await fetch(fileUrl)
@@ -87,7 +86,7 @@ async function applyEffects(source, clip, track) {
     }
   }
 
-  const volumeScale = 1 // master volume géré ailleurs
+  const volumeScale = 1
   const trackVolume = track?.volume || 1
   const totalGain = volumeLinear * volumeScale * trackVolume
   const clampedGain = Math.max(0, Math.min(5, totalGain))
@@ -97,7 +96,6 @@ async function applyEffects(source, clip, track) {
   source.connect(gainNode)
   gainNodes.set(clipId, gainNode)
 
-  // Appliquer les autres effets
   let currentNode = gainNode
 
   if (currentNode !== ctx.destination) {
@@ -144,8 +142,6 @@ async function startClip(clip, track, time) {
     const offset = time - clip.start
     const seekPos = Math.max(0, Math.min(offset, clipDuration - 0.01))
 
-    console.log(`▶️ Démarrage "${clip.name}" à ${seekPos.toFixed(2)}s`)
-
     const result = await applyEffects(source, clip, track)
 
     let finalSource = source
@@ -161,7 +157,6 @@ async function startClip(clip, track, time) {
     if (!finalSource || finalSource === source) {
       source.start(now, seekPos)
       source.onended = () => {
-        console.log(`⏹️ Fin du clip "${clip.name}"`)
         sources.delete(clipId)
         gainNodes.delete(clipId)
         if (effectChains.has(clipId)) {
@@ -173,7 +168,6 @@ async function startClip(clip, track, time) {
     } else {
       sources.set(clipId, finalSource)
       finalSource.onended = () => {
-        console.log(`⏹️ Fin du clip "${clip.name}" (effets)`)
         sources.delete(clipId)
         gainNodes.delete(clipId)
         if (effectChains.has(clipId)) {
@@ -225,7 +219,6 @@ function animationLoop() {
   const loop = loopRegionRef
   if (loop?.enabled && loop.end > loop.start) {
     if (newTime >= loop.end) {
-      console.log(`🔄 Boucle: retour à ${loop.start.toFixed(2)}s`)
       newTime = loop.start
       for (const [clipId, source] of sources) {
         try { source.stop(); source.disconnect() } catch (e) {}
@@ -242,7 +235,6 @@ function animationLoop() {
   }
 
   if (newTime >= totalDuration) {
-    console.log(`⏹️ Fin atteinte (${newTime.toFixed(2)}s)`)
     stopEditor()
     return
   }
@@ -260,7 +252,6 @@ export function initEditor(project, clipDurations, loopRegion, errorCallback) {
   loopRegionRef = loopRegion
   onError = errorCallback
 
-  // Calculer la durée totale
   if (project?.tracks) {
     let maxDuration = 10
     for (const track of project.tracks) {
@@ -277,8 +268,6 @@ export function initEditor(project, clipDurations, loopRegion, errorCallback) {
 }
 
 export function playEditor(startAt = 0) {
-  console.log(`▶️ [Editor] Démarrer à ${startAt.toFixed(2)}s`)
-
   if (!projectRef || projectRef.tracks.length === 0) {
     onError?.('Aucune piste à jouer')
     return
@@ -289,7 +278,6 @@ export function playEditor(startAt = 0) {
     animationFrame = null
   }
 
-  // Nettoyer les sources existantes
   for (const [clipId, source] of sources) {
     try { source.stop(); source.disconnect() } catch (e) {}
   }
@@ -313,11 +301,9 @@ export function playEditor(startAt = 0) {
   }
 
   animationFrame = requestAnimationFrame(animationLoop)
-  console.log('✅ [Editor] Lecture démarrée')
 }
 
 export function pauseEditor() {
-  console.log('⏸️ [Editor] Pause')
   isPaused = true
   isPlaying = false
 
@@ -328,7 +314,6 @@ export function pauseEditor() {
 }
 
 export function resumeEditor() {
-  console.log('▶️ [Editor] Reprise')
   const ctx = audioContext
   if (ctx && ctx.state === 'suspended') {
     ctx.resume()
@@ -342,7 +327,6 @@ export function resumeEditor() {
 }
 
 export function stopEditor() {
-  console.log('⏹️ [Editor] Stop')
   isPlaying = false
   isPaused = false
   currentTime = 0
@@ -367,11 +351,9 @@ export function stopEditor() {
 
 export function seekEditor(time) {
   const clamped = Math.max(0, Math.min(totalDuration, time))
-  console.log(`🎯 [Editor] Seek ${time.toFixed(2)}s -> ${clamped.toFixed(2)}s`)
   currentTime = clamped
 
   if (isPlaying && !isPaused) {
-    // Recalculer les clips actifs
     for (const [clipId, source] of sources) {
       try { source.stop(); source.disconnect() } catch (e) {}
     }

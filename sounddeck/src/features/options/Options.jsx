@@ -126,7 +126,7 @@ function CollapsibleSection({ title, icon, children, defaultOpen = false }) {
 
 export default function Options({ store, addToast }) {
   const { t, currentLang, changeLanguage, version: langVersion } = useLanguage()
-  const [langVersionState, setLangVersion] = useState(0)
+  const [, setLangVersion] = useState(0)
   const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
   const [activeSection, setActiveSection] = useState('appearance')
   const [audioDevices, setAudioDevices] = useState([])
@@ -512,7 +512,7 @@ export default function Options({ store, addToast }) {
                 <button 
                   key={l.code}
                   onClick={async () => {
-                    await store.updateLang(l.code, t)
+                    await store.updateLang(l.code)
                     await changeLanguage(l.code)
                     setLangVersion(prev => prev + 1)
                   }}

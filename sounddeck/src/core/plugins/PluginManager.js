@@ -1,12 +1,5 @@
 /**
  * PluginManager - Gestionnaire central des plugins
- * 
- * Permet de :
- * - Enregistrer des plugins
- * - Charger des plugins dynamiquement
- * - Gérer les pages ajoutées par les plugins
- * - Exécuter des hooks
- * - Vérifier la compatibilité
  */
 export class PluginManager {
   constructor() {
@@ -27,19 +20,13 @@ export class PluginManager {
     this.store = null
   }
 
-  /**
-   * Initialise le gestionnaire de plugins
-   */
   async initialize(store) {
     if (this._initialized) return
     this.store = store
 
-    console.log('🔌 Initialisation du PluginManager...')
-
     try {
-      // Charger les plugins installés
       const installedPlugins = await window.electronAPI?.getInstalledPlugins?.() || []
-      
+
       for (const pluginInfo of installedPlugins) {
         if (pluginInfo.enabled !== false) {
           await this.loadPlugin(pluginInfo)
@@ -47,20 +34,14 @@ export class PluginManager {
       }
 
       this._initialized = true
-      console.log(`✅ PluginManager initialisé (${this.plugins.size} plugins chargés)`)
-      
-      // Exécuter les hooks onAppStart
       this.runHook('onAppStart', store)
-      
+
     } catch (e) {
       console.error('❌ Erreur lors de l\'initialisation du PluginManager:', e)
-      this._initialized = true // Pour ne pas bloquer l'app
+      this._initialized = true
     }
   }
 
-  /**
-   * Charge un plugin depuis ses informations
-   */
   async loadPlugin(pluginInfo) {
     if (this._loadingPlugins.has(pluginInfo.id)) {
       console.warn(`⚠️ Plugin ${pluginInfo.id} déjà en cours de chargement`)
@@ -75,57 +56,46 @@ export class PluginManager {
     this._loadingPlugins.add(pluginInfo.id)
 
     try {
-      // Vérifier la compatibilité
       if (!this._checkCompatibility(pluginInfo)) {
         console.error(`❌ Plugin ${pluginInfo.id} incompatible`)
         this._loadingPlugins.delete(pluginInfo.id)
         return false
       }
 
-      // Charger le module du plugin
       let pluginModule
 
       try {
         if (import.meta.env.DEV) {
-          // ✅ MEILLEURE GESTION DES CHEMINS
           const paths = [
-            // Chemin relatif depuis le dossier courant
             `../../plugins/${pluginInfo.id}/index.js`,
             `../../plugins/${pluginInfo.id}/index.jsx`,
-            // Depuis la racine du projet
             `/src/plugins/${pluginInfo.id}/index.js`,
             `/src/plugins/${pluginInfo.id}/index.jsx`,
-            // Sans extension
             `../plugins/${pluginInfo.id}/index`,
             `/src/plugins/${pluginInfo.id}/index`,
           ]
-          
+
           let loaded = false
           let lastError = null
-          
+
           for (const importPath of paths) {
             try {
-              console.log(`📂 Tentative de chargement depuis: ${importPath}`)
-              // ✅ AJOUT DE @vite-ignore
               pluginModule = await import(/* @vite-ignore */ importPath)
               loaded = true
               break
             } catch (e) {
               lastError = e
-              // Essayer le chemin suivant
             }
           }
-          
+
           if (!loaded) {
             throw new Error(
               `Plugin ${pluginInfo.id} non trouvé dans les chemins: ${paths.join(', ')}\n${lastError?.message || ''}`
             )
           }
         } else {
-          // En production : charger depuis userData/plugins/
           const fullPath = await window.electronAPI?.getPluginPath?.(pluginInfo.id)
           if (fullPath) {
-            // ✅ AJOUT DE @vite-ignore
             pluginModule = await import(/* @vite-ignore */ fullPath)
           } else {
             throw new Error(`Plugin ${pluginInfo.id} non trouvé`)
@@ -139,21 +109,18 @@ export class PluginManager {
 
       const plugin = pluginModule.default || pluginModule
 
-      // Valider le plugin
       if (!plugin.id) {
         console.error('❌ Plugin invalide: id manquant')
         this._loadingPlugins.delete(pluginInfo.id)
         return false
       }
 
-      // Enregistrer le plugin
       this.plugins.set(plugin.id, {
         ...plugin,
         info: pluginInfo,
         loadedAt: Date.now()
       })
 
-      // Enregistrer les pages
       if (plugin.pages) {
         for (const page of plugin.pages) {
           this.pages.set(page.id, {
@@ -161,27 +128,23 @@ export class PluginManager {
             pluginId: plugin.id,
             componentPath: page.component || page.componentPath || `${plugin.id}/${page.id}`
           })
-          
+
           if (page.component) {
             this.components.set(page.id, page.component)
           }
         }
       }
 
-      // Ajouter les traductions
       if (plugin.i18n) {
         this._addTranslations(plugin.i18n)
       }
 
-      // Initialiser le plugin
       if (typeof plugin.init === 'function') {
         await plugin.init(this.store, this)
       }
 
-      // Exécuter les hooks
       this.runHook('onPluginLoad', plugin)
 
-      console.log(`✅ Plugin ${plugin.id} (v${plugin.version}) chargé`)
       this._loadingPlugins.delete(plugin.id)
       return true
 
@@ -192,19 +155,14 @@ export class PluginManager {
     }
   }
 
-  /**
-   * Décharge un plugin
-   */
   async unloadPlugin(pluginId) {
     const plugin = this.plugins.get(pluginId)
     if (!plugin) return false
 
-    // Exécuter le hook de déchargement
     if (typeof plugin.destroy === 'function') {
       await plugin.destroy()
     }
 
-    // Supprimer les pages du plugin
     const pageIds = Array.from(this.pages.keys())
     for (const pageId of pageIds) {
       if (this.pages.get(pageId).pluginId === pluginId) {
@@ -215,20 +173,13 @@ export class PluginManager {
 
     this.plugins.delete(pluginId)
     this.runHook('onPluginUnload', plugin)
-    
-    console.log(`🗑️ Plugin ${pluginId} déchargé`)
+
     return true
   }
 
-  /**
-   * Récupère toutes les pages (core + plugins)
-   * @param {Function} translateFn - Fonction de traduction
-   * @returns {Array} Liste des pages
-   */
   getAllPages(translateFn) {
-    // Si aucune fonction de traduction n'est fournie, on utilise une fonction d'identité
     const t = translateFn || ((key) => key)
-    
+
     const corePages = [
       { id: 'home', label: t('mySounds'), icon: 'ti-home', isCore: true, group: 'navigation' },
       { id: 'discover', label: t('discover'), icon: 'ti-compass', isCore: true, group: 'navigation' },
@@ -247,18 +198,14 @@ export class PluginManager {
       isPlugin: true
     }))
 
-    // Fusionner avec les pages du store (profils, etc.)
     const storePages = this._getStorePages()
 
     return [...corePages, ...pluginPages, ...storePages]
   }
 
-  /**
-   * Récupère les pages du store (profils, etc.)
-   */
   _getStorePages() {
     if (!this.store) return []
-    
+
     const profiles = this.store.profiles || []
     return profiles.map(p => ({
       id: `profile-${p.id}`,
@@ -271,26 +218,16 @@ export class PluginManager {
     }))
   }
 
-  /**
-   * Récupère une page par son ID
-   */
   getPage(pageId) {
     const allPages = this.getAllPages()
     return allPages.find(p => p.id === pageId)
   }
 
-  /**
-   * Vérifie si une page est un plugin
-   */
   isPluginPage(pageId) {
     return this.pages.has(pageId)
   }
 
-  /**
-   * Récupère le composant d'une page plugin
-   */
   async getPluginComponent(pageId) {
-    // Si le composant est déjà en cache
     if (this.components.has(pageId)) {
       return this.components.get(pageId)
     }
@@ -301,11 +238,9 @@ export class PluginManager {
     try {
       let module
       if (import.meta.env.DEV) {
-        // En développement : charger depuis le dossier src/plugins/
         const plugin = this.plugins.get(page.pluginId)
         if (!plugin) return null
-        
-        // Essayer différents chemins
+
         const paths = [
           `../plugins/${page.pluginId}/${page.componentPath}`,
           `../plugins/${page.pluginId}/pages/${page.id}`,
@@ -328,7 +263,6 @@ export class PluginManager {
         console.warn(`⚠️ Composant non trouvé pour la page ${pageId}`, paths)
         return null
       } else {
-        // En production : charger depuis le dossier userData
         const pluginPath = await window.electronAPI?.getPluginComponentPath?.(page.pluginId, page.id)
         if (pluginPath) {
           module = await import(/* @vite-ignore */ pluginPath);
@@ -347,9 +281,6 @@ export class PluginManager {
     return null
   }
 
-  /**
-   * Ajoute des traductions
-   */
   _addTranslations(translations) {
     if (!window.__I18N__) {
       window.__I18N__ = {}
@@ -363,11 +294,7 @@ export class PluginManager {
     }
   }
 
-  /**
-   * Vérifie la compatibilité du plugin
-   */
   _checkCompatibility(pluginInfo) {
-    // Vérifier la version de l'application
     const appVersion = pluginInfo.appVersion || '1.3.0'
     if (pluginInfo.requires && !this._semverSatisfies(appVersion, pluginInfo.requires)) {
       console.warn(`⚠️ Plugin ${pluginInfo.id} requiert ${pluginInfo.requires}, version actuelle ${appVersion}`)
@@ -377,11 +304,7 @@ export class PluginManager {
     return true
   }
 
-  /**
-   * Vérification semver simplifiée
-   */
   _semverSatisfies(version, requirement) {
-    // Version simplifiée
     if (requirement.startsWith('>=')) {
       const reqVersion = requirement.replace('>=', '')
       return version >= reqVersion
@@ -405,17 +328,11 @@ export class PluginManager {
     return version === requirement
   }
 
-  /**
-   * Exécute un hook
-   */
   runHook(hookName, ...args) {
     const hooks = this.hooks[hookName] || []
     return hooks.map(fn => fn(...args))
   }
 
-  /**
-   * Ajoute un hook
-   */
   addHook(hookName, fn) {
     if (!this.hooks[hookName]) {
       this.hooks[hookName] = []
@@ -423,9 +340,6 @@ export class PluginManager {
     this.hooks[hookName].push(fn)
   }
 
-  /**
-   * Récupère la liste des plugins chargés
-   */
   getLoadedPlugins() {
     return Array.from(this.plugins.values()).map(p => ({
       id: p.id,
@@ -437,20 +351,13 @@ export class PluginManager {
     }))
   }
 
-  /**
-   * Vérifie si un plugin est chargé
-   */
   isPluginLoaded(pluginId) {
     return this.plugins.has(pluginId)
   }
 
-  /**
-   * Récupère un plugin par son ID
-   */
   getPlugin(pluginId) {
     return this.plugins.get(pluginId) || null
   }
 }
 
-// Singleton
 export const pluginManager = new PluginManager()

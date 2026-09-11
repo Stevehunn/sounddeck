@@ -13,17 +13,17 @@ export function useEditor(save) {
     createdAt: Date.now(),
     updatedAt: Date.now()
   })
-  
+
   const [selectedClipId, setSelectedClipId] = useState(null)
-  const [editorLoopRegion, setEditorLoopRegionState] = useState({ 
-    enabled: false, 
-    start: 0, 
-    end: 10 
+  const [editorLoopRegion, setEditorLoopRegionState] = useState({
+    enabled: false,
+    start: 0,
+    end: 10
   })
-  
+
   const [canUndoEditor, setCanUndoEditor] = useState(false)
   const [canRedoEditor, setCanRedoEditor] = useState(false)
-  
+
   const editorUndoStack = useRef([])
   const editorRedoStack = useRef([])
 
@@ -234,7 +234,6 @@ export function useEditor(save) {
   }, [save])
 
   const updateEditorProject = useCallback(async (project) => {
-    console.log('💾 [useEditor] updateEditorProject:', project?.id)
     setEditorProject(project)
     await save('editorProject', project)
     return project
@@ -264,13 +263,13 @@ export function useEditor(save) {
 
   const getAudioDuration = useCallback(async (filePath) => {
     try {
-      const fileUrl = filePath.startsWith('file://') 
-        ? filePath 
+      const fileUrl = filePath.startsWith('file://')
+        ? filePath
         : 'file:///' + filePath.replace(/\\/g, '/')
-      
+
       const response = await fetch(fileUrl)
       if (!response.ok) return 3
-      
+
       const arrayBuffer = await response.arrayBuffer()
       const audioContext = new (window.AudioContext || window.webkitAudioContext)()
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
@@ -288,12 +287,12 @@ export function useEditor(save) {
         detail: { clipId, duration }
       }))
     }
-    
+
     const updated = {
       ...editorProject,
       tracks: editorProject.tracks.map(track => ({
         ...track,
-        clips: track.clips.map(clip => 
+        clips: track.clips.map(clip =>
           clip.id === clipId ? { ...clip, duration } : clip
         )
       })),
@@ -304,7 +303,7 @@ export function useEditor(save) {
 
   const fixAllClipDurations = useCallback(async () => {
     if (!editorProject?.tracks) return 0
-    
+
     let fixedCount = 0
     let newTracks = [...editorProject.tracks]
 
@@ -341,7 +340,7 @@ export function useEditor(save) {
     const trackIndex = editorProject.tracks.length + 1
     const trackName = name || `Piste ${trackIndex}`
     const trackColor = color || `hsl(${(trackIndex * 30 + 200) % 360}, 60%, 50%)`
-    
+
     const newTrack = {
       id: `track-${Date.now()}`,
       name: trackName,
@@ -429,7 +428,7 @@ export function useEditor(save) {
     const actualDuration = await getAudioDuration(sound.path)
     let actualStart = start
     const track = editorProject.tracks.find(t => t.id === trackId)
-    
+
     if (track && (actualStart === null || actualStart === undefined)) {
       if (track.clips.length > 0) {
         const lastClip = track.clips.reduce((max, clip) => {
@@ -483,7 +482,7 @@ export function useEditor(save) {
     const actualDuration = await getAudioDuration(filePath)
     let actualStart = start
     const track = editorProject.tracks.find(t => t.id === trackId)
-    
+
     if (track && (actualStart === null || actualStart === undefined)) {
       if (track.clips.length > 0) {
         const lastClip = track.clips.reduce((max, clip) => {
@@ -837,7 +836,7 @@ export function useEditor(save) {
       })
       return { ...track, clips }
     })
-    
+
     if (updated) {
       const updatedProject = {
         ...editorProject,
@@ -876,7 +875,7 @@ export function useEditor(save) {
     getAudioDuration,
     updateClipDurationInEditor,
     fixAllClipDurations,
-    
+
     // ─── GESTION DES PROJETS ──────────────────────────────────────────────
     editorProjects,
     recentEditorProjects,

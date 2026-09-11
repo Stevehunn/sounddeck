@@ -203,14 +203,14 @@ export default function Guide() {
 
       {/* Contenu principal */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {/* Header avec tutoriels */}
-        <div style={{ 
-          padding: '16px 24px', 
-          borderBottom: '1px solid var(--border)', 
-          flexShrink: 0, 
-          background: 'var(--bg-secondary)', 
-          display: 'flex', 
-          alignItems: 'center', 
+        {/* Header */}
+        <div style={{
+          padding: '16px 24px',
+          borderBottom: '1px solid var(--border)',
+          flexShrink: 0,
+          background: 'var(--bg-secondary)',
+          display: 'flex',
+          alignItems: 'center',
           gap: 12,
           flexWrap: 'wrap'
         }}>
@@ -224,32 +224,8 @@ export default function Guide() {
             </div>
           </div>
 
-          {/* ✅ Boutons Tutoriels - TRADUITS */}
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button
-              className="btn-secondary btn-sm"
-              onClick={() => {
-                localStorage.removeItem('sounddeck-tutorial-done')
-                window.location.reload()
-              }}
-              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
-            >
-              <i className="ti ti-book" /> {t('tutorialRestart') || 'Revoir le tutoriel'}
-            </button>
-            <button
-              className="btn-primary btn-sm"
-              onClick={() => {
-                const event = new CustomEvent('open-advanced-tutorial')
-                window.dispatchEvent(event)
-              }}
-              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 'var(--radius-sm)' }}
-            >
-              <i className="ti ti-rocket" /> {t('tutorialAdvanced') || 'Tutoriel avancé'}
-            </button>
-          </div>
-
-          {/* Boutons Précédent/Suivant */}
-          <div style={{ display: 'flex', gap: 6 }}>
+          {/* Boutons Précédent/Suivant (repoussés à droite) */}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
             <button className="btn-secondary btn-sm"
               disabled={activeStep === steps[0].id}
               onClick={() => { const idx = steps.findIndex(s => s.id === activeStep); if (idx > 0) setActiveStep(steps[idx - 1].id) }}
@@ -304,46 +280,44 @@ function DownloadCard({ icon, name, desc, url, instructions }) {
 }
 
 function ConfigStep({ number, title, desc, icon, highlight }) {
-  const { t } = useLanguage()
   return (
-    <div 
-      className={`option-row ${highlight ? 'config-step-highlight' : ''}`} 
-      style={{ 
-        alignItems: 'flex-start', 
+    <div
+      className={`option-row ${highlight ? 'config-step-highlight' : ''}`}
+      style={{
+        alignItems: 'flex-start',
         padding: '10px 14px',
         flexWrap: 'wrap',
         gap: 8
       }}
     >
-      <div style={{ 
-        width: 24, 
-        height: 24, 
-        borderRadius: '50%', 
-        flexShrink: 0, 
-        background: highlight ? 'var(--accent)' : 'var(--bg-tertiary)', 
-        border: `1px solid ${highlight ? 'var(--accent)' : 'var(--border)'}`, 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        fontSize: 11, 
-        fontWeight: 700, 
+      <div style={{
+        width: 24,
+        height: 24,
+        borderRadius: '50%',
+        flexShrink: 0,
+        background: highlight ? 'var(--accent)' : 'var(--bg-tertiary)',
+        border: `1px solid ${highlight ? 'var(--accent)' : 'var(--border)'}`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 11,
+        fontWeight: 700,
         color: highlight ? 'white' : 'var(--text-secondary)',
-        flexShrink: 0
       }}>
         {number}
       </div>
-      <div style={{ 
-        fontSize: 16, 
+      <div style={{
+        fontSize: 16,
         flexShrink: 0,
         width: 28,
         textAlign: 'center'
       }}>{icon}</div>
       <div style={{ flex: 1, minWidth: 180 }}>
-        <div style={{ 
-          fontWeight: 600, 
-          fontSize: 13, 
-          marginBottom: 2, 
-          color: highlight ? 'var(--accent)' : 'var(--text-primary)' 
+        <div style={{
+          fontWeight: 600,
+          fontSize: 13,
+          marginBottom: 2,
+          color: highlight ? 'var(--accent)' : 'var(--text-primary)'
         }}>
           {title}
         </div>

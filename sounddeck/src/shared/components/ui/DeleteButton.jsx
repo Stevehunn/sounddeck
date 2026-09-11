@@ -7,14 +7,14 @@ const DeleteButton = ({
   onDelete,
   onConfirmStart,
   onConfirmEnd,
-  confirmTitle = 'Confirmer la suppression',
-  confirmMessage = 'Voulez-vous vraiment supprimer cet élément ?',
+  confirmTitle,
+  confirmMessage,
   itemName = '',
   size = 'sm',
   className = '',
   disabled = false,
   icon = 'ti-trash',
-  label = 'Supprimer',
+  label,
   deleteLabel,
   showLabel = false,
   variant = 'ghost',
@@ -25,48 +25,41 @@ const DeleteButton = ({
   const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
   const [isHovering, setIsHovering] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
+
   const displayLabel = deleteLabel || label || t('delete') || 'Supprimer'
+  const displayTitle = confirmTitle || t('confirmDeleteSound') || 'Confirmer la suppression'
+  const displayMessage = confirmMessage || t('confirmDeleteMessage') || 'Cette action est irréversible. Voulez-vous vraiment continuer ?'
 
   const handleClick = async (e) => {
-    console.log('🖱️ [DeleteButton] handleClick - itemName:', itemName)
     e?.stopPropagation?.()
-    
+
     setIsConfirming(true)
     if (onConfirmStart) {
       onConfirmStart()
     }
-    
+
     try {
-      let finalMessage = confirmMessage
-      
-      const hasNamePlaceholder = confirmMessage.includes('{name}')
-      const hasNameInMessage = confirmMessage.includes(`"${itemName}"`) || confirmMessage.includes(itemName)
-      
+      let finalMessage = displayMessage
+
+      const hasNamePlaceholder = displayMessage.includes('{name}')
+      const hasNameInMessage = itemName && (
+        displayMessage.includes(`"${itemName}"`) || displayMessage.includes(itemName)
+      )
+
       if (itemName && !hasNamePlaceholder && !hasNameInMessage) {
-        if (confirmMessage.endsWith('?') || confirmMessage.endsWith(':')) {
-          finalMessage = confirmMessage + ` "${itemName}"`
-        } else {
-          finalMessage = confirmMessage + ` "${itemName}"`
-        }
+        finalMessage = `${displayMessage} "${itemName}"`
       }
-      
-      console.log('📋 [DeleteButton] Confirmation - title:', confirmTitle, 'message:', finalMessage)
-      
+
       const confirmed = await confirm({
-        title: confirmTitle,
+        title: displayTitle,
         message: finalMessage,
         type: type,
         confirmText: displayLabel,
         cancelText: t('cancel') || 'Annuler',
       })
-      
-      console.log('📋 [DeleteButton] Résultat confirmation:', confirmed)
-      
+
       if (confirmed) {
-        console.log('✅ [DeleteButton] Exécution de onDelete')
         onDelete?.()
-      } else {
-        console.log('❌ [DeleteButton] Annulé par l\'utilisateur')
       }
     } catch (err) {
       console.error('❌ [DeleteButton] Erreur:', err)
@@ -91,7 +84,7 @@ const DeleteButton = ({
       case 'outline':
         return {
           backgroundColor: isHovering ? 'rgba(224, 82, 82, 0.1)' : 'transparent',
-          color: isHovering ? 'var(--danger)' : 'var(--danger)',
+          color: 'var(--danger)',
           borderWidth: '1px',
           borderStyle: 'solid',
           borderColor: 'var(--danger)',
@@ -103,11 +96,12 @@ const DeleteButton = ({
           borderWidth: '0px',
           borderStyle: 'none',
           borderColor: 'transparent',
-          boxShadow: isHovering 
-            ? '0 4px 15px rgba(224, 82, 82, 0.4)' 
+          boxShadow: isHovering
+            ? '0 4px 15px rgba(224, 82, 82, 0.4)'
             : '0 2px 8px rgba(224, 82, 82, 0.2)',
         }
       case 'ghost-danger':
+      default:
         return {
           backgroundColor: isHovering ? 'rgba(224, 82, 82, 0.1)' : 'transparent',
           color: isHovering ? 'var(--danger)' : 'var(--text-secondary)',
@@ -117,14 +111,6 @@ const DeleteButton = ({
           borderRadius: 'var(--radius-sm)',
           padding: '4px 8px',
           transition: 'all 0.15s ease',
-        }
-      default:
-        return {
-          backgroundColor: isHovering ? 'rgba(224, 82, 82, 0.1)' : 'transparent',
-          color: isHovering ? 'var(--danger)' : 'var(--text-secondary)',
-          borderWidth: '1px',
-          borderStyle: 'solid',
-          borderColor: isHovering ? 'var(--danger)' : 'transparent',
         }
     }
   }
@@ -175,7 +161,7 @@ const DeleteButton = ({
         <i className={`ti ${icon}`} style={{ fontSize: size === 'sm' ? 12 : 14 }} />
         {showLabel && <span>{displayLabel}</span>}
       </button>
-      
+
       <ConfirmWrapper />
     </>
   )

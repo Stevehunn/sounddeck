@@ -1,13 +1,14 @@
 // src/core/i18n/locales/es/trimmer.js
 export default {
-  // ─── RECORTADOR ─────────────────────────────────────────────────────────
   trimmerTitle: 'Recortador',
   trimmerDesc: 'Corta y recorta tus archivos de audio',
   trimmerNoFile: 'Ningún archivo seleccionado',
   trimmerSelectFile: 'Selecciona un archivo de audio',
   trimmerFileSelected: 'Archivo seleccionado',
-  
-  // ─── CONTROLES ──────────────────────────────────────────────────────
+  trimmerTrimTitle: 'Recortar sonido',
+  trimmerRegionSelected: 'Selección: {start} → {end}',
+  trimmerInstallFfmpeg: 'Instala ffmpeg-static vía npm para un recorte preciso.',
+
   trimmerStart: 'Inicio de la selección',
   trimmerEnd: 'Fin de la selección',
   trimmerDuration: 'Duración seleccionada',
@@ -16,42 +17,36 @@ export default {
   trimmerPlayFull: 'Escuchar archivo completo',
   trimmerTrim: 'Recortar',
   trimmerExport: 'Exportar recorte',
-  
-  // ─── ESTADO ──────────────────────────────────────────────────────────
+
   trimmerLoading: 'Cargando archivo...',
   trimmerProcessing: 'Recortando...',
   trimmerSuccess: 'Archivo recortado con éxito',
   trimmerError: 'Error al recortar',
   trimmerPause: 'Pausa',
-  
-  // ─── WAVEFORM ──────────────────────────────────────────────────────
+
   trimmerWaveformLoading: 'Generando waveform...',
   trimmerWaveformError: 'Error al generar la waveform',
   trimmerSelectRegion: 'Selecciona una región arrastrando',
-  trimmerRegionSelected: 'Región seleccionada: {start} → {end}',
-  
-  // ─── PRECISIÓN ──────────────────────────────────────────────────────
+  trimmerRegionSelectedLabel: 'Región seleccionada: {start} → {end}',
+
   trimmerStartLabel: 'Inicio: {time}',
   trimmerEndLabel: 'Fin: {time}',
   trimmerDurationLabel: 'Duración: {time}',
   trimmerRemainingLabel: 'Restante: {time}',
-  
-  // ─── BOTONES ──────────────────────────────────────────────────────────
+
   trimmerCancel: 'Cancelar',
   trimmerConfirm: 'Confirmar recorte',
   trimmerReset: 'Reiniciar selección',
   trimmerZoomIn: 'Acercar',
   trimmerZoomOut: 'Alejar',
   trimmerZoomFit: 'Ajustar a la vista',
-  
-  // ─── FORMATOS ──────────────────────────────────────────────────────────
+
   trimmerFormatWav: 'WAV (sin pérdida)',
   trimmerFormatMp3: 'MP3',
   trimmerFormatOgg: 'OGG',
   trimmerFormatFlac: 'FLAC (sin pérdida)',
   trimmerFormatAac: 'AAC',
-  
-  // ─── EXPORTAR ──────────────────────────────────────────────────────────
+
   trimmerExportName: 'Nombre del archivo exportado',
   trimmerExportFormat: 'Formato de exportación',
   trimmerExportQuality: 'Calidad',
@@ -59,6 +54,4 @@ export default {
   trimmerExportPath: 'Ruta de exportación',
   trimmerExportSuccess: 'Archivo exportado con éxito',
   trimmerExportError: 'Error al exportar',
-  
-  editorSearch: 'Buscar un sonido...',
 };

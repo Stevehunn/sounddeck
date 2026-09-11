@@ -1,3 +1,4 @@
+// src/shared/components/modals/FeedbackModal.jsx
 import { useState } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
@@ -29,7 +30,6 @@ export default function FeedbackModal({ onClose, lang = 'fr', onSubmit, store })
     setError(null)
 
     try {
-      // Récupérer les logs si demandé
       let logs = null
       if (includeLogs) {
         try {
@@ -39,18 +39,15 @@ export default function FeedbackModal({ onClose, lang = 'fr', onSubmit, store })
         }
       }
 
-      // Récupérer une capture d'écran si demandé
       let screenshot = null
       if (includeScreenshot) {
         try {
-          // Utiliser l'API Screenshot de l'application
           screenshot = await window.electronAPI.captureScreen?.()
         } catch (e) {
           console.warn('Impossible de capturer l\'écran:', e)
         }
       }
 
-      // Construire le feedback
       const feedback = {
         type,
         message: message.trim(),
@@ -65,7 +62,6 @@ export default function FeedbackModal({ onClose, lang = 'fr', onSubmit, store })
         profileCount: store?.profiles?.length || 0
       }
 
-      // Envoyer le feedback
       if (onSubmit) {
         await onSubmit(feedback)
       } else {
@@ -85,18 +81,14 @@ export default function FeedbackModal({ onClose, lang = 'fr', onSubmit, store })
     }
   }
 
-  // Fonction d'envoi du feedback
   const submitFeedback = async (feedback) => {
-    // Option 1: Envoyer à un service de bug tracking (ex: Sentry, BugSnag)
-    // Option 2: Envoyer à un serveur backend
-    // Option 3: Ouvrir une issue GitHub
-    
-    console.log('📤 Feedback envoyé:', feedback)
-    
-    // Simuler un délai
+    // En dev : ouvrir une issue GitHub pour les bugs
+    if (import.meta.env.DEV) {
+      console.log('📤 Feedback envoyé:', feedback)
+    }
+
     await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // Ouvrir une issue GitHub pour les bugs
+
     if (feedback.type === 'bug') {
       const title = encodeURIComponent(`[Bug] ${feedback.message.slice(0, 50)}`)
       const body = encodeURIComponent(`
@@ -146,8 +138,6 @@ ${feedback.logs ? `## Logs\n\`\`\`json\n${JSON.stringify(feedback.logs.slice(0, 
     )
   }
 
-  const selectedType = FEEDBACK_TYPES.find(t => t.id === type)
-
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ width: 460, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
@@ -163,25 +153,25 @@ ${feedback.logs ? `## Logs\n\`\`\`json\n${JSON.stringify(feedback.logs.slice(0, 
               {t('feedbackType')}
             </label>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {FEEDBACK_TYPES.map(t => (
+              {FEEDBACK_TYPES.map(feedbackType => (
                 <button
-                  key={t.id}
-                  onClick={() => setType(t.id)}
+                  key={feedbackType.id}
+                  onClick={() => setType(feedbackType.id)}
                   style={{
                     padding: '6px 12px',
                     borderRadius: 8,
                     cursor: 'pointer',
                     fontSize: 12,
-                    border: `2px solid ${type === t.id ? 'var(--accent)' : 'var(--border)'}`,
-                    background: type === t.id ? 'var(--accent-light)' : 'var(--bg-tertiary)',
-                    color: type === t.id ? 'var(--accent)' : 'var(--text-secondary)',
+                    border: `2px solid ${type === feedbackType.id ? 'var(--accent)' : 'var(--border)'}`,
+                    background: type === feedbackType.id ? 'var(--accent-light)' : 'var(--bg-tertiary)',
+                    color: type === feedbackType.id ? 'var(--accent)' : 'var(--text-secondary)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 4
                   }}
                 >
-                  <i className={`ti ${t.icon}`} />
-                  {tr(t.labelKey)}
+                  <i className={`ti ${feedbackType.icon}`} />
+                  {t(feedbackType.labelKey)}
                 </button>
               ))}
             </div>
@@ -266,10 +256,10 @@ ${feedback.logs ? `## Logs\n\`\`\`json\n${JSON.stringify(feedback.logs.slice(0, 
         </div>
 
         <div className="modal-actions" style={{ marginTop: 16 }}>
-          <button 
-            className="btn-secondary btn-lg" 
-            onClick={onClose} 
-            disabled={isSubmitting} 
+          <button
+            className="btn-secondary btn-lg"
+            onClick={onClose}
+            disabled={isSubmitting}
             style={{ borderRadius: 'var(--radius-md)' }}
             aria-label={t('cancel')}
           >

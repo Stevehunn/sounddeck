@@ -3,7 +3,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react
 import { useLanguage } from '@core/i18n/LanguageContext';
 import TutorialOverlay from './TutorialOverlay';
 
-// ✅ Importer les tutoriels des pages core
+// Tutoriels des pages core
 import { TUTORIAL_STEPS as HomeSteps } from '@features/home/tutorialSteps';
 import { TUTORIAL_STEPS as EditorSteps } from '@features/editor/tutorialSteps';
 import { TUTORIAL_STEPS as SequencerSteps } from '@features/sequencer/tutorialSteps';
@@ -12,7 +12,7 @@ import { TUTORIAL_STEPS as OptionsSteps } from '@features/options/tutorialSteps'
 import { TUTORIAL_STEPS as StatsSteps } from '@features/stats/tutorialSteps';
 import { TUTORIAL_STEPS as PresentationSteps, cleanupTutorialFavorites } from '@features/presentation/tutorialSteps';
 
-// ✅ Importer les tutoriels des plugins
+// Tutoriels des plugins
 import { TUTORIAL_STEPS as DiscoverSteps } from '@plugins/myinstants/tutorialSteps';
 import { TUTORIAL_STEPS as YoutubeSteps, startYoutubeTutorial, cleanupYoutubeTutorial, finishYoutubeTutorial } from '@plugins/youtube/tutorialSteps';
 
@@ -34,14 +34,12 @@ export default function Tutorial({ pageId, onComplete }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const startCalledRef = useRef(false);
-  
+
   const steps = TUTORIALS[pageId] ? TUTORIALS[pageId](t) : [];
   const hasSteps = steps && steps.length > 0;
 
-  // ✅ useLayoutEffect : activer le mode tutoriel AVANT le rendu
   useLayoutEffect(() => {
     if (pageId === 'youtube' && !startCalledRef.current) {
-      console.log('📖 [Tutorial] useLayoutEffect - Activation du mode tutoriel YouTube')
       startYoutubeTutorial();
       startCalledRef.current = true;
     }
@@ -51,26 +49,21 @@ export default function Tutorial({ pageId, onComplete }) {
     const timer = setTimeout(() => {
       setIsReady(true);
     }, 500);
-    
+
     return () => clearTimeout(timer);
   }, [pageId]);
 
   const handleNext = useCallback(() => {
-    console.log('📌 [Tutorial] handleNext appelé - currentStep:', currentStep)
-    
     if (currentStep < steps.length - 1) {
       setCurrentStep(prev => prev + 1);
     } else {
-      // Fin du tutoriel
       if (pageId === 'presentation') {
         const store = window.__storeRef?.current;
         cleanupTutorialFavorites(store);
       }
       if (pageId === 'youtube') {
-        console.log('📖 [Tutorial] Fin du tutoriel YouTube - désactivation immédiate')
         finishYoutubeTutorial();
       }
-      // ✅ Marqueurs de fin de tutoriel (par page + global)
       localStorage.setItem(`sounddeck-tutorial-${pageId}-done`, 'true');
       localStorage.setItem('sounddeck-tutorial-done', 'true');
       onComplete();
@@ -83,10 +76,8 @@ export default function Tutorial({ pageId, onComplete }) {
       cleanupTutorialFavorites(store);
     }
     if (pageId === 'youtube') {
-      console.log('📖 [Tutorial] Skip du tutoriel YouTube - désactivation immédiate')
       finishYoutubeTutorial();
     }
-    // ✅ Marqueurs de fin de tutoriel (par page + global)
     localStorage.setItem(`sounddeck-tutorial-${pageId}-done`, 'true');
     localStorage.setItem('sounddeck-tutorial-done', 'true');
     onComplete();

@@ -1,3 +1,4 @@
+// src/shared/components/settings/TwitchAlerts.jsx
 import { useState, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { playSound } from '@core/services/AudioService'
@@ -8,7 +9,6 @@ export default function TwitchAlerts({ store, addToast, lang = 'fr' }) {
   const [isEnabled, setIsEnabled] = useState(true)
 
   useEffect(() => {
-    // Simuler des alertes de test
     if (isEnabled) {
       const timer = setTimeout(() => {
         addTestAlert()
@@ -20,35 +20,38 @@ export default function TwitchAlerts({ store, addToast, lang = 'fr' }) {
   const addTestAlert = () => {
     const alertTypes = ['follow', 'donation', 'sub']
     const type = alertTypes[Math.floor(Math.random() * alertTypes.length)]
-    
+
     let alert = {
       id: Date.now(),
       type,
       timestamp: new Date().toISOString()
     }
-    
+
     switch (type) {
       case 'follow':
         alert.username = ['Streamer', 'Gamer', 'Viewer'][Math.floor(Math.random() * 3)]
-        alert.message = `${alert.username} a suivi la chaîne ! 🎉`
+        alert.message = t('twitchFollowMsg').replace('{username}', alert.username)
         break
       case 'donation':
         alert.username = ['Donateur', 'Sponsor', 'Follower'][Math.floor(Math.random() * 3)]
         alert.amount = (Math.random() * 10 + 1).toFixed(2)
-        alert.message = `${alert.username} a fait un don de ${alert.amount}€ ! ❤️`
+        alert.message = t('twitchDonationMsg')
+          .replace('{username}', alert.username)
+          .replace('{amount}', alert.amount)
         break
       case 'sub':
         alert.username = ['Subscriber', 'Fan', 'Supporter'][Math.floor(Math.random() * 3)]
         alert.tier = ['Tier 1', 'Tier 2', 'Tier 3'][Math.floor(Math.random() * 3)]
-        alert.message = `${alert.username} s'est abonné (${alert.tier}) ! 🎉`
+        alert.message = t('twitchSubMsg')
+          .replace('{username}', alert.username)
+          .replace('{tier}', alert.tier)
         break
     }
-    
+
     setAlerts(prev => [alert, ...prev].slice(0, 10))
-    
-    // Jouer un son d'alerte si disponible
+
     try {
-      const alertSound = store.sounds.find(s => 
+      const alertSound = store.sounds.find(s =>
         s.name.toLowerCase().includes('alert') ||
         s.name.toLowerCase().includes('notification')
       )
@@ -143,7 +146,7 @@ export default function TwitchAlerts({ store, addToast, lang = 'fr' }) {
             sub: 'var(--accent)',
             raid: 'var(--danger)'
           }
-          
+
           const alertIcons = {
             follow: 'ti-heart',
             donation: 'ti-coins',
@@ -168,14 +171,14 @@ export default function TwitchAlerts({ store, addToast, lang = 'fr' }) {
                 gap: 8,
                 fontSize: 12
               }}>
-                <i className={`ti ${alertIcons[alert.type] || 'ti-bell'}`} 
+                <i className={`ti ${alertIcons[alert.type] || 'ti-bell'}`}
                    style={{ color: alertColors[alert.type] || 'var(--accent)' }} />
                 <span style={{ flex: 1 }}>{alert.message}</span>
                 <span style={{
                   fontSize: 9,
                   color: 'var(--text-tertiary)'
                 }}>
-                  {new Date(alert.timestamp).toLocaleTimeString()}
+                  {new Date(alert.timestamp).toLocaleTimeString(currentLang)}
                 </span>
               </div>
             </div>

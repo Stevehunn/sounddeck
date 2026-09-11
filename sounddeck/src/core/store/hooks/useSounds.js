@@ -24,7 +24,7 @@ export function useSounds(initialSounds = [], initialSoundOrder = {}, initialTag
     const updated = [...sounds, newSound]
     setSounds(updated)
     await save('sounds', updated)
-    
+
     const updatedOrder = { ...soundOrder }
     const targetProfiles = newSound.profiles || ['all']
     targetProfiles.forEach(pid => {
@@ -45,7 +45,7 @@ export function useSounds(initialSounds = [], initialSoundOrder = {}, initialTag
     }
     const updated = sounds.filter(s => s.id !== soundId)
     setSounds(updated)
-    
+
     const updatedOrder = { ...soundOrder }
     Object.keys(updatedOrder).forEach(profileId => {
       if (updatedOrder[profileId]) {
@@ -59,7 +59,7 @@ export function useSounds(initialSounds = [], initialSoundOrder = {}, initialTag
   }, [sounds, soundOrder, save])
 
   const updateSound = useCallback(async (soundId, changes) => {
-    const updated = sounds.map(s => 
+    const updated = sounds.map(s =>
       s.id === soundId ? { ...s, ...changes } : s
     )
     setSounds(updated)
@@ -107,7 +107,7 @@ export function useSounds(initialSounds = [], initialSoundOrder = {}, initialTag
       return { ...s, profiles }
     })
     setSounds(updated)
-    
+
     const updatedOrder = { ...soundOrder }
     if (!updatedOrder[profileId]) updatedOrder[profileId] = []
     if (!updatedOrder[profileId].includes(soundId)) {
@@ -124,7 +124,7 @@ export function useSounds(initialSounds = [], initialSoundOrder = {}, initialTag
       return { ...s, profiles: s.profiles.filter(pid => pid !== profileId) }
     })
     setSounds(updated)
-    
+
     const updatedOrder = { ...soundOrder }
     if (updatedOrder[profileId]) {
       updatedOrder[profileId] = updatedOrder[profileId].filter(id => id !== soundId)

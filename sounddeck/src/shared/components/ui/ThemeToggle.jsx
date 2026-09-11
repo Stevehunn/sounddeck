@@ -1,3 +1,4 @@
+// src/shared/components/ui/ThemeToggle.jsx
 import { useState, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
@@ -9,12 +10,11 @@ export default function ThemeToggle({ currentTheme, onThemeChange, lang = 'fr' }
   useEffect(() => {
     const savedAuto = localStorage.getItem('sounddeck-auto-theme') === 'true'
     setAutoTheme(savedAuto)
-    
+
     if (savedAuto) {
       applyAutoTheme()
     }
 
-    // Mettre à jour l'heure toutes les minutes
     const interval = setInterval(() => {
       const hour = new Date().getHours()
       setCurrentHour(hour)
@@ -32,12 +32,12 @@ export default function ThemeToggle({ currentTheme, onThemeChange, lang = 'fr' }
     const theme = isNight ? 'dark' : 'light'
     onThemeChange(theme)
   }
-  
+
   const toggleAutoTheme = () => {
     const newState = !autoTheme
     setAutoTheme(newState)
     localStorage.setItem('sounddeck-auto-theme', String(newState))
-    
+
     if (newState) {
       applyAutoTheme()
     }
@@ -76,7 +76,7 @@ export default function ThemeToggle({ currentTheme, onThemeChange, lang = 'fr' }
             padding: '0 6px',
             borderRadius: 10
           }}>
-            {isNight ? '🌙 Nuit' : '☀️ Jour'}
+            {isNight ? `🌙 ${t('themeNight')}` : `☀️ ${t('themeDay')}`}
           </span>
         )}
       </button>

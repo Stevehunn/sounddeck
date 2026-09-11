@@ -1,6 +1,5 @@
 // src/core/services/AudioService.js
 import { Howl } from 'howler'
-import { audioCache } from './AudioCache'
 import * as AudioMixerService from './AudioMixerService'
 
 const soundCache = {}
@@ -40,10 +39,6 @@ function notifyPlaybackListeners(id) {
 let manualOverrideId = null
 let manualProgress = { id: null, current: 0, duration: 0, ratio: 0 }
 
-/**
- * Utilisé par les lecteurs audio externes (séquenceur, etc.) pour signaler
- * qu'un son est en cours de lecture SANS passer par soundCache.
- */
 export function setCurrentPlayingSound(soundId) {
   manualOverrideId = soundId || null
   if (!soundId) {
@@ -52,9 +47,6 @@ export function setCurrentPlayingSound(soundId) {
   notifyPlaybackListeners(soundId || null)
 }
 
-/**
- * Met à jour la progression pour le son en cours dans l'override manuel.
- */
 export function setCurrentPlayingProgress(soundId, current, duration) {
   if (manualOverrideId !== soundId) return
   manualProgress = {
@@ -83,7 +75,7 @@ function buildFileUrl(filePath) {
 // ─── ANALYSE GAIN ──────────────────────────────────────────────────────────
 export async function analyzeGain(filePath, sampleCount = 200) {
   if (gainCache[filePath]) return gainCache[filePath]
-  
+
   try {
     const fileUrl = buildFileUrl(filePath)
     const audioContext = new (window.AudioContext || window.webkitAudioContext)()
@@ -91,21 +83,21 @@ export async function analyzeGain(filePath, sampleCount = 200) {
     const arrayBuffer = await response.arrayBuffer()
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
     await audioContext.close()
-    
+
     const channelData = audioBuffer.getChannelData(0)
     let sumSquares = 0
     const step = Math.max(1, Math.floor(channelData.length / sampleCount))
-    
+
     for (let i = 0; i < channelData.length; i += step) {
       sumSquares += channelData[i] * channelData[i]
     }
-    
+
     const rms = Math.sqrt(sumSquares / (channelData.length / step))
     const defaultTarget = 0.2
     const targetRMS = gainCache.targetRMS || defaultTarget
     const gain = rms > 0.001 ? targetRMS / rms : 1
     const gainDb = 20 * Math.log10(Math.min(gain, 20))
-    
+
     gainCache[filePath] = gainDb
     return gainDb
   } catch (e) {
@@ -129,14 +121,6 @@ function calculateFinalVolume(globalVolume, soundVolumeDb, gainDb = 0) {
   return Math.max(0.0001, finalVolume)
 }
 
-/**
- * ✅ Calcule le volume final à utiliser pour un son donné, de manière identique
- * au lecteur principal. Utilisé par les lecteurs externes (séquenceur, etc.)
- * 
- * @param {object} sound - Le son (avec .path, .volume/.volumeDb)
- * @param {number} globalVolume - Volume maître 0-100
- * @returns {number} Volume final entre 0.0001 et 1
- */
 export function getFinalVolumeForSound(sound, globalVolume = 80) {
   if (!sound) return 1
   const gainDb = gainCache[sound.path] || 0
@@ -159,7 +143,7 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
     if (Array.isArray(cached)) {
       cached.forEach(h => { try { h.stop(); h.unload() } catch(e){} })
     } else {
-      try { cached.stop(); cached.unload() } catch(e){} 
+      try { cached.stop(); cached.unload() } catch(e){}
     }
     delete soundCache[sound.id]
     return
@@ -172,19 +156,19 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
       html5: false,
       loop,
       format: [format],
-      onend: () => { 
+      onend: () => {
         if (!loop) {
-          delete soundCache[sound.id] 
+          delete soundCache[sound.id]
           if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
         }
       },
-      onstop: () => { 
+      onstop: () => {
         delete soundCache[sound.id]
         if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
       },
-      onloaderror: (id, err) => { 
+      onloaderror: (id, err) => {
         console.error('Erreur:', err)
-        delete soundCache[sound.id] 
+        delete soundCache[sound.id]
         if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
       }
     })
@@ -202,13 +186,13 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
       html5: true,
       loop,
       format: [format],
-      onend: () => { 
+      onend: () => {
         if (!loop) {
-          delete soundCache[sound.id] 
+          delete soundCache[sound.id]
           if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
         }
       },
-      onstop: () => { 
+      onstop: () => {
         delete soundCache[sound.id]
         if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
       },
@@ -263,26 +247,26 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
   const soundVolumeDb = sound.volumeDb ?? sound.volume ?? 0
   let soundRatio = Math.pow(10, soundVolumeDb / 20)
   soundRatio = Math.min(1, soundRatio)
-  
+
   const globalVol = globalVolume / 100
   const mixerVol = (storeRef?.mixerSoundVolume ?? 100) / 100
   const volumeRatio = soundRatio * globalVol * mixerVol
-  
+
   const fileUrl = buildFileUrl(sound.path)
-  
+
   if (soundCache[sound.id]) {
     stopSound(sound.id)
     return
   }
-  
-  const audioBuffer = await loadAudioBuffer(fileUrl)
+
+  const audioBuffer = await AudioMixerService.loadAudioBuffer(fileUrl)
   if (!audioBuffer) {
     console.warn('⚠️ Impossible de charger le son:', fileUrl)
     return
   }
-  
-  const source = playSoundInMixer(audioBuffer, volumeRatio)
-  
+
+  const source = AudioMixerService.playSoundInMixer(audioBuffer, volumeRatio)
+
   if (source) {
     soundCache[sound.id] = source
     if (loop) {
@@ -294,9 +278,9 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
       }
     }
   }
-  
+
   const shouldPlayLocally = playLocally || storeRef?.monitoringEnabled || false
-  
+
   if (shouldPlayLocally) {
     try {
       const localHowl = new Howl({
@@ -309,7 +293,7 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
           console.warn('⚠️ Erreur lecture locale:', err)
         }
       })
-      
+
       localHowl.once('play', () => {
         try {
           const audioNode = localHowl._sounds?.[0]?._node
@@ -319,16 +303,16 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
           }
         } catch (e) {}
       })
-      
+
       localHowl.play()
-      
+
       if (!Array.isArray(soundCache[sound.id])) {
         soundCache[sound.id] = [soundCache[sound.id]]
       }
       if (Array.isArray(soundCache[sound.id])) {
         soundCache[sound.id].push(localHowl)
       }
-      
+
     } catch (e) {
       console.warn('⚠️ Erreur lecture locale:', e)
     }
@@ -339,9 +323,9 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
 export function playSound(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
   if (!sound?.path) return
   notifyPlaybackListeners(sound.id)
-  
+
   const mixerEnabled = storeRef?.mixerEnabled || false
-  if (mixerEnabled && isMixerActive()) {
+  if (mixerEnabled && AudioMixerService.isMixerActive()) {
     playSoundWithMixer(sound, globalVolume, loop, playLocally)
   } else {
     playSoundNormal(sound, audioDevice, globalVolume, loop, playLocally)
@@ -375,7 +359,7 @@ export async function playSoundAsync(sound, audioDevice = 'default', globalVolum
     if (Array.isArray(cached)) {
       cached.forEach(h => { try { h.stop(); h.unload() } catch(e){} })
     } else {
-      try { cached.stop(); cached.unload() } catch(e){} 
+      try { cached.stop(); cached.unload() } catch(e){}
     }
     delete soundCache[sound.id]
     return
@@ -388,19 +372,19 @@ export async function playSoundAsync(sound, audioDevice = 'default', globalVolum
       html5: false,
       loop,
       format: [format],
-      onend: () => { 
+      onend: () => {
         if (!loop) {
-          delete soundCache[sound.id] 
+          delete soundCache[sound.id]
           if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
         }
       },
-      onstop: () => { 
+      onstop: () => {
         delete soundCache[sound.id]
         if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
       },
-      onloaderror: (id, err) => { 
+      onloaderror: (id, err) => {
         console.error('Erreur:', err)
-        delete soundCache[sound.id] 
+        delete soundCache[sound.id]
         if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
       }
     })
@@ -418,13 +402,13 @@ export async function playSoundAsync(sound, audioDevice = 'default', globalVolum
       html5: true,
       loop,
       format: [format],
-      onend: () => { 
+      onend: () => {
         if (!loop) {
-          delete soundCache[sound.id] 
+          delete soundCache[sound.id]
           if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
         }
       },
-      onstop: () => { 
+      onstop: () => {
         delete soundCache[sound.id]
         if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
       },
@@ -477,7 +461,7 @@ export async function playSoundAsync(sound, audioDevice = 'default', globalVolum
 export async function analyzeAllGains(sounds, onProgress) {
   const total = sounds.length
   let done = 0
-  
+
   for (const sound of sounds) {
     if (sound.path && !gainCache[sound.path]) {
       try {
@@ -490,7 +474,7 @@ export async function analyzeAllGains(sounds, onProgress) {
     done++
     if (onProgress) onProgress(done / total)
   }
-  
+
   return gainCache
 }
 
@@ -502,13 +486,35 @@ export function stopSound(soundId) {
     manualOverrideId = null
     manualProgress = { id: null, current: 0, duration: 0, ratio: 0 }
   }
-  
+
   const cached = soundCache[soundId]
   if (cached) {
     if (Array.isArray(cached)) {
-      cached.forEach(h => { try { h.stop(); h.unload() } catch(e){} })
+      cached.forEach(h => {
+        try {
+          if (h instanceof AudioBufferSourceNode || (h.stop && typeof h.stop === 'function')) {
+            h.stop()
+          }
+          if (h.disconnect && typeof h.disconnect === 'function') {
+            h.disconnect()
+          }
+          if (h.unload && typeof h.unload === 'function') {
+            h.unload()
+          }
+        } catch(e){}
+      })
     } else {
-      try { cached.stop(); cached.unload() } catch(e){} 
+      try {
+        if (cached instanceof AudioBufferSourceNode || (cached.stop && typeof cached.stop === 'function')) {
+          cached.stop()
+        }
+        if (cached.disconnect && typeof cached.disconnect === 'function') {
+          cached.disconnect()
+        }
+        if (cached.unload && typeof cached.unload === 'function') {
+          cached.unload()
+        }
+      } catch(e){}
     }
     delete soundCache[soundId]
   }
@@ -530,15 +536,15 @@ export function isPlaying(soundId) {
 
   const cached = soundCache[soundId]
   if (!cached) return false
-  
+
   if (Array.isArray(cached)) {
     return cached.some(h => h.playing && h.playing())
   }
-  
+
   if (cached.playing && typeof cached.playing === 'function') {
     return cached.playing()
   }
-  
+
   try {
     return !!cached
   } catch (e) {
@@ -558,7 +564,7 @@ export function getSoundProgress(soundId) {
 
   const cached = soundCache[soundId]
   if (!cached) return null
-  
+
   if (Array.isArray(cached)) {
     const howl = cached[0]
     if (!howl || !howl.playing || !howl.playing()) return null
@@ -568,7 +574,7 @@ export function getSoundProgress(soundId) {
     if (!duration || duration <= 0) return null
     return { current: seek, duration, ratio: Math.min(1, seek / duration) }
   }
-  
+
   if (cached.playing && typeof cached.playing === 'function') {
     if (!cached.playing()) return null
     const seek = cached.seek()
@@ -577,7 +583,7 @@ export function getSoundProgress(soundId) {
     if (!duration || duration <= 0) return null
     return { current: seek, duration, ratio: Math.min(1, seek / duration) }
   }
-  
+
   return null
 }
 

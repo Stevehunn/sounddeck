@@ -116,8 +116,6 @@ export default function YouTube({ store, addToast }) {
     // ✅ ÉCOUTER L'ÉVÉNEMENT DE FORCE RESET
     useEffect(() => {
         const handleForceReset = () => {
-            console.log('🔄 [YouTube] Force reset reçu - isTutorialMode:', isYoutubeTutorialActive())
-            
             // ✅ Reset complet incluant l'URL
             setUrl('')
             setVideoInfo(null)
@@ -161,7 +159,6 @@ export default function YouTube({ store, addToast }) {
     // ─── VÉRIFICATION DE yt-dlp ──────────────────────────────────────────────
     const checkYtdlp = useCallback(async () => {
         if (isTutorialMode()) {
-            console.log('🎬 [YouTube Tutorial] yt-dlp simulé comme disponible')
             globalYtdlpStatus = 'available'
             globalCheckDone = true
             setYtdlpStatus('available')
@@ -235,7 +232,6 @@ export default function YouTube({ store, addToast }) {
         forceUpdateListeners.push(listener)
 
         if (isTutorialMode()) {
-            console.log('🎬 [YouTube Tutorial] Initialisation avec données mock')
             const mockInfo = getMockVideoInfo()
             const tutorialState = getTutorialState()
             
@@ -389,7 +385,6 @@ export default function YouTube({ store, addToast }) {
             let result
             
             if (isTutorialMode()) {
-                console.log('🎬 [YouTube Tutorial] Mode tutoriel actif, utilisation des données mock')
                 result = await mockFetchVideoInfo()
                 setTutorialStep('trim')
             } else {
@@ -514,7 +509,6 @@ export default function YouTube({ store, addToast }) {
             let result
             
             if (isTutorialMode()) {
-                console.log('🎬 [YouTube Tutorial] Téléchargement simulé')
                 result = await mockDownloadAudio(
                     currentVideoInfo.url,
                     start,
@@ -646,7 +640,6 @@ export default function YouTube({ store, addToast }) {
 
         try {
             if (isTutorialMode()) {
-                console.log('🎬 [YouTube Tutorial] Sauvegarde simulée')
                 await mockSaveSound()
             } else {
                 let imageToSave = finalImage

@@ -1,38 +1,25 @@
 // electron/modules/ipcHandlers.js
-const { ipcMain, dialog, shell } = require('electron')
-const path = require('path')
-const fs = require('fs')
+const { ipcMain, shell } = require('electron')
 const https = require('https')
 const store = require('../store')
-
-console.log('🔧 [ipcHandlers] Fichier chargé')
-console.log(`🔧 [ipcHandlers] ipcMain existe: ${!!ipcMain}`)
-
 
 // ─── HANDLERS SYSTÈME ────────────────────────────────────────────────────────
 
 function registerSystemHandlers() {
-  console.log('🔧 [ipcHandlers] Début registerSystemHandlers')
-  console.log(`📌 ipcMain existe dans la fonction: ${!!ipcMain}`)
-  
   if (!ipcMain) {
     console.error('❌ [ipcHandlers] ipcMain est undefined !')
     return
   }
-  
-  console.log(`📌 Handlers avant: ${ipcMain.eventNames().join(', ')}`)
-  
+
   // Open external URL
   ipcMain.handle('open-external', (event, url) => {
     shell.openExternal(url)
   })
-  console.log('  ✅ open-external enregistré')
 
   // Quit app
   ipcMain.handle('quit-app', () => {
     return true
   })
-  console.log('  ✅ quit-app enregistré')
 
   // Hide window
   ipcMain.handle('hide-window', () => {
@@ -43,7 +30,6 @@ function registerSystemHandlers() {
     }
     return true
   })
-  console.log('  ✅ hide-window enregistré')
 
   // Show window
   ipcMain.handle('show-window', () => {
@@ -51,17 +37,14 @@ function registerSystemHandlers() {
     showMainWindow()
     return true
   })
-  console.log('  ✅ show-window enregistré')
 
   // Update tray language
   ipcMain.handle('update-tray-language', (event, lang) => {
-    console.log(`🌐 update-tray-language: ${lang}`)
     if (global.__updateTrayCallback) {
       global.__updateTrayCallback(lang)
     }
     return true
   })
-  console.log('  ✅ update-tray-language enregistré')
 
   // Get system language
   ipcMain.handle('get-system-language', () => {
@@ -76,7 +59,6 @@ function registerSystemHandlers() {
       return 'fr'
     }
   })
-  console.log('  ✅ get-system-language enregistré')
 
   // Get system keyboard layout
   ipcMain.handle('get-system-keyboard-layout', () => {
@@ -92,7 +74,7 @@ function registerSystemHandlers() {
             return 'azerty'
           }
         } catch (e) {}
-        
+
         try {
           const locale = require('electron').app.getLocale()
           const azertyLocales = ['fr', 'fr-FR', 'fr-BE', 'fr-CH']
@@ -100,7 +82,7 @@ function registerSystemHandlers() {
             return 'azerty'
           }
         } catch (e) {}
-        
+
         return 'qwerty'
       } catch (e) {
         console.warn('⚠️ Erreur détection clavier:', e)
@@ -109,14 +91,10 @@ function registerSystemHandlers() {
     }
     return 'qwerty'
   })
-  console.log('  ✅ get-system-keyboard-layout enregistré')
 
   // ─── HANDLER MYINSTANTS ──────────────────────────────────────────────────
-  // ✅ NE PAS ENREGISTRER SI DÉJÀ PRÉSENT
   if (!ipcMain.eventNames().includes('fetch-myinstants')) {
     ipcMain.handle('fetch-myinstants', async (event, query, mode = 'search', lang = 'fr') => {
-      console.log(`🔍 fetch-myinstants: query="${query}", mode="${mode}", lang="${lang}"`)
-      
       try {
         const { LANGUAGES } = require('../i18n')
         const langData = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0]
@@ -130,11 +108,10 @@ function registerSystemHandlers() {
 
         const fetchPage = (url) => {
           return new Promise((resolve) => {
-            // ✅ TIMEOUT POUR LA RÉCUPÉRATION DE LA PAGE
             const timeout = setTimeout(() => {
               resolve({ ok: false, error: 'Timeout', html: '' })
-            }, 15000) // 15 secondes max
-            
+            }, 15000)
+
             https.get(url, {
               headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
@@ -274,7 +251,6 @@ function registerSystemHandlers() {
           return { success: false, error: 'Aucun son trouvé', sounds: [] }
         }
 
-        // Résoudre les URLs
         const needsResolve = sounds.filter(s => !s.url && s.slug)
         if (needsResolve.length > 0) {
           const toResolve = needsResolve.slice(0, 20)
@@ -303,7 +279,6 @@ function registerSystemHandlers() {
 
         sounds = sounds.filter(s => s.url)
 
-        console.log(`✅ fetch-myinstants: ${sounds.length} sons trouvés`)
         return { success: true, sounds }
 
       } catch (e) {
@@ -311,32 +286,21 @@ function registerSystemHandlers() {
         return { success: false, error: e.message, sounds: [] }
       }
     })
-    console.log('  ✅ fetch-myinstants enregistré')
-  } else {
-    console.log('  ⏭️ fetch-myinstants déjà enregistré')
   }
-
-  console.log(`📌 Handlers après: ${ipcMain.eventNames().join(', ')}`)
-  console.log('✅ [ipcHandlers] Tous les handlers système enregistrés')
 }
 
 // ─── HANDLERS CONFIRMATION ──────────────────────────────────────────────────
 
 function registerConfirmHandlers(windowManager) {
-  console.log('🔧 [ipcHandlers] Début registerConfirmHandlers')
-  
   if (!ipcMain) {
     console.error('❌ [ipcHandlers] ipcMain est undefined !')
     return
   }
-  
-  ipcMain.handle('confirm-quit', (event, action, remember) => {
-    console.log('🔍 confirm-quit appelé avec:', { action, remember })
 
+  ipcMain.handle('confirm-quit', (event, action, remember) => {
     if (action === 'quit') {
       if (remember) {
         store.set('closeToTray', false)
-        console.log('💾 closeToTray sauvegardé:', false)
       }
       windowManager.setQuitting(true)
       windowManager.setPendingQuit(true)
@@ -345,14 +309,12 @@ function registerConfirmHandlers(windowManager) {
     } else if (action === 'minimize') {
       if (remember) {
         store.set('closeToTray', true)
-        console.log('💾 closeToTray sauvegardé:', true)
       }
-      
+
       const mainWindow = windowManager.getMainWindow()
       if (mainWindow) {
         mainWindow.webContents.send('hide-quit-confirm')
         setTimeout(() => {
-          console.log('🔴 [MAIN] Minimisation de la fenêtre après délai')
           mainWindow.hide()
         }, 500)
       }
@@ -361,23 +323,16 @@ function registerConfirmHandlers(windowManager) {
       return 'cancel'
     }
   })
-  
-  console.log('✅ [ipcHandlers] confirm-quit enregistré')
 }
 
 // ─── REGISTRE POUR LE CALLBACK DE MISE À JOUR DU TRAY ─────────────────────
 
 function registerTrayUpdateHandler(callback) {
   global.__updateTrayCallback = callback
-  console.log('🔧 [ipcHandlers] Handler de mise à jour du tray enregistré')
 }
-
-// ─── EXPORT ──────────────────────────────────────────────────────────────────
 
 module.exports = {
   registerSystemHandlers,
   registerConfirmHandlers,
   registerTrayUpdateHandler,
 }
-
-console.log('✅ [ipcHandlers] Module exporté avec succès')

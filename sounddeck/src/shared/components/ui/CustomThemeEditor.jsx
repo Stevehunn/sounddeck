@@ -1,5 +1,6 @@
 // src/shared/components/ui/CustomThemeEditor.jsx
 import { useState, useEffect } from 'react'
+import { useLanguage } from '@core/i18n/LanguageContext'
 
 const DEFAULTS = {
   bgPrimary:    '#111113',
@@ -19,9 +20,9 @@ const DEFAULTS = {
 }
 
 const PRESETS = [
-  { name: 'Violet (défaut)', colors: { ...DEFAULTS } },
+  { nameKey: 'themePresetDefault', colors: { ...DEFAULTS } },
   {
-    name: 'Minuit Bleu',
+    nameKey: 'themePresetMidnightBlue',
     colors: {
       bgPrimary: '#0d1117', bgSecondary: '#161b22', bgTertiary: '#21262d',
       bgHover: '#30363d', border: '#30363d',
@@ -31,7 +32,7 @@ const PRESETS = [
     }
   },
   {
-    name: 'Forêt',
+    nameKey: 'themePresetForest',
     colors: {
       bgPrimary: '#0d1210', bgSecondary: '#131a14', bgTertiary: '#1c2a1e',
       bgHover: '#243328', border: '#2a3d2d',
@@ -41,7 +42,7 @@ const PRESETS = [
     }
   },
   {
-    name: 'Braise',
+    nameKey: 'themePresetEmber',
     colors: {
       bgPrimary: '#130d0d', bgSecondary: '#1c1212', bgTertiary: '#2a1818',
       bgHover: '#331e1e', border: '#3d2424',
@@ -51,7 +52,7 @@ const PRESETS = [
     }
   },
   {
-    name: 'Clair Pastel',
+    nameKey: 'themePresetPastelLight',
     colors: {
       bgPrimary: '#fafafa', bgSecondary: '#f4f4f8', bgTertiary: '#e8e8f0',
       bgHover: '#e0e0ea', border: '#d8d8e4',
@@ -63,30 +64,33 @@ const PRESETS = [
 ]
 
 const COLOR_FIELDS = [
-  { key: 'bgPrimary',     label: 'Fond principal',     group: 'Arrière-plans' },
-  { key: 'bgSecondary',   label: 'Fond secondaire',    group: 'Arrière-plans' },
-  { key: 'bgTertiary',    label: 'Fond tertiaire',     group: 'Arrière-plans' },
-  { key: 'bgHover',       label: 'Fond survol',        group: 'Arrière-plans' },
-  { key: 'border',        label: 'Bordures',           group: 'Arrière-plans' },
-  { key: 'textPrimary',   label: 'Texte principal',    group: 'Textes' },
-  { key: 'textSecondary', label: 'Texte secondaire',   group: 'Textes' },
-  { key: 'textTertiary',  label: 'Texte discret',      group: 'Textes' },
-  { key: 'accent',        label: 'Couleur principale', group: 'Accents' },
-  { key: 'accentLight',   label: 'Accent clair',       group: 'Accents' },
-  { key: 'accentHover',   label: 'Accent survol',      group: 'Accents' },
-  { key: 'success',       label: 'Succès (vert)',      group: 'États' },
-  { key: 'warning',       label: 'Avertissement',      group: 'États' },
-  { key: 'danger',        label: 'Danger (rouge)',     group: 'États' },
+  { key: 'bgPrimary',     labelKey: 'themeFieldBgPrimary',     group: 'bg' },
+  { key: 'bgSecondary',   labelKey: 'themeFieldBgSecondary',   group: 'bg' },
+  { key: 'bgTertiary',    labelKey: 'themeFieldBgTertiary',    group: 'bg' },
+  { key: 'bgHover',       labelKey: 'themeFieldBgHover',       group: 'bg' },
+  { key: 'border',        labelKey: 'themeFieldBorder',        group: 'bg' },
+  { key: 'textPrimary',   labelKey: 'themeFieldTextPrimary',   group: 'text' },
+  { key: 'textSecondary', labelKey: 'themeFieldTextSecondary', group: 'text' },
+  { key: 'textTertiary',  labelKey: 'themeFieldTextTertiary',  group: 'text' },
+  { key: 'accent',        labelKey: 'themeFieldAccent',        group: 'accent' },
+  { key: 'accentLight',   labelKey: 'themeFieldAccentLight',   group: 'accent' },
+  { key: 'accentHover',   labelKey: 'themeFieldAccentHover',   group: 'accent' },
+  { key: 'success',       labelKey: 'themeFieldSuccess',       group: 'state' },
+  { key: 'warning',       labelKey: 'themeFieldWarning',       group: 'state' },
+  { key: 'danger',        labelKey: 'themeFieldDanger',        group: 'state' },
 ]
 
-const GROUPS = ['Arrière-plans', 'Textes', 'Accents', 'États']
+const GROUPS = [
+  { id: 'bg',     labelKey: 'themeGroupBg' },
+  { id: 'text',   labelKey: 'themeGroupText' },
+  { id: 'accent', labelKey: 'themeGroupAccent' },
+  { id: 'state',  labelKey: 'themeGroupState' },
+]
 
-// ✅ Helper pour convertir une clé camelCase en variable CSS
 const keyToCssVar = (key) => {
   return '--' + key.replace(/([A-Z])/g, '-$1').toLowerCase()
 }
 
-// ✅ Nettoie TOUTES les variables custom du :root
 const cleanupInlineStyles = () => {
   COLOR_FIELDS.forEach(f => {
     document.documentElement.style.removeProperty(keyToCssVar(f.key))
@@ -94,16 +98,15 @@ const cleanupInlineStyles = () => {
 }
 
 export default function CustomThemeEditor({ current, onSave }) {
+  const { t } = useLanguage()
   const [colors, setColors] = useState(current || DEFAULTS)
-  const [activeGroup, setActiveGroup] = useState('Accents')
+  const [activeGroup, setActiveGroup] = useState('accent')
   const [changed, setChanged] = useState(false)
 
   useEffect(() => {
     if (current) setColors(current)
   }, [])
 
-  // ✅ CLEANUP : retire les styles inline quand le composant est démonté
-  // (c'est-à-dire quand l'utilisateur change de thème)
   useEffect(() => {
     return () => {
       cleanupInlineStyles()
@@ -114,7 +117,6 @@ export default function CustomThemeEditor({ current, onSave }) {
     const updated = { ...colors, [key]: value }
     setColors(updated)
     setChanged(true)
-    // Aperçu en temps réel : on applique directement sur :root
     document.documentElement.style.setProperty(keyToCssVar(key), value)
   }
 
@@ -126,8 +128,6 @@ export default function CustomThemeEditor({ current, onSave }) {
   const handleSave = () => {
     onSave(colors)
     setChanged(false)
-    // ✅ Nettoyer les styles inline APRÈS avoir sauvegardé
-    // (le thème custom s'appliquera via App.jsx)
     cleanupInlineStyles()
   }
 
@@ -149,18 +149,18 @@ export default function CustomThemeEditor({ current, onSave }) {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between'
       }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <i className="ti ti-palette" /> Éditeur de thème personnalisé
+          <i className="ti ti-palette" /> {t('themeEditorTitle')}
         </span>
         <div style={{ display: 'flex', gap: 6 }}>
           <button className="btn-ghost" onClick={handleReset} style={{ fontSize: 12, padding: '3px 8px' }}>
-            <i className="ti ti-refresh" /> Réinitialiser
+            <i className="ti ti-refresh" /> {t('themeEditorReset')}
           </button>
           <button
             className="btn-primary"
             onClick={handleSave}
             disabled={!changed}
             style={{ fontSize: 12, padding: '4px 12px', opacity: changed ? 1 : 0.5 }}>
-            <i className="ti ti-check" /> Appliquer
+            <i className="ti ti-check" /> {t('themeEditorApply')}
           </button>
         </div>
       </div>
@@ -168,11 +168,11 @@ export default function CustomThemeEditor({ current, onSave }) {
       <div style={{ padding: '14px' }}>
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Palettes prédéfinies
+            {t('themeEditorPresets')}
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {PRESETS.map(preset => (
-              <button key={preset.name} onClick={() => applyPreset(preset)}
+              <button key={preset.nameKey} onClick={() => applyPreset(preset)}
                 style={{
                   padding: '5px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
                   border: '1px solid var(--border)', background: 'var(--bg-tertiary)',
@@ -186,7 +186,7 @@ export default function CustomThemeEditor({ current, onSave }) {
                     <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: c, border: '1px solid rgba(255,255,255,0.1)' }} />
                   ))}
                 </div>
-                {preset.name}
+                {t(preset.nameKey)}
               </button>
             ))}
           </div>
@@ -194,26 +194,26 @@ export default function CustomThemeEditor({ current, onSave }) {
 
         <div style={{ display: 'flex', gap: 4, marginBottom: 12, background: 'var(--bg-tertiary)', borderRadius: 8, padding: 4 }}>
           {GROUPS.map(group => (
-            <button key={group} onClick={() => setActiveGroup(group)}
+            <button key={group.id} onClick={() => setActiveGroup(group.id)}
               style={{
                 flex: 1, padding: '5px 0', borderRadius: 6, border: 'none',
-                background: activeGroup === group ? 'var(--bg-secondary)' : 'transparent',
-                color: activeGroup === group ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                fontSize: 11, cursor: 'pointer', fontWeight: activeGroup === group ? 500 : 400
+                background: activeGroup === group.id ? 'var(--bg-secondary)' : 'transparent',
+                color: activeGroup === group.id ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                fontSize: 11, cursor: 'pointer', fontWeight: activeGroup === group.id ? 500 : 400
               }}>
-              {group}
+              {t(group.labelKey)}
             </button>
           ))}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          {fieldsInGroup.map(({ key, label }) => (
+          {fieldsInGroup.map(({ key, labelKey }) => (
             <div key={key} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '7px 10px', background: 'var(--bg-secondary)',
               border: '1px solid var(--border)', borderRadius: 'var(--radius-md)'
             }}>
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{label}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t(labelKey)}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'monospace' }}>
                   {colors[key]}
@@ -243,7 +243,7 @@ export default function CustomThemeEditor({ current, onSave }) {
 
         <div style={{ marginTop: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Aperçu
+            {t('themeEditorPreview')}
           </div>
           <div style={{
             padding: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)',
@@ -262,11 +262,11 @@ export default function CustomThemeEditor({ current, onSave }) {
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: colors.textPrimary, marginBottom: 4 }}>SoundDeck</div>
-              <div style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 6 }}>Aperçu du thème</div>
+              <div style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 6 }}>{t('themeEditorPreviewSub')}</div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <div style={{ padding: '3px 8px', borderRadius: 4, background: colors.accent, color: 'white', fontSize: 10 }}>Primaire</div>
-                <div style={{ padding: '3px 8px', borderRadius: 4, background: colors.success, color: 'white', fontSize: 10 }}>Succès</div>
-                <div style={{ padding: '3px 8px', borderRadius: 4, background: colors.danger, color: 'white', fontSize: 10 }}>Danger</div>
+                <div style={{ padding: '3px 8px', borderRadius: 4, background: colors.accent, color: 'white', fontSize: 10 }}>{t('themeEditorPrimary')}</div>
+                <div style={{ padding: '3px 8px', borderRadius: 4, background: colors.success, color: 'white', fontSize: 10 }}>{t('themeEditorSuccess')}</div>
+                <div style={{ padding: '3px 8px', borderRadius: 4, background: colors.danger, color: 'white', fontSize: 10 }}>{t('themeEditorDanger')}</div>
               </div>
             </div>
           </div>

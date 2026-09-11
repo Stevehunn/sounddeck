@@ -14,12 +14,11 @@ export function useMixer(save) {
   const updateMixerEnabled = useCallback(async (enabled) => {
     setMixerEnabled(enabled)
     await save('mixerEnabled', enabled)
-    
+
     if (enabled) {
       try {
         const { initAudioMixer, resumeAudioContext, setStoreRef } = await import('@core/services/AudioMixerService')
-        
-        // Récupérer les autres états depuis le store via un callback ou context
+
         const store = {
           playLocally: true,
           monitoringEnabled: monitoringEnabled,
@@ -28,10 +27,10 @@ export function useMixer(save) {
           localAudioDevice: 'default',
           mixerEnabled: true
         }
-        
+
         setStoreRef(store)
         const mixedStream = await initAudioMixer(microphoneDevice || 'default', 'default')
-        
+
         if (mixedStream) {
           resumeAudioContext()
           return { success: true, message: 'mixerActivated' }
@@ -55,8 +54,17 @@ export function useMixer(save) {
 
   const initMixerOnStartup = useCallback(async () => {
     try {
-      const { getMixerFullState, isMixerActive, stopMixer, initAudioMixer, resumeAudioContext, connectMixerToOutput, setNoiseSuppressionMode, setStoreRef } = await import('@core/services/AudioMixerService')
-      
+      const {
+        getMixerFullState,
+        isMixerActive,
+        stopMixer,
+        initAudioMixer,
+        resumeAudioContext,
+        connectMixerToOutput,
+        setNoiseSuppressionMode,
+        setStoreRef
+      } = await import('@core/services/AudioMixerService')
+
       const store = {
         playLocally: true,
         monitoringEnabled: monitoringEnabled,
@@ -65,23 +73,23 @@ export function useMixer(save) {
         localAudioDevice: 'default',
         mixerEnabled: mixerEnabled
       }
-      
+
       setStoreRef(store)
       const fullState = getMixerFullState()
       const isActive = isMixerActive()
-      
+
       if (!mixerEnabled && isActive) {
         await stopMixer()
         return true
       }
-      
+
       if (mixerEnabled && !isActive) {
         const mixedStream = await initAudioMixer(microphoneDevice || 'default', 'default')
-        
+
         if (mixedStream) {
           resumeAudioContext()
           connectMixerToOutput('default')
-          
+
           if (noiseSuppressionMode && noiseSuppressionMode !== 'off') {
             try { setNoiseSuppressionMode(noiseSuppressionMode) } catch (e) {}
           }
@@ -150,7 +158,7 @@ export function useMixer(save) {
     const newState = !monitoringEnabled
     setMonitoringEnabled(newState)
     await save('monitoringEnabled', newState)
-    
+
     try {
       const { setMonitoring } = await import('@core/services/AudioMixerService')
       setMonitoring(newState)

@@ -6,10 +6,7 @@ const fs = require('fs')
 const store = require('../store')
 
 function registerStoreHandlers() {
-  console.log('🔧 [storeHandlers] Enregistrement des handlers...')
-  
   ipcMain.handle('store-get', (event, key) => {
-    console.log(`📥 store-get: ${key}`)
     return store.get(key)
   })
 
@@ -19,13 +16,11 @@ function registerStoreHandlers() {
   })
 
   ipcMain.handle('store-delete', (event, key) => {
-    console.log(`🗑️ store-delete: ${key}`)
     store.delete(key)
     return true
   })
 
   ipcMain.handle('store-set-lang', (event, lang) => {
-    console.log(`🌐 store-set-lang: ${lang}`)
     store.set('lang', lang)
     return true
   })
@@ -56,11 +51,11 @@ function registerStoreHandlers() {
     const { app } = require('electron')
     const PLUGINS_DIR = path.join(app.getPath('userData'), 'plugins')
     const plugins = []
-    
+
     if (!fs.existsSync(PLUGINS_DIR)) return plugins
-    
+
     const folders = fs.readdirSync(PLUGINS_DIR)
-    
+
     for (const folder of folders) {
       const manifestPath = path.join(PLUGINS_DIR, folder, 'plugin.json')
       if (fs.existsSync(manifestPath)) {
@@ -76,7 +71,7 @@ function registerStoreHandlers() {
         }
       }
     }
-    
+
     return plugins
   })
 
@@ -100,34 +95,34 @@ function registerStoreHandlers() {
     const { app } = require('electron')
     const AdmZip = require('adm-zip')
     const PLUGINS_DIR = path.join(app.getPath('userData'), 'plugins')
-    
+
     if (!fs.existsSync(PLUGINS_DIR)) {
       fs.mkdirSync(PLUGINS_DIR, { recursive: true })
     }
-    
+
     try {
       const zip = new AdmZip(Buffer.from(buffer))
       const manifestEntry = zip.getEntry('plugin.json')
-      
+
       if (!manifestEntry) {
         return { success: false, error: 'plugin.json manquant dans l\'archive' }
       }
-      
+
       const manifest = JSON.parse(manifestEntry.getData().toString('utf-8'))
-      
+
       if (!manifest.id) {
         return { success: false, error: 'id manquant dans plugin.json' }
       }
-      
+
       const pluginId = manifest.id.replace(/[^a-zA-Z0-9_-]/g, '')
       const pluginDir = path.join(PLUGINS_DIR, pluginId)
-      
+
       if (fs.existsSync(pluginDir)) {
         fs.rmSync(pluginDir, { recursive: true, force: true })
       }
-      
+
       zip.extractAllTo(pluginDir, true)
-      
+
       return {
         success: true,
         id: pluginId,
@@ -152,11 +147,9 @@ function registerStoreHandlers() {
     }
     return { success: false, error: 'Plugin non trouvé' }
   })
-
-  console.log('✅ Store handlers enregistrés')
 }
 
 module.exports = {
   registerStoreHandlers,
-  store,  // ✅ On ré-exporte pour compatibilité avec main.js
+  store,
 }

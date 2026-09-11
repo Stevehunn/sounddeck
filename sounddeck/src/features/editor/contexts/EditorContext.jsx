@@ -541,10 +541,8 @@ export function EditorProvider({ children, store, addToast }) {
 
   // ✅ startPlaybackLoop - VERSION CORRIGÉE POUR BOUCLE GÉNÉRALE
   const startPlaybackLoop = useCallback(() => {
-    console.log('[LOOP-FIX] 🔄 startPlaybackLoop() appelée')
     
     if (animationRef.current) {
-      console.log('[LOOP-FIX] 🛑 Arrêt de l\'ancienne animation')
       cancelAnimationFrame(animationRef.current)
       animationRef.current = null
     }

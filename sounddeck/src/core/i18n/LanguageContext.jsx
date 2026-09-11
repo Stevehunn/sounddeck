@@ -1,58 +1,52 @@
 // src/core/i18n/LanguageContext.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 
-// ✅ Importer les traductions de l'application (nouvelle architecture modulaire)
+// Traductions de l'application (nouvelle architecture modulaire)
 import frTranslations from './locales/fr/index.js'
 import enTranslations from './locales/en/index.js'
 import esTranslations from './locales/es/index.js'
 
-// ✅ Importer les traductions des plugins (depuis leurs dossiers respectifs)
-import myinstantsFr from '../../plugins/myinstants/i18n.js'
-import myinstantsEn from '../../plugins/myinstants/i18n.js'
-import myinstantsEs from '../../plugins/myinstants/i18n.js'
-import youtubeFr from '../../plugins/youtube/i18n.js'
-import youtubeEn from '../../plugins/youtube/i18n.js'
-import youtubeEs from '../../plugins/youtube/i18n.js'
+// Traductions des plugins (fichiers uniques qui contiennent toutes les langues)
+import myinstantsI18n from '../../plugins/myinstants/i18n.js'
+import youtubeI18n from '../../plugins/youtube/i18n.js'
 
-// ✅ Langues supportées
+// Langues supportées
 export const LANGUAGES = [
   { code: 'fr', label: 'Français', flag: '🇫🇷' },
   { code: 'en', label: 'English', flag: '🇬🇧' },
   { code: 'es', label: 'Español', flag: '🇪🇸' },
 ]
 
-// ✅ Traductions de base (application)
+// Traductions de base (application)
 const APP_TRANSLATIONS = {
   fr: frTranslations,
   en: enTranslations,
   es: esTranslations,
 }
 
-// ✅ Traductions des plugins par langue
-// Fonction utilitaire pour extraire les traductions d'un plugin
+// Extrait les traductions d'un plugin pour une langue
 const getPluginTranslations = (pluginModule, lang) => {
   if (!pluginModule) return {}
-  // Le module peut exporter default ou directement l'objet
   const translations = pluginModule.default || pluginModule
   return translations[lang] || {}
 }
 
 const PLUGIN_TRANSLATIONS = {
   fr: {
-    ...getPluginTranslations(myinstantsFr, 'fr'),
-    ...getPluginTranslations(youtubeFr, 'fr'),
+    ...getPluginTranslations(myinstantsI18n, 'fr'),
+    ...getPluginTranslations(youtubeI18n, 'fr'),
   },
   en: {
-    ...getPluginTranslations(myinstantsEn, 'en'),
-    ...getPluginTranslations(youtubeEn, 'en'),
+    ...getPluginTranslations(myinstantsI18n, 'en'),
+    ...getPluginTranslations(youtubeI18n, 'en'),
   },
   es: {
-    ...getPluginTranslations(myinstantsEs, 'es'),
-    ...getPluginTranslations(youtubeEs, 'es'),
+    ...getPluginTranslations(myinstantsI18n, 'es'),
+    ...getPluginTranslations(youtubeI18n, 'es'),
   },
 }
 
-// ✅ Fusionner toutes les traductions
+// Fusionner toutes les traductions
 const MERGED_TRANSLATIONS = {}
 
 for (const lang of Object.keys(APP_TRANSLATIONS)) {
@@ -62,14 +56,12 @@ for (const lang of Object.keys(APP_TRANSLATIONS)) {
   }
 }
 
-// Pour les langues qui n'existent que dans les plugins
 for (const lang of Object.keys(PLUGIN_TRANSLATIONS)) {
   if (!MERGED_TRANSLATIONS[lang]) {
     MERGED_TRANSLATIONS[lang] = { ...PLUGIN_TRANSLATIONS[lang] }
   }
 }
 
-// ✅ Garder TRANSLATIONS pour rétrocompatibilité
 export const TRANSLATIONS = MERGED_TRANSLATIONS
 
 const LanguageContext = createContext(null)
@@ -103,10 +95,10 @@ export function LanguageProvider({ children }) {
 
   const changeLanguage = useCallback(async (lang) => {
     if (!MERGED_TRANSLATIONS[lang] || lang === currentLang) return
-    
+
     setCurrentLang(lang)
     setVersion(prev => prev + 1)
-    
+
     try {
       await window.electronAPI?.storeSet?.('lang', lang)
       await window.electronAPI?.updateTrayLanguage?.(lang)
@@ -123,14 +115,14 @@ export function LanguageProvider({ children }) {
       value = value?.[k]
       if (!value) break
     }
-    
+
     if (typeof value === 'string' && args.length > 0) {
       return value.replace(/\{(\d+)\}/g, (_, index) => {
         const arg = args[parseInt(index)]
         return arg !== undefined ? arg : `{${index}}`
       })
     }
-    
+
     return value || key
   }, [currentLang])
 

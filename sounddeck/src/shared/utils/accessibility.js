@@ -1,8 +1,5 @@
-/**
- * Génère des ARIA labels pour les composants SoundDeck
- */
+// src/shared/utils/accessibility.js
 
-// Rôles ARIA personnalisés
 export const ROLES = {
   SOUND_CARD: 'button',
   SOUND_GRID: 'grid',
@@ -19,59 +16,47 @@ export const ROLES = {
   TABPANEL: 'tabpanel'
 }
 
-/**
- * Génère les attributs ARIA pour une carte son
- */
-export function getSoundCardAria(sound, isPlaying, shortcut) {
+const defaultT = (key, fallback) => fallback || key
+
+export function getSoundCardAria(sound, isPlaying, shortcut, t = defaultT) {
+  const shortcutLabel = shortcut ? `, ${t('a11yShortcut', 'raccourci')} ${shortcut}` : ''
   return {
     role: ROLES.SOUND_CARD,
-    'aria-label': `Son: ${sound.name}${shortcut ? `, raccourci ${shortcut}` : ''}`,
+    'aria-label': `${t('a11ySound', 'Son')}: ${sound.name}${shortcutLabel}`,
     'aria-pressed': isPlaying ? 'true' : 'false',
     'aria-describedby': `sound-desc-${sound.id}`,
     tabIndex: 0
   }
 }
 
-/**
- * Génère les attributs ARIA pour une grille de sons
- */
-export function getSoundGridAria(totalItems) {
+export function getSoundGridAria(totalItems, t = defaultT) {
   return {
     role: ROLES.SOUND_GRID,
-    'aria-label': 'Grille des sons',
+    'aria-label': t('a11ySoundGrid', 'Grille des sons'),
     'aria-rowcount': totalItems,
     'aria-colcount': Math.min(totalItems, 6)
   }
 }
 
-/**
- * Génère les attributs ARIA pour la sidebar
- */
-export function getSidebarAria() {
+export function getSidebarAria(t = defaultT) {
   return {
     role: ROLES.SIDEBAR,
-    'aria-label': 'Navigation principale',
+    'aria-label': t('a11yMainNav', 'Navigation principale'),
     'aria-controls': 'main-content'
   }
 }
 
-/**
- * Génère les attributs ARIA pour une barre de recherche
- */
-export function getSearchAria(placeholder) {
+export function getSearchAria(placeholder, t = defaultT) {
   return {
     role: ROLES.SEARCH,
-    'aria-label': placeholder || 'Rechercher des sons',
+    'aria-label': placeholder || t('a11ySearch', 'Rechercher des sons'),
     'aria-autocomplete': 'list',
     'aria-haspopup': 'listbox',
     autoComplete: 'off'
   }
 }
 
-/**
- * Génère les attributs ARIA pour un modal
- */
-export function getModalAria(title) {
+export function getModalAria(title, t = defaultT) {
   return {
     role: ROLES.DIALOG,
     'aria-modal': 'true',
@@ -80,22 +65,16 @@ export function getModalAria(title) {
   }
 }
 
-/**
- * Génère les attributs ARIA pour une barre de progression
- */
-export function getProgressAria(value, max = 100) {
+export function getProgressAria(value, max = 100, t = defaultT) {
   return {
     role: ROLES.PROGRESS,
     'aria-valuenow': value,
     'aria-valuemin': 0,
     'aria-valuemax': max,
-    'aria-label': 'Progression audio'
+    'aria-label': t('a11yAudioProgress', 'Progression audio')
   }
 }
 
-/**
- * Génère les attributs ARIA pour un toggle
- */
 export function getToggleAria(label, isActive) {
   return {
     role: 'switch',
@@ -104,9 +83,6 @@ export function getToggleAria(label, isActive) {
   }
 }
 
-/**
- * Génère les attributs ARIA pour un onglet
- */
 export function getTabAria(label, isSelected, controlsId) {
   return {
     role: ROLES.TAB,
@@ -117,19 +93,13 @@ export function getTabAria(label, isSelected, controlsId) {
   }
 }
 
-/**
- * Génère les attributs ARIA pour une liste d'onglets
- */
-export function getTabListAria() {
+export function getTabListAria(t = defaultT) {
   return {
     role: ROLES.TABLIST,
-    'aria-label': 'Navigation par onglets'
+    'aria-label': t('a11yTabs', 'Navigation par onglets')
   }
 }
 
-/**
- * Génère les attributs ARIA pour un panneau d'onglet
- */
 export function getTabPanelAria(id, label) {
   return {
     role: ROLES.TABPANEL,
@@ -138,29 +108,26 @@ export function getTabPanelAria(id, label) {
   }
 }
 
-/**
- * Génère des descriptions pour les lecteurs d'écran
- */
 export const DESCRIPTIONS = {
-  soundCard: (name, playCount) => 
-    `${name}, ${playCount || 0} lectures. Cliquez pour jouer, clic droit pour le menu.`,
-  
-  volumeSlider: (value) => 
-    `Volume à ${value}%. Utilisez les flèches haut/bas pour ajuster.`,
-  
-  shortcutRecorder: (shortcut) => 
-    shortcut 
-      ? `Raccourci: ${shortcut}. Cliquez pour modifier.` 
-      : 'Aucun raccourci. Cliquez pour enregistrer un nouveau raccourci.',
-  
-  searchBox: (count) => 
-    `Recherche de sons. ${count} résultats.`,
-  
-  profileSelector: (name, count) => 
-    `Profil: ${name}, ${count} sons.`,
-  
-  playlistItem: (name, index, total) => 
-    `Son ${index+1} sur ${total}: ${name}.`
+  soundCard: (name, playCount, t = defaultT) =>
+    `${name}, ${playCount || 0} ${t('a11yPlays', 'lectures')}. ${t('a11yClickToPlay', 'Cliquez pour jouer, clic droit pour le menu.')}`,
+
+  volumeSlider: (value, t = defaultT) =>
+    `${t('a11yVolumeAt', 'Volume à')} ${value}%. ${t('a11yVolumeHint', 'Utilisez les flèches haut/bas pour ajuster.')}`,
+
+  shortcutRecorder: (shortcut, t = defaultT) =>
+    shortcut
+      ? `${t('a11yShortcut', 'Raccourci')}: ${shortcut}. ${t('a11yClickToEdit', 'Cliquez pour modifier.')}`
+      : t('a11yNoShortcut', 'Aucun raccourci. Cliquez pour enregistrer un nouveau raccourci.'),
+
+  searchBox: (count, t = defaultT) =>
+    `${t('a11ySearchSounds', 'Recherche de sons.')} ${count} ${t('a11yResults', 'résultats.')}`,
+
+  profileSelector: (name, count, t = defaultT) =>
+    `${t('a11yProfile', 'Profil')}: ${name}, ${count} ${t('a11ySounds', 'sons.')}`,
+
+  playlistItem: (name, index, total, t = defaultT) =>
+    `${t('a11ySoundOf', 'Son')} ${index+1} ${t('a11yOf', 'sur')} ${total}: ${name}.`
 }
 
 export default {

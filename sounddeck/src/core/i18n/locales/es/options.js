@@ -336,6 +336,11 @@ export default {
   themeFieldSuccess: 'Éxito (verde)',
   themeFieldWarning: 'Advertencia',
   themeFieldDanger: 'Peligro (rojo)',
+  themePresetDefault: 'Violeta (por defecto)',
+  themePresetMidnightBlue: 'Medianoche Azul',
+  themePresetForest: 'Bosque',
+  themePresetEmber: 'Brasa',
+  themePresetPastelLight: 'Claro Pastel',
   
   // ─── ERRORES ──────────────────────────────────────────────────────────
   errorLogs: 'Registros de errores',

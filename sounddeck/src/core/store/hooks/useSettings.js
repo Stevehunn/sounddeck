@@ -34,13 +34,12 @@ export function useSettings(initialState = {}, save) {
   const [stopAllShortcut, setStopAllShortcut] = useState(initialState.stopAllShortcut || '')
   const [presentationShortcut, setPresentationShortcut] = useState(initialState.presentationShortcut || '')
 
-
   const updateTheme = useCallback(async (newTheme) => {
     setTheme(newTheme)
     try {
       await save('theme', newTheme)
     } catch (e) {
-      console.error('🎨 [useSettings] ❌ Erreur save("theme"):', e)
+      console.error('Erreur sauvegarde thème:', e)
     }
   }, [save])
 

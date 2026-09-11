@@ -1,3 +1,4 @@
+// src/shared/components/audio/AudioTrimmer.jsx
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
@@ -10,7 +11,7 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
   const [end, setEnd] = useState(0)
   const [trimming, setTrimming] = useState(false)
   const [trimWarning, setTrimWarning] = useState('')
-  const [dragging, setDragging] = useState(null) // 'start' | 'end' | 'playhead'
+  const [dragging, setDragging] = useState(null)
 
   const audioRef = useRef(null)
   const timelineRef = useRef(null)
@@ -29,7 +30,6 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
     return () => { audio.pause(); audio.src = '' }
   }, [fileUrl])
 
-  // Arrêter la lecture quand on dépasse le end
   useEffect(() => {
     if (audioRef.current && currentTime >= end && playing) {
       audioRef.current.pause()
@@ -116,7 +116,7 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
       }
       onConfirm(result.path)
     } else {
-      setTrimWarning('Erreur : ' + result.error)
+      setTrimWarning(`${t('error')} : ${result.error}`)
     }
   }
 
@@ -129,29 +129,25 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
         <i className="ti ti-cut" style={{ color: 'var(--accent)' }} />
-        Rogner le son
+        {t('trimmerTrimTitle')}
         <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 400, marginLeft: 4 }}>
-          Sélection : {formatTime(start)} → {formatTime(end)} ({formatTime(end - start)})
+          {t('trimmerRegionSelected').replace('{start}', formatTime(start)).replace('{end}', formatTime(end))} ({formatTime(end - start)})
         </span>
       </div>
 
       {/* Waveform / timeline */}
       <div style={{ position: 'relative', height: 60, userSelect: 'none' }}>
-        {/* Fond */}
         <div ref={timelineRef} onClick={handleTimelineClick}
           style={{ position: 'absolute', inset: 0, background: 'var(--bg-tertiary)', borderRadius: 8, cursor: 'crosshair', overflow: 'hidden' }}>
 
-          {/* Waveform simulée avec des barres */}
           <WaveformBars duration={duration} />
 
-          {/* Zone sélectionnée */}
           <div style={{
             position: 'absolute', top: 0, bottom: 0, left: selLeft, width: selWidth,
             background: 'rgba(124,111,247,0.25)', border: '1px solid var(--accent)',
             pointerEvents: 'none'
           }} />
 
-          {/* Playhead */}
           <div onMouseDown={handleMouseDown('playhead')}
             style={{
               position: 'absolute', top: 0, bottom: 0, left: playheadLeft,
@@ -162,7 +158,6 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
           </div>
         </div>
 
-        {/* Poignée start */}
         <div onMouseDown={handleMouseDown('start')}
           style={{
             position: 'absolute', top: 0, bottom: 0, left: selLeft,
@@ -172,7 +167,6 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
           <div style={{ width: 4, height: '80%', background: 'var(--accent)', borderRadius: 2 }} />
         </div>
 
-        {/* Poignée end */}
         <div onMouseDown={handleMouseDown('end')}
           style={{
             position: 'absolute', top: 0, bottom: 0, left: `calc(${selLeft} + ${selWidth})`,
@@ -183,39 +177,44 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
         </div>
       </div>
 
-      {/* Timestamps */}
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-tertiary)' }}>
         <span>{formatTime(0)}</span>
         <span style={{ color: 'var(--accent)', fontWeight: 500 }}>{formatTime(currentTime)}</span>
         <span>{formatTime(duration)}</span>
       </div>
 
-      {/* Contrôles sliders précis */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <div>
-          <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 3 }}>Début : {formatTime(start)}</label>
+          <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 3 }}>
+            {t('trimmerStartLabel').replace('{time}', formatTime(start))}
+          </label>
           <input type="range" min="0" max={duration} step="0.01" value={start}
             onChange={e => setStart(Math.min(Number(e.target.value), end - 0.1))}
             style={{ width: '100%', accentColor: 'var(--accent)' }} />
         </div>
         <div>
-          <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 3 }}>Fin : {formatTime(end)}</label>
+          <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 3 }}>
+            {t('trimmerEndLabel').replace('{time}', formatTime(end))}
+          </label>
           <input type="range" min="0" max={duration} step="0.01" value={end}
             onChange={e => setEnd(Math.max(Number(e.target.value), start + 0.1))}
             style={{ width: '100%', accentColor: 'var(--accent)' }} />
         </div>
       </div>
 
-      {/* Boutons */}
       <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
         <button onClick={togglePlay} className="btn-secondary" style={{ gap: 6 }}>
           <i className={`ti ${playing ? 'ti-player-pause' : 'ti-player-play'}`} />
-          {playing ? 'Pause' : 'Écouter la sélection'}
+          {playing ? t('trimmerPause') : t('trimmerPlaySelection')}
         </button>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={onCancel} className="btn-secondary">Retour</button>
+          <button onClick={onCancel} className="btn-secondary">{t('back')}</button>
           <button onClick={handleTrim} className="btn-primary" disabled={trimming}>
-            {trimming ? <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> Traitement...</> : <><i className="ti ti-check" /> Confirmer</>}
+            {trimming ? (
+              <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('trimmerProcessing')}</>
+            ) : (
+              <><i className="ti ti-check" /> {t('trimmerConfirm')}</>
+            )}
           </button>
         </div>
       </div>
@@ -228,7 +227,7 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
       ) : (
         <div style={{ fontSize: 11, color: 'var(--text-tertiary)', padding: '8px 10px', background: 'var(--bg-tertiary)', borderRadius: 6 }}>
           <i className="ti ti-info-circle" style={{ marginRight: 4 }} />
-          Installez <strong>ffmpeg-static</strong> via npm pour le rognage précis.
+          {t('trimmerInstallFfmpeg')}
         </div>
       )}
       <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
@@ -236,9 +235,7 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
   )
 }
 
-// Waveform simulée avec des barres pseudo-aléatoires mais déterministes
 function WaveformBars({ duration }) {
-  const { t } = useLanguage()
   const bars = 80
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', gap: 1, padding: '4px 2px', pointerEvents: 'none' }}>

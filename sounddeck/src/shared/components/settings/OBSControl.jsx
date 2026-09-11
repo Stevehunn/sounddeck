@@ -1,10 +1,10 @@
+// src/shared/components/settings/OBSControl.jsx
 import { useState, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import {
   connectOBS,
   disconnectOBS,
   getOBSStatus,
-  switchOBSScene,
   startOBSRecording,
   stopOBSRecording,
   startOBSStreaming,
@@ -24,7 +24,6 @@ export default function OBSControl({ lang = 'fr' }) {
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    // Vérifier l'état de la connexion
     const checkStatus = () => {
       try {
         const obsStatus = getOBSStatus()
@@ -33,29 +32,29 @@ export default function OBSControl({ lang = 'fr' }) {
         console.warn('Erreur vérification OBS:', e)
       }
     }
-    
+
     const interval = setInterval(checkStatus, 5000)
     checkStatus()
-    
+
     return () => clearInterval(interval)
   }, [])
 
   const handleConnect = async () => {
     setIsLoading(true)
-    setStatus(t('connecting'))
-    
+    setStatus(t('connecting') || t('loading'))
+
     try {
       const result = await connectOBS({ host, port, password })
       if (result.success) {
         setIsConnected(true)
         setStatus(t('obsConnected'))
       } else {
-        setStatus(t('obsConnectionError') + ': ' + result.error)
+        setStatus(`${t('obsConnectionError')}: ${result.error}`)
       }
     } catch (e) {
-      setStatus(t('obsConnectionError') + ': ' + e.message)
+      setStatus(`${t('obsConnectionError')}: ${e.message}`)
     }
-    
+
     setIsLoading(false)
   }
 
@@ -67,7 +66,7 @@ export default function OBSControl({ lang = 'fr' }) {
       setIsStreaming(false)
       setStatus(t('obsDisconnected'))
     } catch (e) {
-      setStatus('Erreur: ' + e.message)
+      setStatus(`${t('error')}: ${e.message}`)
     }
   }
 
@@ -78,7 +77,7 @@ export default function OBSControl({ lang = 'fr' }) {
         setIsRecording(false)
         setStatus(t('obsRecordingStopped'))
       } catch (e) {
-        setStatus('Erreur: ' + e.message)
+        setStatus(`${t('error')}: ${e.message}`)
       }
     } else {
       try {
@@ -86,7 +85,7 @@ export default function OBSControl({ lang = 'fr' }) {
         setIsRecording(true)
         setStatus(t('obsRecordingStarted'))
       } catch (e) {
-        setStatus('Erreur: ' + e.message)
+        setStatus(`${t('error')}: ${e.message}`)
       }
     }
   }
@@ -98,7 +97,7 @@ export default function OBSControl({ lang = 'fr' }) {
         setIsStreaming(false)
         setStatus(t('obsStreamingStopped'))
       } catch (e) {
-        setStatus('Erreur: ' + e.message)
+        setStatus(`${t('error')}: ${e.message}`)
       }
     } else {
       try {
@@ -106,7 +105,7 @@ export default function OBSControl({ lang = 'fr' }) {
         setIsStreaming(true)
         setStatus(t('obsStreamingStarted'))
       } catch (e) {
-        setStatus('Erreur: ' + e.message)
+        setStatus(`${t('error')}: ${e.message}`)
       }
     }
   }
@@ -124,13 +123,9 @@ export default function OBSControl({ lang = 'fr' }) {
         justifyContent: 'space-between',
         marginBottom: 10
       }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8
-        }}>
-          <i className="ti ti-brand-obs" style={{ 
-            color: isConnected ? 'var(--success)' : 'var(--text-tertiary)' 
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <i className="ti ti-brand-obs" style={{
+            color: isConnected ? 'var(--success)' : 'var(--text-tertiary)'
           }} />
           <span style={{ fontWeight: 600, fontSize: 13 }}>
             OBS Studio
@@ -196,7 +191,7 @@ export default function OBSControl({ lang = 'fr' }) {
           style={{ width: '100%', justifyContent: 'center' }}
         >
           {isLoading ? (
-            <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('connecting')}</>
+            <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('loading')}</>
           ) : (
             <><i className="ti ti-plug" /> {t('obsConnect')}</>
           )}
@@ -214,7 +209,7 @@ export default function OBSControl({ lang = 'fr' }) {
             }}
           >
             <i className={`ti ${isRecording ? 'ti-player-stop-filled' : 'ti-circle-filled'}`}
-               style={{ color: isRecording ? 'var(--danger)' : 'var(--danger)' }} />
+               style={{ color: 'var(--danger)' }} />
             {isRecording ? t('obsStopRecording') : t('obsStartRecording')}
           </button>
 
@@ -237,7 +232,7 @@ export default function OBSControl({ lang = 'fr' }) {
             onClick={handleDisconnect}
             style={{ fontSize: 11, color: 'var(--text-tertiary)' }}
           >
-            <i className="ti ti-x" /> {t('disconnect')}
+            <i className="ti ti-x" /> {t('disconnect') || t('close')}
           </button>
         </div>
       )}

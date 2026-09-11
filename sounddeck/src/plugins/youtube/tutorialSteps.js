@@ -11,7 +11,6 @@ const MOCK_VIDEO_INFO = {
 }
 
 export const startYoutubeTutorial = () => {
-  console.log('🎬 [YouTube Tutorial] Démarrage du tutoriel')
   window.__youtubeTutorialActive = true
   window.__youtubeTutorialStartedAt = Date.now()
   window.__youtubeTutorialState = {
@@ -31,7 +30,6 @@ export const startYoutubeTutorial = () => {
 }
 
 export const deactivateYoutubeTutorialMode = () => {
-  console.log('🔕 [YouTube Tutorial] Désactivation des flags')
   window.__youtubeTutorialActive = false
   window.__youtubeTutorialStartedAt = null
   window.__youtubeTutorialState = null
@@ -40,7 +38,6 @@ export const deactivateYoutubeTutorialMode = () => {
 }
 
 export const finishYoutubeTutorial = () => {
-  console.log('🏁 [YouTube Tutorial] Fin du tutoriel - désactivation + reset')
   deactivateYoutubeTutorialMode()
   window.dispatchEvent(new CustomEvent('youtube-force-reset', { 
     detail: { timestamp: Date.now() } 
@@ -48,7 +45,6 @@ export const finishYoutubeTutorial = () => {
 }
 
 export const forceResetYoutubeComponent = () => {
-  console.log('🔄 [YouTube Tutorial] Force reset du composant YouTube')
   deactivateYoutubeTutorialMode()
   window.dispatchEvent(new CustomEvent('youtube-force-reset', { 
     detail: { timestamp: Date.now() } 
@@ -60,11 +56,9 @@ export const cleanupYoutubeTutorial = () => {
   const elapsed = Date.now() - startedAt
   
   if (elapsed < 500 && window.__youtubeTutorialActive) {
-    console.log(`🧹 [YouTube Tutorial] Cleanup IGNORÉ (démarrage récent)`)
     return
   }
   
-  console.log('🧹 [YouTube Tutorial] Nettoyage du tutoriel (legitime)')
   finishYoutubeTutorial()
 }
 
@@ -90,7 +84,6 @@ export const setTutorialStep = (step) => {
   if (window.__youtubeTutorialState) {
     window.__youtubeTutorialState.step = step
   }
-  console.log('🎬 [YouTube Tutorial] Étape mise à jour:', step)
 }
 
 export const mockFetchVideoInfo = () => new Promise((resolve) => {

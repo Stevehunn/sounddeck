@@ -1,21 +1,18 @@
 // src/shared/components/ui/Toast.jsx
-import { useState, useEffect } from 'react'
-
-let toastCounter = 0
-
 export default function Toast({ toasts }) {
   if (!toasts.length) return null
 
   return (
     <div className="toast-container">
-      {toasts.map(t => (
-        <div key={t.id} className={`toast ${t.type}`}>
+      {toasts.map(toast => (
+        <div key={toast.id} className={`toast ${toast.type}`}>
           <i className={`ti ${
-            t.type === 'success' ? 'ti-check' :
-            t.type === 'error' ? 'ti-x' : 'ti-info-circle'
+            toast.type === 'success' ? 'ti-check' :
+            toast.type === 'error' ? 'ti-x' :
+            toast.type === 'warning' ? 'ti-alert-triangle' :
+            'ti-info-circle'
           }`} />
-          {/* ✅ Support pour les éléments React */}
-          {typeof t.message === 'string' ? t.message : t.message}
+          {toast.message}
         </div>
       ))}
     </div>

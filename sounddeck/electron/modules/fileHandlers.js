@@ -4,19 +4,15 @@ const path = require('path')
 const fs = require('fs')
 const https = require('https')
 const http = require('http')
-const { pipeline } = require('stream')
-const { promisify } = require('util')
-const streamPipeline = promisify(pipeline)
 const store = require('../store')
 
-// ─── FONCTION POUR TROUVER FFPROBE ───────────────────────────────────────
+// ─── FONCTION POUR TROUVER FFMPEG ───────────────────────────────────────
 
 function findFFmpeg() {
   try {
     try {
       const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg')
       if (ffmpegInstaller && ffmpegInstaller.path) {
-        console.log('✅ ffmpeg trouvé via @ffmpeg-installer/ffmpeg:', ffmpegInstaller.path)
         return ffmpegInstaller.path
       }
     } catch (e) {}
@@ -24,7 +20,6 @@ function findFFmpeg() {
     try {
       const ffmpegStatic = require('ffmpeg-static')
       if (ffmpegStatic) {
-        console.log('✅ ffmpeg trouvé via ffmpeg-static:', ffmpegStatic)
         return ffmpegStatic
       }
     } catch (e) {}
@@ -32,13 +27,11 @@ function findFFmpeg() {
     try {
       const { execSync } = require('child_process')
       execSync('ffmpeg -version', { stdio: 'ignore' })
-      console.log('✅ ffmpeg trouvé dans le PATH')
       return 'ffmpeg'
     } catch (e) {}
 
     return null
   } catch (e) {
-    console.warn('⚠️ Erreur lors de la recherche de ffmpeg:', e.message)
     return null
   }
 }
@@ -49,31 +42,26 @@ function findYtDlp() {
   try {
     const { app } = require('electron')
     const userDataPath = app.getPath('userData')
-    
+
     const ytdlpPath = path.join(userDataPath, 'yt-dlp.exe')
     if (fs.existsSync(ytdlpPath)) {
-      console.log('✅ yt-dlp trouvé dans userData:', ytdlpPath)
       return ytdlpPath
     }
 
     try {
       const { execSync } = require('child_process')
       execSync('yt-dlp --version', { stdio: 'ignore' })
-      console.log('✅ yt-dlp trouvé dans le PATH')
       return 'yt-dlp'
     } catch (e) {}
 
     const appPath = app.getAppPath()
     const ytdlpAppPath = path.join(path.dirname(appPath), 'yt-dlp.exe')
     if (fs.existsSync(ytdlpAppPath)) {
-      console.log('✅ yt-dlp trouvé dans le dossier de l\'app:', ytdlpAppPath)
       return ytdlpAppPath
     }
 
-    console.log('❌ yt-dlp non trouvé')
     return null
   } catch (e) {
-    console.warn('⚠️ Erreur lors de la recherche de yt-dlp:', e.message)
     return null
   }
 }
@@ -82,8 +70,6 @@ function findYtDlp() {
 
 function downloadFile(url, outputPath) {
   return new Promise((resolve, reject) => {
-    console.log(`📥 [downloadFile] Téléchargement depuis: ${url}`)
-    
     const options = {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -97,14 +83,11 @@ function downloadFile(url, outputPath) {
         return
       }
 
-      console.log(`📥 [downloadFile] GET ${currentUrl} (redirection ${redirectCount})`)
-      
       const req = https.get(currentUrl, options, (response) => {
-        if (response.statusCode === 302 || response.statusCode === 301 || 
+        if (response.statusCode === 302 || response.statusCode === 301 ||
             response.statusCode === 307 || response.statusCode === 308) {
           const redirectUrl = response.headers.location
           if (redirectUrl) {
-            console.log(`🔄 [downloadFile] Redirection vers: ${redirectUrl}`)
             request(redirectUrl, redirectCount + 1)
             return
           }
@@ -135,7 +118,6 @@ function downloadFile(url, outputPath) {
             reject(new Error('Fichier trop petit'))
             return
           }
-          console.log(`✅ [downloadFile] Téléchargé: ${downloadedBytes} bytes`)
           resolve({ success: true, path: outputPath })
         })
 
@@ -169,7 +151,7 @@ async function downloadYtDlp() {
     const { app } = require('electron')
     const userDataPath = app.getPath('userData')
     const ytdlpPath = path.join(userDataPath, 'yt-dlp.exe')
-    
+
     if (fs.existsSync(ytdlpPath)) {
       try {
         const { execFile } = require('child_process')
@@ -179,30 +161,24 @@ async function downloadYtDlp() {
             else resolve()
           })
         })
-        console.log('✅ [download-ytdlp] yt-dlp déjà présent et fonctionnel')
         return { success: true, path: ytdlpPath }
       } catch (e) {
-        console.log('⚠️ [download-ytdlp] yt-dlp présent mais corrompu, retéléchargement...')
         try { fs.unlinkSync(ytdlpPath) } catch (err) {}
       }
     }
 
-    console.log('📥 [download-ytdlp] Téléchargement de yt-dlp...')
-    
     const urls = [
       'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe',
       'https://github.com/yt-dlp/yt-dlp/releases/download/2023.11.16/yt-dlp.exe',
       'https://github.com/yt-dlp/yt-dlp/releases/download/2023.10.13/yt-dlp.exe'
     ]
-    
+
     let lastError = null
-    
+
     for (const url of urls) {
-      console.log(`📥 [download-ytdlp] Tentative avec: ${url}`)
-      
       try {
         await downloadFile(url, ytdlpPath)
-        
+
         try {
           const { execFile } = require('child_process')
           await new Promise((resolve, reject) => {
@@ -211,21 +187,18 @@ async function downloadYtDlp() {
               else resolve()
             })
           })
-          console.log('✅ [download-ytdlp] yt-dlp téléchargé et fonctionnel')
           return { success: true, path: ytdlpPath }
         } catch (e) {
-          console.warn('⚠️ [download-ytdlp] Fichier téléchargé mais non fonctionnel:', e.message)
           try { fs.unlinkSync(ytdlpPath) } catch (err) {}
           continue
         }
       } catch (e) {
         lastError = e.message
-        console.warn(`⚠️ [download-ytdlp] Échec avec ${url}:`, e.message)
       }
     }
-    
+
     return { success: false, error: lastError || 'Échec de tous les téléchargements' }
-    
+
   } catch (e) {
     console.error('❌ [download-ytdlp] Erreur:', e.message)
     return { success: false, error: e.message }
@@ -235,9 +208,6 @@ async function downloadYtDlp() {
 // ─── HANDLERS FICHIERS ──────────────────────────────────────────────────────
 
 function registerFileHandlers(mainWindow, soundsDir) {
-  console.log('🔧 [fileHandlers] Début registerFileHandlers')
-  
-  // Ouvrir le dialogue de fichier
   ipcMain.handle('open-file-dialog', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: 'Importer des sons',
@@ -246,9 +216,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
     })
     return result.canceled ? [] : result.filePaths
   })
-  console.log('  ✅ open-file-dialog enregistré')
 
-  // Ouvrir le dialogue d'image
   ipcMain.handle('open-image-dialog', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: 'Choisir une image',
@@ -257,9 +225,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
     })
     return result.canceled ? null : result.filePaths[0]
   })
-  console.log('  ✅ open-image-dialog enregistré')
 
-  // Ouvrir le dialogue de dossier
   ipcMain.handle('open-directory-dialog', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: 'Choisir un dossier d\'export',
@@ -267,9 +233,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
     })
     return result
   })
-  console.log('  ✅ open-directory-dialog enregistré')
 
-  // Importer un fichier son
   ipcMain.handle('import-sound-file', async (event, filePath) => {
     try {
       const fileName = path.basename(filePath)
@@ -278,18 +242,16 @@ function registerFileHandlers(mainWindow, soundsDir) {
         ? path.join(soundsDir, `${Date.now()}_${fileName}`)
         : destPath
       fs.copyFileSync(filePath, finalDest)
-      return { 
-        success: true, 
-        path: finalDest.replace(/\\/g, '/'), 
-        name: path.basename(finalDest, path.extname(finalDest)) 
+      return {
+        success: true,
+        path: finalDest.replace(/\\/g, '/'),
+        name: path.basename(finalDest, path.extname(finalDest))
       }
-    } catch (e) { 
-      return { success: false, error: e.message } 
+    } catch (e) {
+      return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ import-sound-file enregistré')
 
-  // Importer une image
   ipcMain.handle('import-image-file', async (event, filePath) => {
     try {
       const { app } = require('electron')
@@ -299,34 +261,28 @@ function registerFileHandlers(mainWindow, soundsDir) {
       const destPath = path.join(imagesDir, fileName)
       fs.copyFileSync(filePath, destPath)
       return { success: true, path: destPath.replace(/\\/g, '/') }
-    } catch (e) { 
-      return { success: false, error: e.message } 
+    } catch (e) {
+      return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ import-image-file enregistré')
 
-  // Supprimer un fichier son
   ipcMain.handle('delete-sound-file', async (event, filePath) => {
-    try { 
+    try {
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
-      return { success: true } 
-    } catch (e) { 
-      return { success: false, error: e.message } 
+      return { success: true }
+    } catch (e) {
+      return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ delete-sound-file enregistré')
 
-  // Vérifier si un fichier existe
   ipcMain.handle('file-exists', (event, filePath) => {
-    try { 
-      return fs.existsSync(filePath) 
-    } catch (e) { 
-      return false 
+    try {
+      return fs.existsSync(filePath)
+    } catch (e) {
+      return false
     }
   })
-  console.log('  ✅ file-exists enregistré')
 
-  // Lire un fichier
   ipcMain.handle('read-file', async (event, filePath) => {
     try {
       const data = fs.readFileSync(filePath)
@@ -335,9 +291,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ read-file enregistré')
 
-  // Écrire un fichier son
   ipcMain.handle('write-sound-file', async (event, filePath, data) => {
     try {
       const uint8Array = new Uint8Array(data)
@@ -347,13 +301,9 @@ function registerFileHandlers(mainWindow, soundsDir) {
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ write-sound-file enregistré')
 
-  // Obtenir le répertoire des sons
   ipcMain.handle('get-sounds-dir', () => soundsDir)
-  console.log('  ✅ get-sounds-dir enregistré')
 
-  // Écrire un fichier déposé
   ipcMain.handle('write-dropped-file', async (event, fileName, arrayBuffer) => {
     try {
       const safeName = fileName.replace(/[^a-zA-Z0-9._\- ]/g, '_')
@@ -366,20 +316,18 @@ function registerFileHandlers(mainWindow, soundsDir) {
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ write-dropped-file enregistré')
 
-  // Sauvegarder un fichier
   ipcMain.handle('save-file-dialog', async (event, fileName, buffer) => {
     const result = await dialog.showSaveDialog(mainWindow, {
       title: 'Sauvegarder le fichier normalisé',
       defaultPath: fileName,
       filters: [{ name: 'Audio WAV', extensions: ['wav'] }]
     })
-    
+
     if (result.canceled) {
       return { success: false }
     }
-    
+
     try {
       const uint8Array = new Uint8Array(buffer)
       fs.writeFileSync(result.filePath, uint8Array)
@@ -388,9 +336,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ save-file-dialog enregistré')
 
-  // Télécharger un son depuis une URL
   ipcMain.handle('download-sound-url', async (event, rawUrl, fileName) => {
     const destPath = path.join(soundsDir, fileName)
 
@@ -489,15 +435,10 @@ function registerFileHandlers(mainWindow, soundsDir) {
 
     return doRequest(url, destPath)
   })
-  console.log('  ✅ download-sound-url enregistré')
 
-  // ─── ROGNER UN FICHIER SON AVEC FFMEG ───────────────────────────────────
   ipcMain.handle('trim-sound-file', async (event, filePath, startTime, endTime) => {
-    console.log('✂️ [trim-sound-file] Appelé avec:', { filePath, startTime, endTime })
-    
     try {
       if (!fs.existsSync(filePath)) {
-        console.error('❌ [trim-sound-file] Fichier non trouvé:', filePath)
         return { success: false, error: 'Fichier non trouvé' }
       }
 
@@ -507,17 +448,14 @@ function registerFileHandlers(mainWindow, soundsDir) {
       const newFileName = `${baseName}_trimmed_${Date.now()}${ext}`
       const outputPath = path.join(dir, newFileName)
 
-      console.log(`✂️ [trim-sound-file] Output: ${outputPath}`)
-
       const duration = endTime - startTime
       if (duration <= 0) {
         return { success: false, error: 'Durée de rognage invalide' }
       }
 
       const ffmpegPath = findFFmpeg()
-      
+
       if (!ffmpegPath) {
-        console.warn('⚠️ [trim-sound-file] ffmpeg non disponible, copie du fichier')
         fs.copyFileSync(filePath, outputPath)
         return {
           success: true,
@@ -527,7 +465,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
       }
 
       const { execFile } = require('child_process')
-      
+
       return new Promise((resolve) => {
         const args = [
           '-i', filePath,
@@ -538,12 +476,9 @@ function registerFileHandlers(mainWindow, soundsDir) {
           outputPath
         ]
 
-        console.log(`✂️ [trim-sound-file] Commande ffmpeg: ${ffmpegPath} ${args.join(' ')}`)
-
         execFile(ffmpegPath, args, { timeout: 60000 }, (error, stdout, stderr) => {
           if (error) {
             console.error('❌ [trim-sound-file] Erreur ffmpeg:', error.message)
-            console.error('  stderr:', stderr)
             try {
               fs.copyFileSync(filePath, outputPath)
               resolve({
@@ -568,22 +503,18 @@ function registerFileHandlers(mainWindow, soundsDir) {
             return
           }
 
-          console.log(`✅ [trim-sound-file] Fichier rogné créé: ${outputPath} (${stats.size} bytes)`)
           resolve({ success: true, path: outputPath })
         })
       })
 
     } catch (e) {
-      console.error('❌ [trim-sound-file] Exception:', e)
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ trim-sound-file enregistré')
 
   // ─── HANDLERS YOUTUBE ──────────────────────────────────────────────────
 
   ipcMain.handle('check-ytdlp', async () => {
-    console.log('📥 [check-ytdlp] Vérification de yt-dlp...')
     try {
       const ytdlpPath = findYtDlp()
       if (ytdlpPath) {
@@ -592,15 +523,11 @@ function registerFileHandlers(mainWindow, soundsDir) {
           await new Promise((resolve, reject) => {
             execFile(ytdlpPath, ['--version'], { timeout: 10000 }, (error, stdout) => {
               if (error) reject(error)
-              else {
-                console.log('✅ [check-ytdlp] Version:', stdout.trim())
-                resolve()
-              }
+              else resolve()
             })
           })
           return { available: true, path: ytdlpPath }
         } catch (e) {
-          console.warn('⚠️ [check-ytdlp] yt-dlp trouvé mais ne fonctionne pas:', e.message)
           if (ytdlpPath !== 'yt-dlp' && fs.existsSync(ytdlpPath)) {
             try { fs.unlinkSync(ytdlpPath) } catch (err) {}
           }
@@ -612,22 +539,16 @@ function registerFileHandlers(mainWindow, soundsDir) {
       return { available: false, error: e.message }
     }
   })
-  console.log('  ✅ check-ytdlp enregistré')
 
   ipcMain.handle('download-ytdlp', async () => {
-    console.log('📥 [download-ytdlp] Téléchargement de yt-dlp...')
     return await downloadYtDlp()
   })
-  console.log('  ✅ download-ytdlp enregistré')
 
-  // ─── Récupérer les infos d'une vidéo YouTube ──────────────────────────────
   ipcMain.handle('youtube-info', async (event, url) => {
-    console.log('📥 [youtube-info] Récupération des infos pour:', url)
     try {
       let ytdlpPath = findYtDlp()
-      
+
       if (!ytdlpPath) {
-        console.log('📥 [youtube-info] yt-dlp non trouvé, tentative de téléchargement...')
         const result = await downloadYtDlp()
         if (result.success) {
           ytdlpPath = result.path
@@ -637,7 +558,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
       }
 
       const { execFile } = require('child_process')
-      
+
       return new Promise((resolve) => {
         const args = [
           '--no-warnings',
@@ -648,15 +569,12 @@ function registerFileHandlers(mainWindow, soundsDir) {
           url
         ]
 
-        console.log(`📥 [youtube-info] Commande: ${ytdlpPath} ${args.join(' ')}`)
-
-        execFile(ytdlpPath, args, { 
+        execFile(ytdlpPath, args, {
           timeout: 30000,
           maxBuffer: 10 * 1024 * 1024
         }, (error, stdout, stderr) => {
           if (error) {
             console.error('❌ [youtube-info] Erreur:', error.message)
-            console.error('  stderr:', stderr)
             if (ytdlpPath !== 'yt-dlp' && fs.existsSync(ytdlpPath)) {
               try { fs.unlinkSync(ytdlpPath) } catch (err) {}
             }
@@ -664,33 +582,32 @@ function registerFileHandlers(mainWindow, soundsDir) {
           }
 
           let cleanOutput = stdout.trim()
-          
           let jsonStr = ''
           let braceCount = 0
           let inString = false
           let escapeNext = false
-          
+
           for (let i = 0; i < cleanOutput.length; i++) {
             const char = cleanOutput[i]
-            
+
             if (escapeNext) {
               escapeNext = false
               jsonStr += char
               continue
             }
-            
+
             if (char === '\\') {
               escapeNext = true
               jsonStr += char
               continue
             }
-            
+
             if (char === '"' && !escapeNext) {
               inString = !inString
               jsonStr += char
               continue
             }
-            
+
             if (!inString) {
               if (char === '{') {
                 braceCount++
@@ -703,24 +620,20 @@ function registerFileHandlers(mainWindow, soundsDir) {
                 continue
               }
             }
-            
+
             jsonStr += char
           }
 
-          console.log(`📥 [youtube-info] JSON extrait (${jsonStr.length} caractères)`)
-
           try {
             const data = JSON.parse(jsonStr)
-            
+
             if (!data.id || !data.title) {
-              console.error('❌ [youtube-info] Données incomplètes:', data)
-              return resolve({ 
-                success: false, 
-                error: 'Données vidéo incomplètes' 
+              return resolve({
+                success: false,
+                error: 'Données vidéo incomplètes'
               })
             }
 
-            console.log(`✅ [youtube-info] Infos récupérées: ${data.title}`)
             resolve({
               success: true,
               id: data.id,
@@ -732,31 +645,23 @@ function registerFileHandlers(mainWindow, soundsDir) {
             })
           } catch (e) {
             console.error('❌ [youtube-info] Erreur parse JSON:', e.message)
-            console.error('  stdout brut:', stdout.substring(0, 500))
-            console.error('  jsonStr extrait:', jsonStr.substring(0, 500))
-            resolve({ 
-              success: false, 
-              error: `Erreur de parsing: ${e.message}. Vérifiez que l'URL est valide.` 
+            resolve({
+              success: false,
+              error: `Erreur de parsing: ${e.message}. Vérifiez que l'URL est valide.`
             })
           }
         })
       })
     } catch (e) {
-      console.error('❌ [youtube-info] Exception:', e.message)
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ youtube-info enregistré')
 
-  // ─── Télécharger l'audio d'une vidéo YouTube ──────────────────────────────
   ipcMain.handle('youtube-download', async (event, url, start, end, title) => {
-    console.log('📥 [youtube-download] Téléchargement de:', url)
-    console.log(`📥 [youtube-download] Start: ${start}s, End: ${end}s`)
     try {
       let ytdlpPath = findYtDlp()
-      
+
       if (!ytdlpPath) {
-        console.log('📥 [youtube-download] yt-dlp non trouvé, tentative de téléchargement...')
         const result = await downloadYtDlp()
         if (result.success) {
           ytdlpPath = result.path
@@ -766,11 +671,10 @@ function registerFileHandlers(mainWindow, soundsDir) {
       }
 
       const ffmpegPath = findFFmpeg()
-      console.log(`📥 [youtube-download] ffmpeg trouvé: ${ffmpegPath || 'NON TROUVÉ'}`)
 
       const { app } = require('electron')
       const { execFile } = require('child_process')
-      
+
       const safeTitle = (title || 'audio').replace(/[^a-zA-Z0-9]/g, '_')
       const outputDir = app.getPath('userData')
       const outputPath = path.join(outputDir, `${safeTitle}_${Date.now()}.mp3`)
@@ -788,9 +692,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
 
         if (ffmpegPath) {
           args.push('--ffmpeg-location', ffmpegPath)
-          console.log(`📥 [youtube-download] Utilisation de ffmpeg: ${ffmpegPath}`)
-        } else {
-          console.warn('⚠️ [youtube-download] ffmpeg non trouvé, la conversion peut échouer')
         }
 
         if (start > 0) {
@@ -800,12 +701,9 @@ function registerFileHandlers(mainWindow, soundsDir) {
 
         args.push(url)
 
-        console.log(`📥 [youtube-download] Commande: ${ytdlpPath} ${args.join(' ')}`)
-
         execFile(ytdlpPath, args, { timeout: 300000 }, (error, stdout, stderr) => {
           if (error) {
             console.error('❌ [youtube-download] Erreur:', error.message)
-            console.error('  stderr:', stderr)
             if (ytdlpPath !== 'yt-dlp' && fs.existsSync(ytdlpPath)) {
               try { fs.unlinkSync(ytdlpPath) } catch (err) {}
             }
@@ -814,13 +712,12 @@ function registerFileHandlers(mainWindow, soundsDir) {
 
           const files = fs.readdirSync(outputDir)
           const baseName = path.basename(outputPath, '.mp3')
-          const audioFile = files.find(f => 
+          const audioFile = files.find(f =>
             f.startsWith(baseName) && f.endsWith('.mp3')
           )
 
           if (audioFile) {
             const finalPath = path.join(outputDir, audioFile)
-            console.log(`✅ [youtube-download] Téléchargé: ${finalPath}`)
             resolve({ success: true, path: finalPath.replace(/\\/g, '/') })
           } else {
             const mp3Files = files.filter(f => f.endsWith('.mp3'))
@@ -829,7 +726,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
                 return fs.statSync(path.join(outputDir, b)).mtime - fs.statSync(path.join(outputDir, a)).mtime
               })[0]
               const finalPath = path.join(outputDir, latest)
-              console.log(`✅ [youtube-download] Téléchargé (nom détecté): ${finalPath}`)
               resolve({ success: true, path: finalPath.replace(/\\/g, '/') })
             } else {
               resolve({ success: false, error: 'Fichier audio non trouvé' })
@@ -838,20 +734,14 @@ function registerFileHandlers(mainWindow, soundsDir) {
         })
       })
     } catch (e) {
-      console.error('❌ [youtube-download] Exception:', e.message)
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ youtube-download enregistré')
 
   // ─── EXPORT / IMPORT ──────────────────────────────────────────────────────
 
   ipcMain.handle('export-config', async () => {
-    console.log('📥 [export-config] Export de la configuration...')
     try {
-      const { app } = require('electron')
-      // ✅ Utilise l'instance partagée (plus de new Store())
-      
       const data = {
         profiles: store.get('profiles', []),
         sounds: store.get('sounds', []),
@@ -880,21 +770,17 @@ function registerFileHandlers(mainWindow, soundsDir) {
       }
 
       fs.writeFileSync(result.filePath, JSON.stringify(data, null, 2))
-      console.log(`✅ [export-config] Exporté vers: ${result.filePath}`)
       return { success: true, path: result.filePath }
     } catch (e) {
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ export-config enregistré')
 
   ipcMain.handle('export-full', async () => {
-    console.log('📥 [export-full] Export de l\'archive complète...')
     try {
       const { app } = require('electron')
-      // ✅ Utilise l'instance partagée (plus de new Store())
       const archiver = require('archiver')
-      
+
       const result = await dialog.showSaveDialog({
         title: 'Exporter l\'archive complète',
         defaultPath: `sounddeck-full-${new Date().toISOString().slice(0,10)}.zip`,
@@ -911,7 +797,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
       return new Promise((resolve) => {
         output.on('close', () => {
           const sizeMb = (archive.pointer() / 1024 / 1024).toFixed(1)
-          console.log(`✅ [export-full] Archive créée: ${sizeMb} MB`)
           resolve({ success: true, path: result.filePath, sizeMb })
         })
 
@@ -940,10 +825,9 @@ function registerFileHandlers(mainWindow, soundsDir) {
         archive.append(JSON.stringify(config, null, 2), { name: 'config.json' })
 
         const sounds = store.get('sounds', [])
-        const soundsDir = app.getPath('userData')
         for (const sound of sounds) {
           if (sound.path) {
-            const soundPath = sound.path.startsWith('file://') 
+            const soundPath = sound.path.startsWith('file://')
               ? sound.path.replace('file:///', '').replace(/\\/g, '/')
               : sound.path
             if (fs.existsSync(soundPath)) {
@@ -958,15 +842,11 @@ function registerFileHandlers(mainWindow, soundsDir) {
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ export-full enregistré')
 
   ipcMain.handle('export-sounds-only', async () => {
-    console.log('📥 [export-sounds-only] Export des sons uniquement...')
     try {
-      const { app } = require('electron')
-      // ✅ Utilise l'instance partagée (plus de new Store())
       const archiver = require('archiver')
-      
+
       const result = await dialog.showSaveDialog({
         title: 'Exporter les sons uniquement',
         defaultPath: `sounddeck-sounds-${new Date().toISOString().slice(0,10)}.zip`,
@@ -983,7 +863,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
       return new Promise((resolve) => {
         output.on('close', () => {
           const sizeMb = (archive.pointer() / 1024 / 1024).toFixed(1)
-          console.log(`✅ [export-sounds-only] Archive créée: ${sizeMb} MB`)
           resolve({ success: true, path: result.filePath, sizeMb })
         })
 
@@ -994,10 +873,9 @@ function registerFileHandlers(mainWindow, soundsDir) {
         archive.pipe(output)
 
         const sounds = store.get('sounds', [])
-        const soundsDir = app.getPath('userData')
         for (const sound of sounds) {
           if (sound.path) {
-            const soundPath = sound.path.startsWith('file://') 
+            const soundPath = sound.path.startsWith('file://')
               ? sound.path.replace('file:///', '').replace(/\\/g, '/')
               : sound.path
             if (fs.existsSync(soundPath)) {
@@ -1012,13 +890,10 @@ function registerFileHandlers(mainWindow, soundsDir) {
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ export-sounds-only enregistré')
 
   ipcMain.handle('import-backup', async () => {
-    console.log('📥 [import-backup] Import d\'une sauvegarde...')
     try {
       const { app } = require('electron')
-      // ✅ Utilise l'instance partagée (plus de new Store())
       const unzipper = require('unzipper')
 
       const result = await dialog.showOpenDialog({
@@ -1038,7 +913,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
 
       if (ext === '.json') {
         const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
-        
+
         if (data.profiles) store.set('profiles', data.profiles)
         if (data.sounds) store.set('sounds', data.sounds)
         if (data.shortcuts) store.set('shortcuts', data.shortcuts)
@@ -1052,7 +927,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
         if (data.normalizationEnabled !== undefined) store.set('normalizationEnabled', data.normalizationEnabled)
         if (data.normalizationTarget !== undefined) store.set('normalizationTarget', data.normalizationTarget)
 
-        console.log('✅ [import-backup] Configuration JSON importée')
         return { success: true, type: 'json' }
       } else if (ext === '.zip') {
         const extractDir = path.join(app.getPath('userData'), 'temp_extract')
@@ -1068,7 +942,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
         const configPath = path.join(extractDir, 'config.json')
         if (fs.existsSync(configPath)) {
           const data = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
-          
+
           if (data.profiles) store.set('profiles', data.profiles)
           if (data.sounds) store.set('sounds', data.sounds)
           if (data.shortcuts) store.set('shortcuts', data.shortcuts)
@@ -1093,7 +967,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
             }
           }
 
-          console.log('✅ [import-backup] Archive ZIP importée')
           fs.rmSync(extractDir, { recursive: true, force: true })
           return { success: true, type: 'full', importedSounds: data.sounds?.length || 0 }
         }
@@ -1107,14 +980,9 @@ function registerFileHandlers(mainWindow, soundsDir) {
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ import-backup enregistré')
 
   ipcMain.handle('export-profile', async (event, profileId) => {
-    console.log('📥 [export-profile] Export du profil:', profileId)
     try {
-      const { app } = require('electron')
-      // ✅ Utilise l'instance partagée (plus de new Store())
-      
       const profiles = store.get('profiles', [])
       const profile = profiles.find(p => p.id === profileId)
       if (!profile) {
@@ -1142,9 +1010,8 @@ function registerFileHandlers(mainWindow, soundsDir) {
       }
 
       fs.writeFileSync(result.filePath, JSON.stringify(data, null, 2))
-      console.log(`✅ [export-profile] Exporté vers: ${result.filePath}`)
-      return { 
-        success: true, 
+      return {
+        success: true,
         path: result.filePath,
         soundCount: profileSounds.length,
         sizeMb: (fs.statSync(result.filePath).size / 1024 / 1024).toFixed(1)
@@ -1153,14 +1020,9 @@ function registerFileHandlers(mainWindow, soundsDir) {
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ export-profile enregistré')
 
   ipcMain.handle('import-profile', async () => {
-    console.log('📥 [import-profile] Import d\'un profil...')
     try {
-      const { app } = require('electron')
-      // ✅ Utilise l'instance partagée (plus de new Store())
-
       const result = await dialog.showOpenDialog({
         title: 'Importer un profil',
         filters: [{ name: 'JSON', extensions: ['json'] }],
@@ -1194,9 +1056,8 @@ function registerFileHandlers(mainWindow, soundsDir) {
       }
       store.set('sounds', sounds)
 
-      console.log(`✅ [import-profile] Profil "${data.profile.name}" importé avec ${importedCount} sons`)
-      return { 
-        success: true, 
+      return {
+        success: true,
         profileName: data.profile.name,
         soundCount: importedCount
       }
@@ -1204,12 +1065,10 @@ function registerFileHandlers(mainWindow, soundsDir) {
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ import-profile enregistré')
 
   // ─── SPOTIFY / SOUNDCLOUD HANDLERS ──────────────────────────────────────
 
   ipcMain.handle('spotify-track-info', async (event, trackId) => {
-    console.log('📥 [spotify-track-info] ID:', trackId)
     return {
       success: true,
       data: {
@@ -1221,16 +1080,14 @@ function registerFileHandlers(mainWindow, soundsDir) {
       }
     }
   })
-  console.log('  ✅ spotify-track-info enregistré')
 
   ipcMain.handle('soundcloud-track-info', async (event, url) => {
-    console.log('📥 [soundcloud-track-info] URL:', url)
     try {
       const match = url.match(/soundcloud\.com\/(?:.*)\/([a-zA-Z0-9_-]+)/)
       if (!match) {
         return { success: false, error: 'URL SoundCloud invalide' }
       }
-      
+
       return {
         success: true,
         data: {
@@ -1245,38 +1102,32 @@ function registerFileHandlers(mainWindow, soundsDir) {
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ soundcloud-track-info enregistré')
 
   ipcMain.handle('download-platform-track', async (event, params) => {
-    console.log('📥 [download-platform-track] Plateforme:', params.platform)
-    const { platform, url, trackId, outputPath, title, artist } = params
+    const { outputPath } = params
 
     try {
-      const fs = require('fs')
       const dummyAudioBuffer = Buffer.alloc(1024 * 100)
       fs.writeFileSync(outputPath, dummyAudioBuffer)
-      
-      console.log(`✅ [download-platform-track] Fichier créé: ${outputPath}`)
+
       return { success: true, path: outputPath }
     } catch (e) {
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ download-platform-track enregistré')
 
   // ─── CONVERSION AUDIO ──────────────────────────────────────────────────────
 
   ipcMain.handle('convert-audio', async (event, inputPath, outputPath, format, bitrate) => {
-    console.log('📥 [convert-audio] Conversion:', { inputPath, outputPath, format, bitrate })
     try {
       const ffmpegPath = findFFmpeg()
-      
+
       if (!ffmpegPath) {
         return { success: false, error: 'ffmpeg non disponible' }
       }
 
       const { execFile } = require('child_process')
-      
+
       return new Promise((resolve) => {
         const args = [
           '-i', inputPath,
@@ -1285,8 +1136,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
           '-y',
           outputPath
         ]
-
-        console.log(`📥 [convert-audio] Commande: ${ffmpegPath} ${args.join(' ')}`)
 
         execFile(ffmpegPath, args, { timeout: 60000 }, (error, stdout, stderr) => {
           if (error) {
@@ -1299,7 +1148,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
           }
 
           const stats = fs.statSync(outputPath)
-          console.log(`✅ [convert-audio] Conversion réussie: ${outputPath} (${stats.size} bytes)`)
           resolve({ success: true, path: outputPath, size: stats.size })
         })
       })
@@ -1307,13 +1155,11 @@ function registerFileHandlers(mainWindow, soundsDir) {
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ convert-audio enregistré')
 
   ipcMain.handle('export-audio-file', async (event, params) => {
-    console.log('📥 [export-audio-file] Export audio:', params.fileName)
     try {
       const { data, fileName, format } = params
-      
+
       const result = await dialog.showSaveDialog({
         title: 'Exporter l\'audio',
         defaultPath: fileName || 'exported_audio.wav',
@@ -1330,16 +1176,12 @@ function registerFileHandlers(mainWindow, soundsDir) {
 
       const uint8Array = new Uint8Array(data)
       fs.writeFileSync(result.filePath, uint8Array)
-      
-      console.log(`✅ [export-audio-file] Exporté: ${result.filePath}`)
+
       return { success: true, path: result.filePath }
     } catch (e) {
       return { success: false, error: e.message }
     }
   })
-  console.log('  ✅ export-audio-file enregistré')
-
-  console.log('✅ [fileHandlers] Tous les handlers fichiers enregistrés')
 }
 
 module.exports = {

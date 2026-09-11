@@ -19,10 +19,8 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
   const [isLoading, setIsLoading] = useState(false)
 
   const loadBackups = () => {
-    console.log('🔄 [BackupSettings] loadBackups appelé')
     try {
       const list = getBackupList()
-      console.log('📋 [BackupSettings] Liste des sauvegardes:', list.length)
       setBackups(list)
     } catch (e) {
       console.error('❌ [BackupSettings] Erreur loadBackups:', e)
@@ -32,11 +30,8 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
 
   useEffect(() => {
     loadBackups()
-    
-    const handleRefresh = () => {
-      console.log('🔄 [BackupSettings] Événement refresh-backups reçu')
-      loadBackups()
-    }
+
+    const handleRefresh = () => loadBackups()
     window.addEventListener('refresh-backups', handleRefresh)
     return () => window.removeEventListener('refresh-backups', handleRefresh)
   }, [])
@@ -46,68 +41,65 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
     try {
       const result = await performBackup(store)
       if (result.success) {
-        addToast('✅ Sauvegarde effectuée', 'success')
+        addToast(t('backupSuccess'), 'success')
         loadBackups()
       } else {
-        addToast('❌ Erreur sauvegarde: ' + (result.error || 'Erreur inconnue'), 'error')
+        addToast('❌ ' + (result.error || t('error')), 'error')
       }
     } catch (e) {
       console.error('❌ [BackupSettings] Erreur backup:', e)
-      addToast('❌ Erreur: ' + e.message, 'error')
+      addToast('❌ ' + e.message, 'error')
     }
     setIsLoading(false)
   }
 
   const handleRestore = async (index) => {
     const confirmed = await confirm({
-      title: t('restoreBackup') || 'Restaurer la sauvegarde',
-      message: t('restoreBackupConfirm') || 'Voulez-vous vraiment restaurer cette sauvegarde ?',
+      title: t('restore'),
+      message: t('confirmRestore'),
       type: 'warning'
     })
     if (!confirmed) return
-    
+
     setIsLoading(true)
     try {
       const result = await restoreBackup(store, index)
       if (result.success) {
-        addToast('✅ Sauvegarde restaurée', 'success')
+        addToast(t('backupRestored'), 'success')
         setTimeout(() => window.location.reload(), 500)
       } else {
-        addToast('❌ Erreur restauration: ' + (result.error || 'Erreur inconnue'), 'error')
+        addToast('❌ ' + (result.error || t('error')), 'error')
       }
     } catch (e) {
       console.error('❌ [BackupSettings] Erreur restore:', e)
-      addToast('❌ Erreur: ' + e.message, 'error')
+      addToast('❌ ' + e.message, 'error')
     }
     setIsLoading(false)
   }
 
   const handleDelete = async (index) => {
-    console.log('🗑️ [BackupSettings] handleDelete appelé pour l\'index:', index)
     try {
       const result = await deleteBackup(index)
-      console.log('📤 [BackupSettings] Résultat deleteBackup:', result)
       if (result.success) {
-        addToast('✅ Sauvegarde supprimée', 'success')
+        addToast(t('backupDeleted'), 'success')
         loadBackups()
         window.dispatchEvent(new CustomEvent('refresh-backups'))
-        console.log('🔄 [BackupSettings] Liste rafraîchie après suppression')
       } else {
-        addToast('❌ Erreur: ' + (result.error || 'Erreur inconnue'), 'error')
+        addToast('❌ ' + (result.error || t('error')), 'error')
       }
     } catch (e) {
       console.error('❌ [BackupSettings] Erreur delete:', e)
-      addToast('❌ Erreur: ' + e.message, 'error')
+      addToast('❌ ' + e.message, 'error')
     }
   }
 
   const handleExport = () => {
     try {
       exportBackups()
-      addToast('✅ Sauvegardes exportées', 'success')
+      addToast(t('backupsExported'), 'success')
     } catch (e) {
       console.error('❌ [BackupSettings] Erreur export:', e)
-      addToast('❌ Erreur: ' + e.message, 'error')
+      addToast('❌ ' + e.message, 'error')
     }
   }
 
@@ -118,25 +110,25 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
     input.onchange = async (e) => {
       const file = e.target.files[0]
       if (!file) return
-      
+
       try {
         const result = await importBackups(file)
         if (result.success) {
-          addToast(`✅ ${result.count} sauvegardes importées`, 'success')
+          addToast(`✅ ${result.count} ${t('backupsImported')}`, 'success')
           loadBackups()
         } else {
-          addToast('❌ Erreur import: ' + (result.error || 'Erreur inconnue'), 'error')
+          addToast('❌ ' + (result.error || t('error')), 'error')
         }
       } catch (err) {
         console.error('❌ [BackupSettings] Erreur import:', err)
-        addToast('❌ Erreur: ' + err.message, 'error')
+        addToast('❌ ' + err.message, 'error')
       }
     }
     input.click()
   }
 
   const formatDate = (timestamp) => {
-    return new Date(timestamp).toLocaleString()
+    return new Date(timestamp).toLocaleString(currentLang)
   }
 
   return (
@@ -165,7 +157,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
               padding: '2px 8px',
               borderRadius: 10
             }}>
-              {backups.length} {t('backups')}
+              {backups.length}
             </span>
           </div>
 
@@ -238,7 +230,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
                   {formatDate(backup.timestamp)}
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
-                  {backup.sounds?.length || 0} sons · {backup.profiles?.length || 0} profils
+                  {backup.sounds?.length || 0} {t('sounds')} · {backup.profiles?.length || 0} {t('profiles')}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 4 }}>
@@ -253,8 +245,8 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
                 </button>
                 <DeleteButton
                   onDelete={() => handleDelete(index)}
-                  confirmTitle={t('deleteBackup') || 'Confirmer la suppression de la sauvegarde'}
-                  confirmMessage={t('deleteBackupConfirm') || 'Voulez-vous vraiment supprimer cette sauvegarde ?'}
+                  confirmTitle={t('delete')}
+                  confirmMessage={t('confirmDeleteMessage')}
                   itemName={formatDate(backup.timestamp)}
                   size="sm"
                   variant="ghost-danger"

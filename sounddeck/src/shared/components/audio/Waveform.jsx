@@ -1,6 +1,7 @@
+// src/shared/components/audio/Waveform.jsx
 import { useEffect, useRef, useState } from 'react'
+import { useLanguage } from '@core/i18n/LanguageContext'
 
-// Génère les données de waveform depuis un fichier audio via Web Audio API
 async function generateWaveformData(fileUrl, samples = 200) {
   try {
     const audioContext = new (window.AudioContext || window.webkitAudioContext)()
@@ -21,7 +22,6 @@ async function generateWaveformData(fileUrl, samples = 200) {
       data.push(sum / blockSize)
     }
 
-    // Normaliser entre 0 et 1
     const max = Math.max(...data)
     return max > 0 ? data.map(v => v / max) : data
   } catch (e) {
@@ -45,6 +45,7 @@ export default function Waveform({
   colorSelected = 'rgba(124,111,247,0.8)',
   colorUnselected = 'rgba(124,111,247,0.25)'
 }) {
+  const { t } = useLanguage()
   const canvasRef = useRef(null)
   const [waveData, setWaveData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -55,7 +56,6 @@ export default function Waveform({
     ? (filePath.startsWith('file://') ? filePath : 'file:///' + filePath.replace(/\\/g, '/'))
     : null
 
-  // Charger les données waveform
   useEffect(() => {
     if (!fileUrl) return
     setLoading(true)
@@ -66,7 +66,6 @@ export default function Waveform({
     })
   }, [fileUrl])
 
-  // Dessiner sur le canvas
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || !waveData) return
@@ -88,7 +87,6 @@ export default function Waveform({
       const ratio = i / waveData.length
       const barH = Math.max(2, val * h * 0.9)
 
-      // Couleur selon position
       let fillColor
       if (showHandles) {
         if (ratio >= startRatio && ratio <= endRatio) {
@@ -106,7 +104,6 @@ export default function Waveform({
       ctx.fill()
     })
 
-    // Ligne de lecture
     if (duration > 0) {
       const playX = playRatio * width
       ctx.strokeStyle = 'white'
@@ -165,7 +162,6 @@ export default function Waveform({
     <div ref={containerRef} style={{ position: 'relative', width: '100%', height, cursor: 'crosshair', userSelect: 'none' }}
       onMouseDown={handleMouseDown}>
 
-      {/* Canvas waveform */}
       <canvas
         ref={canvasRef}
         width={600}
@@ -173,7 +169,6 @@ export default function Waveform({
         style={{ width: '100%', height: '100%', display: loading ? 'none' : 'block', borderRadius: 8 }}
       />
 
-      {/* Loading */}
       {loading && (
         <div style={{
           position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
@@ -181,11 +176,10 @@ export default function Waveform({
           gap: 8, color: 'var(--text-tertiary)', fontSize: 12
         }}>
           <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
-          Analyse audio...
+          {t('waveformAnalyzing')}
         </div>
       )}
 
-      {/* Poignée start */}
       {showHandles && duration > 0 && (
         <div style={{
           position: 'absolute', top: 0, bottom: 0,
@@ -207,7 +201,6 @@ export default function Waveform({
         </div>
       )}
 
-      {/* Poignée end */}
       {showHandles && duration > 0 && end != null && (
         <div style={{
           position: 'absolute', top: 0, bottom: 0,

@@ -1,7 +1,5 @@
 // src/features/editor/tutorialSteps.js
-export const TUTORIAL_STEPS = (t) => {
-  console.log('🔍 [TUTORIAL] TUTORIAL_STEPS appelé avec la fonction t:', typeof t)
-  
+export const TUTORIAL_STEPS = (t) => {  
   const steps = [
     {
       id: 'editor-1',
@@ -43,7 +41,6 @@ export const TUTORIAL_STEPS = (t) => {
       hint: t('tutorialEditorStep4Hint') || '💡 Astuce : Le menu contextuel est l\'outil principal pour gérer vos clips.',
       position: 'right',
       afterShow: () => {
-        console.log('🎬 [Tutorial] Étape 4 - Ouverture du menu contextuel')
         setTimeout(() => {
           const clip = document.querySelector('[data-testid="editor-clip"]') || 
                        document.querySelector('.editor-clip-wrapper')
@@ -57,13 +54,11 @@ export const TUTORIAL_STEPS = (t) => {
               clientY: rect.top + 20,
             })
             clip.dispatchEvent(event)
-            console.log('✅ [Tutorial] Menu contextuel ouvert')
             
             setTimeout(() => {
               const menu = document.querySelector('.clip-actions-menu') || 
                            document.querySelector('[data-testid="context-menu"]')
               if (menu) {
-                console.log('✅ [Tutorial] Menu trouvé, mise à jour de la cible')
                 window.__tutorialUpdateTarget?.()
               }
             }, 400)
@@ -71,7 +66,6 @@ export const TUTORIAL_STEPS = (t) => {
         }, 500)
       },
       onLeave: () => {
-        console.log('🔚 [Tutorial] Fermeture du menu contextuel')
         setTimeout(() => {
           const clickEvent = new MouseEvent('mousedown', { view: window, bubbles: true })
           document.body.dispatchEvent(clickEvent)
@@ -88,14 +82,12 @@ export const TUTORIAL_STEPS = (t) => {
       hint: t('tutorialEditorStep5Hint') || '💡 Astuce : L\'auto-preview joue les effets 1 seconde après chaque modification.',
       position: 'top',
       afterShow: () => {
-        console.log('🎬 [Tutorial] Étape 5 - Ouverture du panneau des effets')
         
         const selectClipAndOpenPanel = () => {
           // 1. Sélectionner le clip
           if (window.__editorGetFirstClipId) {
             const clipId = window.__editorGetFirstClipId()
             if (clipId && window.__editorSelectClip) {
-              console.log(`✅ [Tutorial] Sélection du clip via React: ${clipId}`)
               window.__editorSelectClip(clipId)
             }
           } else {
@@ -104,7 +96,6 @@ export const TUTORIAL_STEPS = (t) => {
             if (clipEl) {
               const clickEvent = new MouseEvent('click', { view: window, bubbles: true })
               clipEl.dispatchEvent(clickEvent)
-              console.log('✅ [Tutorial] Clip sélectionné via DOM')
             }
           }
           
@@ -117,11 +108,9 @@ export const TUTORIAL_STEPS = (t) => {
                 const isActive = toggleBtn.classList.contains('btn-primary')
                 if (!isActive) {
                   toggleBtn.click()
-                  console.log('✅ [Tutorial] Panneau ouvert via toggle')
                 }
               }
             } else {
-              console.log('✅ [Tutorial] Panneau déjà ouvert')
             }
             
             // 3. Mettre à jour la cible
@@ -134,8 +123,6 @@ export const TUTORIAL_STEPS = (t) => {
         setTimeout(selectClipAndOpenPanel, 400)
       },
       onLeave: () => {
-        console.log('🔚 [Tutorial] Fin de l\'étape 5 - Panneau reste ouvert')
-        // ✅ NE PAS FERMER LE PANNEAU
       }
     },
     {
@@ -148,7 +135,6 @@ export const TUTORIAL_STEPS = (t) => {
       hint: t('tutorialEditorStep6Hint') || '💡 Astuce : Chaque effet a des paramètres uniques. Explorez-les pour découvrir toutes les possibilités !',
       position: 'top',
       afterShow: () => {
-        console.log('🎬 [Tutorial] Étape 6 - Ajout automatique d\'un effet Volume')
         
         let effectAdded = false
         
@@ -156,7 +142,6 @@ export const TUTORIAL_STEPS = (t) => {
         const ensurePanelOpen = () => {
           const panel = document.querySelector('[data-testid="editor-effects-panel"]')
           if (panel) {
-            console.log('✅ [Tutorial] Panneau déjà ouvert')
             return true
           }
           
@@ -165,7 +150,6 @@ export const TUTORIAL_STEPS = (t) => {
             const isActive = toggleBtn.classList.contains('btn-primary')
             if (!isActive) {
               toggleBtn.click()
-              console.log('✅ [Tutorial] Panneau ouvert via toggle')
             }
             return true
           }
@@ -198,7 +182,6 @@ export const TUTORIAL_STEPS = (t) => {
                                 document.querySelector('[class*="effect-item"]')
           
           if (existingEffect) {
-            console.log('✅ [Tutorial] Un effet existe déjà, mise à jour de la cible')
             setTimeout(() => {
               window.__tutorialUpdateTarget?.()
             }, 200)
@@ -223,7 +206,6 @@ export const TUTORIAL_STEPS = (t) => {
               return
             }
             
-            console.log('✅ [Tutorial] Bouton "Ajouter un effet" trouvé, clic...')
             addBtn.click()
             
             setTimeout(() => {
@@ -234,7 +216,6 @@ export const TUTORIAL_STEPS = (t) => {
               ) || document.querySelector('[data-testid="effect-volume"]')
               
               if (volumeBtn) {
-                console.log('✅ [Tutorial] Effet Volume trouvé, clic...')
                 volumeBtn.click()
                 effectAdded = true
                 
@@ -244,7 +225,6 @@ export const TUTORIAL_STEPS = (t) => {
                                     document.querySelector('[class*="effect-item"]')
                   
                   if (effectItem) {
-                    console.log('✅ [Tutorial] Effet Volume trouvé, mise à jour de la cible')
                     setTimeout(() => {
                       window.__tutorialUpdateTarget?.()
                     }, 200)
@@ -280,7 +260,6 @@ export const TUTORIAL_STEPS = (t) => {
         }, 400)
       },
       onLeave: () => {
-        console.log('🔚 [Tutorial] Fin de l\'étape 6 - Nettoyage des effets')
         
         setTimeout(() => {
           const deleteBtn = document.querySelector('[data-testid="editor-effect-delete"]') ||
@@ -296,7 +275,6 @@ export const TUTORIAL_STEPS = (t) => {
                             )
           
           if (deleteBtn) {
-            console.log('✅ [Tutorial] Bouton de suppression d\'effet trouvé, suppression...')
             deleteBtn.click()
           } else {
             console.warn('⚠️ [Tutorial] Bouton de suppression d\'effet non trouvé')
@@ -335,13 +313,6 @@ export const TUTORIAL_STEPS = (t) => {
       position: 'bottom',
     },
   ]
-  
-  console.log('📋 [TUTORIAL] Steps générés:', steps.length)
-  steps.forEach((step, index) => {
-    console.log(`  ${index + 1}. ${step.id}:`)
-    console.log(`     title: "${step.title}"`)
-    console.log(`     target: "${step.target}"`)
-  })
   
   return steps
 }

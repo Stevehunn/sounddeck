@@ -32,7 +32,11 @@ export default {
   addSound: 'Ajouter un son',
   manageProfile: 'Gérer le profil',
   shortcutPlaceholder: '+ Raccourci',
-  
+  or: 'OU',
+  appLoading: 'Chargement de SoundDeck...',
+  connecting: 'Connexion...',
+  disconnect: 'Déconnecter',
+
   // ─── ÉTATS ────────────────────────────────────────────────────────────
   enabled: 'Activé',
   disabled: 'Désactivé',
@@ -55,7 +59,7 @@ export default {
   success: 'Succès',
   warning: 'Avertissement',
   info: 'Information',
-  
+
   // ─── ACTIONS ──────────────────────────────────────────────────────────
   actions: 'Actions',
   loop: 'Boucle',
@@ -64,7 +68,7 @@ export default {
   stopAll: 'Tout arrêter',
   volume: 'Volume',
   resetVolume: 'Réinitialiser le volume',
-  
+
   // ─── PROFILS ──────────────────────────────────────────────────────────
   profiles: 'Profils',
   newProfile: 'Nouveau profil',
@@ -86,7 +90,7 @@ export default {
   profileManagerDeleteConfirm: 'Confirmer la suppression du profil',
   profileManagerDeleteMessage: 'Voulez-vous vraiment supprimer le profil "{name}" avec ses {count} sons ?',
   profileMoved: 'Profil déplacé',
-  
+
   // ─── TOASTS ───────────────────────────────────────────────────────────
   toastProfileChanged: 'Profil changé',
   toastLoopOn: 'Boucle activée',
@@ -105,7 +109,11 @@ export default {
   toggleShortcutRemoved: 'Raccourci toggle supprimé',
   mixerResynced: 'Mixeur resynchronisé',
   backupDeleted: 'Sauvegarde supprimée',
-  
+  backupSuccess: '✅ Sauvegarde effectuée',
+  backupRestored: '✅ Sauvegarde restaurée',
+  backupsExported: '✅ Sauvegardes exportées',
+  backupsImported: 'sauvegardes importées',
+
   // ─── MENU ─────────────────────────────────────────────────────────────
   menuFavoriteAdd: 'Ajouter aux favoris',
   menuFavoriteRemove: 'Retirer des favoris',
@@ -115,7 +123,7 @@ export default {
   menuChangeEmoji: 'Changer l\'emoji',
   menuRemoveFromProfile: 'Retirer du profil',
   menuDelete: 'Supprimer définitivement',
-  
+
   // ─── CONFIRMATIONS ────────────────────────────────────────────────────
   confirmDeleteSound: 'Confirmer la suppression du son',
   confirmDeleteSoundMessage: 'Voulez-vous vraiment supprimer définitivement ce son ?',
@@ -134,30 +142,32 @@ export default {
   confirmCancel: 'Annuler',
   confirmProceed: 'Confirmer et continuer',
 
-  // ✅ CONFIRMATION DE FERMETURE (QuitConfirm)
   quitConfirmTitle: 'Quitter SoundDeck ?',
   quitConfirmMessage: 'Voulez-vous quitter l\'application ou la réduire dans le tray ?',
   quitConfirmQuit: 'Quitter',
   quitConfirmMinimize: 'Réduire dans le tray',
   quitConfirmCancel: 'Annuler',
   quitConfirmRemember: 'Ne plus me demander',
-  
+
   // ─── THÈME ────────────────────────────────────────────────────────────
   themeAutoOn: 'Thème automatique activé',
   themeAutoOff: 'Thème automatique désactivé',
-  
+  themeNight: 'Nuit',
+  themeDay: 'Jour',
+
   // ─── CARTES ───────────────────────────────────────────────────────────
   cardSizeSmall: 'Petit',
   cardSizeMedium: 'Moyen',
   cardSizeLarge: 'Grand',
-  
+
   // ─── TAGS ─────────────────────────────────────────────────────────────
   tags: 'Tags',
   addTag: 'Ajouter un tag',
   removeTag: 'Supprimer le tag',
   tagAdded: 'Tag ajouté',
   tagRemoved: 'Tag supprimé',
-  
+  soundsLoaded: 'son(s) chargé(s)',
+
   // ─── DIVERS ──────────────────────────────────────────────────────────
   playCount: 'lectures',
   favorites: 'Favoris',
@@ -192,7 +202,10 @@ export default {
   addedToProfile: 'ajouté au profil',
   importedAndCompressed: 'importés et compressés',
   profileSounds: 'Sons du profil',
-  
+  chooseEmoji: 'Choisir un emoji',
+  waveformAnalyzing: 'Analyse audio...',
+  pluginBadge: 'Plugin',
+
   // ─── FEEDBACK ─────────────────────────────────────────────────────────
   feedbackTitle: 'Envoyer un feedback',
   feedbackType: 'Type de feedback',
@@ -212,7 +225,7 @@ export default {
   feedbackError: 'Erreur lors de l\'envoi',
   feedbackThankYou: 'Merci !',
   feedbackThankYouDesc: 'Votre feedback a été envoyé avec succès.',
-  
+
   // ─── PLUGINS ──────────────────────────────────────────────────────────
   pluginInstaller: 'Installer un plugin',
   pluginName: 'Nom du plugin',
@@ -222,7 +235,19 @@ export default {
   pluginNotFound: 'Plugin non trouvé',
   pluginInstallError: 'Erreur lors de l\'installation du plugin',
   pluginUninstallError: 'Erreur lors de la désinstallation du plugin',
-  
+  pluginFromUrl: '📡 Installer depuis une URL',
+  pluginFromFile: '📁 Installer depuis un fichier',
+  pluginChooseFile: 'Choisir un fichier .sdplugin',
+  pluginFormatInfo: 'Format .sdplugin',
+  pluginFormatDesc: 'Une archive ZIP contenant un fichier',
+  pluginInvalidUrl: 'Veuillez entrer une URL valide',
+  pluginUnsupportedFormat: 'Format non supporté. Utilisez un fichier .sdplugin ou .zip',
+  pluginDownloading: 'Téléchargement du plugin...',
+  pluginInstalling: 'Installation en cours...',
+  pluginExtracting: 'Extraction des fichiers...',
+  pluginReadingFile: 'Lecture du fichier...',
+  pluginDone: 'Terminé !',
+
   // ─── OBS ──────────────────────────────────────────────────────────────
   obsConnect: 'Se connecter à OBS',
   obsHost: 'Hôte OBS',
@@ -239,12 +264,15 @@ export default {
   obsConnected: 'Connecté à OBS',
   obsDisconnected: 'Déconnecté de OBS',
   obsConnectionError: 'Erreur de connexion OBS',
-  
+
   // ─── TWITCH ──────────────────────────────────────────────────────────
   twitchAlerts: 'Alertes Twitch',
   noAlerts: 'Aucune alerte',
   twitchAlertsDesc: 'Les alertes Twitch apparaîtront ici en temps réel',
-  
+  twitchFollowMsg: '{username} a suivi la chaîne ! 🎉',
+  twitchDonationMsg: '{username} a fait un don de {amount}€ ! ❤️',
+  twitchSubMsg: '{username} s\'est abonné ({tier}) ! 🎉',
+
   // ─── GESTION DES SONS ──────────────────────────────────────────────
   soundManagement: 'Gestion des sons',
   compressOnImport: 'Compresser à l\'import',
@@ -264,7 +292,7 @@ export default {
   compressionError: '❌ Erreur de compression : {error}',
   compressionSkipped: 'ℹ️ Compression ignorée (fichier déjà petit)',
   compressionNotAvailable: '⚠️ ffmpeg non disponible, compression désactivée',
-  
+
   // ─── NORMALISATION ──────────────────────────────────────────────────
   normalization: 'Normalisation',
   normalizationDesc: 'Égalise le volume des sons automatiquement',
@@ -288,4 +316,25 @@ export default {
   normalizationTargetHigh: '-0.9 dB (Fort)',
   normalizationTargetVeryHigh: '-0.4 dB (Très fort)',
   normalizationTargetMax: '0 dB (Max)',
+
+  // ─── ACCESSIBILITÉ ────────────────────────────────────────────────────
+  a11ySound: 'Son',
+  a11ySoundGrid: 'Grille des sons',
+  a11yMainNav: 'Navigation principale',
+  a11ySearch: 'Rechercher des sons',
+  a11yAudioProgress: 'Progression audio',
+  a11yTabs: 'Navigation par onglets',
+  a11yPlays: 'lectures',
+  a11yClickToPlay: 'Cliquez pour jouer, clic droit pour le menu.',
+  a11yVolumeAt: 'Volume à',
+  a11yVolumeHint: 'Utilisez les flèches haut/bas pour ajuster.',
+  a11yShortcut: 'Raccourci',
+  a11yClickToEdit: 'Cliquez pour modifier.',
+  a11yNoShortcut: 'Aucun raccourci. Cliquez pour enregistrer un nouveau raccourci.',
+  a11ySearchSounds: 'Recherche de sons.',
+  a11yResults: 'résultats.',
+  a11yProfile: 'Profil',
+  a11ySounds: 'sons.',
+  a11ySoundOf: 'Son',
+  a11yOf: 'sur',
 };

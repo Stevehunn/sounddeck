@@ -18,9 +18,6 @@ const effectCache = new Map()
  * @returns {AudioBuffer} Buffer avec effets appliqués
  */
 export function applyEffectsToBuffer(audioBuffer, effects, sampleRate = 44100, normalize = true) {
-  console.log(`🎛️ [realTimeEffects] applyEffectsToBuffer appelé`)
-  console.log(`📊 [realTimeEffects] Effets reçus:`, effects)
-  console.log(`📊 [realTimeEffects] Buffer durée: ${audioBuffer.duration.toFixed(2)}s`)
   
   if (!audioBuffer) {
     console.error('❌ [realTimeEffects] Buffer null')
@@ -28,16 +25,13 @@ export function applyEffectsToBuffer(audioBuffer, effects, sampleRate = 44100, n
   }
   
   if (!effects || effects.length === 0) {
-    console.log('ℹ️ [realTimeEffects] Aucun effet à appliquer')
     return audioBuffer
   }
   
   // Filtrer les effets actifs
   const activeEffects = effects.filter(e => e.enabled)
-  console.log(`📊 [realTimeEffects] Effets actifs: ${activeEffects.length}`, activeEffects)
   
   if (activeEffects.length === 0) {
-    console.log('ℹ️ [realTimeEffects] Aucun effet actif')
     return audioBuffer
   }
   
@@ -49,32 +43,25 @@ export function applyEffectsToBuffer(audioBuffer, effects, sampleRate = 44100, n
   try {
     // Appliquer les effets dans l'ordre
     for (const effect of activeEffects) {
-      console.log(`🎛️ [realTimeEffects] Application de l'effet: ${effect.type}`, effect.params)
       
       switch (effect.type) {
         case 'volume':
           result = applyVolumeEffect(result, effect.params.value || 1, ctx)
-          console.log(`  ✅ Volume appliqué: ${effect.params.value || 1}x`)
           break
         case 'fadeIn':
           result = applyFadeInEffect(result, effect.params.duration || 0.5, ctx)
-          console.log(`  ✅ Fade In appliqué: ${effect.params.duration || 0.5}s`)
           break
         case 'fadeOut':
           result = applyFadeOutEffect(result, effect.params.duration || 0.5, ctx)
-          console.log(`  ✅ Fade Out appliqué: ${effect.params.duration || 0.5}s`)
           break
         case 'speed':
           result = applySpeedEffect(result, effect.params.value || 1, ctx)
-          console.log(`  ✅ Speed appliqué: ${effect.params.value || 1}x`)
           break
         case 'echo':
           result = applyEchoEffect(result, effect.params.delay || 0.3, effect.params.decay || 0.5, effect.params.mix || 0.3, ctx)
-          console.log(`  ✅ Echo appliqué: delay=${effect.params.delay || 0.3}s, mix=${effect.params.mix || 0.3}`)
           break
         case 'reverb':
           result = applyReverbEffect(result, effect.params.roomSize || 0.5, effect.params.mix || 0.2, ctx)
-          console.log(`  ✅ Reverb appliquée: roomSize=${effect.params.roomSize || 0.5}, mix=${effect.params.mix || 0.2}`)
           break
         default:
           console.warn(`⚠️ [realTimeEffects] Effet non reconnu: ${effect.type}`)
@@ -93,12 +80,9 @@ export function applyEffectsToBuffer(audioBuffer, effects, sampleRate = 44100, n
     
     if (shouldNormalize) {
       result = normalizeBuffer(result, ctx)
-      console.log(`  ✅ Normalisation appliquée`)
     } else {
-      console.log(`  ℹ️ Normalisation ignorée (volume=${volumeValue}x, onlyVolume=${onlyVolume})`)
     }
     
-    console.log(`✅ [realTimeEffects] Tous les effets appliqués avec succès`)
     return result
     
   } catch (e) {
@@ -123,11 +107,9 @@ export function applyEffectsToBuffer(audioBuffer, effects, sampleRate = 44100, n
 function applyVolumeEffect(buffer, volume, ctx) {
   const clampedVolume = Math.max(0, Math.min(5, volume))
   
-  console.log(`🔊 [applyVolumeEffect] volume reçu: ${volume}, clamped: ${clampedVolume}`)
   
   // ✅ Si le volume est à 1, retourner le buffer inchangé
   if (Math.abs(clampedVolume - 1) < 0.001) {
-    console.log(`ℹ️ [applyVolumeEffect] Volume à 1, aucun changement`)
     return buffer
   }
   
@@ -145,7 +127,6 @@ function applyVolumeEffect(buffer, volume, ctx) {
     }
   }
   
-  console.log(`✅ [applyVolumeEffect] Volume appliqué: ${clampedVolume}x`)
   return newBuffer
 }
 
@@ -158,7 +139,6 @@ function applyVolumeEffect(buffer, volume, ctx) {
  */
 function applyFadeInEffect(buffer, duration, ctx) {
   if (duration <= 0.05) {
-    console.log(`ℹ️ [applyFadeInEffect] Durée trop courte (${duration}s), ignorée`)
     return buffer
   }
   
@@ -168,7 +148,6 @@ function applyFadeInEffect(buffer, duration, ctx) {
   
   let fadeSamples = Math.floor(duration * sampleRate)
   
-  console.log(`🌅 [applyFadeInEffect] Duration: ${duration}s, Fade samples: ${fadeSamples}, Total samples: ${length}`)
   
   // ✅ Limiter le fade à la durée du clip
   if (fadeSamples > length) {
@@ -177,7 +156,6 @@ function applyFadeInEffect(buffer, duration, ctx) {
   }
   
   if (fadeSamples >= length) {
-    console.log(`ℹ️ Fade In couvre tout le clip`)
   }
   
   const newBuffer = ctx.createBuffer(channels, length, sampleRate)
@@ -205,7 +183,6 @@ function applyFadeInEffect(buffer, duration, ctx) {
     }
   }
   
-  console.log(`✅ [applyFadeInEffect] Fade In appliqué: ${duration}s`)
   return newBuffer
 }
 
@@ -218,7 +195,6 @@ function applyFadeInEffect(buffer, duration, ctx) {
  */
 function applyFadeOutEffect(buffer, duration, ctx) {
   if (duration <= 0.05) {
-    console.log(`ℹ️ [applyFadeOutEffect] Durée trop courte (${duration}s), ignorée`)
     return buffer
   }
   
@@ -228,7 +204,6 @@ function applyFadeOutEffect(buffer, duration, ctx) {
   
   let fadeSamples = Math.floor(duration * sampleRate)
   
-  console.log(`🌇 [applyFadeOutEffect] Duration: ${duration}s, Fade samples: ${fadeSamples}, Total samples: ${length}`)
   
   // ✅ Limiter le fade à la durée du clip
   if (fadeSamples > length) {
@@ -239,7 +214,6 @@ function applyFadeOutEffect(buffer, duration, ctx) {
   const start = Math.max(0, length - fadeSamples)
   
   if (fadeSamples >= length) {
-    console.log(`ℹ️ Fade Out couvre tout le clip`)
   }
   
   const newBuffer = ctx.createBuffer(channels, length, sampleRate)
@@ -267,7 +241,6 @@ function applyFadeOutEffect(buffer, duration, ctx) {
     }
   }
   
-  console.log(`✅ [applyFadeOutEffect] Fade Out appliqué: ${duration}s`)
   return newBuffer
 }
 
@@ -454,14 +427,12 @@ function normalizeBuffer(buffer, ctx) {
   
   // ✅ Si maxPeak est déjà dans une plage acceptable, ne rien faire
   if (maxPeak === 0 || (maxPeak < 0.95 && maxPeak > 0.1)) {
-    console.log(`  ℹ️ [normalizeBuffer] Pas de normalisation nécessaire (maxPeak=${maxPeak.toFixed(3)})`)
     return buffer
   }
   
   // ✅ Si maxPeak > 0.95, réduire pour éviter l'écrêtage
   if (maxPeak > 0.95) {
     const gain = 0.95 / maxPeak
-    console.log(`  🔧 [normalizeBuffer] Réduction du gain: ${gain.toFixed(3)}x (maxPeak=${maxPeak.toFixed(3)})`)
     
     const newBuffer = ctx.createBuffer(channels, length, buffer.sampleRate)
     for (let channel = 0; channel < channels; channel++) {
@@ -477,7 +448,6 @@ function normalizeBuffer(buffer, ctx) {
   // ✅ Si maxPeak < 0.1, augmenter le gain (pour les sons très faibles)
   if (maxPeak < 0.1) {
     const gain = 0.3 / maxPeak
-    console.log(`  🔧 [normalizeBuffer] Augmentation du gain: ${gain.toFixed(3)}x (maxPeak=${maxPeak.toFixed(3)})`)
     
     const newBuffer = ctx.createBuffer(channels, length, buffer.sampleRate)
     for (let channel = 0; channel < channels; channel++) {

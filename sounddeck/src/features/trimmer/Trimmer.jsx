@@ -1,11 +1,9 @@
 // src/features/trimmer/Trimmer.jsx
-import { useState, useEffect, useRef, useCallback } from 'react'
-// ✅ CORRIGER LES IMPORTS
+import { useState, useEffect, useRef } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import Waveform, { formatTime } from '@shared/components/audio/Waveform'
 import useConfirm from '@shared/hooks/useConfirm'
 
-// ✅ Emojis uniques - supprimer les doublons
 const EMOJIS = [
   '🔊','🎵','🎶','🎼','🎧','🎤','🎸','🎹','🎺','🎻','🥁','🪗','🪘','🎷','🪕',
   '😂','🤣','😱','😬','🤡','👾','🦄','💥','🔥','⭐','🌟','✨','💫','🌈','⚡',
@@ -16,26 +14,15 @@ const EMOJIS = [
   '🚀','🛸','💎','💰','💵','💶','💷','💴','🪙','🧿','🔮','🪄','⚔️','🛡️','🏹'
 ]
 
-// ✅ Fonction utilitaire pour obtenir l'URL correcte de l'image
 const getImageUrl = (imagePath) => {
   if (!imagePath) return null
-  
-  // ✅ Si c'est déjà une URL HTTP(S), la retourner directement
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath
-  }
-  
-  // ✅ Si c'est déjà une URL file://, la retourner directement
-  if (imagePath.startsWith('file://')) {
-    return imagePath
-  }
-  
-  // ✅ Sinon, la traiter comme un chemin local
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath
+  if (imagePath.startsWith('file://')) return imagePath
   return `file:///${imagePath.replace(/\\/g, '/')}`
 }
 
 export default function Trimmer({ store, addToast }) {
-  const { t, currentLang } = useLanguage()
+  const { t } = useLanguage()
   const [selectedSound, setSelectedSound] = useState(null)
   const [search, setSearch] = useState('')
 
@@ -52,7 +39,7 @@ export default function Trimmer({ store, addToast }) {
         <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
             <i className="ti ti-cut" style={{ color: 'var(--accent)' }} />
-            {t('editorTitle')}
+            {t('trimmerTitle')}
           </div>
           <input
             value={search}
@@ -101,8 +88,8 @@ function SoundListItem({ sound, active, onClick }) {
   const imageUrl = sound.image ? getImageUrl(sound.image) : null
 
   return (
-    <button 
-      onClick={onClick} 
+    <button
+      onClick={onClick}
       className={`sidebar-item ${active ? 'active' : ''}`}
       style={{ borderLeft: `2px solid ${active ? 'var(--accent)' : 'transparent'}` }}
       data-testid={`sound-list-item-${sound.id}`}
@@ -154,7 +141,6 @@ function SoundEditor({ sound, store, addToast, onDone }) {
   const [saving, setSaving] = useState(false)
 
   const audioRef = useRef(null)
-  const timelineRef = useRef(null)
 
   const fileUrl = sound.path.startsWith('file://')
     ? sound.path
@@ -219,7 +205,6 @@ function SoundEditor({ sound, store, addToast, onDone }) {
     if (!name.trim()) { addToast(t('editorNameRequired'), 'error'); return }
     if (targetProfiles.length === 0) { addToast(t('editorProfileRequired'), 'error'); return }
 
-    // Vérifier les doublons
     const existingSound = store.sounds.find(s => s.name.toLowerCase() === name.trim().toLowerCase())
     if (existingSound) {
       const confirmed = await confirm({
@@ -258,7 +243,6 @@ function SoundEditor({ sound, store, addToast, onDone }) {
     onDone()
   }
 
-  // ✅ Aperçu de l'image avec gestion des URLs
   const previewImageUrl = imagePreview ? getImageUrl(imagePreview) : null
 
   return (
@@ -272,10 +256,10 @@ function SoundEditor({ sound, store, addToast, onDone }) {
           <button className="btn-secondary btn-lg" onClick={onDone} style={{ borderRadius: 'var(--radius-md)' }}>
             <i className="ti ti-x" /> {t('cancel')}
           </button>
-          <button 
-            className="btn-primary btn-lg" 
-            onClick={handleSave} 
-            disabled={saving} 
+          <button
+            className="btn-primary btn-lg"
+            onClick={handleSave}
+            disabled={saving}
             style={{ borderRadius: 'var(--radius-md)' }}
             data-testid="trimmer-create-button"
           >
@@ -345,19 +329,19 @@ function SoundEditor({ sound, store, addToast, onDone }) {
             </div>
 
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <button 
-                onClick={togglePlay} 
-                className="btn-secondary btn-lg" 
+              <button
+                onClick={togglePlay}
+                className="btn-secondary btn-lg"
                 style={{ flex: 1, justifyContent: 'center', borderRadius: 'var(--radius-md)', minWidth: 120 }}
                 data-testid="trimmer-listen-button"
               >
                 <i className={`ti ${playing ? 'ti-player-pause' : 'ti-player-play'}`} />
                 {playing ? t('trimmerPause') : t('listenSelection')}
               </button>
-              <button 
-                onClick={() => { setStart(0); setEnd(duration) }} 
-                className="btn-ghost btn-lg" 
-                title={t('selectAll')} 
+              <button
+                onClick={() => { setStart(0); setEnd(duration) }}
+                className="btn-ghost btn-lg"
+                title={t('selectAll')}
                 style={{ borderRadius: 'var(--radius-md)' }}
                 data-testid="trimmer-reset-button"
               >
@@ -425,8 +409,8 @@ function SoundEditor({ sound, store, addToast, onDone }) {
                 <SectionTitle icon="ti-mood-smile" label={t('editorEmojiLabel')} />
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, maxHeight: 200, overflowY: 'auto' }}>
                   {EMOJIS.map(e => (
-                    <button 
-                      key={e} 
+                    <button
+                      key={e}
                       onClick={() => setEmoji(e)}
                       style={{
                         width: 34, height: 34, fontSize: 16, borderRadius: 'var(--radius-sm)', cursor: 'pointer',
@@ -434,11 +418,11 @@ function SoundEditor({ sound, store, addToast, onDone }) {
                         background: emoji === e ? 'var(--accent-light)' : 'var(--bg-tertiary)',
                         transition: 'all var(--transition-base) ease'
                       }}
-                      onMouseEnter={e => {
-                        if (emoji !== e) e.currentTarget.style.borderColor = 'var(--accent)'
+                      onMouseEnter={ev => {
+                        if (emoji !== e) ev.currentTarget.style.borderColor = 'var(--accent)'
                       }}
-                      onMouseLeave={e => {
-                        if (emoji !== e) e.currentTarget.style.borderColor = 'var(--border)'
+                      onMouseLeave={ev => {
+                        if (emoji !== e) ev.currentTarget.style.borderColor = 'var(--border)'
                       }}
                     >
                       {e}

@@ -336,6 +336,11 @@ export default {
   themeFieldSuccess: 'Success (green)',
   themeFieldWarning: 'Warning',
   themeFieldDanger: 'Danger (red)',
+  themePresetDefault: 'Violet (default)',
+  themePresetMidnightBlue: 'Midnight Blue',
+  themePresetForest: 'Forest',
+  themePresetEmber: 'Ember',
+  themePresetPastelLight: 'Pastel Light',
   
   // ─── ERRORS ──────────────────────────────────────────────────────────
   errorLogs: 'Error logs',

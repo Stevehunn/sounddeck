@@ -1,3 +1,4 @@
+// src/shared/components/settings/PluginInstaller.jsx
 import { useState, useRef } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
@@ -9,18 +10,15 @@ export default function PluginInstaller({ onClose, addToast, lang, onInstall }) 
   const [status, setStatus] = useState('')
   const fileInputRef = useRef(null)
 
-  console.log('🔧 PluginInstaller monté')
-
   const handleInstallFromUrl = async () => {
     if (!url.trim()) {
-      addToast('Veuillez entrer une URL valide', 'error')
+      addToast(t('pluginInvalidUrl'), 'error')
       return
     }
 
-    console.log('📥 Installation depuis URL:', url)
     setInstalling(true)
     setProgress(10)
-    setStatus('Téléchargement du plugin...')
+    setStatus(t('pluginDownloading'))
 
     try {
       const response = await fetch(url)
@@ -28,34 +26,29 @@ export default function PluginInstaller({ onClose, addToast, lang, onInstall }) 
         throw new Error(`HTTP ${response.status}`)
       }
 
-      console.log('✅ Fichier téléchargé, taille:', response.headers.get('content-length'))
-
       setProgress(40)
-      setStatus('Installation en cours...')
+      setStatus(t('pluginInstalling'))
 
       const arrayBuffer = await response.arrayBuffer()
-      console.log('📦 Buffer taille:', arrayBuffer.byteLength)
 
       setProgress(70)
-      setStatus('Extraction des fichiers...')
+      setStatus(t('pluginExtracting'))
 
-      // ✅ Passer le buffer directement
       const result = await window.electronAPI.installPluginFromBuffer?.(arrayBuffer, url.split('/').pop() || 'plugin.sdplugin')
 
       setProgress(100)
-      setStatus('Terminé !')
+      setStatus(t('pluginDone'))
 
       if (result?.success) {
-        addToast(`✅ Plugin "${result.name}" installé avec succès !`, 'success')
+        addToast(`✅ ${result.name}`, 'success')
         if (onInstall) onInstall(result)
         setTimeout(onClose, 1500)
       } else {
-        addToast(`❌ Erreur: ${result?.error || 'Installation échouée'}`, 'error')
+        addToast(`❌ ${result?.error || t('pluginInstallError')}`, 'error')
       }
     } catch (e) {
-      console.error('❌ Erreur:', e)
-      setStatus('Erreur')
-      addToast(`❌ Erreur: ${e.message}`, 'error')
+      setStatus(t('error'))
+      addToast(`❌ ${e.message}`, 'error')
     } finally {
       setInstalling(false)
       setProgress(0)
@@ -64,56 +57,43 @@ export default function PluginInstaller({ onClose, addToast, lang, onInstall }) 
   }
 
   const handleInstallFromFile = () => {
-    console.log('📁 Ouverture du dialogue de fichier')
     fileInputRef.current?.click()
   }
 
   const handleFileSelected = async (e) => {
     const file = e.target.files[0]
-    if (!file) {
-      console.log('❌ Aucun fichier sélectionné')
-      return
-    }
+    if (!file) return
 
-    console.log('📁 Fichier sélectionné:', file.name, 'taille:', file.size, 'type:', file.type)
-
-    // Vérifier l'extension
     if (!file.name.endsWith('.sdplugin') && !file.name.endsWith('.zip')) {
-      addToast('Format non supporté. Utilisez un fichier .sdplugin ou .zip', 'error')
+      addToast(t('pluginUnsupportedFormat'), 'error')
       return
     }
 
     setInstalling(true)
     setProgress(20)
-    setStatus('Lecture du fichier...')
+    setStatus(t('pluginReadingFile'))
 
     try {
-      // ✅ Lire le fichier comme ArrayBuffer
       const arrayBuffer = await file.arrayBuffer()
-      console.log('📦 Buffer taille:', arrayBuffer.byteLength)
 
       setProgress(50)
-      setStatus('Installation en cours...')
+      setStatus(t('pluginInstalling'))
 
-      // ✅ Passer le buffer directement au main process
       const result = await window.electronAPI.installPluginFromBuffer?.(arrayBuffer, file.name)
 
-      console.log('📤 Résultat installation:', result)
-
       setProgress(100)
-      setStatus('Terminé !')
+      setStatus(t('pluginDone'))
 
       if (result?.success) {
-        addToast(`✅ Plugin "${result.name}" installé avec succès !`, 'success')
+        addToast(`✅ ${result.name}`, 'success')
         if (onInstall) onInstall(result)
         setTimeout(onClose, 1500)
       } else {
-        addToast(`❌ Erreur: ${result?.error || 'Installation échouée'}`, 'error')
+        addToast(`❌ ${result?.error || t('pluginInstallError')}`, 'error')
       }
     } catch (err) {
-      console.error('❌ Erreur installation:', err)
-      setStatus('Erreur')
-      addToast(`❌ Erreur: ${err.message}`, 'error')
+      setStatus(t('error'))
+      addToast(`❌ ${err.message}`, 'error')
     } finally {
       setInstalling(false)
       setProgress(0)
@@ -128,19 +108,19 @@ export default function PluginInstaller({ onClose, addToast, lang, onInstall }) 
       <div className="modal" style={{ width: 520 }} onClick={e => e.stopPropagation()}>
         <div className="modal-title">
           <i className="ti ti-puzzle" style={{ color: 'var(--accent)' }} />
-          Installer un plugin
+          {t('pluginsInstall')}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Méthode 1: URL */}
           <div>
-            <div style={{ 
-              fontSize: 12, 
-              fontWeight: 600, 
+            <div style={{
+              fontSize: 12,
+              fontWeight: 600,
               color: 'var(--text-secondary)',
               marginBottom: 6
             }}>
-              📡 Installer depuis une URL
+              {t('pluginFromUrl')}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
@@ -151,48 +131,48 @@ export default function PluginInstaller({ onClose, addToast, lang, onInstall }) 
                 disabled={installing}
                 onKeyDown={e => e.key === 'Enter' && handleInstallFromUrl()}
               />
-              <button 
+              <button
                 className="btn-primary btn-sm"
                 onClick={handleInstallFromUrl}
                 disabled={installing || !url.trim()}
                 style={{ minWidth: 100 }}
               >
-                {installing ? 'Installation...' : 'Installer'}
+                {installing ? t('pluginInstalling') : t('pluginsInstallBtn')}
               </button>
             </div>
           </div>
 
           {/* Séparateur */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
             gap: 12,
             color: 'var(--text-tertiary)',
             fontSize: 11
           }}>
             <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-            OU
+            {t('or')}
             <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
           </div>
 
           {/* Méthode 2: Fichier */}
           <div>
-            <div style={{ 
-              fontSize: 12, 
-              fontWeight: 600, 
+            <div style={{
+              fontSize: 12,
+              fontWeight: 600,
               color: 'var(--text-secondary)',
               marginBottom: 6
             }}>
-              📁 Installer depuis un fichier
+              {t('pluginFromFile')}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button 
+              <button
                 className="btn-secondary"
                 onClick={handleInstallFromFile}
                 disabled={installing}
                 style={{ flex: 1, justifyContent: 'center' }}
               >
-                <i className="ti ti-folder-open" /> Choisir un fichier .sdplugin
+                <i className="ti ti-folder-open" /> {t('pluginChooseFile')}
               </button>
               <input
                 ref={fileInputRef}
@@ -207,8 +187,8 @@ export default function PluginInstaller({ onClose, addToast, lang, onInstall }) 
           {/* Barre de progression */}
           {installing && (
             <div style={{ marginTop: 4 }}>
-              <div style={{ 
-                display: 'flex', 
+              <div style={{
+                display: 'flex',
                 justifyContent: 'space-between',
                 fontSize: 11,
                 color: 'var(--text-secondary)',
@@ -235,9 +215,9 @@ export default function PluginInstaller({ onClose, addToast, lang, onInstall }) 
             </div>
           )}
 
-          {/* Info */}
-          <div style={{ 
-            fontSize: 11, 
+          {/* Info format */}
+          <div style={{
+            fontSize: 11,
             color: 'var(--text-tertiary)',
             padding: '10px 12px',
             background: 'var(--bg-tertiary)',
@@ -246,25 +226,25 @@ export default function PluginInstaller({ onClose, addToast, lang, onInstall }) 
             marginTop: 4
           }}>
             <i className="ti ti-info-circle" style={{ marginRight: 4, color: 'var(--accent)' }} />
-            <strong>Format .sdplugin :</strong> Une archive ZIP contenant un fichier 
-            <code style={{ 
-              background: 'var(--bg-secondary)', 
-              padding: '1px 6px', 
+            <strong>{t('pluginFormatInfo')} :</strong> {t('pluginFormatDesc')}
+            <code style={{
+              background: 'var(--bg-secondary)',
+              padding: '1px 6px',
               borderRadius: 3,
               margin: '0 4px',
               fontSize: 10
-            }}>plugin.json</code> 
-            et le code du plugin.
+            }}>plugin.json</code>
+            + index.js
           </div>
         </div>
 
         <div className="modal-actions" style={{ marginTop: 16 }}>
-          <button 
-            className="btn-secondary btn-lg" 
+          <button
+            className="btn-secondary btn-lg"
             onClick={onClose}
             disabled={installing}
           >
-            Fermer
+            {t('close')}
           </button>
         </div>
       </div>

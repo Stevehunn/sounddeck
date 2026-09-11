@@ -248,11 +248,6 @@ function EditorTimelineContent() {
     }
   })
 
-  useEffect(() => {
-    if (markersState.hasInitialized) return
-    setMarkersState(prev => ({ ...prev, hasInitialized: true }))
-  }, [markersState.hasInitialized])
-
   const handleAddTrack = useCallback(() => {
     try {
       const trackIndex = tracks.length + 1
@@ -314,9 +309,13 @@ function EditorTimelineContent() {
       }
       
       if (track.clips.length > 0) {
-        const confirmed = window.confirm(
-          `La piste "${track.name}" contient ${track.clips.length} clip(s). Voulez-vous vraiment la supprimer ?`
-        )
+        const confirmed = await confirm({
+          title: t('confirmDeleteTrack'),
+          message: t('confirmDeleteTrackMessage') || `Voulez-vous vraiment supprimer cette piste ?`,
+          type: 'danger',
+          confirmText: t('delete') || 'Supprimer',
+          cancelText: t('cancel') || 'Annuler'
+        })
         if (!confirmed) return
       }
       
@@ -1019,18 +1018,14 @@ function EditorTimelineContent() {
   useEffect(() => {
     // Exposer la fonction de sélection de clip via window pour le tutoriel
     window.__editorSelectClip = (clipId) => {
-      console.log(`🔍 [Editor] Sélection du clip via tutoriel: ${clipId}`)
-      // Trouver le clip et le sélectionner
       for (const track of tracks) {
         const clip = track.clips.find(c => c.id === clipId)
         if (clip) {
           selectClip(clipId, track.id)
           setShowEffectsPanel(true)
-          console.log(`✅ [Editor] Clip sélectionné: ${clip.name}`)
           return true
         }
       }
-      console.warn(`⚠️ [Editor] Clip non trouvé: ${clipId}`)
       return false
     }
     

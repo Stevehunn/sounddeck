@@ -1,4 +1,6 @@
+// src/shared/components/audio/VirtualizedSoundGrid.jsx
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useLanguage } from '@core/i18n/LanguageContext'
 import SoundCard from '@shared/components/audio/SoundCard'
 
 export default function VirtualizedSoundGrid({
@@ -23,6 +25,7 @@ export default function VirtualizedSoundGrid({
   lazyLoading = true,
   itemsPerPage = 20
 }) {
+  const { t } = useLanguage()
   const [visibleSounds, setVisibleSounds] = useState([])
   const [page, setPage] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
@@ -78,7 +81,6 @@ export default function VirtualizedSoundGrid({
     if (!lazyLoading || !hasMore) return
 
     if (!lastElementRef.current) {
-      // Si pas d'élément, charger plus
       if (visibleSounds.length > 0 && visibleSounds.length < sounds.length) {
         loadMore()
       }
@@ -118,12 +120,12 @@ export default function VirtualizedSoundGrid({
 
   return (
     <div ref={containerRef}>
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`, 
-        gap: 10, 
-        position: 'relative', 
-        zIndex: 1 
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
+        gap: 10,
+        position: 'relative',
+        zIndex: 1
       }}>
         {visibleSounds.map((s, index) => {
           const isDragging = draggedSoundId === s.id
@@ -164,10 +166,10 @@ export default function VirtualizedSoundGrid({
                   boxShadow: '0 0 10px var(--accent)'
                 }} />
               )}
-              <SoundCard 
-                sound={s} 
-                shortcut={shortcuts[s.id]} 
-                audioDevice={audioDevice} 
+              <SoundCard
+                sound={s}
+                shortcut={shortcuts[s.id]}
+                audioDevice={audioDevice}
                 volume={volume}
                 loopEnabled={loopEnabled}
                 playLocally={playLocally}
@@ -176,24 +178,24 @@ export default function VirtualizedSoundGrid({
                 onSetShortcut={store.setShortcut}
                 onVolumeChange={store.updateSoundVolume}
                 onPlay={store.incrementPlayCount}
-                onRemoveFromProfile={async (id) => { 
+                onRemoveFromProfile={async (id) => {
                   await store.removeSoundFromProfile(id, store.currentProfileId)
-                  addToast?.(lang === 'fr' ? 'Retiré du profil' : 'Removed from profile', 'info')
+                  addToast?.(t('removedFromProfile'), 'info')
                 }}
-                onDelete={async (id) => { 
+                onDelete={async (id) => {
                   await store.deleteSound(id)
-                  addToast?.(lang === 'fr' ? 'Supprimé' : 'Deleted', 'info')
+                  addToast?.(t('deleted'), 'info')
                 }}
                 onRename={(id, name) => store.updateSound(id, { name })}
                 onChangeImage={store.updateSoundImage}
                 onChangeEmoji={store.updateSoundEmoji}
                 onAddTag={async (id, tag) => {
                   await store.addTagToSound(id, tag)
-                  addToast?.(`${lang === 'fr' ? 'Tag ajouté' : 'Tag added'}: #${tag}`, 'success')
+                  addToast?.(`${t('tagAdded')}: #${tag}`, 'success')
                 }}
                 onRemoveTag={async (id, tag) => {
                   await store.removeTagFromSound(id, tag)
-                  addToast?.(`${lang === 'fr' ? 'Tag retiré' : 'Tag removed'}: #${tag}`, 'info')
+                  addToast?.(`${t('tagRemoved')}: #${tag}`, 'info')
                 }}
                 tags={store.tags[s.id] || []}
                 draggable={draggable}
@@ -217,7 +219,7 @@ export default function VirtualizedSoundGrid({
           fontSize: 12
         }}>
           <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite', marginRight: 8 }} />
-          {lang === 'fr' ? 'Chargement...' : 'Loading...'}
+          {t('loading')}
         </div>
       )}
 
@@ -229,7 +231,7 @@ export default function VirtualizedSoundGrid({
           color: 'var(--text-tertiary)',
           fontSize: 11
         }}>
-          {visibleSounds.length} {lang === 'fr' ? 'son(s) chargé(s)' : 'sound(s) loaded'}
+          {visibleSounds.length} {t('soundsLoaded')}
         </div>
       )}
 

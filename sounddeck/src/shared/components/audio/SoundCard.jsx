@@ -13,35 +13,33 @@ function fmtTime(s) {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
-// Convertir une ancienne valeur de volume (0-100) en dB (-24 à +24)
 function convertOldVolumeToDb(oldVolume) {
   if (oldVolume === undefined || oldVolume === null) return 0
   if (oldVolume >= -24 && oldVolume <= 24) return oldVolume
   return Math.round(((oldVolume - 50) / 50) * 24 * 10) / 10
 }
 
-// Liste d'emojis prédéfinis
-const EMOJI_LIST = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋','🎤','🦄','💯','🤡','👾','🪇','🪘','🎸','🎹','🎷','🎺','🎻','🥁','🪗','🎼','🎧','📢','📣','🔇','🔈','🔉','🔊','💬','🗣️','👥','👤','🎭','🎪','🎨','🎬','🎤','🎧','🎼','🎹','🥁','🎷','🎺','🎸','🎻','🪕','🎮','🕹️','🎲','🧩','🎯','🎱','🎳','🎰','🧨','💣','🔫','🗡️','⚔️','🛡️','🏹','🪃','🪄','🔮','🧿','🪬','💎','🪙','💰','💵','💶','💷','💴','🪪','📱','📲','💻','🖥️','🖨️','⌨️','🖱️','🖲️','💽','💾','💿','📀','🧮','📟','☎️','📞','📠','📺','📻','🎙️','🎚️','🎛️','🧭','⏰','⏳','⌛️']
+const EMOJI_LIST = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋','🎤','🦄','💯','🤡','👾','🪇','🪘','🎸','🎹','🎷','🎼','🎧','📢','📣','🔇','🔈','🔉','💬','🗣️','👥','👤','🎭','🎪','🎨','🎬','🕹️','🎲','🧩','🎯','🎱','🎳','🎰','🧨','💣','🗡️','⚔️','🛡️','🏹','🪃','🪄','🔮','🧿','💎','🪙','💰','💵','💶','💷','💴','🪪','📱','📲','💻','🖥️','🖨️','⌨️','🖱️','🖲️','💽','💾','💿','📀','🧮','📟','☎️','📞','📠','📺','📻','🎙️','🎚️','🎛️','🧭','⏰','⏳','⌛️']
 
-export default function SoundCard({ 
-  sound, 
-  shortcut, 
-  audioDevice, 
-  volume, 
-  loopEnabled, 
-  playLocally, 
-  onToggleFavorite, 
-  onSetShortcut, 
-  onDelete, 
-  onRemoveFromProfile, 
-  onRename, 
-  onVolumeChange, 
-  onPlay, 
-  currentProfileId, 
-  lang = 'fr', 
-  onDragStart, 
-  onDragEnd, 
-  draggable = true, 
+export default function SoundCard({
+  sound,
+  shortcut,
+  audioDevice,
+  volume,
+  loopEnabled,
+  playLocally,
+  onToggleFavorite,
+  onSetShortcut,
+  onDelete,
+  onRemoveFromProfile,
+  onRename,
+  onVolumeChange,
+  onPlay,
+  currentProfileId,
+  lang = 'fr',
+  onDragStart,
+  onDragEnd,
+  draggable = true,
   layout = 'qwerty',
   onChangeImage,
   onChangeEmoji,
@@ -61,7 +59,7 @@ export default function SoundCard({
   const [emojiPickerPosition, setEmojiPickerPosition] = useState({ top: 0, left: 0 })
   const [showTagInput, setShowTagInput] = useState(false)
   const [newTagValue, setNewTagValue] = useState('')
-  
+
   const initialVolume = sound.volumeDb !== undefined ? sound.volumeDb : convertOldVolumeToDb(sound.volume)
   const [localVolume, setLocalVolume] = useState(initialVolume)
   const [imgError, setImgError] = useState(false)
@@ -83,9 +81,9 @@ export default function SoundCard({
   }
   const sizeConfig = cardSizes[size] || cardSizes.medium
 
-  useEffect(() => { 
+  useEffect(() => {
     const newVolume = sound.volumeDb !== undefined ? sound.volumeDb : convertOldVolumeToDb(sound.volume)
-    setLocalVolume(newVolume) 
+    setLocalVolume(newVolume)
   }, [sound.volume, sound.volumeDb])
 
   useEffect(() => { setImgError(false) }, [sound.image])
@@ -173,22 +171,21 @@ export default function SoundCard({
   const imageUrl = buildImageUrl(sound.image)
   const showImage = !!(sound.image) && !imgError
 
-  // Fonction pour calculer la position du menu
   const calculateMenuPosition = useCallback(() => {
     if (!buttonRef.current) return
 
     const rect = buttonRef.current.getBoundingClientRect()
     const menuWidth = 220
-    
+
     let left = rect.left - 10
     const spaceRight = window.innerWidth - left - menuWidth
     if (spaceRight < 10) {
       left = Math.max(10, window.innerWidth - menuWidth - 10)
     }
-    
+
     const estimatedHeight = menuHeight > 0 ? menuHeight : 300
     const spaceBottom = window.innerHeight - rect.bottom - 6
-    
+
     let top
     if (spaceBottom >= estimatedHeight) {
       top = rect.bottom + 6
@@ -200,10 +197,10 @@ export default function SoundCard({
         top = Math.max(10, (window.innerHeight - estimatedHeight) / 2)
       }
     }
-    
+
     top = Math.max(10, Math.min(top, window.innerHeight - estimatedHeight - 10))
     left = Math.max(10, Math.min(left, window.innerWidth - menuWidth - 10))
-    
+
     setMenuPosition({ top, left })
   }, [menuHeight])
 
@@ -213,7 +210,7 @@ export default function SoundCard({
       setShowMenu(false)
       return
     }
-    
+
     calculateMenuPosition()
     setShowMenu(true)
     setShowVolume(false)
@@ -261,7 +258,7 @@ export default function SoundCard({
         setShowMenu(false)
       }
     }
-    
+
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showMenu])
@@ -289,26 +286,22 @@ export default function SoundCard({
     }
   }
 
-  const isFavorite = sound.favorites?.includes(currentProfileId) || false;
+  const isFavorite = sound.favorites?.includes(currentProfileId) || false
 
-  // ✅ Fonction de suppression avec confirmation - Délègue à onDelete
   const handleDeleteWithConfirm = async () => {
     setShowMenu(false)
-    
+
     if (onDelete) {
       onDelete(sound.id)
-    } else {
-      console.warn('⚠️ onDelete non fourni, suppression impossible')
     }
   }
 
-  // ✅ Fonction de retrait du profil avec confirmation
   const handleRemoveFromProfileWithConfirm = async () => {
     setShowMenu(false)
-    
+
     if (onRemoveFromProfile && currentProfileId !== 'all') {
       const soundName = sound.name || 'ce son'
-      
+
       const confirmed = await confirm({
         title: t('confirmAction') || 'Confirmer le retrait',
         message: `${t('menuRemoveFromProfile')} "${soundName}" ?`,
@@ -316,7 +309,7 @@ export default function SoundCard({
         confirmText: t('remove') || 'Retirer',
         cancelText: t('cancel') || 'Annuler'
       })
-      
+
       if (confirmed) {
         onRemoveFromProfile(sound.id)
       }
@@ -325,8 +318,8 @@ export default function SoundCard({
 
   return (
     <>
-      <div 
-        ref={cardRef} 
+      <div
+        ref={cardRef}
         draggable={draggable && !isDraggingVolume && !showVolume}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
@@ -347,7 +340,7 @@ export default function SoundCard({
       >
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-          <button 
+          <button
             onClick={e => { e.stopPropagation(); onToggleFavorite(sound.id) }}
             data-testid="favorite-button"
             style={{
@@ -365,8 +358,8 @@ export default function SoundCard({
                 <i className="ti ti-repeat" />
               </span>
             )}
-            <button 
-              ref={buttonRef} 
+            <button
+              ref={buttonRef}
               onClick={handleMenuToggle}
               data-testid="dots-button"
               style={{
@@ -420,12 +413,12 @@ export default function SoundCard({
             style={{ fontSize: sizeConfig.nameSize, padding: '3px 6px', marginBottom: 2 }}
             onClick={e => e.stopPropagation()} />
         ) : (
-          <div style={{ 
-            fontSize: sizeConfig.nameSize, 
-            fontWeight: 500, 
-            overflow: 'hidden', 
-            textOverflow: 'ellipsis', 
-            whiteSpace: 'nowrap', 
+          <div style={{
+            fontSize: sizeConfig.nameSize,
+            fontWeight: 500,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
             marginBottom: 2,
             textAlign: 'center'
           }}>
@@ -434,10 +427,10 @@ export default function SoundCard({
         )}
 
         {tags.length > 0 && (
-          <div style={{ 
-            display: 'flex', 
-            flexWrap: 'wrap', 
-            gap: 3, 
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 3,
             marginTop: 2,
             justifyContent: 'center'
           }}>
@@ -667,7 +660,7 @@ export default function SoundCard({
       )}
 
       {showEmojiPicker && createPortal(
-        <div 
+        <div
           style={{
             position: 'fixed',
             top: emojiPickerPosition.top,
@@ -684,16 +677,16 @@ export default function SoundCard({
           }}
           onClick={e => e.stopPropagation()}
         >
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
             marginBottom: 8
           }}>
             <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
-              Choisir un emoji
+              {t('chooseEmoji')}
             </span>
-            <button 
+            <button
               onClick={() => setShowEmojiPicker(false)}
               style={{
                 background: 'transparent',
@@ -744,7 +737,7 @@ export default function SoundCard({
         </div>,
         document.body
       )}
-      
+
       <ConfirmWrapper />
     </>
   )
@@ -754,11 +747,11 @@ export default function SoundCard({
 function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragStart, onDragEnd, soundName, position }) {
   const { t, currentLang } = useLanguage()
   const [localVolume, setLocalVolume] = useState(volume)
-  
+
   useEffect(() => {
     setLocalVolume(volume)
   }, [volume])
-  
+
   const handleSliderChange = (e) => {
     const newVal = parseFloat(e.target.value)
     if (!isNaN(newVal)) {
@@ -789,13 +782,13 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
         onClose()
       }
     }
-    
+
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [onClose])
 
   return (
-    <div 
+    <div
       id="volume-panel"
       onClick={e => e.stopPropagation()}
       style={{
@@ -815,9 +808,9 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
         animation: 'fadeIn 0.15s ease'
       }}
     >
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'space-between',
         marginBottom: 16
       }}>
@@ -864,7 +857,7 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
         </button>
       </div>
 
-      <div style={{ 
+      <div style={{
         textAlign: 'center',
         marginBottom: 16,
         padding: '8px 0',
@@ -872,8 +865,8 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
         borderRadius: 'var(--radius-md)',
         border: '1px solid var(--border)'
       }}>
-        <span style={{ 
-          fontSize: 32, 
+        <span style={{
+          fontSize: 32,
           fontWeight: 700,
           color: localVolume === 0 ? 'var(--accent)' : localVolume > 0 ? 'var(--success)' : 'var(--danger)'
         }}>
@@ -883,23 +876,23 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
       </div>
 
       <div style={{ padding: '4px 0' }}>
-        <input 
-          type="range" 
-          min="-24" 
-          max="24" 
-          step="0.5" 
+        <input
+          type="range"
+          min="-24"
+          max="24"
+          step="0.5"
           value={localVolume}
           onChange={handleSliderChange}
           onMouseDown={handleSliderMouseDown}
           onMouseUp={handleSliderMouseUp}
           onTouchStart={handleSliderMouseDown}
           onTouchEnd={handleSliderMouseUp}
-          style={{ 
-            width: '100%', 
-            accentColor: 'var(--accent)', 
-            background: 'transparent', 
-            border: 'none', 
-            padding: 0, 
+          style={{
+            width: '100%',
+            accentColor: 'var(--accent)',
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
             cursor: 'pointer',
             height: 6
           }}
@@ -908,8 +901,8 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
 
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 16 }}>
         <span>-24 dB</span>
-        <span style={{ 
-          color: localVolume === 0 ? 'var(--accent)' : 'var(--text-tertiary)', 
+        <span style={{
+          color: localVolume === 0 ? 'var(--accent)' : 'var(--text-tertiary)',
           fontWeight: localVolume === 0 ? 600 : 400,
           background: localVolume === 0 ? 'var(--accent-light)' : 'transparent',
           padding: '1px 8px',
@@ -959,8 +952,8 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
           <span>{t('reset')}</span>
         </button>
 
-        <button 
-          onClick={(e) => { e.stopPropagation(); onClose(); }} 
+        <button
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
           className="btn-primary"
           style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
         >
@@ -978,19 +971,18 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
   )
 }
 
-// ContextMenuPortal
-function ContextMenuPortal({ 
-  sound, 
-  currentProfileId, 
-  onClose, 
-  onToggleFavorite, 
-  onRename, 
-  onVolumeOpen, 
-  onRemoveFromProfile, 
+function ContextMenuPortal({
+  sound,
+  currentProfileId,
+  onClose,
+  onToggleFavorite,
+  onRename,
+  onVolumeOpen,
+  onRemoveFromProfile,
   onDelete,
   onChangeImage,
   onChangeEmoji,
-  position, 
+  position,
   lang = 'fr',
   onHeightMeasured,
   onDeleteWithConfirm,
@@ -1001,7 +993,7 @@ function ContextMenuPortal({
 
   useEffect(() => {
     if (!menuRef.current) return
-    
+
     requestAnimationFrame(() => {
       if (!menuRef.current) return
       const height = menuRef.current.getBoundingClientRect().height
@@ -1013,29 +1005,24 @@ function ContextMenuPortal({
 
   useEffect(() => {
     if (!menuRef.current) return
-    
+
     requestAnimationFrame(() => {
       if (!menuRef.current) return
-      
+
       const rect = menuRef.current.getBoundingClientRect()
       let { top, left } = position
-      
+
       if (rect.right > window.innerWidth) {
         left = Math.max(10, window.innerWidth - rect.width - 10)
       }
-      
+
       if (rect.bottom > window.innerHeight) {
         top = Math.max(10, window.innerHeight - rect.height - 10)
       }
-      
-      if (left < 10) {
-        left = 10
-      }
-      
-      if (top < 10) {
-        top = 10
-      }
-      
+
+      if (left < 10) left = 10
+      if (top < 10) top = 10
+
       if (top !== position.top || left !== position.left) {
         menuRef.current.style.top = top + 'px'
         menuRef.current.style.left = left + 'px'
@@ -1053,8 +1040,8 @@ function ContextMenuPortal({
   }
 
   return (
-    <div 
-      ref={menuRef} 
+    <div
+      ref={menuRef}
       onClick={handleMenuClick}
       data-testid="context-menu"
       style={{
@@ -1071,53 +1058,53 @@ function ContextMenuPortal({
         backdropFilter: 'blur(4px)'
       }}
     >
-      <MenuItem 
-        icon={sound.favorite ? 'ti-star' : 'ti-star-filled'} 
-        label={sound.favorite ? t('menuFavoriteRemove') : t('menuFavoriteAdd')} 
+      <MenuItem
+        icon={sound.favorite ? 'ti-star' : 'ti-star-filled'}
+        label={sound.favorite ? t('menuFavoriteRemove') : t('menuFavoriteAdd')}
         onClick={() => handleAction(onToggleFavorite)}
         lang={lang}
       />
-      <MenuItem 
-        icon="ti-pencil" 
-        label={t('menuRename')} 
+      <MenuItem
+        icon="ti-pencil"
+        label={t('menuRename')}
         onClick={() => handleAction(onRename)}
         lang={lang}
       />
-      <MenuItem 
-        icon="ti-volume" 
-        label={t('menuVolume')} 
+      <MenuItem
+        icon="ti-volume"
+        label={t('menuVolume')}
         onClick={() => handleAction(onVolumeOpen)}
         lang={lang}
       />
-      
-      <MenuItem 
-        icon="ti-photo" 
-        label={t('menuChangeImage')} 
+
+      <MenuItem
+        icon="ti-photo"
+        label={t('menuChangeImage')}
         onClick={() => handleAction(onChangeImage)}
         lang={lang}
       />
-      
-      <MenuItem 
-        icon="ti-mood-smile" 
-        label={t('menuChangeEmoji')} 
+
+      <MenuItem
+        icon="ti-mood-smile"
+        label={t('menuChangeEmoji')}
         onClick={() => handleAction(onChangeEmoji)}
         lang={lang}
       />
-      
+
       {onRemoveFromProfile && currentProfileId !== 'all' && (
         <>
           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-          <MenuItem 
-            icon="ti-folder-minus" 
-            label={t('menuRemoveFromProfile')} 
+          <MenuItem
+            icon="ti-folder-minus"
+            label={t('menuRemoveFromProfile')}
             onClick={() => handleAction(onRemoveFromProfileWithConfirm)}
-            warning 
+            warning
             lang={lang}
           />
         </>
       )}
       <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-      
+
       <div style={{ padding: '2px 4px' }}>
         <button
           onClick={() => {
@@ -1157,7 +1144,7 @@ function ContextMenuPortal({
 
 function MenuItem({ icon, label, onClick, danger, warning, lang = 'fr' }) {
   return (
-    <button 
+    <button
       onClick={onClick}
       style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 8,

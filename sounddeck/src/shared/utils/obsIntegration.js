@@ -31,7 +31,6 @@ export async function connectOBS(config = {}) {
     )
     
     obsConnected = true
-    console.log('✅ Connecté à OBS')
     
     // Configurer les événements
     setupOBSEvents()
@@ -62,7 +61,6 @@ export function disconnectOBS() {
     clearInterval(reconnectTimer)
     reconnectTimer = null
   }
-  console.log('🔌 Déconnecté d\'OBS')
 }
 
 /**
@@ -73,15 +71,12 @@ function setupOBSEvents() {
   
   try {
     obsWebSocket.on('ConnectionOpened', () => {
-      console.log('🔗 Connexion OBS ouverte')
     })
     
     obsWebSocket.on('ConnectionClosed', () => {
-      console.log('🔗 Connexion OBS fermée')
       obsConnected = false
       if (!reconnectTimer) {
         reconnectTimer = setInterval(() => {
-          console.log('🔄 Tentative de reconnexion OBS...')
           connectOBS()
         }, OBS_CONFIG.reconnectInterval)
       }
@@ -165,7 +160,6 @@ export async function stopOBSStreaming() {
  * Envoie une alerte personnalisée vers OBS (via Browser Source)
  */
 export function sendOBSAlert(message, type = 'info', duration = 3000) {
-  console.log(`📢 Alerte OBS: ${message} (${type})`)
   return { success: true }
 }
 

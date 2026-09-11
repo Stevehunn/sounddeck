@@ -11,7 +11,7 @@ import useConfirm from '@shared/hooks/useConfirm'
 
 const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
 
-export default function Home({ store, addToast, loopEnabled, lang = 'fr', globalSearch = '' }) {
+export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
   const { t, currentLang } = useLanguage()
   const { confirm, ConfirmWrapper } = useConfirm({ lang })
   const playLocally = store.playLocally
@@ -30,7 +30,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
   const gridRef = useRef(null)
   const favoritesGridRef = useRef(null)
 
-  const searchTerm = globalSearch || localSearch
+  const searchTerm = localSearch
 
   const [draggedSoundId, setDraggedSoundId] = useState(null)
   const [dragOverIndex, setDragOverIndex] = useState(null)
@@ -255,7 +255,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
             
             await window.electronAPI.deleteSoundFile(originalPath)
             
-            console.log(`✅ Fichier compressé: ${formatSize(compressionResult.originalSize)} → ${formatSize(compressionResult.size)} (${Math.round((1 - compressionResult.ratio) * 100)}% réduction)`)
           } else {
             console.warn('⚠️ Compression échouée, utilisation du fichier original:', compressionResult.error)
           }
@@ -361,7 +360,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr', global
               if (compressionResult.success) {
                 result.path = compressedPath
                 await window.electronAPI.deleteSoundFile(originalPath)
-                console.log(`✅ Fichier compressé: ${formatSize(compressionResult.originalSize)} → ${formatSize(compressionResult.size)}`)
               }
             } catch (e) {
               console.warn('⚠️ Erreur compression:', e)

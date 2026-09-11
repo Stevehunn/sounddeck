@@ -110,7 +110,7 @@ export default {
   editorZoomReset: 'Réinitialiser le zoom',
   editorZoomFit: 'Ajuster',
   editorZoomPercent: '{percent}%',
-  editorZoomHint: 'Ctrl+Molette ou Ctrl+{/* */}+/- pour zoomer',
+  editorZoomHint: 'Ctrl+Molette ou Ctrl+Plus/Moins pour zoomer',
   editorAddFile: 'Importer un fichier',
   editorRenameProject: 'Renommer le projet',
   editorSnap: 'Aimantation',

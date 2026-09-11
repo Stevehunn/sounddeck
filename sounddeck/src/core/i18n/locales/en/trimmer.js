@@ -1,13 +1,14 @@
 // src/core/i18n/locales/en/trimmer.js
 export default {
-  // ─── TRIMMER ─────────────────────────────────────────────────────────
   trimmerTitle: 'Trimmer',
   trimmerDesc: 'Cut and trim your audio files',
   trimmerNoFile: 'No file selected',
   trimmerSelectFile: 'Select an audio file',
   trimmerFileSelected: 'File selected',
-  
-  // ─── CONTROLS ──────────────────────────────────────────────────────
+  trimmerTrimTitle: 'Trim sound',
+  trimmerRegionSelected: 'Selection: {start} → {end}',
+  trimmerInstallFfmpeg: 'Install ffmpeg-static via npm for precise trimming.',
+
   trimmerStart: 'Selection start',
   trimmerEnd: 'Selection end',
   trimmerDuration: 'Selected duration',
@@ -16,42 +17,36 @@ export default {
   trimmerPlayFull: 'Play full file',
   trimmerTrim: 'Trim',
   trimmerExport: 'Export trimmed',
-  
-  // ─── STATUS ──────────────────────────────────────────────────────────
+
   trimmerLoading: 'Loading file...',
   trimmerProcessing: 'Trimming...',
   trimmerSuccess: 'File trimmed successfully',
   trimmerError: 'Error trimming',
   trimmerPause: 'Pause',
-  
-  // ─── WAVEFORM ──────────────────────────────────────────────────────
+
   trimmerWaveformLoading: 'Generating waveform...',
   trimmerWaveformError: 'Error generating waveform',
   trimmerSelectRegion: 'Select a region by dragging',
-  trimmerRegionSelected: 'Region selected: {start} → {end}',
-  
-  // ─── PRECISION ──────────────────────────────────────────────────────
+  trimmerRegionSelectedLabel: 'Region selected: {start} → {end}',
+
   trimmerStartLabel: 'Start: {time}',
   trimmerEndLabel: 'End: {time}',
   trimmerDurationLabel: 'Duration: {time}',
   trimmerRemainingLabel: 'Remaining: {time}',
-  
-  // ─── BUTTONS ──────────────────────────────────────────────────────────
+
   trimmerCancel: 'Cancel',
   trimmerConfirm: 'Confirm trim',
   trimmerReset: 'Reset selection',
   trimmerZoomIn: 'Zoom in',
   trimmerZoomOut: 'Zoom out',
   trimmerZoomFit: 'Fit to view',
-  
-  // ─── FORMATS ──────────────────────────────────────────────────────────
+
   trimmerFormatWav: 'WAV (lossless)',
   trimmerFormatMp3: 'MP3',
   trimmerFormatOgg: 'OGG',
   trimmerFormatFlac: 'FLAC (lossless)',
   trimmerFormatAac: 'AAC',
-  
-  // ─── EXPORT ──────────────────────────────────────────────────────────
+
   trimmerExportName: 'Exported file name',
   trimmerExportFormat: 'Export format',
   trimmerExportQuality: 'Quality',
@@ -59,6 +54,4 @@ export default {
   trimmerExportPath: 'Export path',
   trimmerExportSuccess: 'File exported successfully',
   trimmerExportError: 'Error exporting',
-  
-  editorSearch: 'Search for a sound...',
 };

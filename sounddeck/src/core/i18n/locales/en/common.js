@@ -32,7 +32,11 @@ export default {
   addSound: 'Add sound',
   manageProfile: 'Manage profile',
   shortcutPlaceholder: '+ Shortcut',
-  
+  or: 'OR',
+  appLoading: 'Loading SoundDeck...',
+  connecting: 'Connecting...',
+  disconnect: 'Disconnect',
+
   // ─── STATES ────────────────────────────────────────────────────────────
   enabled: 'Enabled',
   disabled: 'Disabled',
@@ -55,7 +59,7 @@ export default {
   success: 'Success',
   warning: 'Warning',
   info: 'Info',
-  
+
   // ─── ACTIONS ──────────────────────────────────────────────────────────
   actions: 'Actions',
   loop: 'Loop',
@@ -64,7 +68,7 @@ export default {
   stopAll: 'Stop all',
   volume: 'Volume',
   resetVolume: 'Reset volume',
-  
+
   // ─── PROFILES ────────────────────────────────────────────────────────
   profiles: 'Profiles',
   newProfile: 'New profile',
@@ -86,7 +90,7 @@ export default {
   profileManagerDeleteConfirm: 'Confirm profile deletion',
   profileManagerDeleteMessage: 'Do you really want to delete profile "{name}" with its {count} sounds?',
   profileMoved: 'Profile moved',
-  
+
   // ─── TOASTS ──────────────────────────────────────────────────────────
   toastProfileChanged: 'Profile changed',
   toastLoopOn: 'Loop enabled',
@@ -105,7 +109,11 @@ export default {
   toggleShortcutRemoved: 'Toggle shortcut removed',
   mixerResynced: 'Mixer resynced',
   backupDeleted: 'Backup deleted',
-  
+  backupSuccess: '✅ Backup completed',
+  backupRestored: '✅ Backup restored',
+  backupsExported: '✅ Backups exported',
+  backupsImported: 'backups imported',
+
   // ─── MENU ─────────────────────────────────────────────────────────────
   menuFavoriteAdd: 'Add to favorites',
   menuFavoriteRemove: 'Remove from favorites',
@@ -115,7 +123,7 @@ export default {
   menuChangeEmoji: 'Change emoji',
   menuRemoveFromProfile: 'Remove from profile',
   menuDelete: 'Delete permanently',
-  
+
   // ─── CONFIRMATIONS ────────────────────────────────────────────────────
   confirmDeleteSound: 'Confirm sound deletion',
   confirmDeleteSoundMessage: 'Do you really want to permanently delete this sound?',
@@ -134,30 +142,32 @@ export default {
   confirmCancel: 'Cancel',
   confirmProceed: 'Confirm and proceed',
 
-  // ✅ CONFIRMATION DE FERMETURE (QuitConfirm)
   quitConfirmTitle: 'Quit SoundDeck?',
   quitConfirmMessage: 'Do you want to quit the application or minimize it to the tray?',
   quitConfirmQuit: 'Quit',
   quitConfirmMinimize: 'Minimize to tray',
   quitConfirmCancel: 'Cancel',
   quitConfirmRemember: 'Remember my choice',
-  
+
   // ─── THEME ────────────────────────────────────────────────────────────
   themeAutoOn: 'Auto theme enabled',
   themeAutoOff: 'Auto theme disabled',
-  
+  themeNight: 'Night',
+  themeDay: 'Day',
+
   // ─── CARDS ──────────────────────────────────────────────────────────
   cardSizeSmall: 'Small',
   cardSizeMedium: 'Medium',
   cardSizeLarge: 'Large',
-  
+
   // ─── TAGS ─────────────────────────────────────────────────────────────
   tags: 'Tags',
   addTag: 'Add tag',
   removeTag: 'Remove tag',
   tagAdded: 'Tag added',
   tagRemoved: 'Tag removed',
-  
+  soundsLoaded: 'sound(s) loaded',
+
   // ─── MISC ──────────────────────────────────────────────────────────
   playCount: 'plays',
   favorites: 'Favorites',
@@ -192,7 +202,10 @@ export default {
   addedToProfile: 'added to profile',
   importedAndCompressed: 'imported and compressed',
   profileSounds: 'Profile sounds',
-  
+  chooseEmoji: 'Choose an emoji',
+  waveformAnalyzing: 'Analyzing audio...',
+  pluginBadge: 'Plugin',
+
   // ─── FEEDBACK ────────────────────────────────────────────────────────
   feedbackTitle: 'Send feedback',
   feedbackType: 'Feedback type',
@@ -212,7 +225,7 @@ export default {
   feedbackError: 'Error sending',
   feedbackThankYou: 'Thank you!',
   feedbackThankYouDesc: 'Your feedback has been sent successfully.',
-  
+
   // ─── PLUGINS ────────────────────────────────────────────────────────
   pluginInstaller: 'Install plugin',
   pluginName: 'Plugin name',
@@ -222,7 +235,19 @@ export default {
   pluginNotFound: 'Plugin not found',
   pluginInstallError: 'Error installing plugin',
   pluginUninstallError: 'Error uninstalling plugin',
-  
+  pluginFromUrl: '📡 Install from URL',
+  pluginFromFile: '📁 Install from file',
+  pluginChooseFile: 'Choose a .sdplugin file',
+  pluginFormatInfo: '.sdplugin format',
+  pluginFormatDesc: 'A ZIP archive containing a file',
+  pluginInvalidUrl: 'Please enter a valid URL',
+  pluginUnsupportedFormat: 'Unsupported format. Use a .sdplugin or .zip file',
+  pluginDownloading: 'Downloading plugin...',
+  pluginInstalling: 'Installing...',
+  pluginExtracting: 'Extracting files...',
+  pluginReadingFile: 'Reading file...',
+  pluginDone: 'Done!',
+
   // ─── OBS ──────────────────────────────────────────────────────────────
   obsConnect: 'Connect to OBS',
   obsHost: 'OBS Host',
@@ -239,12 +264,15 @@ export default {
   obsConnected: 'Connected to OBS',
   obsDisconnected: 'Disconnected from OBS',
   obsConnectionError: 'OBS connection error',
-  
+
   // ─── TWITCH ──────────────────────────────────────────────────────────
   twitchAlerts: 'Twitch Alerts',
   noAlerts: 'No alerts',
   twitchAlertsDesc: 'Twitch alerts will appear here in real time',
-  
+  twitchFollowMsg: '{username} followed the channel! 🎉',
+  twitchDonationMsg: '{username} donated {amount}€! ❤️',
+  twitchSubMsg: '{username} subscribed ({tier})! 🎉',
+
   // ─── SOUND MANAGEMENT ──────────────────────────────────────────────
   soundManagement: 'Sound Management',
   compressOnImport: 'Compress on import',
@@ -288,4 +316,25 @@ export default {
   normalizationTargetHigh: '-0.9 dB (Loud)',
   normalizationTargetVeryHigh: '-0.4 dB (Very loud)',
   normalizationTargetMax: '0 dB (Max)',
+
+  // ─── ACCESSIBILITY ────────────────────────────────────────────────────
+  a11ySound: 'Sound',
+  a11ySoundGrid: 'Sound grid',
+  a11yMainNav: 'Main navigation',
+  a11ySearch: 'Search sounds',
+  a11yAudioProgress: 'Audio progress',
+  a11yTabs: 'Tab navigation',
+  a11yPlays: 'plays',
+  a11yClickToPlay: 'Click to play, right-click for menu.',
+  a11yVolumeAt: 'Volume at',
+  a11yVolumeHint: 'Use up/down arrows to adjust.',
+  a11yShortcut: 'Shortcut',
+  a11yClickToEdit: 'Click to edit.',
+  a11yNoShortcut: 'No shortcut. Click to record a new shortcut.',
+  a11ySearchSounds: 'Search for sounds.',
+  a11yResults: 'results.',
+  a11yProfile: 'Profile',
+  a11ySounds: 'sounds.',
+  a11ySoundOf: 'Sound',
+  a11yOf: 'of',
 };

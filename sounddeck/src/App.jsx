@@ -17,11 +17,9 @@ import WelcomeScreen from '@features/welcome/WelcomeScreen'
 import Tutorial from '@shared/components/ui/Tutorial'
 import HelpButton from '@shared/components/ui/HelpButton'
 
-// ✅ IMPORTS AUDIO CORRECTS
 import { playSound, stopAllSounds, setStoreRef } from '@core/services/AudioService'
 import { warmupAudioContext } from '@core/services/AudioMixerService'
 
-// ✅ IMPORTS PLUGINS
 import { PluginProvider, usePlugins } from '@core/plugins/PluginContext'
 import { usePluginPage } from '@core/plugins/hooks/usePluginPage'
 
@@ -35,18 +33,15 @@ function AppContent() {
   const [mixerInitialized, setMixerInitialized] = useState(false)
   const [isFirstLaunch, setIsFirstLaunch] = useState(null)
   const [showTutorial, setShowTutorial] = useState(false)
-  const [showAdvancedTutorial, setShowAdvancedTutorial] = useState(false)
   const [showQuitConfirm, setShowQuitConfirm] = useState(false)
   const [tutorialPageId, setTutorialPageId] = useState('home')
 
-  // ✅ Récupérer l'état des plugins
   const { isPluginPage, getPage, pages, loaded: pluginsLoaded, pluginManager } = usePlugins()
 
-  // ✅ Charger la page plugin si nécessaire
-  const { 
-    Component: PluginComponent, 
-    loading: pluginLoading, 
-    error: pluginError 
+  const {
+    Component: PluginComponent,
+    loading: pluginLoading,
+    error: pluginError
   } = usePluginPage(isPluginPage(currentPage) ? currentPage : null)
 
   const soundsRef = useRef([])
@@ -58,25 +53,20 @@ function AppContent() {
   const volumeRef = useRef(80)
   const setPresentationRef = useRef(null)
   const isQuittingRef = useRef(false)
-
-  // ✅ Blocage simple avec ref
   const isPopupBlockedRef = useRef(false)
   const blockTimerRef = useRef(null)
 
-  // ✅ Passer la référence du store à audio.js pour le mixeur
+  // Passer la référence du store à audio.js pour le mixeur
   useEffect(() => {
     setStoreRef(store)
   }, [store])
 
-  // ✅ PRÉCHAUFFAGE DU CONTEXTE AUDIO - au démarrage de l'app
+  // Préchauffage audio
   useEffect(() => {
     if (store.loading) return
-    
     const timer = setTimeout(() => {
-      console.log('🔥 Démarrage du préchauffage audio...')
       warmupAudioContext()
     }, 500)
-    
     return () => clearTimeout(timer)
   }, [store.loading])
 
@@ -88,31 +78,27 @@ function AppContent() {
   useEffect(() => { volumeRef.current = store.volume }, [store.volume])
   useEffect(() => { setPresentationRef.current = setPresentationMode }, [setPresentationMode])
 
-  // ✅ Fonction pour ouvrir le tutoriel
+  // Fonction pour ouvrir le tutoriel
   const openTutorial = useCallback((pageId) => {
-    console.log('📖 [App] Ouverture du tutoriel pour la page:', pageId)
     setTutorialPageId(pageId)
     setShowTutorial(true)
   }, [])
 
-  // ✅ Exposer la fonction globalement pour les pages
+  // Exposer la fonction globalement pour les pages
   useEffect(() => {
     window.__startTutorial = openTutorial
-    console.log('📖 [App] window.__startTutorial exposé')
     return () => {
       delete window.__startTutorial
     }
   }, [openTutorial])
 
-  // ✅ Vérifier si c'est le premier lancement
+  // Vérifier si c'est le premier lancement
   useEffect(() => {
     const checkFirstLaunch = async () => {
       try {
         const hasLaunchedBefore = await window.electronAPI.storeGet('hasLaunchedBefore')
-        
-        // ✅ Vérifier la clé 'home' (celle qui est réellement créée par Tutorial.jsx)
         const tutorialHomeDone = localStorage.getItem('sounddeck-tutorial-home-done')
-        
+
         if (!hasLaunchedBefore) {
           setIsFirstLaunch(true)
         } else if (!tutorialHomeDone) {
@@ -128,25 +114,12 @@ function AppContent() {
     checkFirstLaunch()
   }, [])
 
-  // ✅ Écouter l'ouverture du tutoriel avancé
-  useEffect(() => {
-    const handleOpenAdvanced = () => {
-      setShowAdvancedTutorial(true)
-    }
-    
-    window.addEventListener('open-advanced-tutorial', handleOpenAdvanced)
-    
-    return () => {
-      window.removeEventListener('open-advanced-tutorial', handleOpenAdvanced)
-    }
-  }, [])
-
-  // ✅ Raccourcis souris - Molette pour changer de profil
+  // Raccourcis souris - Molette pour changer de profil
   useEffect(() => {
     const handleWheel = (e) => {
       const target = e.target
       const isOnSidebar = target.closest?.('aside') || target.closest?.('.sidebar')
-      
+
       if (isOnSidebar && e.ctrlKey) {
         e.preventDefault()
         if (e.deltaY > 0) {
@@ -164,42 +137,26 @@ function AppContent() {
     return () => window.removeEventListener('wheel', handleWheel)
   }, [store.currentProfileId, store.profiles])
 
-  // ✅ Gestion de la popup
+  // Gestion de la popup de fermeture
   useEffect(() => {
     const blockPopup = () => {
-      console.log('🚫 [BLOCK] Blocage de la popup')
       isPopupBlockedRef.current = true
-      
       if (blockTimerRef.current) {
         clearTimeout(blockTimerRef.current)
       }
-      
       blockTimerRef.current = setTimeout(() => {
-        console.log('✅ [BLOCK] Fin du blocage')
         isPopupBlockedRef.current = false
         blockTimerRef.current = null
       }, 1000)
     }
 
     const handleShowQuitConfirm = () => {
-      console.log(`📌 SHOW_QUIT_CONFIRM - blocked: ${isPopupBlockedRef.current}`)
-      
-      if (isPopupBlockedRef.current) {
-        console.log('🚫 Popup REFUSÉE - Blocage actif')
-        return
-      }
-
-      if (document.hidden) {
-        console.log('🚫 Popup REFUSÉE - Fenêtre masquée')
-        return
-      }
-
-      console.log('✅ Popup ACCEPTÉE')
+      if (isPopupBlockedRef.current) return
+      if (document.hidden) return
       setShowQuitConfirm(true)
     }
 
     const handleHideQuitConfirm = () => {
-      console.log('🔇 hide-quit-confirm reçu')
       setShowQuitConfirm(false)
       blockPopup()
     }
@@ -210,7 +167,7 @@ function AppContent() {
     return () => {
       window.electronAPI?.removeAllListeners?.('show-quit-confirm')
       window.electronAPI?.removeAllListeners?.('hide-quit-confirm')
-      
+
       if (blockTimerRef.current) {
         clearTimeout(blockTimerRef.current)
         blockTimerRef.current = null
@@ -219,31 +176,20 @@ function AppContent() {
     }
   }, [])
 
-  useEffect(() => {
-    if (showQuitConfirm) {
-      console.log(`💬 showQuitConfirm = true`)
-    }
-  }, [showQuitConfirm])
-
-  // ✅ SYNC #1 : Au démarrage, LIRE le thème depuis electron-store
-  // et aligner React si nécessaire. ⚠️ AUCUNE ÉCRITURE SUR LE DISQUE ICI
-  // (le cas corrompu 'custom sans couleurs' est géré visuellement par le useEffect "Appliquer le thème")
+  // Sync #1 : Au démarrage, LIRE le thème depuis electron-store
   useEffect(() => {
     if (store.loading) return
-    
+
     const syncThemeFromDisk = async () => {
       try {
         const diskTheme = await window.electronAPI.storeGet('theme')
         const diskCustomTheme = await window.electronAPI.storeGet('customTheme')
-        
+
         if (diskTheme === 'custom' && !diskCustomTheme) {
-          console.log('🎨 [App] Fallback visuel custom→dark (store intact)')
           return
         }
-        
-        // ✅ Sinon : si le disque diffère du React, aligner React sur le disque
+
         if (diskTheme && diskTheme !== store.theme) {
-          console.log(`🎨 [App] CORRECTION: ${store.theme} -> ${diskTheme}`)
           store.updateTheme(diskTheme)
         }
       } catch (e) {
@@ -256,7 +202,7 @@ function AppContent() {
   useEffect(() => {
     if (store.loading) return
     if (!store.theme) return
-    
+
     window.electronAPI.storeSet('theme', store.theme).catch(e => {
       console.warn('⚠️ Erreur persist theme:', e)
     })
@@ -269,13 +215,8 @@ function AppContent() {
     const effectiveTheme =
       (store.theme === 'custom' && !store.customTheme) ? 'dark' : (store.theme || 'dark')
 
-    console.log('🎨 [App] Theme applied:', effectiveTheme,
-                '| store.theme:', store.theme,
-                '| customTheme:', !!store.customTheme)
-
     document.documentElement.setAttribute('data-theme', effectiveTheme)
 
-    // ✅ Nettoyer les styles inline résiduels du CustomThemeEditor
     if (effectiveTheme !== 'custom') {
       const colorKeys = [
         'bg-primary', 'bg-secondary', 'bg-tertiary', 'bg-hover', 'border',
@@ -288,7 +229,6 @@ function AppContent() {
       })
     }
 
-    // ✅ Injecter les CSS custom UNIQUEMENT si on est en mode custom ET qu'on a des couleurs
     const existing = document.getElementById('custom-theme-style')
     if (effectiveTheme === 'custom' && store.customTheme) {
       const c = store.customTheme
@@ -330,38 +270,34 @@ function AppContent() {
     }
   }, [currentLang])
 
-  // ✅ Initialiser le mixeur au démarrage si activé
+  // Initialiser le mixeur au démarrage si activé
   useEffect(() => {
     if (store.loading) return
     if (mixerInitialized) return
-    
+
     const initMixer = async () => {
       if (store.mixerEnabled && store.initMixerOnStartup) {
-        console.log('🎛️ Initialisation du mixeur au démarrage de l\'app...')
         await new Promise(resolve => setTimeout(resolve, 500))
         const success = await store.initMixerOnStartup()
         setMixerInitialized(true)
-        if (success) {
-          console.log('✅ Mixeur initialisé avec succès au démarrage')
-        } else {
+        if (!success) {
           console.warn('⚠️ Échec de l\'initialisation du mixeur au démarrage')
         }
       } else {
         setMixerInitialized(true)
       }
     }
-    
+
     initMixer()
   }, [store.loading, store.mixerEnabled, store.initMixerOnStartup, mixerInitialized])
 
-  // ✅ Vérifier l'état du mixeur quand la langue change
+  // Vérifier l'état du mixeur quand la langue change
   useEffect(() => {
     if (!store.loading && store.mixerEnabled && mixerInitialized) {
       const checkMixer = async () => {
         try {
           const { isMixerOperational, repairMixer } = await import("@core/services/AudioMixerService");
           if (!isMixerOperational()) {
-            console.log('🔧 Mixeur non opérationnel après changement de langue, tentative de réparation...')
             repairMixer()
           }
         } catch (e) {
@@ -372,19 +308,18 @@ function AppContent() {
     }
   }, [currentLang, store.loading, store.mixerEnabled, mixerInitialized])
 
-  // ✅ Vérifier le périphérique micro au démarrage
+  // Vérifier le périphérique micro au démarrage
   useEffect(() => {
     if (store.loading) return
-    
+
     const checkMicrophoneDevice = async () => {
       if (store.microphoneDevice && store.microphoneDevice !== 'default') {
         try {
           const devices = await navigator.mediaDevices.enumerateDevices()
           const audioInputs = devices.filter(d => d.kind === 'audioinput')
           const deviceExists = audioInputs.some(d => d.deviceId === store.microphoneDevice)
-          
+
           if (!deviceExists) {
-            console.log('🔧 Périphérique micro introuvable, réinitialisation au périphérique par défaut')
             await store.updateMicrophoneDeviceId('default')
           }
         } catch (e) {
@@ -392,11 +327,11 @@ function AppContent() {
         }
       }
     }
-    
+
     checkMicrophoneDevice()
   }, [store.loading, store.microphoneDevice])
 
-  // ✅ Enregistrer les listeners IPC
+  // Enregistrer les listeners IPC
   useEffect(() => {
     if (!window.electronAPI) return
 
@@ -437,7 +372,7 @@ function AppContent() {
     }
   }, [store.loopEnabled, store.mixerEnabled, t])
 
-  // ✅ Fonction addToast
+  // Fonction addToast
   const addToast = useCallback((message, type = 'info') => {
     const id = crypto.randomUUID ? crypto.randomUUID() : Date.now() + '_' + Math.random()
     setToasts(prev => [...prev, { id, message, type }])
@@ -448,20 +383,18 @@ function AppContent() {
 
   // ✅ Wrapper pour ajouter le HelpButton à une page
   const PageWrapper = ({ children, pageId }) => {
-    const handleHelpClick = () => {
-      console.log('📖 [PageWrapper] Clic sur HelpButton pour la page:', pageId)
-      openTutorial(pageId)
-    }
+    const handleHelpClick = () => openTutorial(pageId)
+    const showHelp = pageId !== 'guide'
 
     return (
       <div style={{ position: 'relative', height: '100%', width: '100%' }}>
         {children}
-        <HelpButton onClick={handleHelpClick} />
+        {showHelp && <HelpButton onClick={handleHelpClick} />}
       </div>
     )
   }
 
-  // ✅ RENDU DES PAGES
+  // RENDU DES PAGES
   const renderPage = () => {
     if (currentPage === 'home') {
       return (
@@ -512,8 +445,8 @@ function AppContent() {
         </PageWrapper>
       )
     }
-    
-    // ✅ Gestion des pages plugins (inclut discover, youtube, etc.)
+
+    // Gestion des pages plugins (inclut discover, youtube, etc.)
     if (isPluginPage(currentPage)) {
       if (pluginLoading) {
         return (
@@ -530,7 +463,7 @@ function AppContent() {
           </div>
         )
       }
-      
+
       if (pluginError) {
         return (
           <div style={{
@@ -547,8 +480,8 @@ function AppContent() {
             <i className="ti ti-alert-triangle" style={{ fontSize: 32 }} />
             <div style={{ fontSize: 16, fontWeight: 600 }}>{t('error')}</div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{pluginError}</div>
-            <button 
-              className="btn-secondary btn-sm" 
+            <button
+              className="btn-secondary btn-sm"
               onClick={() => setCurrentPage('home')}
             >
               {t('close')}
@@ -556,7 +489,7 @@ function AppContent() {
           </div>
         )
       }
-      
+
       if (PluginComponent) {
         return (
           <PageWrapper pageId={currentPage}>
@@ -564,7 +497,7 @@ function AppContent() {
           </PageWrapper>
         )
       }
-      
+
       return (
         <div style={{
           display: 'flex',
@@ -577,8 +510,8 @@ function AppContent() {
         }}>
           <i className="ti ti-puzzle" style={{ fontSize: 32 }} />
           <div style={{ fontSize: 16 }}>{t('optionsPlugins')}</div>
-          <button 
-            className="btn-secondary btn-sm" 
+          <button
+            className="btn-secondary btn-sm"
             onClick={() => setCurrentPage('home')}
           >
             {t('close')}
@@ -603,7 +536,7 @@ function AppContent() {
     )
   }
 
-  // ✅ Si le store est en chargement
+  // Si le store est en chargement
   if (store.loading) {
     return (
       <div style={{
@@ -617,7 +550,7 @@ function AppContent() {
     )
   }
 
-  // ✅ Si c'est le premier lancement, afficher l'écran de bienvenue
+  // Si c'est le premier lancement, afficher l'écran de bienvenue
   if (isFirstLaunch === true) {
     return <WelcomeScreen onComplete={() => setIsFirstLaunch(false)} />
   }
@@ -663,17 +596,17 @@ function AppContent() {
       )}
 
       {showQuitConfirm && (
-        <QuitConfirm 
+        <QuitConfirm
           key={`quitconfirm-${currentLang}`}
-          onClose={() => setShowQuitConfirm(false)} 
+          onClose={() => setShowQuitConfirm(false)}
         />
       )}
 
       {showTutorial && (
-        <Tutorial 
+        <Tutorial
           key={`tutorial-${currentLang}`}
           pageId={tutorialPageId}
-          onComplete={() => setShowTutorial(false)} 
+          onComplete={() => setShowTutorial(false)}
         />
       )}
 
@@ -691,7 +624,7 @@ function AppContent() {
 
 export default function App() {
   const store = useStore()
-  
+
   if (store.loading) {
     return (
       <div style={{
