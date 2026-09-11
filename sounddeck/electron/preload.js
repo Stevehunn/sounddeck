@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath),
   writeDroppedFile: (fileName, arrayBuffer) => ipcRenderer.invoke('write-dropped-file', fileName, arrayBuffer),
 
+  // ✅ NOUVEAU : Export des logs d'erreur (contourne le blocage will-download)
+  exportErrorLogs: (json) => ipcRenderer.invoke('export-error-logs', json),
+
   // ─── STORE ──────────────────────────────────────────────────────────────
   storeGet: (key) => ipcRenderer.invoke('store-get', key),
   storeSet: (key, value) => ipcRenderer.invoke('store-set', key, value),

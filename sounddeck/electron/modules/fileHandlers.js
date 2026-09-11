@@ -304,6 +304,27 @@ function registerFileHandlers(mainWindow, soundsDir) {
 
   ipcMain.handle('get-sounds-dir', () => soundsDir)
 
+  // ✅ NOUVEAU : Export des logs d'erreur (contourne le blocage will-download)
+  ipcMain.handle('export-error-logs', async (event, logsJson) => {
+    try {
+      const result = await dialog.showSaveDialog(mainWindow, {
+        title: 'Exporter les logs d\'erreur',
+        defaultPath: `sounddeck-error-logs-${new Date().toISOString().slice(0, 10)}.json`,
+        filters: [{ name: 'JSON', extensions: ['json'] }]
+      })
+
+      if (result.canceled) {
+        return { success: false, canceled: true }
+      }
+
+      fs.writeFileSync(result.filePath, logsJson, 'utf-8')
+      return { success: true, path: result.filePath }
+    } catch (e) {
+      console.error('❌ [export-error-logs] Erreur:', e.message)
+      return { success: false, error: e.message }
+    }
+  })
+
   ipcMain.handle('write-dropped-file', async (event, fileName, arrayBuffer) => {
     try {
       const safeName = fileName.replace(/[^a-zA-Z0-9._\- ]/g, '_')

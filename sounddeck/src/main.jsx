@@ -10,15 +10,6 @@ import { setupGlobalErrorHandler } from './shared/utils/errorHandler'
 // ✅ Configurer le gestionnaire d'erreurs global
 setupGlobalErrorHandler()
 
-// ✅ Logger les erreurs non capturées
-window.addEventListener('error', (event) => {
-  console.error('❌ Erreur non capturée:', event.error || event.message)
-})
-
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('❌ Promesse rejetée non gérée:', event.reason)
-})
-
 // ✅ Détection automatique de la langue système au démarrage
 const initApp = async () => {
   try {

@@ -404,16 +404,37 @@ export default function Options({ store, addToast }) {
   }, [store, t, addToast, confirm])
 
   const handleClearLogs = useCallback(async () => {
-    const confirmed = await confirm({
-      title: t('clearLogs'),
-      message: t('clearLogsConfirm'),
-      type: 'danger'
-    })
-    if (!confirmed) return
-    
-    await window.electronAPI.storeDelete('errorLogs')
-    addToast(t('logsCleared'), 'info')
-  }, [confirm, t, addToast])
+    try {
+      await window.electronAPI.storeDelete('errorLogs')
+      addToast(t('logsCleared'), 'info')
+    } catch (e) {
+      addToast('❌ ' + e.message, 'error')
+    }
+  }, [t, addToast])
+
+  // ✅ Nouveau : export via IPC (contourne le blocage will-download)
+  const handleExportLogs = useCallback(async () => {
+    try {
+      const raw = await window.electronAPI.storeGet('errorLogs')
+      const logs = Array.isArray(raw) ? raw : []
+
+      if (logs.length === 0) {
+        addToast(t('noErrorLogs'), 'info')
+        return
+      }
+
+      const json = JSON.stringify(logs, null, 2)
+      const r = await window.electronAPI.exportErrorLogs(json)
+
+      if (r?.success) {
+        addToast(t('logsExported') || 'Logs exportés ✓', 'success')
+      } else if (!r?.canceled) {
+        addToast('❌ ' + (r?.error || t('error')), 'error')
+      }
+    } catch (e) {
+      addToast('❌ ' + e.message, 'error')
+    }
+  }, [t, addToast])
 
   const handlePluginUninstall = useCallback(async (plugin) => {
     const result = await window.electronAPI.uninstallPlugin?.(plugin.id)
@@ -1479,21 +1500,8 @@ export default function Options({ store, addToast }) {
             <div style={{ display: 'flex', gap: 6 }}>
               <button 
                 className="btn-secondary btn-sm"
-                onClick={async () => {
-                  const logs = await window.electronAPI.storeGet('errorLogs') || []
-                  if (logs.length === 0) {
-                    addToast(t('noErrorLogs'), 'info')
-                  } else {
-                    const json = JSON.stringify(logs, null, 2)
-                    const blob = new Blob([json], { type: 'application/json' })
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = `error-logs-${new Date().toISOString().slice(0,10)}.json`
-                    a.click()
-                    URL.revokeObjectURL(url)
-                  }
-                }}
+                onClick={handleExportLogs}
+                style={{ fontSize: 12, padding: '4px 12px' }}
               >
                 <i className="ti ti-file-text" /> {t('exportLogs')}
               </button>

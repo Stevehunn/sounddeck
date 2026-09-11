@@ -1,54 +1,113 @@
 // src/shared/utils/errorHandler.js
 import { useState, useEffect } from 'react'
 
+const MAX_LOGS = 100
+
 let errorLogs = []
 let isErrorDialogOpen = false
 let errorDialogCallbacks = []
+let pendingWrite = null
 
-/**
- * Gère les erreurs globalement
- */
+// ─── STORAGE ────────────────────────────────────────────────────────────────
+
+async function readLogsFromStore() {
+  try {
+    if (typeof window === 'undefined') return []
+    if (window.electronAPI?.storeGet) {
+      const raw = await window.electronAPI.storeGet('errorLogs')
+      return Array.isArray(raw) ? raw : []
+    }
+    // Fallback localStorage
+    const raw = localStorage.getItem('sounddeck-error-logs')
+    return raw ? JSON.parse(raw) : []
+  } catch (e) {
+    console.warn('[errorHandler] readLogsFromStore error:', e)
+    return []
+  }
+}
+
+async function writeLogsToStore(logs) {
+  try {
+    if (typeof window === 'undefined') return
+    const payload = Array.isArray(logs) ? logs : []
+    if (window.electronAPI?.storeSet) {
+      await window.electronAPI.storeSet('errorLogs', payload)
+    } else {
+      localStorage.setItem('sounddeck-error-logs', JSON.stringify(payload))
+    }
+  } catch (e) {
+    console.warn('[errorHandler] writeLogsToStore error:', e)
+  }
+}
+
+// Debounce : évite de spammer le store si 50 erreurs arrivent d'un coup
+function scheduleWrite() {
+  if (pendingWrite) return
+  pendingWrite = setTimeout(async () => {
+    pendingWrite = null
+    await writeLogsToStore(errorLogs)
+  }, 300)
+}
+
+// ─── SETUP ──────────────────────────────────────────────────────────────────
+
 export function setupGlobalErrorHandler() {
+  if (typeof window === 'undefined') return
+
+  // Charger les logs existants au démarrage
+  readLogsFromStore().then(logs => {
+    if (logs.length > 0) {
+      errorLogs = logs
+    }
+  })
+
   window.addEventListener('error', (event) => {
-    handleError(event.error || event.message, 'uncaught', event)
+    handleError(event.error || event.message, 'uncaught', {
+      source: event.filename,
+      line: event.lineno,
+      column: event.colno
+    })
   })
 
   window.addEventListener('unhandledrejection', (event) => {
-    handleError(event.reason, 'unhandledrejection', event)
+    handleError(event.reason, 'unhandledrejection', null)
   })
 }
 
+// ─── CORE ───────────────────────────────────────────────────────────────────
+
 /**
- * Gère une erreur
+ * Enregistre une erreur (synchrone pour l'appelant, asynchrone pour le store)
  */
 export function handleError(error, type = 'unknown', context = null) {
   const errorEntry = {
     id: Date.now() + '_' + Math.random().toString(36).slice(2, 7),
     timestamp: new Date().toISOString(),
     type,
-    message: error?.message || String(error),
-    stack: error?.stack,
-    context: context ? JSON.stringify(context) : null,
-    userAgent: navigator.userAgent,
-    url: window.location.href
+    message: error?.message || String(error) || 'Erreur inconnue',
+    stack: (error?.stack || '').slice(0, 4000),
+    context: context ? safeStringify(context) : null,
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+    url: typeof window !== 'undefined' ? window.location?.href : null,
   }
 
-  console.error(`❌ Erreur [${type}]:`, error)
-
-  errorLogs.unshift(errorEntry)
-
-  if (errorLogs.length > 100) {
-    errorLogs = errorLogs.slice(0, 100)
+  // Log console (dev uniquement)
+  if (isDev()) {
+    console.error(`❌ [${type}]`, error)
   }
 
-  try {
-    localStorage.setItem('sounddeck-error-logs', JSON.stringify(errorLogs))
-  } catch (e) {
-    console.warn('Impossible de sauvegarder les logs:', e)
-  }
+  // Ajouter en tête
+  errorLogs = [errorEntry, ...errorLogs].slice(0, MAX_LOGS)
 
-  errorDialogCallbacks.forEach(cb => cb(errorEntry))
+  // Persister (debounced)
+  scheduleWrite()
 
+  // Notifier les abonnés (hooks React)
+  errorDialogCallbacks.forEach(cb => {
+    try { cb(errorEntry) } catch (e) { /* silent */ }
+  })
+
+  // Afficher pour les erreurs critiques
   if (isCriticalError(error)) {
     showErrorToUser(errorEntry)
   }
@@ -56,39 +115,41 @@ export function handleError(error, type = 'unknown', context = null) {
   return errorEntry
 }
 
-/**
- * Détermine si une erreur est critique
- */
+function isDev() {
+  if (typeof window === 'undefined') return false
+  return window.location?.hostname === 'localhost' ||
+         window.location?.hostname === '127.0.0.1'
+}
+
+function safeStringify(obj) {
+  try {
+    return JSON.stringify(obj)
+  } catch {
+    return String(obj)
+  }
+}
+
 function isCriticalError(error) {
   const criticalMessages = [
-    'out of memory',
-    'fatal',
-    'crash',
-    'cannot read property',
-    'undefined is not',
-    'null is not'
+    'out of memory', 'fatal', 'crash',
+    'cannot read property', 'undefined is not', 'null is not'
   ]
-
-  const message = error?.message?.toLowerCase() || String(error).toLowerCase()
+  const message = (error?.message || String(error) || '').toLowerCase()
   return criticalMessages.some(msg => message.includes(msg))
 }
 
-/**
- * Affiche une erreur à l'utilisateur
- */
+// ─── DIALOG ─────────────────────────────────────────────────────────────────
+
 function showErrorToUser(errorEntry) {
-  if (window.addToast) {
+  if (typeof window !== 'undefined' && window.addToast) {
     window.addToast(`❌ Erreur: ${errorEntry.message.slice(0, 100)}`, 'error')
   }
-
   openErrorDialog(errorEntry)
 }
 
-/**
- * Ouvre la boîte de dialogue d'erreur
- */
 export function openErrorDialog(errorEntry) {
   if (isErrorDialogOpen) return
+  if (typeof document === 'undefined') return
   isErrorDialogOpen = true
 
   const dialog = document.createElement('div')
@@ -117,7 +178,6 @@ export function openErrorDialog(errorEntry) {
     box-shadow: var(--shadow-xl);
   `
 
-  const safeId = JSON.stringify(errorEntry.id)
   const safeMessage = escapeHtml(errorEntry.message)
   const safeStack = escapeHtml(errorEntry.stack || 'Aucune stack disponible')
   const safeContext = errorEntry.context ? escapeHtml('\n\nContexte: ' + errorEntry.context) : ''
@@ -173,19 +233,30 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;')
 }
 
-/**
- * Rapporte une erreur
- */
-export function reportError(errorId) {
-  const error = errorLogs.find(e => e.id === errorId)
-  if (!error) return
+// ─── REPORT ─────────────────────────────────────────────────────────────────
 
-  alert('Erreur signalée ! Merci de nous aider à améliorer SoundDeck.')
+export async function reportError(errorId) {
+  const error = errorLogs.find(e => e.id === errorId)
+  if (!error) return { success: false, error: 'Erreur introuvable' }
+
+  try {
+    // TODO: brancher un backend de collecte si tu en ajoutes un plus tard.
+    // Pour l'instant : feedback local + log console.
+    if (isDev()) {
+      console.info('📤 [reportError] Erreur signalée:', error)
+    }
+
+    if (typeof window !== 'undefined' && window.addToast) {
+      window.addToast('Merci ! Votre signalement a été pris en compte.', 'success')
+    }
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
 }
 
-/**
- * Hook pour les erreurs locales
- */
+// ─── HOOKS ──────────────────────────────────────────────────────────────────
+
 export function useErrorHandler() {
   const [error, setError] = useState(null)
 
@@ -194,60 +265,61 @@ export function useErrorHandler() {
     setError(entry)
   }
 
-  const clearError = () => {
-    setError(null)
-  }
+  const clearError = () => setError(null)
 
   return { error, setError: handleErrorLocal, clearError }
 }
 
-/**
- * Hook pour les logs
- */
 export function useErrorLogs() {
   const [logs, setLogs] = useState([])
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('sounddeck-error-logs')
-      if (saved) {
-        setLogs(JSON.parse(saved))
+    let mounted = true
+
+    readLogsFromStore().then(loaded => {
+      if (mounted) {
+        setLogs(loaded)
+        errorLogs = loaded
       }
-    } catch (e) {
-      console.warn('Erreur lecture logs:', e)
-    }
+    })
 
-    const callback = (error) => {
-      setLogs(prev => [error, ...prev].slice(0, 100))
+    const callback = (entry) => {
+      setLogs(prev => [entry, ...prev].slice(0, MAX_LOGS))
     }
-
     errorDialogCallbacks.push(callback)
+
     return () => {
+      mounted = false
       const index = errorDialogCallbacks.indexOf(callback)
-      if (index !== -1) {
-        errorDialogCallbacks.splice(index, 1)
-      }
+      if (index !== -1) errorDialogCallbacks.splice(index, 1)
     }
   }, [])
 
-  const clearLogs = () => {
+  const clearLogs = async () => {
     errorLogs = []
     setLogs([])
-    localStorage.removeItem('sounddeck-error-logs')
+    await writeLogsToStore([])
+    try { localStorage.removeItem('sounddeck-error-logs') } catch {}
   }
 
-  const exportLogsFn = () => {
+  const exportLogs = () => {
     const json = JSON.stringify(logs, null, 2)
     const blob = new Blob([json], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `sounddeck-error-logs-${new Date().toISOString().slice(0,10)}.json`
+    a.download = `sounddeck-error-logs-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
   }
 
-  return { logs, clearLogs, exportLogs: exportLogsFn }
+  return { logs, clearLogs, exportLogs }
+}
+
+// ─── HELPERS PUBLICS ────────────────────────────────────────────────────────
+
+export async function getErrorLogsFromStore() {
+  return await readLogsFromStore()
 }
 
 if (typeof window !== 'undefined') {
@@ -261,5 +333,6 @@ export default {
   openErrorDialog,
   reportError,
   useErrorHandler,
-  useErrorLogs
+  useErrorLogs,
+  getErrorLogsFromStore,
 }
