@@ -18,10 +18,16 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
   const [backups, setBackups] = useState([])
   const [isLoading, setIsLoading] = useState(false)
 
+  // ✅ Charge les backups avec un index réel + reverse (plus récent en haut)
   const loadBackups = () => {
     try {
       const list = getBackupList()
-      setBackups(list)
+      const withIndex = list.map((backup, realIndex) => ({
+        ...backup,
+        _realIndex: realIndex
+      }))
+      withIndex.reverse()
+      setBackups(withIndex)
     } catch (e) {
       console.error('❌ [BackupSettings] Erreur loadBackups:', e)
       setBackups([])
@@ -53,7 +59,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
     setIsLoading(false)
   }
 
-  const handleRestore = async (index) => {
+  const handleRestore = async (realIndex) => {
     const confirmed = await confirm({
       title: t('restore'),
       message: t('confirmRestore'),
@@ -63,7 +69,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
 
     setIsLoading(true)
     try {
-      const result = await restoreBackup(store, index)
+      const result = await restoreBackup(store, realIndex)
       if (result.success) {
         addToast(t('backupRestored'), 'success')
         setTimeout(() => window.location.reload(), 500)
@@ -77,9 +83,9 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
     setIsLoading(false)
   }
 
-  const handleDelete = async (index) => {
+  const handleDelete = async (realIndex) => {
     try {
-      const result = await deleteBackup(index)
+      const result = await deleteBackup(realIndex)
       if (result.success) {
         addToast(t('backupDeleted'), 'success')
         loadBackups()
@@ -93,10 +99,17 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
     }
   }
 
-  const handleExport = () => {
+  // ✅ Adapté : exportBackups est maintenant async (utilise IPC)
+  const handleExport = async () => {
     try {
-      exportBackups()
-      addToast(t('backupsExported'), 'success')
+      const result = await exportBackups()
+
+      if (result.success) {
+        addToast(t('backupsExported'), 'success')
+      } else if (!result.canceled) {
+        addToast('❌ ' + (result.error || t('error')), 'error')
+      }
+      // Si canceled, on ne dit rien (l'utilisateur a annulé volontairement)
     } catch (e) {
       console.error('❌ [BackupSettings] Erreur export:', e)
       addToast('❌ ' + e.message, 'error')
@@ -212,9 +225,9 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
             </div>
           )}
 
-          {backups.map((backup, index) => (
+          {backups.map((backup) => (
             <div
-              key={backup.timestamp || index}
+              key={backup.timestamp || backup._realIndex}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -236,7 +249,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
               <div style={{ display: 'flex', gap: 4 }}>
                 <button
                   className="btn-ghost btn-sm"
-                  onClick={() => handleRestore(index)}
+                  onClick={() => handleRestore(backup._realIndex)}
                   style={{ fontSize: 11, color: 'var(--text-tertiary)' }}
                   onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
                   onMouseLeave={e => e.currentTarget.style.color = 'var(--text-tertiary)'}
@@ -244,7 +257,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
                   <i className="ti ti-refresh" /> {t('restore')}
                 </button>
                 <DeleteButton
-                  onDelete={() => handleDelete(index)}
+                  onDelete={() => handleDelete(backup._realIndex)}
                   confirmTitle={t('delete')}
                   confirmMessage={t('confirmDeleteMessage')}
                   itemName={formatDate(backup.timestamp)}

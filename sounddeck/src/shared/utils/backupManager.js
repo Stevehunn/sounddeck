@@ -219,22 +219,41 @@ async function checkAndRestoreBackup(store) {
 }
 
 /**
- * Exporte les sauvegardes
+ * ✅ Exporte les sauvegardes vers un fichier JSON via IPC
+ * (contourne le blocage will-download de Electron)
  */
-export function exportBackups() {
-  const backups = getBackupList()
-  const json = JSON.stringify(backups, null, 2)
-  const blob = new Blob([json], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `sounddeck-backups-${new Date().toISOString().slice(0,10)}.json`
-  a.click()
-  URL.revokeObjectURL(url)
+export async function exportBackups() {
+  try {
+    const backups = getBackupList()
+
+    if (backups.length === 0) {
+      return { success: false, error: 'Aucune sauvegarde à exporter' }
+    }
+
+    const json = JSON.stringify(backups, null, 2)
+    const defaultName = `sounddeck-backups-${new Date().toISOString().slice(0, 10)}.json`
+
+    const r = await window.electronAPI.exportJsonFile(
+      json,
+      defaultName,
+      'Exporter les sauvegardes'
+    )
+
+    if (r?.success) {
+      return { success: true, path: r.path }
+    } else if (r?.canceled) {
+      return { success: false, canceled: true }
+    } else {
+      return { success: false, error: r?.error || 'Erreur inconnue' }
+    }
+  } catch (e) {
+    console.error('❌ [backupManager] exportBackups error:', e)
+    return { success: false, error: e.message }
+  }
 }
 
 /**
- * Importe des sauvegardes
+ * Importe des sauvegardes depuis un fichier
  */
 export function importBackups(file) {
   return new Promise((resolve, reject) => {

@@ -304,12 +304,13 @@ function registerFileHandlers(mainWindow, soundsDir) {
 
   ipcMain.handle('get-sounds-dir', () => soundsDir)
 
-  // ✅ NOUVEAU : Export des logs d'erreur (contourne le blocage will-download)
-  ipcMain.handle('export-error-logs', async (event, logsJson) => {
+  // ✅ Export JSON générique (contourne le blocage will-download)
+  // Utilisé pour : logs d'erreur, backups, et tout futur export JSON
+  ipcMain.handle('export-json-file', async (event, jsonContent, defaultFileName, title) => {
     try {
       const result = await dialog.showSaveDialog(mainWindow, {
-        title: 'Exporter les logs d\'erreur',
-        defaultPath: `sounddeck-error-logs-${new Date().toISOString().slice(0, 10)}.json`,
+        title: title || 'Exporter en JSON',
+        defaultPath: defaultFileName || `sounddeck-export-${new Date().toISOString().slice(0, 10)}.json`,
         filters: [{ name: 'JSON', extensions: ['json'] }]
       })
 
@@ -317,10 +318,10 @@ function registerFileHandlers(mainWindow, soundsDir) {
         return { success: false, canceled: true }
       }
 
-      fs.writeFileSync(result.filePath, logsJson, 'utf-8')
+      fs.writeFileSync(result.filePath, jsonContent, 'utf-8')
       return { success: true, path: result.filePath }
     } catch (e) {
-      console.error('❌ [export-error-logs] Erreur:', e.message)
+      console.error('❌ [export-json-file] Erreur:', e.message)
       return { success: false, error: e.message }
     }
   })

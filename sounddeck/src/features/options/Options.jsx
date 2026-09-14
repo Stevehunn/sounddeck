@@ -424,7 +424,11 @@ export default function Options({ store, addToast }) {
       }
 
       const json = JSON.stringify(logs, null, 2)
-      const r = await window.electronAPI.exportErrorLogs(json)
+      const r = await window.electronAPI.exportJsonFile(
+        json,
+        `sounddeck-error-logs-${new Date().toISOString().slice(0, 10)}.json`,
+        t('errorLogs') || 'Exporter les logs d\'erreur'
+      )
 
       if (r?.success) {
         addToast(t('logsExported') || 'Logs exportés ✓', 'success')
