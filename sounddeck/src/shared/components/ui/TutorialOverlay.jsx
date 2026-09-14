@@ -3,63 +3,211 @@ import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react
 import { createPortal } from 'react-dom';
 import { useLanguage } from '@core/i18n/LanguageContext';
 
-function findElement(selector, fallbackSelector) {
-  if (typeof selector === 'function') {
-    try {
-      const result = selector();
-      if (result && (result.offsetParent !== null || result.getClientRects().length > 0)) return result;
-    } catch (e) {}
-  }
-  if (typeof selector === 'string') {
-    try {
-      const el = document.querySelector(selector);
-      if (el && (el.offsetParent !== null || el.getClientRects().length > 0)) return el;
-    } catch (e) {}
-  }
-  if (fallbackSelector) {
-    if (typeof fallbackSelector === 'function') {
-      try {
-        const result = fallbackSelector();
-        if (result && (result.offsetParent !== null || result.getClientRects().length > 0)) return result;
-      } catch (e) {}
-    }
-    try {
-      const el = document.querySelector(fallbackSelector);
-      if (el && (el.offsetParent !== null || el.getClientRects().length > 0)) return el;
-    } catch (e) {}
-  }
-  return null;
+// ─── CONSTANTES ─────────────────────────────────────────────────────────────
+
+const VIEWPORT_PADDING = 16
+const BUBBLE_GAP = 20
+const MIN_BUBBLE_WIDTH = 300
+const MIN_BUBBLE_HEIGHT = 200        // header + body mini + footer + padding
+const PREFERRED_BUBBLE_WIDTH = 400
+const PREFERRED_BUBBLE_HEIGHT = 340
+const FOOTER_RESERVED = 60           // hauteur estimée footer + border + marge
+
+// ─── UTILS ──────────────────────────────────────────────────────────────────
+
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(v, max))
 }
 
-function getElementRect(element) {
-  if (!element) return null;
-  const rect = element.getBoundingClientRect();
+/** Dimensions du viewport fiables (prend en compte zoom/barres). */
+function getViewport() {
+  const vv = typeof window !== 'undefined' ? window.visualViewport : null
   return {
-    top: rect.top,
-    left: rect.left,
-    width: rect.width,
-    height: rect.height,
-    centerX: rect.left + rect.width / 2,
-    centerY: rect.top + rect.height / 2,
-    bottom: rect.bottom,
-    right: rect.right,
-  };
-}
-
-function scrollToElement(element) {
-  if (!element) return false;
-  try {
-    const rect = element.getBoundingClientRect();
-    const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
-    if (!isVisible) {
-      element.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'center' });
-      return true;
-    }
-    return false;
-  } catch (e) {
-    return false;
+    vw: vv?.width ?? window.innerWidth,
+    vh: vv?.height ?? window.innerHeight,
   }
 }
+
+function findElement(selector, fallbackSelector) {
+  const tryGet = (s) => {
+    if (typeof s === 'function') {
+      try {
+        const r = s()
+        if (r && (r.offsetParent !== null || r.getClientRects().length > 0)) return r
+      } catch (e) {}
+      return null
+    }
+    if (typeof s === 'string') {
+      try {
+        const el = document.querySelector(s)
+        if (el && (el.offsetParent !== null || el.getClientRects().length > 0)) return el
+      } catch (e) {}
+      return null
+    }
+    return null
+  }
+  return tryGet(selector) || tryGet(fallbackSelector)
+}
+
+function getElementRect(el) {
+  if (!el) return null
+  const r = el.getBoundingClientRect()
+  return {
+    top: r.top,
+    left: r.left,
+    width: r.width,
+    height: r.height,
+    centerX: r.left + r.width / 2,
+    centerY: r.top + r.height / 2,
+    bottom: r.bottom,
+    right: r.right,
+  }
+}
+
+function scrollToElement(el) {
+  if (!el) return
+  try {
+    const r = el.getBoundingClientRect()
+    const isVisible = r.top >= 0 && r.bottom <= window.innerHeight
+    if (!isVisible) {
+      el.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'center' })
+    }
+  } catch (e) {}
+}
+
+// ─── LAYOUT ─────────────────────────────────────────────────────────────────
+
+/**
+ * Calcule la meilleure position pour la bulle SANS JAMAIS recouvrir la cible.
+ */
+function computeBubbleLayout(targetRect, forcedPosition) {
+  const { vw, vh } = getViewport()
+  const p = VIEWPORT_PADDING
+  const g = BUBBLE_GAP
+
+  // Espace disponible dans chaque direction
+  const spaces = {
+    right:  vw - targetRect.right - g - p,
+    left:   targetRect.left - g - p,
+    bottom: vh - targetRect.bottom - g - p,
+    top:    targetRect.top - g - p,
+  }
+
+  // Dimensions souhaitées (limitées au viewport)
+  const prefW = Math.min(PREFERRED_BUBBLE_WIDTH, vw - 2 * p)
+  const prefH = Math.min(PREFERRED_BUBBLE_HEIGHT, vh - 2 * p)
+
+  // Une direction est viable si elle peut accueillir la taille minimale
+  const fits = {
+    right:  spaces.right  >= MIN_BUBBLE_WIDTH,
+    left:   spaces.left   >= MIN_BUBBLE_WIDTH,
+    bottom: spaces.bottom >= MIN_BUBBLE_HEIGHT,
+    top:    spaces.top    >= MIN_BUBBLE_HEIGHT,
+  }
+
+  // Choix de la direction
+  let dir = null
+
+  if (forcedPosition && fits[forcedPosition]) {
+    dir = forcedPosition
+  }
+
+  if (!dir) {
+    let best = null
+    let bestSpace = -1
+    for (const d of ['right', 'left', 'bottom', 'top']) {
+      if (fits[d] && spaces[d] > bestSpace) {
+        bestSpace = spaces[d]
+        best = d
+      }
+    }
+    if (best) dir = best
+  }
+
+  if (!dir) {
+    // Fallback : la direction avec le plus d'espace (même si insuffisant)
+    let best = null
+    let bestSpace = -1
+    for (const d of ['right', 'left', 'bottom', 'top']) {
+      if (spaces[d] > bestSpace) {
+        bestSpace = spaces[d]
+        best = d
+      }
+    }
+    dir = best || 'bottom'
+  }
+
+  const available = spaces[dir]
+
+  // ─── Dimensionnement ─────────────────────────────────────────────────
+  // Pour left/right : la largeur est contrainte, la hauteur = viewport safe
+  // Pour top/bottom : la hauteur est contrainte, la largeur = préférentielle
+  let bw, bh
+
+  if (dir === 'right' || dir === 'left') {
+    bw = Math.min(prefW, Math.max(available, MIN_BUBBLE_WIDTH))
+    // La hauteur n'est PAS contrainte par `available` (le side est vertical),
+    // mais par le viewport moins de la marge basse
+    bh = Math.min(prefH, vh - 2 * p)
+  } else {
+    bw = prefW
+    // Contrainte stricte : on ne doit pas dépasser la place disponible
+    // ET on réserve la place pour le footer
+    bh = Math.min(prefH, Math.max(available, MIN_BUBBLE_HEIGHT))
+  }
+
+  // Sécurité viewport
+  bw = Math.min(bw, vw - 2 * p)
+  bh = Math.min(bh, vh - 2 * p)
+
+  // ─── Position ────────────────────────────────────────────────────────
+  let top, left, arrow
+
+  if (dir === 'right') {
+    top = clamp(targetRect.centerY - bh / 2, p, vh - bh - p)
+    left = targetRect.right + g
+    arrow = 'left'
+  } else if (dir === 'left') {
+    top = clamp(targetRect.centerY - bh / 2, p, vh - bh - p)
+    left = targetRect.left - bw - g
+    arrow = 'right'
+  } else if (dir === 'bottom') {
+    top = targetRect.bottom + g
+    left = clamp(targetRect.centerX - bw / 2, p, vw - bw - p)
+    arrow = 'top'
+  } else {
+    // top
+    top = targetRect.top - bh - g
+    left = clamp(targetRect.centerX - bw / 2, p, vw - bw - p)
+    arrow = 'bottom'
+  }
+
+  // Clamp final : garantit que la bulle reste dans le viewport
+  top = clamp(top, p, vh - bh - p)
+  left = clamp(left, p, vw - bw - p)
+
+  return { top, left, width: bw, height: bh, arrow, direction: dir }
+}
+
+/**
+ * Calcule l'offset de la flèche pour qu'elle pointe vers le centre de la cible.
+ */
+function computeArrowOffset(layout, targetRect) {
+  const { top, left, width, height, arrow } = layout
+  const MIN_MARGIN = 24
+
+  if (arrow === 'top' || arrow === 'bottom') {
+    const rel = targetRect.centerX - left
+    return { x: clamp(rel, MIN_MARGIN, width - MIN_MARGIN), y: null }
+  }
+  if (arrow === 'left' || arrow === 'right') {
+    const rel = targetRect.centerY - top
+    return { x: null, y: clamp(rel, MIN_MARGIN, height - MIN_MARGIN) }
+  }
+  return { x: null, y: null }
+}
+
+// ─── COMPOSANT ──────────────────────────────────────────────────────────────
 
 export default function TutorialOverlay({
   steps,
@@ -68,445 +216,548 @@ export default function TutorialOverlay({
   onSkip,
   onComplete,
   isOpen,
-  pageId = ''
+  pageId = '',
 }) {
-  const { t } = useLanguage();
+  const { t } = useLanguage()
 
-  const [bubbleState, setBubbleState] = useState({
-    top: 0,
-    left: 0,
-    arrow: 'bottom',
-    targetRect: null,
-    readyForStep: -1,
-  });
-  const [isExecutingAction, setIsExecutingAction] = useState(false);
-  const [isScrollable, setIsScrollable] = useState(false);
-  const [isScrolledToBottom, setIsScrolledToBottom] = useState(false);
+  const [layout, setLayout] = useState(null)
+  const [targetRect, setTargetRect] = useState(null)
+  const [arrowPos, setArrowPos] = useState({ x: null, y: null })
+  const [isExecutingAction, setIsExecutingAction] = useState(false)
+  const [isScrollable, setIsScrollable] = useState(false)
+  const [isScrolledToBottom, setIsScrolledToBottom] = useState(false)
 
-  const bubbleRef = useRef(null);
-  const bodyRef = useRef(null);
-  const rafRef = useRef(null);
+  const bubbleRef = useRef(null)
+  const bodyRef = useRef(null)
+  const rafRef = useRef(null)
+  const lastAdvanceTimeRef = useRef(0)
+  const actionTimeoutRef = useRef(null)
+  const layoutReadyStepRef = useRef(-1)
+  // ✅ Évite les boucles infinies de correction
+  const correctedForStepRef = useRef(-1)
 
-  const lastAdvanceTimeRef = useRef(0);
-  const actionTimeoutRef = useRef(null);
+  const stepData = steps[currentStep] || steps[0]
+  const isLastStep = currentStep === steps.length - 1
 
-  const stepData = steps[currentStep] || steps[0];
-  const isLastStep = currentStep === steps.length - 1;
+  // ─── Reset à chaque changement d'étape ───────────────────────────────────
+  useEffect(() => {
+    setLayout(null)
+    setTargetRect(null)
+    setArrowPos({ x: null, y: null })
+    setIsExecutingAction(false)
+    setIsScrollable(false)
+    setIsScrolledToBottom(false)
+    layoutReadyStepRef.current = -1
+    correctedForStepRef.current = -1
+  }, [currentStep])
 
-  const [lastRenderedStep, setLastRenderedStep] = useState(currentStep);
-  if (lastRenderedStep !== currentStep) {
-    setLastRenderedStep(currentStep);
-    setBubbleState({ top: 0, left: 0, arrow: 'bottom', targetRect: null, readyForStep: -1 });
-    setIsExecutingAction(false);
-    setIsScrollable(false);
-    setIsScrolledToBottom(false);
-  }
-
+  // ─── Cleanup timeout ─────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      if (actionTimeoutRef.current) {
-        clearTimeout(actionTimeoutRef.current);
-      }
-    };
-  }, []);
+      if (actionTimeoutRef.current) clearTimeout(actionTimeoutRef.current)
+    }
+  }, [])
 
-  // Détecte si le body nécessite un scroll
+  // ─── Détection du scroll interne de la bulle ─────────────────────────────
   const checkScrollable = useCallback(() => {
-    const body = bodyRef.current;
-    if (!body) return;
-    const hasScroll = body.scrollHeight > body.clientHeight + 2;
-    const atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 4;
-    setIsScrollable(hasScroll);
-    setIsScrolledToBottom(atBottom);
-  }, []);
+    const body = bodyRef.current
+    if (!body) return
+    const hasScroll = body.scrollHeight > body.clientHeight + 2
+    const atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 4
+    setIsScrollable(hasScroll)
+    setIsScrolledToBottom(atBottom)
+  }, [])
 
-  // Vérifie le scroll après le rendu du contenu
   useLayoutEffect(() => {
-    if (bubbleState.readyForStep !== currentStep) return;
-    const timer = setTimeout(checkScrollable, 50);
-    return () => clearTimeout(timer);
-  }, [bubbleState.readyForStep, currentStep, checkScrollable]);
+    if (!layout) return
+    const timer = setTimeout(checkScrollable, 50)
+    return () => clearTimeout(timer)
+  }, [layout, checkScrollable])
 
-  const calculateBubblePosition = useCallback((rect, forcePosition) => {
-    if (!rect) return { top: window.innerHeight / 2 - 125, left: window.innerWidth / 2 - 190, arrow: 'bottom' };
-
-    const bubbleWidth = 420;
-    // Estimation plus large pour tenir compte du scroll possible
-    const bubbleHeight = Math.min(window.innerHeight - 40, 480);
-    const padding = 20;
-    const gap = 16;
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    const spaceBottom = viewportHeight - rect.bottom - gap - padding;
-    const spaceTop = rect.top - gap - padding;
-    const spaceRight = viewportWidth - rect.right - gap - padding;
-    const spaceLeft = rect.left - gap - padding;
-
-    const canFitBottom = spaceBottom >= Math.min(bubbleHeight, 260);
-    const canFitTop = spaceTop >= Math.min(bubbleHeight, 260);
-    const canFitRight = spaceRight >= bubbleWidth;
-    const canFitLeft = spaceLeft >= bubbleWidth;
-
-    const centeredLeft = Math.max(
-      padding,
-      Math.min(rect.centerX - bubbleWidth / 2, viewportWidth - bubbleWidth - padding)
-    );
-    const centeredTop = Math.max(
-      padding,
-      Math.min(rect.centerY - bubbleHeight / 2, viewportHeight - bubbleHeight - padding)
-    );
-
-    const buildBottom = () => ({
-      top: Math.min(rect.bottom + gap, viewportHeight - bubbleHeight - padding),
-      left: centeredLeft,
-      arrow: 'top'
-    });
-    const buildTop = () => ({
-      top: Math.max(padding, rect.top - bubbleHeight - gap),
-      left: centeredLeft,
-      arrow: 'bottom'
-    });
-    const buildRight = () => ({
-      top: centeredTop,
-      left: rect.right + gap,
-      arrow: 'left'
-    });
-    const buildLeft = () => ({
-      top: centeredTop,
-      left: rect.left - bubbleWidth - gap,
-      arrow: 'right'
-    });
-
-    if (forcePosition === 'top' && canFitTop) return buildTop();
-    if (forcePosition === 'bottom' && canFitBottom) return buildBottom();
-    if (forcePosition === 'right' && canFitRight) return buildRight();
-    if (forcePosition === 'left' && canFitLeft) return buildLeft();
-
-    if (canFitBottom) return buildBottom();
-    if (canFitTop) return buildTop();
-    if (canFitRight) return buildRight();
-    if (canFitLeft) return buildLeft();
-
-    return {
-      top: Math.max(padding, Math.min(rect.bottom + gap, viewportHeight - bubbleHeight - padding)),
-      left: centeredLeft,
-      arrow: 'top'
-    };
-  }, []);
-
+  // ─── Calcul et mise à jour de la position ────────────────────────────────
   const updateTarget = useCallback(() => {
-    const currentStepData = steps[currentStep] || steps[0];
+    const data = steps[currentStep] || steps[0]
+    const { vw, vh } = getViewport()
 
-    if (!currentStepData?.target) {
-      setBubbleState({
-        top: window.innerHeight / 2 - 125,
-        left: window.innerWidth / 2 - 190,
-        arrow: 'bottom',
-        targetRect: null,
-        readyForStep: currentStep,
-      });
-      return;
+    // ─ Cas 1 : pas de cible → bulle centrée
+    if (!data?.target) {
+      const bw = Math.min(PREFERRED_BUBBLE_WIDTH, vw - 2 * VIEWPORT_PADDING)
+      const bh = Math.min(PREFERRED_BUBBLE_HEIGHT, vh - 2 * VIEWPORT_PADDING)
+      setLayout({
+        top: (vh - bh) / 2,
+        left: (vw - bw) / 2,
+        width: bw,
+        height: bh,
+        arrow: null,
+        direction: 'center',
+      })
+      setTargetRect(null)
+      setArrowPos({ x: null, y: null })
+      layoutReadyStepRef.current = currentStep
+      return
     }
 
-    const element = findElement(currentStepData.target, currentStepData.fallbackTarget);
-    if (element) {
-      scrollToElement(element);
+    // ─ Cas 2 : recherche de l'élément cible
+    const el = findElement(data.target, data.fallbackTarget)
 
+    if (!el) {
+      const bw = Math.min(PREFERRED_BUBBLE_WIDTH, vw - 2 * VIEWPORT_PADDING)
+      const bh = Math.min(PREFERRED_BUBBLE_HEIGHT, vh - 2 * VIEWPORT_PADDING)
+      setLayout({
+        top: (vh - bh) / 2,
+        left: (vw - bw) / 2,
+        width: bw,
+        height: bh,
+        arrow: null,
+        direction: 'center',
+      })
+      setTargetRect(null)
+      setArrowPos({ x: null, y: null })
+      layoutReadyStepRef.current = currentStep
+      return
+    }
+
+    scrollToElement(el)
+
+    // Double RAF pour laisser le navigateur appliquer le scroll
+    requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const rect = getElementRect(element);
-          const pos = calculateBubblePosition(rect, currentStepData.position);
-          setBubbleState({
-            ...pos,
-            targetRect: rect,
-            readyForStep: currentStep,
-          });
-        });
-      });
-    } else {
-      setBubbleState({
-        top: window.innerHeight / 2 - 125,
-        left: window.innerWidth / 2 - 190,
-        arrow: 'bottom',
-        targetRect: null,
-        readyForStep: currentStep,
-      });
-    }
-  }, [currentStep, steps, calculateBubblePosition]);
+        const rect = getElementRect(el)
+        if (!rect) return
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const timer = setTimeout(() => updateTarget(), 80);
-    return () => clearTimeout(timer);
-  }, [isOpen, currentStep, updateTarget]);
+        const newLayout = computeBubbleLayout(rect, data.position)
+        const offset = computeArrowOffset(newLayout, rect)
 
+        setLayout(newLayout)
+        setTargetRect(rect)
+        setArrowPos(offset)
+        layoutReadyStepRef.current = currentStep
+      })
+    })
+  }, [currentStep, steps])
+
+  // ─── Déclenchement après changement d'étape ──────────────────────────────
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) return
+    const timer = setTimeout(updateTarget, 100)
+    return () => clearTimeout(timer)
+  }, [isOpen, currentStep, updateTarget])
+
+  // ─── Reposition au resize / scroll / resize fenêtre ──────────────────────
+  useEffect(() => {
+    if (!isOpen) return
 
     const handleResize = () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(updateTarget);
-    };
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      rafRef.current = requestAnimationFrame(updateTarget)
+    }
 
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('scroll', handleResize);
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('scroll', handleResize, true)
+    window.visualViewport?.addEventListener('resize', handleResize)
+    window.visualViewport?.addEventListener('scroll', handleResize)
 
     return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('scroll', handleResize);
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, [isOpen, updateTarget]);
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('scroll', handleResize, true)
+      window.visualViewport?.removeEventListener('resize', handleResize)
+      window.visualViewport?.removeEventListener('scroll', handleResize)
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    }
+  }, [isOpen, updateTarget])
 
+  // ─── ✅ CORRECTION POST-RENDU : garantit que la bulle reste dans le viewport ───
+  useLayoutEffect(() => {
+    if (!layout || !bubbleRef.current) return
+    if (correctedForStepRef.current === currentStep) return
+    if (layoutReadyStepRef.current !== currentStep) return
+
+    const el = bubbleRef.current
+    // Force le navigateur à calculer la vraie hauteur
+    const rect = el.getBoundingClientRect()
+    const { vw, vh } = getViewport()
+    const p = VIEWPORT_PADDING
+
+    let newTop = layout.top
+    let newLeft = layout.left
+    let needsUpdate = false
+
+    // Correction verticale : la bulle doit tenir dans [p, vh - p]
+    if (rect.bottom > vh - p) {
+      newTop = Math.max(p, vh - p - rect.height)
+      needsUpdate = true
+    }
+    if (newTop < p) {
+      newTop = p
+      needsUpdate = true
+    }
+
+    // Correction horizontale : la bulle doit tenir dans [p, vw - p]
+    if (rect.right > vw - p) {
+      newLeft = Math.max(p, vw - p - rect.width)
+      needsUpdate = true
+    }
+    if (newLeft < p) {
+      newLeft = p
+      needsUpdate = true
+    }
+
+    if (needsUpdate) {
+      correctedForStepRef.current = currentStep
+      // On applique le repositionnement via setLayout pour éviter le saut
+      setLayout(prev => prev ? { ...prev, top: newTop, left: newLeft } : prev)
+
+      // Recalcule l'offset de la flèche par rapport à la nouvelle position
+      if (targetRect && layout.arrow) {
+        const offset = computeArrowOffset(
+          { ...layout, top: newTop, left: newLeft },
+          targetRect
+        )
+        setArrowPos(offset)
+      }
+    } else {
+      correctedForStepRef.current = currentStep
+    }
+  }, [layout, currentStep, targetRect])
+
+  // ─── Actions ─────────────────────────────────────────────────────────────
   const handleLeave = useCallback(() => {
     if (stepData?.onLeave && typeof stepData.onLeave === 'function') {
-      stepData.onLeave();
+      stepData.onLeave()
     }
-  }, [stepData]);
-
-  if (!isOpen || !stepData) return null;
+  }, [stepData])
 
   const handleNext = useCallback((e) => {
-    if (e && typeof e.isTrusted === 'boolean' && !e.isTrusted) return;
+    if (e && typeof e.isTrusted === 'boolean' && !e.isTrusted) return
 
-    const now = Date.now();
-    if (now - lastAdvanceTimeRef.current < 800) return;
-    lastAdvanceTimeRef.current = now;
+    const now = Date.now()
+    if (now - lastAdvanceTimeRef.current < 800) return
+    lastAdvanceTimeRef.current = now
 
     if (stepData?.afterNextStep && typeof stepData.afterNextStep === 'function') {
-      setIsExecutingAction(true);
-
+      setIsExecutingAction(true)
       try {
-        stepData.afterNextStep();
+        stepData.afterNextStep()
       } catch (err) {
-        console.error('❌ [TutorialOverlay] Erreur afterNextStep:', err);
+        console.error('❌ [TutorialOverlay] Erreur afterNextStep:', err)
       }
-
-      const delay = stepData.afterNextStepDelay || 2000;
-
+      const delay = stepData.afterNextStepDelay || 2000
       actionTimeoutRef.current = setTimeout(() => {
-        handleLeave();
-        setIsExecutingAction(false);
-        onNext?.();
-      }, delay);
-      return;
+        handleLeave()
+        setIsExecutingAction(false)
+        onNext?.()
+      }, delay)
+      return
     }
 
-    handleLeave();
-    onNext?.();
-  }, [currentStep, steps, stepData, onNext, handleLeave]);
+    handleLeave()
+    onNext?.()
+  }, [stepData, onNext, handleLeave])
 
   const handleSkip = useCallback((e) => {
-    if (e && typeof e.isTrusted === 'boolean' && !e.isTrusted) return;
+    if (e && typeof e.isTrusted === 'boolean' && !e.isTrusted) return
     if (actionTimeoutRef.current) {
-      clearTimeout(actionTimeoutRef.current);
-      actionTimeoutRef.current = null;
+      clearTimeout(actionTimeoutRef.current)
+      actionTimeoutRef.current = null
     }
-    handleLeave();
-    if (pageId) {
-      localStorage.setItem(`sounddeck-tutorial-${pageId}-done`, 'true');
+    handleLeave()
+    if (pageId) localStorage.setItem(`sounddeck-tutorial-${pageId}-done`, 'true')
+    onComplete?.()
+  }, [handleLeave, pageId, onComplete])
+
+  // ─── Rendu ────────────────────────────────────────────────────────────────
+  if (!isOpen || !stepData) return null
+
+  const isReady = layoutReadyStepRef.current === currentStep && layout !== null
+  const showBubble = isReady && !isExecutingAction
+
+  const highlightStyle = targetRect
+    ? {
+        position: 'fixed',
+        top: targetRect.top - 8,
+        left: targetRect.left - 8,
+        width: targetRect.width + 16,
+        height: targetRect.height + 16,
+        borderRadius: '12px',
+        boxShadow:
+          '0 0 0 3px var(--accent), 0 0 0 6px rgba(124,111,247,0.2), 0 0 30px rgba(124,111,247,0.3)',
+        background: 'transparent',
+        pointerEvents: 'none',
+        zIndex: 100001,
+        animation: 'highlightPulse 2s ease-in-out infinite',
+        transition: 'top 0.2s ease, left 0.2s ease, width 0.2s ease, height 0.2s ease',
+      }
+    : null
+
+  const bubbleStyle = layout
+    ? {
+        position: 'fixed',
+        top: layout.top,
+        left: layout.left,
+        width: layout.width,
+        maxWidth: 'calc(100vw - 32px)',
+        maxHeight: 'calc(100vh - 32px)',
+        background: 'var(--bg-secondary)',
+        border: '2px solid var(--accent)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '18px 22px',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(124,111,247,0.15)',
+        zIndex: 100002,
+        animation: 'bubbleAppear 0.25s ease forwards',
+        pointerEvents: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        transition: 'top 0.15s ease-out, left 0.15s ease-out',
+      }
+    : null
+
+  // ─── Flèche ──────────────────────────────────────────────────────────────
+  const getArrowElement = () => {
+    if (!layout?.arrow) return null
+
+    const base = {
+      position: 'absolute',
+      width: 0,
+      height: 0,
+      borderStyle: 'solid',
+      pointerEvents: 'none',
+      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
     }
-    onComplete?.();
-  }, [handleLeave, pageId, onComplete]);
+    const borderColor = 'var(--accent)'
+    const { arrow } = layout
+    const { x, y } = arrowPos
 
-  const isBubbleReady = bubbleState.readyForStep === currentStep;
-  const targetRect = isBubbleReady ? bubbleState.targetRect : null;
-  const showBubble = isBubbleReady && !isExecutingAction;
-  const bubblePosition = { top: bubbleState.top, left: bubbleState.left, arrow: bubbleState.arrow };
-
-  const highlightStyle = targetRect ? {
-    position: 'fixed',
-    top: targetRect.top - 8,
-    left: targetRect.left - 8,
-    width: targetRect.width + 16,
-    height: targetRect.height + 16,
-    borderRadius: '12px',
-    boxShadow: '0 0 0 3px var(--accent), 0 0 0 6px rgba(124,111,247,0.2), 0 0 30px rgba(124,111,247,0.3)',
-    background: 'transparent',
-    pointerEvents: 'none',
-    zIndex: 100001,
-    animation: 'highlightPulse 2s ease-in-out infinite',
-    transition: 'top 0.12s ease-out, left 0.12s ease-out, width 0.12s ease-out, height 0.12s ease-out',
-  } : {};
-
-  const bubbleStyle = {
-    position: 'fixed',
-    top: bubblePosition.top,
-    left: bubblePosition.left,
-    width: '420px',
-    maxWidth: 'calc(100vw - 40px)',
-    maxHeight: 'calc(100vh - 40px)',
-    background: 'var(--bg-secondary)',
-    border: '2px solid var(--accent)',
-    borderRadius: 'var(--radius-lg)',
-    padding: '20px 24px',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(124,111,247,0.15)',
-    zIndex: 100002,
-    animation: `bubbleAppear 0.3s ease forwards`,
-    pointerEvents: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 0,
-  };
-
-  const arrowStyle = {
-    position: 'absolute',
-    width: 0,
-    height: 0,
-    borderStyle: 'solid',
-    pointerEvents: 'none',
-  };
-
-  const getArrowStyles = () => {
-    const colors = { border: 'var(--accent)', background: 'var(--bg-secondary)' };
-    const arrowOffset = '50%';
-
-    switch (bubblePosition.arrow) {
-      case 'top':
-        return { ...arrowStyle, bottom: '100%', left: arrowOffset, transform: 'translateX(-50%)', borderWidth: '0 12px 14px 12px', borderColor: `transparent transparent ${colors.border} transparent` };
-      case 'bottom':
-        return { ...arrowStyle, top: '100%', left: arrowOffset, transform: 'translateX(-50%)', borderWidth: '14px 12px 0 12px', borderColor: `${colors.border} transparent transparent transparent` };
-      case 'left':
-        return { ...arrowStyle, right: '100%', top: arrowOffset, transform: 'translateY(-50%)', borderWidth: '12px 14px 12px 0', borderColor: `transparent ${colors.border} transparent transparent` };
-      case 'right':
-        return { ...arrowStyle, left: '100%', top: arrowOffset, transform: 'translateY(-50%)', borderWidth: '12px 0 12px 14px', borderColor: `transparent transparent transparent ${colors.border}` };
-      default:
-        return {};
+    if (arrow === 'top') {
+      return (
+        <div
+          style={{
+            ...base,
+            bottom: '100%',
+            left: x ?? '50%',
+            transform: 'translateX(-50%)',
+            borderWidth: '0 12px 14px 12px',
+            borderColor: `transparent transparent ${borderColor} transparent`,
+          }}
+        />
+      )
     }
-  };
-
-  const arrowStyles = getArrowStyles();
-
-  useEffect(() => {
-    if (isOpen) {
-      window.__tutorialUpdateTarget = updateTarget;
-      return () => { delete window.__tutorialUpdateTarget; };
+    if (arrow === 'bottom') {
+      return (
+        <div
+          style={{
+            ...base,
+            top: '100%',
+            left: x ?? '50%',
+            transform: 'translateX(-50%)',
+            borderWidth: '14px 12px 0 12px',
+            borderColor: `${borderColor} transparent transparent transparent`,
+          }}
+        />
+      )
     }
-  }, [isOpen, updateTarget]);
+    if (arrow === 'left') {
+      return (
+        <div
+          style={{
+            ...base,
+            right: '100%',
+            top: y ?? '50%',
+            transform: 'translateY(-50%)',
+            borderWidth: '12px 14px 12px 0',
+            borderColor: `transparent ${borderColor} transparent transparent`,
+          }}
+        />
+      )
+    }
+    if (arrow === 'right') {
+      return (
+        <div
+          style={{
+            ...base,
+            left: '100%',
+            top: y ?? '50%',
+            transform: 'translateY(-50%)',
+            borderWidth: '12px 0 12px 14px',
+            borderColor: `transparent transparent transparent ${borderColor}`,
+          }}
+        />
+      )
+    }
+    return null
+  }
 
   return createPortal(
     <>
-      <div style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(0,0,0,0.4)',
-        zIndex: 100000,
-        animation: 'fadeIn 0.3s ease',
-        pointerEvents: 'none',
-      }} />
+      {/* Backdrop */}
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.4)',
+          zIndex: 100000,
+          animation: 'fadeIn 0.3s ease',
+          pointerEvents: 'none',
+        }}
+      />
 
-      {targetRect && !isExecutingAction && (
+      {/* Highlight de la cible */}
+      {highlightStyle && !isExecutingAction && (
         <>
           <div style={highlightStyle}>
-            <div style={{
-              position: 'absolute', inset: -4,
-              borderRadius: '16px',
-              border: '2px solid var(--accent)',
-              opacity: 0.3,
-              animation: 'borderPulse 2s ease-in-out infinite',
-              pointerEvents: 'none',
-            }} />
+            <div
+              style={{
+                position: 'absolute',
+                inset: -4,
+                borderRadius: '16px',
+                border: '2px solid var(--accent)',
+                opacity: 0.3,
+                animation: 'borderPulse 2s ease-in-out infinite',
+                pointerEvents: 'none',
+              }}
+            />
           </div>
 
-          <div style={{
-            position: 'fixed',
-            top: targetRect.top - 10, left: targetRect.left - 10,
-            width: 16, height: 16,
-            borderLeft: '3px solid var(--accent)',
-            borderTop: '3px solid var(--accent)',
-            borderRadius: '4px 0 0 0',
-            pointerEvents: 'none', zIndex: 100001, opacity: 0.6,
-          }} />
-
-          <div style={{
-            position: 'fixed',
-            top: targetRect.bottom - 6,
-            left: targetRect.right - 6,
-            width: 16, height: 16,
-            borderRight: '3px solid var(--accent)',
-            borderBottom: '3px solid var(--accent)',
-            borderRadius: '0 0 4px 0',
-            pointerEvents: 'none', zIndex: 100001, opacity: 0.6,
-          }} />
+          <div
+            style={{
+              position: 'fixed',
+              top: targetRect.top - 10,
+              left: targetRect.left - 10,
+              width: 16,
+              height: 16,
+              borderLeft: '3px solid var(--accent)',
+              borderTop: '3px solid var(--accent)',
+              borderRadius: '4px 0 0 0',
+              pointerEvents: 'none',
+              zIndex: 100001,
+              opacity: 0.7,
+            }}
+          />
+          <div
+            style={{
+              position: 'fixed',
+              top: targetRect.bottom - 6,
+              left: targetRect.right - 6,
+              width: 16,
+              height: 16,
+              borderRight: '3px solid var(--accent)',
+              borderBottom: '3px solid var(--accent)',
+              borderRadius: '0 0 4px 0',
+              pointerEvents: 'none',
+              zIndex: 100001,
+              opacity: 0.7,
+            }}
+          />
         </>
       )}
 
+      {/* Bulle */}
       {showBubble && (
         <div style={bubbleStyle} ref={bubbleRef}>
-          <div style={arrowStyles} />
+          {getArrowElement()}
 
-          {/* ─── HEADER : icône + titre (fixe) ─── */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, marginBottom: 8 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: '50%',
-              background: 'var(--accent-light)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 20, flexShrink: 0,
-            }}>
+          {/* HEADER */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              flexShrink: 0,
+              marginBottom: 10,
+            }}
+          >
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                background: 'var(--accent-light)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 20,
+                flexShrink: 0,
+              }}
+            >
               {stepData.icon || '📖'}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--accent)' }}>
+              <div
+                style={{
+                  fontWeight: 600,
+                  fontSize: 15,
+                  color: 'var(--accent)',
+                }}
+              >
                 {stepData.title}
               </div>
             </div>
           </div>
 
-          {/* ─── BODY : description + hint (scrollable si besoin) ─── */}
+          {/* BODY */}
           <div
             ref={bodyRef}
             onScroll={checkScrollable}
             style={{
-              flex: 1,
+              flex: '1 1 auto',
               minHeight: 0,
               overflowY: 'auto',
               overflowX: 'hidden',
               paddingRight: isScrollable && !isScrolledToBottom ? 8 : 0,
               transition: 'padding-right 0.2s ease',
-              // Style scrollbar fin
               scrollbarWidth: 'thin',
               scrollbarColor: 'var(--border) transparent',
             }}
           >
-            <div style={{
-              fontSize: 13,
-              color: 'var(--text-secondary)',
-              lineHeight: 1.6,
-              paddingBottom: 4,
-            }}>
+            <div
+              style={{
+                fontSize: 13,
+                color: 'var(--text-secondary)',
+                lineHeight: 1.6,
+                paddingBottom: 4,
+              }}
+            >
               {stepData.description}
             </div>
 
             {stepData.hint && (
-              <div style={{
-                marginTop: 8,
-                padding: '6px 12px',
-                background: 'var(--bg-tertiary)',
-                borderRadius: 'var(--radius-sm)',
-                fontSize: 11,
-                color: 'var(--text-tertiary)',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 6,
-              }}>
-                <i className="ti ti-bulb" style={{ color: 'var(--warning)', flexShrink: 0, marginTop: 1 }} />
-                <span style={{ lineHeight: 1.5 }}>
-                  {stepData.hint}
-                </span>
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: '6px 12px',
+                  background: 'var(--bg-tertiary)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: 11,
+                  color: 'var(--text-tertiary)',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 6,
+                }}
+              >
+                <i
+                  className="ti ti-bulb"
+                  style={{
+                    color: 'var(--warning)',
+                    flexShrink: 0,
+                    marginTop: 1,
+                  }}
+                />
+                <span style={{ lineHeight: 1.5 }}>{stepData.hint}</span>
               </div>
             )}
           </div>
 
-          {/* ─── Indicateur de scroll (dégradé en bas) ─── */}
+          {/* Dégradé de scroll */}
           {isScrollable && !isScrolledToBottom && (
             <div
               style={{
                 position: 'absolute',
                 left: 2,
                 right: 2,
-                bottom: 62,
+                bottom: FOOTER_RESERVED,
                 height: 24,
-                background: 'linear-gradient(to bottom, transparent, var(--bg-secondary))',
+                background:
+                  'linear-gradient(to bottom, transparent, var(--bg-secondary))',
                 pointerEvents: 'none',
                 borderBottomLeftRadius: 'var(--radius-lg)',
                 borderBottomRightRadius: 'var(--radius-lg)',
@@ -514,23 +765,30 @@ export default function TutorialOverlay({
             />
           )}
 
-          {/* ─── FOOTER : points + boutons (fixe) ─── */}
-          <div style={{
-            flexShrink: 0,
-            paddingTop: 12,
-            marginTop: 4,
-            borderTop: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
+          {/* FOOTER */}
+          <div
+            style={{
+              flexShrink: 0,
+              paddingTop: 12,
+              marginTop: 4,
+              borderTop: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
             <div style={{ display: 'flex', gap: 4 }}>
               {steps.map((_, index) => (
                 <div
                   key={index}
                   style={{
-                    width: 6, height: 6, borderRadius: '50%',
-                    background: index <= currentStep ? 'var(--accent)' : 'var(--bg-tertiary)',
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background:
+                      index <= currentStep
+                        ? 'var(--accent)'
+                        : 'var(--bg-tertiary)',
                     transition: 'background 0.3s ease',
                   }}
                 />
@@ -549,10 +807,20 @@ export default function TutorialOverlay({
                 type="button"
                 className="btn-primary btn-sm"
                 onClick={handleNext}
-                style={{ fontSize: 11, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 4 }}
+                style={{
+                  fontSize: 11,
+                  padding: '4px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
               >
                 {isLastStep ? t('tutorialFinish') : t('tutorialNext')}
-                <i className={`ti ${isLastStep ? 'ti-check' : 'ti-arrow-right'}`} />
+                <i
+                  className={`ti ${
+                    isLastStep ? 'ti-check' : 'ti-arrow-right'
+                  }`}
+                />
               </button>
             </div>
           </div>
@@ -569,8 +837,8 @@ export default function TutorialOverlay({
           50% { opacity: 0.5; transform: scale(1.03); }
         }
         @keyframes bubbleAppear {
-          from { opacity: 0; transform: scale(0.95) translateY(10px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
+          from { opacity: 0; transform: scale(0.97); }
+          to { opacity: 1; transform: scale(1); }
         }
         @keyframes fadeIn {
           from { opacity: 0; }
@@ -579,5 +847,5 @@ export default function TutorialOverlay({
       `}</style>
     </>,
     document.body
-  );
+  )
 }

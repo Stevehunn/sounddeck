@@ -2,7 +2,7 @@
 
 function findFirstSound() {
   const card = document.querySelector('[data-testid^="sound-card-"]');
-  if (card) return card;
+  if (card && card.offsetParent !== null) return card;
   const fallback = document.querySelector('.sound-card:not([style*="display: none"])');
   if (fallback) return fallback;
   return document.querySelector('.sound-grid .sound-card:first-child, .sound-card:first-child');
@@ -10,7 +10,7 @@ function findFirstSound() {
 
 function findAddSoundButton() {
   const addBtn = document.querySelector('[data-testid="add-sound-button"]');
-  if (addBtn) return addBtn;
+  if (addBtn && addBtn.offsetParent !== null) return addBtn;
 
   const buttons = document.querySelectorAll('button');
   for (const btn of buttons) {
@@ -63,27 +63,17 @@ function findDotsButton() {
   return null;
 }
 
+/**
+ * ✅ Cible la section "Profils" dans le sidebar.
+ * On utilise le testId posé sur le wrapper.
+ */
 function findProfilesSection() {
   const section = document.querySelector('[data-testid="profiles-section"]');
-  if (section) return section;
+  if (section && section.offsetParent !== null) return section;
 
-  const sidebar = document.querySelector('.sidebar, aside');
-  if (sidebar) {
-    const sections = sidebar.querySelectorAll('[class*="section"], [class*="group"]');
-    for (const section of sections) {
-      const title = section.querySelector('[class*="title"], [class*="label"]');
-      if (title && title.textContent) {
-        return section;
-      }
-    }
-    const allSounds = sidebar.querySelector('[class*="item"]:has(.ti-stack)');
-    if (allSounds) {
-      const section = allSounds.closest('[class*="section"]');
-      return section || allSounds;
-    }
-    return sidebar;
-  }
-  return null;
+  // Fallback : le sidebar entier
+  const sidebar = document.querySelector('aside, .sidebar');
+  return sidebar || null;
 }
 
 function findFirstOtherSoundAddButton() {
@@ -108,25 +98,27 @@ function findFirstOtherSoundAddButton() {
   return null;
 }
 
+/**
+ * ✅ Cible le bouton "+ Nouveau profil" dans le sidebar.
+ * Priorité absolue au testId (stable, indépendant de la langue / du DOM).
+ */
 function findNewProfileButton() {
-  const newProfileBtn = document.querySelector('[data-testid="new-profile-button"]');
-  if (newProfileBtn) return newProfileBtn;
+  // 1) TestId officiel
+  const btn = document.querySelector('[data-testid="new-profile-button"]');
+  if (btn && btn.offsetParent !== null) return btn;
 
-  const sidebar = document.querySelector('.sidebar, aside');
+  // 2) Fallback : dans le sidebar, chercher un bouton.sidebar-item
+  //    qui a un <span class="label"> ET une icône .ti-plus
+  const sidebar = document.querySelector('aside, .sidebar');
   if (sidebar) {
-    const btns = sidebar.querySelectorAll('button');
-    for (const btn of btns) {
-      if (btn.querySelector('.ti-plus')) {
-        const section = btn.closest('[class*="section"]');
-        if (section) {
-          const title = section.querySelector('[class*="title"], [class*="label"]');
-          if (title && title.textContent) return btn;
-        }
+    const buttons = sidebar.querySelectorAll('button.sidebar-item');
+    for (const b of buttons) {
+      if (b.querySelector('.label') && b.querySelector('.ti-plus')) {
+        return b;
       }
     }
-    const fallback = sidebar.querySelector('[class*="new-profile"]');
-    if (fallback) return fallback;
   }
+
   return null;
 }
 
@@ -186,7 +178,7 @@ export const TUTORIAL_STEPS = (t) => [
     description: t('tutorialHomeStep5Desc'),
     hint: t('tutorialHomeStep5Hint'),
     target: findProfilesSection,
-    fallbackTarget: '.sidebar .profiles-section',
+    fallbackTarget: 'aside',
   },
   {
     id: 'home-step6',
@@ -195,7 +187,7 @@ export const TUTORIAL_STEPS = (t) => [
     description: t('tutorialHomeStep6Desc'),
     hint: t('tutorialHomeStep6Hint'),
     target: findNewProfileButton,
-    fallbackTarget: '.sidebar .new-profile-btn',
+    fallbackTarget: '[data-testid="new-profile-button"]',
   },
   {
     id: 'home-step7',

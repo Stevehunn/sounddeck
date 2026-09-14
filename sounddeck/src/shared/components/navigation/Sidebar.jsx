@@ -617,7 +617,7 @@ const Sidebar = memo(function Sidebar({
       const allPinned = isProfilePinned('all')
 
       return (
-        <div key="profiles">
+        <div key="profiles" data-testid="profiles-section">
           <div style={{ padding: '8px 12px 4px', marginTop: 4 }}>
             <div style={{
               fontSize: 11,
@@ -692,6 +692,7 @@ const Sidebar = memo(function Sidebar({
               label={t('newProfile')}
               muted
               onClick={() => setShowNewProfile(true)}
+              testId="new-profile-button"
             />
           )}
         </div>
@@ -983,13 +984,15 @@ function SidebarItem({
   showDragHandle = false, 
   isAction = false, 
   isProfile = false,
-  isPlugin = false 
+  isPlugin = false,
+  testId
 }) {
   const { t } = useLanguage()
   const isActive = active || false
   
   return (
     <button
+      data-testid={testId}
       onClick={onClick}
       className={`sidebar-item ${isActive ? 'active' : ''} ${muted ? 'muted' : ''}`}
       style={{
