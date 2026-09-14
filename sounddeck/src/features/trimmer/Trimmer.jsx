@@ -30,6 +30,21 @@ export default function Trimmer({ store, addToast }) {
     s.name.toLowerCase().includes(search.toLowerCase())
   )
 
+  // ✅ Expose une fonction globale pour le tutoriel : sélectionne automatiquement
+  // le premier son de la liste (déclenché par afterNextStep de l'étape 1).
+  useEffect(() => {
+    window.__trimmerSelectFirstSound = () => {
+      const list = store.sounds || []
+      if (list.length === 0) return false
+      setSearch('') // Reset la recherche pour que le son soit visible
+      setSelectedSound(list[0])
+      return true
+    }
+    return () => {
+      delete window.__trimmerSelectFirstSound
+    }
+  }, [store.sounds])
+
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       <div style={{
@@ -115,7 +130,7 @@ function SoundListItem({ sound, active, onClick }) {
 function EmptyState() {
   const { t } = useLanguage()
   return (
-    <div className="flex-center" style={{ flexDirection: 'column', height: '100%', gap: 12, color: 'var(--text-tertiary)' }}>
+    <div className="flex-center" data-testid="trimmer-empty-state" style={{ flexDirection: 'column', height: '100%', gap: 12, color: 'var(--text-tertiary)' }}>
       <i className="ti ti-cut" style={{ fontSize: 48, color: 'var(--border)' }} />
       <div style={{ fontWeight: 500, fontSize: 14 }}>{t('selectSound')}</div>
       <div style={{ fontSize: 12, textAlign: 'center', maxWidth: 260, lineHeight: 1.6 }}>

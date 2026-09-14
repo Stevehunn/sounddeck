@@ -168,6 +168,7 @@ const MarkersPanel = memo(({
         </div>
 
         <button
+          data-testid="editor-markers-add-button"
           className="btn-ghost btn-sm"
           onClick={handleAddAtCurrentTime}
           style={{
@@ -212,6 +213,7 @@ const MarkersPanel = memo(({
             </label>
             <input
               ref={(input) => input?.focus()}
+              data-testid="editor-marker-name-input"
               type="text"
               value={markerName}
               onChange={(e) => setMarkerName(e.target.value)}

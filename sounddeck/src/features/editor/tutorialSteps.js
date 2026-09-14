@@ -1,36 +1,71 @@
 // src/features/editor/tutorialSteps.js
-export const TUTORIAL_STEPS = (t) => {  
+
+/**
+ * Retourne true si le projet contient au moins un clip.
+ */
+function hasClips() {
+  if (typeof window === 'undefined') return false
+  if (typeof window.__editorHasClips === 'function') {
+    try { return window.__editorHasClips() } catch (e) { return false }
+  }
+  return !!document.querySelector(
+    '[data-testid="editor-clip"], .editor-clip-wrapper, [data-clip-id]'
+  )
+}
+
+/**
+ * Force le recalcul de la position de la bulle après une action async.
+ */
+function refreshTarget(delay = 350) {
+  setTimeout(() => {
+    window.__tutorialUpdateTarget?.()
+  }, delay)
+}
+
+export const TUTORIAL_STEPS = (t) => {
   const steps = [
+    // ─── ÉTAPE 1 : Toolbar ─────────────────────────────────────────────────
     {
       id: 'editor-1',
       title: t('tutorialEditorStep1Title') || 'La barre d\'outils',
-      description: t('tutorialEditorStep1Desc') || 'En haut de l\'écran se trouve la barre d\'outils. C\'est là que vous gérez vos projets, ajoutez des pistes, importez des fichiers et contrôlez la lecture.',
+      description: t('tutorialEditorStep1Desc') || 'En haut se trouve la barre d\'outils. C\'est là que vous gérez vos projets, ajoutez des pistes, importez des fichiers et contrôlez la lecture.',
       icon: '📂',
       target: '[data-testid="editor-toolbar"]',
-      fallbackTarget: '.editor-toolbar',
+      fallbackTarget: '[data-testid="editor-container"]',
       hint: t('tutorialEditorStep1Hint') || '💡 Astuce : Le métronome (🎵) vous aide à garder le tempo.',
       position: 'bottom',
     },
+
+    // ─── ÉTAPE 2 : Ajouter un son ──────────────────────────────────────────
     {
       id: 'editor-2',
       title: t('tutorialEditorStep2Title') || 'Ajouter un son à votre projet',
-      description: t('tutorialEditorStep2Desc') || 'Cliquez sur "Ajouter un son" dans la barre d\'outils pour importer un son depuis votre bibliothèque SoundDeck vers la timeline.',
+      description: t('tutorialEditorStep2Desc') || 'Cliquez sur "Ajouter un clip" dans la barre d\'outils pour importer un son depuis votre bibliothèque SoundDeck vers la timeline.',
       icon: '📥',
       target: '[data-testid="editor-add-clip-button"]',
-      fallbackTarget: '.editor-toolbar',
+      fallbackTarget: '[data-testid="editor-toolbar"]',
       hint: t('tutorialEditorStep2Hint') || '💡 Astuce : Vous pouvez aussi importer un fichier audio externe avec "Importer un fichier".',
       position: 'bottom',
     },
+
+    // ─── ÉTAPE 3 : Timeline ────────────────────────────────────────────────
     {
       id: 'editor-3',
       title: t('tutorialEditorStep3Title') || 'La timeline et les pistes',
       description: t('tutorialEditorStep3Desc') || 'Au centre se trouve la timeline avec vos pistes. Chaque piste contient des clips (sons) que vous pouvez déplacer en les glissant, ou ajuster leur durée en tirant sur les bords.',
       icon: '📊',
       target: '[data-testid="editor-timeline"]',
-      fallbackTarget: '.timeline-container',
+      fallbackTarget: '[data-testid="editor-container"]',
       hint: t('tutorialEditorStep3Hint') || '💡 Astuce : Les pistes vous permettent d\'organiser vos sons par catégorie (batterie, voix, effets...).',
       position: 'bottom',
+      onShow: () => {
+        if (!hasClips()) {
+          console.warn('[Tutorial Éditeur] Aucun clip dans le projet — étapes 4-6 dégradées.')
+        }
+      },
     },
+
+    // ─── ÉTAPE 4 : Menu contextuel ─────────────────────────────────────────
     {
       id: 'editor-4',
       title: t('tutorialEditorStep4Title') || 'Le menu contextuel du clip',
@@ -40,279 +75,139 @@ export const TUTORIAL_STEPS = (t) => {
       fallbackTarget: '[data-testid="context-menu"]',
       hint: t('tutorialEditorStep4Hint') || '💡 Astuce : Le menu contextuel est l\'outil principal pour gérer vos clips.',
       position: 'right',
-      afterShow: () => {
+      onShow: () => {
+        if (!hasClips()) return
+        window.__editorCloseClipMenu?.()
         setTimeout(() => {
-          const clip = document.querySelector('[data-testid="editor-clip"]') || 
-                       document.querySelector('.editor-clip-wrapper')
-          if (clip) {
-            const rect = clip.getBoundingClientRect()
-            const event = new MouseEvent('contextmenu', {
-              view: window,
-              bubbles: true,
-              cancelable: true,
-              clientX: rect.left + rect.width / 2,
-              clientY: rect.top + 20,
-            })
-            clip.dispatchEvent(event)
-            
-            setTimeout(() => {
-              const menu = document.querySelector('.clip-actions-menu') || 
-                           document.querySelector('[data-testid="context-menu"]')
-              if (menu) {
-                window.__tutorialUpdateTarget?.()
-              }
-            }, 400)
-          }
-        }, 500)
-      },
-      onLeave: () => {
-        setTimeout(() => {
-          const clickEvent = new MouseEvent('mousedown', { view: window, bubbles: true })
-          document.body.dispatchEvent(clickEvent)
-        }, 100)
-      }
-    },
-    {
-      id: 'editor-5',
-      title: t('tutorialEditorStep5Title') || 'Les effets audio',
-      description: t('tutorialEditorStep5Desc') || 'Cliquez sur "Effets" dans la barre d\'outils pour ouvrir le panneau des effets. Sélectionnez un clip, puis cliquez sur "Ajouter un effet" pour personnaliser votre son.',
-      icon: '🎛️',
-      target: '[data-testid="editor-add-effect-button"]',
-      fallbackTarget: '[data-testid="editor-effects-panel"]',
-      hint: t('tutorialEditorStep5Hint') || '💡 Astuce : L\'auto-preview joue les effets 1 seconde après chaque modification.',
-      position: 'top',
-      afterShow: () => {
-        
-        const selectClipAndOpenPanel = () => {
-          // 1. Sélectionner le clip
-          if (window.__editorGetFirstClipId) {
-            const clipId = window.__editorGetFirstClipId()
-            if (clipId && window.__editorSelectClip) {
-              window.__editorSelectClip(clipId)
-            }
-          } else {
-            const clipEl = document.querySelector('[data-testid="editor-clip"]') || 
-                           document.querySelector('.editor-clip-wrapper')
-            if (clipEl) {
-              const clickEvent = new MouseEvent('click', { view: window, bubbles: true })
-              clipEl.dispatchEvent(clickEvent)
-            }
-          }
-          
-          // 2. Ouvrir le panneau des effets (si pas déjà ouvert)
-          setTimeout(() => {
-            const panel = document.querySelector('[data-testid="editor-effects-panel"]')
-            if (!panel) {
-              const toggleBtn = document.querySelector('[data-testid="editor-effects-panel-toggle"]')
-              if (toggleBtn) {
-                const isActive = toggleBtn.classList.contains('btn-primary')
-                if (!isActive) {
-                  toggleBtn.click()
-                }
-              }
-            } else {
-            }
-            
-            // 3. Mettre à jour la cible
-            setTimeout(() => {
-              window.__tutorialUpdateTarget?.()
-            }, 300)
-          }, 300)
-        }
-        
-        setTimeout(selectClipAndOpenPanel, 400)
-      },
-      onLeave: () => {
-      }
-    },
-    {
-      id: 'editor-6',
-      title: t('tutorialEditorStep6Title') || 'Personnaliser avec les effets',
-      description: t('tutorialEditorStep6Desc') || 'Une fois le panneau des effets ouvert, vous pouvez ajuster chaque paramètre. Par exemple, pour l\'effet "Volume", faites glisser le curseur pour augmenter ou baisser le volume.',
-      icon: '🔊',
-      target: '[data-testid="editor-effect-item"]',
-      fallbackTarget: '[data-testid="editor-effects-panel"]',
-      hint: t('tutorialEditorStep6Hint') || '💡 Astuce : Chaque effet a des paramètres uniques. Explorez-les pour découvrir toutes les possibilités !',
-      position: 'top',
-      afterShow: () => {
-        
-        let effectAdded = false
-        
-        // ✅ Vérifier si le panneau est ouvert, l'ouvrir si nécessaire
-        const ensurePanelOpen = () => {
-          const panel = document.querySelector('[data-testid="editor-effects-panel"]')
-          if (panel) {
-            return true
-          }
-          
-          const toggleBtn = document.querySelector('[data-testid="editor-effects-panel-toggle"]')
-          if (toggleBtn) {
-            const isActive = toggleBtn.classList.contains('btn-primary')
-            if (!isActive) {
-              toggleBtn.click()
-            }
-            return true
-          }
-          return false
-        }
-        
-        // ✅ S'assurer que le clip est sélectionné
-        const ensureClipSelected = () => {
-          if (window.__editorGetFirstClipId) {
-            const clipId = window.__editorGetFirstClipId()
-            if (clipId && window.__editorSelectClip) {
-              window.__editorSelectClip(clipId)
-              return true
-            }
-          }
-          const clipEl = document.querySelector('[data-testid="editor-clip"]') || 
-                         document.querySelector('.editor-clip-wrapper')
-          if (clipEl) {
-            clipEl.dispatchEvent(new MouseEvent('click', { view: window, bubbles: true }))
-            return true
-          }
-          return false
-        }
-        
-        // ✅ Ajouter un effet Volume si nécessaire
-        const addVolumeEffect = () => {
-          // Vérifier si un effet existe déjà
-          const existingEffect = document.querySelector('[data-testid="editor-effect-item"]') ||
-                                document.querySelector('.effect-item') ||
-                                document.querySelector('[class*="effect-item"]')
-          
-          if (existingEffect) {
-            setTimeout(() => {
-              window.__tutorialUpdateTarget?.()
-            }, 200)
-            return
-          }
-          
-          // ✅ Attendre que le DOM soit prêt avant de chercher le bouton
-          setTimeout(() => {
-            const addBtn = document.querySelector('[data-testid="editor-add-effect-button"]') ||
-                          document.querySelector('.add-effect-button') ||
-                          Array.from(document.querySelectorAll('button')).find(
-                            btn => btn.textContent?.includes('Ajouter un effet') || 
-                                   btn.textContent?.includes('Add effect')
-                          )
-            
-            if (!addBtn) {
-              console.warn('⚠️ [Tutorial] Bouton "Ajouter un effet" non trouvé')
-              // ✅ Fallback : essayer de mettre à jour la cible quand même
-              setTimeout(() => {
-                window.__tutorialUpdateTarget?.()
-              }, 300)
-              return
-            }
-            
-            addBtn.click()
-            
-            setTimeout(() => {
-              const volumeBtn = Array.from(document.querySelectorAll('button')).find(
-                btn => btn.textContent?.trim() === 'Volume' || 
-                       btn.textContent?.includes('📢 Volume') ||
-                       btn.textContent?.includes('🔊 Volume')
-              ) || document.querySelector('[data-testid="effect-volume"]')
-              
-              if (volumeBtn) {
-                volumeBtn.click()
-                effectAdded = true
-                
-                setTimeout(() => {
-                  const effectItem = document.querySelector('[data-testid="editor-effect-item"]') ||
-                                    document.querySelector('.effect-item') ||
-                                    document.querySelector('[class*="effect-item"]')
-                  
-                  if (effectItem) {
-                    setTimeout(() => {
-                      window.__tutorialUpdateTarget?.()
-                    }, 200)
-                  } else {
-                    // ✅ Fallback : mettre à jour quand même
-                    setTimeout(() => {
-                      window.__tutorialUpdateTarget?.()
-                    }, 300)
-                  }
-                }, 500)
-              } else {
-                console.warn('⚠️ [Tutorial] Effet Volume non trouvé')
-                // ✅ Fallback : mettre à jour la cible
-                setTimeout(() => {
-                  window.__tutorialUpdateTarget?.()
-                }, 300)
-              }
-            }, 400)
-          }, 300) // ✅ Délai pour laisser le DOM se mettre à jour
-        }
-        
-        // ✅ Exécution séquentielle
-        setTimeout(() => {
-          ensureClipSelected()
-          
-          setTimeout(() => {
-            ensurePanelOpen()
-            
-            setTimeout(() => {
-              addVolumeEffect()
-            }, 400) // ✅ Délai augmenté
-          }, 300)
-        }, 400)
-      },
-      onLeave: () => {
-        
-        setTimeout(() => {
-          const deleteBtn = document.querySelector('[data-testid="editor-effect-delete"]') ||
-                            document.querySelector('.effect-delete-button') ||
-                            Array.from(document.querySelectorAll('button')).find(
-                              btn => btn.textContent?.includes('✕') || 
-                                     btn.textContent?.includes('×') ||
-                                     btn.getAttribute('data-testid') === 'delete-effect'
-                            ) ||
-                            Array.from(document.querySelectorAll('button')).find(
-                              btn => btn.querySelector('.ti-trash') || 
-                                     btn.querySelector('.ti-x')
-                            )
-          
-          if (deleteBtn) {
-            deleteBtn.click()
-          } else {
-            console.warn('⚠️ [Tutorial] Bouton de suppression d\'effet non trouvé')
+          const opened = window.__editorOpenClipMenu?.()
+          if (opened) {
+            refreshTarget(450)
           }
         }, 300)
-      }
+      },
+      onLeave: () => {
+        window.__editorCloseClipMenu?.()
+      },
     },
+
+    // ─── ÉTAPE 5 : Panneau effets ──────────────────────────────────────────
+    {
+      id: 'editor-5',
+      title: t('tutorialEditorStep5Title') || 'Le panneau des effets',
+      description: t('tutorialEditorStep5Desc') || 'Sous la timeline se trouve le panneau des effets. Il affiche tous les effets appliqués au clip actuellement sélectionné.',
+      icon: '🎛️',
+      target: '[data-testid="editor-effects-panel"]',
+      fallbackTarget: '[data-testid="editor-toolbar"]',
+      hint: t('tutorialEditorStep5Hint') || '💡 Astuce : Sélectionnez un clip dans la timeline pour voir ses effets.',
+      position: 'top',
+      onShow: () => {
+        if (!hasClips()) return
+        setTimeout(() => {
+          const ok = window.__editorSelectFirstClip?.(true)
+          if (ok) refreshTarget(450)
+        }, 250)
+      },
+    },
+
+    // ─── ÉTAPE 6 : Ajouter un effet ────────────────────────────────────────
+    {
+      id: 'editor-6',
+      title: t('tutorialEditorStep6Title') || 'Ajouter et régler un effet',
+      description: t('tutorialEditorStep6Desc') || 'Cliquez sur "Ajouter un effet" pour choisir parmi les effets disponibles (Volume, Fade In/Out, Écho, Réverbération...). Ensuite, réglez les paramètres avec les curseurs.',
+      icon: '🔊',
+      target: '[data-testid="editor-add-effect-button"]',
+      fallbackTarget: '[data-testid="editor-effects-panel"]',
+      hint: t('tutorialEditorStep6Hint') || '💡 Astuce : L\'auto-preview rejoue le clip avec les effets 1 seconde après chaque modification.',
+      position: 'top',
+      onShow: () => {
+        if (!hasClips()) return
+        setTimeout(() => {
+          window.__editorSelectFirstClip?.(true)
+          refreshTarget(400)
+        }, 250)
+      },
+    },
+
+    // ─── ÉTAPE 7 : Panneau des marqueurs ───────────────────────────────────
     {
       id: 'editor-7',
-      title: t('tutorialEditorStep7Title') || 'Le zoom de la timeline',
-      description: t('tutorialEditorStep7Desc') || 'Utilisez les contrôles de zoom en bas de l\'écran pour agrandir ou réduire la timeline. Cela vous permet de travailler sur des détails précis ou de voir l\'ensemble de votre projet.',
+      title: t('tutorialEditorStep7Title') || 'Le panneau des marqueurs',
+      description: t('tutorialEditorStep7Desc') || 'Le panneau des marqueurs s\'ouvre à droite de la timeline. Il regroupe tous les points de repère de votre projet : intro, refrain, drop, etc. Chaque marqueur peut avoir un nom, une position et une couleur.',
+      icon: '🚩',
+      target: '[data-testid="editor-markers-panel"]',
+      fallbackTarget: '[data-testid="editor-timeline"]',
+      hint: t('tutorialEditorStep7Hint') || '💡 Astuce : Appuyez sur Ctrl+M pour ajouter un marqueur directement à la position du playhead.',
+      position: 'left',
+      onShow: () => {
+        // Ouvre automatiquement le panneau si fermé
+        setTimeout(() => {
+          const panel = document.querySelector('[data-testid="editor-markers-panel"]')
+          if (!panel) {
+            const btn = document.querySelector('[data-testid="editor-add-marker-button"]')
+            if (btn) btn.click()
+          }
+          refreshTarget(450)
+        }, 300)
+      },
+    },
+
+    // ─── ÉTAPE 8 : Ajouter un marqueur ─────────────────────────────────────
+    {
+      id: 'editor-8',
+      title: t('tutorialEditorStep8Title') || 'Ajouter un marqueur',
+      description: t('tutorialEditorStep8Desc') || 'Cliquez sur "+ Ajouter" en haut du panneau pour créer un nouveau marqueur. Vous pourrez ensuite lui donner un nom, choisir sa position et sélectionner une couleur.',
+      icon: '➕',
+      target: '[data-testid="editor-markers-add-button"]',
+      fallbackTarget: '[data-testid="editor-markers-panel"]',
+      hint: t('tutorialEditorStep8Hint') || '💡 Astuce : Cliquez sur un marqueur pour déplacer le playhead à sa position.',
+      position: 'left',
+      onShow: () => {
+        // S'assurer que le panneau est bien ouvert
+        const panel = document.querySelector('[data-testid="editor-markers-panel"]')
+        if (!panel) {
+          const btn = document.querySelector('[data-testid="editor-add-marker-button"]')
+          if (btn) btn.click()
+        }
+        refreshTarget(350)
+      },
+    },
+
+    // ─── ÉTAPE 9 : Zoom ────────────────────────────────────────────────────
+    {
+      id: 'editor-9',
+      title: t('tutorialEditorStep9Title') || 'Le zoom de la timeline',
+      description: t('tutorialEditorStep9Desc') || 'Utilisez les contrôles de zoom en bas de l\'écran pour agrandir ou réduire la timeline. Cela vous permet de travailler sur des détails précis ou de voir l\'ensemble de votre projet.',
       icon: '🔍',
       target: '[data-testid="editor-zoom-controls"]',
       fallbackTarget: '[data-testid="editor-container"]',
-      hint: t('tutorialEditorStep7Hint') || '💡 Astuce : Utilisez Ctrl+Molette ou Ctrl+{/* */}+/- pour zoomer rapidement.',
+      hint: t('tutorialEditorStep9Hint') || '💡 Astuce : Utilisez Ctrl+Molette pour zoomer rapidement.',
       position: 'top',
     },
+
+    // ─── ÉTAPE 10 : Volume maître ──────────────────────────────────────────
     {
-      id: 'editor-8',
-      title: t('tutorialEditorStep8Title') || 'Le volume maître',
-      description: t('tutorialEditorStep8Desc') || 'À droite du zoom, vous trouverez le contrôle du volume maître. Il ajuste le niveau sonore global de votre projet. Vous pouvez également le couper avec le bouton à gauche.',
+      id: 'editor-10',
+      title: t('tutorialEditorStep10Title') || 'Le volume maître',
+      description: t('tutorialEditorStep10Desc') || 'À droite du zoom, vous trouverez le contrôle du volume maître. Il ajuste le niveau sonore global de votre projet. Vous pouvez également le couper avec le bouton à gauche.',
       icon: '🔊',
       target: '[data-testid="editor-master-volume"]',
       fallbackTarget: '[data-testid="editor-container"]',
-      hint: t('tutorialEditorStep8Hint') || '💡 Astuce : Le volume maître affecte tous les sons du projet, pas seulement les pistes.',
+      hint: t('tutorialEditorStep10Hint') || '💡 Astuce : Le bouton 🔄 réinitialise tous les volumes (maître + pistes) à 100%.',
       position: 'top',
     },
+
+    // ─── ÉTAPE 11 : Export ─────────────────────────────────────────────────
     {
-      id: 'editor-9',
-      title: t('tutorialEditorStep9Title') || 'Exporter votre projet',
-      description: t('tutorialEditorStep9Desc') || 'Une fois votre projet terminé, cliquez sur "Exporter" dans la barre d\'outils pour sauvegarder votre création en MP3, WAV ou d\'autres formats.',
+      id: 'editor-11',
+      title: t('tutorialEditorStep11Title') || 'Exporter votre projet',
+      description: t('tutorialEditorStep11Desc') || 'Une fois votre projet terminé, cliquez sur "Exporter" dans la barre d\'outils pour sauvegarder votre création en MP3, WAV ou l\'ajouter directement à votre bibliothèque.',
       icon: '💾',
       target: '[data-testid="editor-export-button"]',
-      fallbackTarget: '.editor-toolbar',
-      hint: t('tutorialEditorStep9Hint') || '💡 Astuce : MP3 pour une taille réduite, WAV pour une qualité sans perte.',
+      fallbackTarget: '[data-testid="editor-toolbar"]',
+      hint: t('tutorialEditorStep11Hint') || '💡 Astuce : MP3 pour une taille réduite, WAV pour une qualité sans perte.',
       position: 'bottom',
     },
   ]
-  
+
   return steps
 }

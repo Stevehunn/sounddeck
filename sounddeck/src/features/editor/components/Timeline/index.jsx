@@ -847,7 +847,9 @@ export default function EditorTimeline({
 
         {/* Panel des marqueurs */}
         {shouldShowPanel && (
-          <div style={{
+        <div
+          data-testid="editor-markers-panel"
+          style={{
             width: 280,
             minWidth: 280,
             height: '100%',

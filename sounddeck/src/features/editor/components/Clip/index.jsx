@@ -39,9 +39,9 @@ const EditorClip = ({
   const [dragMode, setDragMode] = useState('move')
   const [isHovering, setIsHovering] = useState(false)
   const [isClipPlaying, setIsClipPlaying] = useState(false)
-  
+
   const [localStart, setLocalStart] = useState(start)
-  
+
   const clipRef = useRef(null)
   const clipContainerRef = useRef(null)
   const dragStartClipId = useRef(null)
@@ -57,16 +57,14 @@ const EditorClip = ({
   const SNAP_VALUE = 0.01
   const DRAG_SENSITIVITY = 1.0
 
-  // ✅ Vérifier si le clip est en boucle
   const isClipLooping = clip?.id && loopState?.clips?.[clip.id]?.enabled || false
   const clipLoopData = clip?.id ? loopState?.clips?.[clip.id] : null
-  
+
   const loopVisual = clipLoopData?.visual || 'arrow'
   const loopColor = clipLoopData?.arrowColor || '#22c55e'
   const loopEnd = clipLoopData?.end || totalDuration
   const loopMode = clipLoopData?.loopMode || 'endOfTrack'
 
-  // ✅ Calcul de la position de la zone de boucle
   const clipEndPosition = clipWidth
   const loopEndRelativePosition = Math.max(0, (loopEnd - start) * pixelsPerSecond)
   const loopWidth = Math.max(0, loopEndRelativePosition - clipEndPosition)
@@ -93,25 +91,22 @@ const EditorClip = ({
 
   const playheadPosition = Math.max(0, Math.min((currentTime - start) * pixelsPerSecond, clipWidth - 2))
 
+  // ✅ FIX : on passe trackId en 3ème argument pour que Editor.jsx puisse le propager
   const handleContextMenu = useCallback((e) => {
-    console.log('🖱️ [Clip] Clic droit DÉTECTÉ sur le clip:', clip.id, 'nom:', clip.name)
     e.preventDefault()
     e.stopPropagation()
     if (onContextMenu) {
-      console.log('🖱️ [Clip] Appel de onContextMenu avec clipId:', clip.id)
-      onContextMenu(e, clip.id)
-    } else {
-      console.warn('🖱️ [Clip] onContextMenu est undefined !')
+      onContextMenu(e, clip.id, trackId)
     }
-  }, [clip.id, clip.name, onContextMenu])
+  }, [clip.id, trackId, onContextMenu])
 
   const handleMouseDown = (e) => {
     if (e.button !== 0) return
-    
+
     const target = e.target
     const isResizeStart = target.dataset?.resize === 'start' || target.closest?.('[data-resize="start"]')
     const isResizeEnd = target.dataset?.resize === 'end' || target.closest?.('[data-resize="end"]')
-    
+
     if (isResizeStart || isResizeEnd) {
       setDragMode(isResizeStart ? 'resize-start' : 'resize-end')
       setIsDragging(true)
@@ -125,17 +120,17 @@ const EditorClip = ({
       e.preventDefault()
       return
     }
-    
-    const isActionButton = target.closest?.('.delete-button') || 
+
+    const isActionButton = target.closest?.('.delete-button') ||
                           target.closest?.('[data-action]') ||
                           target.closest?.('button')
-    
+
     if (isActionButton) {
       e.stopPropagation()
       e.preventDefault()
       return
     }
-    
+
     onSelect?.(clip.id)
     dragStartClipId.current = clip.id
     setIsDragging(true)
@@ -145,53 +140,53 @@ const EditorClip = ({
     accumulatedDeltaRef.current = 0
     hasMovedRef.current = false
     dragStartTimeRef.current = start
-    
+
     e.stopPropagation()
     e.preventDefault()
   }
 
   const handleMouseMove = useCallback((e) => {
     if (!isDraggingRef.current) return
-    
+
     if (frameIdRef.current) {
       cancelAnimationFrame(frameIdRef.current)
       frameIdRef.current = null
     }
-    
+
     frameIdRef.current = requestAnimationFrame(() => {
       const deltaPixels = e.clientX - lastClientXRef.current
       lastClientXRef.current = e.clientX
-      
+
       accumulatedDeltaRef.current += deltaPixels
-      
+
       const totalDeltaSeconds = (accumulatedDeltaRef.current / pixelsPerSecond) * DRAG_SENSITIVITY
       let newStart = Math.max(0, dragStartTimeRef.current + totalDeltaSeconds)
-      
+
       if (snapEnabled) {
         newStart = Math.round(newStart / SNAP_VALUE) * SNAP_VALUE
         newStart = Math.round(newStart * 1000) / 1000
       }
-      
+
       if (Math.abs(accumulatedDeltaRef.current) > 1) {
         hasMovedRef.current = true
       }
-      
+
       setLocalStart(newStart)
-      
+
       frameIdRef.current = null
     })
   }, [pixelsPerSecond, snapEnabled])
 
   const handleMouseUp = useCallback(() => {
     if (!isDraggingRef.current) return
-    
+
     if (frameIdRef.current) {
       cancelAnimationFrame(frameIdRef.current)
       frameIdRef.current = null
     }
-    
+
     const finalStart = localStart
-    
+
     if (hasMovedRef.current && onMove && dragStartClipId.current) {
       onMove(
         dragStartClipId.current,
@@ -200,7 +195,7 @@ const EditorClip = ({
         { skipHistory: true }
       )
     }
-    
+
     setIsDragging(false)
     isDraggingRef.current = false
     dragStartClipId.current = null
@@ -216,7 +211,7 @@ const EditorClip = ({
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
-      
+
       if (frameIdRef.current) {
         cancelAnimationFrame(frameIdRef.current)
         frameIdRef.current = null
@@ -261,13 +256,12 @@ const EditorClip = ({
     onCutClip?.(clip)
   }
 
-  // ✅ Rendu de la zone de boucle
   const renderLoopOverlay = () => {
     if (!isClipLooping) return null
     if (loopWidth <= 0) return null
-    
+
     const loopStart = clipWidth
-    
+
     return (
       <div
         ref={clipContainerRef}
@@ -285,7 +279,6 @@ const EditorClip = ({
           borderRadius: '0 4px 4px 0',
         }}
       >
-        {/* "]" à la fin de la boucle */}
         <div style={{
           position: 'absolute',
           right: -2,
@@ -307,8 +300,7 @@ const EditorClip = ({
             ]
           </span>
         </div>
-        
-        {/* Label "FIN" en bas */}
+
         <div style={{
           position: 'absolute',
           right: -2,
@@ -327,8 +319,7 @@ const EditorClip = ({
         }}>
           FIN {(loopWidth / pixelsPerSecond).toFixed(1)}s
         </div>
-        
-        {/* Flèche tiretée */}
+
         <div
           style={{
             position: 'absolute',
@@ -349,7 +340,7 @@ const EditorClip = ({
             background: `repeating-linear-gradient(90deg, ${loopColor}, ${loopColor} 6px, transparent 6px, transparent 12px)`,
             opacity: 0.4,
           }} />
-          
+
           <div style={{
             position: 'absolute',
             right: -6,
@@ -363,8 +354,7 @@ const EditorClip = ({
             opacity: 0.6
           }} />
         </div>
-        
-        {/* Label "LOOP" avec infos */}
+
         <div style={{
           position: 'absolute',
           top: -24,
@@ -424,6 +414,8 @@ const EditorClip = ({
     <div
       ref={clipRef}
       data-testid="editor-clip"
+      data-clip-id={clip.id}
+      data-track-id={trackId}
       className="editor-clip-wrapper"
       style={{
         position: 'absolute',
@@ -449,10 +441,8 @@ const EditorClip = ({
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      {/* Zone de boucle */}
       {renderLoopOverlay()}
 
-      {/* Badge de boucle avec info */}
       {isClipLooping && (
         <div style={{
           position: 'absolute',
@@ -590,7 +580,7 @@ const EditorClip = ({
               <i className="ti ti-player-play" />
             </button>
           )}
-          
+
           <button
             onClick={handleCopy}
             style={{
@@ -606,7 +596,7 @@ const EditorClip = ({
           >
             <i className="ti ti-copy" />
           </button>
-          
+
           <button
             onClick={handleCut}
             style={{

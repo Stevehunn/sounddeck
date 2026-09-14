@@ -1016,20 +1016,12 @@ function EditorTimelineContent() {
 
   // ✅ Exposer les fonctions pour le tutoriel
   useEffect(() => {
-    // Exposer la fonction de sélection de clip via window pour le tutoriel
-    window.__editorSelectClip = (clipId) => {
-      for (const track of tracks) {
-        const clip = track.clips.find(c => c.id === clipId)
-        if (clip) {
-          selectClip(clipId, track.id)
-          setShowEffectsPanel(true)
-          return true
-        }
-      }
-      return false
+    // Vérifie si le projet contient au moins un clip
+    window.__editorHasClips = () => {
+      return tracks.some(t => t.clips && t.clips.length > 0)
     }
-    
-    // Exposer une fonction pour récupérer le premier clip ID
+
+    // Récupère l'ID du premier clip du projet
     window.__editorGetFirstClipId = () => {
       for (const track of tracks) {
         if (track.clips && track.clips.length > 0) {
@@ -1038,10 +1030,91 @@ function EditorTimelineContent() {
       }
       return null
     }
-    
+
+    // Sélectionne un clip par son ID
+    window.__editorSelectClip = (clipId, openEffects = true) => {
+      for (const track of tracks) {
+        const clip = track.clips.find(c => c.id === clipId)
+        if (clip) {
+          selectClip(clipId, track.id)
+          if (openEffects) setShowEffectsPanel(true)
+          return true
+        }
+      }
+      return false
+    }
+
+    // Sélectionne automatiquement le premier clip + ouvre le panneau effets
+    window.__editorSelectFirstClip = (openEffects = true) => {
+      const clipId = window.__editorGetFirstClipId?.()
+      if (!clipId) return false
+      return window.__editorSelectClip?.(clipId, openEffects) || false
+    }
+
+    // Ouvre le menu contextuel d'un clip (par défaut : le premier)
+    window.__editorOpenClipMenu = (clipId = null) => {
+      const targetId = clipId || window.__editorGetFirstClipId?.()
+      if (!targetId) return false
+
+      // Sélectionner d'abord le clip (pour que le menu sache quel trackId utiliser)
+      window.__editorSelectClip?.(targetId, false)
+
+      // Trouver l'élément DOM
+      const clipEl =
+        document.querySelector(`[data-clip-id="${targetId}"]`) ||
+        document.querySelector('[data-testid="editor-clip"]') ||
+        document.querySelector('.editor-clip-wrapper')
+
+      if (!clipEl) return false
+
+      const rect = clipEl.getBoundingClientRect()
+
+      // Dispatch d'un vrai événement contextmenu avec les coordonnées
+      const event = new MouseEvent('contextmenu', {
+        view: window,
+        bubbles: true,
+        cancelable: true,
+        button: 2,
+        buttons: 2,
+        clientX: rect.left + Math.min(rect.width / 2, 60),
+        clientY: rect.top + Math.min(rect.height / 2, 20),
+      })
+      clipEl.dispatchEvent(event)
+      return true
+    }
+
+    // Ferme le menu contextuel
+    window.__editorCloseClipMenu = () => {
+      const evt = new MouseEvent('mousedown', {
+        view: window,
+        bubbles: true,
+        cancelable: true,
+        clientX: 5,
+        clientY: 5,
+      })
+      document.body.dispatchEvent(evt)
+    }
+
+    // Ouvre le panneau des marqueurs
+    window.__editorOpenMarkersPanel = () => {
+      const btn = document.querySelector('[data-testid="editor-add-marker-button"]')
+      if (btn) {
+        btn.click()
+        return true
+      }
+      const panel = document.querySelector('[data-testid="editor-markers-panel"]')
+      if (panel) return true
+      return false
+    }
+
     return () => {
-      delete window.__editorSelectClip
+      delete window.__editorHasClips
       delete window.__editorGetFirstClipId
+      delete window.__editorSelectClip
+      delete window.__editorSelectFirstClip
+      delete window.__editorOpenClipMenu
+      delete window.__editorCloseClipMenu
+      delete window.__editorOpenMarkersPanel
     }
   }, [tracks, selectClip, setShowEffectsPanel])
 

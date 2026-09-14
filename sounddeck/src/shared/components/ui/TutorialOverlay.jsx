@@ -8,10 +8,10 @@ import { useLanguage } from '@core/i18n/LanguageContext';
 const VIEWPORT_PADDING = 16
 const BUBBLE_GAP = 20
 const MIN_BUBBLE_WIDTH = 300
-const MIN_BUBBLE_HEIGHT = 200        // header + body mini + footer + padding
+const MIN_BUBBLE_HEIGHT = 200
 const PREFERRED_BUBBLE_WIDTH = 400
 const PREFERRED_BUBBLE_HEIGHT = 340
-const FOOTER_RESERVED = 60           // hauteur estimée footer + border + marge
+const FOOTER_RESERVED = 60
 
 // ─── UTILS ──────────────────────────────────────────────────────────────────
 
@@ -19,7 +19,6 @@ function clamp(v, min, max) {
   return Math.max(min, Math.min(v, max))
 }
 
-/** Dimensions du viewport fiables (prend en compte zoom/barres). */
 function getViewport() {
   const vv = typeof window !== 'undefined' ? window.visualViewport : null
   return {
@@ -77,15 +76,11 @@ function scrollToElement(el) {
 
 // ─── LAYOUT ─────────────────────────────────────────────────────────────────
 
-/**
- * Calcule la meilleure position pour la bulle SANS JAMAIS recouvrir la cible.
- */
 function computeBubbleLayout(targetRect, forcedPosition) {
   const { vw, vh } = getViewport()
   const p = VIEWPORT_PADDING
   const g = BUBBLE_GAP
 
-  // Espace disponible dans chaque direction
   const spaces = {
     right:  vw - targetRect.right - g - p,
     left:   targetRect.left - g - p,
@@ -93,11 +88,9 @@ function computeBubbleLayout(targetRect, forcedPosition) {
     top:    targetRect.top - g - p,
   }
 
-  // Dimensions souhaitées (limitées au viewport)
   const prefW = Math.min(PREFERRED_BUBBLE_WIDTH, vw - 2 * p)
   const prefH = Math.min(PREFERRED_BUBBLE_HEIGHT, vh - 2 * p)
 
-  // Une direction est viable si elle peut accueillir la taille minimale
   const fits = {
     right:  spaces.right  >= MIN_BUBBLE_WIDTH,
     left:   spaces.left   >= MIN_BUBBLE_WIDTH,
@@ -105,7 +98,6 @@ function computeBubbleLayout(targetRect, forcedPosition) {
     top:    spaces.top    >= MIN_BUBBLE_HEIGHT,
   }
 
-  // Choix de la direction
   let dir = null
 
   if (forcedPosition && fits[forcedPosition]) {
@@ -125,7 +117,6 @@ function computeBubbleLayout(targetRect, forcedPosition) {
   }
 
   if (!dir) {
-    // Fallback : la direction avec le plus d'espace (même si insuffisant)
     let best = null
     let bestSpace = -1
     for (const d of ['right', 'left', 'bottom', 'top']) {
@@ -139,28 +130,19 @@ function computeBubbleLayout(targetRect, forcedPosition) {
 
   const available = spaces[dir]
 
-  // ─── Dimensionnement ─────────────────────────────────────────────────
-  // Pour left/right : la largeur est contrainte, la hauteur = viewport safe
-  // Pour top/bottom : la hauteur est contrainte, la largeur = préférentielle
   let bw, bh
 
   if (dir === 'right' || dir === 'left') {
     bw = Math.min(prefW, Math.max(available, MIN_BUBBLE_WIDTH))
-    // La hauteur n'est PAS contrainte par `available` (le side est vertical),
-    // mais par le viewport moins de la marge basse
     bh = Math.min(prefH, vh - 2 * p)
   } else {
     bw = prefW
-    // Contrainte stricte : on ne doit pas dépasser la place disponible
-    // ET on réserve la place pour le footer
     bh = Math.min(prefH, Math.max(available, MIN_BUBBLE_HEIGHT))
   }
 
-  // Sécurité viewport
   bw = Math.min(bw, vw - 2 * p)
   bh = Math.min(bh, vh - 2 * p)
 
-  // ─── Position ────────────────────────────────────────────────────────
   let top, left, arrow
 
   if (dir === 'right') {
@@ -176,22 +158,17 @@ function computeBubbleLayout(targetRect, forcedPosition) {
     left = clamp(targetRect.centerX - bw / 2, p, vw - bw - p)
     arrow = 'top'
   } else {
-    // top
     top = targetRect.top - bh - g
     left = clamp(targetRect.centerX - bw / 2, p, vw - bw - p)
     arrow = 'bottom'
   }
 
-  // Clamp final : garantit que la bulle reste dans le viewport
   top = clamp(top, p, vh - bh - p)
   left = clamp(left, p, vw - bw - p)
 
   return { top, left, width: bw, height: bh, arrow, direction: dir }
 }
 
-/**
- * Calcule l'offset de la flèche pour qu'elle pointe vers le centre de la cible.
- */
 function computeArrowOffset(layout, targetRect) {
   const { top, left, width, height, arrow } = layout
   const MIN_MARGIN = 24
@@ -233,8 +210,10 @@ export default function TutorialOverlay({
   const lastAdvanceTimeRef = useRef(0)
   const actionTimeoutRef = useRef(null)
   const layoutReadyStepRef = useRef(-1)
-  // ✅ Évite les boucles infinies de correction
   const correctedForStepRef = useRef(-1)
+
+  // ✅ NOUVEAU : évite d'appeler onShow plusieurs fois pour la même étape
+  const onShowCalledRef = useRef(-1)
 
   const stepData = steps[currentStep] || steps[0]
   const isLastStep = currentStep === steps.length - 1
@@ -249,6 +228,7 @@ export default function TutorialOverlay({
     setIsScrolledToBottom(false)
     layoutReadyStepRef.current = -1
     correctedForStepRef.current = -1
+    onShowCalledRef.current = -1
   }, [currentStep])
 
   // ─── Cleanup timeout ─────────────────────────────────────────────────────
@@ -279,7 +259,6 @@ export default function TutorialOverlay({
     const data = steps[currentStep] || steps[0]
     const { vw, vh } = getViewport()
 
-    // ─ Cas 1 : pas de cible → bulle centrée
     if (!data?.target) {
       const bw = Math.min(PREFERRED_BUBBLE_WIDTH, vw - 2 * VIEWPORT_PADDING)
       const bh = Math.min(PREFERRED_BUBBLE_HEIGHT, vh - 2 * VIEWPORT_PADDING)
@@ -297,7 +276,6 @@ export default function TutorialOverlay({
       return
     }
 
-    // ─ Cas 2 : recherche de l'élément cible
     const el = findElement(data.target, data.fallbackTarget)
 
     if (!el) {
@@ -319,7 +297,6 @@ export default function TutorialOverlay({
 
     scrollToElement(el)
 
-    // Double RAF pour laisser le navigateur appliquer le scroll
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const rect = getElementRect(el)
@@ -343,7 +320,7 @@ export default function TutorialOverlay({
     return () => clearTimeout(timer)
   }, [isOpen, currentStep, updateTarget])
 
-  // ─── Reposition au resize / scroll / resize fenêtre ──────────────────────
+  // ─── Reposition au resize / scroll ───────────────────────────────────────
   useEffect(() => {
     if (!isOpen) return
 
@@ -366,14 +343,26 @@ export default function TutorialOverlay({
     }
   }, [isOpen, updateTarget])
 
-  // ─── ✅ CORRECTION POST-RENDU : garantit que la bulle reste dans le viewport ───
+  // ✅ Expose une fonction globale pour forcer le recalcul de la position
+  // Utilisé par les steps qui ouvrent un menu/panneau après onShow
+  useEffect(() => {
+    if (!isOpen) return
+    window.__tutorialUpdateTarget = () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      rafRef.current = requestAnimationFrame(updateTarget)
+    }
+    return () => {
+      delete window.__tutorialUpdateTarget
+    }
+  }, [isOpen, updateTarget])
+
+  // ─── Correction post-rendu : garantit que la bulle reste dans le viewport ───
   useLayoutEffect(() => {
     if (!layout || !bubbleRef.current) return
     if (correctedForStepRef.current === currentStep) return
     if (layoutReadyStepRef.current !== currentStep) return
 
     const el = bubbleRef.current
-    // Force le navigateur à calculer la vraie hauteur
     const rect = el.getBoundingClientRect()
     const { vw, vh } = getViewport()
     const p = VIEWPORT_PADDING
@@ -382,7 +371,6 @@ export default function TutorialOverlay({
     let newLeft = layout.left
     let needsUpdate = false
 
-    // Correction verticale : la bulle doit tenir dans [p, vh - p]
     if (rect.bottom > vh - p) {
       newTop = Math.max(p, vh - p - rect.height)
       needsUpdate = true
@@ -392,7 +380,6 @@ export default function TutorialOverlay({
       needsUpdate = true
     }
 
-    // Correction horizontale : la bulle doit tenir dans [p, vw - p]
     if (rect.right > vw - p) {
       newLeft = Math.max(p, vw - p - rect.width)
       needsUpdate = true
@@ -404,10 +391,8 @@ export default function TutorialOverlay({
 
     if (needsUpdate) {
       correctedForStepRef.current = currentStep
-      // On applique le repositionnement via setLayout pour éviter le saut
       setLayout(prev => prev ? { ...prev, top: newTop, left: newLeft } : prev)
 
-      // Recalcule l'offset de la flèche par rapport à la nouvelle position
       if (targetRect && layout.arrow) {
         const offset = computeArrowOffset(
           { ...layout, top: newTop, left: newLeft },
@@ -419,6 +404,21 @@ export default function TutorialOverlay({
       correctedForStepRef.current = currentStep
     }
   }, [layout, currentStep, targetRect])
+
+  // ✅ NOUVEAU : appel onShow UNE SEULE FOIS par étape, dès que la bulle est prête
+  const showBubble = layoutReadyStepRef.current === currentStep && layout !== null
+  useEffect(() => {
+    if (!showBubble) return
+    if (onShowCalledRef.current === currentStep) return
+    onShowCalledRef.current = currentStep
+    if (typeof stepData?.onShow === 'function') {
+      try {
+        stepData.onShow()
+      } catch (e) {
+        console.error('[TutorialOverlay] Erreur onShow:', e)
+      }
+    }
+  }, [showBubble, currentStep, stepData])
 
   // ─── Actions ─────────────────────────────────────────────────────────────
   const handleLeave = useCallback(() => {
@@ -468,8 +468,7 @@ export default function TutorialOverlay({
   // ─── Rendu ────────────────────────────────────────────────────────────────
   if (!isOpen || !stepData) return null
 
-  const isReady = layoutReadyStepRef.current === currentStep && layout !== null
-  const showBubble = isReady && !isExecutingAction
+  const showHighlight = targetRect && !isExecutingAction
 
   const highlightStyle = targetRect
     ? {
@@ -512,7 +511,6 @@ export default function TutorialOverlay({
       }
     : null
 
-  // ─── Flèche ──────────────────────────────────────────────────────────────
   const getArrowElement = () => {
     if (!layout?.arrow) return null
 
@@ -589,7 +587,6 @@ export default function TutorialOverlay({
 
   return createPortal(
     <>
-      {/* Backdrop */}
       <div
         style={{
           position: 'fixed',
@@ -601,8 +598,7 @@ export default function TutorialOverlay({
         }}
       />
 
-      {/* Highlight de la cible */}
-      {highlightStyle && !isExecutingAction && (
+      {showHighlight && (
         <>
           <div style={highlightStyle}>
             <div
@@ -651,179 +647,209 @@ export default function TutorialOverlay({
         </>
       )}
 
-      {/* Bulle */}
       {showBubble && (
         <div style={bubbleStyle} ref={bubbleRef}>
           {getArrowElement()}
 
-          {/* HEADER */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              flexShrink: 0,
-              marginBottom: 10,
-            }}
-          >
+          {isExecutingAction ? (
             <div
               style={{
-                width: 40,
-                height: 40,
-                borderRadius: '50%',
-                background: 'var(--accent-light)',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 20,
-                flexShrink: 0,
+                gap: 14,
+                padding: '20px 10px',
+                minHeight: 110,
               }}
             >
-              {stepData.icon || '📖'}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
+              <i
+                className="ti ti-loader"
                 style={{
-                  fontWeight: 600,
-                  fontSize: 15,
+                  fontSize: 34,
                   color: 'var(--accent)',
+                  animation: 'spin 1s linear infinite',
                 }}
-              >
-                {stepData.title}
-              </div>
-            </div>
-          </div>
-
-          {/* BODY */}
-          <div
-            ref={bodyRef}
-            onScroll={checkScrollable}
-            style={{
-              flex: '1 1 auto',
-              minHeight: 0,
-              overflowY: 'auto',
-              overflowX: 'hidden',
-              paddingRight: isScrollable && !isScrolledToBottom ? 8 : 0,
-              transition: 'padding-right 0.2s ease',
-              scrollbarWidth: 'thin',
-              scrollbarColor: 'var(--border) transparent',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 13,
-                color: 'var(--text-secondary)',
-                lineHeight: 1.6,
-                paddingBottom: 4,
-              }}
-            >
-              {stepData.description}
-            </div>
-
-            {stepData.hint && (
+              />
               <div
                 style={{
-                  marginTop: 8,
-                  padding: '6px 12px',
-                  background: 'var(--bg-tertiary)',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: 11,
-                  color: 'var(--text-tertiary)',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 6,
+                  fontSize: 13,
+                  color: 'var(--text-secondary)',
+                  textAlign: 'center',
+                  fontWeight: 500,
                 }}
               >
-                <i
-                  className="ti ti-bulb"
-                  style={{
-                    color: 'var(--warning)',
-                    flexShrink: 0,
-                    marginTop: 1,
-                  }}
-                />
-                <span style={{ lineHeight: 1.5 }}>{stepData.hint}</span>
+                {t('tutorialPreparing') || 'Préparation...'}
               </div>
-            )}
-          </div>
-
-          {/* Dégradé de scroll */}
-          {isScrollable && !isScrolledToBottom && (
-            <div
-              style={{
-                position: 'absolute',
-                left: 2,
-                right: 2,
-                bottom: FOOTER_RESERVED,
-                height: 24,
-                background:
-                  'linear-gradient(to bottom, transparent, var(--bg-secondary))',
-                pointerEvents: 'none',
-                borderBottomLeftRadius: 'var(--radius-lg)',
-                borderBottomRightRadius: 'var(--radius-lg)',
-              }}
-            />
-          )}
-
-          {/* FOOTER */}
-          <div
-            style={{
-              flexShrink: 0,
-              paddingTop: 12,
-              marginTop: 4,
-              borderTop: '1px solid var(--border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <div style={{ display: 'flex', gap: 4 }}>
-              {steps.map((_, index) => (
-                <div
-                  key={index}
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    background:
-                      index <= currentStep
-                        ? 'var(--accent)'
-                        : 'var(--bg-tertiary)',
-                    transition: 'background 0.3s ease',
-                  }}
-                />
-              ))}
             </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                type="button"
-                className="btn-secondary btn-sm"
-                onClick={handleSkip}
-                style={{ fontSize: 11, padding: '4px 10px' }}
-              >
-                {t('tutorialSkip')}
-              </button>
-              <button
-                type="button"
-                className="btn-primary btn-sm"
-                onClick={handleNext}
+          ) : (
+            <>
+              <div
                 style={{
-                  fontSize: 11,
-                  padding: '4px 12px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 4,
+                  gap: 12,
+                  flexShrink: 0,
+                  marginBottom: 10,
                 }}
               >
-                {isLastStep ? t('tutorialFinish') : t('tutorialNext')}
-                <i
-                  className={`ti ${
-                    isLastStep ? 'ti-check' : 'ti-arrow-right'
-                  }`}
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    background: 'var(--accent-light)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 20,
+                    flexShrink: 0,
+                  }}
+                >
+                  {stepData.icon || '📖'}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontWeight: 600,
+                      fontSize: 15,
+                      color: 'var(--accent)',
+                    }}
+                  >
+                    {stepData.title}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                ref={bodyRef}
+                onScroll={checkScrollable}
+                style={{
+                  flex: '1 1 auto',
+                  minHeight: 0,
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
+                  paddingRight: isScrollable && !isScrolledToBottom ? 8 : 0,
+                  transition: 'padding-right 0.2s ease',
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: 'var(--border) transparent',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: 'var(--text-secondary)',
+                    lineHeight: 1.6,
+                    paddingBottom: 4,
+                  }}
+                >
+                  {stepData.description}
+                </div>
+
+                {stepData.hint && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: '6px 12px',
+                      background: 'var(--bg-tertiary)',
+                      borderRadius: 'var(--radius-sm)',
+                      fontSize: 11,
+                      color: 'var(--text-tertiary)',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 6,
+                    }}
+                  >
+                    <i
+                      className="ti ti-bulb"
+                      style={{
+                        color: 'var(--warning)',
+                        flexShrink: 0,
+                        marginTop: 1,
+                      }}
+                    />
+                    <span style={{ lineHeight: 1.5 }}>{stepData.hint}</span>
+                  </div>
+                )}
+              </div>
+
+              {isScrollable && !isScrolledToBottom && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 2,
+                    right: 2,
+                    bottom: FOOTER_RESERVED,
+                    height: 24,
+                    background:
+                      'linear-gradient(to bottom, transparent, var(--bg-secondary))',
+                    pointerEvents: 'none',
+                    borderBottomLeftRadius: 'var(--radius-lg)',
+                    borderBottomRightRadius: 'var(--radius-lg)',
+                  }}
                 />
-              </button>
-            </div>
-          </div>
+              )}
+
+              <div
+                style={{
+                  flexShrink: 0,
+                  paddingTop: 12,
+                  marginTop: 4,
+                  borderTop: '1px solid var(--border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {steps.map((_, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background:
+                          index <= currentStep
+                            ? 'var(--accent)'
+                            : 'var(--bg-tertiary)',
+                        transition: 'background 0.3s ease',
+                      }}
+                    />
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onClick={handleSkip}
+                    style={{ fontSize: 11, padding: '4px 10px' }}
+                  >
+                    {t('tutorialSkip')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary btn-sm"
+                    onClick={handleNext}
+                    style={{
+                      fontSize: 11,
+                      padding: '4px 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    {isLastStep ? t('tutorialFinish') : t('tutorialNext')}
+                    <i
+                      className={`ti ${
+                        isLastStep ? 'ti-check' : 'ti-arrow-right'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -844,8 +870,12 @@ export default function TutorialOverlay({
           from { opacity: 0; }
           to { opacity: 1; }
         }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
       `}</style>
     </>,
     document.body
-  )
+  );
 }

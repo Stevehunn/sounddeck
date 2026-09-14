@@ -6,6 +6,7 @@ export default {
   tutorialSkip: 'Passer',
   tutorialNext: 'Suivant',
   tutorialFinish: 'Terminer',
+  tutorialPreparing: 'Préparation...',
   tutorialNotFound: 'Aucun tutoriel disponible pour cette page',
   tutorialRestart: 'Revoir le tutoriel',
   tutorialAdvanced: 'Tutoriel avancé',
@@ -76,17 +77,25 @@ export default {
   tutorialEditorStep6Desc: 'Une fois le panneau des effets ouvert, vous pouvez ajuster chaque paramètre. Par exemple, pour l\'effet "Volume", faites glisser le curseur pour augmenter ou baisser le volume.',
   tutorialEditorStep6Hint: '💡 Astuce : Chaque effet a des paramètres uniques. Explorez-les pour découvrir toutes les possibilités !',
 
-  tutorialEditorStep7Title: 'Le zoom de la timeline',
-  tutorialEditorStep7Desc: 'Utilisez les contrôles de zoom en bas de l\'écran pour agrandir ou réduire la timeline. Cela vous permet de travailler sur des détails précis ou de voir l\'ensemble de votre projet.',
-  tutorialEditorStep7Hint: '💡 Astuce : Utilisez Ctrl+Molette ou Ctrl+{/* */}+/- pour zoomer rapidement.',
+  tutorialEditorStep7Title: 'Le panneau des marqueurs',
+  tutorialEditorStep7Desc: 'Le panneau des marqueurs s\'ouvre à droite de la timeline. Il regroupe tous les points de repère de votre projet : intro, refrain, drop, etc. Chaque marqueur peut avoir un nom, une position et une couleur.',
+  tutorialEditorStep7Hint: '💡 Astuce : Appuyez sur Ctrl+M pour ajouter un marqueur directement à la position du playhead.',
 
-  tutorialEditorStep8Title: 'Le volume maître',
-  tutorialEditorStep8Desc: 'À droite du zoom, vous trouverez le contrôle du volume maître. Il ajuste le niveau sonore global de votre projet. Vous pouvez également le couper avec le bouton à gauche.',
-  tutorialEditorStep8Hint: '💡 Astuce : Le volume maître affecte tous les sons du projet, pas seulement les pistes.',
+  tutorialEditorStep8Title: 'Ajouter un marqueur',
+  tutorialEditorStep8Desc: 'Cliquez sur "+ Ajouter" en haut du panneau pour créer un nouveau marqueur. Vous pourrez ensuite lui donner un nom, choisir sa position et sélectionner une couleur.',
+  tutorialEditorStep8Hint: '💡 Astuce : Cliquez sur un marqueur pour déplacer le playhead à sa position.',
 
-  tutorialEditorStep9Title: 'Exporter votre projet',
-  tutorialEditorStep9Desc: 'Une fois votre projet terminé, cliquez sur "Exporter" dans la barre d\'outils pour sauvegarder votre création en MP3, WAV ou d\'autres formats.',
-  tutorialEditorStep9Hint: '💡 Astuce : MP3 pour une taille réduite, WAV pour une qualité sans perte.',
+  tutorialEditorStep9Title: 'Le zoom de la timeline',
+  tutorialEditorStep9Desc: 'Utilisez les contrôles de zoom en bas de l\'écran pour agrandir ou réduire la timeline. Cela vous permet de travailler sur des détails précis ou de voir l\'ensemble de votre projet.',
+  tutorialEditorStep9Hint: '💡 Astuce : Utilisez Ctrl+Molette pour zoomer rapidement.',
+
+  tutorialEditorStep10Title: 'Le volume maître',
+  tutorialEditorStep10Desc: 'À droite du zoom, vous trouverez le contrôle du volume maître. Il ajuste le niveau sonore global de votre projet. Vous pouvez également le couper avec le bouton à gauche.',
+  tutorialEditorStep10Hint: '💡 Astuce : Le bouton 🔄 réinitialise tous les volumes (maître + pistes) à 100%.',
+
+  tutorialEditorStep11Title: 'Exporter votre projet',
+  tutorialEditorStep11Desc: 'Une fois votre projet terminé, cliquez sur "Exporter" dans la barre d\'outils pour sauvegarder votre création en MP3, WAV ou l\'ajouter directement à votre bibliothèque.',
+  tutorialEditorStep11Hint: '💡 Astuce : MP3 pour une taille réduite, WAV pour une qualité sans perte.',
 
   // ─── SEQUENCER ──────────────────────────────────────────────────────
   tutorialSequencerStep1Title: 'Créer une playlist',
@@ -132,28 +141,28 @@ export default {
 
   // ─── TRIMMER ────────────────────────────────────────────────────────
   tutorialTrimmerStep1Title: 'Sélectionner un son',
-  tutorialTrimmerStep1Desc: 'Choisissez un son dans la liste de gauche pour commencer à le rogner. La liste affiche tous vos sons disponibles.',
-  tutorialTrimmerStep1Hint: '💡 Astuce : Vous pouvez utiliser la barre de recherche pour trouver rapidement un son spécifique.',
-  
-  tutorialTrimmerStep2Title: 'Visualiser et sélectionner une portion',
-  tutorialTrimmerStep2Desc: 'Le waveform affiche la forme d\'onde du son. Utilisez les poignées ═══ sur les bords pour sélectionner la portion à conserver. Vous pouvez aussi ajuster les curseurs "Début" et "Fin" en dessous.',
-  tutorialTrimmerStep2Hint: '💡 Astuce : Faites glisser les poignées ou utilisez les curseurs pour un réglage précis.',
-  
-  tutorialTrimmerStep3Title: 'Écouter la sélection',
-  tutorialTrimmerStep3Desc: 'Avant de rogner, écoutez la sélection pour vérifier que vous avez bien choisi la bonne portion. Cliquez sur "Écouter la sélection" pour prévisualiser.',
-  tutorialTrimmerStep3Hint: '💡 Astuce : La barre de progression en dessous du waveform vous montre où vous en êtes dans la lecture.',
-  
-  tutorialTrimmerStep4Title: 'Personnaliser votre son',
-  tutorialTrimmerStep4Desc: 'Donnez un nom à votre nouveau son, choisissez une image ou un emoji, et sélectionnez le ou les profils dans lesquels l\'ajouter.',
-  tutorialTrimmerStep4Hint: '💡 Astuce : Une image rendra votre son plus reconnaissable dans la bibliothèque.',
-  
-  tutorialTrimmerStep5Title: 'Créer le son',
-  tutorialTrimmerStep5Desc: 'Une fois que vous avez configuré le nom, l\'image et les profils, cliquez sur "Créer le son" pour l\'ajouter définitivement à votre bibliothèque.',
-  tutorialTrimmerStep5Hint: '💡 Astuce : Le son apparaîtra immédiatement dans votre profil et sera prêt à être joué.',
-  
-  tutorialTrimmerStep6Title: 'Rechercher un son',
-  tutorialTrimmerStep6Desc: 'Utilisez la barre de recherche en haut de la liste pour filtrer vos sons par nom. C\'est pratique quand vous avez beaucoup de sons.',
-  tutorialTrimmerStep6Hint: '💡 Astuce : La recherche est instantanée, les résultats se mettent à jour au fur et à mesure que vous tapez.',
+  tutorialTrimmerStep1Desc: 'Choisissez dans la liste de gauche le son que vous souhaitez rogner. Utilisez la barre de recherche pour le retrouver rapidement.',
+  tutorialTrimmerStep1Hint: '💡 Astuce : La liste affiche tous les sons de votre bibliothèque, quel que soit le profil.',
+
+  tutorialTrimmerStep2Title: 'Ajuster la zone de rognage',
+  tutorialTrimmerStep2Desc: 'Faites glisser les poignées bleues sur la waveform pour définir le début et la fin de la portion à conserver. La zone surlignée sera le nouveau son.',
+  tutorialTrimmerStep2Hint: '💡 Astuce : Cliquez directement sur la waveform pour déplacer le curseur de lecture.',
+
+  tutorialTrimmerStep3Title: 'Écouter avant de créer',
+  tutorialTrimmerStep3Desc: 'Cliquez sur "Écouter la sélection" pour vérifier que la portion choisie correspond à ce que vous voulez. Le son s\'arrête automatiquement en fin de sélection.',
+  tutorialTrimmerStep3Hint: '💡 Astuce : Réglez les curseurs Début/Fin pour un ajustement à la milliseconde près.',
+
+  tutorialTrimmerStep4Title: 'Tout sélectionner',
+  tutorialTrimmerStep4Desc: 'Ce bouton réinitialise la sélection sur le fichier entier. Pratique si vous voulez repartir de zéro sans changer de son.',
+  tutorialTrimmerStep4Hint: '💡 Astuce : Vous pouvez aussi cliquer sur une autre poignée directement dans la waveform.',
+
+  tutorialTrimmerStep5Title: 'Nommer le nouveau son',
+  tutorialTrimmerStep5Desc: 'Donnez un nom à votre nouveau son. Vous pouvez aussi lui attribuer une image ou un emoji, et choisir les profils dans lesquels il apparaîtra.',
+  tutorialTrimmerStep5Hint: '💡 Astuce : Le son original est conservé, seul le nouveau son rogné sera ajouté.',
+
+  tutorialTrimmerStep6Title: 'Créer le son rogné',
+  tutorialTrimmerStep6Desc: 'Cliquez sur "Créer le son" pour valider. Le nouveau son est ajouté à votre bibliothèque et disponible immédiatement sur la page Mes sons.',
+  tutorialTrimmerStep6Hint: '💡 Astuce : Si un son porte déjà ce nom, une confirmation vous sera demandée.',
 
   // ─── OPTIONS ────────────────────────────────────────────────────────
   tutorialOptionsStep1Title: 'Personnaliser l\'apparence',
