@@ -203,85 +203,83 @@ export function EditorProvider({ children, store, addToast }) {
 
   // ─── CHARGEMENT DU PROJET ──────────────────────────────────────────────
 
-  const loadProject = useCallback(async (projectData) => {
-    console.log('📂 [EditorContext] loadProject appelé avec:', projectData?.id, projectData?.name)
-    console.log('📂 [EditorContext] projectData complet:', JSON.stringify(projectData, null, 2))
-    
-    if (!projectData) {
-      console.log('📂 [EditorContext] projectData est null/undefined, initialisation terminée')
-      setIsInitialized(true)
-      return
-    }
-
-    if (project?.id === projectData.id && project?.tracks?.length === projectData.tracks?.length) {
-      console.log('📂 [EditorContext] Projet déjà chargé, skip')
-      setIsInitialized(true)
-      return
-    }
-
-    if (!projectData.name) {
-      projectData.name = 'Nouveau projet'
-    }
-
-    console.log('📂 [EditorContext] Chargement du projet:', projectData.name)
-
-    setProject(projectData)
-    projectRef.current = projectData
-    setSelectedClipId(null)
-    setSelectedTrackId(null)
-    setCurrentTime(0)
-    setIsPlaying(false)
-    setIsPaused(false)
-    setIsDurationsLoaded(false)
-    setIsInitialized(true)
-    setSoloPlayClipId(null)
-    
-    try {
-      // ✅ Sauvegarder l'ID du projet actuel dans le store
-      await window.electronAPI.storeSet?.('currentEditorProjectId', projectData.id)
-      console.log('💾 [EditorContext] currentEditorProjectId sauvegardé:', projectData.id)
-      
-      // ✅ Mettre à jour store.editorProject avec le projet chargé
-      if (store?.updateEditorProject) {
-        await store.updateEditorProject(projectData)
-        console.log('💾 [EditorContext] store.editorProject mis à jour avec:', projectData.name)
+  const loadProject = useCallback(
+    async (projectData) => {
+      if (!projectData) {
+        setIsInitialized(true)
+        return
       }
-    } catch (e) {
-      console.warn('⚠️ [EditorContext] Erreur lors de la sauvegarde:', e)
-    }
-    
-    if (projectData.loops) {
-      console.log('🔄 [EditorContext] Chargement des boucles:', projectData.loops)
-      setLoopState(projectData.loops)
-    }
-    
-    let maxDuration = 10
-    if (projectData.tracks) {
-      for (const track of projectData.tracks) {
-        for (const clip of track.clips) {
-          const duration = clip.duration || 3
-          const end = (clip.start || 0) + duration
-          if (end > maxDuration) maxDuration = end
+
+      const isSameProject = projectRef.current?.id === projectData.id
+      if (isSameProject && initialLoadDoneRef.current) {
+        projectRef.current = projectData
+        setProject(projectData)
+        setIsInitialized(true)
+        return
+      }
+
+      if (project?.id === projectData.id && project?.tracks?.length === projectData.tracks?.length) {
+        setIsInitialized(true)
+        return
+      }
+
+      if (!projectData.name) {
+        projectData.name = 'Nouveau projet'
+      }
+
+      setProject(projectData)
+      projectRef.current = projectData
+      setSelectedClipId(null)
+      setSelectedTrackId(null)
+      setCurrentTime(0)
+      setIsPlaying(false)
+      setIsPaused(false)
+      setIsDurationsLoaded(false)
+      setIsInitialized(true)
+      setSoloPlayClipId(null)
+
+      try {
+        await window.electronAPI.storeSet?.(
+          'currentEditorProjectId',
+          projectData.id
+        )
+
+        if (store?.updateEditorProject) {
+          await store.updateEditorProject(projectData)
         }
+      } catch (e) {
+        console.warn('⚠️ [EditorContext] Erreur sauvegarde:', e)
       }
-      setTotalDuration(Math.max(maxDuration + 2, 10))
-    }
-    
-    if (projectData.tracks) {
-      const durations = {}
-      for (const track of projectData.tracks) {
-        for (const clip of track.clips) {
-          if (clip.id) {
-            durations[clip.id] = clip.duration || 3
+
+      if (projectData.loops) {
+        setLoopState(projectData.loops)
+      }
+
+      let maxDuration = 10
+      if (projectData.tracks) {
+        for (const track of projectData.tracks) {
+          for (const clip of track.clips) {
+            const duration = clip.duration || 3
+            const end = (clip.start || 0) + duration
+            if (end > maxDuration) maxDuration = end
           }
         }
+        setTotalDuration(Math.max(maxDuration + 2, 10))
       }
-      setClipDurations(durations)
-      setIsDurationsLoaded(true)
-    }
-    
-    console.log('✅ [EditorContext] Projet chargé avec succès:', projectData.name)
-  }, [project, store])
+
+      if (projectData.tracks) {
+        const durations = {}
+        for (const track of projectData.tracks) {
+          for (const clip of track.clips) {
+            if (clip.id) durations[clip.id] = clip.duration || 3
+          }
+        }
+        setClipDurations(durations)
+        setIsDurationsLoaded(true)
+      }
+    },
+    [project, store]
+  )
 
   // ─── INITIALISATION ──────────────────────────────────────────────────────
 

@@ -1,6 +1,18 @@
 // src/features/editor/components/Track/index.jsx
-import React, { useState, useRef, useCallback, useEffect } from 'react'
+
+import React, { useMemo, useCallback } from 'react'
 import EditorClip from '../Clip'
+
+const TRACK_COLORS = [
+  'hsl(220, 70%, 55%)',
+  'hsl(340, 70%, 55%)',
+  'hsl(40, 70%, 55%)',
+  'hsl(160, 70%, 55%)',
+  'hsl(280, 70%, 55%)',
+  'hsl(10, 70%, 55%)',
+  'hsl(190, 70%, 55%)',
+  'hsl(70, 70%, 55%)',
+]
 
 const EditorTrack = ({
   track,
@@ -32,176 +44,77 @@ const EditorTrack = ({
   onPasteClip,
   loopState = {},
 }) => {
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragStartX, setDragStartX] = useState(0)
-  const [dragClipId, setDragClipId] = useState(null)
-  const [dragStartTime, setDragStartTime] = useState(0)
-  
-  const trackRef = useRef(null)
-  
-  const [clipVersion, setClipVersion] = useState(0)
-  const prevClipPositions = useRef({})
-  const prevClipIds = useRef(new Set())
+  // ✅ Couleur stable (pas recalculée à chaque render)
+  const color = useMemo(
+    () => trackColor || TRACK_COLORS[trackIndex % TRACK_COLORS.length],
+    [trackColor, trackIndex]
+  )
 
-  console.log(`🔁 [Track] ${track.name} - loopState reçu:`, loopState)
+  // ✅ Handlers stables (évitent de recréer les fonctions)
+  const handleClipSelect = useCallback(
+    (clipId) => onClipSelect?.(clipId, track.id),
+    [onClipSelect, track.id]
+  )
 
-  const handleClipContextMenu = useCallback((e, clipId) => {
-    console.log('🖱️ [Track] Clic droit reçu pour clip:', clipId, 'sur piste:', track.id)
-    if (onClipContextMenu) {
-      console.log('🖱️ [Track] Transmission à onClipContextMenu avec clipId:', clipId)
-      onClipContextMenu(e, clipId, track.id)
-    } else {
-      console.warn('🖱️ [Track] onClipContextMenu est undefined !')
-    }
-  }, [track.id, onClipContextMenu])
+  const handleClipMove = useCallback(
+    (clipId, newStart, newTrackId, options) =>
+      onClipMove?.(track.id, clipId, newStart, newTrackId, options),
+    [onClipMove, track.id]
+  )
 
-  useEffect(() => {
-    let changed = false
-    
-    const currentIds = new Set(track.clips.map(c => c.id))
-    if (prevClipIds.current.size !== currentIds.size) {
-      changed = true
-    } else {
-      for (const id of currentIds) {
-        if (!prevClipIds.current.has(id)) {
-          changed = true
-          break
-        }
+  const handleClipUpdate = useCallback(
+    (clipId, updates) => onClipUpdate?.(track.id, clipId, updates),
+    [onClipUpdate, track.id]
+  )
+
+  const handleClipRemove = useCallback(
+    (trackId, clipId) => onClipRemove?.(trackId, clipId),
+    [onClipRemove]
+  )
+
+  const handleClipDuplicate = useCallback(
+    (clipId) => onClipDuplicate?.(clipId, track.id),
+    [onClipDuplicate, track.id]
+  )
+
+  const handleClipFade = useCallback(
+    (clipId, edge, duration) => onClipFade?.(track.id, clipId, edge, duration),
+    [onClipFade, track.id]
+  )
+
+  const handleClipContextMenu = useCallback(
+    (e, clipId) => {
+      if (onClipContextMenu) {
+        onClipContextMenu(e, clipId, track.id)
       }
-    }
-    prevClipIds.current = currentIds
-    
-    for (const clip of track.clips) {
-      const key = clip.id
-      const pos = clip.start
-      if (prevClipPositions.current[key] !== pos) {
-        prevClipPositions.current[key] = pos
-        changed = true
-      }
-    }
-    
-    if (changed) {
-      setClipVersion(prev => prev + 1)
-    }
-  }, [track.clips])
-
-  const getTrackColor = useCallback((index) => {
-    if (trackColor) return trackColor
-    const colors = [
-      'hsl(220, 70%, 55%)',
-      'hsl(340, 70%, 55%)',
-      'hsl(40, 70%, 55%)',
-      'hsl(160, 70%, 55%)',
-      'hsl(280, 70%, 55%)',
-      'hsl(10, 70%, 55%)',
-      'hsl(190, 70%, 55%)',
-      'hsl(70, 70%, 55%)'
-    ]
-    return colors[index % colors.length]
-  }, [trackColor])
-
-  const handleMouseDown = (e) => {
-    if (e.button !== 0) return
-    const rect = trackRef.current?.getBoundingClientRect()
-    if (!rect) return
-    
-    const x = e.clientX - rect.left
-    const time = Math.max(0, x / pixelsPerSecond)
-    
-    setIsDragging(true)
-    setDragStartX(e.clientX)
-    setDragClipId(null)
-    setDragStartTime(time)
-  }
-
-  const handleMouseMove = useCallback((e) => {
-    if (!isDragging) return
-    
-    const rect = trackRef.current?.getBoundingClientRect()
-    if (!rect) return
-    
-    const x = e.clientX - rect.left
-    const time = Math.max(0, x / pixelsPerSecond)
-    
-    if (dragClipId) {
-      onClipMove?.(track.id, dragClipId, time - dragStartTime, track.id)
-    }
-  }, [isDragging, dragClipId, dragStartTime, track.id, onClipMove, pixelsPerSecond])
-
-  const handleMouseUp = useCallback(() => {
-    if (isDragging) {
-      setIsDragging(false)
-      onDragCheckpoint?.()
-    }
-  }, [isDragging, onDragCheckpoint])
-
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-    }
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isDragging, handleMouseMove, handleMouseUp])
-
-  const color = getTrackColor(trackIndex)
-
-  const handleClipSelect = useCallback((clipId) => {
-    onClipSelect?.(clipId, track.id)
-  }, [onClipSelect, track.id])
-
-  const handleClipMove = useCallback((clipId, newStart, newTrackId, options) => {
-    onClipMove?.(track.id, clipId, newStart, newTrackId, options)
-  }, [onClipMove, track.id])
-
-  const handleClipUpdate = useCallback((clipId, updates) => {
-    onClipUpdate?.(track.id, clipId, updates)
-  }, [onClipUpdate, track.id])
-
-  const handleClipRemove = useCallback((trackId, clipId) => {
-    onClipRemove?.(trackId, clipId)
-  }, [onClipRemove])
-
-  const handleClipDuplicate = useCallback((clipId) => {
-    onClipDuplicate?.(clipId, track.id)
-  }, [onClipDuplicate, track.id])
-
-  const handleClipFade = useCallback((clipId, edge, duration) => {
-    onClipFade?.(track.id, clipId, edge, duration)
-  }, [onClipFade, track.id])
-
-  const handleUpdateClipDuration = useCallback((clipId, newDuration) => {
-    onUpdateClipDuration?.(clipId, newDuration)
-  }, [onUpdateClipDuration])
+    },
+    [onClipContextMenu, track.id]
+  )
 
   return (
     <div
-      ref={trackRef}
       style={{
         position: 'relative',
         height: 96,
         minHeight: 96,
         width: '100%',
         borderBottom: '1px solid var(--border)',
-        background: selectedTrackId === track.id ? 'rgba(124,111,247,0.05)' : 'transparent',
+        background:
+          selectedTrackId === track.id ? 'rgba(124,111,247,0.05)' : 'transparent',
         userSelect: 'none',
-        transition: 'background 0.15s'
+        transition: 'background 0.15s',
       }}
-      onMouseDown={handleMouseDown}
     >
       {track.clips?.map((clip) => {
         const duration = clipDurations?.[clip.id] || clip.duration || 3
         const clipStart = clip.start || 0
         const isSelected = selectedClipId === clip.id
 
-        const loopStateHash = Object.keys(loopState?.clips || {}).length
-        const clipKey = `${clip.id}-${clipVersion}-${loopStateHash}`
-
         return (
           <EditorClip
-            key={clipKey}
+            // ✅ FIX : la key est juste clip.id — plus de clipVersion / loopStateHash
+            // → React préserve l'état interne (isDragging, isHovering, etc.)
+            key={clip.id}
             clip={clip}
             duration={duration}
             start={clipStart}
@@ -217,7 +130,7 @@ const EditorTrack = ({
             onDuplicate={handleClipDuplicate}
             onFade={handleClipFade}
             onContextMenu={handleClipContextMenu}
-            onUpdateDuration={handleUpdateClipDuration}
+            onUpdateDuration={onUpdateClipDuration}
             waveformData={waveformData?.[clip.id]}
             isPlaying={isPlaying}
             currentTime={currentTime}

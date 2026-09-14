@@ -23,10 +23,20 @@ import { warmupAudioContext } from '@core/services/AudioMixerService'
 import { PluginProvider, usePlugins } from '@core/plugins/PluginContext'
 import { usePluginPage } from '@core/plugins/hooks/usePluginPage'
 
+function PageWrapper({ children, pageId, onHelpClick }) {
+  const showHelp = pageId !== 'guide'
+
+  return (
+    <div style={{ position: 'relative', height: '100%', width: '100%' }}>
+      {children}
+      {showHelp && <HelpButton onClick={() => onHelpClick(pageId)} />}
+    </div>
+  )
+}
+
 // ─── COMPOSANT PRINCIPAL AVEC PLUGINS ────────────────────────────────────────
-function AppContent() {
-  const store = useStore()
-  const { t, currentLang, changeLanguage, version: langVersion } = useLanguage()
+function AppContent({ store }) {
+  const { t, currentLang } = useLanguage()
   const [currentPage, setCurrentPage] = useState('home')
   const [presentationMode, setPresentationMode] = useState(false)
   const [toasts, setToasts] = useState([])
@@ -41,7 +51,7 @@ function AppContent() {
   const {
     Component: PluginComponent,
     loading: pluginLoading,
-    error: pluginError
+    error: pluginError,
   } = usePluginPage(isPluginPage(currentPage) ? currentPage : null)
 
   const soundsRef = useRef([])
@@ -56,12 +66,10 @@ function AppContent() {
   const isPopupBlockedRef = useRef(false)
   const blockTimerRef = useRef(null)
 
-  // Passer la référence du store à audio.js pour le mixeur
   useEffect(() => {
     setStoreRef(store)
   }, [store])
 
-  // Préchauffage audio
   useEffect(() => {
     if (store.loading) return
     const timer = setTimeout(() => {
@@ -70,21 +78,34 @@ function AppContent() {
     return () => clearTimeout(timer)
   }, [store.loading])
 
-  useEffect(() => { soundsRef.current = store.sounds }, [store.sounds])
-  useEffect(() => { switchToNextProfileRef.current = store.switchToNextProfile }, [store.switchToNextProfile])
-  useEffect(() => { toggleLoopRef.current = store.toggleLoop }, [store.toggleLoop])
-  useEffect(() => { playLocallyRef.current = store.playLocally }, [store.playLocally])
-  useEffect(() => { audioDeviceRef.current = store.audioDevice }, [store.audioDevice])
-  useEffect(() => { volumeRef.current = store.volume }, [store.volume])
-  useEffect(() => { setPresentationRef.current = setPresentationMode }, [setPresentationMode])
+  useEffect(() => {
+    soundsRef.current = store.sounds
+  }, [store.sounds])
+  useEffect(() => {
+    switchToNextProfileRef.current = store.switchToNextProfile
+  }, [store.switchToNextProfile])
+  useEffect(() => {
+    toggleLoopRef.current = store.toggleLoop
+  }, [store.toggleLoop])
+  useEffect(() => {
+    playLocallyRef.current = store.playLocally
+  }, [store.playLocally])
+  useEffect(() => {
+    audioDeviceRef.current = store.audioDevice
+  }, [store.audioDevice])
+  useEffect(() => {
+    volumeRef.current = store.volume
+  }, [store.volume])
+  useEffect(() => {
+    setPresentationRef.current = setPresentationMode
+  }, [setPresentationMode])
 
-  // Fonction pour ouvrir le tutoriel
+  // ✅ FIX : openTutorial stable
   const openTutorial = useCallback((pageId) => {
     setTutorialPageId(pageId)
     setShowTutorial(true)
   }, [])
 
-  // Exposer la fonction globalement pour les pages
   useEffect(() => {
     window.__startTutorial = openTutorial
     return () => {
@@ -92,19 +113,20 @@ function AppContent() {
     }
   }, [openTutorial])
 
-  // Vérifier si c'est le premier lancement
   useEffect(() => {
     const checkFirstLaunch = async () => {
       try {
-        const hasLaunchedBefore = await window.electronAPI.storeGet('hasLaunchedBefore')
-        const tutorialHomeDone = localStorage.getItem('sounddeck-tutorial-home-done')
+        const hasLaunchedBefore = await window.electronAPI.storeGet(
+          'hasLaunchedBefore'
+        )
+        const tutorialHomeDone = localStorage.getItem(
+          'sounddeck-tutorial-home-done'
+        )
 
         if (!hasLaunchedBefore) {
           setIsFirstLaunch(true)
         } else if (!tutorialHomeDone) {
-          setTimeout(() => {
-            setShowTutorial(true)
-          }, 500)
+          setTimeout(() => setShowTutorial(true), 500)
         }
       } catch (e) {
         console.warn('⚠️ Erreur vérification premier lancement:', e)
@@ -114,11 +136,12 @@ function AppContent() {
     checkFirstLaunch()
   }, [])
 
-  // Raccourcis souris - Molette pour changer de profil
+  // Molette pour changer de profil
   useEffect(() => {
     const handleWheel = (e) => {
       const target = e.target
-      const isOnSidebar = target.closest?.('aside') || target.closest?.('.sidebar')
+      const isOnSidebar =
+        target.closest?.('aside') || target.closest?.('.sidebar')
 
       if (isOnSidebar && e.ctrlKey) {
         e.preventDefault()
@@ -126,8 +149,11 @@ function AppContent() {
           store.switchToNextProfile?.()
         } else {
           const profiles = store.profiles || []
-          const currentIndex = profiles.findIndex(p => p.id === store.currentProfileId)
-          const prevIndex = currentIndex > 0 ? currentIndex - 1 : profiles.length - 1
+          const currentIndex = profiles.findIndex(
+            (p) => p.id === store.currentProfileId
+          )
+          const prevIndex =
+            currentIndex > 0 ? currentIndex - 1 : profiles.length - 1
           store.switchProfile?.(profiles[prevIndex]?.id)
         }
       }
@@ -137,13 +163,11 @@ function AppContent() {
     return () => window.removeEventListener('wheel', handleWheel)
   }, [store.currentProfileId, store.profiles])
 
-  // Gestion de la popup de fermeture
+  // Popup de fermeture
   useEffect(() => {
     const blockPopup = () => {
       isPopupBlockedRef.current = true
-      if (blockTimerRef.current) {
-        clearTimeout(blockTimerRef.current)
-      }
+      if (blockTimerRef.current) clearTimeout(blockTimerRef.current)
       blockTimerRef.current = setTimeout(() => {
         isPopupBlockedRef.current = false
         blockTimerRef.current = null
@@ -167,7 +191,6 @@ function AppContent() {
     return () => {
       window.electronAPI?.removeAllListeners?.('show-quit-confirm')
       window.electronAPI?.removeAllListeners?.('hide-quit-confirm')
-
       if (blockTimerRef.current) {
         clearTimeout(blockTimerRef.current)
         blockTimerRef.current = null
@@ -176,7 +199,7 @@ function AppContent() {
     }
   }, [])
 
-  // Sync #1 : Au démarrage, LIRE le thème depuis electron-store
+  // Sync thème
   useEffect(() => {
     if (store.loading) return
 
@@ -185,9 +208,7 @@ function AppContent() {
         const diskTheme = await window.electronAPI.storeGet('theme')
         const diskCustomTheme = await window.electronAPI.storeGet('customTheme')
 
-        if (diskTheme === 'custom' && !diskCustomTheme) {
-          return
-        }
+        if (diskTheme === 'custom' && !diskCustomTheme) return
 
         if (diskTheme && diskTheme !== store.theme) {
           store.updateTheme(diskTheme)
@@ -203,28 +224,40 @@ function AppContent() {
     if (store.loading) return
     if (!store.theme) return
 
-    window.electronAPI.storeSet('theme', store.theme).catch(e => {
+    window.electronAPI.storeSet('theme', store.theme).catch((e) => {
       console.warn('⚠️ Erreur persist theme:', e)
     })
   }, [store.theme, store.loading])
 
-  // Appliquer le thème
+  // Appliquer thème
   useEffect(() => {
     if (store.loading) return
 
     const effectiveTheme =
-      (store.theme === 'custom' && !store.customTheme) ? 'dark' : (store.theme || 'dark')
+      store.theme === 'custom' && !store.customTheme
+        ? 'dark'
+        : store.theme || 'dark'
 
     document.documentElement.setAttribute('data-theme', effectiveTheme)
 
     if (effectiveTheme !== 'custom') {
       const colorKeys = [
-        'bg-primary', 'bg-secondary', 'bg-tertiary', 'bg-hover', 'border',
-        'text-primary', 'text-secondary', 'text-tertiary',
-        'accent', 'accent-light', 'accent-hover',
-        'success', 'warning', 'danger'
+        'bg-primary',
+        'bg-secondary',
+        'bg-tertiary',
+        'bg-hover',
+        'border',
+        'text-primary',
+        'text-secondary',
+        'text-tertiary',
+        'accent',
+        'accent-light',
+        'accent-hover',
+        'success',
+        'warning',
+        'danger',
       ]
-      colorKeys.forEach(key => {
+      colorKeys.forEach((key) => {
         document.documentElement.style.removeProperty(`--${key}`)
       })
     }
@@ -250,9 +283,8 @@ function AppContent() {
           --danger: ${c.danger};
         }
       `
-      if (existing) {
-        existing.textContent = css
-      } else {
+      if (existing) existing.textContent = css
+      else {
         const style = document.createElement('style')
         style.id = 'custom-theme-style'
         style.textContent = css
@@ -263,43 +295,45 @@ function AppContent() {
     }
   }, [store.theme, store.customTheme, store.loading])
 
-  // Mettre à jour le menu du tray quand la langue change
+  // Tray language
   useEffect(() => {
     if (window.electronAPI?.updateTrayLanguage) {
       window.electronAPI.updateTrayLanguage(currentLang)
     }
   }, [currentLang])
 
-  // Initialiser le mixeur au démarrage si activé
+  // Init mixer
   useEffect(() => {
     if (store.loading) return
     if (mixerInitialized) return
 
     const initMixer = async () => {
       if (store.mixerEnabled && store.initMixerOnStartup) {
-        await new Promise(resolve => setTimeout(resolve, 500))
+        await new Promise((resolve) => setTimeout(resolve, 500))
         const success = await store.initMixerOnStartup()
         setMixerInitialized(true)
-        if (!success) {
-          console.warn('⚠️ Échec de l\'initialisation du mixeur au démarrage')
-        }
+        if (!success) console.warn('⚠️ Échec init mixeur')
       } else {
         setMixerInitialized(true)
       }
     }
-
     initMixer()
-  }, [store.loading, store.mixerEnabled, store.initMixerOnStartup, mixerInitialized])
+  }, [
+    store.loading,
+    store.mixerEnabled,
+    store.initMixerOnStartup,
+    mixerInitialized,
+  ])
 
-  // Vérifier l'état du mixeur quand la langue change
+  // Vérif mixer quand langue change
   useEffect(() => {
     if (!store.loading && store.mixerEnabled && mixerInitialized) {
       const checkMixer = async () => {
         try {
-          const { isMixerOperational, repairMixer } = await import("@core/services/AudioMixerService");
-          if (!isMixerOperational()) {
-            repairMixer()
-          }
+          const { isMixerOperational, repairMixer } = await import(
+            '@core/services/AudioMixerService'
+          )
+          if (!isMixerOperational()) repairMixer()
         } catch (e) {
           console.warn('Erreur vérification mixeur:', e)
         }
@@ -308,7 +342,7 @@ function AppContent() {
     }
   }, [currentLang, store.loading, store.mixerEnabled, mixerInitialized])
 
-  // Vérifier le périphérique micro au démarrage
+  // Vérif micro
   useEffect(() => {
     if (store.loading) return
 
@@ -316,29 +350,33 @@ function AppContent() {
       if (store.microphoneDevice && store.microphoneDevice !== 'default') {
         try {
           const devices = await navigator.mediaDevices.enumerateDevices()
-          const audioInputs = devices.filter(d => d.kind === 'audioinput')
-          const deviceExists = audioInputs.some(d => d.deviceId === store.microphoneDevice)
-
-          if (!deviceExists) {
-            await store.updateMicrophoneDeviceId('default')
-          }
+          const audioInputs = devices.filter((d) => d.kind === 'audioinput')
+          const deviceExists = audioInputs.some(
+            (d) => d.deviceId === store.microphoneDevice
+          )
+          if (!deviceExists) await store.updateMicrophoneDeviceId('default')
         } catch (e) {
-          console.warn('⚠️ Erreur lors de la vérification du périphérique micro:', e)
+          console.warn('⚠️ Erreur vérif micro:', e)
         }
       }
     }
-
     checkMicrophoneDevice()
   }, [store.loading, store.microphoneDevice])
 
-  // Enregistrer les listeners IPC
+  // IPC listeners
   useEffect(() => {
     if (!window.electronAPI) return
 
     window.electronAPI.onPlaySound((soundId) => {
-      const sound = soundsRef.current.find(s => s.id === soundId)
+      const sound = soundsRef.current.find((s) => s.id === soundId)
       if (sound) {
-        playSound(sound, audioDeviceRef.current, volumeRef.current, false, playLocallyRef.current)
+        playSound(
+          sound,
+          audioDeviceRef.current,
+          volumeRef.current,
+          false,
+          playLocallyRef.current
+        )
       }
     })
 
@@ -351,7 +389,10 @@ function AppContent() {
 
     window.electronAPI.onToggleLoop(async () => {
       if (toggleLoopRef.current) toggleLoopRef.current()
-      addToastRef.current?.(store.loopEnabled ? t('toastLoopOff') : t('toastLoopOn'), 'info')
+      addToastRef.current?.(
+        store.loopEnabled ? t('toastLoopOff') : t('toastLoopOn'),
+        'info'
+      )
     })
 
     window.electronAPI.onStopAllSounds(() => {
@@ -360,7 +401,7 @@ function AppContent() {
     })
 
     window.electronAPI.onTogglePresentation(() => {
-      setPresentationRef.current?.(prev => !prev)
+      setPresentationRef.current?.((prev) => !prev)
     })
 
     return () => {
@@ -372,93 +413,108 @@ function AppContent() {
     }
   }, [store.loopEnabled, store.mixerEnabled, t])
 
-  // Fonction addToast
   const addToast = useCallback((message, type = 'info') => {
-    const id = crypto.randomUUID ? crypto.randomUUID() : Date.now() + '_' + Math.random()
-    setToasts(prev => [...prev, { id, message, type }])
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000)
+    const id = crypto.randomUUID
+      ? crypto.randomUUID()
+      : Date.now() + '_' + Math.random()
+    setToasts((prev) => [...prev, { id, message, type }])
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000)
   }, [])
 
-  useEffect(() => { addToastRef.current = addToast }, [addToast])
+  useEffect(() => {
+    addToastRef.current = addToast
+  }, [addToast])
 
-  // ✅ Wrapper pour ajouter le HelpButton à une page
-  const PageWrapper = ({ children, pageId }) => {
-    const handleHelpClick = () => openTutorial(pageId)
-    const showHelp = pageId !== 'guide'
-
-    return (
-      <div style={{ position: 'relative', height: '100%', width: '100%' }}>
-        {children}
-        {showHelp && <HelpButton onClick={handleHelpClick} />}
-      </div>
-    )
-  }
-
-  // RENDU DES PAGES
-  const renderPage = () => {
+  // ✅ FIX : renderPage stable
+  const renderPage = useCallback(() => {
     if (currentPage === 'home') {
       return (
-        <PageWrapper pageId="home">
-          <Home key={`home-${currentLang}`} store={store} addToast={addToast} loopEnabled={store.loopEnabled} />
+        <PageWrapper pageId="home" onHelpClick={openTutorial}>
+          <Home
+            key={`home-${currentLang}`}
+            store={store}
+            addToast={addToast}
+            loopEnabled={store.loopEnabled}
+          />
         </PageWrapper>
       )
     }
     if (currentPage === 'options') {
       return (
-        <PageWrapper pageId="options">
-          <Options key={`options-${currentLang}`} store={store} addToast={addToast} />
+        <PageWrapper pageId="options" onHelpClick={openTutorial}>
+          <Options
+            key={`options-${currentLang}`}
+            store={store}
+            addToast={addToast}
+          />
         </PageWrapper>
       )
     }
     if (currentPage === 'trimmer') {
       return (
-        <PageWrapper pageId="trimmer">
-          <Trimmer key={`trimmer-${currentLang}`} store={store} addToast={addToast} />
+        <PageWrapper pageId="trimmer" onHelpClick={openTutorial}>
+          <Trimmer
+            key={`trimmer-${currentLang}`}
+            store={store}
+            addToast={addToast}
+          />
         </PageWrapper>
       )
     }
     if (currentPage === 'editor') {
       return (
-        <PageWrapper pageId="editor">
-          <Editor key={`editor-${currentLang}`} store={store} addToast={addToast} />
+        <PageWrapper pageId="editor" onHelpClick={openTutorial}>
+          <Editor
+            key={`editor-${currentLang}`}
+            store={store}
+            addToast={addToast}
+          />
         </PageWrapper>
       )
     }
     if (currentPage === 'sequencer') {
       return (
-        <PageWrapper pageId="sequencer">
-          <Sequencer key={`sequencer-${currentLang}`} store={store} addToast={addToast} />
+        <PageWrapper pageId="sequencer" onHelpClick={openTutorial}>
+          <Sequencer
+            key={`sequencer-${currentLang}`}
+            store={store}
+            addToast={addToast}
+          />
         </PageWrapper>
       )
     }
     if (currentPage === 'guide') {
       return (
-        <PageWrapper pageId="guide">
+        <PageWrapper pageId="guide" onHelpClick={openTutorial}>
           <Guide key={`guide-${currentLang}`} />
         </PageWrapper>
       )
     }
     if (currentPage === 'stats') {
       return (
-        <PageWrapper pageId="stats">
+        <PageWrapper pageId="stats" onHelpClick={openTutorial}>
           <Stats key={`stats-${currentLang}`} store={store} />
         </PageWrapper>
       )
     }
 
-    // Gestion des pages plugins (inclut discover, youtube, etc.)
     if (isPluginPage(currentPage)) {
       if (pluginLoading) {
         return (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            color: 'var(--text-tertiary)',
-            gap: 12
-          }}>
-            <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              color: 'var(--text-tertiary)',
+              gap: 12,
+            }}
+          >
+            <i
+              className="ti ti-loader"
+              style={{ animation: 'spin 1s linear infinite' }}
+            />
             <span>{t('appLoading')}</span>
           </div>
         )
@@ -466,20 +522,24 @@ function AppContent() {
 
       if (pluginError) {
         return (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            color: 'var(--danger)',
-            gap: 12,
-            padding: 20,
-            textAlign: 'center'
-          }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              color: 'var(--danger)',
+              gap: 12,
+              padding: 20,
+              textAlign: 'center',
+            }}
+          >
             <i className="ti ti-alert-triangle" style={{ fontSize: 32 }} />
             <div style={{ fontSize: 16, fontWeight: 600 }}>{t('error')}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{pluginError}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+              {pluginError}
+            </div>
             <button
               className="btn-secondary btn-sm"
               onClick={() => setCurrentPage('home')}
@@ -492,22 +552,28 @@ function AppContent() {
 
       if (PluginComponent) {
         return (
-          <PageWrapper pageId={currentPage}>
-            <PluginComponent key={`plugin-${currentPage}-${currentLang}`} store={store} addToast={addToast} />
+          <PageWrapper pageId={currentPage} onHelpClick={openTutorial}>
+            <PluginComponent
+              key={`plugin-${currentPage}-${currentLang}`}
+              store={store}
+              addToast={addToast}
+            />
           </PageWrapper>
         )
       }
 
       return (
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
-          color: 'var(--text-tertiary)',
-          gap: 12
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            color: 'var(--text-tertiary)',
+            gap: 12,
+          }}
+        >
           <i className="ti ti-puzzle" style={{ fontSize: 32 }} />
           <div style={{ fontSize: 16 }}>{t('optionsPlugins')}</div>
           <button
@@ -521,42 +587,70 @@ function AppContent() {
     }
 
     return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100%',
-        color: 'var(--text-tertiary)',
-        gap: 12
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          color: 'var(--text-tertiary)',
+          gap: 12,
+        }}
+      >
         <i className="ti ti-404" style={{ fontSize: 32 }} />
         <div style={{ fontSize: 16 }}>404</div>
       </div>
     )
-  }
+  }, [
+    currentPage,
+    currentLang,
+    store,
+    addToast,
+    pluginLoading,
+    pluginError,
+    PluginComponent,
+    isPluginPage,
+    openTutorial,
+    t,
+  ])
 
-  // Si le store est en chargement
   if (store.loading) {
     return (
-      <div style={{
-        height: '100vh', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', background: 'var(--bg-primary)',
-        color: 'var(--text-secondary)', flexDirection: 'column', gap: 12
-      }}>
-        <i className="ti ti-speakerphone" style={{ fontSize: 32, color: 'var(--accent)' }} />
+      <div
+        style={{
+          height: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--bg-primary)',
+          color: 'var(--text-secondary)',
+          flexDirection: 'column',
+          gap: 12,
+        }}
+      >
+        <i
+          className="ti ti-speakerphone"
+          style={{ fontSize: 32, color: 'var(--accent)' }}
+        />
         <span>{t('appLoading')}</span>
       </div>
     )
   }
 
-  // Si c'est le premier lancement, afficher l'écran de bienvenue
   if (isFirstLaunch === true) {
     return <WelcomeScreen onComplete={() => setIsFirstLaunch(false)} />
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg-primary)' }}>
+    <div
+      style={{
+        display: 'flex',
+        height: '100vh',
+        overflow: 'hidden',
+        background: 'var(--bg-primary)',
+      }}
+    >
       <Sidebar
         key={`sidebar-${store.sidebarVersion}-${currentLang}`}
         profiles={store.profiles}
@@ -570,7 +664,10 @@ function AppContent() {
         loopEnabled={store.loopEnabled}
         volume={store.volume}
         onVolumeChange={store.updateVolume}
-        onStopAll={() => { stopAllSounds(); addToast(t('toastAllStopped'), 'info') }}
+        onStopAll={() => {
+          stopAllSounds()
+          addToast(t('toastAllStopped'), 'info')
+        }}
         onPresentation={() => setPresentationMode(true)}
         addToast={addToast}
         onReorderProfiles={store.reorderProfiles}
@@ -581,7 +678,14 @@ function AppContent() {
         isPluginPage={isPluginPage}
       />
 
-      <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <main
+        style={{
+          flex: 1,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {renderPage()}
       </main>
 
@@ -627,12 +731,22 @@ export default function App() {
 
   if (store.loading) {
     return (
-      <div style={{
-        height: '100vh', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', background: 'var(--bg-primary)',
-        color: 'var(--text-secondary)', flexDirection: 'column', gap: 12
-      }}>
-        <i className="ti ti-speakerphone" style={{ fontSize: 32, color: 'var(--accent)' }} />
+      <div
+        style={{
+          height: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--bg-primary)',
+          color: 'var(--text-secondary)',
+          flexDirection: 'column',
+          gap: 12,
+        }}
+      >
+        <i
+          className="ti ti-speakerphone"
+          style={{ fontSize: 32, color: 'var(--accent)' }}
+        />
         <span>Chargement de SoundDeck...</span>
       </div>
     )
@@ -640,7 +754,8 @@ export default function App() {
 
   return (
     <PluginProvider store={store}>
-      <AppContent />
+      {/* ✅ FIX : store passé en prop à AppContent (plus de double useStore) */}
+      <AppContent store={store} />
     </PluginProvider>
   )
 }
