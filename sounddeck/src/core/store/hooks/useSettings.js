@@ -52,11 +52,13 @@ export function useSettings(initialState = {}, save) {
     await save('customTheme', colors)
   }, [save])
 
-  const updateLang = useCallback(async (newLang) => {
-    setLang(newLang)
-    await save('lang', newLang)
-    await window.electronAPI.storeSetLang?.(newLang)
-  }, [save])
+  const updateLang = useCallback(
+    async (newLang) => {
+      setLang(newLang)
+      await save('lang', newLang)
+    },
+    [save]
+  )
 
   const updateAudioDevice = useCallback(async (deviceId) => {
     setAudioDevice(deviceId)

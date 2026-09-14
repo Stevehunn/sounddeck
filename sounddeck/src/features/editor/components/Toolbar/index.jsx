@@ -1,7 +1,6 @@
 // src/features/editor/components/Toolbar/index.jsx
 import React, { useState, useEffect, useRef } from 'react'
 import EditorMetronome from './EditorMetronome'
-import ImportFileModal from '../Modals/ImportFileModal'
 import ProjectControls from './ProjectControls'
 
 export default function EditorToolbar({
@@ -27,7 +26,6 @@ export default function EditorToolbar({
   onToggleCrossfade,
   projectName,
   onRenameProject,
-  onRefreshDurations,
   tr,
   addToast,
   loopState,
@@ -55,14 +53,12 @@ export default function EditorToolbar({
   onToggleEffectsPanel,
 }) {
   const [showAddClip, setShowAddClip] = useState(false)
-  const [showImportModal, setShowImportModal] = useState(false)
   const [selectedTrackId, setSelectedTrackId] = useState('')
   const [selectedSoundId, setSelectedSoundId] = useState('')
   const [isRenaming, setIsRenaming] = useState(false)
-  const [newProjectName, setNewProjectName] = useState(projectName || 'Nouveau projet')
-  const [pendingFile, setPendingFile] = useState(null)
-  const [pendingFileName, setPendingFileName] = useState('')
-  const [isRefreshingDurations, setIsRefreshingDurations] = useState(false)
+  const [newProjectName, setNewProjectName] = useState(
+    projectName || 'Nouveau projet'
+  )
   const dropdownRef = useRef(null)
 
   const timelineLoop = loopState?.timeline || { enabled: false }
@@ -89,14 +85,17 @@ export default function EditorToolbar({
   }
 
   const getNextStartPosition = (trackId) => {
-    const track = tracks.find(t => t.id === trackId)
+    const track = tracks.find((t) => t.id === trackId)
     if (!track) return 0
     if (track.clips.length === 0) return 0
-    
-    const lastClip = track.clips.reduce((max, clip) => {
-      const clipEnd = clip.start + (clip.duration || 3)
-      return clipEnd > max.end ? { start: clip.start, end: clipEnd } : max
-    }, { start: 0, end: 0 })
+
+    const lastClip = track.clips.reduce(
+      (max, clip) => {
+        const clipEnd = clip.start + (clip.duration || 3)
+        return clipEnd > max.end ? { start: clip.start, end: clipEnd } : max
+      },
+      { start: 0, end: 0 }
+    )
     return lastClip.end + 0.5
   }
 
@@ -118,54 +117,41 @@ export default function EditorToolbar({
     }
 
     const startPosition = getNextStartPosition(trackId)
-    console.log('🎵 [Toolbar] Ajout clip:', { trackId, soundId: selectedSoundId, startPosition })
-    
     onAddClip(trackId, selectedSoundId, startPosition)
     setShowAddClip(false)
     setSelectedSoundId('')
   }
 
-  const handleAddFileClick = async () => {
-    try {
-      const result = await window.electronAPI.openFileDialog()
-      if (!result || result.length === 0) return
-      
-      const filePath = result[0]
-      const fileName = filePath.split(/[\\/]/).pop() || 'Fichier audio'
-      
-      if (tracks.length === 0) {
-        addToast?.(tr('editorNoTracks'), 'error')
-        return
-      }
-      
-      if (tracks.length === 1) {
-        setPendingFile(filePath)
-        setPendingFileName(fileName)
-        setShowImportModal(true)
-        return
-      }
-      
-      setPendingFile(filePath)
-      setPendingFileName(fileName)
-      setShowImportModal(true)
-      
-    } catch (err) {
-      console.error('Erreur import fichier:', err)
-      addToast?.(tr('editorFileImportError'), 'error')
-    }
-  }
-
   const getButtonState = () => {
-    if (isPlaying) return { icon: 'ti-player-pause', label: tr('editorPause'), color: 'var(--warning)' }
-    if (isPaused) return { icon: 'ti-player-play', label: tr('editorResume'), color: 'var(--accent)' }
-    if (currentTime > 0) return { icon: 'ti-player-play', label: tr('editorPlayFromStart'), color: 'var(--accent)' }
-    return { icon: 'ti-player-play', label: tr('editorPlay'), color: 'var(--accent)' }
+    if (isPlaying)
+      return {
+        icon: 'ti-player-pause',
+        label: tr('editorPause'),
+        color: 'var(--warning)',
+      }
+    if (isPaused)
+      return {
+        icon: 'ti-player-play',
+        label: tr('editorResume'),
+        color: 'var(--accent)',
+      }
+    if (currentTime > 0)
+      return {
+        icon: 'ti-player-play',
+        label: tr('editorPlayFromStart'),
+        color: 'var(--accent)',
+      }
+    return {
+      icon: 'ti-player-play',
+      label: tr('editorPlay'),
+      color: 'var(--accent)',
+    }
   }
 
   const buttonState = getButtonState()
 
   return (
-    <div 
+    <div
       data-testid="editor-toolbar"
       style={{
         padding: '8px 16px',
@@ -176,16 +162,17 @@ export default function EditorToolbar({
         gap: 10,
         flexWrap: 'wrap',
         flexShrink: 0,
-        position: 'relative'
+        position: 'relative',
       }}
     >
-      {/* Nom du projet */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 120 }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 120 }}
+      >
         {isRenaming ? (
           <input
             type="text"
             value={newProjectName}
-            onChange={e => setNewProjectName(e.target.value)}
+            onChange={(e) => setNewProjectName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 setIsRenaming(false)
@@ -209,7 +196,7 @@ export default function EditorToolbar({
               borderRadius: 'var(--radius-sm)',
               padding: '4px 8px',
               width: 150,
-              color: 'var(--text-primary)'
+              color: 'var(--text-primary)',
             }}
           />
         ) : (
@@ -222,11 +209,18 @@ export default function EditorToolbar({
               color: 'var(--text-primary)',
               display: 'flex',
               alignItems: 'center',
-              gap: 4
+              gap: 4,
             }}
             title={tr('editorClickToRename')}
           >
-            <i className="ti ti-pencil" style={{ fontSize: 12, color: 'var(--text-tertiary)', opacity: 0.6 }} />
+            <i
+              className="ti ti-pencil"
+              style={{
+                fontSize: 12,
+                color: 'var(--text-tertiary)',
+                opacity: 0.6,
+              }}
+            />
             {projectName || 'Nouveau projet'}
           </span>
         )}
@@ -234,7 +228,6 @@ export default function EditorToolbar({
 
       <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
 
-      {/* Contrôles de lecture */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <button
           data-testid="editor-play-button"
@@ -248,7 +241,7 @@ export default function EditorToolbar({
             alignItems: 'center',
             justifyContent: 'center',
             background: buttonState.color,
-            borderColor: buttonState.color
+            borderColor: buttonState.color,
           }}
           title={buttonState.label}
         >
@@ -265,7 +258,7 @@ export default function EditorToolbar({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            opacity: (!isPlaying && !isPaused && currentTime === 0) ? 0.4 : 1
+            opacity: !isPlaying && !isPaused && currentTime === 0 ? 0.4 : 1,
           }}
           title={tr('editorStop')}
         >
@@ -283,7 +276,7 @@ export default function EditorToolbar({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            opacity: canUndo ? 1 : 0.4
+            opacity: canUndo ? 1 : 0.4,
           }}
           title={tr('editorUndo')}
         >
@@ -301,7 +294,7 @@ export default function EditorToolbar({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            opacity: canRedo ? 1 : 0.4
+            opacity: canRedo ? 1 : 0.4,
           }}
           title={tr('editorRedo')}
         >
@@ -317,7 +310,7 @@ export default function EditorToolbar({
             borderRadius: 'var(--radius-sm)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
           }}
           title={tr('editorSnap')}
         >
@@ -325,43 +318,53 @@ export default function EditorToolbar({
         </button>
 
         <button
-          className={autoCrossfade ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+          className={
+            autoCrossfade ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'
+          }
           onClick={onToggleCrossfade}
           style={{ fontSize: 10, padding: '2px 8px', minHeight: 24 }}
           title={tr('editorAutoCrossfade') || 'Crossfade automatique'}
         >
           <i className="ti ti-transition-right" />
-          {autoCrossfade ? tr('crossfadeOn') || 'Crossfade ON' : tr('crossfadeOff') || 'Crossfade OFF'}
+          {autoCrossfade
+            ? tr('crossfadeOn') || 'Crossfade ON'
+            : tr('crossfadeOff') || 'Crossfade OFF'}
         </button>
 
-        <span style={{ 
-          fontSize: 12, 
-          fontFamily: 'monospace', 
-          color: 'var(--text-secondary)',
-          minWidth: 100,
-          textAlign: 'center'
-        }}>
+        <span
+          style={{
+            fontSize: 12,
+            fontFamily: 'monospace',
+            color: 'var(--text-secondary)',
+            minWidth: 100,
+            textAlign: 'center',
+          }}
+        >
           {formatTime(currentTime)} / {formatTime(totalDuration)}
         </span>
 
         {isPlaying && (
-          <span style={{
-            fontSize: 10,
-            color: 'var(--success)',
-            background: 'rgba(29,158,117,0.15)',
-            padding: '2px 8px',
-            borderRadius: 10,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4
-          }}>
-            <span style={{ 
-              width: 6, 
-              height: 6, 
-              borderRadius: '50%', 
-              background: 'var(--success)',
-              animation: 'pulse 1s ease-in-out infinite'
-            }} />
+          <span
+            style={{
+              fontSize: 10,
+              color: 'var(--success)',
+              background: 'rgba(29,158,117,0.15)',
+              padding: '2px 8px',
+              borderRadius: 10,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: 'var(--success)',
+                animation: 'pulse 1s ease-in-out infinite',
+              }}
+            />
             {tr('editorPlaying')}
           </span>
         )}
@@ -369,7 +372,6 @@ export default function EditorToolbar({
 
       <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
 
-      {/* Métronome */}
       <EditorMetronome
         bpm={bpm || 120}
         onBpmChange={onBpmChange}
@@ -383,7 +385,6 @@ export default function EditorToolbar({
 
       <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
 
-      {/* Projets */}
       <ProjectControls
         project={project}
         projectList={projectList}
@@ -404,11 +405,12 @@ export default function EditorToolbar({
 
       <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
 
-      {/* ✅ BOUTON EFFETS - CORRIGÉ AVEC LA BONNE CLÉ */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <button
           data-testid="editor-effects-panel-toggle"
-          className={showEffectsPanel ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+          className={
+            showEffectsPanel ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'
+          }
           onClick={() => onToggleEffectsPanel?.(!showEffectsPanel)}
           style={{
             minHeight: 28,
@@ -417,19 +419,27 @@ export default function EditorToolbar({
             display: 'flex',
             alignItems: 'center',
             gap: 4,
-            fontSize: 11
+            fontSize: 11,
           }}
-          title={showEffectsPanel ? tr('hideEffectsPanel') || 'Masquer le panneau des effets' : tr('showEffectsPanel') || 'Afficher le panneau des effets'}
+          title={
+            showEffectsPanel
+              ? tr('hideEffectsPanel') || 'Masquer le panneau des effets'
+              : tr('showEffectsPanel') || 'Afficher le panneau des effets'
+          }
         >
           <i className="ti ti-wand" />
           <span>{tr('editorEffects') || 'Effets'}</span>
-          <span style={{
-            fontSize: 8,
-            padding: '1px 6px',
-            borderRadius: 10,
-            background: showEffectsPanel ? 'rgba(255,255,255,0.2)' : 'var(--bg-tertiary)',
-            color: showEffectsPanel ? 'white' : 'var(--text-tertiary)'
-          }}>
+          <span
+            style={{
+              fontSize: 8,
+              padding: '1px 6px',
+              borderRadius: 10,
+              background: showEffectsPanel
+                ? 'rgba(255,255,255,0.2)'
+                : 'var(--bg-tertiary)',
+              color: showEffectsPanel ? 'white' : 'var(--text-tertiary)',
+            }}
+          >
             {showEffectsPanel ? 'ON' : 'OFF'}
           </span>
         </button>
@@ -437,11 +447,12 @@ export default function EditorToolbar({
 
       <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
 
-      {/* Boutons boucle générale */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <button
           data-testid="editor-loop-toggle-button"
-          className={timelineLoop.enabled ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+          className={
+            timelineLoop.enabled ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'
+          }
           onClick={onToggleTimelineLoop}
           style={{
             minHeight: 28,
@@ -450,19 +461,25 @@ export default function EditorToolbar({
             display: 'flex',
             alignItems: 'center',
             gap: 4,
-            fontSize: 11
+            fontSize: 11,
           }}
-          title={tr('toggleTimelineLoop') || 'Activer/désactiver la boucle générale'}
+          title={
+            tr('toggleTimelineLoop') || 'Activer/désactiver la boucle générale'
+          }
         >
           <i className="ti ti-repeat" />
           <span>{tr('loop') || 'Boucle'}</span>
-          <span style={{
-            fontSize: 8,
-            padding: '1px 6px',
-            borderRadius: 10,
-            background: timelineLoop.enabled ? 'rgba(255,255,255,0.2)' : 'var(--bg-tertiary)',
-            color: timelineLoop.enabled ? 'white' : 'var(--text-tertiary)'
-          }}>
+          <span
+            style={{
+              fontSize: 8,
+              padding: '1px 6px',
+              borderRadius: 10,
+              background: timelineLoop.enabled
+                ? 'rgba(255,255,255,0.2)'
+                : 'var(--bg-tertiary)',
+              color: timelineLoop.enabled ? 'white' : 'var(--text-tertiary)',
+            }}
+          >
             {timelineLoop.enabled ? 'ON' : 'OFF'}
           </span>
         </button>
@@ -478,7 +495,7 @@ export default function EditorToolbar({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 12
+            fontSize: 12,
           }}
           title={tr('loopSettings') || 'Paramètres de la boucle'}
         >
@@ -488,7 +505,6 @@ export default function EditorToolbar({
 
       <div style={{ flex: 1 }} />
 
-      {/* Boutons d'action */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button
           data-testid="editor-add-track-button"
@@ -514,7 +530,8 @@ export default function EditorToolbar({
           onClick={onAddFile}
           style={{ fontSize: 12 }}
         >
-          <i className="ti ti-file-import" /> {tr('editorAddFile') || 'Importer un fichier'}
+          <i className="ti ti-file-import" />{' '}
+          {tr('editorAddFile') || 'Importer un fichier'}
         </button>
 
         <button
@@ -527,7 +544,6 @@ export default function EditorToolbar({
         </button>
       </div>
 
-      {/* Dropdown pour ajouter un clip */}
       {showAddClip && (
         <div
           ref={dropdownRef}
@@ -543,7 +559,7 @@ export default function EditorToolbar({
             zIndex: 20,
             minWidth: 260,
             boxShadow: 'var(--shadow-lg)',
-            animation: 'fadeIn 0.15s ease'
+            animation: 'fadeIn 0.15s ease',
           }}
         >
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
@@ -551,35 +567,40 @@ export default function EditorToolbar({
           </div>
 
           <div style={{ marginBottom: 10 }}>
-            <label style={{
-              fontSize: 11,
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: 4
-            }}>
+            <label
+              style={{
+                fontSize: 11,
+                color: 'var(--text-secondary)',
+                display: 'block',
+                marginBottom: 4,
+              }}
+            >
               {tr('editorSelectTrack')}
             </label>
             <select
               value={selectedTrackId}
-              onChange={e => setSelectedTrackId(e.target.value)}
+              onChange={(e) => setSelectedTrackId(e.target.value)}
               style={{ width: '100%', fontSize: 12 }}
             >
               <option value="">{tr('editorSelectTrack')}</option>
               {tracks.map((track, index) => (
                 <option key={track.id} value={track.id}>
-                  {track.name || `Piste ${index + 1}`} ({track.clips.length} clips)
+                  {track.name || `Piste ${index + 1}`} ({track.clips.length}{' '}
+                  clips)
                 </option>
               ))}
             </select>
           </div>
 
           <div style={{ marginBottom: 10 }}>
-            <label style={{
-              fontSize: 11,
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: 4
-            }}>
+            <label
+              style={{
+                fontSize: 11,
+                color: 'var(--text-secondary)',
+                display: 'block',
+                marginBottom: 4,
+              }}
+            >
               {tr('editorSelectSound')}
             </label>
             <select
@@ -597,7 +618,7 @@ export default function EditorToolbar({
               style={{ width: '100%', fontSize: 12 }}
             >
               <option value="">{tr('editorSelectSound')}</option>
-              {sounds.map(sound => (
+              {sounds.map((sound) => (
                 <option key={sound.id} value={sound.id}>
                   {sound.emoji || '🔊'} {sound.name}
                 </option>
@@ -617,46 +638,31 @@ export default function EditorToolbar({
               className="btn-primary btn-sm"
               onClick={handleAddClipAction}
               disabled={!selectedTrackId || !selectedSoundId}
-              style={{ fontSize: 12, opacity: (!selectedTrackId || !selectedSoundId) ? 0.5 : 1 }}
+              style={{
+                fontSize: 12,
+                opacity: !selectedTrackId || !selectedSoundId ? 0.5 : 1,
+              }}
             >
               <i className="ti ti-plus" /> {tr('add')}
             </button>
           </div>
 
           {tracks.length === 0 && (
-            <div style={{
-              fontSize: 11,
-              color: 'var(--text-tertiary)',
-              marginTop: 8,
-              textAlign: 'center',
-              padding: 8,
-              background: 'var(--bg-tertiary)',
-              borderRadius: 'var(--radius-sm)'
-            }}>
+            <div
+              style={{
+                fontSize: 11,
+                color: 'var(--text-tertiary)',
+                marginTop: 8,
+                textAlign: 'center',
+                padding: 8,
+                background: 'var(--bg-tertiary)',
+                borderRadius: 'var(--radius-sm)',
+              }}
+            >
               {tr('editorAddTrackHint')}
             </div>
           )}
         </div>
-      )}
-
-      {/* Modal d'importation */}
-      {showImportModal && (
-        <ImportFileModal
-          tracks={tracks}
-          fileName={pendingFileName}
-          onConfirm={(trackId) => {
-            console.log('📁 [Toolbar] Import fichier:', { trackId, file: pendingFile })
-            setShowImportModal(false)
-            setPendingFile(null)
-            setPendingFileName('')
-          }}
-          onCancel={() => {
-            setShowImportModal(false)
-            setPendingFile(null)
-            setPendingFileName('')
-          }}
-          tr={tr}
-        />
       )}
     </div>
   )

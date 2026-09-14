@@ -27,8 +27,36 @@ const DeleteButton = ({
   const [isConfirming, setIsConfirming] = useState(false)
 
   const displayLabel = deleteLabel || label || t('delete') || 'Supprimer'
-  const displayTitle = confirmTitle || t('confirmDeleteSound') || 'Confirmer la suppression'
-  const displayMessage = confirmMessage || t('confirmDeleteMessage') || 'Cette action est irréversible. Voulez-vous vraiment continuer ?'
+  const displayTitle =
+    confirmTitle || t('confirmDeleteSound') || 'Confirmer la suppression'
+  const displayMessage =
+    confirmMessage ||
+    t('confirmDeleteMessage') ||
+    'Cette action est irréversible. Voulez-vous vraiment continuer ?'
+
+  const buildFinalMessage = () => {
+    let finalMessage = displayMessage
+
+    const hasNamePlaceholder = /\{name\}|\{itemName\}/.test(finalMessage)
+
+    if (itemName && hasNamePlaceholder) {
+      finalMessage = finalMessage
+        .replace(/\{name\}/g, itemName)
+        .replace(/\{itemName\}/g, itemName)
+      return finalMessage
+    }
+
+    if (itemName && !hasNamePlaceholder) {
+      const hasNameInMessage =
+        finalMessage.includes(`"${itemName}"`) ||
+        finalMessage.includes(itemName)
+      if (!hasNameInMessage) {
+        finalMessage = `${finalMessage} "${itemName}"`
+      }
+    }
+
+    return finalMessage
+  }
 
   const handleClick = async (e) => {
     e?.stopPropagation?.()
@@ -39,16 +67,7 @@ const DeleteButton = ({
     }
 
     try {
-      let finalMessage = displayMessage
-
-      const hasNamePlaceholder = displayMessage.includes('{name}')
-      const hasNameInMessage = itemName && (
-        displayMessage.includes(`"${itemName}"`) || displayMessage.includes(itemName)
-      )
-
-      if (itemName && !hasNamePlaceholder && !hasNameInMessage) {
-        finalMessage = `${displayMessage} "${itemName}"`
-      }
+      const finalMessage = buildFinalMessage()
 
       const confirmed = await confirm({
         title: displayTitle,

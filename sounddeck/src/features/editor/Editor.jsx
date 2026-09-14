@@ -387,14 +387,14 @@ function EditorTimelineContent() {
   }, [tracks, addToast, t])
 
   const handleImportConfirm = useCallback(
-    async ({ file, fileName, trackId, startTime }) => {
-      if (!file) {
+    async ({ filePath, fileName, trackId, startTime }) => {
+      if (!filePath) {
         addToast?.('Aucun fichier sélectionné', 'error')
         return
       }
 
       try {
-        const result = await addClipFromFile(trackId, file, startTime)
+        const result = await addClipFromFile(trackId, filePath, startTime)
         if (result) {
           addToast?.(`"${fileName}" ${t('editorFileImported')}`, 'success')
         } else {

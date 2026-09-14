@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { playSound, stopSound, isPlaying, getSoundProgress } from '@core/services/AudioService'
-import ShortcutRecorder from "@shared/components/settings/ShortcutRecorder"
+import ShortcutRecorder from '@shared/components/settings/ShortcutRecorder'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import useConfirm from '@shared/hooks/useConfirm'
 
@@ -20,6 +20,20 @@ function convertOldVolumeToDb(oldVolume) {
 }
 
 const EMOJI_LIST = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋','🎤','🦄','💯','🤡','👾','🪇','🪘','🎸','🎹','🎷','🎼','🎧','📢','📣','🔇','🔈','🔉','💬','🗣️','👥','👤','🎭','🎪','🎨','🎬','🕹️','🎲','🧩','🎯','🎱','🎳','🎰','🧨','💣','🗡️','⚔️','🛡️','🏹','🪃','🪄','🔮','🧿','💎','🪙','💰','💵','💶','💷','💴','🪪','📱','📲','💻','🖥️','🖨️','⌨️','🖱️','🖲️','💽','💾','💿','📀','🧮','📟','☎️','📞','📠','📺','📻','🎙️','🎚️','🎛️','🧭','⏰','⏳','⌛️']
+
+function buildImageUrl(imgPath) {
+  if (!imgPath) return null
+  if (imgPath.startsWith('file://') || imgPath.startsWith('http')) return imgPath
+  const normalized = imgPath.replace(/\\/g, '/')
+  const parts = normalized.split('/')
+  const encoded = parts
+    .map((part) => {
+      if (part === '' || /^[A-Za-z]:$/.test(part)) return part
+      return encodeURIComponent(part)
+    })
+    .join('/')
+  return 'file:///' + encoded
+}
 
 export default function SoundCard({
   sound,
@@ -46,10 +60,10 @@ export default function SoundCard({
   tags = [],
   onAddTag,
   onRemoveTag,
-  size = 'medium'
+  size = 'medium',
 }) {
-  const { t, currentLang } = useLanguage()
-  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
+  const { t } = useLanguage()
+  const { confirm, ConfirmWrapper } = useConfirm({ lang })
   const [playing, setPlaying] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showVolume, setShowVolume] = useState(false)
@@ -60,7 +74,10 @@ export default function SoundCard({
   const [showTagInput, setShowTagInput] = useState(false)
   const [newTagValue, setNewTagValue] = useState('')
 
-  const initialVolume = sound.volumeDb !== undefined ? sound.volumeDb : convertOldVolumeToDb(sound.volume)
+  const initialVolume =
+    sound.volumeDb !== undefined
+      ? sound.volumeDb
+      : convertOldVolumeToDb(sound.volume)
   const [localVolume, setLocalVolume] = useState(initialVolume)
   const [imgError, setImgError] = useState(false)
   const [fileError, setFileError] = useState(false)
@@ -77,19 +94,29 @@ export default function SoundCard({
   const cardSizes = {
     small: { padding: 6, fontSize: 9, emojiSize: 20, nameSize: 10 },
     medium: { padding: 8, fontSize: 11, emojiSize: 26, nameSize: 11 },
-    large: { padding: 10, fontSize: 13, emojiSize: 32, nameSize: 13 }
+    large: { padding: 10, fontSize: 13, emojiSize: 32, nameSize: 13 },
   }
   const sizeConfig = cardSizes[size] || cardSizes.medium
 
+  const isFavorite = sound.favorites?.includes(currentProfileId) || false
+
   useEffect(() => {
-    const newVolume = sound.volumeDb !== undefined ? sound.volumeDb : convertOldVolumeToDb(sound.volume)
+    const newVolume =
+      sound.volumeDb !== undefined
+        ? sound.volumeDb
+        : convertOldVolumeToDb(sound.volume)
     setLocalVolume(newVolume)
   }, [sound.volume, sound.volumeDb])
 
-  useEffect(() => { setImgError(false) }, [sound.image])
+  useEffect(() => {
+    setImgError(false)
+  }, [sound.image])
 
   useEffect(() => {
-    if (!playing) { setProgress(null); return }
+    if (!playing) {
+      setProgress(null)
+      return
+    }
     const interval = setInterval(() => {
       if (!isPlaying(sound.id)) {
         setPlaying(false)
@@ -133,43 +160,32 @@ export default function SoundCard({
   }
 
   const handleRename = () => {
-    if (nameValue.trim() && nameValue !== sound.name) onRename(sound.id, nameValue.trim())
+    if (nameValue.trim() && nameValue !== sound.name)
+      onRename(sound.id, nameValue.trim())
     setEditingName(false)
   }
 
-  const handleVolumeCommit = useCallback((val) => {
-    const clampedVal = Math.max(-24, Math.min(24, val))
-    onVolumeChange(sound.id, clampedVal)
-  }, [sound.id, onVolumeChange])
+  const handleVolumeCommit = useCallback(
+    (val) => {
+      const clampedVal = Math.max(-24, Math.min(24, val))
+      onVolumeChange(sound.id, clampedVal)
+    },
+    [sound.id, onVolumeChange]
+  )
 
   const handleVolumeDragStart = useCallback(() => {
     setIsDraggingVolume(true)
-    if (cardRef.current) {
-      cardRef.current.style.cursor = 'default'
-    }
+    if (cardRef.current) cardRef.current.style.cursor = 'default'
   }, [])
 
   const handleVolumeDragEnd = useCallback(() => {
     setIsDraggingVolume(false)
-    if (cardRef.current) {
+    if (cardRef.current)
       cardRef.current.style.cursor = draggable ? 'grab' : 'default'
-    }
   }, [draggable])
 
-  const buildImageUrl = (imgPath) => {
-    if (!imgPath) return null
-    if (imgPath.startsWith('file://') || imgPath.startsWith('http')) return imgPath
-    const normalized = imgPath.replace(/\\/g, '/')
-    const parts = normalized.split('/')
-    const encoded = parts.map((part) => {
-      if (part === '' || /^[A-Za-z]:$/.test(part)) return part
-      return encodeURIComponent(part)
-    }).join('/')
-    return 'file:///' + encoded
-  }
-
   const imageUrl = buildImageUrl(sound.image)
-  const showImage = !!(sound.image) && !imgError
+  const showImage = !!sound.image && !imgError
 
   const calculateMenuPosition = useCallback(() => {
     if (!buttonRef.current) return
@@ -219,8 +235,14 @@ export default function SoundCard({
   const handleVolumeOpen = () => {
     if (cardRef.current) {
       const rect = cardRef.current.getBoundingClientRect()
-      const top = Math.max(10, Math.min(rect.top + rect.height / 2 - 150, window.innerHeight - 320))
-      const left = Math.max(10, Math.min(rect.left + rect.width / 2 - 150, window.innerWidth - 320))
+      const top = Math.max(
+        10,
+        Math.min(rect.top + rect.height / 2 - 150, window.innerHeight - 320)
+      )
+      const left = Math.max(
+        10,
+        Math.min(rect.left + rect.width / 2 - 150, window.innerWidth - 320)
+      )
       setVolumePosition({ top, left })
     }
     setShowVolume(true)
@@ -242,7 +264,7 @@ export default function SoundCard({
       const rect = buttonRef.current.getBoundingClientRect()
       setEmojiPickerPosition({
         top: rect.bottom + 4,
-        left: rect.left - 100
+        left: rect.left - 100,
       })
     }
     setShowEmojiPicker(true)
@@ -274,26 +296,17 @@ export default function SoundCard({
       e.preventDefault()
       return false
     }
-    if (onDragStart) {
-      onDragStart(e)
-    }
+    if (onDragStart) onDragStart(e)
   }
 
   const handleDragEnd = (e) => {
     if (isDraggingVolume || showVolume) return
-    if (onDragEnd) {
-      onDragEnd(e)
-    }
+    if (onDragEnd) onDragEnd(e)
   }
-
-  const isFavorite = sound.favorites?.includes(currentProfileId) || false
 
   const handleDeleteWithConfirm = async () => {
     setShowMenu(false)
-
-    if (onDelete) {
-      onDelete(sound.id)
-    }
+    if (onDelete) onDelete(sound.id)
   }
 
   const handleRemoveFromProfileWithConfirm = async () => {
@@ -307,12 +320,10 @@ export default function SoundCard({
         message: `${t('menuRemoveFromProfile')} "${soundName}" ?`,
         type: 'warning',
         confirmText: t('remove') || 'Retirer',
-        cancelText: t('cancel') || 'Annuler'
+        cancelText: t('cancel') || 'Annuler',
       })
 
-      if (confirmed) {
-        onRemoveFromProfile(sound.id)
-      }
+      if (confirmed) onRemoveFromProfile(sound.id)
     }
   }
 
@@ -328,33 +339,63 @@ export default function SoundCard({
         className={`sound-card sound-card-${size} ${playing ? 'playing-pulse' : ''}`}
         style={{
           background: 'var(--bg-secondary)',
-          border: `1px solid ${fileError ? 'var(--danger)' : playing ? (loopEnabled ? 'var(--success)' : 'var(--accent)') : 'var(--border)'}`,
+          border: `1px solid ${
+            fileError
+              ? 'var(--danger)'
+              : playing
+                ? loopEnabled
+                  ? 'var(--success)'
+                  : 'var(--accent)'
+                : 'var(--border)'
+          }`,
           borderRadius: 'var(--radius-md)',
           padding: sizeConfig.padding,
           position: 'relative',
           transition: 'border-color 0.15s, transform 0.15s ease, box-shadow 0.15s ease',
-          cursor: draggable && !isDraggingVolume && !showVolume ? 'grab' : 'default',
+          cursor:
+            draggable && !isDraggingVolume && !showVolume ? 'grab' : 'default',
           userSelect: isDraggingVolume || showVolume ? 'none' : 'auto',
-          boxShadow: playing ? '0 0 20px rgba(124,111,247,0.15)' : 'none'
+          boxShadow: playing ? '0 0 20px rgba(124,111,247,0.15)' : 'none',
         }}
       >
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 4,
+          }}
+        >
           <button
-            onClick={e => { e.stopPropagation(); onToggleFavorite(sound.id) }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleFavorite(sound.id)
+            }}
             data-testid="favorite-button"
             style={{
-              background: isFavorite ? 'rgba(239,159,39,0.15)' : 'var(--bg-tertiary)',
-              border: `1px solid ${isFavorite ? 'var(--warning)' : 'var(--border)'}`,
-              borderRadius: 6, fontSize: 12, color: isFavorite ? 'var(--warning)' : 'var(--text-tertiary)',
-              padding: '3px 7px', cursor: 'pointer', lineHeight: 1
-            }}>
+              background: isFavorite
+                ? 'rgba(239,159,39,0.15)'
+                : 'var(--bg-tertiary)',
+              border: `1px solid ${
+                isFavorite ? 'var(--warning)' : 'var(--border)'
+              }`,
+              borderRadius: 6,
+              fontSize: 12,
+              color: isFavorite ? 'var(--warning)' : 'var(--text-tertiary)',
+              padding: '3px 7px',
+              cursor: 'pointer',
+              lineHeight: 1,
+            }}
+          >
             <i className={`ti ${isFavorite ? 'ti-star-filled' : 'ti-star'}`} />
           </button>
 
           <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
             {loopEnabled && (
-              <span title="Loop activé" style={{ fontSize: 11, color: 'var(--success)' }}>
+              <span
+                title="Loop activé"
+                style={{ fontSize: 11, color: 'var(--success)' }}
+              >
                 <i className="ti ti-repeat" />
               </span>
             )}
@@ -363,78 +404,148 @@ export default function SoundCard({
               onClick={handleMenuToggle}
               data-testid="dots-button"
               style={{
-                background: 'var(--bg-tertiary)', border: '1px solid var(--border)',
-                borderRadius: 6, color: 'var(--text-secondary)', padding: '3px 7px',
-                fontSize: 12, cursor: 'pointer', lineHeight: 1
-              }}>
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                color: 'var(--text-secondary)',
+                padding: '3px 7px',
+                fontSize: 12,
+                cursor: 'pointer',
+                lineHeight: 1,
+              }}
+            >
               <i className="ti ti-dots-vertical" />
             </button>
           </div>
         </div>
 
-        <div onClick={handlePlay}
+        <div
+          onClick={handlePlay}
           style={{
-            width: '100%', aspectRatio: '1', background: 'var(--bg-tertiary)',
-            borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: sizeConfig.emojiSize, marginBottom: 4, position: 'relative', overflow: 'hidden', cursor: 'pointer'
+            width: '100%',
+            aspectRatio: '1',
+            background: 'var(--bg-tertiary)',
+            borderRadius: 8,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: sizeConfig.emojiSize,
+            marginBottom: 4,
+            position: 'relative',
+            overflow: 'hidden',
+            cursor: 'pointer',
           }}
-          onMouseEnter={e => { const o = e.currentTarget.querySelector('.play-overlay'); if (o) o.style.opacity = 1 }}
-          onMouseLeave={e => { const o = e.currentTarget.querySelector('.play-overlay'); if (o && !playing) o.style.opacity = 0 }}
+          onMouseEnter={(e) => {
+            const o = e.currentTarget.querySelector('.play-overlay')
+            if (o) o.style.opacity = 1
+          }}
+          onMouseLeave={(e) => {
+            const o = e.currentTarget.querySelector('.play-overlay')
+            if (o && !playing) o.style.opacity = 0
+          }}
         >
           {showImage && (
             <img
               src={imageUrl}
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+              }}
               onError={() => setImgError(true)}
             />
           )}
           {!showImage && (
-            <span style={{ fontSize: sizeConfig.emojiSize }}>{sound.emoji || '🔊'}</span>
+            <span style={{ fontSize: sizeConfig.emojiSize }}>
+              {sound.emoji || '🔊'}
+            </span>
           )}
-          <div className="play-overlay" style={{
-            position: 'absolute', inset: 0,
-            background: playing
-              ? (loopEnabled ? 'rgba(29,158,117,0.85)' : 'rgba(224,82,82,0.85)')
-              : 'rgba(124,111,247,0.85)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            opacity: playing ? 1 : 0, transition: 'opacity 0.15s, background 0.15s', borderRadius: 8
-          }}>
-            <i className={`ti ${playing ? 'ti-player-stop-filled' : 'ti-player-play-filled'}`} style={{ fontSize: sizeConfig.emojiSize, color: 'white' }} />
+          <div
+            className="play-overlay"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: playing
+                ? loopEnabled
+                  ? 'rgba(29,158,117,0.85)'
+                  : 'rgba(224,82,82,0.85)'
+                : 'rgba(124,111,247,0.85)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: playing ? 1 : 0,
+              transition: 'opacity 0.15s, background 0.15s',
+              borderRadius: 8,
+            }}
+          >
+            <i
+              className={`ti ${
+                playing ? 'ti-player-stop-filled' : 'ti-player-play-filled'
+              }`}
+              style={{ fontSize: sizeConfig.emojiSize, color: 'white' }}
+            />
             {playing && loopEnabled && (
-              <i className="ti ti-repeat" style={{ position: 'absolute', bottom: 4, right: 4, fontSize: 12, color: 'white', opacity: 0.8 }} />
+              <i
+                className="ti ti-repeat"
+                style={{
+                  position: 'absolute',
+                  bottom: 4,
+                  right: 4,
+                  fontSize: 12,
+                  color: 'white',
+                  opacity: 0.8,
+                }}
+              />
             )}
           </div>
         </div>
 
         {editingName ? (
-          <input autoFocus value={nameValue} onChange={e => setNameValue(e.target.value)}
+          <input
+            autoFocus
+            value={nameValue}
+            onChange={(e) => setNameValue(e.target.value)}
             onBlur={handleRename}
-            onKeyDown={e => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setEditingName(false) }}
-            style={{ fontSize: sizeConfig.nameSize, padding: '3px 6px', marginBottom: 2 }}
-            onClick={e => e.stopPropagation()} />
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleRename()
+              if (e.key === 'Escape') setEditingName(false)
+            }}
+            style={{
+              fontSize: sizeConfig.nameSize,
+              padding: '3px 6px',
+              marginBottom: 2,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
         ) : (
-          <div style={{
-            fontSize: sizeConfig.nameSize,
-            fontWeight: 500,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            marginBottom: 2,
-            textAlign: 'center'
-          }}>
+          <div
+            style={{
+              fontSize: sizeConfig.nameSize,
+              fontWeight: 500,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              marginBottom: 2,
+              textAlign: 'center',
+            }}
+          >
             {sound.name}
           </div>
         )}
 
         {tags.length > 0 && (
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 3,
-            marginTop: 2,
-            justifyContent: 'center'
-          }}>
-            {tags.map(tag => (
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 3,
+              marginTop: 2,
+              justifyContent: 'center',
+            }}
+          >
+            {tags.map((tag) => (
               <span
                 key={tag}
                 style={{
@@ -445,18 +556,18 @@ export default function SoundCard({
                   color: 'var(--accent)',
                   border: '1px solid var(--accent)',
                   cursor: 'pointer',
-                  transition: 'all 0.15s ease'
+                  transition: 'all 0.15s ease',
                 }}
                 onClick={(e) => {
                   e.stopPropagation()
                   onRemoveTag?.(sound.id, tag)
                 }}
-                onMouseEnter={e => {
+                onMouseEnter={(e) => {
                   e.currentTarget.style.background = 'rgba(224,82,82,0.15)'
                   e.currentTarget.style.color = 'var(--danger)'
                   e.currentTarget.style.borderColor = 'var(--danger)'
                 }}
-                onMouseLeave={e => {
+                onMouseLeave={(e) => {
                   e.currentTarget.style.background = 'var(--accent-light)'
                   e.currentTarget.style.color = 'var(--accent)'
                   e.currentTarget.style.borderColor = 'var(--accent)'
@@ -469,22 +580,32 @@ export default function SoundCard({
         )}
 
         {onAddTag && (
-          <div style={{ position: 'relative', display: 'inline-flex', justifyContent: 'center', marginTop: 2 }}>
+          <div
+            style={{
+              position: 'relative',
+              display: 'inline-flex',
+              justifyContent: 'center',
+              marginTop: 2,
+            }}
+          >
             {showTagInput ? (
-              <div style={{
-                display: 'flex',
-                gap: 4,
-                alignItems: 'center',
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--accent)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '2px 4px',
-                width: '100%'
-              }} onClick={e => e.stopPropagation()}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 4,
+                  alignItems: 'center',
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--accent)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '2px 4px',
+                  width: '100%',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
                 <input
                   autoFocus
                   value={newTagValue}
-                  onChange={e => setNewTagValue(e.target.value)}
+                  onChange={(e) => setNewTagValue(e.target.value)}
                   placeholder="Tag..."
                   style={{
                     flex: 1,
@@ -495,17 +616,15 @@ export default function SoundCard({
                     background: 'var(--bg-tertiary)',
                     border: '1px solid var(--border)',
                     color: 'var(--text-primary)',
-                    width: '100%'
+                    width: '100%',
                   }}
-                  onKeyDown={e => {
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter' && newTagValue.trim()) {
                       onAddTag(sound.id, newTagValue.trim().toLowerCase())
                       setNewTagValue('')
                       setShowTagInput(false)
                     }
-                    if (e.key === 'Escape') {
-                      setShowTagInput(false)
-                    }
+                    if (e.key === 'Escape') setShowTagInput(false)
                   }}
                 />
                 <button
@@ -522,7 +641,7 @@ export default function SoundCard({
                     fontSize: 9,
                     borderRadius: 'var(--radius-sm)',
                     minHeight: 20,
-                    minWidth: 20
+                    minWidth: 20,
                   }}
                 >
                   <i className="ti ti-check" style={{ fontSize: 10 }} />
@@ -535,7 +654,7 @@ export default function SoundCard({
                     fontSize: 9,
                     borderRadius: 'var(--radius-sm)',
                     minHeight: 20,
-                    minWidth: 20
+                    minWidth: 20,
                   }}
                 >
                   <i className="ti ti-x" style={{ fontSize: 10 }} />
@@ -546,10 +665,6 @@ export default function SoundCard({
                 onClick={(e) => {
                   e.stopPropagation()
                   setShowTagInput(true)
-                  setTimeout(() => {
-                    const input = document.querySelector('.tag-input-inline')
-                    if (input) input.focus()
-                  }, 10)
                 }}
                 style={{
                   fontSize: 8,
@@ -559,15 +674,15 @@ export default function SoundCard({
                   color: 'var(--text-tertiary)',
                   border: '1px dashed var(--border)',
                   cursor: 'pointer',
-                  transition: 'all 0.15s ease'
+                  transition: 'all 0.15s ease',
                 }}
-                onMouseEnter={e => {
+                onMouseEnter={(e) => {
                   if (e.currentTarget) {
                     e.currentTarget.style.borderColor = 'var(--accent)'
                     e.currentTarget.style.color = 'var(--accent)'
                   }
                 }}
-                onMouseLeave={e => {
+                onMouseLeave={(e) => {
                   if (e.currentTarget) {
                     e.currentTarget.style.borderColor = 'var(--border)'
                     e.currentTarget.style.color = 'var(--text-tertiary)'
@@ -591,161 +706,226 @@ export default function SoundCard({
 
         {progress && (
           <div style={{ marginTop: 4 }}>
-            <div style={{
-              height: 4, background: 'var(--bg-tertiary)',
-              borderRadius: 2, overflow: 'hidden',
-              border: '1px solid var(--border)'
-            }}>
-              <div style={{
-                height: '100%', borderRadius: 2,
-                background: loopEnabled ? 'var(--success)' : 'var(--accent)',
-                width: `${progress.ratio * 100}%`,
-                transition: 'width 0.1s linear',
-                boxShadow: `0 0 4px ${loopEnabled ? 'var(--success)' : 'var(--accent)'}`
-              }} />
+            <div
+              style={{
+                height: 4,
+                background: 'var(--bg-tertiary)',
+                borderRadius: 2,
+                overflow: 'hidden',
+                border: '1px solid var(--border)',
+              }}
+            >
+              <div
+                style={{
+                  height: '100%',
+                  borderRadius: 2,
+                  background: loopEnabled ? 'var(--success)' : 'var(--accent)',
+                  width: `${progress.ratio * 100}%`,
+                  transition: 'width 0.1s linear',
+                  boxShadow: `0 0 4px ${
+                    loopEnabled ? 'var(--success)' : 'var(--accent)'
+                  }`,
+                }}
+              />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'var(--text-tertiary)', marginTop: 1 }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: 8,
+                color: 'var(--text-tertiary)',
+                marginTop: 1,
+              }}
+            >
               <span>{fmtTime(progress.current)}</span>
               <span>{fmtTime(progress.duration)}</span>
             </div>
           </div>
         )}
         {sound.playCount > 0 && (
-          <div style={{ fontSize: 8, color: 'var(--text-tertiary)', textAlign: 'center', marginTop: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+          <div
+            style={{
+              fontSize: 8,
+              color: 'var(--text-tertiary)',
+              textAlign: 'center',
+              marginTop: 2,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 3,
+            }}
+          >
             <i className="ti ti-player-play" style={{ fontSize: 8 }} />
             {sound.playCount} {t('playCount')}
           </div>
         )}
       </div>
 
-      {showMenu && createPortal(
-        <div ref={menuRef}>
-          <ContextMenuPortal
-            sound={sound}
-            currentProfileId={currentProfileId}
-            onClose={() => setShowMenu(false)}
-            onToggleFavorite={() => { onToggleFavorite(sound.id); setShowMenu(false) }}
-            onRename={() => { setEditingName(true); setShowMenu(false) }}
-            onVolumeOpen={handleVolumeOpen}
-            onRemoveFromProfile={onRemoveFromProfile ? () => { onRemoveFromProfile(sound.id); setShowMenu(false) } : null}
-            onDelete={onDelete}
-            onChangeImage={handleChangeImage}
-            onChangeEmoji={handleChangeEmoji}
-            position={menuPosition}
+      {showMenu &&
+        createPortal(
+          <div ref={menuRef}>
+            <ContextMenuPortal
+              sound={sound}
+              isFavorite={isFavorite}
+              currentProfileId={currentProfileId}
+              onClose={() => setShowMenu(false)}
+              onToggleFavorite={() => {
+                onToggleFavorite(sound.id)
+                setShowMenu(false)
+              }}
+              onRename={() => {
+                setEditingName(true)
+                setShowMenu(false)
+              }}
+              onVolumeOpen={handleVolumeOpen}
+              onRemoveFromProfile={
+                onRemoveFromProfile
+                  ? () => {
+                      onRemoveFromProfile(sound.id)
+                      setShowMenu(false)
+                    }
+                  : null
+              }
+              onDelete={onDelete}
+              onChangeImage={handleChangeImage}
+              onChangeEmoji={handleChangeEmoji}
+              position={menuPosition}
+              lang={lang}
+              onHeightMeasured={setMenuHeight}
+              onDeleteWithConfirm={handleDeleteWithConfirm}
+              onRemoveFromProfileWithConfirm={handleRemoveFromProfileWithConfirm}
+            />
+          </div>,
+          document.body
+        )}
+
+      {showVolume &&
+        createPortal(
+          <VolumePanel
+            volume={localVolume}
+            onChange={setLocalVolume}
+            onCommit={handleVolumeCommit}
+            onClose={() => {
+              setShowVolume(false)
+              handleVolumeDragEnd()
+            }}
+            onDragStart={handleVolumeDragStart}
+            onDragEnd={handleVolumeDragEnd}
+            soundName={sound.name}
             lang={lang}
-            onHeightMeasured={setMenuHeight}
-            onDeleteWithConfirm={handleDeleteWithConfirm}
-            onRemoveFromProfileWithConfirm={handleRemoveFromProfileWithConfirm}
-          />
-        </div>,
-        document.body
-      )}
+            position={volumePosition}
+          />,
+          document.body
+        )}
 
-      {showVolume && createPortal(
-        <VolumePanel
-          volume={localVolume}
-          onChange={setLocalVolume}
-          onCommit={handleVolumeCommit}
-          onClose={() => {
-            setShowVolume(false)
-            handleVolumeDragEnd()
-          }}
-          onDragStart={handleVolumeDragStart}
-          onDragEnd={handleVolumeDragEnd}
-          soundName={sound.name}
-          lang={lang}
-          position={volumePosition}
-        />,
-        document.body
-      )}
-
-      {showEmojiPicker && createPortal(
-        <div
-          style={{
-            position: 'fixed',
-            top: emojiPickerPosition.top,
-            left: emojiPickerPosition.left,
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-md)',
-            padding: 12,
-            zIndex: 99999,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-            maxWidth: 320,
-            maxHeight: 300,
-            overflowY: 'auto'
-          }}
-          onClick={e => e.stopPropagation()}
-        >
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 8
-          }}>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
-              {t('chooseEmoji')}
-            </span>
-            <button
-              onClick={() => setShowEmojiPicker(false)}
+      {showEmojiPicker &&
+        createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              top: emojiPickerPosition.top,
+              left: emojiPickerPosition.left,
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+              padding: 12,
+              zIndex: 99999,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+              maxWidth: 320,
+              maxHeight: 300,
+              overflowY: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
               style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--text-tertiary)',
-                cursor: 'pointer',
-                padding: '2px 4px'
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 8,
               }}
             >
-              <i className="ti ti-x" />
-            </button>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            {EMOJI_LIST.map(e => (
-              <button
-                key={e}
-                onClick={() => {
-                  if (onChangeEmoji) {
-                    onChangeEmoji(sound.id, e)
-                  }
-                  setShowEmojiPicker(false)
-                }}
+              <span
                 style={{
-                  width: 36,
-                  height: 36,
-                  fontSize: 18,
-                  borderRadius: 6,
-                  border: `1px solid ${sound.emoji === e ? 'var(--accent)' : 'var(--border)'}`,
-                  background: sound.emoji === e ? 'var(--accent-light)' : 'var(--bg-tertiary)',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = 'var(--accent)'
-                  e.currentTarget.style.transform = 'scale(1.1)'
-                }}
-                onMouseLeave={e => {
-                  if (sound.emoji !== e) {
-                    e.currentTarget.style.borderColor = 'var(--border)'
-                  }
-                  e.currentTarget.style.transform = 'scale(1)'
+                  fontSize: 12,
+                  color: 'var(--text-secondary)',
+                  fontWeight: 500,
                 }}
               >
-                {e}
+                {t('chooseEmoji')}
+              </span>
+              <button
+                onClick={() => setShowEmojiPicker(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-tertiary)',
+                  cursor: 'pointer',
+                  padding: '2px 4px',
+                }}
+              >
+                <i className="ti ti-x" />
               </button>
-            ))}
-          </div>
-        </div>,
-        document.body
-      )}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {EMOJI_LIST.map((e) => (
+                <button
+                  key={e}
+                  onClick={() => {
+                    if (onChangeEmoji) onChangeEmoji(sound.id, e)
+                    setShowEmojiPicker(false)
+                  }}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    fontSize: 18,
+                    borderRadius: 6,
+                    border: `1px solid ${
+                      sound.emoji === e ? 'var(--accent)' : 'var(--border)'
+                    }`,
+                    background:
+                      sound.emoji === e
+                        ? 'var(--accent-light)'
+                        : 'var(--bg-tertiary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--accent)'
+                    e.currentTarget.style.transform = 'scale(1.1)'
+                  }}
+                  onMouseLeave={(e) => {
+                    if (sound.emoji !== e) {
+                      e.currentTarget.style.borderColor = 'var(--border)'
+                    }
+                    e.currentTarget.style.transform = 'scale(1)'
+                  }}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>,
+          document.body
+        )}
 
       <ConfirmWrapper />
     </>
   )
 }
 
-// VolumePanel (inchangé)
-function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragStart, onDragEnd, soundName, position }) {
-  const { t, currentLang } = useLanguage()
+function VolumePanel({
+  volume,
+  onChange,
+  onCommit,
+  onClose,
+  lang = 'fr',
+  onDragStart,
+  onDragEnd,
+  soundName,
+  position,
+}) {
+  const { t } = useLanguage()
   const [localVolume, setLocalVolume] = useState(volume)
 
   useEffect(() => {
@@ -790,7 +970,7 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
   return (
     <div
       id="volume-panel"
-      onClick={e => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
       style={{
         position: 'fixed',
         top: position?.top || '50%',
@@ -805,39 +985,61 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
         maxWidth: '90vw',
         boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
         backdropFilter: 'blur(8px)',
-        animation: 'fadeIn 0.15s ease'
+        animation: 'fadeIn 0.15s ease',
       }}
     >
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 16
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 16,
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            background: 'var(--bg-tertiary)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 16
-          }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: 'var(--bg-tertiary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 16,
+            }}
+          >
             {soundName?.charAt(0)?.toUpperCase() || '🔊'}
           </div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+              }}
+            >
               {t('menuVolume')}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div
+              style={{
+                fontSize: 11,
+                color: 'var(--text-tertiary)',
+                maxWidth: 140,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
               {soundName || ''}
             </div>
           </div>
         </div>
         <button
-          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          onClick={(e) => {
+            e.stopPropagation()
+            onClose()
+          }}
           style={{
             background: 'transparent',
             border: 'none',
@@ -848,31 +1050,49 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
             display: 'flex',
             alignItems: 'center',
             borderRadius: 4,
-            transition: 'all 0.15s'
+            transition: 'all 0.15s',
           }}
-          onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'var(--bg-hover)' }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-tertiary)'; e.currentTarget.style.background = 'transparent' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--text-primary)'
+            e.currentTarget.style.background = 'var(--bg-hover)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--text-tertiary)'
+            e.currentTarget.style.background = 'transparent'
+          }}
         >
           <i className="ti ti-x" />
         </button>
       </div>
 
-      <div style={{
-        textAlign: 'center',
-        marginBottom: 16,
-        padding: '8px 0',
-        background: 'var(--bg-tertiary)',
-        borderRadius: 'var(--radius-md)',
-        border: '1px solid var(--border)'
-      }}>
-        <span style={{
-          fontSize: 32,
-          fontWeight: 700,
-          color: localVolume === 0 ? 'var(--accent)' : localVolume > 0 ? 'var(--success)' : 'var(--danger)'
-        }}>
-          {localVolume > 0 ? '+' : ''}{localVolume}
+      <div
+        style={{
+          textAlign: 'center',
+          marginBottom: 16,
+          padding: '8px 0',
+          background: 'var(--bg-tertiary)',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border)',
+        }}
+      >
+        <span
+          style={{
+            fontSize: 32,
+            fontWeight: 700,
+            color:
+              localVolume === 0
+                ? 'var(--accent)'
+                : localVolume > 0
+                  ? 'var(--success)'
+                  : 'var(--danger)',
+          }}
+        >
+          {localVolume > 0 ? '+' : ''}
+          {localVolume}
         </span>
-        <span style={{ fontSize: 16, color: 'var(--text-tertiary)', marginLeft: 4 }}>dB</span>
+        <span style={{ fontSize: 16, color: 'var(--text-tertiary)', marginLeft: 4 }}>
+          dB
+        </span>
       </div>
 
       <div style={{ padding: '4px 0' }}>
@@ -894,21 +1114,31 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
             border: 'none',
             padding: 0,
             cursor: 'pointer',
-            height: 6
+            height: 6,
           }}
         />
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 16 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          fontSize: 10,
+          color: 'var(--text-tertiary)',
+          marginBottom: 16,
+        }}
+      >
         <span>-24 dB</span>
-        <span style={{
-          color: localVolume === 0 ? 'var(--accent)' : 'var(--text-tertiary)',
-          fontWeight: localVolume === 0 ? 600 : 400,
-          background: localVolume === 0 ? 'var(--accent-light)' : 'transparent',
-          padding: '1px 8px',
-          borderRadius: 10,
-          fontSize: 9
-        }}>
+        <span
+          style={{
+            color: localVolume === 0 ? 'var(--accent)' : 'var(--text-tertiary)',
+            fontWeight: localVolume === 0 ? 600 : 400,
+            background: localVolume === 0 ? 'var(--accent-light)' : 'transparent',
+            padding: '1px 8px',
+            borderRadius: 10,
+            fontSize: 9,
+          }}
+        >
           ▸ 0 dB {t('volumeDefault')}
         </span>
         <span>+24 dB</span>
@@ -916,13 +1146,20 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
 
       <div style={{ display: 'flex', gap: 8 }}>
         <button
-          onClick={(e) => { e.stopPropagation(); resetToZero(); }}
+          onClick={(e) => {
+            e.stopPropagation()
+            resetToZero()
+          }}
           style={{
             flex: 1,
-            background: localVolume === 0 ? 'var(--accent-light)' : 'var(--bg-tertiary)',
-            border: `1px solid ${localVolume === 0 ? 'var(--accent)' : 'var(--border)'}`,
+            background:
+              localVolume === 0 ? 'var(--accent-light)' : 'var(--bg-tertiary)',
+            border: `1px solid ${
+              localVolume === 0 ? 'var(--accent)' : 'var(--border)'
+            }`,
             borderRadius: 'var(--radius-md)',
-            color: localVolume === 0 ? 'var(--accent)' : 'var(--text-secondary)',
+            color:
+              localVolume === 0 ? 'var(--accent)' : 'var(--text-secondary)',
             cursor: 'pointer',
             padding: '8px 12px',
             fontSize: 12,
@@ -930,16 +1167,16 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
             alignItems: 'center',
             justifyContent: 'center',
             gap: 6,
-            transition: 'all 0.15s'
+            transition: 'all 0.15s',
           }}
-          onMouseEnter={e => {
+          onMouseEnter={(e) => {
             if (localVolume !== 0) {
               e.currentTarget.style.borderColor = 'var(--accent)'
               e.currentTarget.style.color = 'var(--accent)'
               e.currentTarget.style.background = 'var(--accent-light)'
             }
           }}
-          onMouseLeave={e => {
+          onMouseLeave={(e) => {
             if (localVolume !== 0) {
               e.currentTarget.style.borderColor = 'var(--border)'
               e.currentTarget.style.color = 'var(--text-secondary)'
@@ -953,7 +1190,10 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
         </button>
 
         <button
-          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          onClick={(e) => {
+            e.stopPropagation()
+            onClose()
+          }}
           className="btn-primary"
           style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
         >
@@ -973,6 +1213,7 @@ function VolumePanel({ volume, onChange, onCommit, onClose, lang = 'fr', onDragS
 
 function ContextMenuPortal({
   sound,
+  isFavorite,
   currentProfileId,
   onClose,
   onToggleFavorite,
@@ -986,9 +1227,9 @@ function ContextMenuPortal({
   lang = 'fr',
   onHeightMeasured,
   onDeleteWithConfirm,
-  onRemoveFromProfileWithConfirm
+  onRemoveFromProfileWithConfirm,
 }) {
-  const { t, currentLang } = useLanguage()
+  const { t } = useLanguage()
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -997,9 +1238,7 @@ function ContextMenuPortal({
     requestAnimationFrame(() => {
       if (!menuRef.current) return
       const height = menuRef.current.getBoundingClientRect().height
-      if (onHeightMeasured && height > 0) {
-        onHeightMeasured(height)
-      }
+      if (onHeightMeasured && height > 0) onHeightMeasured(height)
     })
   }, [onHeightMeasured])
 
@@ -1030,9 +1269,7 @@ function ContextMenuPortal({
     })
   }, [position])
 
-  const handleMenuClick = (e) => {
-    e.stopPropagation()
-  }
+  const handleMenuClick = (e) => e.stopPropagation()
 
   const handleAction = (action) => {
     action()
@@ -1055,40 +1292,35 @@ function ContextMenuPortal({
         zIndex: 999,
         minWidth: 200,
         boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-        backdropFilter: 'blur(4px)'
+        backdropFilter: 'blur(4px)',
       }}
     >
       <MenuItem
-        icon={sound.favorite ? 'ti-star' : 'ti-star-filled'}
-        label={sound.favorite ? t('menuFavoriteRemove') : t('menuFavoriteAdd')}
+        icon={isFavorite ? 'ti-star-filled' : 'ti-star'}
+        label={isFavorite ? t('menuFavoriteRemove') : t('menuFavoriteAdd')}
         onClick={() => handleAction(onToggleFavorite)}
-        lang={lang}
       />
       <MenuItem
         icon="ti-pencil"
         label={t('menuRename')}
         onClick={() => handleAction(onRename)}
-        lang={lang}
       />
       <MenuItem
         icon="ti-volume"
         label={t('menuVolume')}
         onClick={() => handleAction(onVolumeOpen)}
-        lang={lang}
       />
 
       <MenuItem
         icon="ti-photo"
         label={t('menuChangeImage')}
         onClick={() => handleAction(onChangeImage)}
-        lang={lang}
       />
 
       <MenuItem
         icon="ti-mood-smile"
         label={t('menuChangeEmoji')}
         onClick={() => handleAction(onChangeEmoji)}
-        lang={lang}
       />
 
       {onRemoveFromProfile && currentProfileId !== 'all' && (
@@ -1099,7 +1331,6 @@ function ContextMenuPortal({
             label={t('menuRemoveFromProfile')}
             onClick={() => handleAction(onRemoveFromProfileWithConfirm)}
             warning
-            lang={lang}
           />
         </>
       )}
@@ -1125,12 +1356,12 @@ function ContextMenuPortal({
             transition: 'background 0.1s',
             color: 'var(--danger)',
             fontSize: 13,
-            fontFamily: 'inherit'
+            fontFamily: 'inherit',
           }}
-          onMouseEnter={e => {
+          onMouseEnter={(e) => {
             e.currentTarget.style.background = 'rgba(224, 82, 82, 0.1)'
           }}
-          onMouseLeave={e => {
+          onMouseLeave={(e) => {
             e.currentTarget.style.background = 'transparent'
           }}
         >
@@ -1142,21 +1373,34 @@ function ContextMenuPortal({
   )
 }
 
-function MenuItem({ icon, label, onClick, danger, warning, lang = 'fr' }) {
+function MenuItem({ icon, label, onClick, danger, warning }) {
   return (
     <button
       onClick={onClick}
       style={{
-        width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-        padding: '6px 10px', background: 'transparent', border: 'none',
-        color: danger ? 'var(--danger)' : warning ? 'var(--warning)' : 'var(--text-primary)',
-        fontSize: 13, borderRadius: 6, cursor: 'pointer', textAlign: 'left',
-        transition: 'background 0.1s'
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '6px 10px',
+        background: 'transparent',
+        border: 'none',
+        color: danger
+          ? 'var(--danger)'
+          : warning
+            ? 'var(--warning)'
+            : 'var(--text-primary)',
+        fontSize: 13,
+        borderRadius: 6,
+        cursor: 'pointer',
+        textAlign: 'left',
+        transition: 'background 0.1s',
       }}
-      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
+      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
-      <i className={`ti ${icon}`} style={{ fontSize: 16, minWidth: 20 }} />{label}
+      <i className={`ti ${icon}`} style={{ fontSize: 16, minWidth: 20 }} />
+      {label}
     </button>
   )
 }
