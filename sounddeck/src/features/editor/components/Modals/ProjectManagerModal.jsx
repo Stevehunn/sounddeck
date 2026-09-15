@@ -1,6 +1,7 @@
 // src/features/editor/components/Modals/ProjectManagerModal.jsx
 import React, { useState, useEffect } from 'react'
 import { DeleteButton } from '@shared/components/ui'
+import { formatTime } from '@shared/utils/format'
 
 export default function ProjectManagerModal({
   isOpen,
@@ -81,7 +82,7 @@ export default function ProjectManagerModal({
   const formatDate = (timestamp) => {
     if (!timestamp) return ''
     const date = new Date(timestamp)
-    return date.toLocaleDateString('fr-FR', {
+    return date.toLocaleDateString(undefined, {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',

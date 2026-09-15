@@ -5,13 +5,7 @@ import { playSound, stopSound, isPlaying, getSoundProgress } from '@core/service
 import ShortcutRecorder from '@shared/components/settings/ShortcutRecorder'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import useConfirm from '@shared/hooks/useConfirm'
-
-function fmtTime(s) {
-  if (!s || isNaN(s)) return '0:00'
-  const m = Math.floor(s / 60)
-  const sec = Math.floor(s % 60)
-  return `${m}:${sec.toString().padStart(2, '0')}`
-}
+import { formatTime } from '@shared/utils/format'
 
 function convertOldVolumeToDb(oldVolume) {
   if (oldVolume === undefined || oldVolume === null) return 0
@@ -737,8 +731,8 @@ export default function SoundCard({
                 marginTop: 1,
               }}
             >
-              <span>{fmtTime(progress.current)}</span>
-              <span>{fmtTime(progress.duration)}</span>
+              <span>{formatTime(progress.current)}</span>
+              <span>{formatTime(progress.duration)}</span>
             </div>
           </div>
         )}

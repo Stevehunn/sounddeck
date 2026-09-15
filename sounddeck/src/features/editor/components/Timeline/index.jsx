@@ -10,21 +10,12 @@ import TimelinePlayhead from './TimelinePlayhead'
 import TimelineLoop from './TimelineLoop'
 import TimelineZoomControls from './TimelineZoomControls'
 import MarkersPanel from '../Markers/MarkersPanel'
+import { formatTime } from '@shared/utils/format'
 
 const TRACK_HEAD_WIDTH = 200
 const BASE_PIXELS_PER_SECOND = 80
 const STORAGE_KEY = 'sounddeck_markers_panel_open'
 const AUTO_OPEN_KEY = 'sounddeck_markers_auto_open'
-
-function formatTime(seconds) {
-  if (!seconds || isNaN(seconds)) return '0:00'
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  if (m > 0) {
-    return `${m}:${s.toString().padStart(2, '0')}`
-  }
-  return `${s.toFixed(1)}s`
-}
 
 export default function EditorTimeline({
   tracks,
@@ -85,10 +76,10 @@ export default function EditorTimeline({
   onOpenLoopPanel,
   onActivateTimelineLoopManualClick,
   isTimelineClickModeActive = false,
-  onTimelineClickForLoop
+  onTimelineClickForLoop,
 }) {
   const editorContext = useEditor()
-  
+
   const containerRef = useRef(null)
   const clipsContainerRef = useRef(null)
   const rulerContainerRef = useRef(null)
@@ -97,29 +88,29 @@ export default function EditorTimeline({
   const [isPanning, setIsPanning] = useState(false)
   const [panStartX, setPanStartX] = useState(0)
   const [scrollLeft, setScrollLeft] = useState(0)
-  
+
   const store = storeProp || editorContext?.store
-  
+
   const [showMarkersPanel, setShowMarkersPanel] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
   const hasInitializedRef = useRef(false)
-  
+
   const getAutoOpenPreference = useCallback(() => {
     const saved = localStorage.getItem(AUTO_OPEN_KEY)
     return saved === null ? false : saved === 'true'
   }, [])
 
-  const pixelsPerSecond = 80 * zoomLevel
+  const pixelsPerSecond = BASE_PIXELS_PER_SECOND * zoomLevel
   const totalWidth = Math.max(totalDuration * pixelsPerSecond + 100, 600)
 
   const handleClipsScroll = useCallback((e) => {
     const scrollLeft = e.currentTarget.scrollLeft
     setScrollLeft(scrollLeft)
-    
+
     if (rulerInnerRef.current) {
       rulerInnerRef.current.style.transform = `translateX(-${scrollLeft}px)`
     }
-    
+
     if (loopContainerRef.current) {
       loopContainerRef.current.style.transform = `translateX(-${scrollLeft}px)`
     }
@@ -142,7 +133,7 @@ export default function EditorTimeline({
       'hsl(280, 70%, 55%)',
       'hsl(10, 70%, 55%)',
       'hsl(190, 70%, 55%)',
-      'hsl(70, 70%, 55%)'
+      'hsl(70, 70%, 55%)',
     ]
     return colors[index % colors.length]
   }
@@ -150,19 +141,18 @@ export default function EditorTimeline({
   useEffect(() => {
     if (hasInitializedRef.current) return
     hasInitializedRef.current = true
-    
+
     const autoOpen = getAutoOpenPreference()
-    
+
     if (!autoOpen) {
       setShowMarkersPanel(false)
       setIsInitialized(true)
       return
     }
-    
+
     setShowMarkersPanel(true)
     localStorage.setItem(STORAGE_KEY, 'true')
     setIsInitialized(true)
-    
   }, [onAddMarker, getAutoOpenPreference])
 
   const handleToggleMarkersPanel = useCallback((show) => {
@@ -172,7 +162,7 @@ export default function EditorTimeline({
 
   const handleAutoOpenChange = useCallback((autoOpen) => {
     localStorage.setItem(AUTO_OPEN_KEY, String(autoOpen))
-    
+
     if (autoOpen) {
       setShowMarkersPanel(true)
       localStorage.setItem(STORAGE_KEY, 'true')
@@ -182,91 +172,136 @@ export default function EditorTimeline({
     }
   }, [])
 
-  const clientXToTime = useCallback((clientX, containerElement) => {
-    const container = containerElement || clipsContainerRef.current
-    if (!container) return 0
-    const rect = container.getBoundingClientRect()
-    const scrollLeft = container.scrollLeft
-    const clickInTimeline = (clientX - rect.left) + scrollLeft
-    const clampedX = Math.max(0, Math.min(totalWidth, clickInTimeline))
-    return clampedX / pixelsPerSecond
-  }, [totalWidth, pixelsPerSecond])
+  const clientXToTime = useCallback(
+    (clientX, containerElement) => {
+      const container = containerElement || clipsContainerRef.current
+      if (!container) return 0
+      const rect = container.getBoundingClientRect()
+      const scrollLeft = container.scrollLeft
+      const clickInTimeline = clientX - rect.left + scrollLeft
+      const clampedX = Math.max(0, Math.min(totalWidth, clickInTimeline))
+      return clampedX / pixelsPerSecond
+    },
+    [totalWidth, pixelsPerSecond]
+  )
 
-  const handleTimelineClick = useCallback((e) => {
-    if (isTimelineClickModeActive && onTimelineClickForLoop) {
+  const handleTimelineClick = useCallback(
+    (e) => {
+      if (isTimelineClickModeActive && onTimelineClickForLoop) {
+        const time = clientXToTime(e.clientX)
+        if (time >= 0 && time <= totalDuration) {
+          e.preventDefault()
+          e.stopPropagation()
+          onTimelineClickForLoop(time)
+        }
+        return
+      }
+
+      if (isPendingAction) {
+        const time = clientXToTime(e.clientX)
+        if (time >= 0 && time <= totalDuration) {
+          onExecutePendingAction?.(time)
+        }
+        return
+      }
+
+      const target = e.target
+      if (
+        target.closest?.('.editor-clip-wrapper') ||
+        target.closest?.('button')
+      ) {
+        return
+      }
+
       const time = clientXToTime(e.clientX)
       if (time >= 0 && time <= totalDuration) {
-        e.preventDefault()
-        e.stopPropagation()
-        onTimelineClickForLoop(time)
+        onSeek?.(time)
       }
-      return
-    }
+    },
+    [
+      isPendingAction,
+      isTimelineClickModeActive,
+      onTimelineClickForLoop,
+      clientXToTime,
+      totalDuration,
+      onExecutePendingAction,
+      onSeek,
+    ]
+  )
 
-    if (isPendingAction) {
-      const time = clientXToTime(e.clientX)
-      if (time >= 0 && time <= totalDuration) {
-        onExecutePendingAction?.(time)
+  const handleRulerClick = useCallback(
+    (e) => {
+      if (isTimelineClickModeActive && onTimelineClickForLoop) {
+        const time = clientXToTime(e.clientX, rulerContainerRef.current)
+        if (time >= 0 && time <= totalDuration) {
+          e.preventDefault()
+          e.stopPropagation()
+          onTimelineClickForLoop(time)
+        }
+        return
       }
-      return
-    }
-    
-    const target = e.target
-    if (target.closest?.('.editor-clip-wrapper') || target.closest?.('button')) {
-      return
-    }
-    
-    const time = clientXToTime(e.clientX)
-    if (time >= 0 && time <= totalDuration) {
-      onSeek?.(time)
-    }
-  }, [isPendingAction, isTimelineClickModeActive, onTimelineClickForLoop, clientXToTime, totalDuration, onExecutePendingAction, onSeek])
 
-  const handleRulerClick = useCallback((e) => {
-    if (isTimelineClickModeActive && onTimelineClickForLoop) {
+      if (isPendingAction) {
+        const time = clientXToTime(e.clientX, rulerContainerRef.current)
+        if (time >= 0 && time <= totalDuration) {
+          onExecutePendingAction?.(time)
+        }
+        return
+      }
+
       const time = clientXToTime(e.clientX, rulerContainerRef.current)
       if (time >= 0 && time <= totalDuration) {
-        e.preventDefault()
-        e.stopPropagation()
-        onTimelineClickForLoop(time)
+        onSeek?.(time)
       }
-      return
-    }
+    },
+    [
+      isPendingAction,
+      isTimelineClickModeActive,
+      onTimelineClickForLoop,
+      clientXToTime,
+      totalDuration,
+      onExecutePendingAction,
+      onSeek,
+    ]
+  )
 
-    if (isPendingAction) {
+  const handleRulerDoubleClick = useCallback(
+    (e) => {
       const time = clientXToTime(e.clientX, rulerContainerRef.current)
       if (time >= 0 && time <= totalDuration) {
-        onExecutePendingAction?.(time)
-      }
-      return
-    }
-    
-    const time = clientXToTime(e.clientX, rulerContainerRef.current)
-    if (time >= 0 && time <= totalDuration) {
-      onSeek?.(time)
-    }
-  }, [isPendingAction, isTimelineClickModeActive, onTimelineClickForLoop, clientXToTime, totalDuration, onExecutePendingAction, onSeek])
+        onSeek?.(time)
 
-  const handleRulerDoubleClick = useCallback((e) => {
-    const time = clientXToTime(e.clientX, rulerContainerRef.current)
-    if (time >= 0 && time <= totalDuration) {
-      onSeek?.(time)
-      
-      if (selectedClipId && selectedTrackId && onSplitClip) {
-        const allClips = tracks.flatMap(t => t.clips)
-        const clip = allClips.find(c => c.id === selectedClipId)
-        if (clip) {
-          const duration = clipDurations[clip.id] || clip.duration || 3
-          const start = clip.start || 0
-          const end = start + duration
-          if (time > start + 0.05 && time < end - 0.05) {
-            onSplitClip(selectedTrackId, selectedClipId, time)
-            addToast?.(tr('editorSplitSuccess') || 'Clip coupé à la position du curseur', 'success')
+        if (selectedClipId && selectedTrackId && onSplitClip) {
+          const allClips = tracks.flatMap((t) => t.clips)
+          const clip = allClips.find((c) => c.id === selectedClipId)
+          if (clip) {
+            const duration = clipDurations[clip.id] || clip.duration || 3
+            const start = clip.start || 0
+            const end = start + duration
+            if (time > start + 0.05 && time < end - 0.05) {
+              onSplitClip(selectedTrackId, selectedClipId, time)
+              addToast?.(
+                tr('editorSplitSuccess') || 'Clip coupé à la position du curseur',
+                'success'
+              )
+            }
           }
         }
       }
-    }
-  }, [clientXToTime, totalDuration, onSeek, selectedClipId, selectedTrackId, tracks, clipDurations, onSplitClip, addToast, tr])
+    },
+    [
+      clientXToTime,
+      totalDuration,
+      onSeek,
+      selectedClipId,
+      selectedTrackId,
+      tracks,
+      clipDurations,
+      onSplitClip,
+      addToast,
+      tr,
+    ]
+  )
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -280,19 +315,19 @@ export default function EditorTimeline({
 
   const renderLoopMarkers = () => {
     if (!loopState?.clips) return null
-    
+
     const markers = []
-    
+
     for (const [clipId, loopData] of Object.entries(loopState.clips)) {
       if (!loopData.enabled) continue
-      
+
       let clip = null
       let clipStart = 0
       let clipDuration = 0
       let loopEnd = loopData.end || totalDuration
-      
+
       for (const track of tracks) {
-        const found = track.clips.find(c => c.id === clipId)
+        const found = track.clips.find((c) => c.id === clipId)
         if (found) {
           clip = found
           clipStart = found.start || 0
@@ -300,15 +335,15 @@ export default function EditorTimeline({
           break
         }
       }
-      
+
       if (!clip) continue
-      
+
       const clipEnd = clipStart + clipDuration
       const loopEndPosition = Math.min(loopEnd, totalDuration) * pixelsPerSecond
       const loopColor = loopData.arrowColor || '#22c55e'
       const loopMode = loopData.loopMode || 'endOfTrack'
       const totalCycles = loopData.totalCycles || loopData.cycleCount || 1
-      
+
       if (loopEndPosition > clipEnd * pixelsPerSecond) {
         markers.push(
           <div
@@ -325,71 +360,79 @@ export default function EditorTimeline({
               justifyContent: 'center',
             }}
           >
-            <div style={{
-              position: 'absolute',
-              top: -4,
-              bottom: -4,
-              left: 0,
-              width: 2,
-              background: loopColor,
-              opacity: 0.6,
-              boxShadow: `0 0 12px ${loopColor}60`,
-            }} />
-            
-            <div style={{
-              position: 'absolute',
-              top: '50%',
-              left: 4,
-              transform: 'translateY(-50%)',
-              fontSize: 22,
-              fontWeight: 900,
-              color: loopColor,
-              opacity: 0.9,
-              textShadow: `0 0 20px ${loopColor}50, 0 0 40px ${loopColor}30`,
-              lineHeight: 1,
-            }}>
+            <div
+              style={{
+                position: 'absolute',
+                top: -4,
+                bottom: -4,
+                left: 0,
+                width: 2,
+                background: loopColor,
+                opacity: 0.6,
+                boxShadow: `0 0 12px ${loopColor}60`,
+              }}
+            />
+
+            <div
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: 4,
+                transform: 'translateY(-50%)',
+                fontSize: 22,
+                fontWeight: 900,
+                color: loopColor,
+                opacity: 0.9,
+                textShadow: `0 0 20px ${loopColor}50, 0 0 40px ${loopColor}30`,
+                lineHeight: 1,
+              }}
+            >
               ]
             </div>
-            
-            <div style={{
-              position: 'absolute',
-              top: 20,
-              left: 4,
-              fontSize: 8,
-              fontWeight: 500,
-              color: loopColor,
-              background: 'rgba(0,0,0,0.8)',
-              padding: '2px 8px',
-              borderRadius: 3,
-              border: `1px solid ${loopColor}40`,
-              whiteSpace: 'nowrap',
-              fontFamily: 'monospace',
-              opacity: 0.8,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
-            }}>
+
+            <div
+              style={{
+                position: 'absolute',
+                top: 20,
+                left: 4,
+                fontSize: 8,
+                fontWeight: 500,
+                color: loopColor,
+                background: 'rgba(0,0,0,0.8)',
+                padding: '2px 8px',
+                borderRadius: 3,
+                border: `1px solid ${loopColor}40`,
+                whiteSpace: 'nowrap',
+                fontFamily: 'monospace',
+                opacity: 0.8,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              }}
+            >
               <span>🔚</span>
               <span>{tr('loopEndLabel') || 'FIN'}</span>
               {loopMode === 'cycles' && totalCycles > 1 && (
                 <span style={{ opacity: 0.6 }}>({totalCycles}x)</span>
               )}
-              <span style={{ opacity: 0.5 }}>{(loopEnd - clipStart).toFixed(1)}s</span>
+              <span style={{ opacity: 0.5 }}>
+                {(loopEnd - clipStart).toFixed(1)}s
+              </span>
             </div>
           </div>
         )
       }
-      
+
       if (loopMode === 'cycles' && totalCycles > 1) {
         const cycleDuration = clipDuration
         let cycleEnd = clipEnd
-        
+
         for (let i = 1; i < totalCycles; i++) {
           cycleEnd += cycleDuration
           const position = cycleEnd * pixelsPerSecond
           if (position >= loopEndPosition) break
-          
+
           markers.push(
             <div
               key={`cycle-marker-${clipId}-${i}`}
@@ -406,34 +449,36 @@ export default function EditorTimeline({
                 borderLeft: `2px dashed ${loopColor}40`,
               }}
             >
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                fontSize: 7,
-                color: loopColor,
-                opacity: 0.4,
-                fontFamily: 'monospace'
-              }}>
-                {i+1}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  fontSize: 7,
+                  color: loopColor,
+                  opacity: 0.4,
+                  fontFamily: 'monospace',
+                }}
+              >
+                {i + 1}
               </div>
             </div>
           )
         }
       }
     }
-    
+
     return markers
   }
 
   const renderMarkerMarkers = () => {
     if (!markers || markers.length === 0) return null
-    
+
     return markers.map((marker) => {
       const position = marker.time * pixelsPerSecond
       if (position > totalWidth) return null
-      
+
       return (
         <div
           key={`marker-${marker.id}`}
@@ -446,54 +491,60 @@ export default function EditorTimeline({
             background: marker.color || '#3b82f6',
             zIndex: 4,
             pointerEvents: 'none',
-            opacity: 0.8
+            opacity: 0.8,
           }}
           title={`${marker.name} (${formatTime(marker.time)})`}
         >
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 0,
-            height: 0,
-            borderLeft: '4px solid transparent',
-            borderRight: '4px solid transparent',
-            borderTop: `6px solid ${marker.color || '#3b82f6'}`
-          }} />
-          
-          <div style={{
-            position: 'absolute',
-            top: 6,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            fontSize: 7,
-            color: 'var(--text-tertiary)',
-            background: 'var(--bg-secondary)',
-            padding: '1px 4px',
-            borderRadius: 2,
-            border: `1px solid ${marker.color || '#3b82f6'}`,
-            whiteSpace: 'nowrap',
-            opacity: 0.7,
-            pointerEvents: 'none',
-            maxWidth: 60,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis'
-          }}>
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 0,
+              height: 0,
+              borderLeft: '4px solid transparent',
+              borderRight: '4px solid transparent',
+              borderTop: `6px solid ${marker.color || '#3b82f6'}`,
+            }}
+          />
+
+          <div
+            style={{
+              position: 'absolute',
+              top: 6,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              fontSize: 7,
+              color: 'var(--text-tertiary)',
+              background: 'var(--bg-secondary)',
+              padding: '1px 4px',
+              borderRadius: 2,
+              border: `1px solid ${marker.color || '#3b82f6'}`,
+              whiteSpace: 'nowrap',
+              opacity: 0.7,
+              pointerEvents: 'none',
+              maxWidth: 60,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
             {marker.name.length > 8 ? marker.name.slice(0, 8) + '…' : marker.name}
           </div>
-          
-          <div style={{
-            position: 'absolute',
-            top: 20,
-            bottom: 0,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 1,
-            background: marker.color || '#3b82f6',
-            opacity: 0.3,
-            pointerEvents: 'none'
-          }} />
+
+          <div
+            style={{
+              position: 'absolute',
+              top: 20,
+              bottom: 0,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 1,
+              background: marker.color || '#3b82f6',
+              opacity: 0.3,
+              pointerEvents: 'none',
+            }}
+          />
         </div>
       )
     })
@@ -520,7 +571,9 @@ export default function EditorTimeline({
   }, [zoomLevel, onZoomChange])
 
   const getTrackKey = (track) => {
-    const clipPositions = track.clips.map(c => `${c.id}:${c.start.toFixed(3)}`).join('|')
+    const clipPositions = track.clips
+      .map((c) => `${c.id}:${c.start.toFixed(3)}`)
+      .join('|')
     return `${track.id}-${clipPositions}`
   }
 
@@ -536,66 +589,73 @@ export default function EditorTimeline({
         flexDirection: 'column',
         background: 'var(--bg-primary)',
         overflow: 'hidden',
-        position: 'relative'
+        position: 'relative',
       }}
     >
       {/* Ruler */}
-      <div style={{
-        display: 'flex',
-        height: 36,
-        minHeight: 36,
-        background: 'var(--bg-secondary)',
-        borderBottom: '1px solid var(--border)',
-        flexShrink: 0,
-        zIndex: 5,
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        <div style={{
-          width: TRACK_HEAD_WIDTH,
-          minWidth: TRACK_HEAD_WIDTH,
-          flexShrink: 0,
+      <div
+        style={{
+          display: 'flex',
+          height: 36,
+          minHeight: 36,
           background: 'var(--bg-secondary)',
-          borderRight: '1px solid var(--border)',
-          zIndex: 2,
-          position: 'relative'
-        }} />
+          borderBottom: '1px solid var(--border)',
+          flexShrink: 0,
+          zIndex: 5,
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            width: TRACK_HEAD_WIDTH,
+            minWidth: TRACK_HEAD_WIDTH,
+            flexShrink: 0,
+            background: 'var(--bg-secondary)',
+            borderRight: '1px solid var(--border)',
+            zIndex: 2,
+            position: 'relative',
+          }}
+        />
         <div
           ref={rulerContainerRef}
           style={{
             flex: 1,
             position: 'relative',
             overflow: 'hidden',
-            cursor: isPendingAction || isTimelineClickModeActive ? 'pointer' : 'pointer'
+            cursor: isPendingAction || isTimelineClickModeActive ? 'pointer' : 'pointer',
           }}
           onClick={handleRulerClick}
           onDoubleClick={handleRulerDoubleClick}
           onWheel={handleRulerWheel}
         >
           {isPendingAction && (
-            <div style={{
-              position: 'absolute',
-              top: 4,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 20,
-              padding: '4px 16px',
-              background: 'var(--accent)',
-              borderRadius: 'var(--radius-md)',
-              color: 'white',
-              fontSize: 11,
-              fontWeight: 500,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              boxShadow: '0 4px 20px var(--accent)66',
-              animation: 'clickHerePulse 1.2s ease-in-out infinite'
-            }}>
+            <div
+              style={{
+                position: 'absolute',
+                top: 4,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 20,
+                padding: '4px 16px',
+                background: 'var(--accent)',
+                borderRadius: 'var(--radius-md)',
+                color: 'white',
+                fontSize: 11,
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                boxShadow: '0 4px 20px var(--accent)66',
+                animation: 'clickHerePulse 1.2s ease-in-out infinite',
+              }}
+            >
               <i className="ti ti-click" />
               <span>{tr('clickHere') || '🖱️ Cliquez ici'}</span>
             </div>
           )}
-          
+
+          {/* ✅ FIX : width + minWidth au lieu de Math.max avec '100%' */}
           <div
             ref={rulerInnerRef}
             style={{
@@ -603,10 +663,11 @@ export default function EditorTimeline({
               top: 0,
               left: 0,
               height: '100%',
-              width: Math.max(totalWidth, '100%'),
+              width: totalWidth,
+              minWidth: '100%',
               transform: `translateX(-${scrollLeft}px)`,
               transition: 'none',
-              willChange: 'transform'
+              willChange: 'transform',
             }}
           >
             <TimelineRuler
@@ -629,27 +690,32 @@ export default function EditorTimeline({
         </div>
       </div>
 
-      {/* Loop - TimelineLoop avec synchronisation du scroll */}
-      <div style={{
-        display: 'flex',
-        height: 10,
-        minHeight: 10,
-        flexShrink: 0,
-        background: 'var(--bg-tertiary)',
-        borderBottom: '1px solid var(--border)',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        <div style={{
-          width: TRACK_HEAD_WIDTH,
-          minWidth: TRACK_HEAD_WIDTH,
+      {/* Loop strip */}
+      <div
+        style={{
+          display: 'flex',
+          height: 10,
+          minHeight: 10,
           flexShrink: 0,
           background: 'var(--bg-tertiary)',
-          borderRight: '1px solid var(--border)',
-          zIndex: 2,
-          position: 'relative'
-        }} />
+          borderBottom: '1px solid var(--border)',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            width: TRACK_HEAD_WIDTH,
+            minWidth: TRACK_HEAD_WIDTH,
+            flexShrink: 0,
+            background: 'var(--bg-tertiary)',
+            borderRight: '1px solid var(--border)',
+            zIndex: 2,
+            position: 'relative',
+          }}
+        />
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          {/* ✅ FIX : width + minWidth au lieu de Math.max avec '100%' */}
           <div
             ref={loopContainerRef}
             style={{
@@ -657,10 +723,11 @@ export default function EditorTimeline({
               top: 0,
               left: 0,
               height: '100%',
-              width: Math.max(totalWidth, '100%'),
+              width: totalWidth,
+              minWidth: '100%',
               transform: `translateX(-${scrollLeft}px)`,
               transition: 'none',
-              willChange: 'transform'
+              willChange: 'transform',
             }}
           >
             <TimelineLoop
@@ -688,41 +755,47 @@ export default function EditorTimeline({
       </div>
 
       {/* Tracks + Markers Panel */}
-      <div style={{
-        display: 'flex',
-        flex: 1,
-        overflow: 'hidden',
-        position: 'relative'
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          flex: 1,
+          overflow: 'hidden',
+          position: 'relative',
+        }}
+      >
         {/* Track Headers */}
-        <div style={{
-          width: TRACK_HEAD_WIDTH,
-          minWidth: TRACK_HEAD_WIDTH,
-          height: '100%',
-          flexShrink: 0,
-          background: 'var(--bg-secondary)',
-          borderRight: '1px solid var(--border)',
-          zIndex: 2,
-          overflow: 'hidden'
-        }}>
+        <div
+          style={{
+            width: TRACK_HEAD_WIDTH,
+            minWidth: TRACK_HEAD_WIDTH,
+            height: '100%',
+            flexShrink: 0,
+            background: 'var(--bg-secondary)',
+            borderRight: '1px solid var(--border)',
+            zIndex: 2,
+            overflow: 'hidden',
+          }}
+        >
           {tracks.length === 0 && (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              color: 'var(--text-tertiary)',
-              gap: 8,
-              padding: 16,
-              fontSize: 12
-            }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                color: 'var(--text-tertiary)',
+                gap: 8,
+                padding: 16,
+                fontSize: 12,
+              }}
+            >
               <i className="ti ti-playlist" style={{ fontSize: 24 }} />
               <span>{tr('editorNoTracks')}</span>
               <span style={{ fontSize: 10 }}>{tr('editorAddTrackHint')}</span>
             </div>
           )}
-          
+
           {tracks.map((track, index) => {
             const trackColor = track.color || getTrackColor(index)
             return (
@@ -735,8 +808,11 @@ export default function EditorTimeline({
                   alignItems: 'center',
                   padding: '4px 8px',
                   borderBottom: '1px solid var(--border)',
-                  background: selectedTrackId === track.id ? 'rgba(124,111,247,0.05)' : 'transparent',
-                  gap: 4
+                  background:
+                    selectedTrackId === track.id
+                      ? 'rgba(124,111,247,0.05)'
+                      : 'transparent',
+                  gap: 4,
                 }}
               >
                 <TrackHeader
@@ -772,42 +848,47 @@ export default function EditorTimeline({
             overflow: 'auto',
             position: 'relative',
             background: 'var(--bg-primary)',
-            cursor: isPendingAction || isTimelineClickModeActive ? 'pointer' : 'pointer'
+            cursor:
+              isPendingAction || isTimelineClickModeActive ? 'pointer' : 'pointer',
           }}
           onClick={handleTimelineClick}
           onScroll={handleClipsScroll}
         >
-          <div style={{
-            position: 'relative',
-            width: Math.max(totalWidth, 600),
-            height: '100%'
-          }}>
-            {markers && markers.length > 0 && markers.map((marker) => {
-              const position = marker.time * pixelsPerSecond
-              if (position > totalWidth) return null
-              
-              return (
-                <div
-                  key={`marker-line-${marker.id}`}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    bottom: 0,
-                    left: position,
-                    width: 1,
-                    background: marker.color || '#3b82f6',
-                    opacity: 0.15,
-                    zIndex: 1,
-                    pointerEvents: 'none'
-                  }}
-                />
-              )
-            })}
-            
+          <div
+            style={{
+              position: 'relative',
+              width: Math.max(totalWidth, 600),
+              height: '100%',
+            }}
+          >
+            {markers &&
+              markers.length > 0 &&
+              markers.map((marker) => {
+                const position = marker.time * pixelsPerSecond
+                if (position > totalWidth) return null
+
+                return (
+                  <div
+                    key={`marker-line-${marker.id}`}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      bottom: 0,
+                      left: position,
+                      width: 1,
+                      background: marker.color || '#3b82f6',
+                      opacity: 0.15,
+                      zIndex: 1,
+                      pointerEvents: 'none',
+                    }}
+                  />
+                )
+              })}
+
             {tracks.map((track, index) => {
               const trackColor = track.color || getTrackColor(index)
               const trackKey = getTrackKey(track)
-              
+
               return (
                 <EditorTrack
                   key={trackKey}
@@ -847,44 +928,51 @@ export default function EditorTimeline({
 
         {/* Panel des marqueurs */}
         {shouldShowPanel && (
-        <div
-          data-testid="editor-markers-panel"
-          style={{
-            width: 280,
-            minWidth: 280,
-            height: '100%',
-            background: 'var(--bg-secondary)',
-            borderLeft: '1px solid var(--border)',
-            zIndex: 3,
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column'
-          }}>
-            <div style={{
+          <div
+            data-testid="editor-markers-panel"
+            style={{
+              width: 280,
+              minWidth: 280,
+              height: '100%',
+              background: 'var(--bg-secondary)',
+              borderLeft: '1px solid var(--border)',
+              zIndex: 3,
+              overflow: 'hidden',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '6px 10px',
-              borderBottom: '1px solid var(--border)',
-              flexShrink: 0,
-              background: 'var(--bg-tertiary)'
-            }}>
-              <span style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: 'var(--text-secondary)',
+              flexDirection: 'column',
+            }}
+          >
+            <div
+              style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 4
-              }}>
+                justifyContent: 'space-between',
+                padding: '6px 10px',
+                borderBottom: '1px solid var(--border)',
+                flexShrink: 0,
+                background: 'var(--bg-tertiary)',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: 'var(--text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
                 <i className="ti ti-flag" style={{ color: 'var(--accent)' }} />
                 {tr('editorMarkers') || 'Marqueurs'}
-                <span style={{
-                  fontSize: 9,
-                  fontWeight: 400,
-                  color: 'var(--text-tertiary)',
-                  marginLeft: 2
-                }}>
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 400,
+                    color: 'var(--text-tertiary)',
+                    marginLeft: 2,
+                  }}
+                >
                   ({markers?.length || 0})
                 </span>
               </span>
@@ -899,7 +987,7 @@ export default function EditorTimeline({
                   color: 'var(--text-tertiary)',
                   minWidth: 20,
                   minHeight: 20,
-                  borderRadius: 'var(--radius-sm)'
+                  borderRadius: 'var(--radius-sm)',
                 }}
                 title={tr('close') || 'Fermer le panneau des marqueurs'}
               >
@@ -907,11 +995,13 @@ export default function EditorTimeline({
               </button>
             </div>
 
-            <div style={{
-              flex: 1,
-              overflow: 'auto',
-              padding: 8
-            }}>
+            <div
+              style={{
+                flex: 1,
+                overflow: 'auto',
+                padding: 8,
+              }}
+            >
               <MarkersPanel
                 markers={markers}
                 onAddMarker={onAddMarker}
@@ -927,7 +1017,6 @@ export default function EditorTimeline({
           </div>
         )}
 
-        {/* Bouton pour ouvrir le panneau des marqueurs */}
         {isInitialized && !showMarkersPanel && onAddMarker && (
           <button
             data-testid="editor-add-marker-button"
@@ -951,7 +1040,7 @@ export default function EditorTimeline({
               gap: 6,
               boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
               background: 'var(--bg-secondary)',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.borderColor = 'var(--accent)'
@@ -965,15 +1054,17 @@ export default function EditorTimeline({
           >
             <i className="ti ti-flag" />
             {tr('editorMarkers') || 'Marqueurs'}
-            <span style={{
-              fontSize: 9,
-              color: 'var(--text-tertiary)',
-              background: 'var(--bg-tertiary)',
-              padding: '0 6px',
-              borderRadius: 10,
-              minWidth: 16,
-              textAlign: 'center'
-            }}>
+            <span
+              style={{
+                fontSize: 9,
+                color: 'var(--text-tertiary)',
+                background: 'var(--bg-tertiary)',
+                padding: '0 6px',
+                borderRadius: 10,
+                minWidth: 16,
+                textAlign: 'center',
+              }}
+            >
               {markers?.length || 0}
             </span>
           </button>
@@ -981,7 +1072,7 @@ export default function EditorTimeline({
       </div>
 
       {/* Zoom Controls */}
-      <div 
+      <div
         data-testid="editor-zoom-controls"
         style={{
           position: 'sticky',
@@ -995,8 +1086,9 @@ export default function EditorTimeline({
           backdropFilter: 'blur(8px)',
           borderTop: '1px solid var(--border)',
           zIndex: 20,
-          flexShrink: 0
-        }}>
+          flexShrink: 0,
+        }}
+      >
         <TimelineZoomControls
           zoomLevel={zoomLevel}
           onZoomChange={onZoomChange}
@@ -1008,11 +1100,11 @@ export default function EditorTimeline({
 
       <style>{`
         @keyframes clickHerePulse {
-          0%, 100% { 
+          0%, 100% {
             transform: translateX(-50%) scale(1);
             opacity: 1;
           }
-          50% { 
+          50% {
             transform: translateX(-50%) scale(1.06);
             opacity: 0.85;
           }

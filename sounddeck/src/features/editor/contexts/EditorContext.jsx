@@ -2,6 +2,26 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
+let __sharedDurationCtx = null
+
+function getSharedDurationCtx() {
+  if (!__sharedDurationCtx || __sharedDurationCtx.state === 'closed') {
+    __sharedDurationCtx = new (window.AudioContext ||
+      window.webkitAudioContext)()
+  }
+  return __sharedDurationCtx
+}
+
+// ✅ Générateur d'ID robuste (Date.now + counter + random)
+function generateId(prefix) {
+  const rand = Math.random().toString(36).slice(2, 7)
+  return `${prefix}-${Date.now()}-${rand}`
+}
+
+// ✅ Logger dev-only : plus aucun spam console en production
+const __DEBUG__ = typeof import.meta !== 'undefined' && import.meta.env?.DEV
+const log = __DEBUG__ ? console.log.bind(console) : () => {}
+
 const EditorContext = createContext(null)
 
 // ✅ CONSTANTES POUR LA BOUCLE GÉNÉRALE
@@ -110,7 +130,7 @@ export function EditorProvider({ children, store, addToast }) {
 
   // ✅ Fonction pour mettre à jour le gain de toutes les sources (volume maître)
   const updateMasterGain = useCallback((newGain) => {
-    console.log(`🎚️ [EditorContext] Mise à jour du volume maître: ${newGain.toFixed(2)}`)
+    log(`🎚️ [EditorContext] Mise à jour du volume maître: ${newGain.toFixed(2)}`)
     
     for (const [clipId, entry] of Object.entries(audioSourcesRef.current)) {
       if (entry?.gainNode) {
@@ -132,7 +152,7 @@ export function EditorProvider({ children, store, addToast }) {
 
   // ✅ Fonction pour mettre à jour le volume d'une piste spécifique
   const updateTrackVolume = useCallback((trackId, newVolume) => {
-    console.log(`🎚️ [EditorContext] Mise à jour du volume de la piste ${trackId}: ${newVolume.toFixed(2)}`)
+    log(`🎚️ [EditorContext] Mise à jour du volume de la piste ${trackId}: ${newVolume.toFixed(2)}`)
     
     const masterVolume = masterGainRef.current || 1
     
@@ -183,19 +203,22 @@ export function EditorProvider({ children, store, addToast }) {
 
   const getAudioDuration = useCallback(async (filePath) => {
     try {
-      const fileUrl = filePath.startsWith('file://') 
-        ? filePath 
+      const fileUrl = filePath.startsWith('file://')
+        ? filePath
         : 'file:///' + filePath.replace(/\\/g, '/')
-      
+
       const response = await fetch(fileUrl)
       if (!response.ok) return 3
-      
+
       const arrayBuffer = await response.arrayBuffer()
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-      const duration = audioBuffer.duration
-      await audioContext.close()
-      return duration
+      const ctx = getSharedDurationCtx()
+
+      if (ctx.state === 'suspended') {
+        await ctx.resume().catch(() => {})
+      }
+
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
+      return audioBuffer.duration
     } catch (e) {
       return 3
     }
@@ -294,7 +317,7 @@ export function EditorProvider({ children, store, addToast }) {
         let currentProjectId = null
         try {
           currentProjectId = await window.electronAPI.storeGet?.('currentEditorProjectId')
-          console.log('📂 [EditorContext] currentEditorProjectId récupéré:', currentProjectId)
+          log('📂 [EditorContext] currentEditorProjectId récupéré:', currentProjectId)
         } catch (e) {
           console.warn('Impossible de récupérer currentEditorProjectId:', e)
         }
@@ -308,7 +331,7 @@ export function EditorProvider({ children, store, addToast }) {
             const result = await window.electronAPI.loadEditorProject?.(currentProjectId)
             if (result?.success) {
               editorProject = result.project
-              console.log('📂 [EditorContext] Projet chargé depuis ID:', editorProject?.name)
+              log('📂 [EditorContext] Projet chargé depuis ID:', editorProject?.name)
             }
           } catch (e) {
             console.warn('Erreur chargement projet depuis ID:', e)
@@ -428,7 +451,7 @@ export function EditorProvider({ children, store, addToast }) {
       return
     }
     
-    console.log(`🎵 [playClip] Tentative de lecture: ${clip.name} (${clip.id}) path: ${clip.path}`)
+    log(`🎵 [playClip] Tentative de lecture: ${clip.name} (${clip.id}) path: ${clip.path}`)
     
     // ✅ Supprimer l'ancienne source si elle existe
     const oldEntry = audioSourcesRef.current[clip.id]
@@ -449,7 +472,7 @@ export function EditorProvider({ children, store, addToast }) {
         return
       }
       
-      console.log(`🎵 [playClip] Buffer chargé: ${clip.name} durée: ${buffer.duration.toFixed(2)}s`)
+      log(`🎵 [playClip] Buffer chargé: ${clip.name} durée: ${buffer.duration.toFixed(2)}s`)
       
       const ctx = audioContextRef.current
       if (!ctx) {
@@ -467,7 +490,7 @@ export function EditorProvider({ children, store, addToast }) {
             const processedBuffer = applyEffectsToBuffer(buffer, clip.effects, ctx.sampleRate, true)
             if (processedBuffer) {
               sourceBuffer = processedBuffer
-              console.log(`🎵 [playClip] Effets appliqués pour: ${clip.name}`)
+              log(`🎵 [playClip] Effets appliqués pour: ${clip.name}`)
             }
           } catch (e) {
             console.warn('⚠️ [playClip] Erreur effets:', e)
@@ -513,23 +536,23 @@ export function EditorProvider({ children, store, addToast }) {
       if (customOffset !== null && customOffset !== undefined) {
         // ✅ UTILISER L'OFFSET PERSONNALISÉ (prioritaire)
         offset = Math.max(0, Math.min(customOffset, sourceBuffer.duration - 0.01))
-        console.log(`🎵 [playClip] Lecture avec offset personnalisé: ${offset.toFixed(2)}s`)
+        log(`🎵 [playClip] Lecture avec offset personnalisé: ${offset.toFixed(2)}s`)
       } else {
         // ✅ CALCULER L'OFFSET NORMAL
         const clipOffset = clip.offset || 0
         const timeInClip = Math.max(0, currentTime - (clip.start || 0))
         offset = Math.min(clipOffset + timeInClip, sourceBuffer.duration - 0.01)
-        console.log(`🎵 [playClip] Lecture avec offset calculé: ${offset.toFixed(2)}s (clipOffset=${clipOffset.toFixed(2)}s, timeInClip=${timeInClip.toFixed(2)}s)`)
+        log(`🎵 [playClip] Lecture avec offset calculé: ${offset.toFixed(2)}s (clipOffset=${clipOffset.toFixed(2)}s, timeInClip=${timeInClip.toFixed(2)}s)`)
       }
       
-      console.log(`🎵 [playClip] Lecture: ${clip.name} offset=${offset.toFixed(2)}s, duration=${sourceBuffer.duration.toFixed(2)}s`)
+      log(`🎵 [playClip] Lecture: ${clip.name} offset=${offset.toFixed(2)}s, duration=${sourceBuffer.duration.toFixed(2)}s`)
       
       // ✅ DÉMARRER LA SOURCE
       source.start(0, offset)
       audioSourcesRef.current[clip.id] = { source, gainNode }
       
       source.onended = () => {
-        console.log(`⏹️ [playClip] Fin du clip: ${clip.name}`)
+        log(`⏹️ [playClip] Fin du clip: ${clip.name}`)
       }
       
     } catch (e) {
@@ -649,7 +672,7 @@ export function EditorProvider({ children, store, addToast }) {
               // ✅ GESTION DU MODE SOLO
               if (soloClipId && clip.id !== soloClipId) {
                 if (playingClips.has(clip.id)) {
-                  console.log(`[LOOP-FIX] 🛑 ${clip.name} - Arrêt (mode solo)`)
+                  log(`[LOOP-FIX] 🛑 ${clip.name} - Arrêt (mode solo)`)
                   const entry = audioSourcesRef.current[clip.id]
                   if (entry) {
                     try { 
@@ -687,7 +710,7 @@ export function EditorProvider({ children, store, addToast }) {
                     
                     const lastCycleForClip = clipsStartedThisCycle.get(clip.id)
                     if (lastCycleForClip !== currentCycleNumber) {
-                      console.log(`[LOOP-FIX] 🚀 ${clip.name} - Cycle ${currentCycleNumber + 1} à ${clipTime.toFixed(2)}s (offset ${customOffset.toFixed(2)}s)`)
+                      log(`[LOOP-FIX] 🚀 ${clip.name} - Cycle ${currentCycleNumber + 1} à ${clipTime.toFixed(2)}s (offset ${customOffset.toFixed(2)}s)`)
                       clipsStartedThisCycle.set(clip.id, currentCycleNumber)
                       playClip(clip, track, customOffset)
                       playingClips.add(clip.id)
@@ -698,7 +721,7 @@ export function EditorProvider({ children, store, addToast }) {
                   }
                 } else if (globalTime >= clipLoopEnd) {
                   if (playingClips.has(clip.id)) {
-                    console.log(`[LOOP-FIX] 🛑 ${clip.name} - Fin de la boucle individuelle`)
+                    log(`[LOOP-FIX] 🛑 ${clip.name} - Fin de la boucle individuelle`)
                     const entry = audioSourcesRef.current[clip.id]
                     if (entry) {
                       try { 
@@ -739,7 +762,7 @@ export function EditorProvider({ children, store, addToast }) {
                     // ✅ VÉRIFIER SI LE CLIP A DÉJÀ ÉTÉ LANCÉ DANS CE CYCLE
                     const lastCycleForClip = generalLoopClipsStarted.get(clip.id)
                     if (lastCycleForClip !== currentCycle) {
-                      console.log(`[LOOP-FIX] 🔄 ${clip.name} - Boucle générale cycle ${currentCycle + 1} à ${clipTime.toFixed(2)}s (offset ${customOffset.toFixed(2)}s)`)
+                      log(`[LOOP-FIX] 🔄 ${clip.name} - Boucle générale cycle ${currentCycle + 1} à ${clipTime.toFixed(2)}s (offset ${customOffset.toFixed(2)}s)`)
                       generalLoopClipsStarted.set(clip.id, currentCycle)
                       playClip(clip, track, customOffset)
                       playingClips.add(clip.id)
@@ -775,9 +798,9 @@ export function EditorProvider({ children, store, addToast }) {
                 // ✅ Vérifier si le clip est déjà en cours de lecture
                 if (!playingClips.has(clip.id)) {
                   if (isGeneralLoop) {
-                    console.log(`[LOOP-FIX] 🔄 ${clip.name} - Boucle générale cycle ${currentCycle + 1} à ${clipTime.toFixed(2)}s (offset ${customOffset.toFixed(2)}s)`)
+                    log(`[LOOP-FIX] 🔄 ${clip.name} - Boucle générale cycle ${currentCycle + 1} à ${clipTime.toFixed(2)}s (offset ${customOffset.toFixed(2)}s)`)
                   } else {
-                    console.log(`[LOOP-FIX] ▶️ ${clip.name} - Lancement à ${clipTime.toFixed(2)}s (offset ${customOffset?.toFixed(2) || 0}s)`)
+                    log(`[LOOP-FIX] ▶️ ${clip.name} - Lancement à ${clipTime.toFixed(2)}s (offset ${customOffset?.toFixed(2) || 0}s)`)
                   }
                   playClip(clip, track, customOffset || 0)
                   playingClips.add(clip.id)
@@ -820,7 +843,7 @@ export function EditorProvider({ children, store, addToast }) {
               }
               
               if (!shouldContinue) {
-                console.log(`[LOOP-FIX] ⏹️ ${clip?.name || clipId} - Arrêt (fini)`)
+                log(`[LOOP-FIX] ⏹️ ${clip?.name || clipId} - Arrêt (fini)`)
                 const entry = audioSourcesRef.current[clipId]
                 if (entry) {
                   try { 
@@ -860,7 +883,7 @@ export function EditorProvider({ children, store, addToast }) {
         
         // ✅ Arrêter la lecture à la fin du projet
         if (globalTime >= totalDuration) {
-          console.log(`[LOOP-FIX] ⏹️ Fin de la lecture à ${globalTime.toFixed(2)}s`)
+          log(`[LOOP-FIX] ⏹️ Fin de la lecture à ${globalTime.toFixed(2)}s`)
           setIsPlaying(false)
           setCurrentTime(totalDuration)
           setStopAtTime(null)
@@ -889,7 +912,7 @@ export function EditorProvider({ children, store, addToast }) {
     }
     
     // ✅ NETTOYAGE AVANT DÉMARRAGE
-    console.log('[LOOP-FIX] 🧹 Nettoyage avant démarrage')
+    log('[LOOP-FIX] 🧹 Nettoyage avant démarrage')
     for (const [id, entry] of Object.entries(audioSourcesRef.current)) {
       try { 
         entry.source.stop() 
@@ -899,30 +922,30 @@ export function EditorProvider({ children, store, addToast }) {
     audioSourcesRef.current = {}
     
     animationRef.current = requestAnimationFrame(loop)
-    console.log('[LOOP-FIX] ✅ Animation démarrée')
+    log('[LOOP-FIX] ✅ Animation démarrée')
   }, [totalDuration, playClip, clipDurations, loopState])
 
   // ─── PLAYBACK CONTROLS ──────────────────────────────────────────────
 
   const play = useCallback(async () => {
-    console.log('[LOOP-FIX] 🎬 play() appelé - RÉINITIALISATION TOTALE')
+    log('[LOOP-FIX] 🎬 play() appelé - RÉINITIALISATION TOTALE')
     
     setIsPaused(false)
     isPausedRef.current = false
     setStopAtTime(null)
     stopAtTimeRef.current = null
     
-    console.log('[LOOP-FIX] 🔇 Arrêt de toutes les sources audio')
+    log('[LOOP-FIX] 🔇 Arrêt de toutes les sources audio')
     for (const [id, entry] of Object.entries(audioSourcesRef.current)) {
       try { 
-        console.log(`[LOOP-FIX]   - Arrêt de la source: ${id}`)
+        log(`[LOOP-FIX]   - Arrêt de la source: ${id}`)
         entry.source.stop() 
         entry.source.disconnect()
       } catch (e) {}
     }
     audioSourcesRef.current = {}
     lastPlayedClipsRef.current = new Set()
-    console.log('[LOOP-FIX] ✅ Sources arrêtées, lastPlayedClips vidé')
+    log('[LOOP-FIX] ✅ Sources arrêtées, lastPlayedClips vidé')
     
     try {
       if (!audioContextRef.current) {
@@ -942,7 +965,7 @@ export function EditorProvider({ children, store, addToast }) {
       setIsPaused(false)
       isPausedRef.current = false
       
-      console.log('[LOOP-FIX] ▶️ Lecture démarrée, appel à startPlaybackLoop dans 50ms')
+      log('[LOOP-FIX] ▶️ Lecture démarrée, appel à startPlaybackLoop dans 50ms')
       
       setTimeout(() => {
         startPlaybackLoop()
@@ -998,9 +1021,9 @@ export function EditorProvider({ children, store, addToast }) {
   }, [clipDurations, startPlaybackLoop])
 
   const resume = useCallback(async () => {
-    console.log('[LOOP-FIX] ▶️ resume() appelé - Reprise de la lecture')
-    console.log(`[LOOP-FIX]   - Position actuelle: ${currentTimeRef.current.toFixed(2)}s`)
-    console.log(`[LOOP-FIX]   - isPaused avant: ${isPausedRef.current}`)
+    log('[LOOP-FIX] ▶️ resume() appelé - Reprise de la lecture')
+    log(`[LOOP-FIX]   - Position actuelle: ${currentTimeRef.current.toFixed(2)}s`)
+    log(`[LOOP-FIX]   - isPaused avant: ${isPausedRef.current}`)
     
     if (!audioContextRef.current) {
       audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
@@ -1008,7 +1031,7 @@ export function EditorProvider({ children, store, addToast }) {
     
     if (audioContextRef.current.state === 'suspended') {
       await audioContextRef.current.resume()
-      console.log('[LOOP-FIX]   - AudioContext repris')
+      log('[LOOP-FIX]   - AudioContext repris')
     }
     
     setIsPaused(false)
@@ -1018,7 +1041,7 @@ export function EditorProvider({ children, store, addToast }) {
     
     lastPlayedClipsRef.current = new Set()
     
-    console.log(`[LOOP-FIX] ▶️ Reprise de la lecture à ${currentTimeRef.current.toFixed(2)}s`)
+    log(`[LOOP-FIX] ▶️ Reprise de la lecture à ${currentTimeRef.current.toFixed(2)}s`)
     
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current)
@@ -1031,9 +1054,9 @@ export function EditorProvider({ children, store, addToast }) {
   }, [startPlaybackLoop])
 
   const pause = useCallback(() => {
-    console.log('[LOOP-FIX] ⏸️ pause() appelée')
-    console.log(`[LOOP-FIX]   - Position actuelle: ${currentTimeRef.current.toFixed(2)}s`)
-    console.log(`[LOOP-FIX]   - isPlaying avant: ${isPlayingRef.current}`)
+    log('[LOOP-FIX] ⏸️ pause() appelée')
+    log(`[LOOP-FIX]   - Position actuelle: ${currentTimeRef.current.toFixed(2)}s`)
+    log(`[LOOP-FIX]   - isPlaying avant: ${isPlayingRef.current}`)
     
     setIsPaused(true)
     isPausedRef.current = true
@@ -1047,15 +1070,15 @@ export function EditorProvider({ children, store, addToast }) {
     
     if (audioContextRef.current && audioContextRef.current.state === 'running') {
       audioContextRef.current.suspend().catch(() => {})
-      console.log('[LOOP-FIX]   - AudioContext suspendu')
+      log('[LOOP-FIX]   - AudioContext suspendu')
     }
     
-    console.log(`[LOOP-FIX]   - isPausedRef après: ${isPausedRef.current}`)
-    console.log(`[LOOP-FIX]   - isPlayingRef après: ${isPlayingRef.current}`)
+    log(`[LOOP-FIX]   - isPausedRef après: ${isPausedRef.current}`)
+    log(`[LOOP-FIX]   - isPlayingRef après: ${isPlayingRef.current}`)
   }, [])
 
   const stop = useCallback(() => {
-    console.log('[LOOP-FIX] ⏹️ stop() appelée')
+    log('[LOOP-FIX] ⏹️ stop() appelée')
     
     setIsPlaying(false)
     isPlayingRef.current = false
@@ -1077,7 +1100,7 @@ export function EditorProvider({ children, store, addToast }) {
     
     for (const [id, entry] of Object.entries(audioSourcesRef.current)) {
       try { 
-        console.log(`[LOOP-FIX]   - Arrêt de la source (stop): ${id}`)
+        log(`[LOOP-FIX]   - Arrêt de la source (stop): ${id}`)
         entry.source.stop() 
         entry.source.disconnect()
       } catch (e) {}
@@ -1101,28 +1124,28 @@ export function EditorProvider({ children, store, addToast }) {
   }, [totalDuration])
 
   const togglePlay = useCallback(() => {
-    console.log('[LOOP-FIX] 🔄 togglePlay() appelée')
-    console.log(`[LOOP-FIX]   - isPlayingRef: ${isPlayingRef.current}, isPausedRef: ${isPausedRef.current}`)
-    console.log(`[LOOP-FIX]   - isPlaying state: ${isPlaying}, isPaused state: ${isPaused}`)
+    log('[LOOP-FIX] 🔄 togglePlay() appelée')
+    log(`[LOOP-FIX]   - isPlayingRef: ${isPlayingRef.current}, isPausedRef: ${isPausedRef.current}`)
+    log(`[LOOP-FIX]   - isPlaying state: ${isPlaying}, isPaused state: ${isPaused}`)
     
     const currentlyPlaying = isPlayingRef.current
     const currentlyPaused = isPausedRef.current
     
-    console.log(`[LOOP-FIX]   - currentlyPlaying: ${currentlyPlaying}, currentlyPaused: ${currentlyPaused}`)
+    log(`[LOOP-FIX]   - currentlyPlaying: ${currentlyPlaying}, currentlyPaused: ${currentlyPaused}`)
     
     if (currentlyPlaying) {
-      console.log('[LOOP-FIX]   ➜ Pause')
+      log('[LOOP-FIX]   ➜ Pause')
       pause()
       return
     }
     
     if (currentlyPaused) {
-      console.log('[LOOP-FIX]   ➜ Reprise')
+      log('[LOOP-FIX]   ➜ Reprise')
       resume()
       return
     }
     
-    console.log('[LOOP-FIX]   ➜ Démarrage depuis le début')
+    log('[LOOP-FIX]   ➜ Démarrage depuis le début')
     setSoloPlayClipId(null)
     soloPlayClipIdRef.current = null
     setCurrentTime(0)
@@ -1171,7 +1194,7 @@ export function EditorProvider({ children, store, addToast }) {
       const trackColor = color || `hsl(${(trackIndex * 30 + 200) % 360}, 60%, 50%)`
       
       const newTrack = {
-        id: `track-${Date.now()}`,
+        id: generateId('track'),
         name: trackName,
         color: trackColor,
         clips: [],
@@ -1863,7 +1886,7 @@ export function EditorProvider({ children, store, addToast }) {
     addToast?.(`Clip "${clip.name}" coupé en deux`, 'success')
     selectClip(leftClip.id, trackId)
     
-    console.log(`✂️ Split: left ${leftDuration.toFixed(2)}s (offset ${leftClip.offset.toFixed(2)}s), right ${rightDuration.toFixed(2)}s (offset ${rightClip.offset.toFixed(2)}s)`)
+    log(`✂️ Split: left ${leftDuration.toFixed(2)}s (offset ${leftClip.offset.toFixed(2)}s), right ${rightDuration.toFixed(2)}s (offset ${rightClip.offset.toFixed(2)}s)`)
     
     return { leftClip, rightClip }
   }, [project, clipDurations, store, addToast, selectClip, generateUniqueId])
@@ -2098,7 +2121,7 @@ export function EditorProvider({ children, store, addToast }) {
   // ─── FONCTIONS BOUCLE CLIP ──────────────────────────────────────────────────
 
   const toggleClipLoop = useCallback((clipId, options = {}) => {
-    console.log('🔄 [EditorContext] toggleClipLoop appelé:', { clipId, options })
+    log('🔄 [EditorContext] toggleClipLoop appelé:', { clipId, options })
     
     if (!project) {
       console.warn('🔄 [EditorContext] Aucun projet')
@@ -2122,10 +2145,10 @@ export function EditorProvider({ children, store, addToast }) {
     const duration = clipDurations[clip.id] || clip.duration || 3
     const start = clip.start || 0
     
-    console.log('🔄 [EditorContext] Clip trouvé:', clip.name, 'durée:', duration, 'début:', start)
+    log('🔄 [EditorContext] Clip trouvé:', clip.name, 'durée:', duration, 'début:', start)
     
     if (options.enabled === false) {
-      console.log('🔄 [EditorContext] Désactivation de la boucle pour:', clip.name)
+      log('🔄 [EditorContext] Désactivation de la boucle pour:', clip.name)
       
       const updatedLoopState = {
         ...loopState,
@@ -2156,7 +2179,7 @@ export function EditorProvider({ children, store, addToast }) {
     }
     
     if (loopState.clips[clipId]?.enabled) {
-      console.log('🔄 [EditorContext] Désactivation de la boucle (toggle) pour:', clip.name)
+      log('🔄 [EditorContext] Désactivation de la boucle (toggle) pour:', clip.name)
       
       const updatedLoopState = {
         ...loopState,
@@ -2214,7 +2237,7 @@ export function EditorProvider({ children, store, addToast }) {
       loopEnd = Math.max(start + duration, totalDuration)
     }
     
-    console.log('🔄 [EditorContext] Activation de la boucle pour:', clip.name, 'loopEnd:', loopEnd, 'mode:', loopMode, 'cycleCount:', cycleCount)
+    log('🔄 [EditorContext] Activation de la boucle pour:', clip.name, 'loopEnd:', loopEnd, 'mode:', loopMode, 'cycleCount:', cycleCount)
     
     const updatedLoopState = {
       ...loopState,
@@ -2294,7 +2317,7 @@ export function EditorProvider({ children, store, addToast }) {
   // ─── FONCTIONS BOUCLE TIMELINE ──────────────────────────────────────────
 
   const setTimelineLoop = useCallback((options) => {
-    console.log('🔄 [EditorContext] setTimelineLoop appelé:', options)
+    log('🔄 [EditorContext] setTimelineLoop appelé:', options)
     
     if (!project) {
       console.warn('🔄 [EditorContext] Aucun projet')
@@ -2328,7 +2351,7 @@ export function EditorProvider({ children, store, addToast }) {
 
   const toggleTimelineLoop = useCallback(() => {
     const newEnabled = !loopState.timeline.enabled
-    console.log('🔄 [EditorContext] toggleTimelineLoop:', newEnabled)
+    log('🔄 [EditorContext] toggleTimelineLoop:', newEnabled)
     
     if (newEnabled) {
       const start = loopState.timeline.start
@@ -2352,12 +2375,12 @@ export function EditorProvider({ children, store, addToast }) {
   const isActionOverlayActive = actionOverlay.type !== null
 
   const cancelActionOverlay = useCallback(() => {
-    console.log('🔍 [OVERLAY] cancelActionOverlay appelé')
+    log('🔍 [OVERLAY] cancelActionOverlay appelé')
     setActionOverlay(INITIAL_OVERLAY_STATE)
   }, [])
 
   const activateLoopManualClick = useCallback((clipId, trackId, options = {}) => {
-    console.log('🔍 [OVERLAY] activateLoopManualClick appelé:', { clipId, trackId, options })
+    log('🔍 [OVERLAY] activateLoopManualClick appelé:', { clipId, trackId, options })
     
     const clip = project?.tracks?.flatMap(t => t.clips).find(c => c.id === clipId)
     
@@ -2376,12 +2399,12 @@ export function EditorProvider({ children, store, addToast }) {
       data: {}
     })
     
-    console.log('🔍 [OVERLAY] actionOverlay défini pour loop-clip avec step: 0')
+    log('🔍 [OVERLAY] actionOverlay défini pour loop-clip avec step: 0')
     addToast?.('🖱️ Mode clic activé', 'info')
   }, [project, addToast])
 
   const activateTimelineLoopManualClick = useCallback(() => {
-    console.log('🔍 [OVERLAY] activateTimelineLoopManualClick appelé')
+    log('🔍 [OVERLAY] activateTimelineLoopManualClick appelé')
     
     setActionOverlay({
       type: 'loop-timeline',
@@ -2398,12 +2421,12 @@ export function EditorProvider({ children, store, addToast }) {
       }
     })
     
-    console.log('🔍 [OVERLAY] actionOverlay défini pour loop-timeline avec step: 0')
+    log('🔍 [OVERLAY] actionOverlay défini pour loop-timeline avec step: 0')
     addToast?.('🖱️ Mode clic activé - Étape 1/3', 'info')
   }, [addToast])
 
   const activateSplitManualClick = useCallback((clipId, trackId) => {
-    console.log('🔍 [OVERLAY] activateSplitManualClick appelé:', { clipId, trackId })
+    log('🔍 [OVERLAY] activateSplitManualClick appelé:', { clipId, trackId })
     
     const clip = project?.tracks?.flatMap(t => t.clips).find(c => c.id === clipId)
     
@@ -2418,15 +2441,15 @@ export function EditorProvider({ children, store, addToast }) {
       data: {}
     })
     
-    console.log('🔍 [OVERLAY] actionOverlay défini pour split avec step: 0')
+    log('🔍 [OVERLAY] actionOverlay défini pour split avec step: 0')
     addToast?.('✂️ Mode clic activé', 'info')
   }, [project, addToast])
 
   const executeActionOverlay = useCallback((clickTime) => {
-    console.log('🔍 [OVERLAY] executeActionOverlay appelé')
-    console.log(`🔍 [OVERLAY]   - actionOverlay.type: ${actionOverlay.type}`)
-    console.log(`🔍 [OVERLAY]   - actionOverlay.step avant: ${actionOverlay.step}`)
-    console.log(`🔍 [OVERLAY]   - clickTime: ${clickTime}`)
+    log('🔍 [OVERLAY] executeActionOverlay appelé')
+    log(`🔍 [OVERLAY]   - actionOverlay.type: ${actionOverlay.type}`)
+    log(`🔍 [OVERLAY]   - actionOverlay.step avant: ${actionOverlay.step}`)
+    log(`🔍 [OVERLAY]   - clickTime: ${clickTime}`)
     
     if (!actionOverlay.type) {
       console.warn('🔍 [OVERLAY] ⚠️ Aucune action en cours')
@@ -2436,10 +2459,10 @@ export function EditorProvider({ children, store, addToast }) {
     const { type, clipId, trackId, options, step, data } = actionOverlay
     const clampedTime = Math.max(0, Math.min(clickTime, totalDuration))
     
-    console.log(`🔍 [OVERLAY] Exécution action ${type} à ${clampedTime.toFixed(2)}s, étape ${step}`)
+    log(`🔍 [OVERLAY] Exécution action ${type} à ${clampedTime.toFixed(2)}s, étape ${step}`)
     
     if (type === 'loop-clip') {
-      console.log('🔍 [OVERLAY] 📦 loop-clip - un seul clic')
+      log('🔍 [OVERLAY] 📦 loop-clip - un seul clic')
       const clip = project?.tracks?.flatMap(t => t.clips).find(c => c.id === clipId)
       if (!clip) {
         console.warn('🔍 [OVERLAY] ⚠️ Clip non trouvé')
@@ -2452,7 +2475,7 @@ export function EditorProvider({ children, store, addToast }) {
       const start = clip.start || 0
       const manualDuration = Math.max(duration, clampedTime - start)
       
-      console.log(`🔍 [OVERLAY]   - duration: ${duration}, start: ${start}, manualDuration: ${manualDuration}`)
+      log(`🔍 [OVERLAY]   - duration: ${duration}, start: ${start}, manualDuration: ${manualDuration}`)
       
       const updatedOptions = {
         ...options,
@@ -2466,47 +2489,47 @@ export function EditorProvider({ children, store, addToast }) {
       cancelActionOverlay()
       
     } else if (type === 'loop-timeline') {
-      console.log(`🔍 [OVERLAY] 📦 loop-timeline - étape actuelle: ${step}`)
+      log(`🔍 [OVERLAY] 📦 loop-timeline - étape actuelle: ${step}`)
       
       const newStep = step + 1
       const newData = { ...data }
       
       if (step === 0) {
         newData.start = clampedTime
-        console.log(`🔍 [OVERLAY]   📍 Étape 1: Début défini à ${clampedTime.toFixed(2)}s`)
+        log(`🔍 [OVERLAY]   📍 Étape 1: Début défini à ${clampedTime.toFixed(2)}s`)
         
         setActionOverlay(prev => {
-          console.log(`🔍 [OVERLAY]   🔄 setActionOverlay - nouvelle étape: 1`)
+          log(`🔍 [OVERLAY]   🔄 setActionOverlay - nouvelle étape: 1`)
           const updated = {
             ...prev,
             step: 1,
             data: newData
           }
-          console.log(`🔍 [OVERLAY]   🔄 updated.step: ${updated.step}`)
+          log(`🔍 [OVERLAY]   🔄 updated.step: ${updated.step}`)
           return updated
         })
         
-        console.log('🔍 [OVERLAY]   ✅ actionOverlay mis à jour avec step: 1')
+        log('🔍 [OVERLAY]   ✅ actionOverlay mis à jour avec step: 1')
         addToast?.(`🖱️ Début défini à ${clampedTime.toFixed(1)}s (2/3)`, 'info')
         
       } else if (step === 1) {
-        console.log(`🔍 [OVERLAY]   📍 Étape 2: Fin à ${clampedTime.toFixed(2)}s, start: ${data.start}`)
+        log(`🔍 [OVERLAY]   📍 Étape 2: Fin à ${clampedTime.toFixed(2)}s, start: ${data.start}`)
         
         if (clampedTime > data.start) {
           newData.end = clampedTime
           
           setActionOverlay(prev => {
-            console.log(`🔍 [OVERLAY]   🔄 setActionOverlay - nouvelle étape: 2`)
+            log(`🔍 [OVERLAY]   🔄 setActionOverlay - nouvelle étape: 2`)
             const updated = {
               ...prev,
               step: 2,
               data: newData
             }
-            console.log(`🔍 [OVERLAY]   🔄 updated.step: ${updated.step}`)
+            log(`🔍 [OVERLAY]   🔄 updated.step: ${updated.step}`)
             return updated
           })
           
-          console.log('🔍 [OVERLAY]   ✅ actionOverlay mis à jour avec step: 2')
+          log('🔍 [OVERLAY]   ✅ actionOverlay mis à jour avec step: 2')
           addToast?.(`🖱️ Fin définie à ${clampedTime.toFixed(1)}s (3/3)`, 'info')
         } else {
           console.warn('🔍 [OVERLAY]   ⚠️ Fin doit être après le début')
@@ -2514,13 +2537,13 @@ export function EditorProvider({ children, store, addToast }) {
         }
         
       } else if (step === 2) {
-        console.log(`🔍 [OVERLAY]   📍 Étape 3: Durée à ${clampedTime.toFixed(2)}s, start: ${data.start}`)
+        log(`🔍 [OVERLAY]   📍 Étape 3: Durée à ${clampedTime.toFixed(2)}s, start: ${data.start}`)
         
         const duration = clampedTime - data.start
-        console.log(`🔍 [OVERLAY]   - duration calculée: ${duration.toFixed(2)}s`)
+        log(`🔍 [OVERLAY]   - duration calculée: ${duration.toFixed(2)}s`)
         
         if (duration > 0.1) {
-          console.log(`🔍 [OVERLAY]   ✅ Durée valide, application de la boucle`)
+          log(`🔍 [OVERLAY]   ✅ Durée valide, application de la boucle`)
           setTimelineLoop({
             enabled: true,
             start: data.start,
@@ -2528,7 +2551,7 @@ export function EditorProvider({ children, store, addToast }) {
             manualDuration: duration,
             durationMode: 'manualDuration'
           })
-          console.log(`🔍 [OVERLAY]   ✅ Boucle définie: ${data.start.toFixed(2)}s → ${(data.end || clampedTime).toFixed(2)}s (${duration.toFixed(2)}s)`)
+          log(`🔍 [OVERLAY]   ✅ Boucle définie: ${data.start.toFixed(2)}s → ${(data.end || clampedTime).toFixed(2)}s (${duration.toFixed(2)}s)`)
           addToast?.(`✅ Boucle définie: ${data.start.toFixed(1)}s → ${(data.end || clampedTime).toFixed(1)}s (${duration.toFixed(1)}s)`, 'success')
           
           cancelActionOverlay()
@@ -2539,7 +2562,7 @@ export function EditorProvider({ children, store, addToast }) {
       }
       
     } else if (type === 'split') {
-      console.log('🔍 [OVERLAY] 📦 split')
+      log('🔍 [OVERLAY] 📦 split')
       const clip = project?.tracks?.flatMap(t => t.clips).find(c => c.id === clipId)
       if (!clip) {
         console.warn('🔍 [OVERLAY] ⚠️ Clip non trouvé')
@@ -2552,7 +2575,7 @@ export function EditorProvider({ children, store, addToast }) {
       const start = clip.start || 0
       const end = start + duration
       
-      console.log(`🔍 [OVERLAY]   - duration: ${duration}, start: ${start}, end: ${end}, clampedTime: ${clampedTime}`)
+      log(`🔍 [OVERLAY]   - duration: ${duration}, start: ${start}, end: ${end}, clampedTime: ${clampedTime}`)
       
       if (clampedTime > start + 0.05 && clampedTime < end - 0.05) {
         splitClip(trackId, clipId, clampedTime)
@@ -2601,7 +2624,7 @@ export function EditorProvider({ children, store, addToast }) {
     if (!project) return null
     
     const newMarker = {
-      id: `marker-${Date.now()}-${idCounterRef.current}`,
+      id: generateId('marker'),
       name: markerData.name || `Marqueur ${(project.markers?.length || 0) + 1}`,
       time: markerData.time || currentTime,
       color: markerData.color || '#3b82f6'

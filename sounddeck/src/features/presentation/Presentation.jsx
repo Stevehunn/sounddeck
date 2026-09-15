@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { playSound, stopSound, isPlaying, getSoundProgress } from '@core/services/AudioService'
 import HelpButton from '@shared/components/ui/HelpButton'
+import { formatTime } from '@shared/utils/format'
 
 export default function Presentation({ store, onExit, lang = 'fr' }) {
   const { t, currentLang } = useLanguage()
@@ -217,13 +218,6 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
   )
 }
 
-function fmtTime(s) {
-  if (!s || isNaN(s)) return '0:00'
-  const m = Math.floor(s / 60)
-  const sec = Math.floor(s % 60)
-  return `${m}:${sec.toString().padStart(2, '0')}`
-}
-
 function formatShortcut(shortcut) {
   if (!shortcut) return []
   return shortcut
@@ -332,8 +326,8 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size, lang }) {
             <div className={`fill ${playing ? 'accent' : ''}`} style={{ width: `${progress.ratio * 100}%` }} />
           </div>
           <div className="time">
-            <span>{fmtTime(progress.current)}</span>
-            <span>{fmtTime(progress.duration)}</span>
+            <span>{formatTime(progress.current)}</span>
+            <span>{formatTime(progress.duration)}</span>
           </div>
         </div>
       )}

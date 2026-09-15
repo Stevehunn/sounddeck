@@ -1,6 +1,21 @@
+// src/core/plugins/PluginManager.js
 /**
  * PluginManager - Gestionnaire central des plugins
  */
+import { DEFAULT_ICONS, DEFAULT_GROUPS } from '@shared/constants/navigation'
+
+const CORE_PAGES_DEFS = [
+  { id: 'home', labelKey: 'mySounds' },
+  { id: 'discover', labelKey: 'discover' },
+  { id: 'trimmer', labelKey: 'trimmer' },
+  { id: 'editor', labelKey: 'editor' },
+  { id: 'sequencer', labelKey: 'sequencer' },
+  { id: 'youtube', labelKey: 'youtube' },
+  { id: 'stats', labelKey: 'stats' },
+  { id: 'guide', labelKey: 'guide' },
+  { id: 'options', labelKey: 'options' },
+]
+
 export class PluginManager {
   constructor() {
     this.plugins = new Map()
@@ -13,7 +28,7 @@ export class PluginManager {
       onSoundPlay: [],
       onAppStart: [],
       onPluginLoad: [],
-      onPluginUnload: []
+      onPluginUnload: [],
     }
     this._initialized = false
     this._loadingPlugins = new Set()
@@ -25,7 +40,8 @@ export class PluginManager {
     this.store = store
 
     try {
-      const installedPlugins = await window.electronAPI?.getInstalledPlugins?.() || []
+      const installedPlugins =
+        (await window.electronAPI?.getInstalledPlugins?.()) || []
 
       for (const pluginInfo of installedPlugins) {
         if (pluginInfo.enabled !== false) {
@@ -35,7 +51,6 @@ export class PluginManager {
 
       this._initialized = true
       this.runHook('onAppStart', store)
-
     } catch (e) {
       console.error('❌ Erreur lors de l\'initialisation du PluginManager:', e)
       this._initialized = true
@@ -94,7 +109,9 @@ export class PluginManager {
             )
           }
         } else {
-          const fullPath = await window.electronAPI?.getPluginPath?.(pluginInfo.id)
+          const fullPath = await window.electronAPI?.getPluginPath?.(
+            pluginInfo.id
+          )
           if (fullPath) {
             pluginModule = await import(/* @vite-ignore */ fullPath)
           } else {
@@ -118,7 +135,7 @@ export class PluginManager {
       this.plugins.set(plugin.id, {
         ...plugin,
         info: pluginInfo,
-        loadedAt: Date.now()
+        loadedAt: Date.now(),
       })
 
       if (plugin.pages) {
@@ -126,7 +143,8 @@ export class PluginManager {
           this.pages.set(page.id, {
             ...page,
             pluginId: plugin.id,
-            componentPath: page.component || page.componentPath || `${plugin.id}/${page.id}`
+            componentPath:
+              page.component || page.componentPath || `${plugin.id}/${page.id}`,
           })
 
           if (page.component) {
@@ -147,7 +165,6 @@ export class PluginManager {
 
       this._loadingPlugins.delete(plugin.id)
       return true
-
     } catch (e) {
       console.error(`❌ Erreur chargement plugin ${pluginInfo.id}:`, e)
       this._loadingPlugins.delete(pluginInfo.id)
@@ -180,22 +197,18 @@ export class PluginManager {
   getAllPages(translateFn) {
     const t = translateFn || ((key) => key)
 
-    const corePages = [
-      { id: 'home', label: t('mySounds'), icon: 'ti-home', isCore: true, group: 'navigation' },
-      { id: 'discover', label: t('discover'), icon: 'ti-compass', isCore: true, group: 'navigation' },
-      { id: 'trimmer', label: t('trimmer'), icon: 'ti-cut', isCore: true, group: 'navigation' },
-      { id: 'editor', label: t('editor'), icon: 'ti-wand', isCore: true, group: 'navigation' },
-      { id: 'sequencer', label: t('sequencer'), icon: 'ti-playlist', isCore: true, group: 'navigation' },
-      { id: 'youtube', label: t('youtube'), icon: 'ti-brand-youtube', isCore: true, group: 'navigation' },
-      { id: 'stats', label: t('stats'), icon: 'ti-chart-bar', isCore: true, group: 'navigation' },
-      { id: 'guide', label: t('guide'), icon: 'ti-book', isCore: true, group: 'footer' },
-      { id: 'options', label: t('options'), icon: 'ti-settings', isCore: true, group: 'footer' }
-    ]
+    const corePages = CORE_PAGES_DEFS.map(({ id, labelKey }) => ({
+      id,
+      label: t(labelKey),
+      icon: DEFAULT_ICONS[id],
+      group: DEFAULT_GROUPS[id],
+      isCore: true,
+    }))
 
-    const pluginPages = Array.from(this.pages.values()).map(p => ({
+    const pluginPages = Array.from(this.pages.values()).map((p) => ({
       ...p,
       isCore: false,
-      isPlugin: true
+      isPlugin: true,
     }))
 
     const storePages = this._getStorePages()
@@ -207,20 +220,20 @@ export class PluginManager {
     if (!this.store) return []
 
     const profiles = this.store.profiles || []
-    return profiles.map(p => ({
+    return profiles.map((p) => ({
       id: `profile-${p.id}`,
       label: p.name,
       icon: p.id === 'all' ? 'ti-stack' : 'ti-user',
       isCore: false,
       isProfile: true,
       group: 'profiles',
-      profileId: p.id
+      profileId: p.id,
     }))
   }
 
   getPage(pageId) {
     const allPages = this.getAllPages()
-    return allPages.find(p => p.id === pageId)
+    return allPages.find((p) => p.id === pageId)
   }
 
   isPluginPage(pageId) {
@@ -245,12 +258,12 @@ export class PluginManager {
           `../plugins/${page.pluginId}/${page.componentPath}`,
           `../plugins/${page.pluginId}/pages/${page.id}`,
           `../plugins/${page.pluginId}/${page.id}`,
-          `../plugins/${page.pluginId}/components/${page.id}`
+          `../plugins/${page.pluginId}/components/${page.id}`,
         ]
 
         for (const path of paths) {
           try {
-            const module = await import(/* @vite-ignore */ path);
+            const module = await import(/* @vite-ignore */ path)
             if (module) {
               const Component = module.default || module
               this.components.set(pageId, Component)
@@ -263,9 +276,12 @@ export class PluginManager {
         console.warn(`⚠️ Composant non trouvé pour la page ${pageId}`, paths)
         return null
       } else {
-        const pluginPath = await window.electronAPI?.getPluginComponentPath?.(page.pluginId, page.id)
+        const pluginPath = await window.electronAPI?.getPluginComponentPath?.(
+          page.pluginId,
+          page.id
+        )
         if (pluginPath) {
-          module = await import(/* @vite-ignore */ pluginPath);
+          module = await import(/* @vite-ignore */ pluginPath)
         }
       }
 
@@ -296,8 +312,13 @@ export class PluginManager {
 
   _checkCompatibility(pluginInfo) {
     const appVersion = pluginInfo.appVersion || '1.3.0'
-    if (pluginInfo.requires && !this._semverSatisfies(appVersion, pluginInfo.requires)) {
-      console.warn(`⚠️ Plugin ${pluginInfo.id} requiert ${pluginInfo.requires}, version actuelle ${appVersion}`)
+    if (
+      pluginInfo.requires &&
+      !this._semverSatisfies(appVersion, pluginInfo.requires)
+    ) {
+      console.warn(
+        `⚠️ Plugin ${pluginInfo.id} requiert ${pluginInfo.requires}, version actuelle ${appVersion}`
+      )
       return false
     }
 
@@ -330,7 +351,7 @@ export class PluginManager {
 
   runHook(hookName, ...args) {
     const hooks = this.hooks[hookName] || []
-    return hooks.map(fn => fn(...args))
+    return hooks.map((fn) => fn(...args))
   }
 
   addHook(hookName, fn) {
@@ -341,13 +362,13 @@ export class PluginManager {
   }
 
   getLoadedPlugins() {
-    return Array.from(this.plugins.values()).map(p => ({
+    return Array.from(this.plugins.values()).map((p) => ({
       id: p.id,
       name: p.name || p.id,
       version: p.version || '1.0.0',
       author: p.author || 'Inconnu',
       loadedAt: p.loadedAt,
-      pages: p.pages?.length || 0
+      pages: p.pages?.length || 0,
     }))
   }
 

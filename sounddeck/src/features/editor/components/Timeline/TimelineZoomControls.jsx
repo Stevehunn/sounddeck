@@ -1,5 +1,6 @@
 // src/features/editor/components/Timeline/TimelineZoomControls.jsx
 import React, { memo } from 'react'
+import { formatTime } from '@shared/utils/format'
 
 const TimelineZoomControls = memo(({
   zoomLevel,

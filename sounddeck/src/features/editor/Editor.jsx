@@ -23,6 +23,10 @@ import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
 import useConfirm from '@shared/hooks/useConfirm'
 import useProjectManager from './hooks/useProjectManager'
 
+// ✅ Logger dev-only
+const __DEBUG__ = typeof import.meta !== 'undefined' && import.meta.env?.DEV
+const log = __DEBUG__ ? console.log.bind(console) : () => {}
+
 export default function Editor({ store, addToast }) {
   return (
     <EditorProvider store={store} addToast={addToast}>
@@ -685,8 +689,13 @@ function EditorTimelineContent() {
       return
     }
 
+    const clipId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? `clip-${crypto.randomUUID().slice(0, 8)}`
+        : `clip-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+
     const newClip = {
-      id: `clip-${Date.now()}`,
+      id: clipId,
       name: clip.name || 'Clip collé',
       path: clip.path,
       start: (clip.start || 0) + 1,
@@ -694,10 +703,13 @@ function EditorTimelineContent() {
       offset: clip.offset || 0,
       volume: clip.volume || 0,
       volumeDb: clip.volumeDb || 0,
-      effects: (clip.effects || []).map((e) => ({
-        ...e,
-        id: `effect-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      })),
+      effects: (clip.effects || []).map((e) => {
+        const effId =
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? `effect-${crypto.randomUUID().slice(0, 8)}`
+            : `effect-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+        return { ...e, id: effId }
+      }),
       fadeIn: clip.fadeIn || 0,
       fadeOut: clip.fadeOut || 0,
       pitch: clip.pitch || 0,
@@ -1109,8 +1121,13 @@ function EditorTimelineContent() {
     onAddTrack: handleAddTrack,
     onAddMarker: () => {
       const markers = project?.markers || []
+      const markerId =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? `marker-${crypto.randomUUID().slice(0, 8)}`
+          : `marker-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+
       const newMarker = {
-        id: `marker-${Date.now()}`,
+        id: markerId,
         name: `Marqueur ${markers.length + 1}`,
         time: currentTime,
         color: '#3b82f6',

@@ -1,6 +1,7 @@
 // src/shared/components/audio/Waveform.jsx
 import { useEffect, useRef, useState } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
+import { formatTime as formatTimeShared } from '@shared/utils/format'
 
 async function generateWaveformData(fileUrl, samples = 200) {
   try {
@@ -228,9 +229,5 @@ export default function Waveform({
 }
 
 export function formatTime(s) {
-  if (!s || isNaN(s)) return '0:00'
-  const m = Math.floor(s / 60)
-  const sec = Math.floor(s % 60)
-  const ms = Math.floor((s % 1) * 10)
-  return `${m}:${sec.toString().padStart(2, '0')}.${ms}`
+  return formatTimeShared(s, { alwaysMMSS: true, decimals: 1 })
 }

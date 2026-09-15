@@ -6,10 +6,15 @@ import ProfileManagerModal from '@shared/components/modals/ProfileManagerModal'
 import { DeleteButton } from '@shared/components/ui'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { playSound, stopAllSounds, stopSound } from '@core/services/AudioService'
-import { compressAudio, formatSize } from '@shared/utils/audioConverter'
 import useConfirm from '@shared/hooks/useConfirm'
 
 const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
+
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 
 export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
   const { t, currentLang } = useLanguage()
@@ -240,23 +245,28 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
           const originalPath = result.path
           const ext = originalPath.split('.').pop() || 'mp3'
           const compressedPath = originalPath.replace(`.${ext}`, `_compressed.${ext}`)
-          
-          const compressionResult = await compressAudio(originalPath, compressedPath, {
-            bitrate: compressionBitrate,
-            format: ext === 'mp3' ? 'mp3' : 'aac'
-          })
-          
-          if (compressionResult.success) {
+          const format = ext === 'mp3' ? 'mp3' : 'aac'
+
+          const compressionResult = await window.electronAPI.convertAudio(
+            originalPath,
+            compressedPath,
+            format,
+            compressionBitrate
+          )
+
+          if (compressionResult?.success) {
+            const originalSize = compressionResult.originalSize || 0
+            const compressedSize = compressionResult.size || 0
+
             result.path = compressedPath
             result.compressed = true
-            result.originalSize = compressionResult.originalSize
-            result.compressedSize = compressionResult.size
-            result.compressionRatio = compressionResult.ratio
-            
+            result.originalSize = originalSize
+            result.compressedSize = compressedSize
+            result.compressionRatio = originalSize > 0 ? compressedSize / originalSize : 1
+
             await window.electronAPI.deleteSoundFile(originalPath)
-            
           } else {
-            console.warn('⚠️ Compression échouée, utilisation du fichier original:', compressionResult.error)
+            console.warn('⚠️ Compression échouée, utilisation du fichier original:', compressionResult?.error)
           }
         } catch (e) {
           console.warn('⚠️ Erreur compression:', e)
@@ -351,13 +361,16 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
               const originalPath = result.path
               const ext = originalPath.split('.').pop() || 'mp3'
               const compressedPath = originalPath.replace(`.${ext}`, `_compressed.${ext}`)
-              
-              const compressionResult = await compressAudio(originalPath, compressedPath, {
-                bitrate: compressionBitrate,
-                format: ext === 'mp3' ? 'mp3' : 'aac'
-              })
-              
-              if (compressionResult.success) {
+              const format = ext === 'mp3' ? 'mp3' : 'aac'
+
+              const compressionResult = await window.electronAPI.convertAudio(
+                originalPath,
+                compressedPath,
+                format,
+                compressionBitrate
+              )
+
+              if (compressionResult?.success) {
                 result.path = compressedPath
                 await window.electronAPI.deleteSoundFile(originalPath)
               }
@@ -395,7 +408,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
 
   const currentProfile = store.profiles.find(p => p.id === currentProfileId)
 
-  // ✅ UNE SEULE FONCTION DE SUPPRESSION - DANS LE COMPOSANT HOME
   const handleDeleteSound = useCallback(async (soundId) => {
     const sound = store.sounds.find(s => s.id === soundId)
     if (!sound) return
@@ -520,7 +532,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
             </div>
           )}
 
-          {/* ✅ SECTION FAVORIS AVEC data-testid */}
           {favoriteSoundsForProfile.length > 0 && (
             <Section 
               title={t('favorites')} 
@@ -554,7 +565,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
             </Section>
           )}
 
-          {/* ✅ SECTION SONS DU PROFIL AVEC data-testid */}
           {filtered.length > 0 && (
             <Section 
               title={t('profileSounds')} 
@@ -593,7 +603,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
             </Section>
           )}
 
-          {/* ✅ SECTION AUTRES SONS AVEC data-testid */}
           {soundsOutsideProfile.length > 0 && (
             <Section 
               title={t('otherSounds')} 
@@ -646,11 +655,16 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
                 try {
                   const ext = filePath.split('.').pop() || 'mp3'
                   const compressedPath = filePath.replace(`.${ext}`, `_compressed.${ext}`)
-                  const compressionResult = await compressAudio(filePath, compressedPath, {
-                    bitrate: store.compressionBitrate || 128,
-                    format: ext === 'mp3' ? 'mp3' : 'aac'
-                  })
-                  if (compressionResult.success) {
+                  const format = ext === 'mp3' ? 'mp3' : 'aac'
+
+                  const compressionResult = await window.electronAPI.convertAudio(
+                    filePath,
+                    compressedPath,
+                    format,
+                    store.compressionBitrate || 128
+                  )
+
+                  if (compressionResult?.success) {
                     finalPath = compressedPath
                     await window.electronAPI.deleteSoundFile(filePath)
                   }
@@ -677,13 +691,19 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
                 try {
                   const ext = result.path.split('.').pop() || 'mp3'
                   const compressedPath = result.path.replace(`.${ext}`, `_compressed.${ext}`)
-                  const compressionResult = await compressAudio(result.path, compressedPath, {
-                    bitrate: store.compressionBitrate || 128,
-                    format: ext === 'mp3' ? 'mp3' : 'aac'
-                  })
-                  if (compressionResult.success) {
+                  const format = ext === 'mp3' ? 'mp3' : 'aac'
+                  const originalPath = result.path
+
+                  const compressionResult = await window.electronAPI.convertAudio(
+                    originalPath,
+                    compressedPath,
+                    format,
+                    store.compressionBitrate || 128
+                  )
+
+                  if (compressionResult?.success) {
                     result.path = compressedPath
-                    await window.electronAPI.deleteSoundFile(result.path.replace(`_compressed.${ext}`, `.${ext}`))
+                    await window.electronAPI.deleteSoundFile(originalPath)
                   }
                 } catch (e) {
                   console.warn('⚠️ Erreur compression:', e)
@@ -719,9 +739,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
   )
 }
 
-// ─── SOUS-COMPOSANTS ──────────────────────────────────────────────────────────
-
-// ✅ Section avec data-testid
 function Section({ title, icon, iconColor, count, muted, children, testId }) {
   return (
     <section 
@@ -746,7 +763,6 @@ function Section({ title, icon, iconColor, count, muted, children, testId }) {
   )
 }
 
-// ✅ SoundGrid avec data-testid
 function SoundGrid({ 
   sounds, 
   shortcuts, 
@@ -769,7 +785,7 @@ function SoundGrid({
   onDelete,
   testId
 }) {
-  const { t, currentLang } = useLanguage()
+  const { t } = useLanguage()
   const cardSize = store.cardSize || 'medium'
   
   const cardSizes = {
@@ -868,7 +884,7 @@ function SoundGrid({
 }
 
 function OutsideCard({ sound, onAdd, lang }) {
-  const { t, currentLang } = useLanguage()
+  const { t } = useLanguage()
   const imageUrl = sound.image
     ? (sound.image.startsWith('file://') ? sound.image : `file:///${sound.image.replace(/\\/g, '/')}`)
     : null
@@ -891,7 +907,7 @@ function OutsideCard({ sound, onAdd, lang }) {
 }
 
 function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onUrlImport, onManualAdd, store, lang }) {
-  const { t, currentLang } = useLanguage()
+  const { t } = useLanguage()
   const [tab, setTab] = useState('file')
   const [url, setUrl] = useState('')
   const [urlName, setUrlName] = useState('')

@@ -12,6 +12,7 @@ import {
   analyzeGain,
 } from '@core/services/AudioService'
 import useConfirm from '@shared/hooks/useConfirm'
+import { formatTime } from '@shared/utils/format'
 
 export default function Sequencer({ store, addToast, lang = 'fr' }) {
   const { t, currentLang } = useLanguage()
@@ -543,13 +544,6 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, onSav
     return acc + (item.delay || 0)
   }, 0)
 
-  const fmtSeqTime = (s) => {
-    if (!s || isNaN(s)) return '0:00'
-    const m = Math.floor(s / 60)
-    const sec = Math.floor(s % 60)
-    return `${m}:${sec.toString().padStart(2, '0')}`
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
@@ -652,7 +646,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, onSav
               })()}
             </span>
             <span style={{ fontFamily: 'monospace' }}>
-              {fmtSeqTime(currentProgress.current)} / {fmtSeqTime(currentProgress.duration)}
+              {formatTime(currentProgress.current)} / {formatTime(currentProgress.duration)}
             </span>
           </div>
           <div className="progress-bar">
