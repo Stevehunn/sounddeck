@@ -39,6 +39,7 @@ export function useStore() {
     mixerEnabled: mixerHook.mixerEnabled,
   }
 
+  // ─── CHARGEMENT INITIAL ─────────────────────────────────────────────────
   useEffect(() => {
     async function loadData() {
       try {
@@ -136,13 +137,6 @@ export function useStore() {
         const savedMonitoringEnabled =
           (await window.electronAPI.storeGet('monitoringEnabled')) ?? false
 
-        const savedEditorProject = await window.electronAPI.storeGet(
-          'editorProject'
-        )
-        const savedSelectedClipId = await window.electronAPI.storeGet(
-          'selectedClipId'
-        )
-
         const allProfile = { id: 'all', name: 'Tous les sons', isDefault: true }
         const userProfiles = savedProfiles.filter((p) => p.id !== 'all')
         const allProfiles = [allProfile, ...userProfiles]
@@ -196,12 +190,9 @@ export function useStore() {
         mixerHook.setLowLatencyMode(savedLowLatencyMode)
         mixerHook.setMonitoringEnabled(savedMonitoringEnabled)
 
-        if (savedEditorProject) {
-          editorHook.setEditorProject(savedEditorProject)
-        }
-        if (savedSelectedClipId) {
-          editorHook.setSelectedClipId(savedSelectedClipId)
-        }
+        // ✅ S3c : charger la liste des projets + récents
+        await editorHook.loadRecentEditorProjects?.()
+        await editorHook.loadAllEditorProjects?.()
 
         if (savedSidebarConfig) {
           let items = [...(savedSidebarConfig.items || [])]
@@ -507,46 +498,18 @@ export function useStore() {
     initMixerOnStartup: mixerHook.initMixerOnStartup,
     toggleMonitoring: mixerHook.toggleMonitoring,
 
-    editorProject: editorHook.editorProject,
-    setEditorProject: editorHook.setEditorProject,
-    selectedClipId: editorHook.selectedClipId,
-    setSelectedClipId: editorHook.setSelectedClipId,
-    editorLoopRegion: editorHook.editorLoopRegion,
-    setEditorLoopRegion: editorHook.setEditorLoopRegion,
-    toggleEditorLoop: editorHook.toggleEditorLoop,
-    clearEditorLoopRegion: editorHook.clearEditorLoopRegion,
-    canUndoEditor: editorHook.canUndoEditor,
-    canRedoEditor: editorHook.canRedoEditor,
-    commitEditorProject: editorHook.commitEditorProject,
-    pushEditorHistoryCheckpoint: editorHook.pushEditorHistoryCheckpoint,
-    undoEditor: editorHook.undoEditor,
-    redoEditor: editorHook.redoEditor,
-    createEditorProject: editorHook.createEditorProject,
-    updateEditorProject: editorHook.updateEditorProject,
-    updateEditorProjectName: editorHook.updateEditorProjectName,
-    saveEditorMarkers: editorHook.saveEditorMarkers,
-    fixAllClipDurations: editorHook.fixAllClipDurations,
-    addTrack: editorHook.addTrack,
-    removeTrack: editorHook.removeTrack,
-    renameTrack: editorHook.renameTrack,
-    updateTrack: editorHook.updateTrack,
-    updateTrackColor: editorHook.updateTrackColor,
-    reorderTracks: editorHook.reorderTracks,
-    addClipToTrack: (trackId, soundId, start) =>
-      editorHook.addClipToTrack(trackId, soundId, start, soundsHook.sounds),
-    addClipFromFile: editorHook.addClipFromFile,
-    updateClip: editorHook.updateClip,
-    removeClip: editorHook.removeClip,
-    moveClip: editorHook.moveClip,
-    duplicateClip: editorHook.duplicateClip,
-    splitClip: editorHook.splitClip,
-    addEffectToClip: editorHook.addEffectToClip,
-    removeEffectFromClip: editorHook.removeEffectFromClip,
-    updateEffectParam: editorHook.updateEffectParam,
-    toggleEffect: editorHook.toggleEffect,
-    setClipFade: editorHook.setClipFade,
-    updateClipWithPath: editorHook.updateClipWithPath,
-    updateClipDurationInEditor: editorHook.updateClipDurationInEditor,
+    // ✅ S3c : uniquement la gestion multi-projets de l'éditeur
+    editorProjects: editorHook.editorProjects,
+    recentEditorProjects: editorHook.recentEditorProjects,
+    loadAllEditorProjects: editorHook.loadAllEditorProjects,
+    loadRecentEditorProjects: editorHook.loadRecentEditorProjects,
+    saveEditorProject: editorHook.saveEditorProject,
+    loadEditorProject: editorHook.loadEditorProject,
+    deleteEditorProject: editorHook.deleteEditorProject,
+    exportEditorProject: editorHook.exportEditorProject,
+    importEditorProject: editorHook.importEditorProject,
+    renameEditorProject: editorHook.renameEditorProject,
+    duplicateEditorProject: editorHook.duplicateEditorProject,
 
     sidebarConfig,
     sidebarEditMode,

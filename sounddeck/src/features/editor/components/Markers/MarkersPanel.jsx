@@ -104,18 +104,6 @@ const MarkersPanel = memo(({
 
   const sortedMarkers = markers ? [...markers].sort((a, b) => a.time - b.time) : []
 
-  // Raccourci clavier Ctrl+M
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
-        e.preventDefault()
-        handleAddAtCurrentTime()
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [handleAddAtCurrentTime])
-
   if (!onAddMarker) {
     return (
       <div style={{

@@ -1,19 +1,26 @@
 // src/core/plugins/PluginManager.js
 /**
  * PluginManager - Gestionnaire central des plugins
+ *
+ * Permet de :
+ * - Enregistrer des plugins
+ * - Charger des plugins dynamiquement
+ * - Gérer les pages ajoutées par les plugins
+ * - Exécuter des hooks
+ * - Vérifier la compatibilité
  */
 import { DEFAULT_ICONS, DEFAULT_GROUPS } from '@shared/constants/navigation'
 
 const CORE_PAGES_DEFS = [
-  { id: 'home', labelKey: 'mySounds' },
-  { id: 'discover', labelKey: 'discover' },
-  { id: 'trimmer', labelKey: 'trimmer' },
-  { id: 'editor', labelKey: 'editor' },
-  { id: 'sequencer', labelKey: 'sequencer' },
-  { id: 'youtube', labelKey: 'youtube' },
-  { id: 'stats', labelKey: 'stats' },
-  { id: 'guide', labelKey: 'guide' },
-  { id: 'options', labelKey: 'options' },
+  { id: 'home', labelKey: 'mySounds', group: 'navigation' },
+  { id: 'discover', labelKey: 'discover', group: 'navigation' },
+  { id: 'trimmer', labelKey: 'trimmer', group: 'navigation' },
+  { id: 'editor', labelKey: 'editor', group: 'navigation' },
+  { id: 'sequencer', labelKey: 'sequencer', group: 'navigation' },
+  { id: 'youtube', labelKey: 'youtube', group: 'navigation' },
+  { id: 'stats', labelKey: 'stats', group: 'navigation' },
+  { id: 'guide', labelKey: 'guide', group: 'footer' },
+  { id: 'options', labelKey: 'options', group: 'footer' },
 ]
 
 export class PluginManager {
@@ -35,6 +42,9 @@ export class PluginManager {
     this.store = null
   }
 
+  /**
+   * Initialise le gestionnaire de plugins
+   */
   async initialize(store) {
     if (this._initialized) return
     this.store = store
@@ -57,6 +67,9 @@ export class PluginManager {
     }
   }
 
+  /**
+   * Charge un plugin depuis ses informations
+   */
   async loadPlugin(pluginInfo) {
     if (this._loadingPlugins.has(pluginInfo.id)) {
       console.warn(`⚠️ Plugin ${pluginInfo.id} déjà en cours de chargement`)
@@ -172,6 +185,9 @@ export class PluginManager {
     }
   }
 
+  /**
+   * Décharge un plugin
+   */
   async unloadPlugin(pluginId) {
     const plugin = this.plugins.get(pluginId)
     if (!plugin) return false
@@ -194,14 +210,19 @@ export class PluginManager {
     return true
   }
 
+  /**
+   * Récupère toutes les pages (core + plugins + profils)
+   * @param {Function} translateFn - Fonction de traduction
+   * @returns {Array} Liste des pages
+   */
   getAllPages(translateFn) {
     const t = translateFn || ((key) => key)
 
-    const corePages = CORE_PAGES_DEFS.map(({ id, labelKey }) => ({
+    const corePages = CORE_PAGES_DEFS.map(({ id, labelKey, group }) => ({
       id,
       label: t(labelKey),
       icon: DEFAULT_ICONS[id],
-      group: DEFAULT_GROUPS[id],
+      group: DEFAULT_GROUPS[id] || group,
       isCore: true,
     }))
 
@@ -216,6 +237,9 @@ export class PluginManager {
     return [...corePages, ...pluginPages, ...storePages]
   }
 
+  /**
+   * Récupère les pages du store (profils)
+   */
   _getStorePages() {
     if (!this.store) return []
 
@@ -231,15 +255,26 @@ export class PluginManager {
     }))
   }
 
-  getPage(pageId) {
-    const allPages = this.getAllPages()
+  /**
+   * Récupère une page par son ID
+   * ✅ FIX S4 : accepte translateFn pour traduire les labels
+   */
+  getPage(pageId, translateFn) {
+    const allPages = this.getAllPages(translateFn)
     return allPages.find((p) => p.id === pageId)
   }
 
+  /**
+   * Vérifie si une page est un plugin
+   */
   isPluginPage(pageId) {
     return this.pages.has(pageId)
   }
 
+  /**
+   * Récupère le composant d'une page plugin
+   * ✅ FIX S4 : suppression du shadowing de `module` et du code mort
+   */
   async getPluginComponent(pageId) {
     if (this.components.has(pageId)) {
       return this.components.get(pageId)
@@ -249,7 +284,6 @@ export class PluginManager {
     if (!page) return null
 
     try {
-      let module
       if (import.meta.env.DEV) {
         const plugin = this.plugins.get(page.pluginId)
         if (!plugin) return null
@@ -261,34 +295,34 @@ export class PluginManager {
           `../plugins/${page.pluginId}/components/${page.id}`,
         ]
 
-        for (const path of paths) {
+        for (const importPath of paths) {
           try {
-            const module = await import(/* @vite-ignore */ path)
-            if (module) {
-              const Component = module.default || module
+            const mod = await import(/* @vite-ignore */ importPath)
+            if (mod) {
+              const Component = mod.default || mod
               this.components.set(pageId, Component)
               return Component
             }
           } catch (e) {
-            // Continuer
+            // Essayer le chemin suivant
           }
         }
         console.warn(`⚠️ Composant non trouvé pour la page ${pageId}`, paths)
         return null
-      } else {
-        const pluginPath = await window.electronAPI?.getPluginComponentPath?.(
-          page.pluginId,
-          page.id
-        )
-        if (pluginPath) {
-          module = await import(/* @vite-ignore */ pluginPath)
-        }
       }
 
-      if (module) {
-        const Component = module.default || module
-        this.components.set(pageId, Component)
-        return Component
+      // Production
+      const pluginPath = await window.electronAPI?.getPluginComponentPath?.(
+        page.pluginId,
+        page.id
+      )
+      if (pluginPath) {
+        const mod = await import(/* @vite-ignore */ pluginPath)
+        if (mod) {
+          const Component = mod.default || mod
+          this.components.set(pageId, Component)
+          return Component
+        }
       }
     } catch (e) {
       console.error(`❌ Erreur chargement du composant ${pageId}:`, e)
@@ -297,6 +331,9 @@ export class PluginManager {
     return null
   }
 
+  /**
+   * Ajoute des traductions
+   */
   _addTranslations(translations) {
     if (!window.__I18N__) {
       window.__I18N__ = {}
@@ -310,6 +347,9 @@ export class PluginManager {
     }
   }
 
+  /**
+   * Vérifie la compatibilité du plugin
+   */
   _checkCompatibility(pluginInfo) {
     const appVersion = pluginInfo.appVersion || '1.3.0'
     if (

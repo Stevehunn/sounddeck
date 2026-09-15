@@ -129,7 +129,7 @@ export default function SoundCard({
       stopSound(sound.id)
       setPlaying(false)
     }
-  }, [loopEnabled])
+  }, [loopEnabled, playing, sound.id])
 
   const handlePlay = async (e) => {
     e?.stopPropagation()

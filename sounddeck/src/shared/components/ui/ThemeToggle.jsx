@@ -1,19 +1,50 @@
 // src/shared/components/ui/ThemeToggle.jsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
+const STORAGE_KEY = 'autoTheme'
+
 export default function ThemeToggle({ currentTheme, onThemeChange, lang = 'fr' }) {
-  const { t, currentLang } = useLanguage()
+  const { t } = useLanguage()
   const [autoTheme, setAutoTheme] = useState(false)
   const [currentHour, setCurrentHour] = useState(new Date().getHours())
+  const initializedRef = useRef(false)
 
+  // ✅ FIX S4 : migration localStorage → electron-store
   useEffect(() => {
-    const savedAuto = localStorage.getItem('sounddeck-auto-theme') === 'true'
-    setAutoTheme(savedAuto)
+    if (initializedRef.current) return
+    initializedRef.current = true
 
-    if (savedAuto) {
-      applyAutoTheme()
+    const init = async () => {
+      try {
+        let saved = null
+
+        if (window.electronAPI?.storeGet) {
+          saved = await window.electronAPI.storeGet(STORAGE_KEY)
+        }
+
+        // Migration depuis localStorage (une seule fois)
+        if (saved === undefined || saved === null) {
+          const legacy = localStorage.getItem('sounddeck-auto-theme')
+          if (legacy !== null) {
+            saved = legacy === 'true'
+            await window.electronAPI?.storeSet?.(STORAGE_KEY, saved)
+            try { localStorage.removeItem('sounddeck-auto-theme') } catch (e) {}
+          }
+        }
+
+        const isAuto = saved === true
+        setAutoTheme(isAuto)
+
+        if (isAuto) {
+          applyAutoTheme()
+        }
+      } catch (e) {
+        console.warn('[ThemeToggle] Erreur init:', e)
+      }
     }
+
+    init()
 
     const interval = setInterval(() => {
       const hour = new Date().getHours()
@@ -24,6 +55,7 @@ export default function ThemeToggle({ currentTheme, onThemeChange, lang = 'fr' }
     }, 60000)
 
     return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const applyAutoTheme = () => {
@@ -33,10 +65,16 @@ export default function ThemeToggle({ currentTheme, onThemeChange, lang = 'fr' }
     onThemeChange(theme)
   }
 
-  const toggleAutoTheme = () => {
+  // ✅ FIX S4 : persister dans electron-store
+  const toggleAutoTheme = async () => {
     const newState = !autoTheme
     setAutoTheme(newState)
-    localStorage.setItem('sounddeck-auto-theme', String(newState))
+
+    try {
+      await window.electronAPI?.storeSet?.(STORAGE_KEY, newState)
+    } catch (e) {
+      console.warn('[ThemeToggle] Erreur save:', e)
+    }
 
     if (newState) {
       applyAutoTheme()

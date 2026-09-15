@@ -36,8 +36,11 @@ export function useProfiles(initialProfiles = [], initialCurrentId = 'all', save
   }, [save])
 
   const switchToNextProfile = useCallback(async () => {
+    if (!profiles.length) return
     const idx = profiles.findIndex(p => p.id === currentProfileId)
-    const next = profiles[(idx + 1) % profiles.length]
+    const nextIdx = idx === -1 ? 0 : (idx + 1) % profiles.length
+    const next = profiles[nextIdx]
+    if (!next) return
     await switchProfile(next.id)
   }, [profiles, currentProfileId, switchProfile])
 

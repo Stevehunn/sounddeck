@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+// src/core/plugins/PluginContext.jsx
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { pluginManager } from './PluginManager'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
@@ -11,46 +12,41 @@ export function PluginProvider({ children, store }) {
   const [error, setError] = useState(null)
   const { t } = useLanguage()
 
-  // Initialisation du PluginManager
+  // ✅ FIX S4 : initialisation UNE FOIS + rafraîchissement des labels
+  // au changement de langue sans re-init (early-return d'initialize)
   useEffect(() => {
     const init = async () => {
       try {
-        await pluginManager.initialize(store)
-        setPlugins(pluginManager.getLoadedPlugins())
-        // ✅ Passer la fonction de traduction à getAllPages
+        if (!pluginManager._initialized) {
+          await pluginManager.initialize(store)
+          setPlugins(pluginManager.getLoadedPlugins())
+        }
+        // Toujours rafraîchir les labels avec la langue courante
         setPages(pluginManager.getAllPages(t))
         setLoaded(true)
       } catch (e) {
         console.error('❌ Erreur initialisation PluginProvider:', e)
         setError(e.message)
-        setLoaded(true) // Ne pas bloquer l'app
+        setLoaded(true)
       }
     }
     init()
   }, [store, t])
 
-  // Rafraîchir la liste des plugins et pages
   const refresh = useCallback(() => {
     setPlugins(pluginManager.getLoadedPlugins())
-    // ✅ Passer la fonction de traduction à getAllPages
     setPages(pluginManager.getAllPages(t))
   }, [t])
 
-  // Charger un plugin
   const loadPlugin = useCallback(async (pluginInfo) => {
     const result = await pluginManager.loadPlugin(pluginInfo)
-    if (result) {
-      refresh()
-    }
+    if (result) refresh()
     return result
   }, [refresh])
 
-  // Décharger un plugin
   const unloadPlugin = useCallback(async (pluginId) => {
     const result = await pluginManager.unloadPlugin(pluginId)
-    if (result) {
-      refresh()
-    }
+    if (result) refresh()
     return result
   }, [refresh])
 
@@ -61,14 +57,15 @@ export function PluginProvider({ children, store }) {
     loaded,
     error,
     refresh,
-    getPage: (id) => pluginManager.getPage(id),
+    // ✅ FIX S4 : passer `t` à getPage pour traduire les labels
+    getPage: (id) => pluginManager.getPage(id, t),
     isPluginPage: (id) => pluginManager.isPluginPage(id),
     getPluginComponent: (id) => pluginManager.getPluginComponent(id),
     getPlugin: (id) => pluginManager.getPlugin(id),
     loadPlugin,
     unloadPlugin,
     isPluginLoaded: (id) => pluginManager.isPluginLoaded(id),
-    getLoadedPlugins: () => pluginManager.getLoadedPlugins()
+    getLoadedPlugins: () => pluginManager.getLoadedPlugins(),
   }
 
   return (

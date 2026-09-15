@@ -489,9 +489,9 @@ export default function EditorTimeline({
             left: position,
             width: 2,
             background: marker.color || '#3b82f6',
-            zIndex: 4,
+            zIndex: 6,  // ✅ FIX : > z-index du ruler (5) pour passer au-dessus
             pointerEvents: 'none',
-            opacity: 0.8,
+            opacity: 0.9,
           }}
           title={`${marker.name} (${formatTime(marker.time)})`}
         >
@@ -875,10 +875,10 @@ export default function EditorTimeline({
                       top: 0,
                       bottom: 0,
                       left: position,
-                      width: 1,
+                      width: 2,
                       background: marker.color || '#3b82f6',
-                      opacity: 0.15,
-                      zIndex: 1,
+                      opacity: 0.45,
+                      zIndex: 2,
                       pointerEvents: 'none',
                     }}
                   />

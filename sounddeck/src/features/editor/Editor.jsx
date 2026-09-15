@@ -109,7 +109,7 @@ function EditorContent() {
               updatedAt: Date.now(),
             }
             context.setProject(newProject)
-            context.store?.updateEditorProject?.(newProject)
+            context.commitProject(newProject, { skipHistory: true })
           }}
           style={{ marginTop: 8 }}
         >
@@ -508,11 +508,8 @@ function EditorTimelineContent() {
         updatedAt: Date.now(),
       }
 
-      setProject(updatedProject)
-
-      if (store?.updateEditorProject) {
-        store.updateEditorProject(updatedProject).catch(() => {})
-      }
+      // ✅ FIX S3b : commitProject gère setProject + persistence
+      context.commitProject(updatedProject, { skipHistory: true })
 
       if (context.setTrackVolume) {
         for (const track of updatedTracks) {
@@ -526,7 +523,7 @@ function EditorTimelineContent() {
         'success'
       )
     }
-  }, [project, setProject, store, addToast, context, setMasterVolume, setMasterGain, t])
+  }, [project, context, addToast, setMasterVolume, setMasterGain, t])
 
   const handleToggleMetronome = useCallback((enabled) => {
     setMetronomeEnabled(enabled)
@@ -591,10 +588,8 @@ function EditorTimelineContent() {
               updatedAt: Date.now(),
             }
 
-            setProject(updatedProject)
-            if (store?.updateEditorProject) {
-              await store.updateEditorProject(updatedProject)
-            }
+            // ✅ FIX S3b : commitProject gère setProject + persistence + historique
+            context.commitProject(updatedProject)
           }
 
           addToast?.(
@@ -610,7 +605,7 @@ function EditorTimelineContent() {
         addToast?.(`Erreur: ${e.message}`, 'error')
       }
     },
-    [tracks, selectedTrackId, project, store, setProject, addToast]
+    [tracks, selectedTrackId, project, store, context, addToast]
   )
 
   const handleCopyClip = useCallback(
@@ -684,7 +679,7 @@ function EditorTimelineContent() {
       return
     }
 
-    if (!project || !store?.updateEditorProject) {
+    if (!project) {
       addToast?.('Impossible de coller le clip', 'error')
       return
     }
@@ -732,8 +727,8 @@ function EditorTimelineContent() {
       updatedAt: Date.now(),
     }
 
-    await store.updateEditorProject(updatedProject)
-    setProject(updatedProject)
+    // ✅ FIX S3b : commitProject gère setProject + persistence + historique
+    context.commitProject(updatedProject)
     setClipDurations((prev) => ({ ...prev, [newClip.id]: newClip.duration || 3 }))
 
     addToast?.(`"${newClip.name}" ${t('editorPasted')}`, 'success')
@@ -744,8 +739,7 @@ function EditorTimelineContent() {
     selectedTrackId,
     tracks,
     project,
-    store,
-    setProject,
+    context,
     setClipDurations,
     setSelectedClipId,
     setSelectedTrackId,
@@ -1005,12 +999,11 @@ function EditorTimelineContent() {
     ]
   )
 
-  const undoEditor =
-    store?.undoEditor || (() => addToast?.('Undo non disponible', 'info'))
-  const redoEditor =
-    store?.redoEditor || (() => addToast?.('Redo non disponible', 'info'))
-  const canUndo = store?.canUndoEditor || false
-  const canRedo = store?.canRedoEditor || false
+  // ✅ FIX S3b : utiliser le contexte (store core désynchronisé)
+  const undoEditor = context.undoEditor
+  const redoEditor = context.redoEditor
+  const canUndo = context.canUndoEditor
+  const canRedo = context.canRedoEditor
 
   const handleToggleEffectsPanel = useCallback((show) => {
     setShowEffectsPanel(show)
@@ -1121,24 +1114,12 @@ function EditorTimelineContent() {
     onAddTrack: handleAddTrack,
     onAddMarker: () => {
       const markers = project?.markers || []
-      const markerId =
-        typeof crypto !== 'undefined' && crypto.randomUUID
-          ? `marker-${crypto.randomUUID().slice(0, 8)}`
-          : `marker-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-
-      const newMarker = {
-        id: markerId,
+      // ✅ FIX S3b : passer par context.addMarker (le store core n'est plus synchronisé)
+      context.addMarker({
         name: `Marqueur ${markers.length + 1}`,
         time: currentTime,
         color: '#3b82f6',
-      }
-      const updatedProject = {
-        ...project,
-        markers: [...markers, newMarker],
-        updatedAt: Date.now(),
-      }
-      store?.updateEditorProject?.(updatedProject)
-      addToast?.('Marqueur ajouté', 'success')
+      })
     },
     onDelete: () => {
       if (selectedClipId && selectedTrackId) {
@@ -1224,13 +1205,16 @@ function EditorTimelineContent() {
             addToast?.('Nom invalide', 'warning')
             return
           }
-          const result = await projectManager.renameProject(
-            project.id,
-            newName.trim()
-          )
-          if (result) {
-            setProject(result)
-            addToast?.(`Projet renommé en "${newName}"`, 'success')
+          const trimmed = newName.trim()
+          // ✅ FIX S3b : commitProject + persist
+          const ok = context.updateEditorProjectName(trimmed)
+          if (ok) {
+            try {
+              await projectManager.renameProject(project.id, trimmed)
+            } catch (e) {
+              // silencieux — commitProject a déjà persisté
+            }
+            addToast?.(`Projet renommé en "${trimmed}"`, 'success')
           }
         }}
         onRefreshDurations={() => {}}
@@ -1302,13 +1286,14 @@ function EditorTimelineContent() {
           onClipDuplicate={duplicateClip}
           onClipFade={context.setClipFade || (() => {})}
           onClipContextMenu={handleClipContextMenu}
-          onDragCheckpoint={store?.pushEditorHistoryCheckpoint || (() => {})}
+          // ✅ FIX S3b : utiliser le contexte au lieu du store core
+          onDragCheckpoint={context.pushEditorHistoryCheckpoint}
           onTrackRemove={handleRemoveTrack}
           onSeek={seek}
           onTrackMute={muteTrack}
           onTrackSolo={soloTrack}
           onTrackVolume={setTrackVolume}
-          onTrackReorder={store?.reorderTracks || (() => {})}
+          onTrackReorder={context.reorderTracks}
           onRenameTrack={renameTrack}
           onSetLoopRegion={setLoopRegion}
           onClearLoop={clearLoop}

@@ -32,6 +32,7 @@ import {
 } from '@core/services/AudioMixerService'
 import { initBackupManager, stopAutoBackup, startAutoBackup } from '@shared/utils/backupManager'
 import useConfirm from '@shared/hooks/useConfirm'
+import { clearAllErrorLogs } from '@shared/utils/errorHandler'
 
 const SECTIONS = [
   { id: 'appearance', icon: 'ti-palette', labelKey: 'optionsAppearance' },
@@ -404,7 +405,7 @@ export default function Options({ store, addToast }) {
 
   const handleClearLogs = useCallback(async () => {
     try {
-      await window.electronAPI.storeDelete('errorLogs')
+      await clearAllErrorLogs()
       addToast(t('logsCleared'), 'info')
     } catch (e) {
       addToast('❌ ' + e.message, 'error')

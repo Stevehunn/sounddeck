@@ -17,7 +17,6 @@ async function readLogsFromStore() {
       const raw = await window.electronAPI.storeGet('errorLogs')
       return Array.isArray(raw) ? raw : []
     }
-    // Fallback localStorage
     const raw = localStorage.getItem('sounddeck-error-logs')
     return raw ? JSON.parse(raw) : []
   } catch (e) {
@@ -40,7 +39,6 @@ async function writeLogsToStore(logs) {
   }
 }
 
-// Debounce : évite de spammer le store si 50 erreurs arrivent d'un coup
 function scheduleWrite() {
   if (pendingWrite) return
   pendingWrite = setTimeout(async () => {
@@ -54,7 +52,6 @@ function scheduleWrite() {
 export function setupGlobalErrorHandler() {
   if (typeof window === 'undefined') return
 
-  // Charger les logs existants au démarrage
   readLogsFromStore().then(logs => {
     if (logs.length > 0) {
       errorLogs = logs
@@ -76,9 +73,6 @@ export function setupGlobalErrorHandler() {
 
 // ─── CORE ───────────────────────────────────────────────────────────────────
 
-/**
- * Enregistre une erreur (synchrone pour l'appelant, asynchrone pour le store)
- */
 export function handleError(error, type = 'unknown', context = null) {
   const errorEntry = {
     id: Date.now() + '_' + Math.random().toString(36).slice(2, 7),
@@ -91,23 +85,18 @@ export function handleError(error, type = 'unknown', context = null) {
     url: typeof window !== 'undefined' ? window.location?.href : null,
   }
 
-  // Log console (dev uniquement)
   if (isDev()) {
     console.error(`❌ [${type}]`, error)
   }
 
-  // Ajouter en tête
   errorLogs = [errorEntry, ...errorLogs].slice(0, MAX_LOGS)
 
-  // Persister (debounced)
   scheduleWrite()
 
-  // Notifier les abonnés (hooks React)
   errorDialogCallbacks.forEach(cb => {
     try { cb(errorEntry) } catch (e) { /* silent */ }
   })
 
-  // Afficher pour les erreurs critiques
   if (isCriticalError(error)) {
     showErrorToUser(errorEntry)
   }
@@ -240,8 +229,6 @@ export async function reportError(errorId) {
   if (!error) return { success: false, error: 'Erreur introuvable' }
 
   try {
-    // TODO: brancher un backend de collecte si tu en ajoutes un plus tard.
-    // Pour l'instant : feedback local + log console.
     if (isDev()) {
       console.info('📤 [reportError] Erreur signalée:', error)
     }
@@ -284,6 +271,7 @@ export function useErrorLogs() {
     })
 
     const callback = (entry) => {
+      if (!entry) return
       setLogs(prev => [entry, ...prev].slice(0, MAX_LOGS))
     }
     errorDialogCallbacks.push(callback)
@@ -296,24 +284,50 @@ export function useErrorLogs() {
   }, [])
 
   const clearLogs = async () => {
-    errorLogs = []
+    await clearAllErrorLogs()
     setLogs([])
-    await writeLogsToStore([])
-    try { localStorage.removeItem('sounddeck-error-logs') } catch {}
   }
 
-  const exportLogs = () => {
+  // ✅ FIX S4 : exportLogs utilise exportJsonFile (IPC) au lieu de Blob
+  const exportLogs = async () => {
     const json = JSON.stringify(logs, null, 2)
-    const blob = new Blob([json], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `sounddeck-error-logs-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
+    const defaultName = `sounddeck-error-logs-${new Date().toISOString().slice(0, 10)}.json`
+
+    if (window.electronAPI?.exportJsonFile) {
+      return await window.electronAPI.exportJsonFile(
+        json,
+        defaultName,
+        'Exporter les logs d\'erreur'
+      )
+    }
+
+    // Fallback : download navigateur
+    try {
+      const blob = new Blob([json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = defaultName
+      a.click()
+      URL.revokeObjectURL(url)
+      return { success: true }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
   }
 
   return { logs, clearLogs, exportLogs }
+}
+
+// ✅ FIX S4 : fonction exposée pour vider le cache module + le store
+export async function clearAllErrorLogs() {
+  errorLogs = []
+  await writeLogsToStore([])
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('sounddeck-error-logs')
+    }
+  } catch (e) { /* silent */ }
 }
 
 // ─── HELPERS PUBLICS ────────────────────────────────────────────────────────
@@ -335,4 +349,5 @@ export default {
   useErrorHandler,
   useErrorLogs,
   getErrorLogsFromStore,
+  clearAllErrorLogs,
 }

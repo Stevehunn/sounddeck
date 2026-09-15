@@ -72,9 +72,9 @@ export function useProjectManager(store, project, setProject, addToast) {
         
         try {
           await window.electronAPI.storeSet?.('currentEditorProjectId', projectId)
-          if (store?.updateEditorProject) {
-            await store.updateEditorProject(result.project)
-          }
+          // ✅ FIX S3c : saveEditorProject écrit dans editorProjects[id] + currentEditorProjectId
+          // Plus besoin d'appeler store.updateEditorProject
+          await window.electronAPI.saveEditorProject?.(result.project)
         } catch (e) {
           console.warn('⚠️ Impossible de sauvegarder:', e)
         }
@@ -93,7 +93,7 @@ export function useProjectManager(store, project, setProject, addToast) {
     } finally {
       setIsLoading(false)
     }
-  }, [setProject, addToast, loadRecentProjects, store])
+  }, [setProject, addToast, loadRecentProjects])
 
   const createProject = useCallback(async (name) => {
     try {
@@ -234,9 +234,7 @@ export function useProjectManager(store, project, setProject, addToast) {
           
           try {
             await window.electronAPI.storeSet?.('currentEditorProjectId', projectId)
-            if (store?.updateEditorProject) {
-              await store.updateEditorProject(result.project)
-            }
+            // ✅ FIX S3c : pas besoin de store.updateEditorProject
           } catch (e) {
             console.warn('⚠️ Impossible de sauvegarder:', e)
           }
@@ -253,7 +251,7 @@ export function useProjectManager(store, project, setProject, addToast) {
       addToast?.('Erreur lors du renommage: ' + e.message, 'error')
       return null
     }
-  }, [project, setProject, addToast, loadProjectList, loadRecentProjects, store])
+  }, [project, setProject, addToast, loadProjectList, loadRecentProjects])
 
   useEffect(() => {
     loadRecentProjects()
@@ -278,5 +276,4 @@ export function useProjectManager(store, project, setProject, addToast) {
   }
 }
 
-// ✅ EXPORT PAR DÉFAUT - AJOUTÉ POUR LA COMPATIBILITÉ
 export default useProjectManager
