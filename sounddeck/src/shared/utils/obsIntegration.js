@@ -1,42 +1,44 @@
+// src/shared/utils/obsIntegration.js
 // Intégration OBS WebSocket
 
 let obsWebSocket = null
 let obsConnected = false
 let reconnectTimer = null
 
-// Configuration OBS
-const OBS_CONFIG = {
+// Configuration OBS par défaut
+const DEFAULT_OBS_CONFIG = {
   host: 'localhost',
   port: 4455,
   password: '',
   reconnectInterval: 5000
 }
 
+// ✅ S5 : mémoriser la dernière config utilisée pour la reconnexion
+let lastUsedConfig = { ...DEFAULT_OBS_CONFIG }
+
 /**
  * Connecte SoundDeck à OBS via WebSocket
  */
 export async function connectOBS(config = {}) {
-  const finalConfig = { ...OBS_CONFIG, ...config }
-  
+  const finalConfig = { ...DEFAULT_OBS_CONFIG, ...config }
+  // ✅ S5 : sauvegarder la config pour la reconnexion
+  lastUsedConfig = { ...finalConfig }
+
   try {
-    // Importer dynamiquement le client OBS WebSocket
     const OBSWebSocketModule = await import('obs-websocket-js')
     const OBSWebSocket = OBSWebSocketModule.default || OBSWebSocketModule
-    
+
     obsWebSocket = new OBSWebSocket()
-    
+
     await obsWebSocket.connect(
       `ws://${finalConfig.host}:${finalConfig.port}`,
       finalConfig.password
     )
-    
+
     obsConnected = true
-    
-    // Configurer les événements
     setupOBSEvents()
-    
+
     return { success: true, connected: true }
-    
   } catch (e) {
     console.error('❌ Erreur connexion OBS:', e.message)
     obsConnected = false
@@ -68,20 +70,18 @@ export function disconnectOBS() {
  */
 function setupOBSEvents() {
   if (!obsWebSocket) return
-  
+
   try {
-    obsWebSocket.on('ConnectionOpened', () => {
-    })
-    
     obsWebSocket.on('ConnectionClosed', () => {
       obsConnected = false
       if (!reconnectTimer) {
+        // ✅ S5 : utiliser lastUsedConfig au lieu des defaults
         reconnectTimer = setInterval(() => {
-          connectOBS()
-        }, OBS_CONFIG.reconnectInterval)
+          connectOBS(lastUsedConfig)
+        }, lastUsedConfig.reconnectInterval)
       }
     })
-    
+
     obsWebSocket.on('error', (error) => {
       console.error('❌ Erreur OBS:', error)
     })
@@ -98,7 +98,7 @@ export async function sendOBSCommand(command, params = {}) {
     console.warn('⚠️ OBS non connecté')
     return { success: false, error: 'OBS non connecté' }
   }
-  
+
   try {
     const result = await obsWebSocket.call(command, params)
     return { success: true, result }
@@ -108,64 +108,40 @@ export async function sendOBSCommand(command, params = {}) {
   }
 }
 
-/**
- * Change la scène OBS
- */
 export async function switchOBSScene(sceneName) {
   return await sendOBSCommand('SetCurrentProgramScene', { sceneName })
 }
 
-/**
- * Active/Désactive le mode studio OBS
- */
 export async function toggleStudioMode() {
   const state = await sendOBSCommand('GetStudioModeEnabled')
   if (state.success) {
-    return await sendOBSCommand('SetStudioModeEnabled', { 
-      studioModeEnabled: !state.result.studioModeEnabled 
+    return await sendOBSCommand('SetStudioModeEnabled', {
+      studioModeEnabled: !state.result.studioModeEnabled
     })
   }
   return state
 }
 
-/**
- * Démarre l'enregistrement OBS
- */
 export async function startOBSRecording() {
   return await sendOBSCommand('StartRecord')
 }
 
-/**
- * Arrête l'enregistrement OBS
- */
 export async function stopOBSRecording() {
   return await sendOBSCommand('StopRecord')
 }
 
-/**
- * Démarre le streaming OBS
- */
 export async function startOBSStreaming() {
   return await sendOBSCommand('StartStream')
 }
 
-/**
- * Arrête le streaming OBS
- */
 export async function stopOBSStreaming() {
   return await sendOBSCommand('StopStream')
 }
 
-/**
- * Envoie une alerte personnalisée vers OBS (via Browser Source)
- */
 export function sendOBSAlert(message, type = 'info', duration = 3000) {
   return { success: true }
 }
 
-/**
- * Obtient le statut de connexion OBS
- */
 export function getOBSStatus() {
   return {
     connected: obsConnected,

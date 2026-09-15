@@ -36,7 +36,20 @@ export const TUTORIAL_STEPS = (t) => [
     description: t('tutorialDiscoverStep4Desc'),
     icon: '✏️',
     target: '[data-testid="discover-category-editor-button"]',
-    fallbackTarget: 'button:contains("Personnaliser les catégories")',
+    fallbackTarget: () => {
+      const buttons = document.querySelectorAll('button')
+      for (const b of buttons) {
+        const text = b.textContent || ''
+        if (
+          text.includes('Personnaliser') ||
+          text.includes('Customize') ||
+          text.includes('Personalizar')
+        ) {
+          if (b.offsetParent !== null) return b
+        }
+      }
+      return null
+    },
     hint: t('tutorialDiscoverStep4Hint'),
     position: 'bottom',
   },

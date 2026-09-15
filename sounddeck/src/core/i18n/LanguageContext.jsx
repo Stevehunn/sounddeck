@@ -10,12 +10,11 @@ import esTranslations from './locales/es/index.js'
 import myinstantsI18n from '../../plugins/myinstants/i18n.js'
 import youtubeI18n from '../../plugins/youtube/i18n.js'
 
-// Langues supportées
-export const LANGUAGES = [
-  { code: 'fr', label: 'Français', flag: '🇫🇷' },
-  { code: 'en', label: 'English', flag: '🇬🇧' },
-  { code: 'es', label: 'Español', flag: '🇪🇸' },
-]
+// ✅ S5 : import depuis constants.js (plus de dépendance circulaire)
+import { LANGUAGES } from './constants.js'
+
+// Réexport pour compatibilité
+export { LANGUAGES }
 
 // Traductions de base (application)
 const APP_TRANSLATIONS = {
@@ -24,7 +23,6 @@ const APP_TRANSLATIONS = {
   es: esTranslations,
 }
 
-// Extrait les traductions d'un plugin pour une langue
 const getPluginTranslations = (pluginModule, lang) => {
   if (!pluginModule) return {}
   const translations = pluginModule.default || pluginModule
@@ -46,16 +44,13 @@ const PLUGIN_TRANSLATIONS = {
   },
 }
 
-// ✅ FIX : Les traductions de l'app (core) sont prioritaires.
-// Les plugins viennent par-dessus mais ne peuvent PAS écraser les clés
-// core comme `error`, `success`, `loading`, `close`, `cancel`, etc.
-// On fusionne dans l'ordre : plugin puis app (app écrase plugin).
+// ✅ Les traductions core sont prioritaires (ne peuvent pas être écrasées par les plugins)
 const MERGED_TRANSLATIONS = {}
 
 for (const lang of Object.keys(APP_TRANSLATIONS)) {
   MERGED_TRANSLATIONS[lang] = {
     ...(PLUGIN_TRANSLATIONS[lang] || {}),
-    ...APP_TRANSLATIONS[lang], // ← core écrase plugin
+    ...APP_TRANSLATIONS[lang],
   }
 }
 
@@ -111,13 +106,7 @@ export function LanguageProvider({ children }) {
     }
   }, [currentLang])
 
-  // ✅ FIX : t() gère maintenant les placeholders nommés ET positionnels
-  //
-  // Usage :
-  //   t('key')                              → string brute (avec {xxx} non remplacés)
-  //   t('key', 'val0', 'val1')              → remplace {0}, {1}
-  //   t('key', { name: 'Marc', count: 3 })  → remplace {name}, {count}
-  //
+  // ✅ t() gère les placeholders nommés ET positionnels
   const t = useCallback((key, ...args) => {
     const keys = key.split('.')
     let value = MERGED_TRANSLATIONS[currentLang]
@@ -127,7 +116,6 @@ export function LanguageProvider({ children }) {
     }
 
     if (typeof value === 'string' && args.length > 0) {
-      // Cas 1 : premier arg = objet → placeholders nommés
       if (
         args[0] !== null &&
         typeof args[0] === 'object' &&
@@ -140,7 +128,6 @@ export function LanguageProvider({ children }) {
         })
       }
 
-      // Cas 2 : placeholders positionnels {0}, {1}, ...
       return value.replace(/\{(\d+)\}/g, (_, index) => {
         const arg = args[parseInt(index, 10)]
         return arg !== undefined && arg !== null ? String(arg) : `{${index}}`

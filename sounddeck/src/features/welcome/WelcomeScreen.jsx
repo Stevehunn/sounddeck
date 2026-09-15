@@ -1,6 +1,6 @@
 // src/features/welcome/WelcomeScreen.jsx
 import { useState, useEffect } from 'react'
-import { LANGUAGES } from "@core/i18n/locales";
+import { LANGUAGES } from "@core/i18n/constants";
 import { useLanguage } from '@core/i18n/LanguageContext'
 
 export default function WelcomeScreen({ onComplete }) {

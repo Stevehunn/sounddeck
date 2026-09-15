@@ -489,11 +489,25 @@ function registerFileHandlers(mainWindow, soundsDir) {
       const { execFile } = require('child_process')
 
       return new Promise((resolve) => {
+        const ext = path.extname(filePath).toLowerCase().replace('.', '')
+        let codecArgs
+        if (ext === 'mp3') {
+          codecArgs = ['-c:a', 'libmp3lame', '-q:a', '2']
+        } else if (ext === 'wav') {
+          codecArgs = ['-c:a', 'pcm_s16le']
+        } else if (ext === 'ogg' || ext === 'opus') {
+          codecArgs = ['-c:a', 'libvorbis', '-q:a', '5']
+        } else if (ext === 'm4a' || ext === 'aac') {
+          codecArgs = ['-c:a', 'aac', '-b:a', '192k']
+        } else {
+          codecArgs = ['-c:a', 'libmp3lame', '-q:a', '2']
+        }
+
         const args = [
           '-i', filePath,
           '-ss', String(startTime),
           '-t', String(duration),
-          '-c', 'copy',
+          ...codecArgs,
           '-y',
           outputPath
         ]
@@ -1126,15 +1140,12 @@ function registerFileHandlers(mainWindow, soundsDir) {
   })
 
   ipcMain.handle('download-platform-track', async (event, params) => {
-    const { outputPath } = params
-
-    try {
-      const dummyAudioBuffer = Buffer.alloc(1024 * 100)
-      fs.writeFileSync(outputPath, dummyAudioBuffer)
-
-      return { success: true, path: outputPath }
-    } catch (e) {
-      return { success: false, error: e.message }
+    const { platform, url, outputPath } = params || {}
+    console.warn(`⚠️ [download-platform-track] Non implémenté (platform=${platform}, url=${url})`)
+    return {
+      success: false,
+      error: `Le téléchargement depuis ${platform || 'cette plateforme'} n'est pas implémenté. Utilisez YouTube ou MyInstants.`,
+      outputPath
     }
   })
 

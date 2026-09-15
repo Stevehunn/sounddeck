@@ -228,16 +228,18 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
-  if (!isQuitting) {
-    if (process.platform !== 'darwin') {
-      return
-    }
-  }
   if (isQuitting) {
     shortcutManager.cleanupShortcuts()
     trayManager.destroyTray()
     app.quit()
+    return
   }
+
+  // L'app reste vivante dans le tray
+  if (process.platform === 'darwin') {
+    return
+  }
+
 })
 
 app.on('before-quit', () => {

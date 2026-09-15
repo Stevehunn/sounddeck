@@ -107,7 +107,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
       let mode = category.mode
       let query = category.query
 
-      const fetchWithTimeout = (promise, timeout = 200000) => {
+      const fetchWithTimeout = (promise, timeout = 20000) => {
         return Promise.race([
           promise,
           new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeout))
@@ -204,7 +204,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
 
       try {
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout')), 200000)
+          setTimeout(() => reject(new Error('Timeout')), 20000)
         )
 
         let result
