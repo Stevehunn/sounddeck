@@ -1,6 +1,8 @@
 // src/core/services/AudioService.js
 import { Howl } from 'howler'
 import * as AudioMixerService from './AudioMixerService'
+import { buildFileUrl } from '@shared/utils/fileUrl'
+import { withTemporaryAudioContext } from '@shared/utils/audioContext'
 
 const soundCache = {}
 const gainCache = {}
@@ -57,49 +59,34 @@ export function setCurrentPlayingProgress(soundId, current, duration) {
   }
 }
 
-// ─── BUILD FILE URL ────────────────────────────────────────────────────────
-function buildFileUrl(filePath) {
-  if (!filePath) return null
-  if (filePath.startsWith('file://') || filePath.startsWith('http')) return filePath
-
-  let normalized = filePath.replace(/\\/g, '/')
-  const parts = normalized.split('/')
-  const encodedParts = parts.map((part, i) => {
-    if (part === '' || /^[A-Za-z]:$/.test(part)) return part
-    return encodeURIComponent(part).replace(/%2F/gi, '/')
-  })
-
-  return 'file:///' + encodedParts.join('/')
-}
-
 // ─── ANALYSE GAIN ──────────────────────────────────────────────────────────
 export async function analyzeGain(filePath, sampleCount = 200) {
   if (gainCache[filePath]) return gainCache[filePath]
 
   try {
     const fileUrl = buildFileUrl(filePath)
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-    const response = await fetch(fileUrl)
-    const arrayBuffer = await response.arrayBuffer()
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-    await audioContext.close()
 
-    const channelData = audioBuffer.getChannelData(0)
-    let sumSquares = 0
-    const step = Math.max(1, Math.floor(channelData.length / sampleCount))
+    // ✅ S6 : withTemporaryAudioContext gère fetch + decode + close
+    const result = await withTemporaryAudioContext(fileUrl, (audioBuffer) => {
+      const channelData = audioBuffer.getChannelData(0)
+      let sumSquares = 0
+      const step = Math.max(1, Math.floor(channelData.length / sampleCount))
 
-    for (let i = 0; i < channelData.length; i += step) {
-      sumSquares += channelData[i] * channelData[i]
-    }
+      for (let i = 0; i < channelData.length; i += step) {
+        sumSquares += channelData[i] * channelData[i]
+      }
 
-    const rms = Math.sqrt(sumSquares / (channelData.length / step))
-    const defaultTarget = 0.2
-    const targetRMS = gainCache.targetRMS || defaultTarget
-    const gain = rms > 0.001 ? targetRMS / rms : 1
-    const gainDb = 20 * Math.log10(Math.min(gain, 20))
+      const rms = Math.sqrt(sumSquares / (channelData.length / step))
+      const defaultTarget = 0.2
+      const targetRMS = gainCache.targetRMS || defaultTarget
+      const gain = rms > 0.001 ? targetRMS / rms : 1
+      const gainDb = 20 * Math.log10(Math.min(gain, 20))
 
-    gainCache[filePath] = gainDb
-    return gainDb
+      return gainDb
+    })
+
+    gainCache[filePath] = result ?? 0
+    return gainCache[filePath]
   } catch (e) {
     console.warn('Gain analysis failed:', e)
     return 0
@@ -132,7 +119,7 @@ export function getFinalVolumeForSound(sound, globalVolume = 80) {
 function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
   const gainDb = gainCache[sound.path] || 0
   const volumeRatio = calculateFinalVolume(globalVolume, sound.volume ?? 0, gainDb)
-  let fileUrl = buildFileUrl(sound.path)
+  const fileUrl = buildFileUrl(sound.path)
 
   const rawExt = sound.path.split('.').pop()?.split('?')[0]?.split('#')[0]?.toLowerCase()
   const validFormats = ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'opus', 'webm']
@@ -336,126 +323,15 @@ export async function playSoundAsync(sound, audioDevice = 'default', globalVolum
   if (!sound?.path) return
   notifyPlaybackListeners(sound.id)
 
-  let gainDb = 0
   if (sound.path && !gainCache[sound.path]) {
     try {
-      gainDb = await analyzeGain(sound.path)
+      await analyzeGain(sound.path)
     } catch (e) {
       console.warn('Gain analysis failed, using default:', e)
     }
-  } else if (sound.path) {
-    gainDb = gainCache[sound.path] || 0
   }
 
-  const volumeRatio = calculateFinalVolume(globalVolume, sound.volume ?? 0, gainDb)
-  let fileUrl = buildFileUrl(sound.path)
-
-  const rawExt = sound.path.split('.').pop()?.split('?')[0]?.split('#')[0]?.toLowerCase()
-  const validFormats = ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'opus', 'webm']
-  const format = validFormats.includes(rawExt) ? rawExt : 'mp3'
-
-  if (soundCache[sound.id]) {
-    const cached = soundCache[sound.id]
-    if (Array.isArray(cached)) {
-      cached.forEach(h => { try { h.stop(); h.unload() } catch(e){} })
-    } else {
-      try { cached.stop(); cached.unload() } catch(e){}
-    }
-    delete soundCache[sound.id]
-    return
-  }
-
-  if (!audioDevice || audioDevice === 'default') {
-    const howl = new Howl({
-      src: [fileUrl],
-      volume: volumeRatio,
-      html5: false,
-      loop,
-      format: [format],
-      onend: () => {
-        if (!loop) {
-          delete soundCache[sound.id]
-          if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
-        }
-      },
-      onstop: () => {
-        delete soundCache[sound.id]
-        if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
-      },
-      onloaderror: (id, err) => {
-        console.error('Erreur:', err)
-        delete soundCache[sound.id]
-        if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
-      }
-    })
-    soundCache[sound.id] = howl
-    howl.play()
-    return
-  }
-
-  try {
-    const howls = []
-
-    const howlDiscord = new Howl({
-      src: [fileUrl],
-      volume: volumeRatio,
-      html5: true,
-      loop,
-      format: [format],
-      onend: () => {
-        if (!loop) {
-          delete soundCache[sound.id]
-          if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
-        }
-      },
-      onstop: () => {
-        delete soundCache[sound.id]
-        if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
-      },
-      onloaderror: (id, err) => { console.error('Erreur device virtuel:', err) }
-    })
-
-    howlDiscord.once('play', () => {
-      try {
-        const audioNode = howlDiscord._sounds?.[0]?._node
-        if (audioNode && audioNode.setSinkId) {
-          audioNode.setSinkId(audioDevice).catch(e => console.warn('setSinkId failed:', e))
-        }
-      } catch (e) { console.warn('setSinkId error:', e) }
-    })
-
-    howls.push(howlDiscord)
-    howlDiscord.play()
-
-    if (playLocally) {
-      const howlLocal = new Howl({
-        src: [fileUrl],
-        volume: volumeRatio,
-        html5: true,
-        loop,
-        format: [format],
-        onloaderror: (id, err) => { console.error('Erreur local:', err) }
-      })
-      howlLocal.once('play', () => {
-        try {
-          const audioNode = howlLocal._sounds?.[0]?._node
-          if (audioNode && audioNode.setSinkId) {
-            audioNode.setSinkId('default').catch(() => {})
-          }
-        } catch (e) {}
-      })
-      howls.push(howlLocal)
-      howlLocal.play()
-    }
-
-    soundCache[sound.id] = howls
-
-  } catch (e) {
-    console.error('playSound error:', e)
-    const howl = new Howl({ src: [fileUrl], volume: volumeRatio, html5: false, loop, format: [format] })
-    soundCache[sound.id] = howl
-    howl.play()
-  }
+  playSound(sound, audioDevice, globalVolume, loop, playLocally)
 }
 
 export async function analyzeAllGains(sounds, onProgress) {

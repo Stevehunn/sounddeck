@@ -8,9 +8,9 @@ import {
   DEFAULT_GROUPS,
   DEFAULT_ICONS,
 } from '@shared/constants/navigation'
+import { buildFileUrl } from '@shared/utils/fileUrl'
 
 // Map des labels par défaut pour les éléments (traductions)
-// → dépend de `t()`, reste local
 const getDefaultLabels = (t) => ({
   home: t('mySounds'),
   discover: t('discover'),
@@ -896,11 +896,7 @@ const Sidebar = memo(
               >
                 {playingSound.image ? (
                   <img
-                    src={
-                      playingSound.image.startsWith('file://')
-                        ? playingSound.image
-                        : `file:///${playingSound.image.replace(/\\/g, '/')}`
-                    }
+                    src={buildFileUrl(playingSound.image)}
                     alt=""
                     style={{
                       width: 24,

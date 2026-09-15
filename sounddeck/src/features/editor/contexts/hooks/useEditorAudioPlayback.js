@@ -1,5 +1,6 @@
 // src/features/editor/contexts/hooks/useEditorAudioPlayback.js
 import { useCallback, useRef, useEffect } from 'react'
+import { getSharedAudioContext, loadAudioBuffer as loadAudioBufferShared } from '@shared/utils/audioContext'
 
 export function useEditorAudioPlayback(core) {
   const {
@@ -62,24 +63,7 @@ export function useEditorAudioPlayback(core) {
 
   // ─── LOAD BUFFER ───────────────────────────────────────────────────────
   const loadAudioBuffer = useCallback(async (filePath) => {
-    try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
-      }
-      const ctx = audioContextRef.current
-      if (ctx.state === 'suspended') await ctx.resume()
-
-      const fileUrl = filePath.startsWith('file://')
-        ? filePath
-        : 'file:///' + filePath.replace(/\\/g, '/')
-
-      const response = await fetch(fileUrl)
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      const arrayBuffer = await response.arrayBuffer()
-      return await ctx.decodeAudioData(arrayBuffer)
-    } catch (e) {
-      return null
-    }
+    return await loadAudioBufferShared(filePath)
   }, [])
 
   // ─── PLAY CLIP ─────────────────────────────────────────────────────────
@@ -96,7 +80,7 @@ export function useEditorAudioPlayback(core) {
       const buffer = await loadAudioBuffer(clip.path)
       if (!buffer) return
 
-      const ctx = audioContextRef.current
+      const ctx = getSharedAudioContext()
       if (!ctx) return
 
       let sourceBuffer = buffer

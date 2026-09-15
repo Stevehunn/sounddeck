@@ -1,5 +1,6 @@
 // src/features/editor/contexts/hooks/useEditorCore.js
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { getAudioFileDuration } from '@shared/utils/audioContext'
 
 const __DEBUG__ = typeof import.meta !== 'undefined' && import.meta.env?.DEV
 const log = __DEBUG__ ? console.log.bind(console) : () => {}
@@ -42,14 +43,6 @@ const DEFAULT_TIMELINE_LOOP = {
   manualDuration: 10,
   startManualTime: 0,
   endManualTime: 10
-}
-
-let __sharedDurationCtx = null
-function getSharedDurationCtx() {
-  if (!__sharedDurationCtx || __sharedDurationCtx.state === 'closed') {
-    __sharedDurationCtx = new (window.AudioContext || window.webkitAudioContext)()
-  }
-  return __sharedDurationCtx
 }
 
 export function useEditorCore({ store, addToast, t }) {
@@ -151,20 +144,7 @@ export function useEditorCore({ store, addToast, t }) {
   }, [])
 
   const getAudioDuration = useCallback(async (filePath) => {
-    try {
-      const fileUrl = filePath.startsWith('file://')
-        ? filePath
-        : 'file:///' + filePath.replace(/\\/g, '/')
-      const response = await fetch(fileUrl)
-      if (!response.ok) return 3
-      const arrayBuffer = await response.arrayBuffer()
-      const ctx = getSharedDurationCtx()
-      if (ctx.state === 'suspended') await ctx.resume().catch(() => {})
-      const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
-      return audioBuffer.duration
-    } catch (e) {
-      return 3
-    }
+    return await getAudioFileDuration(filePath, 3)
   }, [])
 
   // ─── PERSISTANCE ────────────────────────────────────────────────────────

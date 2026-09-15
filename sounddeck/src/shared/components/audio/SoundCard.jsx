@@ -6,6 +6,7 @@ import ShortcutRecorder from '@shared/components/settings/ShortcutRecorder'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import useConfirm from '@shared/hooks/useConfirm'
 import { formatTime } from '@shared/utils/format'
+import { buildFileUrl } from '@shared/utils/fileUrl'
 
 function convertOldVolumeToDb(oldVolume) {
   if (oldVolume === undefined || oldVolume === null) return 0
@@ -14,20 +15,6 @@ function convertOldVolumeToDb(oldVolume) {
 }
 
 const EMOJI_LIST = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋','🎤','🦄','💯','🤡','👾','🪇','🪘','🎸','🎹','🎷','🎼','🎧','📢','📣','🔇','🔈','🔉','💬','🗣️','👥','👤','🎭','🎪','🎨','🎬','🕹️','🎲','🧩','🎯','🎱','🎳','🎰','🧨','💣','🗡️','⚔️','🛡️','🏹','🪃','🪄','🔮','🧿','💎','🪙','💰','💵','💶','💷','💴','🪪','📱','📲','💻','🖥️','🖨️','⌨️','🖱️','🖲️','💽','💾','💿','📀','🧮','📟','☎️','📞','📠','📺','📻','🎙️','🎚️','🎛️','🧭','⏰','⏳','⌛️']
-
-function buildImageUrl(imgPath) {
-  if (!imgPath) return null
-  if (imgPath.startsWith('file://') || imgPath.startsWith('http')) return imgPath
-  const normalized = imgPath.replace(/\\/g, '/')
-  const parts = normalized.split('/')
-  const encoded = parts
-    .map((part) => {
-      if (part === '' || /^[A-Za-z]:$/.test(part)) return part
-      return encodeURIComponent(part)
-    })
-    .join('/')
-  return 'file:///' + encoded
-}
 
 export default function SoundCard({
   sound,
@@ -178,7 +165,8 @@ export default function SoundCard({
       cardRef.current.style.cursor = draggable ? 'grab' : 'default'
   }, [draggable])
 
-  const imageUrl = buildImageUrl(sound.image)
+  // ✅ S6 : buildFileUrl au lieu de buildImageUrl
+  const imageUrl = buildFileUrl(sound.image)
   const showImage = !!sound.image && !imgError
 
   const calculateMenuPosition = useCallback(() => {

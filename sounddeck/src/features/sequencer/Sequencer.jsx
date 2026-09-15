@@ -13,6 +13,7 @@ import {
 } from '@core/services/AudioService'
 import useConfirm from '@shared/hooks/useConfirm'
 import { formatTime } from '@shared/utils/format'
+import { buildFileUrl } from '@shared/utils/fileUrl'
 
 export default function Sequencer({ store, addToast, lang = 'fr' }) {
   const { t, currentLang } = useLanguage()
@@ -745,7 +746,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, onSav
 
               <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0, overflow: 'hidden' }}>
                 {sound?.image
-                  ? <img src={sound.image.startsWith('file://') ? sound.image : `file:///${sound.image.replace(/\\/g, '/')}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ? <img src={buildFileUrl(sound.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   : (sound?.emoji || '🔊')}
               </div>
 

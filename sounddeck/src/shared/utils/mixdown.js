@@ -2,6 +2,7 @@
  * Mixdown réel - Fusionne tous les clips en un seul fichier audio
  */
 import { audioBufferToWav } from './wavEncoder'
+import { saveAudioBuffer } from './fileExport'
 
 /**
  * Mixe tous les clips d'un projet en un seul buffer audio
@@ -18,7 +19,6 @@ export async function mixdownProject(
     throw new Error('Projet vide')
   }
 
-  // 1. Calculer la durée totale et filtrer les clips
   let totalDuration = 0
   const clipsWithInfo = []
 
@@ -27,7 +27,6 @@ export async function mixdownProject(
       const duration = clipDurations[clip.id] || clip.duration || 3
       const end = clip.start + duration
 
-      // Filtrer les clips qui sont dans la zone d'export
       if (exportEnd !== null) {
         if (clip.start > exportEnd || end < exportStart) {
           continue
@@ -49,7 +48,6 @@ export async function mixdownProject(
     }
   }
 
-  // Ajuster la durée totale
   if (exportEnd !== null && exportEnd > totalDuration) {
     totalDuration = exportEnd
   } else {
@@ -159,12 +157,10 @@ export async function mixdownProject(
       source.connect(clipGain)
       clipGain.connect(offlineContext.destination)
 
-      // Ajuster le début si on a un offset d'export
       const startTime = Math.max(0, clipInfo.start - exportStart)
       const duration = clipInfo.duration || 3
       const offset = clipInfo.offset || 0
 
-      // Si le clip commence avant exportStart, ajuster l'offset
       let adjustedOffset = offset
       let adjustedDuration = duration
       if (clipInfo.start < exportStart) {
@@ -172,7 +168,6 @@ export async function mixdownProject(
         adjustedDuration = duration - (exportStart - clipInfo.start)
       }
 
-      // Si le clip dépasse exportEnd, ajuster la durée
       if (exportEnd !== null && clipInfo.start + duration > exportEnd) {
         adjustedDuration = exportEnd - Math.max(clipInfo.start, exportStart)
       }
@@ -231,18 +226,19 @@ export async function exportMixdown(
     if (onProgress) onProgress(0.2)
 
     if (format === 'wav') {
-      const result = await saveAudioFileViaElectron(wavData, outputPath)
+      // ✅ S6 : utilise saveAudioBuffer centralisé
+      const result = await saveAudioBuffer(wavData, outputPath)
       if (onProgress) onProgress(1)
       return result
     }
 
     try {
       const tempPath = outputPath + '.temp.wav'
-      const saveResult = await saveAudioFileViaElectron(wavData, tempPath)
+      const saveResult = await saveAudioBuffer(wavData, tempPath)
 
       if (!saveResult.success) {
         const fallbackPath = outputPath.replace(/\.(mp3|ogg)$/, '.wav')
-        const result = await saveAudioFileViaElectron(wavData, fallbackPath)
+        const result = await saveAudioBuffer(wavData, fallbackPath)
         if (onProgress) onProgress(1)
         return {
           success: true,
@@ -278,10 +274,7 @@ export async function exportMixdown(
       }
 
       const fallbackPath = outputPath.replace(/\.(mp3|ogg)$/, '.wav')
-      const fallbackResult = await saveAudioFileViaElectron(
-        wavData,
-        fallbackPath
-      )
+      const fallbackResult = await saveAudioBuffer(wavData, fallbackPath)
       if (onProgress) onProgress(1)
       return {
         success: true,
@@ -293,7 +286,7 @@ export async function exportMixdown(
       console.warn('⚠️ Erreur conversion:', e.message)
 
       const fallbackPath = outputPath.replace(/\.(mp3|ogg)$/, '.wav')
-      const result = await saveAudioFileViaElectron(wavData, fallbackPath)
+      const result = await saveAudioBuffer(wavData, fallbackPath)
       if (onProgress) onProgress(1)
       return {
         success: true,
@@ -308,77 +301,6 @@ export async function exportMixdown(
       success: false,
       error: e.message,
     }
-  }
-}
-
-/**
- * Sauvegarde un fichier audio via l'API Electron avec fallback
- */
-async function saveAudioFileViaElectron(data, outputPath) {
-  // Méthode 1: writeSoundFile
-  try {
-    const uint8Array = new Uint8Array(data)
-    const result = await window.electronAPI.writeSoundFile?.(
-      outputPath,
-      Array.from(uint8Array)
-    )
-    if (result?.success) {
-      return { success: true, path: outputPath }
-    }
-  } catch (e) {
-    console.warn('⚠️ [mixdown] writeSoundFile exception:', e)
-  }
-
-  // Méthode 2: saveFileDialog
-  try {
-    const fileName =
-      outputPath.split('/').pop() ||
-      outputPath.split('\\').pop() ||
-      'exported.wav'
-    const result = await window.electronAPI.saveFileDialog?.(fileName, data)
-    if (result?.success && result?.path) {
-      return { success: true, path: result.path }
-    }
-  } catch (e) {
-    console.warn('⚠️ [mixdown] saveFileDialog exception:', e)
-  }
-
-  // Méthode 3: exportAudioFile
-  try {
-    const fileName =
-      outputPath.split('/').pop() ||
-      outputPath.split('\\').pop() ||
-      'exported.wav'
-    const result = await window.electronAPI.exportAudioFile?.({
-      data: Array.from(new Uint8Array(data)),
-      fileName: fileName,
-      format: 'wav',
-    })
-    if (result?.success && result?.path) {
-      return { success: true, path: result.path }
-    }
-  } catch (e) {
-    console.warn('⚠️ [mixdown] exportAudioFile exception:', e)
-  }
-
-  // Dernier fallback: téléchargement navigateur
-  try {
-    const blob = new Blob([data], { type: 'audio/wav' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download =
-      outputPath.split('/').pop() ||
-      outputPath.split('\\').pop() ||
-      'exported.wav'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(url), 10000)
-    return { success: true, path: 'download://' + a.download, downloaded: true }
-  } catch (e) {
-    console.error('❌ [mixdown] Échec de tous les fallbacks:', e)
-    return { success: false, error: e.message }
   }
 }
 

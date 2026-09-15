@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { DeleteButton } from '@shared/components/ui'
 import useConfirm from '@shared/hooks/useConfirm'
+import { buildFileUrl } from '@shared/utils/fileUrl'
 
 export default function ProfileManagerModal({ 
   profileId, 
@@ -196,9 +197,7 @@ export default function ProfileManagerModal({
             ) : (
               sounds.map(sound => {
                 const isSelected = selectedSounds.has(sound.id)
-                const imageUrl = sound.image
-                  ? (sound.image.startsWith('file://') ? sound.image : `file:///${sound.image.replace(/\\/g, '/')}`)
-                  : null
+                const imageUrl = buildFileUrl(sound.image)
 
                 return (
                   <label

@@ -4,6 +4,7 @@ import { useLanguage } from '@core/i18n/LanguageContext'
 import { playSound, stopSound, isPlaying, getSoundProgress } from '@core/services/AudioService'
 import HelpButton from '@shared/components/ui/HelpButton'
 import { formatTime } from '@shared/utils/format'
+import { buildFileUrl } from '@shared/utils/fileUrl'
 
 export default function Presentation({ store, onExit, lang = 'fr' }) {
   const { t, currentLang } = useLanguage()
@@ -243,9 +244,7 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size, lang }) {
   const [imgError, setImgError] = useState(false)
   const [progress, setProgress] = useState(null)
 
-  const imageUrl = sound.image && !imgError
-    ? (sound.image.startsWith('file://') ? sound.image : `file:///${sound.image.replace(/\\/g, '/')}`)
-    : null
+  const imageUrl = sound.image && !imgError ? buildFileUrl(sound.image) : null
 
   useEffect(() => {
     if (!playing) { setProgress(null); return }

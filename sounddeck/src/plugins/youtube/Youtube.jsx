@@ -6,6 +6,7 @@ import { Howl } from 'howler'
 import useConfirm from '@shared/hooks/useConfirm'
 import LoadingOverlay from '@shared/components/ui/LoadingOverlay'
 import { DeleteButton } from '@shared/components/ui'
+import { buildFileUrl } from '@shared/utils/fileUrl'
 
 // ✅ Importer les fonctions du tutoriel
 import { 
@@ -1176,7 +1177,7 @@ export default function YouTube({ store, addToast }) {
                                     }}>
                                         {finalImage ? (
                                             <img 
-                                                src={finalImage.startsWith('http') ? finalImage : `file:///${finalImage.replace(/\\/g, '/')}`} 
+                                                src={buildFileUrl(finalImage)} 
                                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                 onError={(e) => { e.target.style.display = 'none' }}
                                             />

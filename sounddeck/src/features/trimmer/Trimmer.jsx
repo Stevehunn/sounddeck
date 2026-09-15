@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import Waveform, { formatTime } from '@shared/components/audio/Waveform'
 import useConfirm from '@shared/hooks/useConfirm'
+import { buildFileUrl } from '@shared/utils/fileUrl'
 
 const EMOJIS = [
   '🔊','🎵','🎶','🎼','🎧','🎤','🎸','🎹','🎺','🎻','🥁','🪗','🪘','🎷','🪕',
@@ -13,13 +14,6 @@ const EMOJIS = [
   '🍕','🍔','🌮','🌯','🍣','🍜','🍩','🍪','🎂','🧁','🍫','🍭','🍬','🍺','🍻',
   '🚀','🛸','💎','💰','💵','💶','💷','💴','🪙','🧿','🔮','🪄','⚔️','🛡️','🏹'
 ]
-
-const getImageUrl = (imagePath) => {
-  if (!imagePath) return null
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath
-  if (imagePath.startsWith('file://')) return imagePath
-  return `file:///${imagePath.replace(/\\/g, '/')}`
-}
 
 export default function Trimmer({ store, addToast }) {
   const { t } = useLanguage()
@@ -100,7 +94,7 @@ export default function Trimmer({ store, addToast }) {
 }
 
 function SoundListItem({ sound, active, onClick }) {
-  const imageUrl = sound.image ? getImageUrl(sound.image) : null
+  const imageUrl = sound.image ? buildFileUrl(sound.image) : null
 
   return (
     <button
@@ -203,7 +197,7 @@ function SoundEditor({ sound, store, addToast, onDone }) {
       const result = await window.electronAPI.importImageFile(imgPath)
       if (result.success) {
         setImage(result.path)
-        setImagePreview(getImageUrl(result.path))
+        setImagePreview(buildFileUrl(result.path))
       }
     }
   }
@@ -258,7 +252,7 @@ function SoundEditor({ sound, store, addToast, onDone }) {
     onDone()
   }
 
-  const previewImageUrl = imagePreview ? getImageUrl(imagePreview) : null
+  const previewImageUrl = imagePreview ? buildFileUrl(imagePreview) : null
 
   return (
     <>
