@@ -18,6 +18,8 @@ function registerSystemHandlers() {
 
   // Quit app
   ipcMain.handle('quit-app', () => {
+    const { app } = require('electron')
+    app.quit()
     return true
   })
 

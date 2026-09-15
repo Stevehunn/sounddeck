@@ -48,7 +48,7 @@ let workletPromise = null
 
 export function setStoreRef(store) {
   storeRef = store
-  window.__storeRef = store
+  window.__storeRef = { current: store }
 }
 
 // ─── PRÉCHAUFFAGE ──────────────────────────────────────────────────────────

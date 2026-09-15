@@ -46,13 +46,16 @@ const PLUGIN_TRANSLATIONS = {
   },
 }
 
-// Fusionner toutes les traductions
+// ✅ FIX : Les traductions de l'app (core) sont prioritaires.
+// Les plugins viennent par-dessus mais ne peuvent PAS écraser les clés
+// core comme `error`, `success`, `loading`, `close`, `cancel`, etc.
+// On fusionne dans l'ordre : plugin puis app (app écrase plugin).
 const MERGED_TRANSLATIONS = {}
 
 for (const lang of Object.keys(APP_TRANSLATIONS)) {
   MERGED_TRANSLATIONS[lang] = {
-    ...APP_TRANSLATIONS[lang],
     ...(PLUGIN_TRANSLATIONS[lang] || {}),
+    ...APP_TRANSLATIONS[lang], // ← core écrase plugin
   }
 }
 
@@ -108,6 +111,13 @@ export function LanguageProvider({ children }) {
     }
   }, [currentLang])
 
+  // ✅ FIX : t() gère maintenant les placeholders nommés ET positionnels
+  //
+  // Usage :
+  //   t('key')                              → string brute (avec {xxx} non remplacés)
+  //   t('key', 'val0', 'val1')              → remplace {0}, {1}
+  //   t('key', { name: 'Marc', count: 3 })  → remplace {name}, {count}
+  //
   const t = useCallback((key, ...args) => {
     const keys = key.split('.')
     let value = MERGED_TRANSLATIONS[currentLang]
@@ -117,9 +127,23 @@ export function LanguageProvider({ children }) {
     }
 
     if (typeof value === 'string' && args.length > 0) {
+      // Cas 1 : premier arg = objet → placeholders nommés
+      if (
+        args[0] !== null &&
+        typeof args[0] === 'object' &&
+        !Array.isArray(args[0])
+      ) {
+        const params = args[0]
+        return value.replace(/\{(\w+)\}/g, (match, name) => {
+          const v = params[name]
+          return v !== undefined && v !== null ? String(v) : match
+        })
+      }
+
+      // Cas 2 : placeholders positionnels {0}, {1}, ...
       return value.replace(/\{(\d+)\}/g, (_, index) => {
-        const arg = args[parseInt(index)]
-        return arg !== undefined ? arg : `{${index}}`
+        const arg = args[parseInt(index, 10)]
+        return arg !== undefined && arg !== null ? String(arg) : `{${index}}`
       })
     }
 

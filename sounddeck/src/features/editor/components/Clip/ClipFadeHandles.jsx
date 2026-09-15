@@ -1,6 +1,63 @@
 // src/features/editor/components/Clip/ClipFadeHandles.jsx
 import React, { memo } from 'react'
 
+const THROTTLE_MS = 33 // ~30fps, évite de saturer React pendant le drag
+
+/**
+ * Démarre un drag de fade (in ou out).
+ * Throttle les appels à onFade via requestAnimationFrame + limite à ~30fps.
+ * Garantit un flush final au mouseup pour capturer la valeur exacte.
+ */
+function startFadeDrag(e, edge, parentEl, clipId, pixelsPerSecond, onFade) {
+  e.stopPropagation()
+  if (!parentEl) return
+
+  let latestValue = null
+  let rafId = null
+  let lastFlush = 0
+
+  const flush = () => {
+    rafId = null
+    if (latestValue === null) return
+    const now = performance.now()
+    if (now - lastFlush < THROTTLE_MS) {
+      rafId = requestAnimationFrame(flush)
+      return
+    }
+    lastFlush = now
+    onFade?.(clipId, edge, latestValue)
+    latestValue = null
+  }
+
+  const onMouseMove = (e2) => {
+    const rect = parentEl.getBoundingClientRect()
+    const x = edge === 'in'
+      ? e2.clientX - rect.left
+      : rect.right - e2.clientX
+    latestValue = Math.max(0, x / pixelsPerSecond)
+    if (rafId === null) {
+      rafId = requestAnimationFrame(flush)
+    }
+  }
+
+  const onMouseUp = () => {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId)
+      rafId = null
+    }
+    // Flush final : capture la dernière valeur exacte
+    if (latestValue !== null) {
+      onFade?.(clipId, edge, latestValue)
+      latestValue = null
+    }
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+  }
+
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', onMouseUp)
+}
+
 const ClipFadeHandles = memo(({
   clip,
   trackId,
@@ -32,7 +89,7 @@ const ClipFadeHandles = memo(({
           }}
         />
       )}
-      
+
       {/* Fade Out */}
       {hasFadeOut && (
         <div
@@ -63,23 +120,9 @@ const ClipFadeHandles = memo(({
           transition: 'opacity 0.2s',
           pointerEvents: isHovering ? 'auto' : 'none'
         }}
-        onMouseDown={(e) => {
-          e.stopPropagation()
-          // Logique de drag pour le fade in
-          const startFade = clip.fadeIn || 0
-          const onMouseMove = (e2) => {
-            const rect = e.currentTarget.parentElement.getBoundingClientRect()
-            const x = e2.clientX - rect.left
-            const duration = Math.max(0, x / pixelsPerSecond)
-            onFade?.(clip.id, 'in', duration)
-          }
-          const onMouseUp = () => {
-            document.removeEventListener('mousemove', onMouseMove)
-            document.removeEventListener('mouseup', onMouseUp)
-          }
-          document.addEventListener('mousemove', onMouseMove)
-          document.addEventListener('mouseup', onMouseUp)
-        }}
+        onMouseDown={(e) =>
+          startFadeDrag(e, 'in', e.currentTarget.parentElement, clip.id, pixelsPerSecond, onFade)
+        }
       >
         <div style={{
           position: 'absolute',
@@ -108,22 +151,9 @@ const ClipFadeHandles = memo(({
           transition: 'opacity 0.2s',
           pointerEvents: isHovering ? 'auto' : 'none'
         }}
-        onMouseDown={(e) => {
-          e.stopPropagation()
-          // Logique de drag pour le fade out
-          const onMouseMove = (e2) => {
-            const rect = e.currentTarget.parentElement.getBoundingClientRect()
-            const x = rect.right - e2.clientX
-            const duration = Math.max(0, x / pixelsPerSecond)
-            onFade?.(clip.id, 'out', duration)
-          }
-          const onMouseUp = () => {
-            document.removeEventListener('mousemove', onMouseMove)
-            document.removeEventListener('mouseup', onMouseUp)
-          }
-          document.addEventListener('mousemove', onMouseMove)
-          document.addEventListener('mouseup', onMouseUp)
-        }}
+        onMouseDown={(e) =>
+          startFadeDrag(e, 'out', e.currentTarget.parentElement, clip.id, pixelsPerSecond, onFade)
+        }
       >
         <div style={{
           position: 'absolute',
