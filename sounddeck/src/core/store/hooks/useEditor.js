@@ -473,9 +473,13 @@ export function useEditor(save) {
       updatedAt: Date.now()
     }
     await commitEditorProject(updated)
-    await updateClipDurationInEditor(newClip.id, actualDuration)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('clip-duration-updated', {
+        detail: { clipId: newClip.id, duration: actualDuration }
+      }))
+    }
     return newClip
-  }, [editorProject, commitEditorProject, getAudioDuration, updateClipDurationInEditor])
+  }, [editorProject, commitEditorProject, getAudioDuration])
 
   const addClipFromFile = useCallback(async (trackId, filePath, start = null) => {
     const fileName = filePath.split(/[\\/]/).pop() || 'audio'
@@ -528,9 +532,13 @@ export function useEditor(save) {
       updatedAt: Date.now()
     }
     await commitEditorProject(updated)
-    await updateClipDurationInEditor(newClip.id, actualDuration)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('clip-duration-updated', {
+        detail: { clipId: newClip.id, duration: actualDuration }
+      }))
+    }
     return newClip
-  }, [editorProject, commitEditorProject, getAudioDuration, updateClipDurationInEditor])
+  }, [editorProject, commitEditorProject, getAudioDuration])
 
   const updateClip = useCallback(async (trackId, clipId, updates, options = {}) => {
     const updated = {

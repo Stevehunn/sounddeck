@@ -46,7 +46,6 @@ export default {
   editorEffectsActive: 'actif(s)',
   editorEffectPreview: 'Aperçu des effets...',
   editorPreviewEffects: 'Prévisualisation des effets',
-  editorClickToRename: 'Cliquer pour renommer',
   editorFileNotFound: 'Fichier introuvable',
   editorFileImportError: 'Erreur lors de l\'import du fichier',
   editorPasteError: 'Erreur lors du collage',
@@ -59,9 +58,6 @@ export default {
   editorProjectRenamed: 'Projet renommé en "{name}"',
   editorSplit: 'Couper',
   editorLoop: 'Boucle',
-  editorClips: 'Clips',
-  editorTracks: 'Pistes',
-  editorDuration: 'Durée',
   editorAddTrack: 'Ajouter une piste',
   editorAddClip: 'Ajouter un son',
   editorAddEffect: 'Ajouter un effet',
@@ -90,7 +86,7 @@ export default {
   editorUnsolo: 'Désactiver solo',
   editorSoundNotFound: 'Son introuvable',
   editorPlayError: 'Erreur de lecture',
-  editorLoading: 'Chargement des waveforms...',
+  editorLoadingWaveforms: 'Chargement des waveforms...',
   editorNothingToExport: 'Rien à exporter. Ajoutez des sons au projet.',
   editorExportTitle: 'Exporter le mix',
   editorExportNamePlaceholder: 'Nom du son',
@@ -103,7 +99,6 @@ export default {
   editorPause: 'Pause',
   editorResume: 'Reprendre',
   editorStop: 'Arrêter',
-  editorPlaying: 'Lecture en cours',
   editorPaused: 'En pause',
   editorZoomIn: 'Zoom avant',
   editorZoomOut: 'Zoom arrière',
@@ -140,41 +135,18 @@ export default {
   exportActionBothDesc: 'Sauvegarder le fichier ET l\'ajouter à SoundDeck',
   editorNoTracksDesc: 'Ajoutez une piste pour commencer à éditer vos sons.',
   editorLoopSet: 'Boucle définie sur la sélection',
-  
+
   // ─── BARRE D'OUTILS ──────────────────────────────────────────────────
-  editorAddTrack: 'Ajouter une piste',
-  editorAddClip: 'Ajouter un clip',
-  editorAddFile: 'Importer un fichier',
-  editorAddEffect: 'Ajouter un effet',
-  editorExport: 'Exporter',
   editorUndo: 'Annuler',
   editorRedo: 'Rétablir',
-  editorSnap: 'Aimantation',
-  editorAutoCrossfade: 'Crossfade automatique',
-  editorPause: 'Pause',
-  editorResume: 'Reprendre',
-  editorPlay: 'Lecture',
-  editorPlayFromStart: 'Lecture depuis le début',
-  editorStop: 'Arrêter',
-  editorEffects: 'Effets',
-  editorEffectsPanel: 'Panneau des effets',
-  showEffectsPanel: 'Afficher le panneau des effets',
-  hideEffectsPanel: 'Masquer le panneau des effets',
-  editorEffectsActive: 'effets actifs',
-  editorNoEffects: 'Aucun effet',
-  
+  editorNoEffectsPanel: 'Aucun effet',
+
   // ─── PISTES ───────────────────────────────────────────────────────────
   editorTrackDefault: 'Piste {index}',
-  editorNoTracks: 'Aucune piste',
-  editorAddTrackHint: 'Ajoutez une piste pour commencer',
   editorTrackName: 'Nom de la piste',
   editorTrackNamePlaceholder: 'Ex: Batterie, Voix, Effets...',
   editorTrackColor: 'Couleur de la piste',
   editorTrackVolume: 'Volume de la piste',
-  editorSelectTrack: 'Sélectionner une piste',
-  editorSelectSound: 'Sélectionner un son',
-  editorMute: 'Muet',
-  editorSolo: 'Solo',
   editorDoubleClickToRename: 'Double-cliquer pour renommer',
   editorClipMovedUp: 'Clip déplacé vers le haut',
   editorClipMovedDown: 'Clip déplacé vers le bas',
@@ -184,45 +156,31 @@ export default {
   editorTrackRenamed: 'Piste renommée',
   editorReorderTrack: 'Réorganiser les pistes',
   editorUnmute: 'Réactiver le son',
-  
+
   // ─── CLIPS ────────────────────────────────────────────────────────────
   editorClipEdit: 'Édition',
   editorAudioEdit: 'Audio',
-  editorCopy: 'Copier',
-  editorCut: 'Couper',
-  editorCutAction: 'coupé',
-  editorPaste: 'Coller',
-  editorPasted: 'collé',
-  editorCopied: 'copié',
   editorDuplicate: 'Dupliquer',
   editorDelete: 'Supprimer',
-  editorTrim: 'Rogner',
-  editorNormalize: 'Normaliser',
   editorSplitAtMiddle: 'Split au milieu',
   editorSplitWithClick: 'Split avec clic',
-  editorLoop: 'Boucle',
   editorLoopActive: 'Boucle active',
-  editorLoopSet: 'Boucle définie',
   editorLoopColor: 'Couleur de la flèche',
   editorLoopEnd: 'Fin de la boucle',
   editorLoopActivate: 'Activer la boucle',
   editorLoopUpdate: 'Mettre à jour',
-  editorDuplicateClip: 'Dupliquer',
   editorListenClip: 'Écouter le clip',
-  editorClipboardEmpty: 'Presse-papiers vide',
-  editorClipboardExpired: 'Presse-papiers expiré',
   editorFadeIn: 'Fade In',
   editorFadeOut: 'Fade Out',
   editorFades: 'Fades',
   editorStopPreview: 'Arrêter la prévisualisation',
-  
+
   // ─── EFFETS ──────────────────────────────────────────────────────────
   editorEffect: 'Effet',
   editorActiveEffects: 'Effets actifs',
   editorEffectControls: 'Contrôles des effets',
   editorEffectParams: 'Paramètres',
   editorPresets: 'Presets',
-  editorEffectPreview: 'Aperçu des effets',
   editorEffectPreviewError: 'Erreur lors de la prévisualisation',
   editorEffectsPanelTitle: 'Panneau d\'effets',
   editorEffectsPanelDescription: 'Ajoutez et modifiez des effets audio sur le clip sélectionné',
@@ -244,7 +202,7 @@ export default {
   editorEffectsExportError: 'Erreur d\'export audio',
   editorEffectsNoBuffer: 'Impossible de charger le son',
   editorEffectsNormalized: 'Son normalisé',
-  
+
   // ─── NORMALISATION ──────────────────────────────────────────────────
   editorNormalizeMethod: 'Méthode de normalisation',
   editorNormalizePeakDesc: 'Évite l\'écrêtage',
@@ -270,7 +228,7 @@ export default {
   editorNormalizeScopeClip: 'Clip actuel',
   editorNormalizeScopeTrack: 'Piste entière',
   editorNormalizeScopeProject: 'Projet entier',
-  
+
   // ─── IMPORT ──────────────────────────────────────────────────────────
   editorImportFile: 'Importer un fichier',
   editorFileReady: 'Fichier prêt à être importé',
@@ -281,7 +239,7 @@ export default {
   editorImport: 'Importer',
   editorFileImported: 'Fichier importé dans la piste',
   editorImportToTrack: 'Importer dans la piste...',
-  
+
   // ─── BOUCLE TIMELINE ────────────────────────────────────────────────
   timelineLoop: 'Boucle générale',
   loopZone: 'Définir la zone de boucle',
@@ -305,7 +263,8 @@ export default {
   editLoopSettings: 'Modifier les paramètres de la boucle',
   toggleLoop: 'Activer/désactiver la boucle',
   doubleClickToEditLoop: 'Double-clic pour modifier la boucle',
-  
+  settings: 'Réglages',
+
   // ─── ACTION OVERLAY ────────────────────────────────────────────────
   editorLoopClipAction: 'Boucle du clip',
   editorLoopClipInstructions: 'Cliquer sur la ligne de temps après le clip sélectionné pour définir la durée de la boucle.',
@@ -318,7 +277,7 @@ export default {
   editorAction: 'Action',
   editorClickTimeline: 'Cliquez sur la ligne de temps',
   clickHere: '🖱️ Cliquez ici',
-  
+
   // ─── CLIP ACTIONS MENU ──────────────────────────────────────────────
   editorLoopEndOfTrack: 'Jusqu\'à la fin de la piste',
   editorLoopCycles: 'Nombre de cycles',
@@ -326,10 +285,8 @@ export default {
   editorLoopManualClick: 'Cliquer sur la timeline',
   editorLoopClickToDefine: 'Cliquer pour définir',
   editorOpenEffectsPanel: 'Ouvrir le panneau des effets',
-  editorClipEdit: 'Édition',
-  editorAudioEdit: 'Audio',
   customColor: 'Couleur personnalisée',
-  
+
   // ─── LOOP COLORS ─────────────────────────────────────────────────────
   loopColorPurple: 'Violet',
   loopColorBlue: 'Bleu',
@@ -339,28 +296,37 @@ export default {
   loopColorRed: 'Rouge',
   loopColorOrange: 'Orange',
   loopColorYellow: 'Jaune',
-  
+
   // ─── LOOP DURATION ──────────────────────────────────────────────────
   loopDurationCycles: 'Nombre de cycles',
   loopDurationManual: 'Durée manuelle',
   loopEndLabel: 'FIN',
-  
+
   // ─── MASTER VOLUME ──────────────────────────────────────────────────
-  editorUnmute: 'Réactiver le son',
-  editorMute: 'Couper le son',
   editorMasterVolume: 'Volume global',
   editorPeak: 'Pic',
   editorResetVolumes: 'Réinitialiser tous les volumes (maître + pistes) à 100%',
-  
+
   // ─── PROJECT MANAGER ─────────────────────────────────────────────────
   searchProjects: 'Rechercher un projet...',
-  
+  projects: 'Projets',
+  projectManager: 'Gestionnaire de projets',
+  projectName: 'Nom du projet',
+  recentProjects: 'Projets récents',
+  noProjects: 'Aucun projet',
+  noProjectsFound: 'Aucun projet trouvé',
+  saveProject: 'Sauvegarder le projet',
+  exportProject: 'Exporter le projet',
+  importProject: 'Importer un projet',
+  new: 'Nouveau',
+
   // ─── EXPORT ──────────────────────────────────────────────────────────
   exportFileOnlyNote: '📁 Le fichier sera sauvegardé dans votre dossier de téléchargements.',
   exportLibraryOnlyNote: '📚 Le son sera ajouté à votre bibliothèque SoundDeck.',
   exportBothNote: '📁📚 Le fichier sera sauvegardé ET ajouté à SoundDeck.',
   exporting: 'Export...',
-  
+  exportLabel: 'Exporter',
+
   // ─── MARQUEURS ──────────────────────────────────────────────────────────
   editorMarkers: 'Marqueurs',
   editorAddMarker: 'Ajouter un marqueur',
@@ -376,7 +342,6 @@ export default {
   editorDeleteAllMarkersMessage: 'Êtes-vous sûr de vouloir supprimer tous les marqueurs ? Cette action est irréversible.',
   editorMarkerDeleted: 'Marqueur supprimé',
   editorAllMarkersDeleted: 'Tous les marqueurs supprimés',
-  editorDelete: 'Supprimer',
   editorNoMarkers: 'Aucun marqueur',
   editorNavigate: 'Naviguer',
   editorPrevious: 'Précédent',
@@ -391,7 +356,16 @@ export default {
   markersEmpty: 'Aucun marqueur',
   markerAddPlaceholder: 'Nom du marqueur...',
   markerAdd: 'Ajouter un marqueur',
-  
+  markerName: 'Nom du marqueur',
+  markerNamePlaceholder: 'Entrez un nom...',
+  markerPosition: 'Position',
+  markerCurrentTime: 'Position actuelle',
+  markerCustomTime: 'Personnalisée',
+  markerTimeRange: 'Temps en secondes (0 - {max}s)',
+  markerColor: 'Couleur',
+  markersAutoOpen: 'Ouvrir automatiquement à l\'ouverture de l\'éditeur',
+  editorAddMarkerHint: 'Appuyez sur Ctrl+M pour en ajouter un',
+
   // ─── COULEURS DES MARQUEURS ──────────────────────────────────────────
   markerColorRed: 'Rouge',
   markerColorPink: 'Rose',
@@ -403,7 +377,7 @@ export default {
   markerColorYellow: 'Jaune',
   markerColorOrange: 'Orange',
   markerColorBrown: 'Marron',
-  
+
   // ─── SIDEBAR ─────────────────────────────────────────────────────────
   sidebarEditorTitle: 'Éditeur de la sidebar',
   sidebarEditorSub: 'Personnalisez l\'ordre et la visibilité des éléments',
@@ -419,26 +393,13 @@ export default {
   sidebarEditorPinItem: 'Épingler',
   sidebarEditorHide: 'Masquer',
   sidebarEditorShow: 'Afficher',
-  
-  // ─── PROJETS ──────────────────────────────────────────────────────────
-  projects: 'Projets',
-  projectManager: 'Gestionnaire de projets',
-  projectName: 'Nom du projet',
-  recentProjects: 'Projets récents',
-  noProjects: 'Aucun projet',
-  noProjectsFound: 'Aucun projet trouvé',
-  saveProject: 'Sauvegarder le projet',
-  exportProject: 'Exporter le projet',
-  importProject: 'Importer un projet',
-  searchProjects: 'Rechercher un projet...',
-  new: 'Nouveau',
-  
+
   // ─── MÉTRONOME ──────────────────────────────────────────────────────
   editorMetronome: 'Métronome',
   editorTempo: 'Tempo (BPM)',
   editorMetronomeVolume: 'Volume du métronome',
   editorMetronomeReset: 'Réinitialiser le métronome',
-  
+
   // ─── KEYBOARD ────────────────────────────────────────────────────────
   keyboardVisualizerTitle: 'Visualisation du clavier',
   shortcutsTotal: 'raccourcis',
@@ -456,23 +417,16 @@ export default {
   shortcutHintAny: 'Appuyez sur une touche',
   shortcutPressKey: 'Appuyez sur une touche',
   shortcutPressCompact: 'Appuyez',
-  
-  // ─── ZOOM ────────────────────────────────────────────────────────────
-  editorZoomPercent: '{percent}%',
-  editorZoomOut: 'Zoom arrière (Ctrl+-)',
-  editorZoomIn: 'Zoom avant (Ctrl+=)',
-  editorZoomReset: 'Réinitialiser le zoom (Ctrl+0)',
-  editorZoomFit: 'Ajuster pour tout voir',
-  
+
   // ─── SPLIT ────────────────────────────────────────────────────────────
   editorSplitSuccess: 'Clip coupé à la position du curseur',
-  
-  // ─── RENAME ──────────────────────────────────────────────────────────
+
+  // ─── CONFIRMATION ─────────────────────────────────────────────────────
   confirm: 'Confirmer',
-  
+
   // ─── CURRENT ─────────────────────────────────────────────────────────
   current: 'Actuel',
-  
+
   // ─── EFFECTS LABELS ────────────────────────────────────────────────────
   editorEffectVolume: 'Volume',
   editorEffectFadeIn: 'Fade In',
@@ -480,29 +434,27 @@ export default {
   editorEffectSpeed: 'Vitesse',
   editorEffectEcho: 'Écho',
   editorEffectReverb: 'Réverbération',
-  
+
   // ─── TOASTS ────────────────────────────────────────────────────────────
   editorResetVolumesSuccess: '✅ Tous les volumes réinitialisés à 100%',
-  
+
   // ─── PROJECT DELETE ──────────────────────────────────────────────────
   confirmDeleteProject: 'Confirmer la suppression du projet',
   confirmDeleteProjectMessage: 'Voulez-vous vraiment supprimer définitivement le projet "{name}" ?',
   delete: 'Supprimer',
-  
-  // ─── LISTEN BUTTON ───────────────────────────────────────────────────
+
+  // ─── LISTEN / ADJUST ─────────────────────────────────────────────────
   listen: 'Écouter',
-  
-  // ─── ADJUST ──────────────────────────────────────────────────────────
   adjust: 'Ajuster',
-  
+
   // ─── CROSSFADE ────────────────────────────────────────────────────────
   crossfadeOn: 'Crossfade ON',
   crossfadeOff: 'Crossfade OFF',
-  
+
   // ─── TUTORIAL ─────────────────────────────────────────────────────────
   tutorialRestart: 'Revoir le tutoriel',
   tutorialAdvanced: 'Tutoriel avancé',
-  
+
   // ─── AUTO PREVIEW ────────────────────────────────────────────────────
   editorAutoPreviewOn: 'Activer l\'auto-preview (délai 1s)',
   editorAutoPreviewOff: 'Désactiver l\'auto-preview (délai 1s)',
@@ -511,4 +463,10 @@ export default {
   // ─── CONFIRMATIONS ────────────────────────────────────────────────────
   confirmDeleteClip: 'Confirmer la suppression du clip',
   confirmDeleteClipMessage: 'Voulez-vous vraiment supprimer le clip "{name}" ?',
+  confirmDeleteTrack: 'Confirmer la suppression de la piste',
+  confirmDeleteTrackMessage: 'Voulez-vous vraiment supprimer cette piste ?',
+  confirmDeleteEffect: 'Confirmer la suppression de l\'effet',
+  confirmDeleteEffectMessage: 'Voulez-vous vraiment supprimer cet effet ?',
+  confirmDeleteMarker: 'Confirmer la suppression du marqueur',
+  confirmDelete: 'Confirmer la suppression',
 }

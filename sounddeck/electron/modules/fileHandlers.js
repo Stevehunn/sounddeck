@@ -1204,6 +1204,153 @@ function registerFileHandlers(mainWindow, soundsDir) {
       return { success: false, error: e.message }
     }
   })
+
+  // ─── DRIVER VIRTUEL (VB-CABLE) ───────────────────────────────────────────
+  // ✅ AJOUT S2 : handlers pour installer/désinstaller/status du driver virtuel
+
+  const VB_CABLE_URL = 'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack43.zip'
+
+  ipcMain.handle('install-virtual-driver', async () => {
+    try {
+      const { app, shell } = require('electron')
+      const driverDir = path.join(app.getPath('userData'), 'virtual-driver')
+      if (!fs.existsSync(driverDir)) {
+        fs.mkdirSync(driverDir, { recursive: true })
+      }
+
+      const zipPath = path.join(driverDir, 'VBCABLE_Driver_Pack43.zip')
+
+      // Télécharger si pas déjà fait
+      if (!fs.existsSync(zipPath)) {
+        await downloadFile(VB_CABLE_URL, zipPath)
+      }
+
+      // Extraire le ZIP
+      const AdmZip = require('adm-zip')
+      const extractDir = path.join(driverDir, 'extracted')
+      if (!fs.existsSync(extractDir)) {
+        const zip = new AdmZip(zipPath)
+        zip.extractAllTo(extractDir, true)
+      }
+
+      // Chercher l'installeur 64 bits
+      const candidates = [
+        path.join(extractDir, 'VBCABLE_Setup_x64.exe'),
+        path.join(extractDir, 'VBCABLE_Driver_Pack43', 'VBCABLE_Setup_x64.exe'),
+      ]
+      let installerPath = candidates.find(p => fs.existsSync(p))
+
+      if (!installerPath) {
+        // Chercher récursivement
+        const findExe = (dir, depth = 0) => {
+          if (depth > 3) return null
+          try {
+            const entries = fs.readdirSync(dir, { withFileTypes: true })
+            for (const e of entries) {
+              const p = path.join(dir, e.name)
+              if (e.isFile() && e.name.toLowerCase().includes('setup') && e.name.endsWith('.exe')) {
+                return p
+              }
+              if (e.isDirectory()) {
+                const found = findExe(p, depth + 1)
+                if (found) return found
+              }
+            }
+          } catch (err) {}
+          return null
+        }
+        installerPath = findExe(extractDir)
+      }
+
+      if (!installerPath) {
+        return { success: false, error: 'Installeur VB-Cable introuvable dans l\'archive' }
+      }
+
+      // Lancer l'installeur (nécessite les droits admin)
+      await shell.openPath(installerPath)
+
+      return {
+        success: true,
+        installerPath,
+        warning: 'L\'installeur VB-Cable a été ouvert. Suivez les instructions et redémarrez votre PC.',
+      }
+    } catch (e) {
+      console.error('❌ [install-virtual-driver] Erreur:', e)
+      return { success: false, error: e.message }
+    }
+  })
+
+  ipcMain.handle('uninstall-virtual-driver', async () => {
+    try {
+      const { shell } = require('electron')
+      // Ouvrir les paramètres de désinstallation Windows
+      if (process.platform === 'win32') {
+        await shell.openPath('ms-settings:appsfeatures')
+      } else {
+        await shell.openExternal('https://vb-audio.com/Cable/')
+      }
+      return {
+        success: true,
+        warning: 'Recherchez "VB-CABLE" dans la liste et désinstallez-le manuellement.',
+      }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  ipcMain.handle('get-virtual-driver-status', async () => {
+    try {
+      const { app } = require('electron')
+      const driverDir = path.join(app.getPath('userData'), 'virtual-driver')
+      const installerPath = path.join(driverDir, 'extracted', 'VBCABLE_Setup_x64.exe')
+      const zipPath = path.join(driverDir, 'VBCABLE_Driver_Pack43.zip')
+
+      return {
+        success: true,
+        downloaded: fs.existsSync(zipPath),
+        extracted: fs.existsSync(installerPath),
+        installerPath: fs.existsSync(installerPath) ? installerPath : null,
+        // Note : le renderer doit utiliser navigator.mediaDevices.enumerateDevices()
+        // pour vérifier si le driver est réellement actif
+      }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  // ─── YOUTUBE THUMBNAIL DOWNLOAD ──────────────────────────────────────────
+  // ✅ AJOUT S2 : télécharge la miniature d'une vidéo YouTube en local
+
+  ipcMain.handle('download-thumbnail', async (event, url, soundName) => {
+    try {
+      if (!url) return { success: false, error: 'URL manquante' }
+
+      const { app } = require('electron')
+      const imagesDir = path.join(app.getPath('userData'), 'images')
+      if (!fs.existsSync(imagesDir)) {
+        fs.mkdirSync(imagesDir, { recursive: true })
+      }
+
+      // Extraire l'extension depuis l'URL
+      let ext = 'jpg'
+      try {
+        const urlPath = new URL(url).pathname
+        const urlExt = path.extname(urlPath).replace('.', '').toLowerCase()
+        if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(urlExt)) ext = urlExt
+      } catch (e) {}
+
+      const safeName = (soundName || 'thumbnail').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50)
+      const fileName = `thumb_${safeName}_${Date.now()}.${ext}`
+      const outputPath = path.join(imagesDir, fileName)
+
+      await downloadFile(url, outputPath)
+
+      return { success: true, path: outputPath.replace(/\\/g, '/') }
+    } catch (e) {
+      console.error('❌ [download-thumbnail] Erreur:', e)
+      return { success: false, error: e.message }
+    }
+  })
 }
 
 module.exports = {

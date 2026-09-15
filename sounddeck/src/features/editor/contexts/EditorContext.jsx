@@ -24,7 +24,9 @@ const log = __DEBUG__ ? console.log.bind(console) : () => {}
 
 const EditorContext = createContext(null)
 
-// ✅ CONSTANTES POUR LA BOUCLE GÉNÉRALE
+// ✅ CONSTANTES
+const HISTORY_LIMIT = 50
+
 const LOOP_START_MODES = {
   TIMELINE_START: 'timelineStart',
   PLAYHEAD: 'playhead',
@@ -39,7 +41,6 @@ const LOOP_END_MODES = {
   PLAYHEAD: 'playhead'
 }
 
-// ✅ ÉTAT INITIAL DE L'OVERLAY UNIFIÉ
 const INITIAL_OVERLAY_STATE = {
   type: null,
   clipId: null,
@@ -51,7 +52,6 @@ const INITIAL_OVERLAY_STATE = {
   data: {}
 }
 
-// ✅ Valeurs par défaut pour la boucle timeline
 const DEFAULT_TIMELINE_LOOP = {
   enabled: false,
   start: 0,
@@ -92,6 +92,10 @@ export function EditorProvider({ children, store, addToast }) {
   const [masterGain, setMasterGain] = useState(1)
   const [actionOverlay, setActionOverlay] = useState(INITIAL_OVERLAY_STATE)
 
+  // ✅ NOUVEAU : États undo/redo (visibles en React)
+  const [canUndoEditor, setCanUndoEditor] = useState(false)
+  const [canRedoEditor, setCanRedoEditor] = useState(false)
+
   const [loopState, setLoopState] = useState({
     clips: {},
     tracks: {},
@@ -99,7 +103,6 @@ export function EditorProvider({ children, store, addToast }) {
   })
 
   // ─── REFS ──────────────────────────────────────────────────────────────
-  // ✅ REFS STABLES : permettent à tous les useCallback d'avoir des deps vides
   const isLoadingRef = useRef(false)
   const initialLoadDoneRef = useRef(false)
   const audioContextRef = useRef(null)
@@ -126,7 +129,12 @@ export function EditorProvider({ children, store, addToast }) {
   const idCounterRef = useRef(0)
   const masterGainRef = useRef(1)
 
-  // ✅ Sync des refs — mis à jour à chaque render
+  // ✅ NOUVEAU : Stacks undo/redo + flag de blocage
+  const undoStackRef = useRef([])
+  const redoStackRef = useRef([])
+  const isUndoingRef = useRef(false)
+
+  // ✅ Sync des refs
   useEffect(() => { projectRef.current = project }, [project])
   useEffect(() => { storeRef.current = store }, [store])
   useEffect(() => { clipDurationsRef.current = clipDurations }, [clipDurations])
@@ -143,24 +151,98 @@ export function EditorProvider({ children, store, addToast }) {
   useEffect(() => { stopAtTimeRef.current = stopAtTime }, [stopAtTime])
   useEffect(() => { soloPlayClipIdRef.current = soloPlayClipId }, [soloPlayClipId])
 
-  // ─── PERSISTANCE DIRECTE (bypass store → évite le re-render du store) ─
-  // ✅ FIX CRITIQUE : on n'appelle PAS store.updateEditorProject() car cela
-  // déclenche un re-render de useStore → nouveau `store` → toutes les
-  // fonctions de ce Provider sont recréées → cascade "Maximum update depth".
-  // On écrit directement dans electron-store via IPC.
+  // ─── PERSISTANCE DIRECTE (bypass store) ────────────────────────────────
   const persistProject = useCallback((projectData) => {
-    if (!projectData) return
+    if (!projectData?.id) return
     try {
-      window.electronAPI?.storeSet?.('editorProject', projectData).catch(() => {})
+      window.electronAPI?.saveEditorProject?.(projectData).catch(() => {})
     } catch (e) {
-      // silencieux
     }
   }, [])
+
+  // ─── ✅ NOUVEAU : COMMIT WRAPPER (avec historique) ──────────────────────
+  // Utilisé par TOUTES les mutations qui doivent être undoables.
+  // skipHistory: true pour les updates fréquents (drag fade, drag volume...).
+  const commitProject = useCallback((newProject, options = {}) => {
+    if (!newProject) return
+    const { skipHistory = false } = options
+    const currentProject = projectRef.current
+
+    // Push dans l'historique (sauf si explicitement skip)
+    if (!skipHistory && currentProject && !isUndoingRef.current) {
+      undoStackRef.current.push(currentProject)
+      if (undoStackRef.current.length > HISTORY_LIMIT) {
+        undoStackRef.current.shift()
+      }
+      redoStackRef.current = []
+      setCanUndoEditor(true)
+      setCanRedoEditor(false)
+    }
+
+    setProject(newProject)
+    projectRef.current = newProject
+    persistProject(newProject)
+  }, [persistProject])
+
+  // ✅ Push manuel (avant un drag)
+  const pushEditorHistoryCheckpoint = useCallback(() => {
+    const currentProject = projectRef.current
+    if (!currentProject) return
+    undoStackRef.current.push(currentProject)
+    if (undoStackRef.current.length > HISTORY_LIMIT) {
+      undoStackRef.current.shift()
+    }
+    redoStackRef.current = []
+    setCanUndoEditor(true)
+    setCanRedoEditor(false)
+  }, [])
+
+  // ✅ Undo
+  const undoEditor = useCallback(() => {
+    if (undoStackRef.current.length === 0) return false
+    const previous = undoStackRef.current.pop()
+    const current = projectRef.current
+    if (!previous) return false
+
+    isUndoingRef.current = true
+    if (current) redoStackRef.current.push(current)
+
+    setProject(previous)
+    projectRef.current = previous
+    persistProject(previous)
+
+    setCanUndoEditor(undoStackRef.current.length > 0)
+    setCanRedoEditor(true)
+
+    // Reset flag au prochain tick
+    setTimeout(() => { isUndoingRef.current = false }, 0)
+    return true
+  }, [persistProject])
+
+  // ✅ Redo
+  const redoEditor = useCallback(() => {
+    if (redoStackRef.current.length === 0) return false
+    const next = redoStackRef.current.pop()
+    const current = projectRef.current
+    if (!next) return false
+
+    isUndoingRef.current = true
+    if (current) undoStackRef.current.push(current)
+
+    setProject(next)
+    projectRef.current = next
+    persistProject(next)
+
+    setCanUndoEditor(true)
+    setCanRedoEditor(redoStackRef.current.length > 0)
+
+    setTimeout(() => { isUndoingRef.current = false }, 0)
+    return true
+  }, [persistProject])
 
   // ─── FONCTIONS VOLUME ──────────────────────────────────────────────────
 
   const updateMasterGain = useCallback((newGain) => {
-    log(`🎚️ [EditorContext] Mise à jour du volume maître: ${newGain.toFixed(2)}`)
     for (const [clipId, entry] of Object.entries(audioSourcesRef.current)) {
       if (entry?.gainNode) {
         let trackVolume = 1
@@ -179,7 +261,6 @@ export function EditorProvider({ children, store, addToast }) {
   }, [])
 
   const updateTrackVolume = useCallback((trackId, newVolume) => {
-    log(`🎚️ [EditorContext] Volume piste ${trackId}: ${newVolume.toFixed(2)}`)
     const masterVolume = masterGainRef.current || 1
     for (const [clipId, entry] of Object.entries(audioSourcesRef.current)) {
       if (entry?.gainNode) {
@@ -265,8 +346,14 @@ export function EditorProvider({ children, store, addToast }) {
 
     if (!projectData.name) projectData.name = 'Nouveau projet'
 
+    // ✅ Chargement de projet = PAS d'historique (vidé)
     setProject(projectData)
     projectRef.current = projectData
+    undoStackRef.current = []
+    redoStackRef.current = []
+    setCanUndoEditor(false)
+    setCanRedoEditor(false)
+
     setSelectedClipId(null)
     setSelectedTrackId(null)
     setCurrentTime(0)
@@ -278,7 +365,6 @@ export function EditorProvider({ children, store, addToast }) {
 
     try {
       await window.electronAPI.storeSet?.('currentEditorProjectId', projectData.id)
-      // ✅ Persistance directe, pas via store
       persistProject(projectData)
     } catch (e) {
       console.warn('⚠️ [EditorContext] Erreur sauvegarde:', e)
@@ -329,13 +415,31 @@ export function EditorProvider({ children, store, addToast }) {
           currentProjectId = await window.electronAPI.storeGet?.('currentEditorProjectId')
         } catch (e) {}
 
-        let editorProject = storeRef.current?.editorProject
-
-        if (!editorProject && currentProjectId) {
+        let editorProject = null
+        
+        if (currentProjectId) {
           try {
             const result = await window.electronAPI.loadEditorProject?.(currentProjectId)
-            if (result?.success) editorProject = result.project
-          } catch (e) {}
+            if (result?.success) {
+              editorProject = result.project
+              log('📂 [EditorContext] Projet chargé depuis ID:', editorProject?.name)
+            }
+          } catch (e) {
+            console.warn('Erreur chargement projet depuis ID:', e)
+          }
+        }
+        
+        // ✅ MIGRATION : si rien trouvé mais qu'un ancien format (singulier) existe
+        if (!editorProject && store?.editorProject) {
+          editorProject = store.editorProject
+          if (editorProject?.id) {
+            log('📂 [EditorContext] Migration depuis ancien format:', editorProject.name)
+            try {
+              await window.electronAPI.saveEditorProject?.(editorProject)
+            } catch (e) {
+              console.warn('Erreur migration:', e)
+            }
+          }
         }
 
         if (editorProject) {
@@ -350,11 +454,7 @@ export function EditorProvider({ children, store, addToast }) {
               name: 'Nouveau projet',
               tracks: [],
               duration: 60,
-              loops: {
-                clips: {},
-                tracks: {},
-                timeline: { ...DEFAULT_TIMELINE_LOOP }
-              },
+              loops: { clips: {}, tracks: {}, timeline: { ...DEFAULT_TIMELINE_LOOP } },
               createdAt: Date.now(),
               updatedAt: Date.now()
             }
@@ -415,7 +515,6 @@ export function EditorProvider({ children, store, addToast }) {
   const playClip = useCallback(async (clip, track, customOffset = null) => {
     if (!clip?.path) return
 
-    // Nettoyer l'ancienne source
     const oldEntry = audioSourcesRef.current[clip.id]
     if (oldEntry) {
       try { oldEntry.source.stop(); oldEntry.source.disconnect() } catch (e) {}
@@ -450,7 +549,6 @@ export function EditorProvider({ children, store, addToast }) {
       const masterVolume = masterGainRef.current || 1
       gainNode.gain.value = trackVolume * masterVolume
 
-      // Crossfade automatique
       if (autoCrossfadeRef.current) {
         const previousClip = findPreviousClip(clip, track)
         if (previousClip) {
@@ -485,7 +583,6 @@ export function EditorProvider({ children, store, addToast }) {
 
       source.start(0, offset)
       audioSourcesRef.current[clip.id] = { source, gainNode }
-
       source.onended = () => {}
     } catch (e) {
       console.error('❌ [playClip] Erreur:', e)
@@ -521,9 +618,9 @@ export function EditorProvider({ children, store, addToast }) {
         let globalTime = currentTimeRef.current + accumulated
         accumulated = 0
 
-        const loop = loopStateRef.current
+        const loopStateRef_ = loopStateRef.current
         const clipDurationsMap = clipDurationsRef.current
-        const timelineLoop = loop?.timeline || {
+        const timelineLoop = loopStateRef_?.timeline || {
           enabled: false, start: 0, end: 10,
           durationMode: 'cycles', cycleCount: 3, manualDuration: 10
         }
@@ -563,7 +660,7 @@ export function EditorProvider({ children, store, addToast }) {
           const individualLoopClips = new Set()
           for (const track of tracks) {
             for (const clip of track.clips) {
-              if (loop?.clips?.[clip.id]?.enabled) individualLoopClips.add(clip.id)
+              if (loopStateRef_?.clips?.[clip.id]?.enabled) individualLoopClips.add(clip.id)
             }
           }
 
@@ -576,7 +673,7 @@ export function EditorProvider({ children, store, addToast }) {
               const end = start + duration
 
               const isClipLooping = individualLoopClips.has(clip.id)
-              const clipLoopData = loop?.clips?.[clip.id]
+              const clipLoopData = loopStateRef_?.clips?.[clip.id]
               const clipLoopStart = clipLoopData?.start || start
               const clipLoopEnd = clipLoopData?.end || end
 
@@ -688,7 +785,7 @@ export function EditorProvider({ children, store, addToast }) {
                 const found = t.clips.find(c => c.id === clipId)
                 if (found) {
                   clip = found
-                  isClipLooping = loop?.clips?.[clipId]?.enabled || false
+                  isClipLooping = loopStateRef_?.clips?.[clipId]?.enabled || false
                   break
                 }
               }
@@ -946,6 +1043,7 @@ export function EditorProvider({ children, store, addToast }) {
           createdAt: Date.now(),
           updatedAt: Date.now()
         }
+        // Création initiale = pas d'historique
         setProject(newProject)
         projectRef.current = newProject
         currentProject = newProject
@@ -972,9 +1070,8 @@ export function EditorProvider({ children, store, addToast }) {
         updatedAt: Date.now()
       }
 
-      setProject(updatedProject)
-      projectRef.current = updatedProject
-      persistProject(updatedProject)
+      // ✅ Action utilisateur → historique
+      commitProject(updatedProject)
 
       const durations = {}
       for (const track of updatedProject.tracks) {
@@ -992,7 +1089,7 @@ export function EditorProvider({ children, store, addToast }) {
       addToastRef.current?.('Erreur lors de l\'ajout de la piste: ' + e.message, 'error')
       return null
     }
-  }, [persistProject])
+  }, [commitProject])
 
   const removeTrack = useCallback(async (trackId) => {
     const currentProject = projectRef.current
@@ -1022,9 +1119,7 @@ export function EditorProvider({ children, store, addToast }) {
     const updatedTracks = currentProject.tracks.filter(track => track.id !== trackId)
     const updatedProject = { ...currentProject, tracks: updatedTracks, updatedAt: Date.now() }
 
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-    persistProject(updatedProject)
+    commitProject(updatedProject)
 
     const durations = { ...clipDurationsRef.current }
     for (const clip of trackToRemove.clips) delete durations[clip.id]
@@ -1038,7 +1133,7 @@ export function EditorProvider({ children, store, addToast }) {
       setSelectedTrackId(null)
       setSelectedClipId(null)
     }
-  }, [persistProject])
+  }, [commitProject])
 
   const renameTrack = useCallback(async (trackId, newName) => {
     const currentProject = projectRef.current
@@ -1051,11 +1146,9 @@ export function EditorProvider({ children, store, addToast }) {
       ),
       updatedAt: Date.now()
     }
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-    persistProject(updatedProject)
+    commitProject(updatedProject)
     setIsDirty(true)
-  }, [persistProject])
+  }, [commitProject])
 
   const muteTrack = useCallback((trackId, muted) => {
     const currentProject = projectRef.current
@@ -1068,11 +1161,9 @@ export function EditorProvider({ children, store, addToast }) {
       ),
       updatedAt: Date.now()
     }
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-    persistProject(updatedProject)
+    commitProject(updatedProject)
     setIsDirty(true)
-  }, [persistProject])
+  }, [commitProject])
 
   const soloTrack = useCallback((trackId, solo) => {
     const currentProject = projectRef.current
@@ -1087,12 +1178,11 @@ export function EditorProvider({ children, store, addToast }) {
       }),
       updatedAt: Date.now()
     }
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-    persistProject(updatedProject)
+    commitProject(updatedProject)
     setIsDirty(true)
-  }, [persistProject])
+  }, [commitProject])
 
+  // ✅ skipHistory: true → le slider de volume piste déclenche 30 updates/s
   const setTrackVolume = useCallback((trackId, volume) => {
     const currentProject = projectRef.current
     if (!currentProject) return
@@ -1105,12 +1195,34 @@ export function EditorProvider({ children, store, addToast }) {
       ),
       updatedAt: Date.now()
     }
-    setProject(updatedProject)
-    projectRef.current = updatedProject
+    // ✅ Pas d'historique pendant le drag du slider
+    commitProject(updatedProject, { skipHistory: true })
     updateTrackVolume(trackId, clampedVolume)
-    persistProject(updatedProject)
     setIsDirty(true)
-  }, [persistProject, updateTrackVolume])
+  }, [commitProject, updateTrackVolume])
+
+  // ✅ NOUVEAU : Réorganisation des pistes (drag & drop)
+  const reorderTracks = useCallback((startIndex, endIndex) => {
+    const currentProject = projectRef.current
+    if (!currentProject) return false
+
+    const tracks = [...currentProject.tracks]
+    if (startIndex < 0 || startIndex >= tracks.length) return false
+    if (endIndex < 0 || endIndex >= tracks.length) return false
+    if (startIndex === endIndex) return false
+
+    const [moved] = tracks.splice(startIndex, 1)
+    tracks.splice(endIndex, 0, moved)
+
+    const updatedProject = {
+      ...currentProject,
+      tracks,
+      updatedAt: Date.now()
+    }
+    commitProject(updatedProject)
+    setIsDirty(true)
+    return true
+  }, [commitProject])
 
   // ─── FONCTIONS CLIP ────────────────────────────────────────────────────
 
@@ -1139,8 +1251,7 @@ export function EditorProvider({ children, store, addToast }) {
           ),
           updatedAt: Date.now()
         }
-        setProject(updatedProject)
-        projectRef.current = updatedProject
+        commitProject(updatedProject)
 
         if (clip.duration) {
           const newDurations = { ...clipDurationsRef.current, [clip.id]: clip.duration }
@@ -1148,7 +1259,6 @@ export function EditorProvider({ children, store, addToast }) {
           clipDurationsRef.current = newDurations
         }
 
-        persistProject(updatedProject)
         setIsDirty(true)
         addToastRef.current?.(`"${sound.name}" ajouté`, 'success')
         setSelectedClipId(clip.id)
@@ -1161,7 +1271,7 @@ export function EditorProvider({ children, store, addToast }) {
       addToastRef.current?.(e.message || 'Erreur lors de l\'ajout du clip', 'error')
       return null
     }
-  }, [persistProject])
+  }, [commitProject])
 
   const addClipFromFile = useCallback(async (trackId, filePath, startPosition = null) => {
     if (!filePath) {
@@ -1230,14 +1340,12 @@ export function EditorProvider({ children, store, addToast }) {
         updatedAt: Date.now()
       }
 
-      setProject(updatedProject)
-      projectRef.current = updatedProject
+      commitProject(updatedProject)
 
       const newDurations = { ...clipDurationsRef.current, [newClip.id]: actualDuration }
       setClipDurations(newDurations)
       clipDurationsRef.current = newDurations
 
-      persistProject(updatedProject)
       setIsDirty(true)
       addToastRef.current?.(`"${fileName}" importé`, 'success')
       setSelectedClipId(newClip.id)
@@ -1248,7 +1356,7 @@ export function EditorProvider({ children, store, addToast }) {
       addToastRef.current?.(e.message || 'Erreur lors de l\'import du fichier', 'error')
       return null
     }
-  }, [persistProject, getAudioDuration, generateUniqueId])
+  }, [commitProject, getAudioDuration, generateUniqueId])
 
   const removeClip = useCallback((trackId, clipId) => {
     const currentProject = projectRef.current
@@ -1266,9 +1374,6 @@ export function EditorProvider({ children, store, addToast }) {
       updatedAt: Date.now()
     }
 
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-
     const newDurations = { ...clipDurationsRef.current }
     delete newDurations[clipId]
     setClipDurations(newDurations)
@@ -1285,11 +1390,9 @@ export function EditorProvider({ children, store, addToast }) {
       loopStateRef.current = updatedLoopState
 
       const projectWithLoop = { ...updatedProject, loops: updatedLoopState }
-      setProject(projectWithLoop)
-      projectRef.current = projectWithLoop
-      persistProject(projectWithLoop)
+      commitProject(projectWithLoop)
     } else {
-      persistProject(updatedProject)
+      commitProject(updatedProject)
     }
 
     if (selectedClipIdRef.current === clipId) {
@@ -1299,9 +1402,9 @@ export function EditorProvider({ children, store, addToast }) {
 
     setIsDirty(true)
     addToastRef.current?.('Clip supprimé', 'info')
-  }, [persistProject])
+  }, [commitProject])
 
-  const updateClip = useCallback((trackId, clipId, updates) => {
+  const updateClip = useCallback((trackId, clipId, updates, options = {}) => {
     const currentProject = projectRef.current
     if (!currentProject) return
 
@@ -1318,11 +1421,9 @@ export function EditorProvider({ children, store, addToast }) {
       }),
       updatedAt: Date.now()
     }
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-    persistProject(updatedProject)
+    commitProject(updatedProject, options)
     setIsDirty(true)
-  }, [persistProject])
+  }, [commitProject])
 
   const duplicateClip = useCallback((trackId, clipId) => {
     const currentProject = projectRef.current
@@ -1354,19 +1455,18 @@ export function EditorProvider({ children, store, addToast }) {
       updatedAt: Date.now()
     }
 
-    setProject(updatedProject)
-    projectRef.current = updatedProject
+    commitProject(updatedProject)
 
     const newDurations = { ...clipDurationsRef.current, [newClip.id]: newClip.duration || 3 }
     setClipDurations(newDurations)
     clipDurationsRef.current = newDurations
 
-    persistProject(updatedProject)
     setIsDirty(true)
     addToastRef.current?.('Clip dupliqué', 'success')
     return newClip
-  }, [persistProject, generateUniqueId])
+  }, [commitProject, generateUniqueId])
 
+  // ✅ Accepte options.skipHistory (utilisé pendant le drag)
   const moveClip = useCallback((trackId, clipId, newStart, newTrackId, options = {}) => {
     const currentProject = projectRef.current
     if (!currentProject) return
@@ -1412,8 +1512,7 @@ export function EditorProvider({ children, store, addToast }) {
     }
 
     const updatedProject = { ...currentProject, tracks: finalTracks, updatedAt: Date.now() }
-    setProject(updatedProject)
-    projectRef.current = updatedProject
+    commitProject(updatedProject, options)
     setIsDirty(true)
 
     if (updatedClip.duration) {
@@ -1421,9 +1520,7 @@ export function EditorProvider({ children, store, addToast }) {
       setClipDurations(newDurations)
       clipDurationsRef.current = newDurations
     }
-
-    persistProject(updatedProject)
-  }, [persistProject])
+  }, [commitProject])
 
   // ─── SELECTION ─────────────────────────────────────────────────────────
 
@@ -1521,8 +1618,7 @@ export function EditorProvider({ children, store, addToast }) {
       updatedAt: Date.now()
     }
 
-    setProject(updatedProject)
-    projectRef.current = updatedProject
+    commitProject(updatedProject)
 
     const newDurations = {
       ...clipDurationsRef.current,
@@ -1532,13 +1628,12 @@ export function EditorProvider({ children, store, addToast }) {
     setClipDurations(newDurations)
     clipDurationsRef.current = newDurations
 
-    persistProject(updatedProject)
     setIsDirty(true)
     addToastRef.current?.(`Clip "${clip.name}" coupé en deux`, 'success')
     selectClip(leftClip.id, trackId)
 
     return { leftClip, rightClip }
-  }, [persistProject, selectClip, generateUniqueId])
+  }, [commitProject, selectClip, generateUniqueId])
 
   // ─── EFFETS ────────────────────────────────────────────────────────────
 
@@ -1567,12 +1662,10 @@ export function EditorProvider({ children, store, addToast }) {
       updatedAt: Date.now()
     }
 
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-    persistProject(updatedProject)
+    commitProject(updatedProject)
     setIsDirty(true)
     return effect
-  }, [persistProject, generateUniqueId])
+  }, [commitProject, generateUniqueId])
 
   const removeEffectFromClip = useCallback(async (trackId, clipId, effectId) => {
     const currentProject = projectRef.current
@@ -1594,12 +1687,11 @@ export function EditorProvider({ children, store, addToast }) {
       updatedAt: Date.now()
     }
 
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-    persistProject(updatedProject)
+    commitProject(updatedProject)
     setIsDirty(true)
-  }, [persistProject])
+  }, [commitProject])
 
+  // ✅ skipHistory: true (drag de slider)
   const updateEffectParam = useCallback(async (trackId, clipId, effectId, param, value) => {
     const currentProject = projectRef.current
     if (!currentProject) return
@@ -1626,11 +1718,9 @@ export function EditorProvider({ children, store, addToast }) {
       updatedAt: Date.now()
     }
 
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-    persistProject(updatedProject)
+    commitProject(updatedProject, { skipHistory: true })
     setIsDirty(true)
-  }, [persistProject])
+  }, [commitProject])
 
   const toggleEffect = useCallback(async (trackId, clipId, effectId, enabled) => {
     const currentProject = projectRef.current
@@ -1656,12 +1746,11 @@ export function EditorProvider({ children, store, addToast }) {
       updatedAt: Date.now()
     }
 
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-    persistProject(updatedProject)
+    commitProject(updatedProject)
     setIsDirty(true)
-  }, [persistProject])
+  }, [commitProject])
 
+  // ✅ skipHistory: true (drag des poignées de fade)
   const setClipFade = useCallback((trackId, clipId, edge, duration) => {
     const currentProject = projectRef.current
     if (!currentProject) return
@@ -1712,11 +1801,9 @@ export function EditorProvider({ children, store, addToast }) {
       updatedAt: Date.now()
     }
 
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-    persistProject(updatedProject)
+    commitProject(updatedProject, { skipHistory: true })
     setIsDirty(true)
-  }, [persistProject, generateUniqueId])
+  }, [commitProject, generateUniqueId])
 
   // ─── BOUCLE CLIP ───────────────────────────────────────────────────────
 
@@ -1733,7 +1820,6 @@ export function EditorProvider({ children, store, addToast }) {
     const start = clip.start || 0
     const currentLoopState = loopStateRef.current
 
-    // Désactivation
     if (options.enabled === false || currentLoopState.clips[clipId]?.enabled) {
       const updatedLoopState = {
         ...currentLoopState,
@@ -1746,9 +1832,7 @@ export function EditorProvider({ children, store, addToast }) {
       loopStateRef.current = updatedLoopState
 
       const updatedProject = { ...currentProject, loops: updatedLoopState, updatedAt: Date.now() }
-      setProject(updatedProject)
-      projectRef.current = updatedProject
-      persistProject(updatedProject)
+      commitProject(updatedProject)
       addToastRef.current?.(`Boucle désactivée sur "${clip.name}"`, 'info')
       return
     }
@@ -1804,9 +1888,7 @@ export function EditorProvider({ children, store, addToast }) {
     loopStateRef.current = updatedLoopState
 
     const updatedProject = { ...currentProject, loops: updatedLoopState, updatedAt: Date.now() }
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-    persistProject(updatedProject)
+    commitProject(updatedProject)
 
     let toastMessage = `Boucle activée sur "${clip.name}"`
     if (loopMode === 'cycles') toastMessage += ` (${cycleCount} cycles)`
@@ -1814,7 +1896,7 @@ export function EditorProvider({ children, store, addToast }) {
     else if (loopMode === 'manualDuration') toastMessage += ` (${manualDuration}s)`
     else if (loopMode === 'manualClick') toastMessage += ` (clic sur la timeline)`
     addToastRef.current?.(toastMessage, 'success')
-  }, [persistProject])
+  }, [commitProject])
 
   const updateClipLoopOptions = useCallback((clipId, options) => {
     const currentProject = projectRef.current
@@ -1832,10 +1914,8 @@ export function EditorProvider({ children, store, addToast }) {
     loopStateRef.current = updatedLoopState
 
     const updatedProject = { ...currentProject, loops: updatedLoopState, updatedAt: Date.now() }
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-    persistProject(updatedProject)
-  }, [persistProject])
+    commitProject(updatedProject)
+  }, [commitProject])
 
   // ─── BOUCLE TIMELINE ───────────────────────────────────────────────────
 
@@ -1852,11 +1932,9 @@ export function EditorProvider({ children, store, addToast }) {
     loopStateRef.current = updatedLoopState
 
     const updatedProject = { ...currentProject, loops: updatedLoopState, updatedAt: Date.now() }
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-    persistProject(updatedProject)
+    commitProject(updatedProject)
     setIsDirty(true)
-  }, [persistProject])
+  }, [commitProject])
 
   const toggleTimelineLoop = useCallback(() => {
     const timeline = loopStateRef.current.timeline
@@ -2057,13 +2135,11 @@ export function EditorProvider({ children, store, addToast }) {
       updatedAt: Date.now()
     }
 
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-    persistProject(updatedProject)
+    commitProject(updatedProject)
     setIsDirty(true)
     addToastRef.current?.(`Marqueur "${newMarker.name}" ajouté`, 'success')
     return newMarker
-  }, [persistProject])
+  }, [commitProject])
 
   const removeMarker = useCallback((markerId) => {
     const currentProject = projectRef.current
@@ -2078,12 +2154,10 @@ export function EditorProvider({ children, store, addToast }) {
       updatedAt: Date.now()
     }
 
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-    persistProject(updatedProject)
+    commitProject(updatedProject)
     setIsDirty(true)
     addToastRef.current?.(`Marqueur "${markerToRemove.name}" supprimé`, 'info')
-  }, [persistProject])
+  }, [commitProject])
 
   const updateMarker = useCallback((markerId, updates) => {
     const currentProject = projectRef.current
@@ -2097,19 +2171,35 @@ export function EditorProvider({ children, store, addToast }) {
       updatedAt: Date.now()
     }
 
-    setProject(updatedProject)
-    projectRef.current = updatedProject
-    persistProject(updatedProject)
+    commitProject(updatedProject)
     setIsDirty(true)
-  }, [persistProject])
+  }, [commitProject])
 
   const navigateToMarker = useCallback((time) => {
     seek(time)
   }, [seek])
 
-  // ─── VALUE (mémoïsé pour éviter les re-renders en cascade) ─────────────
-  // ✅ Le value change uniquement si les ETATS changent, pas si le parent
-  // re-render sans raison. Les fonctions sont toutes stables grâce aux refs.
+  // ✅ NOUVEAU : Renommer le projet
+  const updateEditorProjectName = useCallback((newName) => {
+    const currentProject = projectRef.current
+    if (!currentProject) return false
+    if (!newName || !newName.trim()) return false
+
+    const trimmed = newName.trim()
+    if (trimmed === currentProject.name) return true
+
+    const updatedProject = {
+      ...currentProject,
+      name: trimmed,
+      updatedAt: Date.now()
+    }
+
+    commitProject(updatedProject)
+    setIsDirty(true)
+    return true
+  }, [commitProject])
+
+  // ─── VALUE ─────────────────────────────────────────────────────────────
 
   const value = useMemo(() => ({
     project,
@@ -2167,6 +2257,16 @@ export function EditorProvider({ children, store, addToast }) {
     pendingAction: actionOverlay,
     activateLoopManualClick,
     activateSplitManualClick,
+    // ✅ NOUVEAU : Historique undo/redo
+    canUndoEditor,
+    canRedoEditor,
+    undoEditor,
+    redoEditor,
+    pushEditorHistoryCheckpoint,
+    // ✅ NOUVEAU : Réorganisation + Rename
+    reorderTracks,
+    updateEditorProjectName,
+    // Fonctions principales
     addTrack,
     removeTrack,
     renameTrack,
@@ -2229,8 +2329,8 @@ export function EditorProvider({ children, store, addToast }) {
     masterGain,
     actionOverlay,
     loopState,
-    // Fonctions stables — on les inclut pour linter, mais elles ne
-    // déclenchent jamais de nouveau useMemo puisqu'elles ne changent pas.
+    canUndoEditor,
+    canRedoEditor,
     setLoopRegionFn,
     cancelActionOverlay,
     executeActionOverlay,
@@ -2241,6 +2341,11 @@ export function EditorProvider({ children, store, addToast }) {
     activateTimelineLoopManualClick,
     activateLoopManualClick,
     activateSplitManualClick,
+    undoEditor,
+    redoEditor,
+    pushEditorHistoryCheckpoint,
+    reorderTracks,
+    updateEditorProjectName,
     addTrack,
     removeTrack,
     renameTrack,

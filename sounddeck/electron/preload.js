@@ -1,3 +1,4 @@
+// electron/preload.js
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -64,13 +65,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   installVirtualDriver: () => ipcRenderer.invoke('install-virtual-driver'),
   uninstallVirtualDriver: () => ipcRenderer.invoke('uninstall-virtual-driver'),
   getVirtualDriverStatus: () => ipcRenderer.invoke('get-virtual-driver-status'),
-  setNoiseSuppression: (enabled) => ipcRenderer.invoke('set-noise-suppression', enabled),
 
   // ─── YOUTUBE ─────────────────────────────────────────────────────────────
   checkYtdlp: () => ipcRenderer.invoke('check-ytdlp'),
   downloadYtdlp: () => ipcRenderer.invoke('download-ytdlp'),
   youtubeInfo: (url) => ipcRenderer.invoke('youtube-info', url),
   youtubeDownload: (url, start, end, title) => ipcRenderer.invoke('youtube-download', url, start, end, title),
+  downloadThumbnail: (url, soundName) => ipcRenderer.invoke('download-thumbnail', url, soundName),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
   // ─── SPOTIFY / SOUNDCLOUD ───────────────────────────────────────────────
@@ -94,7 +95,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getInstalledPlugins: () => ipcRenderer.invoke('get-installed-plugins'),
   getPluginPath: (pluginId) => ipcRenderer.invoke('get-plugin-path', pluginId),
   getPluginComponentPath: (pluginId, pageId) => ipcRenderer.invoke('get-plugin-component-path', pluginId, pageId),
-  installPlugin: (tempPath) => ipcRenderer.invoke('install-plugin', tempPath),
   installPluginFromBuffer: (buffer, fileName) => ipcRenderer.invoke('install-plugin-from-buffer', buffer, fileName),
   uninstallPlugin: (pluginId) => ipcRenderer.invoke('uninstall-plugin', pluginId),
 
