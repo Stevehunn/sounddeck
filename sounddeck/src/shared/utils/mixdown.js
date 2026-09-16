@@ -3,6 +3,7 @@
  */
 import { audioBufferToWav } from './wavEncoder'
 import { saveAudioBuffer } from './fileExport'
+import { buildFileUrl } from './fileUrl'
 
 /**
  * Mixe tous les clips d'un projet en un seul buffer audio
@@ -107,9 +108,7 @@ export async function mixdownProject(
     }
 
     try {
-      const fileUrl = clipInfo.path.startsWith('file://')
-        ? clipInfo.path
-        : 'file:///' + clipInfo.path.replace(/\\/g, '/')
+      const fileUrl = buildFileUrl(clipInfo.path)
 
       const response = await fetch(fileUrl)
       if (!response.ok) {

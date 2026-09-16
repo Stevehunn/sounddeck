@@ -7,6 +7,7 @@ import { DeleteButton } from '@shared/components/ui'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { playSound, stopAllSounds, stopSound } from '@core/services/AudioService'
 import useConfirm from '@shared/hooks/useConfirm'
+import { buildFileUrl } from '@shared/utils/fileUrl'
 
 const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
 
@@ -885,9 +886,7 @@ function SoundGrid({
 
 function OutsideCard({ sound, onAdd, lang }) {
   const { t } = useLanguage()
-  const imageUrl = sound.image
-    ? (sound.image.startsWith('file://') ? sound.image : `file:///${sound.image.replace(/\\/g, '/')}`)
-    : null
+  const imageUrl = buildFileUrl(sound.image)
   return (
     <div style={{ background: 'var(--bg-secondary)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', padding: 10, opacity: 0.75 }}>
       <div style={{ width: '100%', aspectRatio: '1', background: 'var(--bg-tertiary)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 6, overflow: 'hidden' }}>
@@ -1058,7 +1057,7 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{t('image')}</label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {manualImage && (
-                  <img src={`file:///${manualImage.replace(/\\/g, '/')}`}
+                  <img src={buildFileUrl(manualImage)}
                     style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
                 )}
                 <input readOnly value={manualImage ? t('imageSelected') : ''} placeholder={t('noImage')} style={{ flex: 1 }} />

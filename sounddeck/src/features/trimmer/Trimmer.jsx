@@ -151,9 +151,7 @@ function SoundEditor({ sound, store, addToast, onDone }) {
 
   const audioRef = useRef(null)
 
-  const fileUrl = sound.path.startsWith('file://')
-    ? sound.path
-    : 'file:///' + sound.path.replace(/\\/g, '/')
+  const fileUrl = buildFileUrl(sound.path)
 
   useEffect(() => {
     const audio = new Audio(fileUrl)

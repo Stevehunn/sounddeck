@@ -389,8 +389,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, onSav
     // ✅ Notifier la sidebar qu'un nouveau son démarre
     setCurrentPlayingSound(item.soundId)
 
-    const fileUrl = sound.path.startsWith('file://')
-      ? sound.path : 'file:///' + sound.path.replace(/\\/g, '/')
+    const fileUrl = buildFileUrl(sound.path)
 
     // ✅ Analyser le gain en arrière-plan (peuple le cache de normalisation)
     if (sound.path) {
@@ -872,9 +871,7 @@ function AddSoundModal({ sounds, existingIds, onAdd, onClose, lang = 'fr' }) {
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
           {filtered.map(sound => {
             const isSelected = selected.includes(sound.id)
-            const imageUrl = sound.image
-              ? (sound.image.startsWith('file://') ? sound.image : `file:///${sound.image.replace(/\\/g, '/')}`)
-              : null
+            const imageUrl = buildFileUrl(sound.image)
 
             return (
               <label key={sound.id} style={{

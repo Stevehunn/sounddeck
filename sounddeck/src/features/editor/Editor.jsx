@@ -1,5 +1,4 @@
 // src/features/editor/Editor.jsx
-
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useLanguage } from '@core/i18n/LanguageContext'
@@ -22,6 +21,7 @@ import { normalizeClip } from '@shared/utils/normalizeUtils'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
 import useConfirm from '@shared/hooks/useConfirm'
 import useProjectManager from './hooks/useProjectManager'
+import { buildFileUrl } from '@shared/utils/fileUrl'
 
 // ✅ Logger dev-only
 const __DEBUG__ = typeof import.meta !== 'undefined' && import.meta.env?.DEV
@@ -794,9 +794,7 @@ function EditorTimelineContent() {
           '@shared/utils/realTimeEffects'
         )
 
-        const fileUrl = clip.path.startsWith('file://')
-          ? clip.path
-          : 'file:///' + clip.path.replace(/\\/g, '/')
+        const fileUrl = buildFileUrl(clip.path)
 
         const response = await fetch(fileUrl)
         if (!response.ok) throw new Error(`HTTP ${response.status}`)

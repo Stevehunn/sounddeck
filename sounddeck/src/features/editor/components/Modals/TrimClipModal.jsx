@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import Waveform, { formatTime } from '@shared/components/audio/Waveform'
+import { buildFileUrl } from '@shared/utils/fileUrl'
 
 export default function TrimClipModal({
   isOpen,
@@ -45,9 +46,7 @@ export default function TrimClipModal({
         await audioContextRef.current.close()
       }
       
-      const fileUrl = clip.path.startsWith('file://')
-        ? clip.path
-        : 'file:///' + clip.path.replace(/\\/g, '/')
+      const fileUrl = buildFileUrl(clip.path)
       
       const response = await fetch(fileUrl)
       if (!response.ok) {

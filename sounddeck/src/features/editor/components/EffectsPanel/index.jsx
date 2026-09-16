@@ -1,6 +1,7 @@
 // src/features/editor/components/EffectsPanel/index.jsx
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { buildFileUrl } from '@shared/utils/fileUrl'
 
 const EFFECT_TYPES = [
   { id: 'volume', labelKey: 'editorEffectVolume', icon: 'ti-volume', params: ['value'] },
@@ -139,9 +140,7 @@ export default function EditorEffectsPanel({
     setIsProcessingPreview(true)
 
     try {
-      const fileUrl = clip.path.startsWith('file://')
-        ? clip.path
-        : 'file:///' + clip.path.replace(/\\/g, '/')
+      const fileUrl = buildFileUrl(clip.path)
 
       const response = await fetch(fileUrl)
       if (!response.ok) throw new Error(`HTTP ${response.status}`)

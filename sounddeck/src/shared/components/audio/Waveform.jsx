@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { formatTime as formatTimeShared } from '@shared/utils/format'
+import { buildFileUrl } from '@shared/utils/fileUrl'
 
 async function generateWaveformData(fileUrl, samples = 200) {
   try {
@@ -52,10 +53,7 @@ export default function Waveform({
   const [loading, setLoading] = useState(true)
   const [dragging, setDragging] = useState(null)
   const containerRef = useRef(null)
-
-  const fileUrl = filePath
-    ? (filePath.startsWith('file://') ? filePath : 'file:///' + filePath.replace(/\\/g, '/'))
-    : null
+  const fileUrl = filePath ? buildFileUrl(filePath) : null
 
   useEffect(() => {
     if (!fileUrl) return

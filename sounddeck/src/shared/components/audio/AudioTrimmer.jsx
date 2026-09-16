@@ -1,6 +1,7 @@
 // src/shared/components/audio/AudioTrimmer.jsx
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
+import { buildFileUrl } from '@shared/utils/fileUrl'
 
 export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
   const { t } = useLanguage()
@@ -16,7 +17,7 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
   const audioRef = useRef(null)
   const timelineRef = useRef(null)
 
-  const fileUrl = filePath.startsWith('file://') ? filePath : 'file:///' + filePath.replace(/\\/g, '/')
+  const fileUrl = buildFileUrl(filePath)
 
   useEffect(() => {
     const audio = new Audio(fileUrl)
