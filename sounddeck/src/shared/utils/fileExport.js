@@ -46,17 +46,16 @@ export async function saveAudioBuffer(data, outputPath) {
     console.warn('⚠️ [saveAudioBuffer] saveFileDialog exception:', e)
   }
 
-  // Méthode 3 : exportAudioFile
   try {
     const fileName =
       outputPath.split('/').pop() ||
       outputPath.split('\\').pop() ||
       'exported.wav'
-    const result = await window.electronAPI?.exportAudioFile?.({
-      data: Array.from(uint8Array),
+    const result = await window.electronAPI?.exportAudioFile?.(
+      Array.from(uint8Array),
       fileName,
-      format: 'wav',
-    })
+      'wav'
+    )
     if (result?.success && result?.path) {
       return { success: true, path: result.path }
     }

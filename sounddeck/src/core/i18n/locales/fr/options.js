@@ -336,6 +336,11 @@ export default {
   themeFieldSuccess: 'Succès (vert)',
   themeFieldWarning: 'Avertissement',
   themeFieldDanger: 'Danger (rouge)',
+  themePresetDefault: 'Violet (défaut)',
+  themePresetMidnightBlue: 'Minuit Bleu',
+  themePresetForest: 'Forêt',
+  themePresetEmber: 'Braise',
+  themePresetPastelLight: 'Clair Pastel',
   
   // ─── ERREURS ──────────────────────────────────────────────────────────
   errorLogs: 'Logs d\'erreur',
@@ -400,4 +405,7 @@ export default {
   autoBackupDesc: 'Sauvegardez automatiquement votre configuration',
   autoBackupEnabled: 'Sauvegarde automatique activée',
   autoBackupDisabled: 'Sauvegarde automatique désactivée',
+
+  logsCleared: 'Logs effacés',
+  logsExported: 'Logs exportés ✓',
 };

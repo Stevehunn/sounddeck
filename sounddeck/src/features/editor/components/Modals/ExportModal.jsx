@@ -160,7 +160,7 @@ export default function ExportModal({
                   onChange={() => setExportLocation('library')}
                   style={{ width: 'auto', accentColor: 'var(--accent)' }}
                 />
-                {tr('exportAddOnly') || '📚 Ajouter à la bibliothèque'}
+                {tr('exportActionAddOnly') || '📚 Ajouter à la bibliothèque'}
               </label>
               <label style={{
                 display: 'flex',

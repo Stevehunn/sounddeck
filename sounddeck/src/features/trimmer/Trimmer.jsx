@@ -44,7 +44,7 @@ export default function Trimmer({ store, addToast }) {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder={t('editorSearch')}
+            placeholder={t('search')}
             className="input-sm"
             style={{ borderRadius: 'var(--radius-md)' }}
             data-testid="trimmer-search-input"

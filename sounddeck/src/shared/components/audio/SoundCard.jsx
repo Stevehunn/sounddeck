@@ -109,8 +109,15 @@ export default function SoundCard({
     return () => clearInterval(interval)
   }, [playing, sound.id])
 
+  const prevLoopEnabledRef = useRef(loopEnabled)
+
   useEffect(() => {
-    if (!loopEnabled && playing) {
+    const loopJustDisabled =
+      prevLoopEnabledRef.current === true && loopEnabled === false
+
+    prevLoopEnabledRef.current = loopEnabled
+
+    if (loopJustDisabled && playing) {
       stopSound(sound.id)
       setPlaying(false)
     }

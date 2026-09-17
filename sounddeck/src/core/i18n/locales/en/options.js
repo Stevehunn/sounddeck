@@ -405,4 +405,7 @@ export default {
   autoBackupDesc: 'Automatically save your configuration',
   autoBackupEnabled: 'Auto backup enabled',
   autoBackupDisabled: 'Auto backup disabled',
+
+  logsCleared: 'Logs cleared',
+  logsExported: 'Logs exported ✓',
 };

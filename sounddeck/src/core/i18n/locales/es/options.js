@@ -405,4 +405,7 @@ export default {
   autoBackupDesc: 'Guarda tu configuración automáticamente',
   autoBackupEnabled: 'Copia automática activada',
   autoBackupDisabled: 'Copia automática desactivada',
+
+  logsCleared: 'Registros borrados',
+  logsExported: 'Registros exportados ✓',
 };

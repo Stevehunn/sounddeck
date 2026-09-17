@@ -1,54 +1,38 @@
 // src/core/i18n/LanguageContext.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 
-// Traductions de l'application (nouvelle architecture modulaire)
+import { LANGUAGES } from './constants.js'
 import frTranslations from './locales/fr/index.js'
 import enTranslations from './locales/en/index.js'
 import esTranslations from './locales/es/index.js'
 
-// Traductions des plugins (fichiers uniques qui contiennent toutes les langues)
-import myinstantsI18n from '../../plugins/myinstants/i18n.js'
-import youtubeI18n from '../../plugins/youtube/i18n.js'
-// ✅ NOUVEAU : plugin emoji
-import emojiPluginI18n from '../../plugins/emoji/i18n.js'
+const pluginI18nModules = import.meta.glob('../../plugins/*/i18n.js', { eager: true })
 
-// ✅ S5 : import depuis constants.js (plus de dépendance circulaire)
-import { LANGUAGES } from './constants.js'
+const buildPluginTranslations = () => {
+  const result = { fr: {}, en: {}, es: {} }
 
-// Réexport pour compatibilité
-export { LANGUAGES }
+  for (const mod of Object.values(pluginI18nModules)) {
+    const pluginI18n = mod?.default || mod
+    if (!pluginI18n || typeof pluginI18n !== 'object') continue
 
-// Traductions de base (application)
+    for (const lang of ['fr', 'en', 'es']) {
+      const dict = pluginI18n[lang]
+      if (dict && typeof dict === 'object') {
+        Object.assign(result[lang], dict)
+      }
+    }
+  }
+
+  return result
+}
+
 const APP_TRANSLATIONS = {
   fr: frTranslations,
   en: enTranslations,
   es: esTranslations,
 }
 
-const getPluginTranslations = (pluginModule, lang) => {
-  if (!pluginModule) return {}
-  const translations = pluginModule.default || pluginModule
-  return translations[lang] || {}
-}
-
-const PLUGIN_TRANSLATIONS = {
-  fr: {
-    ...getPluginTranslations(myinstantsI18n, 'fr'),
-    ...getPluginTranslations(youtubeI18n, 'fr'),
-    // ✅ NOUVEAU : traductions du plugin emoji discover
-    ...getPluginTranslations(emojiPluginI18n, 'fr'),
-  },
-  en: {
-    ...getPluginTranslations(myinstantsI18n, 'en'),
-    ...getPluginTranslations(youtubeI18n, 'en'),
-    ...getPluginTranslations(emojiPluginI18n, 'en'),
-  },
-  es: {
-    ...getPluginTranslations(myinstantsI18n, 'es'),
-    ...getPluginTranslations(youtubeI18n, 'es'),
-    ...getPluginTranslations(emojiPluginI18n, 'es'),
-  },
-}
+const PLUGIN_TRANSLATIONS = buildPluginTranslations()
 
 // ✅ Les traductions core sont prioritaires (ne peuvent pas être écrasées par les plugins)
 const MERGED_TRANSLATIONS = {}
@@ -67,6 +51,8 @@ for (const lang of Object.keys(PLUGIN_TRANSLATIONS)) {
 }
 
 export const TRANSLATIONS = MERGED_TRANSLATIONS
+
+export { LANGUAGES }
 
 const LanguageContext = createContext(null)
 

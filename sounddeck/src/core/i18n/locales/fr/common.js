@@ -142,6 +142,8 @@ export default {
   confirmCancel: 'Annuler',
   confirmProceed: 'Confirmer et continuer',
 
+  soundExists: 'Son existant',
+  soundExistsConfirm: 'Un son nommé "{name}" existe déjà. Voulez-vous quand même l\'ajouter ?',
   quitConfirmTitle: 'Quitter SoundDeck ?',
   quitConfirmMessage: 'Voulez-vous quitter l\'application ou la réduire dans le tray ?',
   quitConfirmQuit: 'Quitter',

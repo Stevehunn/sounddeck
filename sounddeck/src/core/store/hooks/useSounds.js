@@ -1,5 +1,5 @@
 // src/core/store/hooks/useSounds.js
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { normalizePath } from '../utils/normalizePath'
 
@@ -7,6 +7,21 @@ export function useSounds(initialSounds = [], initialSoundOrder = {}, initialTag
   const [sounds, setSounds] = useState(initialSounds)
   const [soundOrder, setSoundOrder] = useState(initialSoundOrder)
   const [tags, setTags] = useState(initialTags)
+  const soundsRef = useRef(sounds)
+  const saveRef = useRef(save)
+  const pendingPlayCountSaveRef = useRef(null)
+
+  useEffect(() => { soundsRef.current = sounds }, [sounds])
+  useEffect(() => { saveRef.current = save }, [save])
+
+  useEffect(() => {
+    return () => {
+      if (pendingPlayCountSaveRef.current) {
+        clearTimeout(pendingPlayCountSaveRef.current)
+        pendingPlayCountSaveRef.current = null
+      }
+    }
+  }, [])
 
   const addSound = useCallback(async (soundData) => {
     const newSound = {
@@ -76,12 +91,26 @@ export function useSounds(initialSounds = [], initialSoundOrder = {}, initialTag
   }, [sounds, save])
 
   const incrementPlayCount = useCallback(async (soundId) => {
-    const updated = sounds.map(s =>
-      s.id === soundId ? { ...s, playCount: (s.playCount || 0) + 1, lastPlayed: Date.now() } : s
+    const updated = soundsRef.current.map(s =>
+      s.id === soundId
+        ? { ...s, playCount: (s.playCount || 0) + 1, lastPlayed: Date.now() }
+        : s
     )
+    soundsRef.current = updated
     setSounds(updated)
-    await save('sounds', updated)
-  }, [sounds, save])
+
+    if (pendingPlayCountSaveRef.current) {
+      clearTimeout(pendingPlayCountSaveRef.current)
+    }
+    pendingPlayCountSaveRef.current = setTimeout(async () => {
+      pendingPlayCountSaveRef.current = null
+      try {
+        await saveRef.current('sounds', soundsRef.current)
+      } catch (e) {
+        console.warn('⚠️ [useSounds] save playCount échoué:', e)
+      }
+    }, 1500)
+  }, [])
 
   const toggleFavorite = useCallback(async (soundId, currentProfileId) => {
     const updated = sounds.map(s => {
@@ -174,7 +203,6 @@ export function useSounds(initialSounds = [], initialSoundOrder = {}, initialTag
     await save('sounds', updated)
   }, [sounds, save])
 
-  // Tags
   const addTagToSound = useCallback(async (soundId, tag) => {
     const currentTags = tags[soundId] || []
     if (currentTags.includes(tag)) return
@@ -195,7 +223,6 @@ export function useSounds(initialSounds = [], initialSoundOrder = {}, initialTag
     return tags[soundId] || []
   }, [tags])
 
-  // Sons ordonnés selon le profil
   const getOrderedSounds = useCallback((profileId) => {
     const profileSounds = profileId === 'all'
       ? sounds

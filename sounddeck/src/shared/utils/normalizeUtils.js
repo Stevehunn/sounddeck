@@ -184,7 +184,13 @@ export async function normalizeClip(clip, targetPeak = 0.95, store, options = {}
 
     if (!normalizedResult) return null
 
-    await store.updateClipWithPath(clip.id, normalizedResult.finalPath)
+    if (store && typeof store.updateClipWithPath === 'function') {
+      try {
+        await store.updateClipWithPath(clip.id, normalizedResult.finalPath)
+      } catch (e) {
+        console.warn('⚠️ [normalizeClip] updateClipWithPath a échoué:', e?.message)
+      }
+    }
 
     return {
       normalized: true,
