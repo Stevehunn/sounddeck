@@ -210,27 +210,6 @@ function AppContent({ store }) {
     }
   }, [])
 
-  // Sync thème
-  useEffect(() => {
-    if (store.loading) return
-
-    const syncThemeFromDisk = async () => {
-      try {
-        const diskTheme = await window.electronAPI.storeGet('theme')
-        const diskCustomTheme = await window.electronAPI.storeGet('customTheme')
-
-        if (diskTheme === 'custom' && !diskCustomTheme) return
-
-        if (diskTheme && diskTheme !== store.theme) {
-          store.updateTheme(diskTheme)
-        }
-      } catch (e) {
-        console.warn('⚠️ Erreur sync theme:', e)
-      }
-    }
-    syncThemeFromDisk()
-  }, [store.loading])
-
   useEffect(() => {
     if (store.loading) return
     if (!store.theme) return

@@ -43,9 +43,27 @@ export function useSettings(initialState = {}, save) {
     }
   }, [save])
 
-  const updateCustomTheme = useCallback(async (colors) => {
+  /**
+   * ✅ Hydrate le customTheme SANS toucher au thème actif.
+   * Utilisé uniquement au chargement initial du store.
+   */
+  const hydrateCustomTheme = useCallback((colors) => {
+    setCustomTheme(colors || null)
+  }, [])
+
+  /**
+   * ✅ updateCustomTheme : sauvegarde toujours le customTheme,
+   * mais n'active 'custom' QUE si `options.activate === true`.
+   *
+   * @param {Object|null} colors - Palette custom
+   * @param {{ activate?: boolean }} options
+   *   - activate: true → passe le thème actif à 'custom' (bouton "Appliquer")
+   *   - activate: false (défaut) → met juste à jour le customTheme en arrière-plan
+   */
+  const updateCustomTheme = useCallback(async (colors, options = {}) => {
+    const { activate = false } = options
     setCustomTheme(colors)
-    if (colors) {
+    if (colors && activate) {
       setTheme('custom')
       await save('theme', 'custom')
     }
@@ -210,6 +228,7 @@ export function useSettings(initialState = {}, save) {
     setLaunchAtStartup: (val) => { setLaunchAtStartup(val); save('launchAtStartup', val) },
     updateTheme,
     updateCustomTheme,
+    hydrateCustomTheme,
     updateLang,
     updateAudioDevice,
     updateLocalAudioDevice,

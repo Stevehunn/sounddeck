@@ -126,7 +126,7 @@ export default function CustomThemeEditor({ current, onSave }) {
   }
 
   const handleSave = () => {
-    onSave(colors)
+    onSave(colors, { activate: true })
     setChanged(false)
     cleanupInlineStyles()
   }
