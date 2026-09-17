@@ -12,9 +12,15 @@ import { TUTORIAL_STEPS as OptionsSteps } from '@features/options/tutorialSteps'
 import { TUTORIAL_STEPS as StatsSteps } from '@features/stats/tutorialSteps';
 import { TUTORIAL_STEPS as PresentationSteps, cleanupTutorialFavorites } from '@features/presentation/tutorialSteps';
 
+// ✅ NOUVEAU : tutoriel de la page "Mes emojis"
+import { TUTORIAL_STEPS as EmojiPageSteps } from '@features/emoji/tutorialSteps';
+
 // Tutoriels des plugins
 import { TUTORIAL_STEPS as DiscoverSteps } from '@plugins/myinstants/tutorialSteps';
 import { TUTORIAL_STEPS as YoutubeSteps, startYoutubeTutorial, cleanupYoutubeTutorial, finishYoutubeTutorial } from '@plugins/youtube/tutorialSteps';
+
+// ✅ NOUVEAU : tutoriel du plugin emoji discover
+import { TUTORIAL_STEPS as EmojiDiscoverSteps } from '@plugins/emoji/tutorialSteps';
 
 const TUTORIALS = {
   home: HomeSteps,
@@ -26,6 +32,9 @@ const TUTORIALS = {
   presentation: PresentationSteps,
   discover: DiscoverSteps,
   youtube: YoutubeSteps,
+  // ✅ NOUVEAU
+  emoji: EmojiPageSteps,
+  'emoji-discover': EmojiDiscoverSteps,
   guide: null,
 };
 

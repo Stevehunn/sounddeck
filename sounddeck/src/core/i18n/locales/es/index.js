@@ -11,6 +11,7 @@ import guide from './guide.js'
 import presentation from './presentation.js'
 import welcome from './welcome.js'
 import tutorial from './tutorial.js'
+import emoji from './emoji.js'
 
 export default {
   ...common,
@@ -25,4 +26,5 @@ export default {
   ...presentation,
   ...welcome,
   ...tutorial,
+  ...emoji,
 }

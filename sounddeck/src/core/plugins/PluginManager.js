@@ -289,10 +289,10 @@ export class PluginManager {
         if (!plugin) return null
 
         const paths = [
-          `../plugins/${page.pluginId}/${page.componentPath}`,
-          `../plugins/${page.pluginId}/pages/${page.id}`,
-          `../plugins/${page.pluginId}/${page.id}`,
-          `../plugins/${page.pluginId}/components/${page.id}`,
+          `../../plugins/${page.pluginId}/${page.componentPath}`,
+          `../../plugins/${page.pluginId}/pages/${page.id}`,
+          `../../plugins/${page.pluginId}/${page.id}`,
+          `../../plugins/${page.pluginId}/components/${page.id}`,
         ]
 
         for (const importPath of paths) {

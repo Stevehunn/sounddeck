@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ─── MYINSTANTS ──────────────────────────────────────────────────────────
   fetchMyinstants: (query, mode, lang) => ipcRenderer.invoke('fetch-myinstants', query, mode, lang),
 
+  // ✅ NOUVEAU : Emoji Discovery (getemoji.com)
+  fetchEmojis: (categoryId) => ipcRenderer.invoke('fetch-emojis', categoryId),
+
   // ─── RACCOURCIS ──────────────────────────────────────────────────────────
   updateShortcuts: (shortcuts) => ipcRenderer.invoke('update-shortcuts', shortcuts),
   updateProfileShortcut: (acc) => ipcRenderer.invoke('update-profile-shortcut', acc),

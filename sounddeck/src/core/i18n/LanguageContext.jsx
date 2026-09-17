@@ -9,6 +9,8 @@ import esTranslations from './locales/es/index.js'
 // Traductions des plugins (fichiers uniques qui contiennent toutes les langues)
 import myinstantsI18n from '../../plugins/myinstants/i18n.js'
 import youtubeI18n from '../../plugins/youtube/i18n.js'
+// ✅ NOUVEAU : plugin emoji
+import emojiPluginI18n from '../../plugins/emoji/i18n.js'
 
 // ✅ S5 : import depuis constants.js (plus de dépendance circulaire)
 import { LANGUAGES } from './constants.js'
@@ -33,14 +35,18 @@ const PLUGIN_TRANSLATIONS = {
   fr: {
     ...getPluginTranslations(myinstantsI18n, 'fr'),
     ...getPluginTranslations(youtubeI18n, 'fr'),
+    // ✅ NOUVEAU : traductions du plugin emoji discover
+    ...getPluginTranslations(emojiPluginI18n, 'fr'),
   },
   en: {
     ...getPluginTranslations(myinstantsI18n, 'en'),
     ...getPluginTranslations(youtubeI18n, 'en'),
+    ...getPluginTranslations(emojiPluginI18n, 'en'),
   },
   es: {
     ...getPluginTranslations(myinstantsI18n, 'es'),
     ...getPluginTranslations(youtubeI18n, 'es'),
+    ...getPluginTranslations(emojiPluginI18n, 'es'),
   },
 }
 

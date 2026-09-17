@@ -4,16 +4,7 @@ import { useLanguage } from '@core/i18n/LanguageContext'
 import Waveform, { formatTime } from '@shared/components/audio/Waveform'
 import useConfirm from '@shared/hooks/useConfirm'
 import { buildFileUrl } from '@shared/utils/fileUrl'
-
-const EMOJIS = [
-  '🔊','🎵','🎶','🎼','🎧','🎤','🎸','🎹','🎺','🎻','🥁','🪗','🪘','🎷','🪕',
-  '😂','🤣','😱','😬','🤡','👾','🦄','💥','🔥','⭐','🌟','✨','💫','🌈','⚡',
-  '🔔','📢','📣','💬','🗣️','👏','🙌','🤘','👍','👎','💀','👻','🎃','🤖','👽',
-  '🐸','🐧','🐱','🐶','🦊','🐻','🐼','🐨','🦁','🐮','🐷','🐒','🐲','🐉','🦕',
-  '🎮','🕹️','🎯','🎱','🎳','🎰','🧩','🃏','🎴','♠️','♥️','♦️','♣️','🀄','🎲',
-  '🍕','🍔','🌮','🌯','🍣','🍜','🍩','🍪','🎂','🧁','🍫','🍭','🍬','🍺','🍻',
-  '🚀','🛸','💎','💰','💵','💶','💷','💴','🪙','🧿','🔮','🪄','⚔️','🛡️','🏹'
-]
+import EmojiPicker from '@shared/components/ui/EmojiPicker'
 
 export default function Trimmer({ store, addToast }) {
   const { t } = useLanguage()
@@ -144,6 +135,7 @@ function SoundEditor({ sound, store, addToast, onDone }) {
   const [end, setEnd] = useState(0)
   const [name, setName] = useState(sound.name + ' (copie)')
   const [emoji, setEmoji] = useState(sound.emoji || '🔊')
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [image, setImage] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [targetProfiles, setTargetProfiles] = useState([sound.profiles?.[0] || 'all'])
@@ -414,28 +406,34 @@ function SoundEditor({ sound, store, addToast, onDone }) {
             {!imagePreview && (
               <div>
                 <SectionTitle icon="ti-mood-smile" label={t('editorEmojiLabel')} />
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, maxHeight: 200, overflowY: 'auto' }}>
-                  {EMOJIS.map(e => (
-                    <button
-                      key={e}
-                      onClick={() => setEmoji(e)}
-                      style={{
-                        width: 34, height: 34, fontSize: 16, borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                        border: `1px solid ${emoji === e ? 'var(--accent)' : 'var(--border)'}`,
-                        background: emoji === e ? 'var(--accent-light)' : 'var(--bg-tertiary)',
-                        transition: 'all var(--transition-base) ease'
-                      }}
-                      onMouseEnter={ev => {
-                        if (emoji !== e) ev.currentTarget.style.borderColor = 'var(--accent)'
-                      }}
-                      onMouseLeave={ev => {
-                        if (emoji !== e) ev.currentTarget.style.borderColor = 'var(--border)'
-                      }}
-                    >
-                      {e}
-                    </button>
-                  ))}
-                </div>
+                <button
+                  data-testid="trimmer-emoji-picker-button"
+                  onClick={() => setShowEmojiPicker(true)}
+                  className="btn-secondary"
+                  style={{
+                    width: '100%',
+                    justifyContent: 'center',
+                    fontSize: 20,
+                    minHeight: 44,
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                >
+                  {emoji || '🔊'}
+                  <span style={{ fontSize: 12, marginLeft: 8, color: 'var(--text-secondary)' }}>
+                    {t('editorImageChoose') || 'Choisir'}
+                  </span>
+                </button>
+
+                <EmojiPicker
+                  isOpen={showEmojiPicker}
+                  onClose={() => setShowEmojiPicker(false)}
+                  currentEmoji={emoji}
+                  onSelect={(newEmoji) => {
+                    setEmoji(newEmoji)
+                    setShowEmojiPicker(false)
+                  }}
+                  onManageClick={() => window.__navigateTo?.('emoji')}
+                />
               </div>
             )}
 

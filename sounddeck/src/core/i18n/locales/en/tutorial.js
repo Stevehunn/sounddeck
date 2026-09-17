@@ -235,4 +235,25 @@ export default {
   tutorialYoutubeStep3Title: 'Download and configure',
   tutorialYoutubeStep3Desc: 'Download the audio, then configure the name, image and profiles before adding it to your library.',
   tutorialYoutubeStep3Hint: '💡 Tip: You can add a custom image or leave the default emoji.',
+
+  // ─── "MY EMOJIS" PAGE (core) ────────────────────────────────────────
+  tutorialEmojiPageStep1Title: 'Your emoji library',
+  tutorialEmojiPageStep1Desc: 'This page gathers all your emojis: the default ones, those you added manually, and those downloaded from the Discover page.',
+  tutorialEmojiPageStep1Hint: '💡 Tip: Default emojis are always available in the picker.',
+
+  tutorialEmojiPageStep2Title: 'Your added emojis',
+  tutorialEmojiPageStep2Desc: 'This section only shows the emojis you added. They are grouped by their original category.',
+  tutorialEmojiPageStep2Hint: '💡 Tip: Emojis without a category appear in "Uncategorized".',
+
+  tutorialEmojiPageStep3Title: 'Remove an emoji',
+  tutorialEmojiPageStep3Desc: 'Hover over an added emoji to see the × button. Click it to remove it from your collection. Default emojis cannot be removed.',
+  tutorialEmojiPageStep3Hint: '💡 Tip: Use the "Remove category" button to delete several at once.',
+
+  tutorialEmojiPageStep4Title: 'Search',
+  tutorialEmojiPageStep4Desc: 'Use the search bar to filter your added emojis.',
+  tutorialEmojiPageStep4Hint: '💡 Tip: The search matches the emoji character itself.',
+
+  tutorialEmojiPageStep5Title: 'Discover more emojis',
+  tutorialEmojiPageStep5Desc: 'Click "Add more emojis" to open the Discover page and expand your collection by whole category.',
+  tutorialEmojiPageStep5Hint: '💡 Tip: You can add 30 emojis with a single click from the Discover page.',
 };

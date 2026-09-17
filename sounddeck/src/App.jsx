@@ -17,6 +17,9 @@ import WelcomeScreen from '@features/welcome/WelcomeScreen'
 import Tutorial from '@shared/components/ui/Tutorial'
 import HelpButton from '@shared/components/ui/HelpButton'
 
+// ✅ NOUVEAU : Page "Mes emojis"
+import EmojiPage from '@features/emoji/EmojiPage'
+
 import { playSound, stopAllSounds, setStoreRef } from '@core/services/AudioService'
 import { warmupAudioContext } from '@core/services/AudioMixerService'
 
@@ -112,6 +115,14 @@ function AppContent({ store }) {
       delete window.__startTutorial
     }
   }, [openTutorial])
+
+  // ✅ NOUVEAU : navigation programmatique (pour les pages/plugins)
+  useEffect(() => {
+    window.__navigateTo = setCurrentPage
+    return () => {
+      delete window.__navigateTo
+    }
+  }, [])
 
   useEffect(() => {
     const checkFirstLaunch = async () => {
@@ -498,6 +509,20 @@ function AppContent({ store }) {
       )
     }
 
+    // ✅ NOUVEAU : route "emoji" (page "Mes emojis")
+    if (currentPage === 'emoji') {
+      return (
+        <PageWrapper pageId="emoji" onHelpClick={openTutorial}>
+          <EmojiPage
+            key={`emoji-${currentLang}`}
+            store={store}
+            addToast={addToast}
+            onNavigate={setCurrentPage}
+          />
+        </PageWrapper>
+      )
+    }
+
     if (isPluginPage(currentPage)) {
       if (pluginLoading) {
         return (
@@ -754,7 +779,6 @@ export default function App() {
 
   return (
     <PluginProvider store={store}>
-      {/* ✅ FIX : store passé en prop à AppContent (plus de double useStore) */}
       <AppContent store={store} />
     </PluginProvider>
   )

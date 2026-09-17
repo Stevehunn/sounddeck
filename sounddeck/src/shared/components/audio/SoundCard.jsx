@@ -7,14 +7,13 @@ import { useLanguage } from '@core/i18n/LanguageContext'
 import useConfirm from '@shared/hooks/useConfirm'
 import { formatTime } from '@shared/utils/format'
 import { buildFileUrl } from '@shared/utils/fileUrl'
+import EmojiPicker from '@shared/components/ui/EmojiPicker'
 
 function convertOldVolumeToDb(oldVolume) {
   if (oldVolume === undefined || oldVolume === null) return 0
   if (oldVolume >= -24 && oldVolume <= 24) return oldVolume
   return Math.round(((oldVolume - 50) / 50) * 24 * 10) / 10
 }
-
-const EMOJI_LIST = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋','🎤','🦄','💯','🤡','👾','🪇','🪘','🎸','🎹','🎷','🎼','🎧','📢','📣','🔇','🔈','🔉','💬','🗣️','👥','👤','🎭','🎪','🎨','🎬','🕹️','🎲','🧩','🎯','🎱','🎳','🎰','🧨','💣','🗡️','⚔️','🛡️','🏹','🪃','🪄','🔮','🧿','💎','🪙','💰','💵','💶','💷','💴','🪪','📱','📲','💻','🖥️','🖨️','⌨️','🖱️','🖲️','💽','💾','💿','📀','🧮','📟','☎️','📞','📠','📺','📻','🎙️','🎚️','🎛️','🧭','⏰','⏳','⌛️']
 
 export default function SoundCard({
   sound,
@@ -51,7 +50,6 @@ export default function SoundCard({
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(sound.name)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
-  const [emojiPickerPosition, setEmojiPickerPosition] = useState({ top: 0, left: 0 })
   const [showTagInput, setShowTagInput] = useState(false)
   const [newTagValue, setNewTagValue] = useState('')
 
@@ -242,15 +240,14 @@ export default function SoundCard({
   }
 
   const handleChangeEmoji = () => {
-    if (buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect()
-      setEmojiPickerPosition({
-        top: rect.bottom + 4,
-        left: rect.left - 100,
-      })
-    }
     setShowEmojiPicker(true)
     setShowMenu(false)
+  }
+
+  const handleManageEmojis = () => {
+    if (window.__navigateTo) {
+      window.__navigateTo('emoji')
+    }
   }
 
   useEffect(() => {
@@ -800,96 +797,17 @@ export default function SoundCard({
           document.body
         )}
 
-      {showEmojiPicker &&
-        createPortal(
-          <div
-            style={{
-              position: 'fixed',
-              top: emojiPickerPosition.top,
-              left: emojiPickerPosition.left,
-              background: 'var(--bg-secondary)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-md)',
-              padding: 12,
-              zIndex: 99999,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-              maxWidth: 320,
-              maxHeight: 300,
-              overflowY: 'auto',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 8,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 12,
-                  color: 'var(--text-secondary)',
-                  fontWeight: 500,
-                }}
-              >
-                {t('chooseEmoji')}
-              </span>
-              <button
-                onClick={() => setShowEmojiPicker(false)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--text-tertiary)',
-                  cursor: 'pointer',
-                  padding: '2px 4px',
-                }}
-              >
-                <i className="ti ti-x" />
-              </button>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {EMOJI_LIST.map((e) => (
-                <button
-                  key={e}
-                  onClick={() => {
-                    if (onChangeEmoji) onChangeEmoji(sound.id, e)
-                    setShowEmojiPicker(false)
-                  }}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    fontSize: 18,
-                    borderRadius: 6,
-                    border: `1px solid ${
-                      sound.emoji === e ? 'var(--accent)' : 'var(--border)'
-                    }`,
-                    background:
-                      sound.emoji === e
-                        ? 'var(--accent-light)'
-                        : 'var(--bg-tertiary)',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--accent)'
-                    e.currentTarget.style.transform = 'scale(1.1)'
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sound.emoji !== e) {
-                      e.currentTarget.style.borderColor = 'var(--border)'
-                    }
-                    e.currentTarget.style.transform = 'scale(1)'
-                  }}
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
-          </div>,
-          document.body
-        )}
+      {/* ✅ NOUVEAU : EmojiPicker global (modal restylée, cohérent avec l'app) */}
+      <EmojiPicker
+        isOpen={showEmojiPicker}
+        onClose={() => setShowEmojiPicker(false)}
+        currentEmoji={sound.emoji}
+        onSelect={(emoji) => {
+          if (onChangeEmoji) onChangeEmoji(sound.id, emoji)
+          setShowEmojiPicker(false)
+        }}
+        onManageClick={handleManageEmojis}
+      />
 
       <ConfirmWrapper />
     </>

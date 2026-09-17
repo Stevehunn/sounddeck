@@ -8,6 +8,12 @@ import { useEditor } from './hooks/useEditor'
 import { useMixer } from './hooks/useMixer'
 import { DEFAULT_SIDEBAR_CONFIG } from './utils/constants'
 import { normalizePath } from './utils/normalizePath'
+// ✅ NOUVEAU : imports pour la migration des items core (emoji, etc.)
+import {
+  DEFAULT_GROUPS,
+  DEFAULT_ICONS,
+  ACTION_IDS,
+} from '@shared/constants/navigation'
 
 const save = async (key, value) => {
   await window.electronAPI.storeSet(key, value)
@@ -229,6 +235,40 @@ export function useStore() {
               return currentProfileIds.has(item.id)
             }
             return true
+          })
+
+          // ✅ NOUVEAU : migration — ajoute les items core manquants
+          // (pour les utilisateurs qui ont un sidebarConfig sauvegardé
+          //  avant l'ajout de nouvelles pages comme 'emoji')
+          const KNOWN_CORE_IDS = [
+            'home',
+            'discover',
+            'trimmer',
+            'editor',
+            'sequencer',
+            'youtube',
+            'stats',
+            'emoji',           // ← page "Mes emojis"
+            'loop',
+            'shortcuts',
+            'presentation',
+            'guide',
+            'options',
+          ]
+
+          KNOWN_CORE_IDS.forEach((id) => {
+            if (!items.find((i) => i.id === id)) {
+              items.push({
+                id,
+                group: DEFAULT_GROUPS[id] || 'navigation',
+                label: id,
+                icon: DEFAULT_ICONS[id] || 'ti-circle',
+                visible: true,
+                pinned: false,
+                order: items.length,
+                canHide: !ACTION_IDS.includes(id),
+              })
+            }
           })
 
           setSidebarConfig({ ...savedSidebarConfig, items })

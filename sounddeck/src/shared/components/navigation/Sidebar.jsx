@@ -18,6 +18,8 @@ const getDefaultLabels = (t) => ({
   editor: t('editor'),
   sequencer: t('sequencer'),
   youtube: t('youtube'),
+  // ✅ NOUVEAU
+  emoji: t('emojiPageTitle'),
   loop: t('loop'),
   shortcuts: t('shortcuts'),
   presentation: t('presentation'),
@@ -280,6 +282,14 @@ const Sidebar = memo(
           group: 'navigation',
           isCore: true,
         },
+        // ✅ NOUVEAU : Mes emojis (core page, pas plugin)
+        {
+          id: 'emoji',
+          label: t('emojiPageTitle'),
+          icon: 'ti-mood-smile',
+          group: 'navigation',
+          isCore: true,
+        },
         {
           id: 'guide',
           label: t('guide'),
@@ -323,6 +333,8 @@ const Sidebar = memo(
       else if (itemId === 'editor') onChangePage('editor')
       else if (itemId === 'sequencer') onChangePage('sequencer')
       else if (itemId === 'youtube') onChangePage('youtube')
+      // ✅ NOUVEAU : route emoji
+      else if (itemId === 'emoji') onChangePage('emoji')
       else if (itemId === 'guide') onChangePage('guide')
       else if (itemId === 'options') onChangePage('options')
       else if (itemId === 'stats') onChangePage('stats')

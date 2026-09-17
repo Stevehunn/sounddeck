@@ -7,11 +7,12 @@ import useConfirm from '@shared/hooks/useConfirm'
 import LoadingOverlay from '@shared/components/ui/LoadingOverlay'
 import { DeleteButton } from '@shared/components/ui'
 import { buildFileUrl } from '@shared/utils/fileUrl'
+import EmojiPicker from '@shared/components/ui/EmojiPicker'
 
 // ✅ Importer les fonctions du tutoriel
-import { 
-  mockFetchVideoInfo, 
-  mockDownloadAudio, 
+import {
+  mockFetchVideoInfo,
+  mockDownloadAudio,
   mockSaveSound,
   isYoutubeTutorialActive,
   getTutorialState,
@@ -19,8 +20,6 @@ import {
   setTutorialStep,
   getTutorialStep
 } from './tutorialSteps'
-
-const EMOJIS = ['🎵','🎤','🎸','🎹','🥁','🎺','🎻','🎼','🔊','💥','😂','🔥']
 
 // ✅ ÉTAT GLOBAL POUR YT-DLP
 let globalYtdlpStatus = null
@@ -78,6 +77,7 @@ export default function YouTube({ store, addToast }) {
     const [isDuplicating, setIsDuplicating] = useState(false)
     const [toastShown, setToastShown] = useState(false)
     const [useThumbnail, setUseThumbnail] = useState(false)
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false)
 
     // ─── REFS ──────────────────────────────────────────────────────────────────
     const isMounted = useRef(true)
@@ -1270,14 +1270,32 @@ export default function YouTube({ store, addToast }) {
                                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                     {t('editorEmojiLabel')}
                                 </label>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                    {EMOJIS.map(e => (
-                                        <button key={e} onClick={() => setEmoji(e)} style={{ width: 36, height: 36, fontSize: 18, borderRadius: 'var(--radius-sm)', cursor: 'pointer', border: `1px solid ${emoji === e ? 'var(--accent)' : 'var(--border)'}`, background: emoji === e ? 'var(--accent-light)' : 'var(--bg-tertiary)' }}>
-                                            {e}
-                                        </button>
-                                    ))}
+                                <button
+                                    data-testid="youtube-emoji-picker-button"
+                                    onClick={() => setShowEmojiPicker(true)}
+                                    className="btn-secondary"
+                                    style={{
+                                    minWidth: 60,
+                                    minHeight: 44,
+                                    justifyContent: 'center',
+                                    fontSize: 24,
+                                    borderRadius: 'var(--radius-md)',
+                                    }}
+                                >
+                                    {emoji || '🎵'}
+                                </button>
+
+                                <EmojiPicker
+                                    isOpen={showEmojiPicker}
+                                    onClose={() => setShowEmojiPicker(false)}
+                                    currentEmoji={emoji}
+                                    onSelect={(newEmoji) => {
+                                    setEmoji(newEmoji)
+                                    setShowEmojiPicker(false)
+                                    }}
+                                    onManageClick={() => window.__navigateTo?.('emoji')}
+                                />
                                 </div>
-                            </div>
 
                             <div style={{ marginBottom: 24 }}>
                                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>

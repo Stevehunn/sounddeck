@@ -8,8 +8,11 @@ import { useLanguage } from '@core/i18n/LanguageContext'
 import { playSound, stopAllSounds, stopSound } from '@core/services/AudioService'
 import useConfirm from '@shared/hooks/useConfirm'
 import { buildFileUrl } from '@shared/utils/fileUrl'
+// ✅ NOUVEAU : picker global + pool par défaut
+import EmojiPicker from '@shared/components/ui/EmojiPicker'
+import { DEFAULT_EMOJIS } from '@shared/constants/emojis'
 
-const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
+// ❌ SUPPRIMÉ : const EMOJIS = [...] (~20 entrées)
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`
@@ -55,7 +58,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     const calculateColumns = () => {
       if (!gridRef.current) return
       const containerWidth = gridRef.current.offsetWidth
-      
+
       const cardSizes = {
         small: 90,
         medium: 110,
@@ -74,7 +77,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
   const filtered = searchTerm
     ? currentSounds.filter(s => {
         const nameMatch = s.name.toLowerCase().includes(searchTerm.toLowerCase())
-        const tagMatch = (store.tags[s.id] || []).some(t => 
+        const tagMatch = (store.tags[s.id] || []).some(t =>
           t.toLowerCase().includes(searchTerm.toLowerCase())
         )
         return nameMatch || tagMatch
@@ -143,9 +146,9 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     const data = e.dataTransfer.getData('text/plain')
     if (!data) return
     const [sourceId, sourceIndex, sourceType] = data.split('|')
-    
+
     if (sourceId !== draggedSoundId) return
-    
+
     const startIndex = parseInt(sourceIndex)
     const endIndex = dropIndex
 
@@ -158,7 +161,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     }
 
     const allSounds = currentSounds
-    
+
     let globalStartIndex = findGlobalIndex(sourceId)
     if (globalStartIndex === -1) {
       setDraggedSoundId(null)
@@ -191,7 +194,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     if (globalEndIndex > allSounds.length) globalEndIndex = allSounds.length
 
     await store.reorderSounds(globalStartIndex, globalEndIndex)
-    
+
     setDraggedSoundId(null)
     setDragOverIndex(null)
     setIsDragging(false)
@@ -206,9 +209,9 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     const data = e.dataTransfer.getData('text/plain')
     if (!data) return
     const [sourceId, sourceIndex, sourceType] = data.split('|')
-    
+
     if (sourceId !== draggedSoundId) return
-    
+
     const startIndex = parseInt(sourceIndex)
     const endIndex = dropIndex
 
@@ -221,7 +224,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     }
 
     await store.reorderSounds(startIndex, endIndex)
-    
+
     setDraggedSoundId(null)
     setDragOverIndex(null)
     setIsDragging(false)
@@ -233,14 +236,14 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     setTotalFiles(filePaths.length)
     setImportProgress(0)
     let count = 0
-    
+
     const compressOnImport = store.compressOnImport || false
     const compressionBitrate = store.compressionBitrate || 128
-    
+
     for (let i = 0; i < filePaths.length; i++) {
       const fp = filePaths[i]
       let result = await window.electronAPI.importSoundFile(fp)
-      
+
       if (result.success && compressOnImport) {
         try {
           const originalPath = result.path
@@ -273,12 +276,13 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
           console.warn('⚠️ Erreur compression:', e)
         }
       }
-      
+
       if (result.success) {
-        await store.addSound({ 
-          name: result.name, 
-          path: result.path, 
-          emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)], 
+        // ✅ MODIFIÉ : DEFAULT_EMOJIS au lieu de EMOJIS
+        await store.addSound({
+          name: result.name,
+          path: result.path,
+          emoji: DEFAULT_EMOJIS[Math.floor(Math.random() * DEFAULT_EMOJIS.length)],
           profiles: [currentProfileId],
           compressed: result.compressed || false,
           originalSize: result.originalSize,
@@ -288,9 +292,9 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
       }
       setImportProgress(i + 1)
     }
-    
+
     if (count > 0) {
-      const msg = compressOnImport 
+      const msg = compressOnImport
         ? `${count} ${t('sounds')} ${t('importedAndCompressed')}`
         : `${count} ${t('sounds')} ${t('imported')}`
       addToast(msg, 'success')
@@ -339,11 +343,11 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     let imported = 0
     const compressOnImport = store.compressOnImport || false
     const compressionBitrate = store.compressionBitrate || 128
-    
+
     for (const file of audioFiles) {
       try {
         let result = null
-        
+
         if (file.path && file.path.length > 2) {
           result = await window.electronAPI.importSoundFile(file.path)
         } else {
@@ -355,7 +359,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
           })
           result = await window.electronAPI.writeDroppedFile(file.name, arrayBuffer)
         }
-        
+
         if (result.success) {
           if (compressOnImport) {
             try {
@@ -379,11 +383,12 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
               console.warn('⚠️ Erreur compression:', e)
             }
           }
-          
+
+          // ✅ MODIFIÉ : DEFAULT_EMOJIS au lieu de EMOJIS
           await store.addSound({
             name: result.name,
             path: result.path,
-            emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
+            emoji: DEFAULT_EMOJIS[Math.floor(Math.random() * DEFAULT_EMOJIS.length)],
             profiles: [currentProfileId]
           })
           imported++
@@ -412,7 +417,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
   const handleDeleteSound = useCallback(async (soundId) => {
     const sound = store.sounds.find(s => s.id === soundId)
     if (!sound) return
-    
+
     const confirmed = await confirm({
       title: t('confirmDeleteSound') || 'Confirmer la suppression du son',
       message: (t('confirmDeleteSoundMessage') || `Voulez-vous vraiment supprimer définitivement le son "{name}" ?`).replace('{name}', sound.name),
@@ -420,7 +425,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
       confirmText: t('menuDelete') || 'Supprimer définitivement',
       cancelText: t('cancel') || 'Annuler'
     })
-    
+
     if (confirmed) {
       await store.deleteSound(soundId)
       addToast(`"${sound.name}" ${t('deleted')}`, 'info')
@@ -440,11 +445,11 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
               </div>
             )}
           </div>
-          <select 
+          <select
             data-testid="sort-select"
-            value={sortBy} 
-            onChange={e => setSortBy(e.target.value)} 
-            className="input-sm" 
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value)}
+            className="input-sm"
             style={{ width: 'auto', minWidth: 120 }}
           >
             <option value="custom">{t('sortCustom')}</option>
@@ -453,24 +458,24 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
             <option value="recent">{t('sortRecent')}</option>
             <option value="alpha">{t('sortAlpha')}</option>
           </select>
-          <input 
+          <input
             data-testid="search-input"
-            value={localSearch} 
-            onChange={e => setLocalSearch(e.target.value)} 
-            placeholder={t('search')} 
+            value={localSearch}
+            onChange={e => setLocalSearch(e.target.value)}
+            placeholder={t('search')}
             className="input-sm"
-            style={{ width: 160, minWidth: 120 }} 
+            style={{ width: 160, minWidth: 120 }}
           />
-          
-          <button 
+
+          <button
             data-testid="add-sound-button"
-            className="btn-primary btn-sm" 
-            onClick={() => setShowImport(true)} 
+            className="btn-primary btn-sm"
+            onClick={() => setShowImport(true)}
             style={{ minHeight: 34 }}
           >
             <i className="ti ti-plus" /> {t('addSound')}
           </button>
-          
+
           {currentProfileId !== 'all' && (
             <button className="btn-secondary btn-sm" onClick={() => setShowProfileManager(true)} style={{ minHeight: 34 }}>
               <i className="ti ti-settings" /> {t('manageProfile')}
@@ -534,22 +539,22 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
           )}
 
           {favoriteSoundsForProfile.length > 0 && (
-            <Section 
-              title={t('favorites')} 
-              icon="ti-star-filled" 
-              iconColor="var(--warning)" 
+            <Section
+              title={t('favorites')}
+              icon="ti-star-filled"
+              iconColor="var(--warning)"
               count={favoriteSoundsForProfile.length}
               testId="favorites-section"
             >
-              <SoundGrid 
-                sounds={favoriteSoundsForProfile} 
-                shortcuts={shortcuts} 
-                audioDevice={audioDevice} 
-                volume={volume} 
-                loopEnabled={loopEnabled} 
-                playLocally={playLocally} 
-                store={store} 
-                addToast={addToast} 
+              <SoundGrid
+                sounds={favoriteSoundsForProfile}
+                shortcuts={shortcuts}
+                audioDevice={audioDevice}
+                volume={volume}
+                loopEnabled={loopEnabled}
+                playLocally={playLocally}
+                store={store}
+                addToast={addToast}
                 lang={lang}
                 gridRef={favoritesGridRef}
                 draggable={sortBy === 'custom'}
@@ -567,21 +572,21 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
           )}
 
           {filtered.length > 0 && (
-            <Section 
-              title={t('profileSounds')} 
-              icon="ti-music" 
+            <Section
+              title={t('profileSounds')}
+              icon="ti-music"
               count={filtered.length}
               testId="profile-sounds-section"
             >
-              <SoundGrid 
-                sounds={displayed} 
-                shortcuts={shortcuts} 
-                audioDevice={audioDevice} 
-                volume={volume} 
-                loopEnabled={loopEnabled} 
-                playLocally={playLocally} 
-                store={store} 
-                addToast={addToast} 
+              <SoundGrid
+                sounds={displayed}
+                shortcuts={shortcuts}
+                audioDevice={audioDevice}
+                volume={volume}
+                loopEnabled={loopEnabled}
+                playLocally={playLocally}
+                store={store}
+                addToast={addToast}
                 lang={lang}
                 gridRef={gridRef}
                 draggable={sortBy === 'custom'}
@@ -605,11 +610,11 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
           )}
 
           {soundsOutsideProfile.length > 0 && (
-            <Section 
-              title={t('otherSounds')} 
-              icon="ti-circle-plus" 
-              iconColor="var(--text-tertiary)" 
-              count={soundsOutsideProfile.length} 
+            <Section
+              title={t('otherSounds')}
+              icon="ti-circle-plus"
+              iconColor="var(--text-tertiary)"
+              count={soundsOutsideProfile.length}
               muted
               testId="other-sounds-section"
             >
@@ -618,14 +623,14 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
                 {displayedOther.map(s => (
-                  <OutsideCard 
-                    key={s.id} 
-                    sound={s} 
+                  <OutsideCard
+                    key={s.id}
+                    sound={s}
                     onAdd={async () => {
                       await store.addSoundToProfile(s.id, currentProfileId)
                       addToast(`"${s.name}" ${t('addedToProfile')}`, 'success')
-                    }} 
-                    lang={lang} 
+                    }}
+                    lang={lang}
                   />
                 ))}
               </div>
@@ -651,7 +656,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
             onManualAdd={async (name, filePath, imagePath, emoji) => {
               let finalPath = filePath
               const compressOnImport = store.compressOnImport || false
-              
+
               if (compressOnImport) {
                 try {
                   const ext = filePath.split('.').pop() || 'mp3'
@@ -673,13 +678,13 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
                   console.warn('⚠️ Erreur compression:', e)
                 }
               }
-              
-              await store.addSound({ 
-                name, 
-                path: finalPath, 
-                image: imagePath || null, 
-                emoji: emoji || '🔊', 
-                profiles: [currentProfileId] 
+
+              await store.addSound({
+                name,
+                path: finalPath,
+                image: imagePath || null,
+                emoji: emoji || '🔊',
+                profiles: [currentProfileId]
               })
               addToast(`"${name}" ${t('added')}`, 'success')
               setShowImport(false)
@@ -687,7 +692,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
             onUrlImport={async (url, name) => {
               const safeName = name.replace(/\s+/g, '_') + '_' + Date.now() + '.mp3'
               let result = await window.electronAPI.downloadSoundUrl(url, safeName)
-              
+
               if (result.success && store.compressOnImport) {
                 try {
                   const ext = result.path.split('.').pop() || 'mp3'
@@ -710,7 +715,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
                   console.warn('⚠️ Erreur compression:', e)
                 }
               }
-              
+
               if (result.success) {
                 await store.addSound({ name, path: result.path, emoji: '🔊', profiles: [currentProfileId] })
                 addToast(`"${name}" ${t('downloaded')}`, 'success')
@@ -742,18 +747,18 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
 
 function Section({ title, icon, iconColor, count, muted, children, testId }) {
   return (
-    <section 
+    <section
       data-testid={testId || 'section'}
       style={{ marginBottom: 24 }}
     >
-      <div style={{ 
-        fontSize: 12, 
-        fontWeight: 500, 
-        color: muted ? 'var(--text-tertiary)' : 'var(--text-secondary)', 
-        marginBottom: 10, 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: 6 
+      <div style={{
+        fontSize: 12,
+        fontWeight: 500,
+        color: muted ? 'var(--text-tertiary)' : 'var(--text-secondary)',
+        marginBottom: 10,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6
       }}>
         <i className={`ti ${icon}`} style={{ color: iconColor || 'inherit' }} />
         {title}
@@ -764,31 +769,31 @@ function Section({ title, icon, iconColor, count, muted, children, testId }) {
   )
 }
 
-function SoundGrid({ 
-  sounds, 
-  shortcuts, 
-  audioDevice, 
-  volume, 
-  loopEnabled, 
-  playLocally, 
-  store, 
-  addToast, 
-  lang, 
-  gridRef, 
-  draggable, 
-  onDragStart, 
-  onDragEnd, 
-  onDragOver, 
-  onDrop, 
-  draggedSoundId, 
-  dragOverIndex, 
-  dropTarget, 
+function SoundGrid({
+  sounds,
+  shortcuts,
+  audioDevice,
+  volume,
+  loopEnabled,
+  playLocally,
+  store,
+  addToast,
+  lang,
+  gridRef,
+  draggable,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
+  draggedSoundId,
+  dragOverIndex,
+  dropTarget,
   onDelete,
   testId
 }) {
   const { t } = useLanguage()
   const cardSize = store.cardSize || 'medium'
-  
+
   const cardSizes = {
     small: 90,
     medium: 110,
@@ -796,21 +801,21 @@ function SoundGrid({
   }
 
   return (
-    <div 
-      ref={gridRef} 
+    <div
+      ref={gridRef}
       data-testid={testId || 'sound-grid'}
-      style={{ 
-        display: 'grid', 
-        gridTemplateColumns: `repeat(auto-fill, minmax(${cardSizes[cardSize]}px, 1fr))`, 
-        gap: 10, 
-        position: 'relative', 
-        zIndex: 1 
+      style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(auto-fill, minmax(${cardSizes[cardSize]}px, 1fr))`,
+        gap: 10,
+        position: 'relative',
+        zIndex: 1
       }}
     >
       {sounds.map((s, index) => {
         const isDragging = draggedSoundId === s.id
         const isDragOver = dragOverIndex === index && !isDragging
-        
+
         return (
           <div
             key={s.id}
@@ -844,10 +849,10 @@ function SoundGrid({
                 boxShadow: '0 0 10px var(--accent)'
               }} />
             )}
-            <SoundCard 
-              sound={s} 
-              shortcut={shortcuts[s.id]} 
-              audioDevice={audioDevice} 
+            <SoundCard
+              sound={s}
+              shortcut={shortcuts[s.id]}
+              audioDevice={audioDevice}
               volume={volume}
               loopEnabled={loopEnabled}
               playLocally={playLocally}
@@ -893,10 +898,10 @@ function OutsideCard({ sound, onAdd, lang }) {
         {imageUrl ? <img src={imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : sound.emoji}
       </div>
       <div style={{ fontSize: 11, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 6 }}>{sound.name}</div>
-      <button 
+      <button
         data-testid={`add-other-sound-${sound.id}`}
-        onClick={onAdd} 
-        className="btn-primary btn-sm" 
+        onClick={onAdd}
+        className="btn-primary btn-sm"
         style={{ width: '100%', justifyContent: 'center' }}
       >
         <i className="ti ti-circle-plus" /> {t('addToProfile')}
@@ -917,8 +922,8 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
   const [showTrimmer, setShowTrimmer] = useState(false)
   const [compressOnImport, setCompressOnImport] = useState(store?.compressOnImport || false)
   const [compressionBitrate, setCompressionBitrate] = useState(store?.compressionBitrate || 128)
-
-  const EMOJIS = ['🔊','🎵','😂','💥','🔔','🎺','🎻','🐸','🤣','😱','🎮','🔥','💀','👏','🚨','🎉','🐧','😬','🥁','😋']
+  // ✅ NOUVEAU : picker emoji
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
 
   const handlePickFile = async () => {
     const paths = await window.electronAPI.openFileDialog()
@@ -1003,7 +1008,7 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
                   {t('compressOnImport')}
                 </label>
               </div>
-              
+
               {compressOnImport && (
                 <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
@@ -1066,17 +1071,34 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
               </div>
             </div>
 
+            {/* ✅ NOUVEAU : picker emoji (remplace la liste inline) */}
             {!manualImage && (
               <div>
                 <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('emojiLabel')}</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {EMOJIS.map(e => (
-                    <button key={e} onClick={() => setManualEmoji(e)}
-                      style={{ width: 34, height: 34, fontSize: 18, borderRadius: 6, border: `1px solid ${manualEmoji === e ? 'var(--accent)' : 'var(--border)'}`, background: manualEmoji === e ? 'var(--accent-light)' : 'var(--bg-tertiary)', cursor: 'pointer' }}>
-                      {e}
-                    </button>
-                  ))}
-                </div>
+                <button
+                  data-testid="import-modal-emoji-picker-button"
+                  onClick={() => setShowEmojiPicker(true)}
+                  className="btn-secondary"
+                  style={{
+                    width: 60,
+                    height: 60,
+                    justifyContent: 'center',
+                    fontSize: 28,
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                >
+                  {manualEmoji || '🔊'}
+                </button>
+                <EmojiPicker
+                  isOpen={showEmojiPicker}
+                  onClose={() => setShowEmojiPicker(false)}
+                  currentEmoji={manualEmoji}
+                  onSelect={(e) => {
+                    setManualEmoji(e)
+                    setShowEmojiPicker(false)
+                  }}
+                  onManageClick={() => window.__navigateTo?.('emoji')}
+                />
               </div>
             )}
 
@@ -1098,7 +1120,7 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
                   {t('compressOnImport')}
                 </label>
               </div>
-              
+
               {compressOnImport && (
                 <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
@@ -1170,7 +1192,7 @@ function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onU
                   {t('compressOnImport')}
                 </label>
               </div>
-              
+
               {compressOnImport && (
                 <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>

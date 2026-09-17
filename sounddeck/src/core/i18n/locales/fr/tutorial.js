@@ -235,4 +235,25 @@ export default {
   tutorialYoutubeStep3Title: 'Télécharger et configurer',
   tutorialYoutubeStep3Desc: 'Téléchargez l\'audio, puis configurez le nom, l\'image et les profils avant de l\'ajouter à votre bibliothèque.',
   tutorialYoutubeStep3Hint: '💡 Astuce : Vous pouvez ajouter une image personnalisée ou laisser l\'emoji par défaut.',
+
+  // ─── EMOJI PAGE (Mes emojis) ─────────────────────────────────────────
+  tutorialEmojiPageStep1Title: 'Votre bibliothèque d\'emojis',
+  tutorialEmojiPageStep1Desc: 'Cette page regroupe tous vos emojis : ceux par défaut, ceux ajoutés manuellement, et ceux téléchargés depuis la page Découvrir.',
+  tutorialEmojiPageStep1Hint: '💡 Astuce : Les emojis par défaut sont toujours disponibles dans le picker.',
+
+  tutorialEmojiPageStep2Title: 'Vos emojis ajoutés',
+  tutorialEmojiPageStep2Desc: 'Cette section affiche uniquement les emojis que vous avez ajoutés. Ils sont groupés par catégorie d\'origine.',
+  tutorialEmojiPageStep2Hint: '💡 Astuce : Les emojis sans catégorie apparaissent dans "Sans catégorie".',
+
+  tutorialEmojiPageStep3Title: 'Retirer un emoji',
+  tutorialEmojiPageStep3Desc: 'Survolez un emoji ajouté pour voir le bouton ×. Cliquez dessus pour le retirer de votre collection. Les emojis par défaut ne peuvent pas être retirés.',
+  tutorialEmojiPageStep3Hint: '💡 Astuce : Utilisez le bouton "Retirer la catégorie" pour en supprimer plusieurs d\'un coup.',
+
+  tutorialEmojiPageStep4Title: 'Rechercher',
+  tutorialEmojiPageStep4Desc: 'Utilisez la barre de recherche pour filtrer vos emojis ajoutés.',
+  tutorialEmojiPageStep4Hint: '💡 Astuce : La recherche porte sur le caractère emoji lui-même.',
+
+  tutorialEmojiPageStep5Title: 'Découvrir plus d\'emojis',
+  tutorialEmojiPageStep5Desc: 'Cliquez sur "Ajouter plus d\'emojis" pour ouvrir la page Découvrir et enrichir votre collection par catégorie entière.',
+  tutorialEmojiPageStep5Hint: '💡 Astuce : Vous pouvez ajouter 30 emojis d\'un seul clic depuis la page Découvrir.',
 };
