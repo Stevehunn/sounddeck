@@ -29,6 +29,9 @@ export default function MyInstantsDiscover({ store, addToast }) {
   const previewHowlRef = useRef(null)
   const preloadAbortRef = useRef(false)
 
+  // ✅ FIX S.A/B19 : ref pour éviter results.length dans les deps de loadCategory
+  const resultsRef = useRef([])
+
   const CATEGORIES_PREF_KEY = 'myinstants_selected_categories'
 
   const checkApi = useCallback(() => {
@@ -77,13 +80,15 @@ export default function MyInstantsDiscover({ store, addToast }) {
       .filter(Boolean)
   }, [selectedCategories])
 
+  useEffect(() => { resultsRef.current = results }, [results])
+
   const loadCategory = useCallback(async (categoryId, forceRefresh = false) => {
     const category = CATEGORIES[categoryId]
     if (!category) return
 
     if (!checkApi()) return
 
-    if (!forceRefresh && activeCategory === categoryId && results.length > 0) {
+    if (!forceRefresh && activeCategory === categoryId && resultsRef.current.length > 0) {
       return
     }
 
@@ -157,7 +162,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
 
     setLoading(false)
     setCacheInfo(getCacheInfo())
-  }, [currentLang, t, activeCategory, results.length, checkApi])
+  }, [currentLang, t, activeCategory, checkApi])
 
   const preloadAllCategories = useCallback(async (priorityIds = null) => {
     if (isPreloading || isPreloadComplete) return

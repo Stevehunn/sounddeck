@@ -13,14 +13,14 @@ export default {
   homeProfile: 'Profile',
   homeSwitchProfile: 'Switch profile',
   homeDragDropHint: 'Drag and drop your audio files here',
-  
+
   // ─── CATEGORIES ──────────────────────────────────────────────────────
   homeCategories: 'Categories',
   homeAllCategories: 'All',
   homeRecent: 'Recent',
   homeMostPlayed: 'Most played',
   homeFavoritesOnly: 'Favorites only',
-  
+
   // ─── QUICK ACTIONS ─────────────────────────────────────────────────
   homePlayAll: 'Play all',
   homeStopAll: 'Stop all',
@@ -30,13 +30,13 @@ export default {
   homeSortByDate: 'Date added',
   homeSortByPlays: 'Play count',
   homeSortByDuration: 'Duration',
-  
+
   // ─── PROFILE ──────────────────────────────────────────────────────────
   homeProfileSounds: '{count} sounds in this profile',
   homeProfileEmpty: 'This profile is empty',
   homeProfileAddSounds: 'Add sounds by importing or from discovery',
   homeProfileFavorites: '{count} favorites',
-  
+
   // ─── DRAG AND DROP ──────────────────────────────────────────────────
   homeDropHere: 'Drop your files here',
   homeDropSupported: 'Supported formats: MP3, WAV, OGG, FLAC, M4A, AAC',
@@ -46,13 +46,13 @@ export default {
   profile: 'Profile',
   dropFiles: 'Drop your files here',
   orBrowse: 'or click to browse',
-  
+
   // ─── EMPTY STATES ──────────────────────────────────────────────────
   homeEmptyTitle: 'No sounds',
   homeEmptyDesc: 'Start by importing sounds or explore discovery',
   homeEmptyAction: 'Import sounds',
   homeEmptyDiscover: 'Discover sounds',
-  
+
   // ─── CARD ACTIONS ──────────────────────────────────────────────────
   homeCardPlay: 'Play',
   homeCardStop: 'Stop',
@@ -60,11 +60,11 @@ export default {
   homeCardUnfavorite: 'Remove from favorites',
   homeCardEdit: 'Edit',
   homeCardDelete: 'Delete',
-  
+
   // ─── FAVORITES ──────────────────────────────────────────────────────
   homeFavoritesEmpty: 'No favorites',
   homeFavoritesHint: 'Add sounds to favorites to find them quickly',
-  
+
   // ─── ADD SOUND ──────────────────────────────────────────────────────
   addSoundTitle: 'Add a sound',
   tabDrop: 'Drag & drop',

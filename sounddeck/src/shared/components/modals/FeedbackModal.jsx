@@ -40,13 +40,19 @@ export default function FeedbackModal({ onClose, lang = 'fr', onSubmit, store })
       }
 
       let screenshot = null
-      if (includeScreenshot) {
+      if (includeScreenshot && typeof window.electronAPI?.captureScreen === 'function') {
         try {
-          screenshot = await window.electronAPI.captureScreen?.()
+          screenshot = await window.electronAPI.captureScreen()
         } catch (e) {
           console.warn('Impossible de capturer l\'écran:', e)
         }
       }
+
+      let appVersion = '1.3.0'
+      try {
+        const storedVersion = await window.electronAPI.storeGet('appVersion')
+        if (storedVersion) appVersion = storedVersion
+      } catch (e) { /* silencieux */ }
 
       const feedback = {
         type,
@@ -55,11 +61,11 @@ export default function FeedbackModal({ onClose, lang = 'fr', onSubmit, store })
         logs: logs || undefined,
         screenshot: screenshot || undefined,
         timestamp: new Date().toISOString(),
-        version: await window.electronAPI.storeGet('version') || '1.3.0',
+        version: appVersion,
         platform: navigator.platform,
         userAgent: navigator.userAgent,
         soundCount: store?.sounds?.length || 0,
-        profileCount: store?.profiles?.length || 0
+        profileCount: store?.profiles?.length || 0,
       }
 
       if (onSubmit) {
@@ -82,7 +88,6 @@ export default function FeedbackModal({ onClose, lang = 'fr', onSubmit, store })
   }
 
   const submitFeedback = async (feedback) => {
-    // En dev : ouvrir une issue GitHub pour les bugs
     if (import.meta.env.DEV) {
       console.log('📤 Feedback envoyé:', feedback)
     }
@@ -105,7 +110,14 @@ ${feedback.message}
 
 ${feedback.logs ? `## Logs\n\`\`\`json\n${JSON.stringify(feedback.logs.slice(0, 10), null, 2)}\n\`\`\`` : ''}
       `)
-      window.open(`https://github.com/steve833/sounddeck/issues/new?title=${title}&body=${body}`, '_blank')
+      const url = `https://github.com/steve833/sounddeck/issues/new?title=${title}&body=${body}`
+
+      if (window.electronAPI?.openExternal) {
+        window.electronAPI.openExternal(url)
+      } else {
+        // Fallback dev (hors Electron)
+        window.open(url, '_blank')
+      }
     }
   }
 
@@ -141,12 +153,12 @@ ${feedback.logs ? `## Logs\n\`\`\`json\n${JSON.stringify(feedback.logs.slice(0, 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ width: 460, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-        <div className="modal-title" id="modal-title">
+        <div className="modal-title">
           <i className="ti ti-message" style={{ color: 'var(--accent)' }} />
           {t('feedbackTitle')}
         </div>
 
-        <div id="modal-desc" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Type de feedback */}
           <div>
             <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>

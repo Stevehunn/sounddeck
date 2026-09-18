@@ -64,6 +64,7 @@ function AppContent({ store }) {
   const playLocallyRef = useRef(true)
   const audioDeviceRef = useRef('default')
   const volumeRef = useRef(80)
+  const loopEnabledRef = useRef(false)
   const setPresentationRef = useRef(null)
   const isQuittingRef = useRef(false)
   const isPopupBlockedRef = useRef(false)
@@ -102,8 +103,10 @@ function AppContent({ store }) {
   useEffect(() => {
     setPresentationRef.current = setPresentationMode
   }, [setPresentationMode])
+  useEffect(() => {
+    loopEnabledRef.current = store.loopEnabled
+  }, [store.loopEnabled])
 
-  // ✅ FIX : openTutorial stable
   const openTutorial = useCallback((pageId) => {
     setTutorialPageId(pageId)
     setShowTutorial(true)
@@ -380,7 +383,7 @@ function AppContent({ store }) {
     window.electronAPI.onToggleLoop(async () => {
       if (toggleLoopRef.current) toggleLoopRef.current()
       addToastRef.current?.(
-        store.loopEnabled ? t('toastLoopOff') : t('toastLoopOn'),
+        loopEnabledRef.current ? t('toastLoopOff') : t('toastLoopOn'),
         'info'
       )
     })

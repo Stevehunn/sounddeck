@@ -9,7 +9,6 @@ import { DeleteButton } from '@shared/components/ui'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 import EmojiPicker from '@shared/components/ui/EmojiPicker'
 
-// ✅ Importer les fonctions du tutoriel
 import {
   mockFetchVideoInfo,
   mockDownloadAudio,
@@ -18,7 +17,6 @@ import {
   getTutorialState,
   getMockVideoInfo,
   setTutorialStep,
-  getTutorialStep
 } from './tutorialSteps'
 
 // ✅ ÉTAT GLOBAL POUR YT-DLP
@@ -34,12 +32,6 @@ let globalSoundName = ''
 let globalEnd = 0
 let globalDownloadedPath = null
 let globalPlatform = null
-
-// ✅ EMPÊCHER LES DOUBLES APPELS
-let isProcessingRef = false
-
-// ✅ Force le re-rendu du composant YouTube
-let forceUpdateListeners = []
 
 export default function YouTube({ store, addToast }) {
     const { t, currentLang } = useLanguage()
@@ -63,8 +55,8 @@ export default function YouTube({ store, addToast }) {
     const [start, setStart] = useState(0)
     const [end, setEnd] = useState(globalEnd)
     const [soundName, setSoundName] = useState(globalSoundName)
+    const [targetProfiles, setTargetProfiles] = useState([])
     const [emoji, setEmoji] = useState('🎵')
-    const [targetProfiles, setTargetProfiles] = useState(['all'])
     const [step, setStep] = useState(globalStep)
     const [downloadedPath, setDownloadedPath] = useState(globalDownloadedPath)
     const [importing, setImporting] = useState(false)
@@ -87,16 +79,18 @@ export default function YouTube({ store, addToast }) {
     const savingRef = useRef(false)
     const hasCompletedSave = useRef(false)
     const hideProgressTimeoutRef = useRef(null)
+    const resetTimerRef = useRef(null)
+    const isProcessingRef = useRef(false)
+    const forceUpdateListenersRef = useRef([])
+    const tRef = useRef(t)
+    useEffect(() => { tRef.current = t }, [t])
 
-    // ✅ Détecter si on est en mode tutoriel
     const isTutorialMode = useCallback(() => {
         return isYoutubeTutorialActive()
     }, [])
 
-    // ─── VALEUR DÉRIVÉE POUR LE RENDU ────────────────────────────────────────
     const effectiveStatus = globalCheckDone ? (globalYtdlpStatus ?? 'missing') : ytdlpStatus
 
-    // ─── IMAGE FINALE ──────────────────────────────────────────────────────────
     const getFinalImage = useCallback(() => {
         if (useThumbnail && videoInfo?.thumbnail) {
             return videoInfo.thumbnail
@@ -110,14 +104,45 @@ export default function YouTube({ store, addToast }) {
             setShowProgress(false)
             setIsProcessing(false)
             setToastShown(true)
-            addToast('✅ ' + t('ytAudioReady'), 'success')
+            addToast('✅ ' + tRef.current('ytAudioReady'), 'success')
         }
-    }, [step, showProgress, toastShown, addToast, t])
+    }, [step, showProgress, toastShown, addToast])
 
-    // ✅ ÉCOUTER L'ÉVÉNEMENT DE FORCE RESET
+    useEffect(() => {
+        isMounted.current = true
+        return () => {
+            isMounted.current = false
+        }
+    }, [])
+
+    useEffect(() => {
+        if (step !== 'save') return
+        if (targetProfiles.length > 0) return
+
+        const userProfiles = store.profiles.filter(p => p.id !== 'all')
+        if (userProfiles.length === 0) return
+
+        if (isTutorialMode()) {
+            setTargetProfiles(userProfiles.map(p => p.id))
+            return
+        }
+
+        const currentId = store.currentProfileId
+        if (currentId && currentId !== 'all' && userProfiles.some(p => p.id === currentId)) {
+            setTargetProfiles([currentId])
+        } else {
+            setTargetProfiles([userProfiles[0].id])
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [step, store.profiles.length, store.currentProfileId])
+
     useEffect(() => {
         const handleForceReset = () => {
-            // ✅ Reset complet incluant l'URL
+            if (resetTimerRef.current) {
+                clearTimeout(resetTimerRef.current)
+                resetTimerRef.current = null
+            }
+
             setUrl('')
             setVideoInfo(null)
             setDownloadedPath(null)
@@ -125,7 +150,7 @@ export default function YouTube({ store, addToast }) {
             setSoundName('')
             setStart(0)
             setEnd(0)
-            setTargetProfiles(['all'])
+            setTargetProfiles([])
             setPlatform(null)
             setCustomImage(null)
             setUseThumbnail(false)
@@ -137,22 +162,20 @@ export default function YouTube({ store, addToast }) {
             setToastShown(false)
             setLoadingInfo(false)
             setResetKey(prev => prev + 1)
-            
-            // ✅ Reset des globales (y compris url via step)
+
             globalStep = 'url'
             globalVideoInfo = null
             globalSoundName = ''
             globalEnd = 0
             globalDownloadedPath = null
             globalPlatform = null
-            
-            // ✅ Reset des refs
+
             hasCompletedSave.current = false
             savingRef.current = false
-            isProcessingRef = false
+            isProcessingRef.current = false
             fetchingRef.current = false
         }
-        
+
         window.addEventListener('youtube-force-reset', handleForceReset)
         return () => window.removeEventListener('youtube-force-reset', handleForceReset)
     }, [])
@@ -186,14 +209,14 @@ export default function YouTube({ store, addToast }) {
                 return 'missing'
             }
         }
-        
+
         globalCheckPromise = (async () => {
             try {
                 const result = await window.electronAPI.checkYtdlp()
                 globalYtdlpStatus = result?.available ? 'available' : 'missing'
                 globalCheckDone = true
                 setYtdlpStatus(globalYtdlpStatus)
-                forceUpdateListeners.forEach(listener => {
+                forceUpdateListenersRef.current.forEach(listener => {
                     try { listener() } catch (e) {}
                 })
                 return globalYtdlpStatus
@@ -219,9 +242,8 @@ export default function YouTube({ store, addToast }) {
     // ─── INITIALISATION ──────────────────────────────────────────────────────
     useEffect(() => {
         if (initDone.current) return
-        
+
         initDone.current = true
-        isMounted.current = true
         hasCompletedSave.current = false
 
         const listener = () => {
@@ -230,19 +252,19 @@ export default function YouTube({ store, addToast }) {
                 setYtdlpStatus(globalYtdlpStatus ?? 'missing')
             }
         }
-        forceUpdateListeners.push(listener)
+        forceUpdateListenersRef.current.push(listener)
 
         if (isTutorialMode()) {
             const mockInfo = getMockVideoInfo()
             const tutorialState = getTutorialState()
-            
+
             if (mockInfo) {
                 setVideoInfo(mockInfo)
                 setSoundName(mockInfo.title || '')
                 setEnd(mockInfo.duration || 0)
                 setStep(tutorialState.step || 'url')
             }
-            
+
             setTimeout(() => {
                 setForceRender(prev => prev + 1)
             }, 100)
@@ -272,11 +294,11 @@ export default function YouTube({ store, addToast }) {
         }
 
         return () => {
-            const index = forceUpdateListeners.indexOf(listener)
+            const list = forceUpdateListenersRef.current
+            const index = list.indexOf(listener)
             if (index > -1) {
-                forceUpdateListeners.splice(index, 1)
+                list.splice(index, 1)
             }
-            isMounted.current = false
             if (progressIntervalRef.current) {
                 clearInterval(progressIntervalRef.current)
                 progressIntervalRef.current = null
@@ -284,6 +306,10 @@ export default function YouTube({ store, addToast }) {
             if (hideProgressTimeoutRef.current) {
                 clearTimeout(hideProgressTimeoutRef.current)
                 hideProgressTimeoutRef.current = null
+            }
+            if (resetTimerRef.current) {
+                clearTimeout(resetTimerRef.current)
+                resetTimerRef.current = null
             }
         }
     }, [checkYtdlp, isTutorialMode])
@@ -369,7 +395,7 @@ export default function YouTube({ store, addToast }) {
     // ─── RÉCUPÉRATION DES INFOS ──────────────────────────────────────────────
     const handleFetchInfo = useCallback(async () => {
         if (fetchingRef.current) return
-        
+
         if (!url?.trim() && !isTutorialMode()) {
             addToast(t('pasteUrl'), 'warning')
             return
@@ -384,7 +410,7 @@ export default function YouTube({ store, addToast }) {
 
         try {
             let result
-            
+
             if (isTutorialMode()) {
                 result = await mockFetchVideoInfo()
                 setTutorialStep('trim')
@@ -425,14 +451,14 @@ export default function YouTube({ store, addToast }) {
                 setEnd(globalEnd)
                 setStep('trim')
                 setPlatform(globalPlatform)
-                
+
                 if (isTutorialMode()) {
                     setTutorialStep('trim')
                     setTimeout(() => {
                         setForceRender(prev => prev + 1)
                     }, 100)
                 }
-                
+
                 addToast(`✅ ${t('platformDetected').replace('{platform}', info.platform || t('platformYoutube'))}`, 'success')
             } else {
                 addToast('❌ ' + t('ytFetchError') + (result?.error || t('unknownError')), 'error')
@@ -494,21 +520,21 @@ export default function YouTube({ store, addToast }) {
             return
         }
 
-        if (isProcessingRef) {
+        if (isProcessingRef.current) {
             return
         }
 
         setToastShown(false)
 
-        isProcessingRef = true
+        isProcessingRef.current = true
         setImporting(true)
         setIsProcessing(true)
-        
+
         startProgressSimulation()
 
         try {
             let result
-            
+
             if (isTutorialMode()) {
                 result = await mockDownloadAudio(
                     currentVideoInfo.url,
@@ -554,21 +580,21 @@ export default function YouTube({ store, addToast }) {
             }
 
             stopProgressSimulation()
-            
+
             setShowProgress(true)
             setDownloadProgress(100)
             setDownloadStatus('✅ ' + t('downloadComplete'))
-            
-            isProcessingRef = false
+
+            isProcessingRef.current = false
             setImporting(false)
 
             if (result?.success) {
                 globalDownloadedPath = result.path
                 globalStep = 'save'
-                
+
                 setDownloadedPath(result.path)
                 setStep('save')
-                
+
                 if (isTutorialMode()) {
                     setTutorialStep('save')
                     setTimeout(() => {
@@ -584,7 +610,7 @@ export default function YouTube({ store, addToast }) {
             console.error('❌ [YouTube] Erreur téléchargement:', error)
             stopProgressSimulation()
             setShowProgress(false)
-            isProcessingRef = false
+            isProcessingRef.current = false
             setImporting(false)
             setIsProcessing(false)
             addToast('❌ ' + t('ytDownloadError') + error.message, 'error')
@@ -608,6 +634,11 @@ export default function YouTube({ store, addToast }) {
 
         if (!currentDownloadedPath) {
             addToast(t('ytDownloadError'), 'error')
+            return
+        }
+
+        if (targetProfiles.length === 0) {
+            addToast(t('editorProfileRequired') || 'Sélectionnez au moins un profil', 'error')
             return
         }
 
@@ -639,12 +670,29 @@ export default function YouTube({ store, addToast }) {
             }
         }, 200)
 
+        const savedGlobals = {
+            step: globalStep,
+            videoInfo: globalVideoInfo,
+            soundName: globalSoundName,
+            end: globalEnd,
+            downloadedPath: globalDownloadedPath,
+            platform: globalPlatform,
+        }
+
+        // Reset immédiat des globals (avant le await)
+        globalStep = 'url'
+        globalVideoInfo = null
+        globalSoundName = ''
+        globalEnd = 0
+        globalDownloadedPath = null
+        globalPlatform = null
+
         try {
             if (isTutorialMode()) {
                 await mockSaveSound()
             } else {
                 let imageToSave = finalImage
-                
+
                 if (useThumbnail && videoInfo?.thumbnail) {
                     try {
                         if (window.electronAPI.downloadThumbnail) {
@@ -673,40 +721,27 @@ export default function YouTube({ store, addToast }) {
             }
 
             clearInterval(saveInterval)
-            savingRef.current = false
-            setIsProcessing(false)
-            setShowProgress(false)
-            setDownloadProgress(100)
-            setDownloadStatus('✅ ' + t('saveComplete'))
-            
+
+            // Toast de succès
             addToast(`✅ "${currentSoundName.trim()}" ${t('ytSoundAdded')}`, 'success')
 
-            globalStep = 'url'
-            globalVideoInfo = null
-            globalSoundName = ''
-            globalEnd = 0
-            globalDownloadedPath = null
-            globalPlatform = null
-
-            if (isTutorialMode()) {
-                setStep('url')
-                setTutorialStep('url')
-                setTimeout(() => {
-                    setForceRender(prev => prev + 1)
-                }, 100)
-            } else {
-                setUrl('')
-                setVideoInfo(null)
-                setDownloadedPath(null)
-                setStep('url')
-                setSoundName('')
-                setStart(0)
-                setEnd(0)
-                setTargetProfiles(['all'])
-                setPlatform(null)
-                setCustomImage(null)
-                setUseThumbnail(false)
-            }
+            // Reset des states locaux (les globals sont déjà reset)
+            setUrl('')
+            setVideoInfo(null)
+            setDownloadedPath(null)
+            setStep('url')
+            setSoundName('')
+            setStart(0)
+            setEnd(0)
+            setTargetProfiles([])
+            setPlatform(null)
+            setCustomImage(null)
+            setUseThumbnail(false)
+            setToastShown(false)
+            setShowProgress(false)
+            setIsProcessing(false)
+            setDownloadProgress(0)
+            setDownloadStatus('')
 
             if (previewHowl) {
                 previewHowl.stop()
@@ -715,15 +750,26 @@ export default function YouTube({ store, addToast }) {
                 setIsPreviewPlaying(false)
             }
 
-            setTimeout(() => {
-                setDownloadProgress(0)
-                setDownloadStatus('')
+            if (resetTimerRef.current) {
+                clearTimeout(resetTimerRef.current)
+            }
+            resetTimerRef.current = setTimeout(() => {
+                resetTimerRef.current = null
+                savingRef.current = false
                 hasCompletedSave.current = false
-            }, 1500)
+            }, 500)
 
         } catch (error) {
             console.error('❌ [YouTube] Erreur sauvegarde:', error)
             clearInterval(saveInterval)
+
+            globalStep = savedGlobals.step
+            globalVideoInfo = savedGlobals.videoInfo
+            globalSoundName = savedGlobals.soundName
+            globalEnd = savedGlobals.end
+            globalDownloadedPath = savedGlobals.downloadedPath
+            globalPlatform = savedGlobals.platform
+
             savingRef.current = false
             hasCompletedSave.current = false
             setIsProcessing(false)
@@ -888,7 +934,7 @@ export default function YouTube({ store, addToast }) {
                                         {info.uploader || t('unknownArtist')}
                                     </div>
                                     <div style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                        <i className="ti ti-clock" /> 
+                                        <i className="ti ti-clock" />
                                         {t('ytTrimTotalDuration')} {fmt(info.duration)}
                                     </div>
                                 </div>
@@ -904,9 +950,9 @@ export default function YouTube({ store, addToast }) {
                                     <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                                         {t('ytTrimDuration')} <strong style={{ color: 'var(--accent)' }}>{fmt(end - start)}</strong>
                                     </span>
-                                    <button 
-                                        className="btn-ghost btn-sm" 
-                                        onClick={() => { setStart(0); setEnd(info?.duration || 0) }} 
+                                    <button
+                                        className="btn-ghost btn-sm"
+                                        onClick={() => { setStart(0); setEnd(info?.duration || 0) }}
                                         style={{ borderRadius: 'var(--radius-sm)' }}
                                     >
                                         <i className="ti ti-refresh" /> {t('ytTrimSelectAll')}
@@ -917,28 +963,28 @@ export default function YouTube({ store, addToast }) {
                                         <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
                                             {t('start')} : {fmt(start)}
                                         </label>
-                                        <input 
-                                            type="range" 
-                                            min="0" 
-                                            max={info?.duration || 0} 
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max={info?.duration || 0}
                                             step="0.5"
-                                            value={start} 
+                                            value={start}
                                             onChange={e => setStart(Math.min(Number(e.target.value), end - 1))}
-                                            style={{ width: '100%', accentColor: 'var(--accent)' }} 
+                                            style={{ width: '100%', accentColor: 'var(--accent)' }}
                                         />
                                     </div>
                                     <div>
                                         <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
                                             {t('end')} : {fmt(end)}
                                         </label>
-                                        <input 
-                                            type="range" 
-                                            min="0" 
-                                            max={info?.duration || 0} 
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max={info?.duration || 0}
                                             step="0.5"
-                                            value={end} 
+                                            value={end}
                                             onChange={e => setEnd(Math.max(Number(e.target.value), start + 1))}
-                                            style={{ width: '100%', accentColor: 'var(--accent)' }} 
+                                            style={{ width: '100%', accentColor: 'var(--accent)' }}
                                         />
                                     </div>
                                 </div>
@@ -946,11 +992,11 @@ export default function YouTube({ store, addToast }) {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                                 <div>
                                     <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{t('ytPreciseStart')}</label>
-                                    <input 
-                                        type="number" 
-                                        min="0" 
-                                        max={info?.duration} 
-                                        step="0.5" 
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max={info?.duration}
+                                        step="0.5"
                                         value={start}
                                         onChange={e => setStart(Math.max(0, Math.min(Number(e.target.value), end - 1)))}
                                         className="input-sm"
@@ -959,11 +1005,11 @@ export default function YouTube({ store, addToast }) {
                                 </div>
                                 <div>
                                     <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{t('ytPreciseEnd')}</label>
-                                    <input 
-                                        type="number" 
-                                        min="0" 
-                                        max={info?.duration} 
-                                        step="0.5" 
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max={info?.duration}
+                                        step="0.5"
                                         value={end}
                                         onChange={e => setEnd(Math.max(Number(e.target.value), start + 1))}
                                         className="input-sm"
@@ -974,8 +1020,8 @@ export default function YouTube({ store, addToast }) {
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
-                            <button 
-                                className="btn-secondary btn-lg" 
+                            <button
+                                className="btn-secondary btn-lg"
                                 onClick={() => {
                                     if (!isTutorialMode()) {
                                         globalStep = 'url'
@@ -985,16 +1031,16 @@ export default function YouTube({ store, addToast }) {
                                         globalStep = 'url'
                                         setStep('url')
                                     }
-                                }} 
+                                }}
                                 style={{ borderRadius: 'var(--radius-md)', minWidth: 120 }}
                             >
                                 <i className="ti ti-arrow-left" /> {t('ytBack')}
                             </button>
-                            <button 
+                            <button
                                 data-testid="youtube-download-button"
-                                className="youtube-download-button btn-primary btn-lg" 
-                                onClick={handleDownloadAudio} 
-                                disabled={importing || !info} 
+                                className="youtube-download-button btn-primary btn-lg"
+                                onClick={handleDownloadAudio}
+                                disabled={importing || !info}
                                 style={{ borderRadius: 'var(--radius-md)', minWidth: 180 }}
                             >
                                 {importing
@@ -1006,7 +1052,7 @@ export default function YouTube({ store, addToast }) {
                     <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
                     <ConfirmWrapper />
                 </div>
-                
+
                 {showProgress && (
                     <div className="modal-overlay" style={{ zIndex: 100000 }}>
                         <div className="modal" style={{ width: 420, textAlign: 'center' }}>
@@ -1015,8 +1061,8 @@ export default function YouTube({ store, addToast }) {
                                 {downloadProgress >= 100 ? t('downloadComplete') : t('downloadInProgress')}
                             </div>
                             <div style={{ padding: '20px 0' }}>
-                                <div style={{ 
-                                    fontSize: 48, 
+                                <div style={{
+                                    fontSize: 48,
                                     marginBottom: 16,
                                     color: downloadProgress >= 100 ? 'var(--success)' : 'var(--accent)'
                                 }}>
@@ -1029,10 +1075,10 @@ export default function YouTube({ store, addToast }) {
                                 <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8 }}>
                                     {downloadStatus}
                                 </div>
-                                <div style={{ 
-                                    width: '100%', 
-                                    height: 8, 
-                                    background: 'var(--bg-tertiary)', 
+                                <div style={{
+                                    width: '100%',
+                                    height: 8,
+                                    background: 'var(--bg-tertiary)',
                                     borderRadius: 4,
                                     overflow: 'hidden',
                                     marginBottom: 8
@@ -1068,7 +1114,7 @@ export default function YouTube({ store, addToast }) {
                         </div>
                     </div>
                 )}
-                
+
                 <LoadingOverlay visible={isProcessing && !showProgress} message={importing ? t('ytAudioDownloading') : t('processing')} />
             </>
         )
@@ -1086,12 +1132,16 @@ export default function YouTube({ store, addToast }) {
             return null
         }
 
+        const userProfiles = store.profiles.filter(p => p.id !== 'all')
+        const noProfilesSelected = targetProfiles.length === 0
+        const noUserProfiles = userProfiles.length === 0
+
         return (
             <>
                 <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-                    <PageHeader 
-                        title={isTutorialMode() ? '🎬 ' + t('tutorialMode') + ' - ' + t('configSound') : t('configSound')} 
-                        sub={t('ytSaveSubtitle')} 
+                    <PageHeader
+                        title={isTutorialMode() ? '🎬 ' + t('tutorialMode') + ' - ' + t('configSound') : t('configSound')}
+                        sub={t('ytSaveSubtitle')}
                         onBack={() => {
                             if (!savingRef.current) {
                                 if (!isTutorialMode()) {
@@ -1103,7 +1153,7 @@ export default function YouTube({ store, addToast }) {
                                     setStep('trim')
                                 }
                             }
-                        }} 
+                        }}
                     />
                     <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
                         <div style={{ maxWidth: 560, margin: '0 auto' }}>
@@ -1136,14 +1186,14 @@ export default function YouTube({ store, addToast }) {
                                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                     {t('soundName')}
                                 </label>
-                                <input 
+                                <input
                                     data-testid="youtube-save-controls"
-                                    className="youtube-save-controls" 
-                                    value={soundName} 
-                                    onChange={e => setSoundName(e.target.value)} 
-                                    placeholder={t('ytSoundNamePlaceholder')} 
-                                    style={{ fontSize: 13, borderRadius: 'var(--radius-md)' }} 
-                                    autoFocus 
+                                    className="youtube-save-controls"
+                                    value={soundName}
+                                    onChange={e => setSoundName(e.target.value)}
+                                    placeholder={t('ytSoundNamePlaceholder')}
+                                    style={{ fontSize: 13, borderRadius: 'var(--radius-md)' }}
+                                    autoFocus
                                 />
                             </div>
 
@@ -1151,10 +1201,10 @@ export default function YouTube({ store, addToast }) {
                                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                     {t('image')}
                                 </label>
-                                
-                                <div style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
+
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
                                     gap: 12,
                                     padding: '10px 14px',
                                     background: 'var(--bg-secondary)',
@@ -1176,8 +1226,8 @@ export default function YouTube({ store, addToast }) {
                                         border: '1px solid var(--border)'
                                     }}>
                                         {finalImage ? (
-                                            <img 
-                                                src={buildFileUrl(finalImage)} 
+                                            <img
+                                                src={buildFileUrl(finalImage)}
                                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                 onError={(e) => { e.target.style.display = 'none' }}
                                             />
@@ -1199,7 +1249,7 @@ export default function YouTube({ store, addToast }) {
 
                                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                     {videoInfo?.thumbnail && (
-                                        <button 
+                                        <button
                                             className={`btn-${useThumbnail ? 'primary' : 'secondary'} btn-sm`}
                                             onClick={() => {
                                                 setUseThumbnail(!useThumbnail)
@@ -1207,9 +1257,9 @@ export default function YouTube({ store, addToast }) {
                                                     setCustomImage(null)
                                                 }
                                             }}
-                                            style={{ 
-                                                fontSize: 12, 
-                                                padding: '6px 14px', 
+                                            style={{
+                                                fontSize: 12,
+                                                padding: '6px 14px',
                                                 borderRadius: 'var(--radius-sm)',
                                                 display: 'flex',
                                                 alignItems: 'center',
@@ -1221,8 +1271,8 @@ export default function YouTube({ store, addToast }) {
                                         </button>
                                     )}
 
-                                    <button 
-                                        className="btn-secondary btn-sm" 
+                                    <button
+                                        className="btn-secondary btn-sm"
                                         onClick={async () => {
                                             const imgPath = await window.electronAPI.openImageDialog()
                                             if (imgPath) {
@@ -1234,16 +1284,16 @@ export default function YouTube({ store, addToast }) {
                                                 }
                                             }
                                         }}
-                                        style={{ 
-                                            fontSize: 12, 
-                                            padding: '6px 14px', 
+                                        style={{
+                                            fontSize: 12,
+                                            padding: '6px 14px',
                                             borderRadius: 'var(--radius-sm)',
                                             display: 'flex',
                                             alignItems: 'center',
                                             gap: 6
                                         }}
                                     >
-                                        <i className="ti ti-upload" /> 
+                                        <i className="ti ti-upload" />
                                         {customImage ? t('ytImageChange') : t('ytImageAdd')}
                                     </button>
 
@@ -1301,18 +1351,77 @@ export default function YouTube({ store, addToast }) {
                                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                     {t('ytProfilesLabel')}
                                 </label>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                    {store.profiles.map(p => {
-                                        const isChecked = targetProfiles.includes(p.id)
-                                        return (
-                                            <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 13, border: `1px solid ${isChecked ? 'var(--accent)' : 'var(--border)'}`, background: isChecked ? 'var(--accent-light)' : 'transparent' }}>
-                                                <input type="checkbox" checked={isChecked} onChange={() => { setTargetProfiles(prev => prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id]) }} style={{ accentColor: 'var(--accent)', width: 'auto' }} />
-                                                <i className={`ti ${p.isDefault ? 'ti-stack' : 'ti-user'}`} style={{ color: 'var(--text-secondary)' }} />
-                                                {p.id === 'all' ? t('allSounds') : p.name}
-                                            </label>
-                                        )
-                                    })}
-                                </div>
+
+                                {noUserProfiles ? (
+                                    <div style={{
+                                        padding: '10px 12px',
+                                        background: 'rgba(239,159,39,0.1)',
+                                        border: '1px solid var(--warning)',
+                                        borderRadius: 'var(--radius-md)',
+                                        fontSize: 12,
+                                        color: 'var(--warning)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 6
+                                    }}>
+                                        <i className="ti ti-alert-triangle" />
+                                        <span>
+                                            {t('ytNoUserProfile') || 'Créez un profil depuis la page "Mes sons" avant d\'ajouter un son.'}
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                        {userProfiles.map(p => {
+                                            const isChecked = targetProfiles.includes(p.id)
+                                            return (
+                                                <label
+                                                    key={p.id}
+                                                    style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 8,
+                                                        padding: '7px 10px',
+                                                        borderRadius: 'var(--radius-md)',
+                                                        cursor: 'pointer',
+                                                        fontSize: 13,
+                                                        border: `1px solid ${isChecked ? 'var(--accent)' : 'var(--border)'}`,
+                                                        background: isChecked ? 'var(--accent-light)' : 'transparent',
+                                                        transition: 'all 0.15s'
+                                                    }}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        onChange={() => {
+                                                            setTargetProfiles(prev =>
+                                                                prev.includes(p.id)
+                                                                    ? prev.filter(x => x !== p.id)
+                                                                    : [...prev, p.id]
+                                                            )
+                                                        }}
+                                                        style={{ accentColor: 'var(--accent)', width: 'auto' }}
+                                                    />
+                                                    <i className="ti ti-user" style={{ color: 'var(--text-secondary)' }} />
+                                                    {p.name}
+                                                </label>
+                                            )
+                                        })}
+
+                                        {noProfilesSelected && (
+                                            <div style={{
+                                                fontSize: 11,
+                                                color: 'var(--danger)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 4,
+                                                padding: '4px 8px'
+                                            }}>
+                                                <i className="ti ti-alert-triangle" />
+                                                {t('editorProfileRequired') || 'Sélectionnez au moins un profil'}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
@@ -1330,11 +1439,18 @@ export default function YouTube({ store, addToast }) {
                                 }} style={{ borderRadius: 'var(--radius-md)', minWidth: 120 }}>
                                     <i className="ti ti-arrow-left" /> {t('ytBack')}
                                 </button>
-                                <button 
+                                <button
                                     data-testid="youtube-save-button"
-                                    className="youtube-save-button btn-primary btn-lg" 
-                                    onClick={handleSave} 
-                                    disabled={isProcessing || !soundName.trim() || !currentPath || savingRef.current} 
+                                    className="youtube-save-button btn-primary btn-lg"
+                                    onClick={handleSave}
+                                    disabled={
+                                        isProcessing ||
+                                        !soundName.trim() ||
+                                        !currentPath ||
+                                        savingRef.current ||
+                                        noProfilesSelected ||
+                                        noUserProfiles
+                                    }
                                     style={{ borderRadius: 'var(--radius-md)', minWidth: 200 }}
                                 >
                                     {isProcessing
@@ -1346,7 +1462,7 @@ export default function YouTube({ store, addToast }) {
                     </div>
                     <ConfirmWrapper />
                 </div>
-                
+
                 {showProgress && (
                     <div className="modal-overlay" style={{ zIndex: 100000 }}>
                         <div className="modal" style={{ width: 420, textAlign: 'center' }}>
@@ -1355,8 +1471,8 @@ export default function YouTube({ store, addToast }) {
                                 {t('saving')}
                             </div>
                             <div style={{ padding: '20px 0' }}>
-                                <div style={{ 
-                                    fontSize: 48, 
+                                <div style={{
+                                    fontSize: 48,
                                     marginBottom: 16,
                                     color: downloadProgress >= 90 ? 'var(--success)' : 'var(--accent)'
                                 }}>
@@ -1369,10 +1485,10 @@ export default function YouTube({ store, addToast }) {
                                 <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8 }}>
                                     {downloadStatus}
                                 </div>
-                                <div style={{ 
-                                    width: '100%', 
-                                    height: 8, 
-                                    background: 'var(--bg-tertiary)', 
+                                <div style={{
+                                    width: '100%',
+                                    height: 8,
+                                    background: 'var(--bg-tertiary)',
                                     borderRadius: 4,
                                     overflow: 'hidden',
                                     marginBottom: 8
@@ -1403,7 +1519,7 @@ export default function YouTube({ store, addToast }) {
                         </div>
                     </div>
                 )}
-                
+
                 <LoadingOverlay visible={isProcessing && !showProgress} message={t('saving')} />
             </>
         )

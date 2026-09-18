@@ -13,14 +13,14 @@ export default {
   homeProfile: 'Perfil',
   homeSwitchProfile: 'Cambiar perfil',
   homeDragDropHint: 'Arrastra y suelta tus archivos de audio aquí',
-  
+
   // ─── CATEGORÍAS ──────────────────────────────────────────────────────
   homeCategories: 'Categorías',
   homeAllCategories: 'Todas',
   homeRecent: 'Recientes',
   homeMostPlayed: 'Más reproducidos',
   homeFavoritesOnly: 'Solo favoritos',
-  
+
   // ─── ACCIONES RÁPIDAS ─────────────────────────────────────────────────
   homePlayAll: 'Reproducir todo',
   homeStopAll: 'Detener todo',
@@ -30,13 +30,13 @@ export default {
   homeSortByDate: 'Fecha de agregado',
   homeSortByPlays: 'Número de reproducciones',
   homeSortByDuration: 'Duración',
-  
+
   // ─── PERFIL ──────────────────────────────────────────────────────────
   homeProfileSounds: '{count} sonidos en este perfil',
   homeProfileEmpty: 'Este perfil está vacío',
   homeProfileAddSounds: 'Agrega sonidos importándolos o desde descubrimiento',
   homeProfileFavorites: '{count} favoritos',
-  
+
   // ─── DRAG AND DROP ──────────────────────────────────────────────────
   homeDropHere: 'Suelta tus archivos aquí',
   homeDropSupported: 'Formatos soportados: MP3, WAV, OGG, FLAC, M4A, AAC',
@@ -46,13 +46,13 @@ export default {
   profile: 'Perfil',
   dropFiles: 'Suelta tus archivos aquí',
   orBrowse: 'o haz clic para explorar',
-  
+
   // ─── EMPTY STATES ──────────────────────────────────────────────────
   homeEmptyTitle: 'Sin sonidos',
   homeEmptyDesc: 'Comienza importando sonidos o explora el descubrimiento',
   homeEmptyAction: 'Importar sonidos',
   homeEmptyDiscover: 'Descubrir sonidos',
-  
+
   // ─── CARD ACTIONS ──────────────────────────────────────────────────
   homeCardPlay: 'Reproducir',
   homeCardStop: 'Detener',
@@ -60,11 +60,11 @@ export default {
   homeCardUnfavorite: 'Quitar de favoritos',
   homeCardEdit: 'Editar',
   homeCardDelete: 'Eliminar',
-  
+
   // ─── FAVORITOS ──────────────────────────────────────────────────────
   homeFavoritesEmpty: 'Sin favoritos',
   homeFavoritesHint: 'Agrega sonidos a favoritos para encontrarlos rápidamente',
-  
+
   // ─── AÑADIR SONIDO ──────────────────────────────────────────────────────
   addSoundTitle: 'Añadir un sonido',
   tabDrop: 'Arrastrar y soltar',
