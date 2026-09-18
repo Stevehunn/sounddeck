@@ -55,6 +55,23 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
   const favoriteSoundsForProfile = currentSounds.filter(s => s.favorites?.includes(currentProfileId) || false)
 
   useEffect(() => {
+    const resetDragOver = () => setDragOver(false)
+
+    window.addEventListener('dragend', resetDragOver)
+    window.addEventListener('drop', resetDragOver)
+    window.addEventListener('dragleave', (e) => {
+      // relatedTarget === null = l'utilisateur a quitté la fenêtre
+      if (!e.relatedTarget) resetDragOver()
+    })
+
+    return () => {
+      window.removeEventListener('dragend', resetDragOver)
+      window.removeEventListener('drop', resetDragOver)
+    }
+  }, [])
+
+
+  useEffect(() => {
     const calculateColumns = () => {
       if (!gridRef.current) return
       const containerWidth = gridRef.current.offsetWidth
@@ -312,6 +329,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
   const handleDropFiles = async (e) => {
     e.preventDefault()
     setDragOver(false)
+    setShowImport(false)
 
     const dtFiles = [...(e.dataTransfer?.files || [])]
     const dtItems = [...(e.dataTransfer?.items || [])]
@@ -484,8 +502,10 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
         </div>
 
         <div style={{ flex: 1, overflowY: importing ? 'hidden' : 'auto', padding: '16px 20px', position: 'relative' }}
-          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+          onDragEnter={e => { e.preventDefault(); setDragOver(true) }}
+          onDragOver={e => { e.preventDefault(); if (!dragOver) setDragOver(true) }}
           onDragLeave={e => {
+            // Ne pas retirer l'overlay si on passe sur un enfant
             if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false)
           }}
           onDrop={handleDropFiles}>

@@ -44,6 +44,8 @@ export default {
   homeDropSuccess: '{count} archivo(s) importado(s) con éxito',
   dragDropCustomOnly: 'Arrastrar y soltar solo está disponible en orden "Personalizado"',
   profile: 'Perfil',
+  dropFiles: 'Suelta tus archivos aquí',
+  orBrowse: 'o haz clic para explorar',
   
   // ─── EMPTY STATES ──────────────────────────────────────────────────
   homeEmptyTitle: 'Sin sonidos',

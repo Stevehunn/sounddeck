@@ -4,8 +4,6 @@ import React, { memo } from 'react'
 const TimelineRuler = memo(({
   totalDuration,
   pixelsPerSecond,
-  currentTime,
-  isPlaying,
   zoomLevel,
   formatTime
 }) => {
@@ -21,14 +19,14 @@ const TimelineRuler = memo(({
     else step = 0.1
 
     const totalMarks = Math.ceil(totalDuration / step) + 1
-    
+
     for (let i = 0; i < totalMarks; i++) {
       const time = i * step
       const position = time * pixelsPerSecond
       if (position > totalDuration * pixelsPerSecond + 20) break
-      
+
       const isMain = time % 5 === 0 || step >= 5
-      
+
       marks.push(
         <div
           key={time}
@@ -73,49 +71,9 @@ const TimelineRuler = memo(({
       cursor: 'pointer'
     }}>
       {renderRuler()}
-      
-      {/* Playhead */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        left: currentTime * pixelsPerSecond,
-        width: 2,
-        background: 'var(--accent)',
-        zIndex: 10,
-        pointerEvents: 'none',
-        transform: 'translateX(-1px)',
-        boxShadow: '0 0 10px rgba(124,111,247,0.5)',
-        transition: isPlaying ? 'none' : 'left 0.1s ease'
-      }}>
-        <div style={{
-          position: 'absolute',
-          top: -4,
-          left: -4,
-          width: 10,
-          height: 10,
-          borderRadius: '50%',
-          background: 'var(--accent)',
-          border: '2px solid var(--bg-primary)'
-        }} />
-        <div style={{
-          position: 'absolute',
-          top: -20,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          fontSize: 9,
-          fontFamily: 'monospace',
-          color: 'var(--accent)',
-          background: 'var(--bg-secondary)',
-          padding: '1px 4px',
-          borderRadius: 3,
-          border: '1px solid var(--accent)',
-          whiteSpace: 'nowrap',
-          opacity: 0.8
-        }}>
-          {formatTime(currentTime)}
-        </div>
-      </div>
+      {/* ✅ FIX S.A/B33 : le playhead est retiré d'ici.
+          Il est rendu UNE SEULE FOIS par <TimelinePlayhead /> dans Timeline/index.jsx,
+          sinon on obtient un double-playhead superposé. */}
     </div>
   )
 })

@@ -2,7 +2,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import ClipWaveform from './ClipWaveform'
 import ClipFadeHandles from './ClipFadeHandles'
-import ClipResizeHandles from './ClipResizeHandles'
 import ClipActions from './ClipActions'
 
 const EditorClip = ({
@@ -104,22 +103,6 @@ const EditorClip = ({
     if (e.button !== 0) return
 
     const target = e.target
-    const isResizeStart = target.dataset?.resize === 'start' || target.closest?.('[data-resize="start"]')
-    const isResizeEnd = target.dataset?.resize === 'end' || target.closest?.('[data-resize="end"]')
-
-    if (isResizeStart || isResizeEnd) {
-      setDragMode(isResizeStart ? 'resize-start' : 'resize-end')
-      setIsDragging(true)
-      isDraggingRef.current = true
-      setDragStartX(e.clientX)
-      lastClientXRef.current = e.clientX
-      accumulatedDeltaRef.current = 0
-      hasMovedRef.current = false
-      dragStartTimeRef.current = start
-      e.stopPropagation()
-      e.preventDefault()
-      return
-    }
 
     const isActionButton = target.closest?.('.delete-button') ||
                           target.closest?.('[data-action]') ||
@@ -622,35 +605,6 @@ const EditorClip = ({
         isHovering={isHovering}
         onFade={onFade}
         pixelsPerSecond={pixelsPerSecond}
-      />
-
-      <ClipResizeHandles
-        isSelected={isSelected}
-        isHovering={isHovering}
-        duration={duration}
-        pixelsPerSecond={pixelsPerSecond}
-        onResizeStart={(e) => {
-          e.stopPropagation()
-          setDragMode('resize-start')
-          setIsDragging(true)
-          isDraggingRef.current = true
-          setDragStartX(e.clientX)
-          lastClientXRef.current = e.clientX
-          accumulatedDeltaRef.current = 0
-          hasMovedRef.current = false
-          dragStartTimeRef.current = start
-        }}
-        onResizeEnd={(e) => {
-          e.stopPropagation()
-          setDragMode('resize-end')
-          setIsDragging(true)
-          isDraggingRef.current = true
-          setDragStartX(e.clientX)
-          lastClientXRef.current = e.clientX
-          accumulatedDeltaRef.current = 0
-          hasMovedRef.current = false
-          dragStartTimeRef.current = start
-        }}
       />
 
       <ClipActions

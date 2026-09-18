@@ -570,13 +570,6 @@ export default function EditorTimeline({
     return () => clipsContainer.removeEventListener('wheel', onWheel)
   }, [zoomLevel, onZoomChange])
 
-  const getTrackKey = (track) => {
-    const clipPositions = track.clips
-      .map((c) => `${c.id}:${c.start.toFixed(3)}`)
-      .join('|')
-    return `${track.id}-${clipPositions}`
-  }
-
   const shouldShowPanel = isInitialized && showMarkersPanel && onAddMarker
 
   return (
@@ -887,11 +880,10 @@ export default function EditorTimeline({
 
             {tracks.map((track, index) => {
               const trackColor = track.color || getTrackColor(index)
-              const trackKey = getTrackKey(track)
 
               return (
                 <EditorTrack
-                  key={trackKey}
+                  key={track.id}
                   track={track}
                   trackIndex={index}
                   totalDuration={totalDuration}

@@ -44,6 +44,8 @@ export default {
   homeDropSuccess: '{count} fichier(s) importé(s) avec succès',
   dragDropCustomOnly: 'L\'option glissé-déposé est disponible uniquement en tri "Personnalisé"',
   profile: 'Profil',
+  dropFiles: 'Déposez vos fichiers ici',
+  orBrowse: 'ou cliquez pour parcourir',
   
   // ─── EMPTY STATES ──────────────────────────────────────────────────
   homeEmptyTitle: 'Aucun son',

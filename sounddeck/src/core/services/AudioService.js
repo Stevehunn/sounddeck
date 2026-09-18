@@ -240,14 +240,32 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
   const volumeRatio = soundRatio * globalVol * mixerVol
 
   const fileUrl = buildFileUrl(sound.path)
+  const cached = soundCache[sound.id]
 
-  if (soundCache[sound.id]) {
+  // Si un son joue ou est en cours de chargement, on l'arrête et on sort.
+  if (cached && cached !== 'loading') {
     stopSound(sound.id)
     return
   }
 
-  const audioBuffer = await AudioMixerService.loadAudioBuffer(fileUrl)
+  // Si le son est déjà en chargement, on ignore le nouveau clic.
+  if (cached === 'loading') {
+    return
+  }
+
+  soundCache[sound.id] = 'loading'
+
+  let audioBuffer = null
+  try {
+    audioBuffer = await AudioMixerService.loadAudioBuffer(fileUrl)
+  } catch (e) {
+    delete soundCache[sound.id]
+    console.warn('⚠️ Erreur chargement buffer:', e?.message)
+    return
+  }
+
   if (!audioBuffer) {
+    delete soundCache[sound.id]
     console.warn('⚠️ Impossible de charger le son:', fileUrl)
     return
   }
@@ -264,6 +282,9 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
         if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
       }
     }
+  } else {
+    delete soundCache[sound.id]
+    return
   }
 
   const shouldPlayLocally = playLocally || storeRef?.monitoringEnabled || false
@@ -355,6 +376,8 @@ export async function analyzeAllGains(sounds, onProgress) {
 }
 
 export function stopSound(soundId) {
+  const cached = soundCache[soundId]
+
   if (currentPlayingId === soundId) {
     notifyPlaybackListeners(null)
   }
@@ -363,7 +386,12 @@ export function stopSound(soundId) {
     manualProgress = { id: null, current: 0, duration: 0, ratio: 0 }
   }
 
-  const cached = soundCache[soundId]
+  // ✅ Son en cours de chargement (flag posé par playSoundWithMixer) : on nettoie juste.
+  if (cached === 'loading') {
+    delete soundCache[soundId]
+    return
+  }
+
   if (cached) {
     if (Array.isArray(cached)) {
       cached.forEach(h => {

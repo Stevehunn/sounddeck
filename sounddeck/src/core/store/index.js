@@ -46,168 +46,176 @@ export function useStore() {
   }
 
   // ─── CHARGEMENT INITIAL ─────────────────────────────────────────────────
+    // ─── CHARGEMENT INITIAL ─────────────────────────────────────────────────
   useEffect(() => {
     async function loadData() {
       try {
-        const savedProfiles = (await window.electronAPI.storeGet('profiles')) || []
-        const savedSounds = (
-          (await window.electronAPI.storeGet('sounds')) || []
-        ).map((s) => {
+        const [
+          savedProfiles,
+          rawSounds,
+          savedShortcuts,
+          savedProfileShortcut,
+          savedCurrentProfileId,
+          savedSoundOrder,
+          savedTags,
+          savedSidebarConfig,
+          savedTheme,
+          savedCustomTheme,
+          savedLang,
+          savedAudioDevice,
+          savedLocalAudioDevice,
+          savedVolume,
+          savedPlayLocally,
+          savedPreviewVolume,
+          savedKeyboardLayout,
+          savedCardSize,
+          savedNormalizationEnabled,
+          savedNormalizationTarget,
+          savedStartMinimized,
+          savedLaunchAtStartup,
+          savedVirtualDriverInstalled,
+          savedVirtualDeviceActive,
+          savedAutoBackup,
+          savedBackupInterval,
+          savedLazyLoading,
+          savedCompressOnImport,
+          savedCompressionBitrate,
+          savedShortcutsEnabled,
+          savedToggleShortcutsAccelerator,
+          savedToggleWindowShortcut,
+          savedLoopShortcut,
+          savedStopAllShortcut,
+          savedPresentationShortcut,
+          savedMixerEnabled,
+          savedMicrophoneDevice,
+          savedMicrophoneVolume,
+          savedMixerSoundVolume,
+          savedNoiseSuppression,
+          savedNoiseSuppressionMode,
+          savedLowLatencyMode,
+          savedMonitoringEnabled,
+        ] = await Promise.all([
+          window.electronAPI.storeGet('profiles'),
+          window.electronAPI.storeGet('sounds'),
+          window.electronAPI.storeGet('shortcuts'),
+          window.electronAPI.storeGet('profileShortcut'),
+          window.electronAPI.storeGet('currentProfileId'),
+          window.electronAPI.storeGet('soundOrder'),
+          window.electronAPI.storeGet('tags'),
+          window.electronAPI.storeGet('sidebarConfig'),
+          window.electronAPI.storeGet('theme'),
+          window.electronAPI.storeGet('customTheme'),
+          window.electronAPI.storeGet('lang'),
+          window.electronAPI.storeGet('audioDevice'),
+          window.electronAPI.storeGet('localAudioDevice'),
+          window.electronAPI.storeGet('volume'),
+          window.electronAPI.storeGet('playLocally'),
+          window.electronAPI.storeGet('previewVolume'),
+          window.electronAPI.storeGet('keyboardLayout'),
+          window.electronAPI.storeGet('cardSize'),
+          window.electronAPI.storeGet('normalizationEnabled'),
+          window.electronAPI.storeGet('normalizationTarget'),
+          window.electronAPI.getStartMinimized?.() ?? Promise.resolve(null),
+          window.electronAPI.getLaunchAtStartup?.() ?? Promise.resolve(null),
+          window.electronAPI.storeGet('virtualDriverInstalled'),
+          window.electronAPI.storeGet('virtualDeviceActive'),
+          window.electronAPI.storeGet('autoBackupEnabled'),
+          window.electronAPI.storeGet('backupInterval'),
+          window.electronAPI.storeGet('lazyLoadingEnabled'),
+          window.electronAPI.storeGet('compressOnImport'),
+          window.electronAPI.storeGet('compressionBitrate'),
+          window.electronAPI.storeGet('shortcutsEnabled'),
+          window.electronAPI.storeGet('toggleShortcutsAccelerator'),
+          window.electronAPI.storeGet('toggleWindowShortcut'),
+          window.electronAPI.storeGet('loopShortcut'),
+          window.electronAPI.storeGet('stopAllShortcut'),
+          window.electronAPI.storeGet('presentationShortcut'),
+          window.electronAPI.storeGet('mixerEnabled'),
+          window.electronAPI.storeGet('microphoneDevice'),
+          window.electronAPI.storeGet('microphoneVolume'),
+          window.electronAPI.storeGet('mixerSoundVolume'),
+          window.electronAPI.storeGet('noiseSuppression'),
+          window.electronAPI.storeGet('noiseSuppressionMode'),
+          window.electronAPI.storeGet('lowLatencyMode'),
+          window.electronAPI.storeGet('monitoringEnabled'),
+        ])
+
+        // ✅ Normalisation des valeurs (mêmes règles qu'avant, juste regroupées)
+        const savedSounds = (rawSounds || []).map((s) => {
           if (s.volumeDb !== undefined) return s
           const oldVolume = s.volume ?? 100
           const newDb = Math.round(((oldVolume - 50) / 50) * 24 * 10) / 10
           return { ...s, volume: newDb, volumeDb: newDb }
         })
-        const savedShortcuts =
-          (await window.electronAPI.storeGet('shortcuts')) || {}
-        const savedProfileShortcut =
-          (await window.electronAPI.storeGet('profileShortcut')) ||
-          'CommandOrControl+Tab'
-        const savedCurrentProfileId =
-          (await window.electronAPI.storeGet('currentProfileId')) || 'all'
-        const savedSoundOrder =
-          (await window.electronAPI.storeGet('soundOrder')) || {}
-        const savedTags = (await window.electronAPI.storeGet('tags')) || {}
-        const savedSidebarConfig = await window.electronAPI.storeGet(
-          'sidebarConfig'
-        )
-
-        const savedTheme = (await window.electronAPI.storeGet('theme')) || 'dark'
-        const savedCustomTheme =
-          (await window.electronAPI.storeGet('customTheme')) || null
-        const savedLang = (await window.electronAPI.storeGet('lang')) || 'fr'
-        const savedAudioDevice =
-          (await window.electronAPI.storeGet('audioDevice')) || 'default'
-        const savedLocalAudioDevice =
-          (await window.electronAPI.storeGet('localAudioDevice')) || 'default'
-        const savedVolume = (await window.electronAPI.storeGet('volume')) ?? 80
-        const savedPlayLocally =
-          (await window.electronAPI.storeGet('playLocally')) ?? true
-        const savedPreviewVolume =
-          (await window.electronAPI.storeGet('previewVolume')) ?? 70
-        const savedKeyboardLayout =
-          (await window.electronAPI.storeGet('keyboardLayout')) || 'qwerty'
-        const savedCardSize =
-          (await window.electronAPI.storeGet('cardSize')) || 'medium'
-        const savedNormalizationEnabled =
-          (await window.electronAPI.storeGet('normalizationEnabled')) ?? true
-        const savedNormalizationTarget =
-          (await window.electronAPI.storeGet('normalizationTarget')) ?? 0.2
-        const savedStartMinimized =
-          (await window.electronAPI.getStartMinimized?.()) ?? false
-        const savedLaunchAtStartup =
-          (await window.electronAPI.getLaunchAtStartup?.()) ?? false
-        const savedVirtualDriverInstalled =
-          (await window.electronAPI.storeGet('virtualDriverInstalled')) || false
-        const savedVirtualDeviceActive =
-          (await window.electronAPI.storeGet('virtualDeviceActive')) ?? false
-        const savedAutoBackup =
-          (await window.electronAPI.storeGet('autoBackupEnabled')) ?? true
-        const savedBackupInterval =
-          (await window.electronAPI.storeGet('backupInterval')) ?? 5
-        const savedLazyLoading =
-          (await window.electronAPI.storeGet('lazyLoadingEnabled')) ?? true
-        const savedCompressOnImport =
-          (await window.electronAPI.storeGet('compressOnImport')) ?? false
-        const savedCompressionBitrate =
-          (await window.electronAPI.storeGet('compressionBitrate')) ?? 128
-        const savedShortcutsEnabled =
-          (await window.electronAPI.storeGet('shortcutsEnabled')) ?? true
-        const savedToggleShortcutsAccelerator =
-          (await window.electronAPI.storeGet('toggleShortcutsAccelerator')) ||
-          'CommandOrControl+Shift+K'
-        const savedToggleWindowShortcut =
-          (await window.electronAPI.storeGet('toggleWindowShortcut')) ||
-          'CommandOrControl+Shift+S'
-        const savedLoopShortcut =
-          (await window.electronAPI.storeGet('loopShortcut')) || ''
-        const savedStopAllShortcut =
-          (await window.electronAPI.storeGet('stopAllShortcut')) || ''
-        const savedPresentationShortcut =
-          (await window.electronAPI.storeGet('presentationShortcut')) || ''
-
-        const savedMixerEnabled =
-          (await window.electronAPI.storeGet('mixerEnabled')) ?? false
-        const savedMicrophoneDevice =
-          (await window.electronAPI.storeGet('microphoneDevice')) || 'default'
-        const savedMicrophoneVolume =
-          (await window.electronAPI.storeGet('microphoneVolume')) ?? 80
-        const savedMixerSoundVolume =
-          (await window.electronAPI.storeGet('mixerSoundVolume')) ?? 100
-        const savedNoiseSuppression =
-          (await window.electronAPI.storeGet('noiseSuppression')) ?? false
-        const savedNoiseSuppressionMode =
-          (await window.electronAPI.storeGet('noiseSuppressionMode')) || 'auto'
-        const savedLowLatencyMode =
-          (await window.electronAPI.storeGet('lowLatencyMode')) ?? false
-        const savedMonitoringEnabled =
-          (await window.electronAPI.storeGet('monitoringEnabled')) ?? false
 
         const allProfile = { id: 'all', name: 'Tous les sons', isDefault: true }
-        const userProfiles = savedProfiles.filter((p) => p.id !== 'all')
+        const userProfiles = (savedProfiles || []).filter((p) => p.id !== 'all')
         const allProfiles = [allProfile, ...userProfiles]
 
         soundsHook.setSounds(savedSounds)
-        soundsHook.setSoundOrder(savedSoundOrder)
-        soundsHook.setTags(savedTags)
+        soundsHook.setSoundOrder(savedSoundOrder || {})
+        soundsHook.setTags(savedTags || {})
 
         profilesHook.setProfiles(allProfiles)
-        profilesHook.setCurrentProfileId(savedCurrentProfileId)
+        profilesHook.setCurrentProfileId(savedCurrentProfileId || 'all')
 
-        shortcutsHook.setShortcuts(savedShortcuts)
-        shortcutsHook.setProfileShortcut(savedProfileShortcut)
+        shortcutsHook.setShortcuts(savedShortcuts || {})
+        shortcutsHook.setProfileShortcut(savedProfileShortcut || 'CommandOrControl+Tab')
 
-        settingsHook.updateTheme(savedTheme)
-        settingsHook.updateCustomTheme(savedCustomTheme)
-        settingsHook.updateLang(savedLang)
-        settingsHook.updateAudioDevice(savedAudioDevice)
-        settingsHook.updateLocalAudioDevice(savedLocalAudioDevice)
-        settingsHook.updateVolume(savedVolume)
-        settingsHook.updatePlayLocally(savedPlayLocally)
-        settingsHook.updatePreviewVolume(savedPreviewVolume)
-        settingsHook.updateKeyboardLayout(savedKeyboardLayout)
-        settingsHook.updateCardSize(savedCardSize)
-        settingsHook.updateNormalizationEnabled(savedNormalizationEnabled)
-        settingsHook.updateNormalizationTarget(savedNormalizationTarget)
-        settingsHook.setStartMinimized(savedStartMinimized)
-        settingsHook.setLaunchAtStartup(savedLaunchAtStartup)
-        settingsHook.updateVirtualDriverInstalled(savedVirtualDriverInstalled)
-        settingsHook.updateVirtualDeviceActive(savedVirtualDeviceActive)
-        settingsHook.updateAutoBackupEnabled(savedAutoBackup)
-        settingsHook.updateBackupInterval(savedBackupInterval)
-        settingsHook.updateLazyLoadingEnabled(savedLazyLoading)
-        settingsHook.updateCompressOnImport(savedCompressOnImport)
-        settingsHook.updateCompressionBitrate(savedCompressionBitrate)
-        settingsHook.updateShortcutsEnabled(savedShortcutsEnabled)
+        settingsHook.updateTheme(savedTheme || 'dark')
+        settingsHook.updateCustomTheme(savedCustomTheme || null)
+        settingsHook.updateLang(savedLang || 'fr')
+        settingsHook.updateAudioDevice(savedAudioDevice || 'default')
+        settingsHook.updateLocalAudioDevice(savedLocalAudioDevice || 'default')
+        settingsHook.updateVolume(savedVolume ?? 80)
+        settingsHook.updatePlayLocally(savedPlayLocally ?? true)
+        settingsHook.updatePreviewVolume(savedPreviewVolume ?? 70)
+        settingsHook.updateKeyboardLayout(savedKeyboardLayout || 'qwerty')
+        settingsHook.updateCardSize(savedCardSize || 'medium')
+        settingsHook.updateNormalizationEnabled(savedNormalizationEnabled ?? true)
+        settingsHook.updateNormalizationTarget(savedNormalizationTarget ?? 0.2)
+        settingsHook.setStartMinimized(savedStartMinimized ?? false)
+        settingsHook.setLaunchAtStartup(savedLaunchAtStartup ?? false)
+        settingsHook.updateVirtualDriverInstalled(savedVirtualDriverInstalled || false)
+        settingsHook.updateVirtualDeviceActive(savedVirtualDeviceActive ?? false)
+        settingsHook.updateAutoBackupEnabled(savedAutoBackup ?? true)
+        settingsHook.updateBackupInterval(savedBackupInterval ?? 5)
+        settingsHook.updateLazyLoadingEnabled(savedLazyLoading ?? true)
+        settingsHook.updateCompressOnImport(savedCompressOnImport ?? false)
+        settingsHook.updateCompressionBitrate(savedCompressionBitrate ?? 128)
+        settingsHook.updateShortcutsEnabled(savedShortcutsEnabled ?? true)
         settingsHook.updateToggleShortcutsAccelerator(
-          savedToggleShortcutsAccelerator
+          savedToggleShortcutsAccelerator || 'CommandOrControl+Shift+K'
         )
-        settingsHook.updateToggleWindowShortcut(savedToggleWindowShortcut)
-        settingsHook.updateLoopShortcut(savedLoopShortcut)
-        settingsHook.updateStopAllShortcut(savedStopAllShortcut)
-        settingsHook.updatePresentationShortcut(savedPresentationShortcut)
+        settingsHook.updateToggleWindowShortcut(
+          savedToggleWindowShortcut || 'CommandOrControl+Shift+S'
+        )
+        settingsHook.updateLoopShortcut(savedLoopShortcut || '')
+        settingsHook.updateStopAllShortcut(savedStopAllShortcut || '')
+        settingsHook.updatePresentationShortcut(savedPresentationShortcut || '')
 
-        mixerHook.setMixerEnabled(savedMixerEnabled)
-        mixerHook.setMicrophoneDevice(savedMicrophoneDevice)
-        mixerHook.setMicrophoneVolume(savedMicrophoneVolume)
-        mixerHook.setMixerSoundVolume(savedMixerSoundVolume)
-        mixerHook.setNoiseSuppression(savedNoiseSuppression)
-        mixerHook.setNoiseSuppressionMode(savedNoiseSuppressionMode)
-        mixerHook.setLowLatencyMode(savedLowLatencyMode)
-        mixerHook.setMonitoringEnabled(savedMonitoringEnabled)
+        mixerHook.setMixerEnabled(savedMixerEnabled ?? false)
+        mixerHook.setMicrophoneDevice(savedMicrophoneDevice || 'default')
+        mixerHook.setMicrophoneVolume(savedMicrophoneVolume ?? 80)
+        mixerHook.setMixerSoundVolume(savedMixerSoundVolume ?? 100)
+        mixerHook.setNoiseSuppression(savedNoiseSuppression ?? false)
+        mixerHook.setNoiseSuppressionMode(savedNoiseSuppressionMode || 'auto')
+        mixerHook.setLowLatencyMode(savedLowLatencyMode ?? false)
+        mixerHook.setMonitoringEnabled(savedMonitoringEnabled ?? false)
 
-        // ✅ S3c : charger la liste des projets + récents
-        await editorHook.loadRecentEditorProjects?.()
-        await editorHook.loadAllEditorProjects?.()
+        // Projets éditeur (parallélisables entre eux)
+        await Promise.all([
+          editorHook.loadRecentEditorProjects?.(),
+          editorHook.loadAllEditorProjects?.(),
+        ])
 
+        // Sidebar
         if (savedSidebarConfig) {
           let items = [...(savedSidebarConfig.items || [])]
 
           allProfiles.forEach((profile) => {
             const profileId = `profile-${profile.id}`
-            const existingIndex = items.findIndex(
-              (item) => item.id === profileId
-            )
+            const existingIndex = items.findIndex((item) => item.id === profileId)
 
             if (existingIndex === -1) {
               items.push({
@@ -227,9 +235,7 @@ export function useStore() {
             }
           })
 
-          const currentProfileIds = new Set(
-            allProfiles.map((p) => `profile-${p.id}`)
-          )
+          const currentProfileIds = new Set(allProfiles.map((p) => `profile-${p.id}`))
           items = items.filter((item) => {
             if (item.id.startsWith('profile-')) {
               return currentProfileIds.has(item.id)
@@ -237,23 +243,9 @@ export function useStore() {
             return true
           })
 
-          // ✅ NOUVEAU : migration — ajoute les items core manquants
-          // (pour les utilisateurs qui ont un sidebarConfig sauvegardé
-          //  avant l'ajout de nouvelles pages comme 'emoji')
           const KNOWN_CORE_IDS = [
-            'home',
-            'discover',
-            'trimmer',
-            'editor',
-            'sequencer',
-            'youtube',
-            'stats',
-            'emoji',           // ← page "Mes emojis"
-            'loop',
-            'shortcuts',
-            'presentation',
-            'guide',
-            'options',
+            'home', 'discover', 'trimmer', 'editor', 'sequencer', 'youtube',
+            'stats', 'emoji', 'loop', 'shortcuts', 'presentation', 'guide', 'options',
           ]
 
           KNOWN_CORE_IDS.forEach((id) => {
@@ -296,6 +288,7 @@ export function useStore() {
           setSidebarConfig(defaultConfig)
           await save('sidebarConfig', defaultConfig)
         }
+
         setSidebarVersion((prev) => prev + 1)
       } catch (e) {
         console.error('Erreur chargement store:', e)

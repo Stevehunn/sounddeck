@@ -1,7 +1,8 @@
 // src/shared/components/audio/AudioTrimmer.jsx
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { buildFileUrl } from '@shared/utils/fileUrl'
+import Waveform from './Waveform'
 
 export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
   const { t } = useLanguage()
@@ -12,10 +13,8 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
   const [end, setEnd] = useState(0)
   const [trimming, setTrimming] = useState(false)
   const [trimWarning, setTrimWarning] = useState('')
-  const [dragging, setDragging] = useState(null)
 
   const audioRef = useRef(null)
-  const timelineRef = useRef(null)
 
   const fileUrl = buildFileUrl(filePath)
 
@@ -60,48 +59,7 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
     return `${m}:${sec.toString().padStart(2, '0')}`
   }
 
-  const getPosFromEvent = useCallback((e) => {
-    const timeline = timelineRef.current
-    if (!timeline || !duration) return 0
-    const rect = timeline.getBoundingClientRect()
-    const x = (e.clientX - rect.left) / rect.width
-    return Math.max(0, Math.min(duration, x * duration))
-  }, [duration])
-
-  const handleMouseDown = (type) => (e) => {
-    e.preventDefault()
-    setDragging(type)
-  }
-
-  const handleMouseMove = useCallback((e) => {
-    if (!dragging) return
-    const pos = getPosFromEvent(e)
-    if (dragging === 'start') {
-      const newStart = Math.min(pos, end - 0.1)
-      setStart(Math.max(0, newStart))
-    } else if (dragging === 'end') {
-      const newEnd = Math.max(pos, start + 0.1)
-      setEnd(Math.min(duration, newEnd))
-    } else if (dragging === 'playhead') {
-      if (audioRef.current) audioRef.current.currentTime = pos
-      setCurrentTime(pos)
-    }
-  }, [dragging, getPosFromEvent, start, end, duration])
-
-  const handleMouseUp = useCallback(() => setDragging(null), [])
-
-  useEffect(() => {
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [handleMouseMove, handleMouseUp])
-
-  const handleTimelineClick = (e) => {
-    if (dragging) return
-    const pos = getPosFromEvent(e)
+  const handleSeek = (pos) => {
     if (audioRef.current) audioRef.current.currentTime = pos
     setCurrentTime(pos)
   }
@@ -121,61 +79,30 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
     }
   }
 
-  const pct = (v) => `${(v / (duration || 1)) * 100}%`
-  const selLeft = pct(start)
-  const selWidth = `${((end - start) / (duration || 1)) * 100}%`
-  const playheadLeft = pct(currentTime)
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
         <i className="ti ti-cut" style={{ color: 'var(--accent)' }} />
         {t('trimmerTrimTitle')}
         <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 400, marginLeft: 4 }}>
-          {t('trimmerRegionSelected').replace('{start}', formatTime(start)).replace('{end}', formatTime(end))} ({formatTime(end - start)})
+          {t('trimmerRegionSelected', { start: formatTime(start), end: formatTime(end) })} ({formatTime(end - start)})
         </span>
       </div>
 
-      {/* Waveform / timeline */}
-      <div style={{ position: 'relative', height: 60, userSelect: 'none' }}>
-        <div ref={timelineRef} onClick={handleTimelineClick}
-          style={{ position: 'absolute', inset: 0, background: 'var(--bg-tertiary)', borderRadius: 8, cursor: 'crosshair', overflow: 'hidden' }}>
-
-          <WaveformBars duration={duration} />
-
-          <div style={{
-            position: 'absolute', top: 0, bottom: 0, left: selLeft, width: selWidth,
-            background: 'rgba(124,111,247,0.25)', border: '1px solid var(--accent)',
-            pointerEvents: 'none'
-          }} />
-
-          <div onMouseDown={handleMouseDown('playhead')}
-            style={{
-              position: 'absolute', top: 0, bottom: 0, left: playheadLeft,
-              width: 2, background: 'white', cursor: 'col-resize', zIndex: 10,
-              transform: 'translateX(-1px)'
-            }}>
-            <div style={{ position: 'absolute', top: -4, left: -4, width: 10, height: 10, borderRadius: '50%', background: 'white', border: '2px solid var(--accent)' }} />
-          </div>
-        </div>
-
-        <div onMouseDown={handleMouseDown('start')}
-          style={{
-            position: 'absolute', top: 0, bottom: 0, left: selLeft,
-            width: 10, cursor: 'ew-resize', zIndex: 11, transform: 'translateX(-5px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-          <div style={{ width: 4, height: '80%', background: 'var(--accent)', borderRadius: 2 }} />
-        </div>
-
-        <div onMouseDown={handleMouseDown('end')}
-          style={{
-            position: 'absolute', top: 0, bottom: 0, left: `calc(${selLeft} + ${selWidth})`,
-            width: 10, cursor: 'ew-resize', zIndex: 11, transform: 'translateX(-5px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-          <div style={{ width: 4, height: '80%', background: 'var(--accent)', borderRadius: 2 }} />
-        </div>
+      {/* ✅ FIX S.A/B23 : Waveform réel au lieu d'une fausse waveform sinus. */}
+      <div style={{ marginBottom: 4 }}>
+        <Waveform
+          filePath={filePath}
+          start={start}
+          end={end}
+          currentTime={currentTime}
+          duration={duration}
+          height={80}
+          showHandles
+          onSeek={handleSeek}
+          onStartChange={(pos) => setStart(Math.max(0, pos))}
+          onEndChange={(pos) => setEnd(Math.min(duration, pos))}
+        />
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-tertiary)' }}>
@@ -187,7 +114,7 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <div>
           <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 3 }}>
-            {t('trimmerStartLabel').replace('{time}', formatTime(start))}
+            {t('trimmerStartLabel', { time: formatTime(start) })}
           </label>
           <input type="range" min="0" max={duration} step="0.01" value={start}
             onChange={e => setStart(Math.min(Number(e.target.value), end - 0.1))}
@@ -195,7 +122,7 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
         </div>
         <div>
           <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 3 }}>
-            {t('trimmerEndLabel').replace('{time}', formatTime(end))}
+            {t('trimmerEndLabel', { time: formatTime(end) })}
           </label>
           <input type="range" min="0" max={duration} step="0.01" value={end}
             onChange={e => setEnd(Math.max(Number(e.target.value), start + 0.1))}
@@ -231,21 +158,6 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
           {t('trimmerInstallFfmpeg')}
         </div>
       )}
-      <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
-    </div>
-  )
-}
-
-function WaveformBars({ duration }) {
-  const bars = 80
-  return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', gap: 1, padding: '4px 2px', pointerEvents: 'none' }}>
-      {Array.from({ length: bars }).map((_, i) => {
-        const h = 20 + Math.abs(Math.sin(i * 2.3 + duration * 0.1) * Math.cos(i * 1.7) * 70)
-        return (
-          <div key={i} style={{ flex: 1, height: `${h}%`, background: 'rgba(124,111,247,0.35)', borderRadius: 1, minWidth: 1 }} />
-        )
-      })}
     </div>
   )
 }

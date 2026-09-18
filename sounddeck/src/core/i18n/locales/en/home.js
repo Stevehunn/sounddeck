@@ -44,6 +44,8 @@ export default {
   homeDropSuccess: '{count} file(s) imported successfully',
   dragDropCustomOnly: 'Drag and drop is only available in "Custom" sorting',
   profile: 'Profile',
+  dropFiles: 'Drop your files here',
+  orBrowse: 'or click to browse',
   
   // ─── EMPTY STATES ──────────────────────────────────────────────────
   homeEmptyTitle: 'No sounds',
