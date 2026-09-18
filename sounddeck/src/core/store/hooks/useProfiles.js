@@ -17,10 +17,16 @@ export function useProfiles(initialProfiles = [], initialCurrentId = 'all', save
 
   const deleteProfile = useCallback(async (profileId) => {
     if (profileId === 'all') return
+
     const updated = profiles.filter(p => p.id !== profileId)
     setProfiles(updated)
     await save('profiles', updated.filter(p => p.id !== 'all'))
-    if (currentProfileId === profileId) setCurrentProfileId('all')
+
+    if (currentProfileId === profileId) {
+      setCurrentProfileId('all')
+      await save('currentProfileId', 'all')
+    }
+
     return true
   }, [profiles, currentProfileId, save])
 

@@ -166,10 +166,6 @@ export class PluginManager {
         }
       }
 
-      if (plugin.i18n) {
-        this._addTranslations(plugin.i18n)
-      }
-
       if (typeof plugin.init === 'function') {
         await plugin.init(this.store, this)
       }
@@ -332,22 +328,6 @@ export class PluginManager {
   }
 
   /**
-   * Ajoute des traductions
-   */
-  _addTranslations(translations) {
-    if (!window.__I18N__) {
-      window.__I18N__ = {}
-    }
-
-    for (const [lang, keys] of Object.entries(translations)) {
-      if (!window.__I18N__[lang]) {
-        window.__I18N__[lang] = {}
-      }
-      Object.assign(window.__I18N__[lang], keys)
-    }
-  }
-
-  /**
    * Vérifie la compatibilité du plugin
    */
   _checkCompatibility(pluginInfo) {
@@ -365,28 +345,38 @@ export class PluginManager {
     return true
   }
 
-  _semverSatisfies(version, requirement) {
-    if (requirement.startsWith('>=')) {
-      const reqVersion = requirement.replace('>=', '')
-      return version >= reqVersion
+    _semverSatisfies(version, requirement) {
+    const parse = (v) =>
+      String(v)
+        .split('.')
+        .map((n) => parseInt(n, 10) || 0)
+
+    const cmp = (a, b) => {
+      const va = parse(a)
+      const vb = parse(b)
+      const len = Math.max(va.length, vb.length)
+      for (let i = 0; i < len; i++) {
+        const x = va[i] || 0
+        const y = vb[i] || 0
+        if (x !== y) return x - y
+      }
+      return 0
     }
-    if (requirement.startsWith('>')) {
-      const reqVersion = requirement.replace('>', '')
-      return version > reqVersion
+
+    const match = String(requirement).match(/^(>=|<=|>|<|=)?\s*(.+)$/)
+    if (!match) return false
+    const op = match[1] || '='
+    const reqVersion = match[2].trim()
+    const c = cmp(version, reqVersion)
+
+    switch (op) {
+      case '>=': return c >= 0
+      case '>':  return c > 0
+      case '<=': return c <= 0
+      case '<':  return c < 0
+      case '=':  return c === 0
+      default:   return c === 0
     }
-    if (requirement.startsWith('<=')) {
-      const reqVersion = requirement.replace('<=', '')
-      return version <= reqVersion
-    }
-    if (requirement.startsWith('<')) {
-      const reqVersion = requirement.replace('<', '')
-      return version < reqVersion
-    }
-    if (requirement.startsWith('=')) {
-      const reqVersion = requirement.replace('=', '')
-      return version === reqVersion
-    }
-    return version === requirement
   }
 
   runHook(hookName, ...args) {

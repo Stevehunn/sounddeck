@@ -166,7 +166,7 @@ export function useSettings(initialState = {}, save) {
   const updateToggleShortcutsAccelerator = useCallback(async (accelerator) => {
     setToggleShortcutsAccelerator(accelerator)
     await save('toggleShortcutsAccelerator', accelerator)
-    await window.electronAPI.updateToggleShortcutsAccelerator(accelerator)
+    await window.electronAPI?.updateToggleShortcutsAccelerator?.(accelerator)
   }, [save])
 
   const updateToggleWindowShortcut = useCallback(async (accelerator) => {

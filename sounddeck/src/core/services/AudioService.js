@@ -386,42 +386,37 @@ export function stopSound(soundId) {
     manualProgress = { id: null, current: 0, duration: 0, ratio: 0 }
   }
 
-  // ✅ Son en cours de chargement (flag posé par playSoundWithMixer) : on nettoie juste.
   if (cached === 'loading') {
     delete soundCache[soundId]
     return
   }
 
-  if (cached) {
-    if (Array.isArray(cached)) {
-      cached.forEach(h => {
-        try {
-          if (h instanceof AudioBufferSourceNode || (h.stop && typeof h.stop === 'function')) {
-            h.stop()
-          }
-          if (h.disconnect && typeof h.disconnect === 'function') {
-            h.disconnect()
-          }
-          if (h.unload && typeof h.unload === 'function') {
-            h.unload()
-          }
-        } catch(e){}
-      })
-    } else {
-      try {
-        if (cached instanceof AudioBufferSourceNode || (cached.stop && typeof cached.stop === 'function')) {
-          cached.stop()
-        }
-        if (cached.disconnect && typeof cached.disconnect === 'function') {
-          cached.disconnect()
-        }
-        if (cached.unload && typeof cached.unload === 'function') {
-          cached.unload()
-        }
-      } catch(e){}
-    }
-    delete soundCache[soundId]
+  if (!cached) return
+
+  const isBufferSource = (h) =>
+    typeof AudioBufferSourceNode !== 'undefined' && h instanceof AudioBufferSourceNode
+
+  const safeStop = (h) => {
+    try {
+      if (isBufferSource(h) || (h.stop && typeof h.stop === 'function')) {
+        h.stop()
+      }
+      if (h.disconnect && typeof h.disconnect === 'function') {
+        h.disconnect()
+      }
+      if (h.unload && typeof h.unload === 'function') {
+        h.unload()
+      }
+    } catch (e) {}
   }
+
+  if (Array.isArray(cached)) {
+    cached.forEach(safeStop)
+  } else {
+    safeStop(cached)
+  }
+
+  delete soundCache[soundId]
 }
 
 let stopSequencerCallback = null

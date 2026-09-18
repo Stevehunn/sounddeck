@@ -1,5 +1,5 @@
 // src/core/plugins/PluginContext.jsx
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { pluginManager } from './PluginManager'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
@@ -12,8 +12,6 @@ export function PluginProvider({ children, store }) {
   const [error, setError] = useState(null)
   const { t } = useLanguage()
 
-  // ✅ FIX S4 : initialisation UNE FOIS + rafraîchissement des labels
-  // au changement de langue sans re-init (early-return d'initialize)
   useEffect(() => {
     const init = async () => {
       try {
@@ -21,7 +19,6 @@ export function PluginProvider({ children, store }) {
           await pluginManager.initialize(store)
           setPlugins(pluginManager.getLoadedPlugins())
         }
-        // Toujours rafraîchir les labels avec la langue courante
         setPages(pluginManager.getAllPages(t))
         setLoaded(true)
       } catch (e) {
@@ -50,14 +47,15 @@ export function PluginProvider({ children, store }) {
     return result
   }, [refresh])
 
-  const value = {
+  // ✅ FIX S.A/B3 : value mémoïsé → évite les cascades de re-renders
+  //    chez les consommateurs de usePlugins().
+  const value = useMemo(() => ({
     pluginManager,
     plugins,
     pages,
     loaded,
     error,
     refresh,
-    // ✅ FIX S4 : passer `t` à getPage pour traduire les labels
     getPage: (id) => pluginManager.getPage(id, t),
     isPluginPage: (id) => pluginManager.isPluginPage(id),
     getPluginComponent: (id) => pluginManager.getPluginComponent(id),
@@ -66,7 +64,7 @@ export function PluginProvider({ children, store }) {
     unloadPlugin,
     isPluginLoaded: (id) => pluginManager.isPluginLoaded(id),
     getLoadedPlugins: () => pluginManager.getLoadedPlugins(),
-  }
+  }), [plugins, pages, loaded, error, t, refresh, loadPlugin, unloadPlugin])
 
   return (
     <PluginContext.Provider value={value}>

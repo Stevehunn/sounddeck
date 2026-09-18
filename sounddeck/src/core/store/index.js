@@ -15,7 +15,10 @@ import {
   ACTION_IDS,
 } from '@shared/constants/navigation'
 
+let isHydrating = false
+
 const save = async (key, value) => {
+  if (isHydrating) return
   await window.electronAPI.storeSet(key, value)
 }
 
@@ -46,10 +49,10 @@ export function useStore() {
   }
 
   // ─── CHARGEMENT INITIAL ─────────────────────────────────────────────────
-    // ─── CHARGEMENT INITIAL ─────────────────────────────────────────────────
   useEffect(() => {
     async function loadData() {
       try {
+        isHydrating = true
         const [
           savedProfiles,
           rawSounds,
@@ -293,6 +296,7 @@ export function useStore() {
       } catch (e) {
         console.error('Erreur chargement store:', e)
       } finally {
+        isHydrating = false
         setLoading(false)
       }
     }
