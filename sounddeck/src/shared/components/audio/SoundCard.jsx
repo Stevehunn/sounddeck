@@ -30,7 +30,6 @@ export default function SoundCard({
   onVolumeChange,
   onPlay,
   currentProfileId,
-  lang = 'fr',
   onDragStart,
   onDragEnd,
   draggable = true,
@@ -42,8 +41,8 @@ export default function SoundCard({
   onRemoveTag,
   size = 'medium',
 }) {
-  const { t } = useLanguage()
-  const { confirm, ConfirmWrapper } = useConfirm({ lang })
+  const { t, currentLang } = useLanguage()
+  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
   const [playing, setPlaying] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showVolume, setShowVolume] = useState(false)
@@ -379,7 +378,7 @@ export default function SoundCard({
           <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
             {loopEnabled && (
               <span
-                title="Loop activé"
+                title={t('loopActive')}
                 style={{ fontSize: 11, color: 'var(--success)' }}
               >
                 <i className="ti ti-repeat" />
@@ -686,7 +685,7 @@ export default function SoundCard({
           onSave={(acc) => onSetShortcut(sound.id, acc)}
           onClear={() => onSetShortcut(sound.id, '')}
           compact
-          lang={lang}
+          lang={currentLang}
           layout={layout}
         />
 
@@ -776,7 +775,6 @@ export default function SoundCard({
               onChangeImage={handleChangeImage}
               onChangeEmoji={handleChangeEmoji}
               position={menuPosition}
-              lang={lang}
               onHeightMeasured={setMenuHeight}
               onDeleteWithConfirm={handleDeleteWithConfirm}
               onRemoveFromProfileWithConfirm={handleRemoveFromProfileWithConfirm}
@@ -798,13 +796,12 @@ export default function SoundCard({
             onDragStart={handleVolumeDragStart}
             onDragEnd={handleVolumeDragEnd}
             soundName={sound.name}
-            lang={lang}
             position={volumePosition}
           />,
           document.body
         )}
 
-      {/* ✅ NOUVEAU : EmojiPicker global (modal restylée, cohérent avec l'app) */}
+      {/* EmojiPicker global */}
       <EmojiPicker
         isOpen={showEmojiPicker}
         onClose={() => setShowEmojiPicker(false)}
@@ -826,7 +823,6 @@ function VolumePanel({
   onChange,
   onCommit,
   onClose,
-  lang = 'fr',
   onDragStart,
   onDragEnd,
   soundName,
@@ -1131,7 +1127,6 @@ function ContextMenuPortal({
   onChangeImage,
   onChangeEmoji,
   position,
-  lang = 'fr',
   onHeightMeasured,
   onDeleteWithConfirm,
   onRemoveFromProfileWithConfirm,

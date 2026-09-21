@@ -261,7 +261,7 @@ export default function CustomThemeEditor({ current, onSave }) {
               }}>F1</div>
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: colors.textPrimary, marginBottom: 4 }}>SoundDeck</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: colors.textPrimary, marginBottom: 4 }}>{t('themeEditorPreviewName')}</div>
               <div style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 6 }}>{t('themeEditorPreviewSub')}</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <div style={{ padding: '3px 8px', borderRadius: 4, background: colors.accent, color: 'white', fontSize: 10 }}>{t('themeEditorPrimary')}</div>

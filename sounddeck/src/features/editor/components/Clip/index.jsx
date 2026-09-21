@@ -72,17 +72,12 @@ const EditorClip = ({
   const totalCycles = clipLoopData?.totalCycles || 1
 
   useEffect(() => {
-    if (!isDragging) {
-      setLocalStart(start)
-      dragStartTimeRef.current = start
-    }
-  }, [start, isDragging])
+    dragStartTimeRef.current = start
 
-  useEffect(() => {
-    if (isDragging) {
-      dragStartTimeRef.current = start
+    if (!isDragging && localStart !== start) {
+      setLocalStart(start)
     }
-  }, [start, isDragging])
+  }, [start, isDragging, localStart])
 
   useEffect(() => {
     setIsClipPlaying(isPlaying && currentTime >= start && currentTime <= start + duration)

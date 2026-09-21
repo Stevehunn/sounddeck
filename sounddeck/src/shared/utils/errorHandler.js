@@ -319,15 +319,9 @@ export function useErrorLogs() {
   return { logs, clearLogs, exportLogs }
 }
 
-// ✅ FIX S4 : fonction exposée pour vider le cache module + le store
 export async function clearAllErrorLogs() {
   errorLogs = []
   await writeLogsToStore([])
-  try {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('sounddeck-error-logs')
-    }
-  } catch (e) { /* silent */ }
 }
 
 // ─── HELPERS PUBLICS ────────────────────────────────────────────────────────

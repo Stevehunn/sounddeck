@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, forwardRef, useCallback } from 'react'
 import { createRoot } from 'react-dom/client'
 import { useLanguage } from '@core/i18n/LanguageContext'
-import { LANGUAGES } from '@core/i18n/locales'
+import { LANGUAGES } from '@core/i18n/constants'
 import { DeleteButton } from '@shared/components/ui'
 import ShortcutRecorder from '@shared/components/settings/ShortcutRecorder'
 import CustomThemeEditor from '@shared/components/ui/CustomThemeEditor'
@@ -452,7 +452,7 @@ export default function Options({ store, addToast }) {
 
   const handleDeleteBackup = useCallback(async (index) => {
     try {
-      const { deleteBackup } = await import('../../shared/utils/backupManager.js')
+      const { deleteBackup } = await import('@shared/utils/backupManager.js')
       const result = await deleteBackup(index)
       if (result.success) {
         addToast('✅ ' + t('backupDeleted'), 'success')

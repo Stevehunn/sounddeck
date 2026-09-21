@@ -20,9 +20,9 @@ function formatSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
+export default function Home({ store, addToast, loopEnabled }) {
   const { t, currentLang } = useLanguage()
-  const { confirm, ConfirmWrapper } = useConfirm({ lang })
+  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
   const playLocally = store.playLocally
   const [showAll, setShowAll] = useState(false)
   const [showAllOther, setShowAllOther] = useState(false)
@@ -158,6 +158,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
 
   const handleDrop = async (e, dropIndex, targetSource) => {
     e.preventDefault()
+    e.stopPropagation()
     if (!draggedSoundId) return
 
     const data = e.dataTransfer.getData('text/plain')
@@ -221,6 +222,7 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
 
   const handleMainDrop = async (e, dropIndex) => {
     e.preventDefault()
+    e.stopPropagation()
     if (!draggedSoundId) return
 
     const data = e.dataTransfer.getData('text/plain')
@@ -331,14 +333,21 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
     setDragOver(false)
     setShowImport(false)
 
+    if (draggedSoundId) {
+      return
+    }
+
     const dtFiles = [...(e.dataTransfer?.files || [])]
     const dtItems = [...(e.dataTransfer?.items || [])]
     const allFiles = dtFiles.length > 0
       ? dtFiles
       : dtItems.filter(i => i.kind === 'file').map(i => i.getAsFile()).filter(Boolean)
 
+    const hasAnyItem = dtFiles.length > 0 || dtItems.some(i => i.kind === 'file')
     if (!allFiles.length) {
-      addToast(t('noFileDetected'), 'error')
+      if (hasAnyItem) {
+        addToast(t('unsupportedFormat'), 'error')
+      }
       return
     }
 
@@ -575,7 +584,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
                 playLocally={playLocally}
                 store={store}
                 addToast={addToast}
-                lang={lang}
                 gridRef={favoritesGridRef}
                 draggable={sortBy === 'custom'}
                 onDragStart={handleDragStart}
@@ -607,7 +615,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
                 playLocally={playLocally}
                 store={store}
                 addToast={addToast}
-                lang={lang}
                 gridRef={gridRef}
                 draggable={sortBy === 'custom'}
                 onDragStart={handleDragStart}
@@ -650,7 +657,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
                       await store.addSoundToProfile(s.id, currentProfileId)
                       addToast(`"${s.name}" ${t('addedToProfile')}`, 'success')
                     }}
-                    lang={lang}
                   />
                 ))}
               </div>
@@ -742,7 +748,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
               } else addToast(`${t('error')} : ${result.error}`, 'error')
               setShowImport(false)
             }}
-            lang={lang}
           />
         )}
 
@@ -754,7 +759,6 @@ export default function Home({ store, addToast, loopEnabled, lang = 'fr' }) {
             store={store}
             onClose={() => setShowProfileManager(false)}
             addToast={addToast}
-            lang={lang}
           />
         )}
 
@@ -798,7 +802,6 @@ function SoundGrid({
   playLocally,
   store,
   addToast,
-  lang,
   gridRef,
   draggable,
   onDragStart,
@@ -896,9 +899,6 @@ function SoundGrid({
               }}
               tags={store.tags[s.id] || []}
               draggable={draggable}
-              lang={lang}
-              onDragStart={(e) => draggable && onDragStart(e, s.id, index, dropTarget)}
-              onDragEnd={(e) => draggable && onDragEnd(e)}
               layout={store.keyboardLayout || 'qwerty'}
               size={cardSize}
             />
@@ -909,7 +909,7 @@ function SoundGrid({
   )
 }
 
-function OutsideCard({ sound, onAdd, lang }) {
+function OutsideCard({ sound, onAdd}) {
   const { t } = useLanguage()
   const imageUrl = buildFileUrl(sound.image)
   return (
@@ -930,7 +930,7 @@ function OutsideCard({ sound, onAdd, lang }) {
   )
 }
 
-function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onUrlImport, onManualAdd, store, lang }) {
+function ImportModal({ onClose, onOpenDialog, onDrop, dragOver, setDragOver, onUrlImport, onManualAdd, store }) {
   const { t } = useLanguage()
   const [tab, setTab] = useState('file')
   const [url, setUrl] = useState('')

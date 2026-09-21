@@ -39,37 +39,9 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
     }
   }, [store])
 
-  // ✅ FORCER UN RE-RENDER QUAND LES FAVORIS CHANGENT
   useEffect(() => {
-    const refresh = () => {
-      setRefreshKey(prev => prev + 1)
-    }
-
-    const handleStoreUpdate = (e) => {
-      if (e.detail?.type === 'favorites' || e.detail?.type === 'sound') {
-        refresh()
-      }
-    }
-    window.addEventListener('store-update', handleStoreUpdate)
-
-    let lastCount = favoriteSounds.length
-    
-    const interval = setInterval(() => {
-      const currentFavorites = (store.sounds || []).filter(s => 
-        s.favorites && s.favorites.includes(currentProfileId)
-      )
-      const currentCount = currentFavorites.length
-      if (currentCount !== lastCount) {
-        lastCount = currentCount
-        refresh()
-      }
-    }, 200)
-
-    return () => {
-      window.removeEventListener('store-update', handleStoreUpdate)
-      clearInterval(interval)
-    }
-  }, [store, currentProfileId, favoriteSounds.length])
+    setRefreshKey(prev => prev + 1)
+  }, [favoriteSounds.length, currentProfileId])
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onExit() }

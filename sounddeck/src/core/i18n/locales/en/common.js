@@ -63,6 +63,7 @@ export default {
   // ─── ACTIONS ──────────────────────────────────────────────────────────
   actions: 'Actions',
   loop: 'Loop',
+  loopActive: 'Loop enabled',
   shortcuts: 'Shortcuts',
   presentation: 'Presentation',
   stopAll: 'Stop all',

@@ -679,7 +679,7 @@ export default function TutorialOverlay({
                   fontWeight: 500,
                 }}
               >
-                {t('tutorialPreparing') || 'Préparation...'}
+                {t('tutorialPreparing')}
               </div>
             </div>
           ) : (
