@@ -184,63 +184,76 @@ function cleanupShortcuts() {
 
 function registerShortcutHandlers() {
   console.log('🔧 [shortcutManager] Enregistrement des handlers IPC...')
-  
+  const getMain = () => require('./windowManager').getMainWindow()
+
+  const reregister = () => {
+    const w = getMain()
+    reregisterShortcuts(w)
+  }
+
   if (!ipcMain.eventNames().includes('update-shortcuts')) {
     ipcMain.handle('update-shortcuts', (event, shortcuts) => {
       store.set('shortcuts', shortcuts)
+      reregister()
       return true
     })
   }
-  
+
   if (!ipcMain.eventNames().includes('update-profile-shortcut')) {
     ipcMain.handle('update-profile-shortcut', (event, accelerator) => {
       store.set('profileShortcut', accelerator)
+      reregister()
       return true
     })
   }
-  
+
   if (!ipcMain.eventNames().includes('update-loop-shortcut')) {
     ipcMain.handle('update-loop-shortcut', (event, accelerator) => {
       store.set('loopShortcut', accelerator)
-      return true
+      reregister()
     })
   }
-  
+
   if (!ipcMain.eventNames().includes('update-stop-all-shortcut')) {
     ipcMain.handle('update-stop-all-shortcut', (event, accelerator) => {
       store.set('stopAllShortcut', accelerator)
+      reregister()
       return true
     })
   }
-  
+
   if (!ipcMain.eventNames().includes('update-presentation-shortcut')) {
     ipcMain.handle('update-presentation-shortcut', (event, accelerator) => {
       store.set('presentationShortcut', accelerator)
-      return true
+      reregister()
     })
   }
-  
+
   if (!ipcMain.eventNames().includes('update-toggle-shortcuts-accelerator')) {
     ipcMain.handle('update-toggle-shortcuts-accelerator', (event, accelerator) => {
       store.set('toggleShortcutsAccelerator', accelerator)
+      const w = getMain()
+      if (w) registerToggleShortcut(w)
       return true
     })
   }
-  
+
   if (!ipcMain.eventNames().includes('update-toggle-window-shortcut')) {
     ipcMain.handle('update-toggle-window-shortcut', (event, accelerator) => {
       store.set('toggleWindowShortcut', accelerator)
+      const w = getMain()
+      if (w) registerToggleWindowShortcut(w, accelerator)
       return true
     })
   }
-  
+
   if (!ipcMain.eventNames().includes('toggle-global-shortcuts')) {
     ipcMain.handle('toggle-global-shortcuts', () => {
       const mainWindow = require('./windowManager').getMainWindow()
       return toggleGlobalShortcuts(mainWindow)
     })
   }
-  
+
   console.log('✅ [shortcutManager] Handlers IPC enregistrés')
 }
 

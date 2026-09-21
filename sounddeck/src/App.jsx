@@ -404,8 +404,8 @@ function AppContent({ store }) {
       window.electronAPI.removeAllListeners('stop-all-sounds')
       window.electronAPI.removeAllListeners('toggle-presentation')
     }
-  }, [store.loopEnabled, store.mixerEnabled, t])
-
+  }, [store.mixerEnabled, t])
+  
   const addToast = useCallback((message, type = 'info') => {
     const id = crypto.randomUUID
       ? crypto.randomUUID()

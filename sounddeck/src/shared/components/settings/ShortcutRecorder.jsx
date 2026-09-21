@@ -1,6 +1,7 @@
 // src/shared/components/settings/ShortcutRecorder.jsx
 import { useState, useRef, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
+import { DeleteButton } from '@shared/components/ui'
 
 // Mapping des touches par position physique (QWERTY → AZERTY)
 const PHYSICAL_TO_AZERTY = {
@@ -130,7 +131,8 @@ export default function ShortcutRecorder({
   compact = false, 
   requireMod = false, 
   lang = 'fr',
-  layout = 'qwerty'
+  layout = 'qwerty',
+  deleteWithConfirm = false,
 }) {
   const { t, currentLang } = useLanguage()
   const [recording, setRecording] = useState(false)
@@ -199,10 +201,23 @@ export default function ShortcutRecorder({
         {displayValue || displayPlaceholder}
       </div>
       {value && (
-        <button onClick={e => { e.stopPropagation(); onClear?.() }}
-          style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: '2px 4px', borderRadius: 4, fontSize: 12 }}>
-          <i className="ti ti-x" />
-        </button>
+        deleteWithConfirm ? (
+          <DeleteButton
+            onDelete={() => onClear?.()}
+            confirmTitle={t('clearShortcut')}
+            confirmMessage={t('confirmClearShortcut', { shortcut: displayValue })}
+            itemName={displayValue}
+            size="sm"
+            variant="ghost-danger"
+            icon="ti-trash"
+            showLabel={false}
+          />
+        ) : (
+          <button onClick={e => { e.stopPropagation(); onClear?.() }}
+            style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: '2px 4px', borderRadius: 4, fontSize: 12 }}>
+            <i className="ti ti-x" />
+          </button>
+        )
       )}
     </div>
   )

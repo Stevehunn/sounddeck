@@ -6,7 +6,7 @@ import HelpButton from '@shared/components/ui/HelpButton'
 import { formatTime } from '@shared/utils/format'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 
-export default function Presentation({ store, onExit, lang = 'fr' }) {
+export default function Presentation({ store, onExit }) {
   const { t, currentLang } = useLanguage()
   const [playingId, setPlayingId] = useState(null)
   const [search, setSearch] = useState('')
@@ -147,7 +147,6 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
                 playing={playingId === s.id}
                 onPlay={() => handlePlay(s)}
                 size="large"
-                lang={lang}
               />
             ))}
           </div>
@@ -177,7 +176,6 @@ export default function Presentation({ store, onExit, lang = 'fr' }) {
               playing={playingId === s.id}
               onPlay={() => handlePlay(s)}
               size={cardSize}
-              lang={lang}
             />
           ))}
         </div>
@@ -211,7 +209,7 @@ function formatShortcut(shortcut) {
     })
 }
 
-function PresentationCard({ sound, shortcut, playing, onPlay, size, lang }) {
+function PresentationCard({ sound, shortcut, playing, onPlay, size }) {
   const { t, currentLang } = useLanguage()
   const [imgError, setImgError] = useState(false)
   const [progress, setProgress] = useState(null)

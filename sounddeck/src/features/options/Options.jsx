@@ -1029,6 +1029,7 @@ export default function Options({ store, addToast }) {
               onClear={() => store.updateProfileShortcut('')}
               requireMod
               layout={store.keyboardLayout || 'qwerty'}
+              deleteWithConfirm
             />
           </OptionRow>
           <OptionRow label={t('toggleLoop')} sub={t('toggleLoopDesc')}>
@@ -1038,6 +1039,7 @@ export default function Options({ store, addToast }) {
               onClear={() => store.updateLoopShortcut('')}
               requireMod
               layout={store.keyboardLayout || 'qwerty'}
+              deleteWithConfirm
             />
           </OptionRow>
           <OptionRow label={t('stopAllShortcut')} sub={t('stopAllDesc')}>
@@ -1047,6 +1049,7 @@ export default function Options({ store, addToast }) {
               onClear={() => store.updateStopAllShortcut('')}
               requireMod
               layout={store.keyboardLayout || 'qwerty'}
+              deleteWithConfirm
             />
           </OptionRow>
           <OptionRow label={t('presentationShortcut')} sub={t('presentationDesc')}>
@@ -1056,6 +1059,7 @@ export default function Options({ store, addToast }) {
               onClear={() => store.updatePresentationShortcut('')}
               requireMod
               layout={store.keyboardLayout || 'qwerty'}
+              deleteWithConfirm
             />
           </OptionRow>
           
@@ -1072,6 +1076,7 @@ export default function Options({ store, addToast }) {
               }}
               requireMod
               layout={store.keyboardLayout || 'qwerty'}
+              deleteWithConfirm
             />
           </OptionRow>
 
@@ -1088,6 +1093,7 @@ export default function Options({ store, addToast }) {
               }}
               requireMod
               layout={store.keyboardLayout || 'qwerty'}
+              deleteWithConfirm
             />
           </OptionRow>
 

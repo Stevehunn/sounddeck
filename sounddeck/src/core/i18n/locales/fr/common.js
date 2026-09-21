@@ -123,7 +123,10 @@ export default {
   menuChangeImage: 'Changer l\'image',
   menuChangeEmoji: 'Changer l\'emoji',
   menuRemoveFromProfile: 'Retirer du profil',
+  menuRemoveFromProfileConfirm: 'Retirer "{name}" du profil ?',
   menuDelete: 'Supprimer définitivement',
+  clearShortcut: 'Supprimer le raccourci',
+  confirmClearShortcut: 'Supprimer le raccourci "{shortcut}" ?',
 
   // ─── CONFIRMATIONS ────────────────────────────────────────────────────
   confirmDeleteSound: 'Confirmer la suppression du son',

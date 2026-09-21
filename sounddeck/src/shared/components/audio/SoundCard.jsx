@@ -301,11 +301,11 @@ export default function SoundCard({
       const soundName = sound.name || 'ce son'
 
       const confirmed = await confirm({
-        title: t('confirmAction') || 'Confirmer le retrait',
-        message: `${t('menuRemoveFromProfile')} "${soundName}" ?`,
+        title: t('confirmAction'),
+        message: t('menuRemoveFromProfileConfirm', { name: soundName }),
         type: 'warning',
-        confirmText: t('remove') || 'Retirer',
-        cancelText: t('cancel') || 'Annuler',
+        confirmText: t('remove'),
+        cancelText: t('cancel'),
       })
 
       if (confirmed) onRemoveFromProfile(sound.id)
