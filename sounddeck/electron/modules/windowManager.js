@@ -10,7 +10,7 @@ let closeToTray = true
 
 const isDev = !require('electron').app.isPackaged
 
-// ─── CRÉATION DE LA FENÊTRE ──────────────────────────────────────────────────
+// ─── CRÉATION DE LA FENÊTRE ──────────────────────────────────────────────
 
 function createWindow(shouldStartMinimized = false) {
   const iconPath = path.join(__dirname, '../../public/icon.ico')
@@ -31,13 +31,13 @@ function createWindow(shouldStartMinimized = false) {
       nodeIntegration: false,
       webSecurity: false,
       allowRunningInsecureContent: false,
-      experimentalFeatures: true
+      experimentalFeatures: false,
     },
     backgroundColor: '#111113',
     show: !shouldStartMinimized,
     autoHideMenuBar: true,
     frame: true,
-    ...(fs.existsSync(iconPath) ? { icon: iconPath } : {})
+    ...(fs.existsSync(iconPath) ? { icon: iconPath } : {}),
   })
 
   if (isDev) {
@@ -45,33 +45,40 @@ function createWindow(shouldStartMinimized = false) {
     mainWindow.webContents.openDevTools()
   } else {
     let indexPath = path.join(require('electron').app.getAppPath(), 'dist', 'index.html')
-    
+
     if (!fs.existsSync(indexPath)) {
       const resourcePath = path.join(process.resourcesPath, 'app', 'dist', 'index.html')
       if (fs.existsSync(resourcePath)) {
         indexPath = resourcePath
       } else {
-        const exePath = path.join(path.dirname(require('electron').app.getPath('exe')), 'resources', 'app', 'dist', 'index.html')
+        const exePath = path.join(
+          path.dirname(require('electron').app.getPath('exe')),
+          'resources',
+          'app',
+          'dist',
+          'index.html'
+        )
         if (fs.existsSync(exePath)) {
           indexPath = exePath
         }
       }
     }
-    
+
     console.log('📄 Chargement de:', indexPath)
     console.log('📄 Fichier existe:', fs.existsSync(indexPath))
-    
+
     if (!fs.existsSync(indexPath)) {
       console.error('❌ ERREUR: index.html introuvable !')
-      dialog.showErrorBox('Erreur de chargement', 
+      dialog.showErrorBox(
+        'Erreur de chargement',
         'Impossible de trouver index.html.\n\n' +
-        'Chemin recherché: ' + indexPath + '\n\n' +
-        'Vérifiez que le build est correct.'
+          'Chemin recherché: ' + indexPath + '\n\n' +
+          'Vérifiez que le build est correct.'
       )
       require('electron').app.quit()
       return
     }
-    
+
     mainWindow.loadFile(indexPath)
   }
 
@@ -88,7 +95,7 @@ function createWindow(shouldStartMinimized = false) {
   return mainWindow
 }
 
-// ─── GESTION DE LA FENÊTRE ──────────────────────────────────────────────────
+// ─── GESTION DE LA FENÊTRE ───────────────────────────────────────────────
 
 function getMainWindow() {
   return mainWindow
@@ -123,33 +130,16 @@ function focusMainWindow() {
   }
 }
 
-// ─── GESTION DE LA FERMETURE ─────────────────────────────────────────────────
+// ─── GESTION DE LA FERMETURE ─────────────────────────────────────────────
 
-function setQuitting(value) {
-  isQuitting = value
-}
+function setQuitting(value) { isQuitting = value }
+function setPendingQuit(value) { pendingQuit = value }
+function setCloseToTray(value) { closeToTray = value }
+function getCloseToTray() { return closeToTray }
+function getIsQuitting() { return isQuitting }
+function getPendingQuit() { return pendingQuit }
 
-function setPendingQuit(value) {
-  pendingQuit = value
-}
-
-function setCloseToTray(value) {
-  closeToTray = value
-}
-
-function getCloseToTray() {
-  return closeToTray
-}
-
-function getIsQuitting() {
-  return isQuitting
-}
-
-function getPendingQuit() {
-  return pendingQuit
-}
-
-// ─── NETTOYAGE ───────────────────────────────────────────────────────────────
+// ─── NETTOYAGE ───────────────────────────────────────────────────────────
 
 function cleanupWindow() {
   if (mainWindow) {

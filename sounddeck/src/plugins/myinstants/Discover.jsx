@@ -8,6 +8,7 @@ import { useNetwork } from '@shared/contexts'
 export default function MyInstantsDiscover({ store, addToast }) {
   const { t, currentLang } = useLanguage()
   const { showNoConnection, ensureOnline } = useNetwork()
+
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState([])
@@ -32,7 +33,8 @@ export default function MyInstantsDiscover({ store, addToast }) {
   const preloadAbortRef = useRef(false)
   const resultsRef = useRef([])
 
-  const CATEGORIES_PREF_KEY = 'myinstants_selected_categories'
+  const STORE_KEY_CATEGORIES = 'myinstantsSelectedCategories'
+  const LEGACY_LS_KEY = 'myinstants_selected_categories'
 
   const checkApi = useCallback(() => {
     if (!window.electronAPI?.fetchMyinstants) {
@@ -43,12 +45,28 @@ export default function MyInstantsDiscover({ store, addToast }) {
     return true
   }, [t])
 
-  const loadCategoryPreferences = useCallback(() => {
+  const loadCategoryPreferences = useCallback(async () => {
     try {
-      const saved = localStorage.getItem(CATEGORIES_PREF_KEY)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        const validCategories = parsed.filter(id => CATEGORIES[id])
+      let saved = await window.electronAPI?.storeGet?.(STORE_KEY_CATEGORIES)
+
+      if (!Array.isArray(saved)) {
+        const legacy = localStorage.getItem(LEGACY_LS_KEY)
+        if (legacy) {
+          try {
+            const parsed = JSON.parse(legacy)
+            if (Array.isArray(parsed)) {
+              saved = parsed
+              await window.electronAPI?.storeSet?.(STORE_KEY_CATEGORIES, parsed)
+              localStorage.removeItem(LEGACY_LS_KEY)
+            }
+          } catch (e) {
+            // silencieux
+          }
+        }
+      }
+
+      if (Array.isArray(saved) && saved.length > 0) {
+        const validCategories = saved.filter(id => CATEGORIES[id])
         if (validCategories.length > 0) {
           setSelectedCategories(validCategories)
           return validCategories
@@ -57,14 +75,15 @@ export default function MyInstantsDiscover({ store, addToast }) {
     } catch (e) {
       console.warn('Erreur chargement préférences catégories:', e)
     }
+
     const defaults = DEFAULT_CATEGORIES.map(cat => cat.id)
     setSelectedCategories(defaults)
     return defaults
   }, [])
 
-  const saveCategoryPreferences = useCallback((categoryIds) => {
+  const saveCategoryPreferences = useCallback(async (categoryIds) => {
     try {
-      localStorage.setItem(CATEGORIES_PREF_KEY, JSON.stringify(categoryIds))
+      await window.electronAPI?.storeSet?.(STORE_KEY_CATEGORIES, categoryIds)
       setSelectedCategories(categoryIds)
     } catch (e) {
       console.warn('Erreur sauvegarde préférences catégories:', e)
@@ -115,7 +134,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
       const fetchWithTimeout = (promise, timeout = 20000) => {
         return Promise.race([
           promise,
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeout))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeout)),
         ])
       }
 
@@ -172,12 +191,13 @@ export default function MyInstantsDiscover({ store, addToast }) {
 
     setLoading(false)
     setCacheInfo(getCacheInfo())
-  }, [currentLang, t, activeCategory, checkApi, showNoConnection])
+  }, [currentLang, t, activeCategory, checkApi, showNoConnection, ensureOnline])
 
   const preloadAllCategories = useCallback(async (priorityIds = null) => {
     if (isPreloading || isPreloadComplete) return
 
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    const online = await ensureOnline()
+    if (!online) {
       setIsPreloadComplete(true)
       return
     }
@@ -231,7 +251,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
         if (config.mode === 'local' || config.mode === 'trending') {
           result = await Promise.race([
             window.electronAPI.fetchMyinstants('', config.mode === 'local' ? 'local' : 'trending', currentLang),
-            timeoutPromise
+            timeoutPromise,
           ])
         } else if (config.mode === 'multi') {
           const terms = config.query.split(',').map(t => t.trim()).filter(Boolean).slice(0, 2)
@@ -240,7 +260,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
           for (const term of terms) {
             const r = await Promise.race([
               window.electronAPI.fetchMyinstants(term, 'search', currentLang),
-              timeoutPromise
+              timeoutPromise,
             ])
             if (r.success) {
               for (const sound of r.sounds) {
@@ -255,7 +275,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
         } else {
           result = await Promise.race([
             window.electronAPI.fetchMyinstants(config.query, 'search', currentLang),
-            timeoutPromise
+            timeoutPromise,
           ])
         }
 
@@ -275,9 +295,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
       if (preloadAbortRef.current) break
 
       const batch = sortedIds.slice(i, i + batchSize)
-      const results = await Promise.all(
-        batch.map(id => loadOneCategory(id))
-      )
+      const results = await Promise.all(batch.map(id => loadOneCategory(id)))
 
       loaded += results.filter(Boolean).length
       setPreloadProgress(Math.round((loaded / total) * 100))
@@ -300,8 +318,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
         loadCategory(firstCategory)
       }
     }
-
-  }, [currentLang, isPreloading, isPreloadComplete, t, loadCategory, getVisibleCategories, checkApi])
+  }, [currentLang, isPreloading, isPreloadComplete, t, loadCategory, getVisibleCategories, checkApi, ensureOnline])
 
   const handleSearch = useCallback(async () => {
     if (!checkApi()) return
@@ -331,7 +348,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
         }
       }
     } catch (e) {
-      console.error('❌ [Discover] Erreur chargement catégorie:', e)
+      console.error('❌ [Discover] Erreur recherche:', e)
       const online = await ensureOnline()
       if (!online) {
         setError('')
@@ -340,7 +357,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
       }
     }
     setLoading(false)
-  }, [search, currentLang, t, activeCategory, loadCategory, checkApi, showNoConnection])
+  }, [search, currentLang, t, activeCategory, loadCategory, checkApi, showNoConnection, ensureOnline])
 
   const isSoundOwned = useCallback((soundName) => {
     return store.sounds.some(s => s.name.toLowerCase() === soundName.toLowerCase())
@@ -369,7 +386,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
         name: sound.name,
         path: sound.url || null,
         emoji: sound.emoji || '🔊',
-        profiles: profiles
+        profiles: profiles,
       })
 
       addToast(t('myinstantsAdded'), 'success')
@@ -418,10 +435,8 @@ export default function MyInstantsDiscover({ store, addToast }) {
         onloaderror: async () => {
           const stillOnline = await ensureOnline()
           if (stillOnline) {
-            // Erreur de format/décodage (pas réseau)
             addToast(t('myinstantsPreviewError'), 'error')
           }
-          // Si offline, ensureOnline a déjà affiché le modal
           setPreviewing(null)
           previewHowlRef.current = null
         },
@@ -455,13 +470,13 @@ export default function MyInstantsDiscover({ store, addToast }) {
     })
   }
 
-  const saveCategoryEditor = () => {
+  const saveCategoryEditor = async () => {
     if (tempSelectedCategories.length === 0) {
       addToast(t('myinstantsSelectAtLeastOneCategory'), 'error')
       return
     }
 
-    saveCategoryPreferences(tempSelectedCategories)
+    await saveCategoryPreferences(tempSelectedCategories)
     setShowCategoryEditor(false)
     addToast(t('myinstantsCategoryEditorSaved'), 'success')
     setShowAllCategories(false)
@@ -504,7 +519,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
           textAlign: 'center',
           padding: '8px',
           color: 'var(--text-tertiary)',
-          fontSize: 12
+          fontSize: 12,
         }}>
           <i className="ti ti-category" style={{ marginRight: 4 }} />
           {t('myinstantsNoCategories')}
@@ -518,14 +533,14 @@ export default function MyInstantsDiscover({ store, addToast }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 6
+          marginBottom: 6,
         }}>
           <div style={{
             fontSize: 11,
             fontWeight: 600,
             color: 'var(--text-secondary)',
             textTransform: 'uppercase',
-            letterSpacing: '0.05em'
+            letterSpacing: '0.05em',
           }}>
             <i className="ti ti-category" style={{ marginRight: 4 }} />
             {t('myinstantsCategories')} ({visibleCategories.length})
@@ -559,7 +574,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
             flexWrap: 'wrap',
             gap: 4,
             maxHeight: showAllCategories ? 'none' : '80px',
-            overflow: 'hidden'
+            overflow: 'hidden',
           }}
         >
           {displayCategories.map(cat => {
@@ -593,7 +608,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 4,
-                  transition: 'all 0.15s'
+                  transition: 'all 0.15s',
                 }}
                 onMouseEnter={e => {
                   if (!isActive) {
@@ -616,7 +631,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
                     fontSize: 8,
                     marginLeft: 2,
                     color: 'var(--success)',
-                    opacity: 0.6
+                    opacity: 0.6,
                   }}>
                     💾
                   </span>
@@ -656,7 +671,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
             display: 'flex',
             gap: 4,
             marginBottom: 12,
-            flexWrap: 'wrap'
+            flexWrap: 'wrap',
           }}>
             <button className="btn-secondary btn-sm" onClick={selectAllCategories}>
               <i className="ti ti-checkbox" /> {t('myinstantsCategoryEditorSelectAll')}
@@ -675,7 +690,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
             gap: 4,
-            padding: '4px 0'
+            padding: '4px 0',
           }}>
             {CATEGORIES_LIST.map(cat => {
               const isSelected = tempSelectedCategories.includes(cat.id)
@@ -693,7 +708,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
                     cursor: 'pointer',
                     border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
                     background: isSelected ? 'var(--accent-light)' : 'var(--bg-tertiary)',
-                    transition: 'all 0.15s'
+                    transition: 'all 0.15s',
                   }}
                   onMouseEnter={e => {
                     if (!isSelected) e.currentTarget.style.borderColor = 'var(--accent)'
@@ -730,7 +745,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
 
   useEffect(() => {
     const init = async () => {
-      const selected = loadCategoryPreferences()
+      const selected = await loadCategoryPreferences()
 
       if (selected.length > 0) {
         const firstCategory = selected[0]
@@ -767,7 +782,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
         justifyContent: 'center',
         height: '100%',
         color: 'var(--text-tertiary)',
-        gap: 12
+        gap: 12,
       }}>
         <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite', fontSize: 24 }} />
         <span>{t('myinstantsLoading')}</span>
@@ -780,20 +795,20 @@ export default function MyInstantsDiscover({ store, addToast }) {
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      overflow: 'hidden'
+      overflow: 'hidden',
     }}>
       {/* En-tête */}
       <div style={{
         padding: '12px 20px',
         borderBottom: '1px solid var(--border)',
-        flexShrink: 0
+        flexShrink: 0,
       }}>
         <div style={{
           fontWeight: 600,
           fontSize: 15,
           display: 'flex',
           alignItems: 'center',
-          gap: 8
+          gap: 8,
         }}>
           <i className="ti ti-compass" style={{ color: 'var(--accent)' }} />
           {t('myinstantsTitle')}
@@ -819,7 +834,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
           display: 'flex',
           alignItems: 'center',
           gap: 12,
-          flexShrink: 0
+          flexShrink: 0,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
             <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite', fontSize: 14, color: 'var(--accent)' }} />
@@ -833,14 +848,14 @@ export default function MyInstantsDiscover({ store, addToast }) {
             height: 4,
             background: 'var(--bg-tertiary)',
             borderRadius: 2,
-            overflow: 'hidden'
+            overflow: 'hidden',
           }}>
             <div style={{
               width: `${preloadProgress}%`,
               height: '100%',
               background: 'var(--accent)',
               borderRadius: 2,
-              transition: 'width 0.3s ease'
+              transition: 'width 0.3s ease',
             }} />
           </div>
           <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
@@ -856,7 +871,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
         flexShrink: 0,
         display: 'flex',
         gap: 8,
-        flexWrap: 'wrap'
+        flexWrap: 'wrap',
       }}>
         <div style={{ flex: 1, minWidth: 200, display: 'flex', gap: 8 }}>
           <input
@@ -935,7 +950,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
         padding: '8px 20px',
         borderBottom: '1px solid var(--border)',
         flexShrink: 0,
-        background: 'var(--bg-secondary)'
+        background: 'var(--bg-secondary)',
       }}>
         {renderCategories()}
       </div>
@@ -946,13 +961,13 @@ export default function MyInstantsDiscover({ store, addToast }) {
           <div style={{
             textAlign: 'center',
             padding: '40px',
-            color: 'var(--text-tertiary)'
+            color: 'var(--text-tertiary)',
           }}>
             <i className="ti ti-loader" style={{
               animation: 'spin 1s linear infinite',
               fontSize: 32,
               display: 'block',
-              marginBottom: 12
+              marginBottom: 12,
             }} />
             {t('myinstantsLoading')}
           </div>
@@ -962,13 +977,13 @@ export default function MyInstantsDiscover({ store, addToast }) {
           <div style={{
             textAlign: 'center',
             padding: '40px',
-            color: 'var(--text-tertiary)'
+            color: 'var(--text-tertiary)',
           }}>
             <i className="ti ti-alert-triangle" style={{
               fontSize: 32,
               display: 'block',
               marginBottom: 12,
-              color: 'var(--warning)'
+              color: 'var(--warning)',
             }} />
             {error}
             <br />
@@ -986,13 +1001,13 @@ export default function MyInstantsDiscover({ store, addToast }) {
           <div style={{
             textAlign: 'center',
             padding: '60px 20px',
-            color: 'var(--text-tertiary)'
+            color: 'var(--text-tertiary)',
           }}>
             <i className="ti ti-music-off" style={{
               fontSize: 48,
               display: 'block',
               marginBottom: 16,
-              color: 'var(--border)'
+              color: 'var(--border)',
             }} />
             <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 8 }}>
               {t('myinstantsNoResults')}
@@ -1007,7 +1022,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-            gap: 12
+            gap: 12,
           }}>
             {results.map((sound, index) => {
               const owned = isSoundOwned(sound.name)
@@ -1017,7 +1032,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
               return (
                 <div
                   key={sound.id}
-                  data-testid={index === 0 ? "discover-sound-card" : undefined}
+                  data-testid={index === 0 ? 'discover-sound-card' : undefined}
                   style={{
                     background: 'var(--bg-secondary)',
                     border: `1px solid ${owned ? 'var(--success)' : isPreviewing ? 'var(--accent)' : 'var(--border)'}`,
@@ -1026,13 +1041,13 @@ export default function MyInstantsDiscover({ store, addToast }) {
                     textAlign: 'center',
                     transition: 'border-color 0.2s',
                     opacity: owned ? 0.8 : 1,
-                    boxShadow: isPreviewing ? '0 0 20px rgba(124,111,247,0.2)' : 'none'
+                    boxShadow: isPreviewing ? '0 0 20px rgba(124,111,247,0.2)' : 'none',
                   }}
                 >
                   <div style={{
                     fontSize: 32,
                     marginBottom: 8,
-                    opacity: owned ? 0.6 : 1
+                    opacity: owned ? 0.6 : 1,
                   }}>
                     {sound.emoji || '🔊'}
                   </div>
@@ -1043,13 +1058,13 @@ export default function MyInstantsDiscover({ store, addToast }) {
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
                     marginBottom: 8,
-                    color: owned ? 'var(--text-tertiary)' : 'var(--text-primary)'
+                    color: owned ? 'var(--text-tertiary)' : 'var(--text-primary)',
                   }}>
                     {sound.name}
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button
-                      data-testid={index === 0 ? "discover-preview-button" : undefined}
+                      data-testid={index === 0 ? 'discover-preview-button' : undefined}
                       className={`btn-${isPreviewing ? 'danger' : 'secondary'} btn-sm`}
                       style={{ flex: 1 }}
                       onClick={() => togglePreview(sound)}
@@ -1058,7 +1073,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
                       <i className={`ti ${isPreviewing ? 'ti-player-stop-filled' : 'ti-player-play'}`} />
                     </button>
                     <button
-                      data-testid={index === 0 ? "discover-add-button" : undefined}
+                      data-testid={index === 0 ? 'discover-add-button' : undefined}
                       className={`btn-${owned ? 'success' : 'primary'} btn-sm`}
                       style={{ flex: 1 }}
                       onClick={() => openProfileModal(sound)}
@@ -1077,7 +1092,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
                     <div style={{
                       fontSize: 9,
                       color: 'var(--success)',
-                      marginTop: 4
+                      marginTop: 4,
                     }}>
                       <i className="ti ti-check" /> {t('myinstantsAlreadyAdded')}
                     </div>
@@ -1086,7 +1101,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
                     <div style={{
                       fontSize: 9,
                       color: 'var(--accent)',
-                      marginTop: 4
+                      marginTop: 4,
                     }}>
                       <i className="ti ti-volume" style={{ animation: 'pulse 1s ease infinite' }} /> {t('myinstantsPlaying')}
                     </div>
@@ -1097,13 +1112,12 @@ export default function MyInstantsDiscover({ store, addToast }) {
           </div>
         )}
 
-        {/* Bouton "Charger plus" */}
         {!loading && results.length > 0 && results.length >= 20 && (
           <div style={{
             textAlign: 'center',
             padding: '20px 0 10px 0',
             borderTop: '1px solid var(--border)',
-            marginTop: 16
+            marginTop: 16,
           }}>
             <button
               data-testid="discover-load-more"
@@ -1117,7 +1131,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
                 borderRadius: 'var(--radius-md)',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 6
+                gap: 6,
               }}
             >
               <i className="ti ti-chevron-down" />
@@ -1150,7 +1164,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
                       border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
                       background: isSelected ? 'var(--accent-light)' : 'transparent',
                       cursor: 'pointer',
-                      transition: 'all 0.15s'
+                      transition: 'all 0.15s',
                     }}
                     onMouseEnter={e => {
                       if (!isSelected) e.currentTarget.style.borderColor = 'var(--accent)'

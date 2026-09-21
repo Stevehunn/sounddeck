@@ -11,6 +11,7 @@
  */
 export function buildFileUrl(filePath) {
   if (!filePath) return null
+
   if (filePath.startsWith('file://') || filePath.startsWith('http')) {
     return filePath
   }

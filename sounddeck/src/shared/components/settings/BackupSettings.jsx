@@ -8,7 +8,7 @@ import {
   exportBackups,
   importBackups,
   performBackup,
-  deleteBackup
+  deleteBackup,
 } from '../../utils/backupManager.js'
 import useConfirm from '../../hooks/useConfirm.jsx'
 
@@ -18,13 +18,12 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
   const [backups, setBackups] = useState([])
   const [isLoading, setIsLoading] = useState(false)
 
-  // ✅ Charge les backups avec un index réel + reverse (plus récent en haut)
-  const loadBackups = () => {
+  const loadBackups = async () => {
     try {
-      const list = getBackupList()
+      const list = await getBackupList()
       const withIndex = list.map((backup, realIndex) => ({
         ...backup,
-        _realIndex: realIndex
+        _realIndex: realIndex,
       }))
       withIndex.reverse()
       setBackups(withIndex)
@@ -48,7 +47,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
       const result = await performBackup(store)
       if (result.success) {
         addToast(t('backupSuccess'), 'success')
-        loadBackups()
+        await loadBackups()
       } else {
         addToast(result.error || t('error'), 'error')
       }
@@ -63,7 +62,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
     const confirmed = await confirm({
       title: t('restore'),
       message: t('confirmRestore'),
-      type: 'warning'
+      type: 'warning',
     })
     if (!confirmed) return
 
@@ -88,7 +87,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
       const result = await deleteBackup(realIndex)
       if (result.success) {
         addToast(t('backupDeleted'), 'success')
-        loadBackups()
+        await loadBackups()
         window.dispatchEvent(new CustomEvent('refresh-backups'))
       } else {
         addToast(result.error || t('error'), 'error')
@@ -99,7 +98,6 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
     }
   }
 
-  // ✅ Adapté : exportBackups est maintenant async (utilise IPC)
   const handleExport = async () => {
     try {
       const result = await exportBackups()
@@ -127,7 +125,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
         const result = await importBackups(file)
         if (result.success) {
           addToast(`${result.count} ${t('backupsImported')}`, 'success')
-          loadBackups()
+          await loadBackups()
         } else {
           addToast(result.error || t('error'), 'error')
         }
@@ -149,13 +147,13 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
         padding: '12px',
         background: 'var(--bg-secondary)',
         borderRadius: 'var(--radius-md)',
-        border: '1px solid var(--border)'
+        border: '1px solid var(--border)',
       }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 12
+          marginBottom: 12,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <i className="ti ti-cloud" style={{ color: 'var(--accent)' }} />
@@ -167,7 +165,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
               color: 'var(--text-tertiary)',
               background: 'var(--bg-tertiary)',
               padding: '2px 8px',
-              borderRadius: 10
+              borderRadius: 10,
             }}>
               {backups.length}
             </span>
@@ -211,14 +209,14 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: 4
+          gap: 4,
         }}>
           {backups.length === 0 && (
             <div style={{
               textAlign: 'center',
               padding: 16,
               color: 'var(--text-tertiary)',
-              fontSize: 12
+              fontSize: 12,
             }}>
               {t('noBackups')}
             </div>
@@ -234,7 +232,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
                 padding: '8px 12px',
                 background: 'var(--bg-tertiary)',
                 borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border)'
+                border: '1px solid var(--border)',
               }}
             >
               <div>

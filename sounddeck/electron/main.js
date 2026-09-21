@@ -47,44 +47,36 @@ const shouldStartMinimized = store.get('startMinimized', false)
 // ─── ENREGISTREMENT DES HANDLERS ────────────────────────────────────────
 
 function registerAllHandlers() {
-  // Store - TOUJOURS en premier
   if (storeHandlers && typeof storeHandlers.registerStoreHandlers === 'function') {
     storeHandlers.registerStoreHandlers()
   } else {
     console.error('❌ storeHandlers.registerStoreHandlers n\'est pas une fonction !')
   }
 
-  // Projets - après storeHandlers
   registerProjectHandlers(store)
 
-  // Raccourcis
   if (shortcutManager && typeof shortcutManager.registerShortcutHandlers === 'function') {
     shortcutManager.registerShortcutHandlers()
   }
 
-  // Système - handlers généraux (INCLUT fetch-myinstants)
   if (ipcHandlers && typeof ipcHandlers.registerSystemHandlers === 'function') {
     ipcHandlers.registerSystemHandlers()
   }
 
-  // Fichiers - avec la référence à mainWindow
   if (fileHandlers && typeof fileHandlers.registerFileHandlers === 'function') {
     fileHandlers.registerFileHandlers(mainWindow, soundsDir)
   }
 
-  // Confirmation - avec windowManager
   if (ipcHandlers && typeof ipcHandlers.registerConfirmHandlers === 'function') {
     ipcHandlers.registerConfirmHandlers(windowManager)
   }
 
-  // Diagnostic
   if (diagnostic && typeof diagnostic.registerDiagnosticHandlers === 'function') {
     diagnostic.registerDiagnosticHandlers()
   }
 
-  // Gestion du tray
   if (ipcHandlers && typeof ipcHandlers.registerTrayUpdateHandler === 'function') {
-    ipcHandlers.registerTrayUpdateHandler((lang) => {
+    ipcHandlers.registerTrayUpdateHandler(() => {
       updateTrayMenu()
     })
   }
@@ -120,7 +112,7 @@ function createMainWindow() {
       },
       onDoubleClick: () => {
         windowManager.showMainWindow()
-      }
+      },
     })
 
     shortcutManager.registerShortcuts(mainWindow)
@@ -143,9 +135,7 @@ function createMainWindow() {
   mainWindow.on('close', (e) => {
     const closeToTray = store.get('closeToTray', true)
 
-    if (isQuitting) {
-      return
-    }
+    if (isQuitting) return
 
     if (closeToTray === false) {
       isQuitting = true
@@ -186,7 +176,7 @@ function updateTrayMenu() {
     },
     onDoubleClick: () => {
       windowManager.showMainWindow()
-    }
+    },
   })
 }
 

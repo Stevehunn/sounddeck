@@ -1,15 +1,27 @@
 // src/core/plugins/PluginManager.js
 /**
  * PluginManager - Gestionnaire central des plugins
- *
- * Permet de :
- * - Enregistrer des plugins
- * - Charger des plugins dynamiquement
- * - Gérer les pages ajoutées par les plugins
- * - Exécuter des hooks
- * - Vérifier la compatibilité
  */
 import { DEFAULT_ICONS, DEFAULT_GROUPS } from '@shared/constants/navigation'
+
+// ─── PLUGINS INTÉGRÉS (bundlés) ─────────────────────────────────────────
+const INTEGRATED_PLUGIN_LOADERS = import.meta.glob('../../plugins/*/index.js')
+
+// Map : { 'myinstants' → loader, 'youtube' → loader, 'emoji' → loader }
+const INTEGRATED_PLUGINS = (() => {
+  const map = new Map()
+  for (const [path, loader] of Object.entries(INTEGRATED_PLUGIN_LOADERS)) {
+    const match = path.match(/\/plugins\/([^/]+)\/index\.js$/)
+    if (match) {
+      map.set(match[1], loader)
+    }
+  }
+  return map
+})()
+
+const INTEGRATED_PLUGIN_IDS = new Set(INTEGRATED_PLUGINS.keys())
+
+// ─── PAGES CORE ─────────────────────────────────────────────────────────
 
 const CORE_PAGES_DEFS = [
   { id: 'home', labelKey: 'mySounds', group: 'navigation' },
@@ -22,6 +34,8 @@ const CORE_PAGES_DEFS = [
   { id: 'guide', labelKey: 'guide', group: 'footer' },
   { id: 'options', labelKey: 'options', group: 'footer' },
 ]
+
+// ─── CLASSE ─────────────────────────────────────────────────────────────
 
 export class PluginManager {
   constructor() {
@@ -43,20 +57,28 @@ export class PluginManager {
   }
 
   /**
-   * Initialise le gestionnaire de plugins
+   * Initialise le gestionnaire de plugins.
+   * Charge d'abord les plugins INTÉGRÉS (bundlés), puis les EXTERNES.
    */
   async initialize(store) {
     if (this._initialized) return
     this.store = store
 
     try {
+      // 1. Plugins intégrés — toujours chargés
+      for (const [pluginId, loader] of INTEGRATED_PLUGINS) {
+        await this.loadPlugin({ id: pluginId, enabled: true, _integrated: true, _loader: loader })
+      }
+
+      // 2. Plugins externes — installés par l'utilisateur dans userData/plugins
+      //    Note : les IDs déjà chargés (intégrés) sont skippés.
       const installedPlugins =
         (await window.electronAPI?.getInstalledPlugins?.()) || []
 
       for (const pluginInfo of installedPlugins) {
-        if (pluginInfo.enabled !== false) {
-          await this.loadPlugin(pluginInfo)
-        }
+        if (pluginInfo.enabled === false) continue
+        if (INTEGRATED_PLUGIN_IDS.has(pluginInfo.id)) continue // déjà chargé
+        await this.loadPlugin(pluginInfo)
       }
 
       this._initialized = true
@@ -68,7 +90,9 @@ export class PluginManager {
   }
 
   /**
-   * Charge un plugin depuis ses informations
+   * Charge un plugin.
+   * - Si le plugin est INTÉGRÉ : utilise le loader pré-bundlé via import.meta.glob
+   * - Sinon : tentative de chargement dynamique (dev only en pratique)
    */
   async loadPlugin(pluginInfo) {
     if (this._loadingPlugins.has(pluginInfo.id)) {
@@ -90,51 +114,62 @@ export class PluginManager {
         return false
       }
 
-      let pluginModule
+      let pluginModule = null
 
-      try {
-        if (import.meta.env.DEV) {
-          const paths = [
-            `../../plugins/${pluginInfo.id}/index.js`,
-            `../../plugins/${pluginInfo.id}/index.jsx`,
-            `/src/plugins/${pluginInfo.id}/index.js`,
-            `/src/plugins/${pluginInfo.id}/index.jsx`,
-            `../plugins/${pluginInfo.id}/index`,
-            `/src/plugins/${pluginInfo.id}/index`,
-          ]
+      //  Cas 1 : plugin intégré (bundlé par Vite)
+      if (pluginInfo._loader) {
+        try {
+          pluginModule = await pluginInfo._loader()
+        } catch (e) {
+          console.error(`❌ Erreur chargement intégré ${pluginInfo.id}:`, e)
+          this._loadingPlugins.delete(pluginInfo.id)
+          return false
+        }
+      } else {
+        // Cas 2 : plugin externe — on tente les chemins connus
+        // (fonctionne en dev uniquement ; en prod c'est limité, cf O5)
+        const paths = [
+          `../../plugins/${pluginInfo.id}/index.js`,
+          `../../plugins/${pluginInfo.id}/index.jsx`,
+          `/src/plugins/${pluginInfo.id}/index.js`,
+          `/src/plugins/${pluginInfo.id}/index.jsx`,
+          `../plugins/${pluginInfo.id}/index`,
+          `/src/plugins/${pluginInfo.id}/index`,
+        ]
 
-          let loaded = false
-          let lastError = null
+        let lastError = null
 
-          for (const importPath of paths) {
-            try {
-              pluginModule = await import(/* @vite-ignore */ importPath)
-              loaded = true
-              break
-            } catch (e) {
-              lastError = e
-            }
-          }
-
-          if (!loaded) {
-            throw new Error(
-              `Plugin ${pluginInfo.id} non trouvé dans les chemins: ${paths.join(', ')}\n${lastError?.message || ''}`
-            )
-          }
-        } else {
-          const fullPath = await window.electronAPI?.getPluginPath?.(
-            pluginInfo.id
-          )
-          if (fullPath) {
-            pluginModule = await import(/* @vite-ignore */ fullPath)
-          } else {
-            throw new Error(`Plugin ${pluginInfo.id} non trouvé`)
+        for (const importPath of paths) {
+          try {
+            pluginModule = await import(/* @vite-ignore */ importPath)
+            break
+          } catch (e) {
+            lastError = e
           }
         }
-      } catch (e) {
-        console.error(`❌ Erreur chargement du module ${pluginInfo.id}:`, e)
-        this._loadingPlugins.delete(pluginInfo.id)
-        return false
+
+        if (!pluginModule) {
+          // Fallback : chemin disque (résolution par Vite en dev)
+          try {
+            const fullPath = await window.electronAPI?.getPluginPath?.(
+              pluginInfo.id
+            )
+            if (fullPath) {
+              pluginModule = await import(/* @vite-ignore */ fullPath)
+            }
+          } catch (e) {
+            lastError = e
+          }
+        }
+
+        if (!pluginModule) {
+          console.error(
+            `❌ Plugin ${pluginInfo.id} introuvable:`,
+            lastError?.message || 'aucun chemin valide'
+          )
+          this._loadingPlugins.delete(pluginInfo.id)
+          return false
+        }
       }
 
       const plugin = pluginModule.default || pluginModule
@@ -157,10 +192,11 @@ export class PluginManager {
             ...page,
             pluginId: plugin.id,
             componentPath:
-              page.component || page.componentPath || `${plugin.id}/${page.id}`,
+              page.componentPath || page.component || `${plugin.id}/${page.id}`,
           })
 
-          if (page.component) {
+          if (page.component && typeof page.component !== 'string') {
+            // Composant React déjà résolu par l'import statique du plugin
             this.components.set(page.id, page.component)
           }
         }
@@ -182,7 +218,7 @@ export class PluginManager {
   }
 
   /**
-   * Décharge un plugin
+   * Décharge un plugin.
    */
   async unloadPlugin(pluginId) {
     const plugin = this.plugins.get(pluginId)
@@ -207,9 +243,7 @@ export class PluginManager {
   }
 
   /**
-   * Récupère toutes les pages (core + plugins + profils)
-   * @param {Function} translateFn - Fonction de traduction
-   * @returns {Array} Liste des pages
+   * Récupère toutes les pages (core + plugins + profils).
    */
   getAllPages(translateFn) {
     const t = translateFn || ((key) => key)
@@ -234,9 +268,6 @@ export class PluginManager {
     return [...corePages, ...pluginPages, ...storePages]
   }
 
-  /**
-   * Récupère les pages du store (profils)
-   */
   _getStorePages() {
     if (!this.store) return []
 
@@ -252,25 +283,17 @@ export class PluginManager {
     }))
   }
 
-  /**
-   * Récupère une page par son ID
-   * ✅ FIX S4 : accepte translateFn pour traduire les labels
-   */
   getPage(pageId, translateFn) {
     const allPages = this.getAllPages(translateFn)
     return allPages.find((p) => p.id === pageId)
   }
 
-  /**
-   * Vérifie si une page est un plugin
-   */
   isPluginPage(pageId) {
     return this.pages.has(pageId)
   }
 
   /**
-   * Récupère le composant d'une page plugin
-   * ✅ FIX S4 : suppression du shadowing de `module` et du code mort
+   * Récupère le composant d'une page plugin.
    */
   async getPluginComponent(pageId) {
     if (this.components.has(pageId)) {
@@ -308,7 +331,7 @@ export class PluginManager {
         return null
       }
 
-      // Production
+      // Production : tenté via IPC (limité, cf O5)
       const pluginPath = await window.electronAPI?.getPluginComponentPath?.(
         page.pluginId,
         page.id
@@ -328,9 +351,6 @@ export class PluginManager {
     return null
   }
 
-  /**
-   * Vérifie la compatibilité du plugin
-   */
   _checkCompatibility(pluginInfo) {
     const appVersion = pluginInfo.appVersion || '1.3.0'
     if (
@@ -346,7 +366,7 @@ export class PluginManager {
     return true
   }
 
-    _semverSatisfies(version, requirement) {
+  _semverSatisfies(version, requirement) {
     const parse = (v) =>
       String(v)
         .split('.')
