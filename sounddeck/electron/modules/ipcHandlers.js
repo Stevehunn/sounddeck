@@ -3,6 +3,8 @@ const { ipcMain, shell } = require('electron')
 const https = require('https')
 const store = require('../store')
 
+const { normalizeNetworkError } = require('./networkUtils')
+
 // ─── EMOJI SCRAPING (getemoji.com) ──────────────────────────────────────────
 
 const EMOJI_SOURCE_URL = 'https://getemoji.com/'
@@ -30,11 +32,17 @@ const EMOJI_SECTION_MATCHERS = {
 function fetchHtml(url, redirectCount = 0) {
   return new Promise((resolve) => {
     if (redirectCount > 5) {
-      resolve({ ok: false, error: 'Trop de redirections', html: '' })
+      resolve({ ok: false, error: 'Trop de redirections', isNetworkError: false, html: '' })
       return
     }
     const timeout = setTimeout(
-      () => resolve({ ok: false, error: 'Timeout', html: '' }),
+      () =>
+        resolve({
+          ok: false,
+          error: 'NETWORK_TIMEOUT',
+          isNetworkError: true,
+          html: '',
+        }),
       15000
     )
 
@@ -65,6 +73,7 @@ function fetchHtml(url, redirectCount = 0) {
             resolve({
               ok: false,
               error: `HTTP ${res.statusCode}`,
+              isNetworkError: false,
               html: '',
             })
             return
@@ -76,7 +85,13 @@ function fetchHtml(url, redirectCount = 0) {
       )
       .on('error', (e) => {
         clearTimeout(timeout)
-        resolve({ ok: false, error: e.message, html: '' })
+        const normalized = normalizeNetworkError(e)
+        resolve({
+          ok: false,
+          error: normalized || e.message,
+          isNetworkError: !!normalized,
+          html: '',
+        })
       })
   })
 }
@@ -258,7 +273,12 @@ function registerSystemHandlers() {
           const fetchPage = (url) => {
             return new Promise((resolve) => {
               const timeout = setTimeout(() => {
-                resolve({ ok: false, error: 'Timeout', html: '' })
+                resolve({
+                  ok: false,
+                  error: 'NETWORK_TIMEOUT',
+                  isNetworkError: true,
+                  html: '',
+                })
               }, 15000)
 
               https
@@ -290,7 +310,13 @@ function registerSystemHandlers() {
                 )
                 .on('error', (e) => {
                   clearTimeout(timeout)
-                  resolve({ ok: false, error: e.message, html: '' })
+                  const normalized = normalizeNetworkError(e)
+                  resolve({
+                    ok: false,
+                    error: normalized || e.message,
+                    isNetworkError: !!normalized,
+                    html: '',
+                  })
                 })
             })
           }
@@ -401,6 +427,7 @@ function registerSystemHandlers() {
               .split(',')
               .map((t) => t.trim())
               .filter(Boolean)
+            let lastNetworkError = null
             for (const term of terms.slice(0, 4)) {
               const r = await fetchPage(
                 `https://www.myinstants.com/fr/search/?name=${encodeURIComponent(term)}`
@@ -408,6 +435,8 @@ function registerSystemHandlers() {
               if (r.ok) {
                 const found = parseSoundList(r.html)
                 sounds.push(...found)
+              } else if (r.isNetworkError) {
+                lastNetworkError = r.error
               }
               await new Promise((r) => setTimeout(r, 200))
             }
@@ -417,6 +446,15 @@ function registerSystemHandlers() {
               seen.add(s.slug)
               return true
             })
+
+            if (!sounds.length && lastNetworkError) {
+              return {
+                success: false,
+                error: lastNetworkError,
+                isNetworkError: true,
+                sounds: [],
+              }
+            }
           } else if (mode === 'local') {
             let url = query
             if (!url.startsWith('http')) {
@@ -424,7 +462,12 @@ function registerSystemHandlers() {
             }
             const result = await fetchPage(url)
             if (!result.ok)
-              return { success: false, error: result.error, sounds: [] }
+              return {
+                success: false,
+                error: result.error,
+                isNetworkError: result.isNetworkError,
+                sounds: [],
+              }
             sounds = parseSoundList(result.html)
           } else {
             let url
@@ -439,7 +482,12 @@ function registerSystemHandlers() {
 
             const result = await fetchPage(url)
             if (!result.ok)
-              return { success: false, error: result.error, sounds: [] }
+              return {
+                success: false,
+                error: result.error,
+                isNetworkError: result.isNetworkError,
+                sounds: [],
+              }
             sounds = parseSoundList(result.html)
           }
 
@@ -484,7 +532,13 @@ function registerSystemHandlers() {
           return { success: true, sounds }
         } catch (e) {
           console.error('❌ fetch-myinstants error:', e.message)
-          return { success: false, error: e.message, sounds: [] }
+          const normalized = normalizeNetworkError(e)
+          return {
+            success: false,
+            error: normalized || e.message,
+            isNetworkError: !!normalized,
+            sounds: [],
+          }
         }
       }
     )
@@ -504,10 +558,15 @@ function registerSystemHandlers() {
           return { success: true, emojis: cached.emojis, fromCache: true }
         }
 
-        const { ok, html, error } = await fetchHtml(EMOJI_SOURCE_URL)
+        const { ok, html, error, isNetworkError } = await fetchHtml(EMOJI_SOURCE_URL)
         if (!ok) {
           console.error('❌ [fetch-emojis] Erreur fetch:', error)
-          return { success: false, error, emojis: [] }
+          return {
+            success: false,
+            error,
+            isNetworkError: !!isNetworkError,
+            emojis: [],
+          }
         }
 
         const emojis = parseEmojisFromHtml(html, categoryId)
@@ -527,7 +586,13 @@ function registerSystemHandlers() {
         return { success: true, emojis }
       } catch (e) {
         console.error('❌ [fetch-emojis] Exception:', e.message)
-        return { success: false, error: e.message, emojis: [] }
+        const normalized = normalizeNetworkError(e)
+        return {
+          success: false,
+          error: normalized || e.message,
+          isNetworkError: !!normalized,
+          emojis: [],
+        }
       }
     })
   }

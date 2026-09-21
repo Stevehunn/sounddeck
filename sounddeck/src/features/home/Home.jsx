@@ -5,14 +5,13 @@ import AudioTrimmer from '@shared/components/audio/AudioTrimmer'
 import ProfileManagerModal from '@shared/components/modals/ProfileManagerModal'
 import { DeleteButton } from '@shared/components/ui'
 import { useLanguage } from '@core/i18n/LanguageContext'
+import { useNetwork } from '@shared/contexts'
 import { playSound, stopAllSounds, stopSound } from '@core/services/AudioService'
 import useConfirm from '@shared/hooks/useConfirm'
 import { buildFileUrl } from '@shared/utils/fileUrl'
-// ✅ NOUVEAU : picker global + pool par défaut
 import EmojiPicker from '@shared/components/ui/EmojiPicker'
 import { DEFAULT_EMOJIS } from '@shared/constants/emojis'
 
-// ❌ SUPPRIMÉ : const EMOJIS = [...] (~20 entrées)
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`
@@ -23,6 +22,7 @@ function formatSize(bytes) {
 export default function Home({ store, addToast, loopEnabled }) {
   const { t, currentLang } = useLanguage()
   const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
+  const { showNoConnection, ensureOnline } = useNetwork()
   const playLocally = store.playLocally
   const [showAll, setShowAll] = useState(false)
   const [showAllOther, setShowAllOther] = useState(false)
@@ -716,9 +716,17 @@ export default function Home({ store, addToast, loopEnabled }) {
               setShowImport(false)
             }}
             onUrlImport={async (url, name) => {
+              const online = await ensureOnline()
+              if (!online) return
+
               const safeName = name.replace(/\s+/g, '_') + '_' + Date.now() + '.mp3'
               let result = await window.electronAPI.downloadSoundUrl(url, safeName)
 
+              if (!result.success && result.isNetworkError) {
+                showNoConnection()
+                return
+              }
+              
               if (result.success && store.compressOnImport) {
                 try {
                   const ext = result.path.split('.').pop() || 'mp3'
@@ -745,7 +753,9 @@ export default function Home({ store, addToast, loopEnabled }) {
               if (result.success) {
                 await store.addSound({ name, path: result.path, emoji: '🔊', profiles: [currentProfileId] })
                 addToast(`"${name}" ${t('downloaded')}`, 'success')
-              } else addToast(`${t('error')} : ${result.error}`, 'error')
+              } else {
+                addToast(`${t('error')} : ${result.error}`, 'error')
+              }
               setShowImport(false)
             }}
           />

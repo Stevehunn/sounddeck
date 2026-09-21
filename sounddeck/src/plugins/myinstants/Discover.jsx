@@ -3,9 +3,11 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Howl } from 'howler'
 import { CATEGORIES, CATEGORIES_LIST, DEFAULT_CATEGORIES } from './categories'
 import { useLanguage } from '@core/i18n/LanguageContext'
+import { useNetwork } from '@shared/contexts'
 
 export default function MyInstantsDiscover({ store, addToast }) {
   const { t, currentLang } = useLanguage()
+  const { showNoConnection, ensureOnline } = useNetwork()
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState([])
@@ -28,8 +30,6 @@ export default function MyInstantsDiscover({ store, addToast }) {
 
   const previewHowlRef = useRef(null)
   const preloadAbortRef = useRef(false)
-
-  // ✅ FIX S.A/B19 : ref pour éviter results.length dans les deps de loadCategory
   const resultsRef = useRef([])
 
   const CATEGORIES_PREF_KEY = 'myinstants_selected_categories'
@@ -153,19 +153,34 @@ export default function MyInstantsDiscover({ store, addToast }) {
           setError(t('myinstantsNoResults'))
         }
       } else {
-        setError(result.error || t('myinstantsError'))
+        if (result.isNetworkError) {
+          setError('')
+          showNoConnection()
+        } else {
+          setError(result.error || t('myinstantsError'))
+        }
       }
     } catch (e) {
       console.error('❌ [Discover] Erreur chargement catégorie:', e)
-      setError(e.message || t('myinstantsError'))
+      const online = await ensureOnline()
+      if (!online) {
+        setError('')
+      } else {
+        setError(e.message || t('myinstantsError'))
+      }
     }
 
     setLoading(false)
     setCacheInfo(getCacheInfo())
-  }, [currentLang, t, activeCategory, checkApi])
+  }, [currentLang, t, activeCategory, checkApi, showNoConnection])
 
   const preloadAllCategories = useCallback(async (priorityIds = null) => {
     if (isPreloading || isPreloadComplete) return
+
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      setIsPreloadComplete(true)
+      return
+    }
 
     const categoryIds = CATEGORIES_LIST.map(cat => cat.id)
 
@@ -308,14 +323,24 @@ export default function MyInstantsDiscover({ store, addToast }) {
           setError(t('myinstantsNoResults'))
         }
       } else {
-        setError(result.error || t('myinstantsError'))
+        if (result.isNetworkError) {
+          setError('')
+          showNoConnection()
+        } else {
+          setError(result.error || t('myinstantsError'))
+        }
       }
     } catch (e) {
-      console.error('❌ [Discover] Erreur recherche:', e)
-      setError(e.message || t('myinstantsError'))
+      console.error('❌ [Discover] Erreur chargement catégorie:', e)
+      const online = await ensureOnline()
+      if (!online) {
+        setError('')
+      } else {
+        setError(e.message || t('myinstantsError'))
+      }
     }
     setLoading(false)
-  }, [search, currentLang, t, activeCategory, loadCategory, checkApi])
+  }, [search, currentLang, t, activeCategory, loadCategory, checkApi, showNoConnection])
 
   const isSoundOwned = useCallback((soundName) => {
     return store.sounds.some(s => s.name.toLowerCase() === soundName.toLowerCase())
@@ -328,6 +353,9 @@ export default function MyInstantsDiscover({ store, addToast }) {
 
   const confirmAddSound = useCallback(async () => {
     if (!showProfileModal) return
+
+    const online = await ensureOnline()
+    if (!online) return
 
     setDownloading(prev => ({ ...prev, [showProfileModal.id]: true }))
 
@@ -348,13 +376,13 @@ export default function MyInstantsDiscover({ store, addToast }) {
       setShowProfileModal(null)
     } catch (e) {
       console.error('❌ [Discover] Erreur ajout:', e)
-      addToast(t('myinstantsError') + ': ' + e.message, 'error')
+      addToast(t('myinstantsErrorWithDetail', { detail: e.message }), 'error')
     } finally {
       setDownloading(prev => ({ ...prev, [showProfileModal.id]: false }))
     }
-  }, [showProfileModal, selectedProfile, store, addToast, t])
+  }, [showProfileModal, selectedProfile, store, addToast, t, ensureOnline])
 
-  const togglePreview = (sound) => {
+  const togglePreview = async (sound) => {
     if (previewing === sound.id) {
       if (previewHowlRef.current) {
         previewHowlRef.current.stop()
@@ -376,6 +404,9 @@ export default function MyInstantsDiscover({ store, addToast }) {
         previewHowlRef.current.unload()
       }
 
+      const online = await ensureOnline()
+      if (!online) return
+
       const howl = new Howl({
         src: [sound.url],
         volume: 0.5,
@@ -384,11 +415,16 @@ export default function MyInstantsDiscover({ store, addToast }) {
           setPreviewing(null)
           previewHowlRef.current = null
         },
-        onloaderror: () => {
-          addToast(t('myinstantsPreviewError'), 'error')
+        onloaderror: async () => {
+          const stillOnline = await ensureOnline()
+          if (stillOnline) {
+            // Erreur de format/décodage (pas réseau)
+            addToast(t('myinstantsPreviewError'), 'error')
+          }
+          // Si offline, ensureOnline a déjà affiché le modal
           setPreviewing(null)
           previewHowlRef.current = null
-        }
+        },
       })
 
       previewHowlRef.current = howl

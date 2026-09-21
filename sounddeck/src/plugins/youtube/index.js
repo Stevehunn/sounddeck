@@ -11,7 +11,7 @@ const YouTubePlugin = {
   pages: [
     {
       id: 'youtube',
-      label: 'YouTube',
+      labelKey: 'youtubeTitle',
       icon: 'ti-brand-youtube',
       component: YouTube,
       componentPath: './YouTube.jsx',

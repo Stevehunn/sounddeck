@@ -11,7 +11,7 @@ const EmojiPlugin = {
   pages: [
     {
       id: 'emoji-discover',
-      label: 'Découvrir des emojis',
+      labelKey: 'emojiDiscoverTitle',
       icon: 'ti-mood-smile-beam',
       component: EmojiDiscover,
       componentPath: './EmojiDiscover.jsx',

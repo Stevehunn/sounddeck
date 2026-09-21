@@ -16,8 +16,6 @@ import QuitConfirm from '@shared/components/modals/QuitConfirm'
 import WelcomeScreen from '@features/welcome/WelcomeScreen'
 import Tutorial from '@shared/components/ui/Tutorial'
 import HelpButton from '@shared/components/ui/HelpButton'
-
-// ✅ NOUVEAU : Page "Mes emojis"
 import EmojiPage from '@features/emoji/EmojiPage'
 
 import { playSound, stopAllSounds, setStoreRef } from '@core/services/AudioService'
@@ -25,6 +23,8 @@ import { warmupAudioContext } from '@core/services/AudioMixerService'
 
 import { PluginProvider, usePlugins } from '@core/plugins/PluginContext'
 import { usePluginPage } from '@core/plugins/hooks/usePluginPage'
+
+import { NetworkProvider } from '@shared/contexts'
 
 function PageWrapper({ children, pageId, onHelpClick }) {
   const showHelp = pageId !== 'guide'
@@ -64,11 +64,11 @@ function AppContent({ store }) {
   const playLocallyRef = useRef(true)
   const audioDeviceRef = useRef('default')
   const volumeRef = useRef(80)
-  const loopEnabledRef = useRef(false)
   const setPresentationRef = useRef(null)
   const isQuittingRef = useRef(false)
   const isPopupBlockedRef = useRef(false)
   const blockTimerRef = useRef(null)
+  const loopEnabledRef = useRef(false)
 
   useEffect(() => {
     setStoreRef(store)
@@ -103,6 +103,7 @@ function AppContent({ store }) {
   useEffect(() => {
     setPresentationRef.current = setPresentationMode
   }, [setPresentationMode])
+
   useEffect(() => {
     loopEnabledRef.current = store.loopEnabled
   }, [store.loopEnabled])
@@ -119,7 +120,7 @@ function AppContent({ store }) {
     }
   }, [openTutorial])
 
-  // ✅ NOUVEAU : navigation programmatique (pour les pages/plugins)
+  // navigation programmatique (pour les pages/plugins)
   useEffect(() => {
     window.__navigateTo = setCurrentPage
     return () => {
@@ -405,7 +406,7 @@ function AppContent({ store }) {
       window.electronAPI.removeAllListeners('toggle-presentation')
     }
   }, [store.mixerEnabled, t])
-  
+
   const addToast = useCallback((message, type = 'info') => {
     const id = crypto.randomUUID
       ? crypto.randomUUID()
@@ -418,7 +419,6 @@ function AppContent({ store }) {
     addToastRef.current = addToast
   }, [addToast])
 
-  // ✅ FIX : renderPage stable
   const renderPage = useCallback(() => {
     if (currentPage === 'home') {
       return (
@@ -760,8 +760,10 @@ export default function App() {
   }
 
   return (
-    <PluginProvider store={store}>
-      <AppContent store={store} />
-    </PluginProvider>
+    <NetworkProvider>
+      <PluginProvider store={store}>
+        <AppContent store={store} />
+      </PluginProvider>
+    </NetworkProvider>
   )
 }

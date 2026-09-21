@@ -59,6 +59,8 @@ export default {
   success: 'Succès',
   warning: 'Avertissement',
   info: 'Information',
+  networkErrorTitle: 'Pas de connexion internet',
+  networkErrorDesc: 'Vérifiez votre connexion internet puis réessayez.',
 
   // ─── ACTIONS ──────────────────────────────────────────────────────────
   actions: 'Actions',

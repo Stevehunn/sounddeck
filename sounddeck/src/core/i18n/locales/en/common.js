@@ -59,6 +59,8 @@ export default {
   success: 'Success',
   warning: 'Warning',
   info: 'Info',
+  networkErrorTitle: 'No internet connection',
+  networkErrorDesc: 'Check your internet connection and try again.',
 
   // ─── ACTIONS ──────────────────────────────────────────────────────────
   actions: 'Actions',

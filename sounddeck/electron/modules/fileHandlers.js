@@ -5,6 +5,7 @@ const fs = require('fs')
 const https = require('https')
 const http = require('http')
 const store = require('../store')
+const { normalizeNetworkError } = require('./networkUtils')
 
 // ─── FONCTION POUR TROUVER FFMPEG ───────────────────────────────────────
 
@@ -79,7 +80,9 @@ function downloadFile(url, outputPath) {
 
     const request = (currentUrl, redirectCount = 0) => {
       if (redirectCount > 10) {
-        reject(new Error('Trop de redirections'))
+        const err = new Error('Trop de redirections')
+        err.isNetworkError = false
+        reject(err)
         return
       }
 
@@ -94,7 +97,9 @@ function downloadFile(url, outputPath) {
         }
 
         if (response.statusCode !== 200) {
-          reject(new Error(`HTTP ${response.statusCode}`))
+          const err = new Error(`HTTP ${response.statusCode}`)
+          err.isNetworkError = false
+          reject(err)
           return
         }
 
@@ -108,14 +113,18 @@ function downloadFile(url, outputPath) {
         const timeoutId = setTimeout(() => {
           fileStream.close()
           fs.unlink(outputPath, () => {})
-          reject(new Error('Timeout'))
+          const err = new Error('NETWORK_TIMEOUT')
+          err.isNetworkError = true
+          reject(err)
         }, 60000)
 
         fileStream.on('finish', () => {
           clearTimeout(timeoutId)
           if (downloadedBytes < 1000) {
             fs.unlink(outputPath, () => {})
-            reject(new Error('Fichier trop petit'))
+            const err = new Error('Fichier trop petit')
+            err.isNetworkError = false
+            reject(err)
             return
           }
           resolve({ success: true, path: outputPath })
@@ -131,12 +140,21 @@ function downloadFile(url, outputPath) {
       })
 
       req.on('error', (e) => {
-        reject(e)
+        const normalized = normalizeNetworkError(e)
+        if (normalized) {
+          const err = new Error(normalized)
+          err.isNetworkError = true
+          reject(err)
+        } else {
+          reject(e)
+        }
       })
 
       req.setTimeout(30000, () => {
         req.destroy()
-        reject(new Error('Timeout de la requête'))
+        const err = new Error('NETWORK_TIMEOUT')
+        err.isNetworkError = true
+        reject(err)
       })
     }
 
@@ -174,6 +192,7 @@ async function downloadYtDlp() {
     ]
 
     let lastError = null
+    let lastNetworkError = false
 
     for (const url of urls) {
       try {
@@ -194,14 +213,24 @@ async function downloadYtDlp() {
         }
       } catch (e) {
         lastError = e.message
+        if (e.isNetworkError) lastNetworkError = true
       }
     }
 
-    return { success: false, error: lastError || 'Échec de tous les téléchargements' }
+    return {
+      success: false,
+      error: lastError || 'Échec de tous les téléchargements',
+      isNetworkError: lastNetworkError,
+    }
 
   } catch (e) {
     console.error('❌ [download-ytdlp] Erreur:', e.message)
-    return { success: false, error: e.message }
+    const netErr = normalizeNetworkError(e)
+    return {
+      success: false,
+      error: netErr || e.message,
+      isNetworkError: !!netErr,
+    }
   }
 }
 
@@ -305,7 +334,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
   ipcMain.handle('get-sounds-dir', () => soundsDir)
 
   // ✅ Export JSON générique (contourne le blocage will-download)
-  // Utilisé pour : logs d'erreur, backups, et tout futur export JSON
   ipcMain.handle('export-json-file', async (event, jsonContent, defaultFileName, title) => {
     try {
       const result = await dialog.showSaveDialog(mainWindow, {
@@ -386,7 +414,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
 
     const doRequest = (url, dest, redirectCount = 0) => new Promise((resolve) => {
       if (redirectCount > 10) {
-        resolve({ success: false, error: 'Trop de redirections' })
+        resolve({ success: false, error: 'Trop de redirections', isNetworkError: false })
         return
       }
       const protocol = url.startsWith('https') ? https : http
@@ -414,7 +442,8 @@ function registerFileHandlers(mainWindow, soundsDir) {
           fs.unlink(dest, () => {})
           resolve({
             success: false,
-            error: 'Le lien pointe vers une page web et non un fichier audio direct.\n\nPour Google Drive : ouvrez le fichier → cliquez "Télécharger" → copiez le lien direct.\nPour Dropbox : remplacez ?dl=0 par ?dl=1 dans l\'URL.'
+            error: 'Le lien pointe vers une page web et non un fichier audio direct.\n\nPour Google Drive : ouvrez le fichier → cliquez "Télécharger" → copiez le lien direct.\nPour Dropbox : remplacez ?dl=0 par ?dl=1 dans l\'URL.',
+            isNetworkError: false,
           })
           return
         }
@@ -422,7 +451,7 @@ function registerFileHandlers(mainWindow, soundsDir) {
         if (res.statusCode !== 200) {
           file.close()
           fs.unlink(dest, () => {})
-          resolve({ success: false, error: `Erreur HTTP ${res.statusCode}` })
+          resolve({ success: false, error: `Erreur HTTP ${res.statusCode}`, isNetworkError: false })
           return
         }
 
@@ -432,26 +461,35 @@ function registerFileHandlers(mainWindow, soundsDir) {
           const stats = fs.statSync(dest)
           if (stats.size < 1000) {
             fs.unlink(dest, () => {})
-            resolve({ success: false, error: 'Fichier téléchargé trop petit — lien invalide ou protégé.' })
+            resolve({ success: false, error: 'Fichier téléchargé trop petit — lien invalide ou protégé.', isNetworkError: false })
             return
           }
           resolve({ success: true, path: dest.replace(/\\/g, '/') })
         })
         file.on('error', (e) => {
           fs.unlink(dest, () => {})
-          resolve({ success: false, error: e.message })
+          resolve({ success: false, error: e.message, isNetworkError: false })
         })
       })
 
       req.on('error', (e) => {
         fs.unlink(dest, () => {})
-        resolve({ success: false, error: e.message })
+        const netErr = normalizeNetworkError(e)
+        resolve({
+          success: false,
+          error: netErr || e.message,
+          isNetworkError: !!netErr,
+        })
       })
 
       req.setTimeout(15000, () => {
         req.destroy()
         fs.unlink(dest, () => {})
-        resolve({ success: false, error: 'Timeout — le serveur ne répond pas.' })
+        resolve({
+          success: false,
+          error: 'NETWORK_TIMEOUT',
+          isNetworkError: true,
+        })
       })
     })
 
@@ -589,7 +627,11 @@ function registerFileHandlers(mainWindow, soundsDir) {
         if (result.success) {
           ytdlpPath = result.path
         } else {
-          return { success: false, error: 'yt-dlp non disponible. Veuillez l\'installer manuellement.' }
+          return {
+            success: false,
+            error: result.isNetworkError ? 'NETWORK_ERROR' : 'yt-dlp non disponible. Veuillez l\'installer manuellement.',
+            isNetworkError: !!result.isNetworkError,
+          }
         }
       }
 
@@ -614,7 +656,12 @@ function registerFileHandlers(mainWindow, soundsDir) {
             if (ytdlpPath !== 'yt-dlp' && fs.existsSync(ytdlpPath)) {
               try { fs.unlinkSync(ytdlpPath) } catch (err) {}
             }
-            return resolve({ success: false, error: error.message })
+            const netErr = normalizeNetworkError(error)
+            return resolve({
+              success: false,
+              error: netErr || error.message,
+              isNetworkError: !!netErr,
+            })
           }
 
           let cleanOutput = stdout.trim()
@@ -689,7 +736,12 @@ function registerFileHandlers(mainWindow, soundsDir) {
         })
       })
     } catch (e) {
-      return { success: false, error: e.message }
+      const netErr = normalizeNetworkError(e)
+      return {
+        success: false,
+        error: netErr || e.message,
+        isNetworkError: !!netErr,
+      }
     }
   })
 
@@ -702,7 +754,11 @@ function registerFileHandlers(mainWindow, soundsDir) {
         if (result.success) {
           ytdlpPath = result.path
         } else {
-          return { success: false, error: 'yt-dlp non disponible. Veuillez l\'installer manuellement.' }
+          return {
+            success: false,
+            error: result.isNetworkError ? 'NETWORK_ERROR' : 'yt-dlp non disponible. Veuillez l\'installer manuellement.',
+            isNetworkError: !!result.isNetworkError,
+          }
         }
       }
 
@@ -743,7 +799,12 @@ function registerFileHandlers(mainWindow, soundsDir) {
             if (ytdlpPath !== 'yt-dlp' && fs.existsSync(ytdlpPath)) {
               try { fs.unlinkSync(ytdlpPath) } catch (err) {}
             }
-            return resolve({ success: false, error: error.message })
+            const netErr = normalizeNetworkError(error)
+            return resolve({
+              success: false,
+              error: netErr || error.message,
+              isNetworkError: !!netErr,
+            })
           }
 
           const files = fs.readdirSync(outputDir)
@@ -770,7 +831,12 @@ function registerFileHandlers(mainWindow, soundsDir) {
         })
       })
     } catch (e) {
-      return { success: false, error: e.message }
+      const netErr = normalizeNetworkError(e)
+      return {
+        success: false,
+        error: netErr || e.message,
+        isNetworkError: !!netErr,
+      }
     }
   })
 
@@ -1217,7 +1283,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
   })
 
   // ─── DRIVER VIRTUEL (VB-CABLE) ───────────────────────────────────────────
-  // ✅ AJOUT S2 : handlers pour installer/désinstaller/status du driver virtuel
 
   const VB_CABLE_URL = 'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack43.zip'
 
@@ -1252,7 +1317,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
       let installerPath = candidates.find(p => fs.existsSync(p))
 
       if (!installerPath) {
-        // Chercher récursivement
         const findExe = (dir, depth = 0) => {
           if (depth > 3) return null
           try {
@@ -1277,7 +1341,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
         return { success: false, error: 'Installeur VB-Cable introuvable dans l\'archive' }
       }
 
-      // Lancer l'installeur (nécessite les droits admin)
       await shell.openPath(installerPath)
 
       return {
@@ -1287,14 +1350,18 @@ function registerFileHandlers(mainWindow, soundsDir) {
       }
     } catch (e) {
       console.error('❌ [install-virtual-driver] Erreur:', e)
-      return { success: false, error: e.message }
+      const netErr = normalizeNetworkError(e)
+      return {
+        success: false,
+        error: netErr || e.message,
+        isNetworkError: !!netErr,
+      }
     }
   })
 
   ipcMain.handle('uninstall-virtual-driver', async () => {
     try {
       const { shell } = require('electron')
-      // Ouvrir les paramètres de désinstallation Windows
       if (process.platform === 'win32') {
         await shell.openPath('ms-settings:appsfeatures')
       } else {
@@ -1321,8 +1388,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
         downloaded: fs.existsSync(zipPath),
         extracted: fs.existsSync(installerPath),
         installerPath: fs.existsSync(installerPath) ? installerPath : null,
-        // Note : le renderer doit utiliser navigator.mediaDevices.enumerateDevices()
-        // pour vérifier si le driver est réellement actif
       }
     } catch (e) {
       return { success: false, error: e.message }
@@ -1330,7 +1395,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
   })
 
   // ─── YOUTUBE THUMBNAIL DOWNLOAD ──────────────────────────────────────────
-  // ✅ AJOUT S2 : télécharge la miniature d'une vidéo YouTube en local
 
   ipcMain.handle('download-thumbnail', async (event, url, soundName) => {
     try {
@@ -1342,7 +1406,6 @@ function registerFileHandlers(mainWindow, soundsDir) {
         fs.mkdirSync(imagesDir, { recursive: true })
       }
 
-      // Extraire l'extension depuis l'URL
       let ext = 'jpg'
       try {
         const urlPath = new URL(url).pathname
@@ -1359,7 +1422,12 @@ function registerFileHandlers(mainWindow, soundsDir) {
       return { success: true, path: outputPath.replace(/\\/g, '/') }
     } catch (e) {
       console.error('❌ [download-thumbnail] Erreur:', e)
-      return { success: false, error: e.message }
+      const netErr = normalizeNetworkError(e)
+      return {
+        success: false,
+        error: netErr || e.message,
+        isNetworkError: !!netErr,
+      }
     }
   })
 }

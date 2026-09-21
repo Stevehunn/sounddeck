@@ -11,7 +11,7 @@ const MyInstantsPlugin = {
   pages: [
     {
       id: 'discover',
-      label: 'Découverte MyInstants',
+      labelKey: 'myinstantsTitle',
       icon: 'ti-compass',
       component: MyInstantsDiscover,
       componentPath: './Discover.jsx',

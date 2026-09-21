@@ -50,11 +50,11 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
         addToast(t('backupSuccess'), 'success')
         loadBackups()
       } else {
-        addToast('❌ ' + (result.error || t('error')), 'error')
+        addToast(result.error || t('error'), 'error')
       }
     } catch (e) {
       console.error('❌ [BackupSettings] Erreur backup:', e)
-      addToast('❌ ' + e.message, 'error')
+      addToast(e.message, 'error')
     }
     setIsLoading(false)
   }
@@ -74,11 +74,11 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
         addToast(t('backupRestored'), 'success')
         setTimeout(() => window.location.reload(), 500)
       } else {
-        addToast('❌ ' + (result.error || t('error')), 'error')
+        addToast(result.error || t('error'), 'error')
       }
     } catch (e) {
       console.error('❌ [BackupSettings] Erreur restore:', e)
-      addToast('❌ ' + e.message, 'error')
+      addToast(e.message, 'error')
     }
     setIsLoading(false)
   }
@@ -91,11 +91,11 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
         loadBackups()
         window.dispatchEvent(new CustomEvent('refresh-backups'))
       } else {
-        addToast('❌ ' + (result.error || t('error')), 'error')
+        addToast(result.error || t('error'), 'error')
       }
     } catch (e) {
       console.error('❌ [BackupSettings] Erreur delete:', e)
-      addToast('❌ ' + e.message, 'error')
+      addToast(e.message, 'error')
     }
   }
 
@@ -107,12 +107,11 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
       if (result.success) {
         addToast(t('backupsExported'), 'success')
       } else if (!result.canceled) {
-        addToast('❌ ' + (result.error || t('error')), 'error')
+        addToast(result.error || t('error'), 'error')
       }
-      // Si canceled, on ne dit rien (l'utilisateur a annulé volontairement)
     } catch (e) {
       console.error('❌ [BackupSettings] Erreur export:', e)
-      addToast('❌ ' + e.message, 'error')
+      addToast(e.message, 'error')
     }
   }
 
@@ -127,14 +126,14 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
       try {
         const result = await importBackups(file)
         if (result.success) {
-          addToast(`✅ ${result.count} ${t('backupsImported')}`, 'success')
+          addToast(`${result.count} ${t('backupsImported')}`, 'success')
           loadBackups()
         } else {
-          addToast('❌ ' + (result.error || t('error')), 'error')
+          addToast(result.error || t('error'), 'error')
         }
       } catch (err) {
         console.error('❌ [BackupSettings] Erreur import:', err)
-        addToast('❌ ' + err.message, 'error')
+        addToast(err.message, 'error')
       }
     }
     input.click()

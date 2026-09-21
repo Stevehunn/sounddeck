@@ -1,6 +1,7 @@
 // src/plugins/youtube/YouTube.jsx
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
+import { useNetwork } from '@shared/contexts'
 import { detectPlatform, getSpotifyTrack, getSoundCloudTrack, sanitizeFilename } from '@shared/utils/platformImport'
 import { Howl } from 'howler'
 import useConfirm from '@shared/hooks/useConfirm'
@@ -36,6 +37,7 @@ let globalPlatform = null
 export default function YouTube({ store, addToast }) {
     const { t, currentLang } = useLanguage()
     const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
+    const { showNoConnection, ensureOnline } = useNetwork()
 
     // ─── ÉTATS ──────────────────────────────────────────────────────────────────
     const [ytdlpStatus, setYtdlpStatus] = useState(() => {
@@ -382,13 +384,21 @@ export default function YouTube({ store, addToast }) {
                 globalYtdlpStatus = 'available'
                 globalCheckDone = true
                 setYtdlpStatus('available')
-                addToast('✅ ' + t('ytdlpInstalled'), 'success')
+                addToast(t('ytdlpInstalled'), 'success')
             } else {
-                addToast('❌ ' + t('ytdlpInstallError') + (result?.error || t('unknownError')), 'error')
+                if (result?.isNetworkError) {
+                    showNoConnection()
+                } else {
+                    addToast(t('ytdlpInstallError') + ' ' + (result?.error || t('unknownError')), 'error')
+                }
             }
         } catch (error) {
             setDownloading(false)
-            addToast('❌ ' + t('ytdlpInstallError') + error.message, 'error')
+            if (error?.isNetworkError) {
+                showNoConnection()
+            } else {
+                addToast(t('ytdlpInstallError') + ' ' + error.message, 'error')
+            }
         }
     }
 
@@ -428,6 +438,21 @@ export default function YouTube({ store, addToast }) {
                 }
             }
 
+            if (!result?.success && result?.isNetworkError) {
+                const online = await ensureOnline()
+                if (!online) {
+                    setLoadingInfo(false)
+                    fetchingRef.current = false
+                    setIsProcessing(false)
+                    return
+                }
+                addToast(t('ytFetchError') + ' ' + (result?.error || t('unknownError')), 'error')
+                setLoadingInfo(false)
+                fetchingRef.current = false
+                setIsProcessing(false)
+                return
+            }
+
             if (result?.success) {
                 const data = result.data || result
                 const info = {
@@ -461,17 +486,21 @@ export default function YouTube({ store, addToast }) {
 
                 addToast(`✅ ${t('platformDetected').replace('{platform}', info.platform || t('platformYoutube'))}`, 'success')
             } else {
-                addToast('❌ ' + t('ytFetchError') + (result?.error || t('unknownError')), 'error')
+                addToast(t('ytFetchError') + ' ' + (result?.error || t('unknownError')), 'error')
             }
         } catch (error) {
             console.error('❌ [YouTube] Erreur handleFetchInfo:', error)
-            addToast('❌ ' + t('ytFetchError') + error.message, 'error')
+            if (error?.isNetworkError) {
+                showNoConnection()
+            } else {
+                addToast(t('ytFetchError') + ' ' + error.message, 'error')
+            }
         }
 
         setLoadingInfo(false)
         fetchingRef.current = false
         setIsProcessing(false)
-    }, [url, addToast, t, isTutorialMode])
+    }, [url, addToast, t, isTutorialMode, showNoConnection])
 
     // ─── PRÉVISUALISATION ─────────────────────────────────────────────────────
     const togglePreview = (filePath) => {
@@ -604,7 +633,11 @@ export default function YouTube({ store, addToast }) {
             } else {
                 setShowProgress(false)
                 setIsProcessing(false)
-                addToast('❌ ' + t('ytDownloadError') + (result?.error || t('unknownError')), 'error')
+                if (result?.isNetworkError) {
+                    showNoConnection()
+                } else {
+                    addToast(t('ytDownloadError') + ' ' + (result?.error || t('unknownError')), 'error')
+                }
             }
         } catch (error) {
             console.error('❌ [YouTube] Erreur téléchargement:', error)
@@ -613,9 +646,14 @@ export default function YouTube({ store, addToast }) {
             isProcessingRef.current = false
             setImporting(false)
             setIsProcessing(false)
-            addToast('❌ ' + t('ytDownloadError') + error.message, 'error')
+            // ✅ FIX S.C
+            if (error?.isNetworkError) {
+                showNoConnection()
+            } else {
+                addToast(t('ytDownloadError') + ' ' + error.message, 'error')
+            }
         }
-    }, [videoInfo, platform, soundName, start, end, addToast, t, startProgressSimulation, stopProgressSimulation, isTutorialMode])
+    }, [videoInfo, platform, soundName, start, end, addToast, t, startProgressSimulation, stopProgressSimulation, isTutorialMode, showNoConnection])
 
     // ─── SAUVEGARDE ──────────────────────────────────────────────────────────
     const handleSave = useCallback(async () => {
@@ -722,10 +760,8 @@ export default function YouTube({ store, addToast }) {
 
             clearInterval(saveInterval)
 
-            // Toast de succès
             addToast(`✅ "${currentSoundName.trim()}" ${t('ytSoundAdded')}`, 'success')
 
-            // Reset des states locaux (les globals sont déjà reset)
             setUrl('')
             setVideoInfo(null)
             setDownloadedPath(null)

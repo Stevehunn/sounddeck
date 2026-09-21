@@ -224,6 +224,7 @@ export class PluginManager {
 
     const pluginPages = Array.from(this.pages.values()).map((p) => ({
       ...p,
+      label: p.labelKey ? t(p.labelKey) : p.label,
       isCore: false,
       isPlugin: true,
     }))

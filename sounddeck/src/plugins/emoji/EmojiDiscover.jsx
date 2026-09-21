@@ -2,14 +2,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { useEmojis } from '@shared/hooks/useEmojis'
+import { useNetwork } from '@shared/contexts'
 import { EMOJI_DISCOVER_CATEGORIES } from './categories'
 
-// ✅ Cache module-level : partagé entre les re-mounts, ne disparaît
-//    qu'au rechargement complet de l'app (comme MyInstants)
 const emojiCache = new Map()
 
 export default function EmojiDiscover({ store, addToast }) {
   const { t, currentLang } = useLanguage()
+  const { showNoConnection, ensureOnline } = useNetwork()
   const {
     addEmoji,
     addCategory,
@@ -92,14 +92,28 @@ export default function EmojiDiscover({ store, addToast }) {
             setError(t('emojiDiscoverEmpty'))
           }
         } else {
-          if (currentCategoryRef.current === categoryId) {
-            setError(result?.error || t('emojiDiscoverError'))
+          if (result?.isNetworkError) {
+            if (currentCategoryRef.current === categoryId) {
+              setError('')
+            }
+            showNoConnection()
+          } else {
+            if (currentCategoryRef.current === categoryId) {
+              setError(result?.error || t('emojiDiscoverError'))
+            }
           }
         }
       } catch (e) {
         if (!isMountedRef.current) return
-        if (currentCategoryRef.current === categoryId) {
-          setError(e.message || t('emojiDiscoverError'))
+        if (e?.isNetworkError) {
+          if (currentCategoryRef.current === categoryId) {
+            setError('')
+          }
+          showNoConnection()
+        } else {
+          if (currentCategoryRef.current === categoryId) {
+            setError(e.message || t('emojiDiscoverError'))
+          }
         }
       } finally {
         if (isMountedRef.current) {
@@ -108,12 +122,18 @@ export default function EmojiDiscover({ store, addToast }) {
         }
       }
     },
-    [t, getCacheInfo]
+    [t, getCacheInfo, showNoConnection]
   )
 
   // ─── PRÉCHARGEMENT DE TOUTES LES CATÉGORIES ────────────────────────────
   const preloadAllCategories = useCallback(async () => {
     if (isPreloading || isPreloadComplete) return
+
+    const online = await ensureOnline()
+    if (!online) {
+      setIsPreloadComplete(true)
+      return
+    }
 
     const categoryIds = EMOJI_DISCOVER_CATEGORIES.map((c) => c.id)
 
@@ -156,9 +176,21 @@ export default function EmojiDiscover({ store, addToast }) {
           emojiCache.set(id, result.emojis)
           return true
         }
+        if (result?.isNetworkError) {
+          preloadAbortRef.current = true
+          if (isMountedRef.current) {
+            showNoConnection()
+          }
+        }
         return false
       } catch (e) {
         console.warn(`⚠️ [EmojiDiscover] Échec préchargement de ${id}:`, e.message)
+        if (e?.isNetworkError) {
+          preloadAbortRef.current = true
+          if (isMountedRef.current) {
+            showNoConnection()
+          }
+        }
         return false
       }
     }
@@ -187,10 +219,10 @@ export default function EmojiDiscover({ store, addToast }) {
     setPreloadProgress(100)
     setIsPreloadComplete(true)
     setPreloadStatus(
-      `✅ ${t('emojiDiscoverAllCategoriesLoaded') || 'Toutes les catégories sont chargées'}`
+      `✅ ${t('emojiDiscoverAllCategoriesLoaded')}`
     )
     setCacheInfo(getCacheInfo())
-  }, [isPreloading, isPreloadComplete, getCachedCategory, getCacheInfo, t])
+  }, [isPreloading, isPreloadComplete, getCachedCategory, getCacheInfo, t, showNoConnection])
 
   // ─── EFFET INITIAL : charge la catégorie active + lance le preload ─────
   useEffect(() => {
