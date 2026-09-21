@@ -17,6 +17,7 @@ import WelcomeScreen from '@features/welcome/WelcomeScreen'
 import Tutorial from '@shared/components/ui/Tutorial'
 import HelpButton from '@shared/components/ui/HelpButton'
 import EmojiPage from '@features/emoji/EmojiPage'
+import { getItem, setItem } from '@shared/utils/appStorage'
 
 import { playSound, stopAllSounds, setStoreRef } from '@core/services/AudioService'
 import { warmupAudioContext } from '@core/services/AudioMixerService'
@@ -134,13 +135,11 @@ function AppContent({ store }) {
         const hasLaunchedBefore = await window.electronAPI.storeGet(
           'hasLaunchedBefore'
         )
-        const tutorialHomeDone = localStorage.getItem(
-          'sounddeck-tutorial-home-done'
-        )
+        const tutorialHomeDone = await getItem('sounddeck-tutorial-home-done')
 
         if (!hasLaunchedBefore) {
           setIsFirstLaunch(true)
-        } else if (!tutorialHomeDone) {
+        } else if (tutorialHomeDone !== 'true' && tutorialHomeDone !== true) {
           setTimeout(() => setShowTutorial(true), 500)
         }
       } catch (e) {

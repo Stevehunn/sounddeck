@@ -11,6 +11,7 @@ import TimelineLoop from './TimelineLoop'
 import TimelineZoomControls from './TimelineZoomControls'
 import MarkersPanel from '../Markers/MarkersPanel'
 import { formatTime } from '@shared/utils/format'
+import { getBoolean, setItem } from '@shared/utils/appStorage'
 
 const TRACK_HEAD_WIDTH = 200
 const BASE_PIXELS_PER_SECOND = 80
@@ -95,9 +96,8 @@ export default function EditorTimeline({
   const [isInitialized, setIsInitialized] = useState(false)
   const hasInitializedRef = useRef(false)
 
-  const getAutoOpenPreference = useCallback(() => {
-    const saved = localStorage.getItem(AUTO_OPEN_KEY)
-    return saved === null ? false : saved === 'true'
+  const getAutoOpenPreference = useCallback(async () => {
+    return await getBoolean(AUTO_OPEN_KEY, false)
   }, [])
 
   const pixelsPerSecond = BASE_PIXELS_PER_SECOND * zoomLevel
@@ -142,33 +142,48 @@ export default function EditorTimeline({
     if (hasInitializedRef.current) return
     hasInitializedRef.current = true
 
-    const autoOpen = getAutoOpenPreference()
+    ;(async () => {
+      try {
+        const autoOpen = await getAutoOpenPreference()
 
-    if (!autoOpen) {
-      setShowMarkersPanel(false)
-      setIsInitialized(true)
-      return
-    }
+        if (!autoOpen) {
+          setShowMarkersPanel(false)
+          setIsInitialized(true)
+          return
+        }
 
-    setShowMarkersPanel(true)
-    localStorage.setItem(STORAGE_KEY, 'true')
-    setIsInitialized(true)
+        setShowMarkersPanel(true)
+        await setItem(STORAGE_KEY, true)
+        setIsInitialized(true)
+      } catch (e) {
+        console.warn('[Timeline] Erreur init markers panel:', e)
+        // En cas d'erreur, on laisse l'utilisateur ouvrir manuellement
+        setIsInitialized(true)
+      }
+    })()
   }, [onAddMarker, getAutoOpenPreference])
 
-  const handleToggleMarkersPanel = useCallback((show) => {
+  const handleToggleMarkersPanel = useCallback(async (show) => {
     setShowMarkersPanel(show)
-    localStorage.setItem(STORAGE_KEY, String(show))
+    try {
+      await setItem(STORAGE_KEY, show)
+    } catch (e) {
+      // silencieux
+    }
   }, [])
 
-  const handleAutoOpenChange = useCallback((autoOpen) => {
-    localStorage.setItem(AUTO_OPEN_KEY, String(autoOpen))
-
-    if (autoOpen) {
-      setShowMarkersPanel(true)
-      localStorage.setItem(STORAGE_KEY, 'true')
-    } else {
-      setShowMarkersPanel(false)
-      localStorage.setItem(STORAGE_KEY, 'false')
+  const handleAutoOpenChange = useCallback(async (autoOpen) => {
+    try {
+      await setItem(AUTO_OPEN_KEY, autoOpen)
+      if (autoOpen) {
+        setShowMarkersPanel(true)
+        await setItem(STORAGE_KEY, true)
+      } else {
+        setShowMarkersPanel(false)
+        await setItem(STORAGE_KEY, false)
+      }
+    } catch (e) {
+      // silencieux
     }
   }, [])
 
@@ -324,7 +339,7 @@ export default function EditorTimeline({
       let clip = null
       let clipStart = 0
       let clipDuration = 0
-      let loopEnd = loopData.end || totalDuration
+      const loopEnd = loopData.end || totalDuration
 
       for (const track of tracks) {
         const found = track.clips.find((c) => c.id === clipId)
@@ -489,7 +504,7 @@ export default function EditorTimeline({
             left: position,
             width: 2,
             background: marker.color || '#3b82f6',
-            zIndex: 6,  // ✅ FIX : > z-index du ruler (5) pour passer au-dessus
+            zIndex: 6,
             pointerEvents: 'none',
             opacity: 0.9,
           }}
@@ -648,7 +663,6 @@ export default function EditorTimeline({
             </div>
           )}
 
-          {/* ✅ FIX : width + minWidth au lieu de Math.max avec '100%' */}
           <div
             ref={rulerInnerRef}
             style={{
@@ -708,7 +722,6 @@ export default function EditorTimeline({
           }}
         />
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          {/* ✅ FIX : width + minWidth au lieu de Math.max avec '100%' */}
           <div
             ref={loopContainerRef}
             style={{

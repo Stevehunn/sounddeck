@@ -1,5 +1,6 @@
 // src/features/editor/components/Markers/MarkersPanel.jsx
 import React, { useState, useCallback, memo, useEffect, useRef } from 'react'
+import { getBoolean, setItem } from '@shared/utils/appStorage'
 import MarkerItem from './MarkerItem'
 
 const MARKER_COLORS = [
@@ -34,41 +35,42 @@ const MarkersPanel = memo(({
   const [markerName, setMarkerName] = useState('')
   const [markerTime, setMarkerTime] = useState(currentTime)
   const [useCurrentTime, setUseCurrentTime] = useState(true)
-  
-  // ✅ État auto-open avec valeur par défaut
-  const [autoOpen, setAutoOpen] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_AUTO_OPEN)
-    // ✅ Par défaut : false (l'utilisateur décide d'ouvrir)
-    return saved === null ? false : saved === 'true'
-  })
-  
-  // ✅ Ref pour suivre les interactions utilisateur
+
+  const [autoOpen, setAutoOpen] = useState(false)
+
   const isUserInteractionRef = useRef(false)
   const hasInitializedRef = useRef(false)
+
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      const value = await getBoolean(STORAGE_KEY_AUTO_OPEN, false)
+      if (!mounted) return
+      setAutoOpen(value)
+    })()
+    return () => { mounted = false }
+  }, [])
 
   // ✅ NE PAS notifier le parent à l'initialisation
   useEffect(() => {
     if (hasInitializedRef.current) return
     hasInitializedRef.current = true
-    
-    console.log('📍 [MarkersPanel] Initialisation - autoOpen:', autoOpen)
-    // ✅ NE PAS appeler onAutoOpenChange ici
   }, [autoOpen])
 
-  // ✅ Sauvegarder la préférence et notifier le parent UNIQUEMENT sur interaction utilisateur
-  const handleAutoOpenToggle = useCallback(() => {
+  const handleAutoOpenToggle = useCallback(async () => {
     const newValue = !autoOpen
     setAutoOpen(newValue)
-    localStorage.setItem(STORAGE_KEY_AUTO_OPEN, String(newValue))
-    
-    // ✅ Marquer comme interaction utilisateur
+
     isUserInteractionRef.current = true
-    
-    // ✅ Notifier le parent
+
+    try {
+      await setItem(STORAGE_KEY_AUTO_OPEN, newValue)
+    } catch (e) {
+      console.warn('[MarkersPanel] Erreur save autoOpen:', e)
+    }
+
     onAutoOpenChange?.(newValue)
-    console.log('📍 [MarkersPanel] Auto-open (user toggle):', newValue)
-    
-    // ✅ Réinitialiser après un court délai
+
     setTimeout(() => {
       isUserInteractionRef.current = false
     }, 200)
@@ -81,7 +83,7 @@ const MarkersPanel = memo(({
       onAddMarker({
         name,
         time: Math.max(0, Math.min(time, totalDuration)),
-        color: selectedColor
+        color: selectedColor,
       })
       setMarkerName('')
       setIsAdding(false)
@@ -110,7 +112,7 @@ const MarkersPanel = memo(({
         padding: 12,
         color: 'var(--text-tertiary)',
         fontSize: 12,
-        textAlign: 'center'
+        textAlign: 'center',
       }}>
         Marqueurs non disponibles
       </div>
@@ -126,7 +128,7 @@ const MarkersPanel = memo(({
       overflow: 'auto',
       display: 'flex',
       flexDirection: 'column',
-      gap: 8
+      gap: 8,
     }}>
       {/* En-tête */}
       <div style={{
@@ -134,14 +136,14 @@ const MarkersPanel = memo(({
         alignItems: 'center',
         justifyContent: 'space-between',
         flexShrink: 0,
-        gap: 8
+        gap: 8,
       }}>
         <div style={{
           fontSize: 13,
           fontWeight: 600,
           display: 'flex',
           alignItems: 'center',
-          gap: 6
+          gap: 6,
         }}>
           <i className="ti ti-flag" style={{ color: 'var(--accent)' }} />
           {tr?.('editorMarkers') || 'Marqueurs'}
@@ -149,7 +151,7 @@ const MarkersPanel = memo(({
             fontSize: 10,
             fontWeight: 400,
             color: 'var(--text-tertiary)',
-            marginLeft: 4
+            marginLeft: 4,
           }}>
             ({sortedMarkers.length})
           </span>
@@ -171,7 +173,7 @@ const MarkersPanel = memo(({
             alignItems: 'center',
             gap: 4,
             whiteSpace: 'nowrap',
-            transition: 'all 0.15s'
+            transition: 'all 0.15s',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'var(--accent-light)'
@@ -193,7 +195,7 @@ const MarkersPanel = memo(({
           borderRadius: 'var(--radius-sm)',
           padding: 10,
           border: '1px solid var(--border)',
-          flexShrink: 0
+          flexShrink: 0,
         }}>
           <div style={{ marginBottom: 8 }}>
             <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
@@ -215,36 +217,27 @@ const MarkersPanel = memo(({
                 background: 'var(--bg-primary)',
                 color: 'var(--text-primary)',
                 fontSize: 12,
-                outline: 'none'
+                outline: 'none',
               }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleAddMarker()
-                }
-                if (e.key === 'Escape') {
-                  handleCancel()
-                }
+                if (e.key === 'Enter') handleAddMarker()
+                if (e.key === 'Escape') handleCancel()
               }}
             />
           </div>
 
-          {/* Position du marqueur */}
           <div style={{ marginBottom: 8 }}>
             <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
               {tr('markerPosition') || 'Position'}
             </label>
-            <div style={{
-              display: 'flex',
-              gap: 8,
-              alignItems: 'center'
-            }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <label style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 4,
                 fontSize: 11,
                 color: 'var(--text-secondary)',
-                cursor: 'pointer'
+                cursor: 'pointer',
               }}>
                 <input
                   type="radio"
@@ -263,7 +256,7 @@ const MarkersPanel = memo(({
                 gap: 4,
                 fontSize: 11,
                 color: 'var(--text-secondary)',
-                cursor: 'pointer'
+                cursor: 'pointer',
               }}>
                 <input
                   type="radio"
@@ -292,13 +285,13 @@ const MarkersPanel = memo(({
                     background: 'var(--bg-primary)',
                     color: 'var(--text-primary)',
                     fontSize: 12,
-                    outline: 'none'
+                    outline: 'none',
                   }}
                 />
                 <div style={{
                   fontSize: 9,
                   color: 'var(--text-tertiary)',
-                  marginTop: 2
+                  marginTop: 2,
                 }}>
                   {tr('markerTimeRange') || `Temps en secondes (0 - ${totalDuration.toFixed(1)}s)`}
                 </div>
@@ -306,7 +299,6 @@ const MarkersPanel = memo(({
             )}
           </div>
 
-          {/* Sélecteur de couleur */}
           <div style={{ marginBottom: 8 }}>
             <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
               {tr('markerColor') || 'Couleur'}
@@ -315,7 +307,7 @@ const MarkersPanel = memo(({
               display: 'flex',
               gap: 4,
               flexWrap: 'wrap',
-              alignItems: 'center'
+              alignItems: 'center',
             }}>
               {MARKER_COLORS.map(c => (
                 <button
@@ -330,7 +322,7 @@ const MarkersPanel = memo(({
                     cursor: 'pointer',
                     transition: 'all 0.15s',
                     outline: 'none',
-                    flexShrink: 0
+                    flexShrink: 0,
                   }}
                   title={c.id}
                 />
@@ -350,7 +342,7 @@ const MarkersPanel = memo(({
                     justifyContent: 'center',
                     fontSize: 10,
                     color: 'white',
-                    textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                    textShadow: '0 1px 2px rgba(0,0,0,0.5)',
                   }}
                   title="Couleur personnalisée"
                 >
@@ -368,7 +360,7 @@ const MarkersPanel = memo(({
                     border: '1px solid var(--border)',
                     borderRadius: 'var(--radius-sm)',
                     padding: 4,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
                   }}>
                     <input
                       type="color"
@@ -384,7 +376,7 @@ const MarkersPanel = memo(({
                         cursor: 'pointer',
                         border: '1px solid var(--border)',
                         borderRadius: 'var(--radius-sm)',
-                        background: 'transparent'
+                        background: 'transparent',
                       }}
                     />
                   </div>
@@ -393,11 +385,10 @@ const MarkersPanel = memo(({
             </div>
           </div>
 
-          {/* Boutons d'action */}
           <div style={{
             display: 'flex',
             gap: 6,
-            justifyContent: 'flex-end'
+            justifyContent: 'flex-end',
           }}>
             <button
               className="btn btn-secondary btn-sm"
@@ -406,7 +397,7 @@ const MarkersPanel = memo(({
                 fontSize: 11,
                 padding: '4px 12px',
                 minHeight: 28,
-                borderRadius: 'var(--radius-sm)'
+                borderRadius: 'var(--radius-sm)',
               }}
             >
               {tr('cancel') || 'Annuler'}
@@ -420,7 +411,7 @@ const MarkersPanel = memo(({
                 minHeight: 28,
                 borderRadius: 'var(--radius-sm)',
                 background: 'var(--accent)',
-                color: 'white'
+                color: 'white',
               }}
             >
               <i className="ti ti-check" /> {tr('add') || 'Ajouter'}
@@ -433,14 +424,14 @@ const MarkersPanel = memo(({
       <div style={{
         flex: 1,
         overflow: 'auto',
-        minHeight: 50
+        minHeight: 50,
       }}>
         {sortedMarkers.length === 0 && !isAdding && (
           <div style={{
             textAlign: 'center',
             padding: 20,
             color: 'var(--text-tertiary)',
-            fontSize: 12
+            fontSize: 12,
           }}>
             <i className="ti ti-flag" style={{ fontSize: 24, display: 'block', marginBottom: 8 }} />
             {tr?.('markersEmpty') || 'Aucun marqueur'}
@@ -464,7 +455,7 @@ const MarkersPanel = memo(({
         ))}
       </div>
 
-      {/* ✅ Pied de panneau - Auto-open toggle */}
+      {/* Pied de panneau - Auto-open toggle */}
       <div style={{
         borderTop: '1px solid var(--border)',
         paddingTop: 8,
@@ -472,7 +463,7 @@ const MarkersPanel = memo(({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        flexShrink: 0
+        flexShrink: 0,
       }}>
         <label style={{
           display: 'flex',
@@ -484,7 +475,7 @@ const MarkersPanel = memo(({
           padding: '2px 4px',
           borderRadius: 'var(--radius-sm)',
           transition: 'background 0.15s',
-          userSelect: 'none'
+          userSelect: 'none',
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.background = 'var(--bg-hover)'
@@ -502,7 +493,7 @@ const MarkersPanel = memo(({
               height: 16,
               accentColor: 'var(--accent)',
               cursor: 'pointer',
-              borderRadius: 4
+              borderRadius: 4,
             }}
           />
           <span>
@@ -513,7 +504,7 @@ const MarkersPanel = memo(({
         <span style={{
           fontSize: 9,
           color: 'var(--text-tertiary)',
-          opacity: 0.6
+          opacity: 0.6,
         }}>
           {autoOpen ? '🟢 ON' : '🔴 OFF'}
         </span>

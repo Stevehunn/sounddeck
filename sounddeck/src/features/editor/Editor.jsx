@@ -22,10 +22,14 @@ import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
 import useConfirm from '@shared/hooks/useConfirm'
 import useProjectManager from './hooks/useProjectManager'
 import { buildFileUrl } from '@shared/utils/fileUrl'
+import { getBoolean, getNumber, setItem } from '@shared/utils/appStorage'
 
-// ✅ Logger dev-only
 const __DEBUG__ = typeof import.meta !== 'undefined' && import.meta.env?.DEV
 const log = __DEBUG__ ? console.log.bind(console) : () => {}
+
+const STORE_KEY_METRONOME_ENABLED = 'sounddeck_metronome_enabled'
+const STORE_KEY_METRONOME_BPM = 'sounddeck_metronome_bpm'
+const STORE_KEY_MASTER_VOLUME = 'sounddeck_master_volume'
 
 export default function Editor({ store, addToast }) {
   return (
@@ -236,30 +240,38 @@ function EditorTimelineContent() {
 
   const projectManager = useProjectManager(store, project, setProject, addToast)
 
-  // ─── LOCALSTORAGE (métronome, volume maître) ─────────────────────────────
   useEffect(() => {
-    const savedEnabled = localStorage.getItem('sounddeck_metronome_enabled')
-    const savedBpm = localStorage.getItem('sounddeck_metronome_bpm')
+    let mounted = true
+    ;(async () => {
+      try {
+        const [savedEnabled, savedBpm, savedVolume] = await Promise.all([
+          getBoolean(STORE_KEY_METRONOME_ENABLED, false),
+          getNumber(STORE_KEY_METRONOME_BPM, 120),
+          getNumber(STORE_KEY_MASTER_VOLUME, 100),
+        ])
 
-    if (savedEnabled !== null) setMetronomeEnabled(savedEnabled === 'true')
-    if (savedBpm !== null) setBpm(parseInt(savedBpm, 10))
+        if (!mounted) return
 
-    const savedVolume = localStorage.getItem('sounddeck_master_volume')
-    if (savedVolume !== null) {
-      const vol = parseInt(savedVolume, 10)
-      setMasterVolume(vol)
-      masterVolumeRef.current = vol
-      setMasterGain(vol / 100)
-    }
+        setMetronomeEnabled(savedEnabled)
+        setBpm(savedBpm)
+
+        const clampedVolume = Math.max(0, Math.min(200, savedVolume))
+        setMasterVolume(clampedVolume)
+        masterVolumeRef.current = clampedVolume
+        setMasterGain(clampedVolume / 100)
+      } catch (e) {
+        console.warn('[Editor] Erreur chargement prefs:', e)
+      }
+    })()
+
+    return () => { mounted = false }
   }, [setMasterGain])
 
-  // ✅ FIX : calcul stable du clip sélectionné pour le panneau effets
   const selectedClipForPanel = useMemo(() => {
     if (!selectedClipId) return null
     return getClipById(tracks, selectedClipId)
   }, [tracks, selectedClipId])
 
-  // ✅ FIX : compteur de clips stable (évite flatMap à chaque render)
   const totalClipCount = useMemo(
     () => tracks.reduce((sum, t) => sum + (t.clips?.length || 0), 0),
     [tracks]
@@ -367,7 +379,6 @@ function EditorTimelineContent() {
     [addClip]
   )
 
-  // ✅ FIX : handleAddFileClick ouvre le modal avec le vrai file
   const handleAddFileClick = useCallback(async () => {
     if (tracks.length === 0) {
       addToast?.(t('editorNoTracks'), 'error')
@@ -473,7 +484,7 @@ function EditorTimelineContent() {
       setMasterVolume(normalized)
       masterVolumeRef.current = normalized
       setMasterGain(normalized / 100)
-      localStorage.setItem('sounddeck_master_volume', String(normalized))
+      setItem(STORE_KEY_MASTER_VOLUME, normalized).catch(() => {})
     },
     [setMasterGain]
   )
@@ -494,7 +505,7 @@ function EditorTimelineContent() {
     setMasterVolume(100)
     masterVolumeRef.current = 100
     setMasterGain(1)
-    localStorage.setItem('sounddeck_master_volume', '100')
+    setItem(STORE_KEY_MASTER_VOLUME, 100).catch(() => {})
 
     if (project?.tracks) {
       const updatedTracks = project.tracks.map((track) => ({
@@ -508,7 +519,6 @@ function EditorTimelineContent() {
         updatedAt: Date.now(),
       }
 
-      // ✅ FIX S3b : commitProject gère setProject + persistence
       context.commitProject(updatedProject, { skipHistory: true })
 
       if (context.setTrackVolume) {
@@ -527,12 +537,12 @@ function EditorTimelineContent() {
 
   const handleToggleMetronome = useCallback((enabled) => {
     setMetronomeEnabled(enabled)
-    localStorage.setItem('sounddeck_metronome_enabled', String(enabled))
+    setItem(STORE_KEY_METRONOME_ENABLED, enabled).catch(() => {})
   }, [])
 
   const handleBpmChange = useCallback((newBpm) => {
     setBpm(newBpm)
-    localStorage.setItem('sounddeck_metronome_bpm', String(newBpm))
+    setItem(STORE_KEY_METRONOME_BPM, newBpm).catch(() => {})
   }, [])
 
   const handleAddEffectFromMenu = useCallback(
@@ -588,7 +598,6 @@ function EditorTimelineContent() {
               updatedAt: Date.now(),
             }
 
-            // ✅ FIX S3b : commitProject gère setProject + persistence + historique
             context.commitProject(updatedProject)
           }
 
@@ -727,7 +736,6 @@ function EditorTimelineContent() {
       updatedAt: Date.now(),
     }
 
-    // ✅ FIX S3b : commitProject gère setProject + persistence + historique
     context.commitProject(updatedProject)
     setClipDurations((prev) => ({ ...prev, [newClip.id]: newClip.duration || 3 }))
 
@@ -997,7 +1005,6 @@ function EditorTimelineContent() {
     ]
   )
 
-  // ✅ FIX S3b : utiliser le contexte (store core désynchronisé)
   const undoEditor = context.undoEditor
   const redoEditor = context.redoEditor
   const canUndo = context.canUndoEditor
@@ -1008,7 +1015,6 @@ function EditorTimelineContent() {
     if (!show) setShowEffectsAddMenu(false)
   }, [])
 
-  // ✅ Exposer les fonctions pour le tutoriel
   useEffect(() => {
     window.__editorHasClips = () =>
       tracks.some((t) => t.clips && t.clips.length > 0)
@@ -1112,7 +1118,6 @@ function EditorTimelineContent() {
     onAddTrack: handleAddTrack,
     onAddMarker: () => {
       const markers = project?.markers || []
-      // ✅ FIX S3b : passer par context.addMarker (le store core n'est plus synchronisé)
       context.addMarker({
         name: `Marqueur ${markers.length + 1}`,
         time: currentTime,
@@ -1204,7 +1209,6 @@ function EditorTimelineContent() {
             return
           }
           const trimmed = newName.trim()
-          // ✅ FIX S3b : commitProject + persist
           const ok = context.updateEditorProjectName(trimmed)
           if (ok) {
             try {
@@ -1284,7 +1288,6 @@ function EditorTimelineContent() {
           onClipDuplicate={duplicateClip}
           onClipFade={context.setClipFade || (() => {})}
           onClipContextMenu={handleClipContextMenu}
-          // ✅ FIX S3b : utiliser le contexte au lieu du store core
           onDragCheckpoint={context.pushEditorHistoryCheckpoint}
           onTrackRemove={handleRemoveTrack}
           onSeek={seek}
@@ -1332,7 +1335,6 @@ function EditorTimelineContent() {
         />
       </div>
 
-      {/* ✅ FIX : composant séparé au lieu du IIFE dans le JSX */}
       <EffectsPanelSlot
         visible={showEffectsPanel}
         clip={selectedClipForPanel}
@@ -1668,8 +1670,6 @@ function EditorTimelineContent() {
   )
 }
 
-// ✅ FIX : panneau des effets extrait dans un composant dédié
-//    → évite le IIFE dans le JSX et les remontages intempestifs
 function EffectsPanelSlot({
   visible,
   clip,

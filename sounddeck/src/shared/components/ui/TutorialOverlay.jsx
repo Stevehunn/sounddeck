@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLanguage } from '@core/i18n/LanguageContext';
+import { setItem } from '@shared/utils/appStorage'
 
 // ─── CONSTANTES ─────────────────────────────────────────────────────────────
 
@@ -461,7 +462,9 @@ export default function TutorialOverlay({
       actionTimeoutRef.current = null
     }
     handleLeave()
-    if (pageId) localStorage.setItem(`sounddeck-tutorial-${pageId}-done`, 'true')
+    if (pageId) {
+      setItem(`sounddeck-tutorial-${pageId}-done`, true).catch(() => {})
+    }
     onComplete?.()
   }, [handleLeave, pageId, onComplete])
 

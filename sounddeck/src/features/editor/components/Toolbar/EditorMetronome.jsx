@@ -9,7 +9,7 @@ export default function EditorMetronome({
   totalDuration = 0,
   enabled = false,
   onToggle,
-  tr
+  tr,
 }) {
   const [tempo, setTempo] = useState(bpm || 120)
   const [volume, setVolume] = useState(50)
@@ -17,13 +17,27 @@ export default function EditorMetronome({
   const [timeSignature] = useState({ beats: 4, noteValue: 4 })
   const [isClicking, setIsClicking] = useState(false)
   const [count, setCount] = useState(0)
-  
+
   const audioContextRef = useRef(null)
   const animationFrameRef = useRef(null)
   const isEnabledRef = useRef(false)
   const isPlayingRef = useRef(false)
   const currentTimeRef = useRef(0)
   const lastClickTimeRef = useRef(-1000)
+
+  const lastEmittedBpmRef = useRef(bpm || 120)
+
+  useEffect(() => {
+    const incoming = bpm || 120
+    if (incoming !== lastEmittedBpmRef.current) {
+      setTempo(incoming)
+      lastEmittedBpmRef.current = incoming
+      // Feedback sonore si activé
+      if (enabled) {
+        setTimeout(() => generateClickSound(true), 50)
+      }
+    }
+  }, [bpm])
 
   useEffect(() => {
     isEnabledRef.current = enabled
@@ -40,95 +54,93 @@ export default function EditorMetronome({
   const initAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
       try {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
-        console.log('🎵 Contexte audio du métronome créé')
+        audioContextRef.current = new (window.AudioContext ||
+          window.webkitAudioContext)()
       } catch (e) {
         console.warn('Erreur création contexte audio:', e)
         return false
       }
     }
-    
+
     if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume().catch(e => console.warn('Erreur reprise contexte:', e))
+      audioContextRef.current.resume().catch((e) =>
+        console.warn('Erreur reprise contexte:', e)
+      )
     }
-    
+
     return true
   }, [])
 
-  const generateClickSound = useCallback((isAccent = false) => {
-    try {
-      if (!initAudioContext()) {
-        console.warn('❌ Impossible d\'initialiser le contexte audio')
-        return false
-      }
-      
-      const ctx = audioContextRef.current
-      if (!ctx || ctx.state === 'closed') {
-        console.warn('❌ Contexte audio fermé')
-        return false
-      }
-      
-      if (ctx.state === 'suspended') {
-        ctx.resume().catch(e => console.warn('Erreur reprise contexte:', e))
-      }
-      
-      const now = ctx.currentTime
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      
-      osc.type = 'sine'
-      osc.frequency.value = isAccent ? 1200 : 800
-      
-      const vol = isAccent ? (accentVolume / 100) : (volume / 100)
-      const gainValue = Math.max(0.01, vol * 0.3)
-      
-      gain.gain.setValueAtTime(gainValue, now)
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05)
-      
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      
-      osc.start(now)
-      osc.stop(now + 0.05)
-      
-      return true
-    } catch (e) {
-      console.warn('❌ Erreur génération clic métronome:', e.message)
-      return false
-    }
-  }, [volume, accentVolume, initAudioContext])
+  const generateClickSound = useCallback(
+    (isAccent = false) => {
+      try {
+        if (!initAudioContext()) return false
 
-  // ✅ Prévisualisation du métronome (jouer un clic à l'activation)
+        const ctx = audioContextRef.current
+        if (!ctx || ctx.state === 'closed') return false
+
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch((e) =>
+            console.warn('Erreur reprise contexte:', e)
+          )
+        }
+
+        const now = ctx.currentTime
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+
+        osc.type = 'sine'
+        osc.frequency.value = isAccent ? 1200 : 800
+
+        const vol = isAccent ? accentVolume / 100 : volume / 100
+        const gainValue = Math.max(0.01, vol * 0.3)
+
+        gain.gain.setValueAtTime(gainValue, now)
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05)
+
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+
+        osc.start(now)
+        osc.stop(now + 0.05)
+
+        return true
+      } catch (e) {
+        console.warn('❌ Erreur génération clic métronome:', e.message)
+        return false
+      }
+    },
+    [volume, accentVolume, initAudioContext]
+  )
+
   const previewClick = useCallback(() => {
     if (!enabled) return
-    const success = generateClickSound(true)
-    if (success) {
-      console.log('🎵 Preview du métronome')
-    }
+    generateClickSound(true)
   }, [enabled, generateClickSound])
 
-  // ✅ Effet pour preview au toggle
   useEffect(() => {
     if (enabled) {
       setTimeout(previewClick, 100)
     }
   }, [enabled, previewClick])
 
-  const playClick = useCallback((isAccent = false) => {
-    const now = performance.now()
-    
-    if (now - lastClickTimeRef.current < 10) return
-    
-    const success = generateClickSound(isAccent)
-    if (success) {
-      lastClickTimeRef.current = now
-    }
-  }, [generateClickSound])
+  const playClick = useCallback(
+    (isAccent = false) => {
+      const now = performance.now()
+      if (now - lastClickTimeRef.current < 10) return
+
+      const success = generateClickSound(isAccent)
+      if (success) {
+        lastClickTimeRef.current = now
+      }
+    },
+    [generateClickSound]
+  )
 
   const metronomeLoop = useCallback(() => {
     const isEnabled = isEnabledRef.current
     const isPlayingNow = isPlayingRef.current
-    
+
     if (!isEnabled || !isPlayingNow) {
       setIsClicking(false)
       animationFrameRef.current = requestAnimationFrame(metronomeLoop)
@@ -137,24 +149,24 @@ export default function EditorMetronome({
 
     const current = currentTimeRef.current
     const beatDuration = 60 / (tempo || 120)
-    
+
     const currentBeat = Math.floor(current / beatDuration)
     const nextBeatTime = (currentBeat + 1) * beatDuration
     const timeUntilNextBeat = nextBeatTime - current
-    
+
     if (timeUntilNextBeat < 0.02 && timeUntilNextBeat >= 0) {
       const isAccent = (currentBeat + 1) % timeSignature.beats === 1
-      
+
       const lastClickTime = lastClickTimeRef.current
       const timeSinceLastClick = (performance.now() - lastClickTime) / 1000
-      
+
       if (timeSinceLastClick > beatDuration * 0.5) {
         playClick(isAccent)
         setCount((currentBeat + 1) % timeSignature.beats)
         setIsClicking(true)
       }
     }
-    
+
     animationFrameRef.current = requestAnimationFrame(metronomeLoop)
   }, [tempo, timeSignature.beats, playClick])
 
@@ -163,27 +175,25 @@ export default function EditorMetronome({
       cancelAnimationFrame(animationFrameRef.current)
       animationFrameRef.current = null
     }
-    
+
     if (!enabled || !isPlaying) {
       setIsClicking(false)
       setCount(0)
       return
     }
 
-    console.log('🎵 Démarrage du métronome')
     setIsClicking(true)
     setCount(0)
     lastClickTimeRef.current = -1000
-    
+
     initAudioContext()
     animationFrameRef.current = requestAnimationFrame(metronomeLoop)
   }, [enabled, isPlaying, initAudioContext, metronomeLoop])
 
   const handleToggle = useCallback(() => {
     const newState = !enabled
-    console.log(`🎵 Toggle métronome: ${newState ? 'ON' : 'OFF'}`)
     onToggle?.(newState)
-    
+
     if (newState) {
       if (isPlaying) {
         startMetronome()
@@ -201,17 +211,20 @@ export default function EditorMetronome({
     }
   }, [enabled, onToggle, isPlaying, startMetronome])
 
-  const handleBpmChange = useCallback((newBpm) => {
-    const clamped = Math.max(40, Math.min(240, newBpm))
-    setTempo(clamped)
-    onBpmChange?.(clamped)
-    setCount(0)
-    
-    // ✅ Replay un clic pour feedback
-    if (enabled) {
-      setTimeout(() => generateClickSound(true), 50)
-    }
-  }, [onBpmChange, enabled, generateClickSound])
+  const handleBpmChange = useCallback(
+    (newBpm) => {
+      const clamped = Math.max(40, Math.min(240, newBpm))
+      setTempo(clamped)
+      lastEmittedBpmRef.current = clamped
+      onBpmChange?.(clamped)
+      setCount(0)
+
+      if (enabled) {
+        setTimeout(() => generateClickSound(true), 50)
+      }
+    },
+    [onBpmChange, enabled, generateClickSound]
+  )
 
   useEffect(() => {
     if (enabled && isPlaying) {
@@ -234,25 +247,29 @@ export default function EditorMetronome({
         cancelAnimationFrame(animationFrameRef.current)
         animationFrameRef.current = null
       }
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      if (
+        audioContextRef.current &&
+        audioContextRef.current.state !== 'closed'
+      ) {
         audioContextRef.current.close().catch(() => {})
       }
     }
   }, [])
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 6,
-      padding: '2px 8px',
-      background: enabled ? 'rgba(124,111,247,0.08)' : 'var(--bg-tertiary)',
-      borderRadius: 'var(--radius-sm)',
-      border: `1px solid ${enabled ? 'var(--accent)' : 'var(--border)'}`,
-      transition: 'all 0.2s ease',
-      height: 32,
-    }}>
-      {/* Bouton Toggle avec icône plus visible */}
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '2px 8px',
+        background: enabled ? 'rgba(124,111,247,0.08)' : 'var(--bg-tertiary)',
+        borderRadius: 'var(--radius-sm)',
+        border: `1px solid ${enabled ? 'var(--accent)' : 'var(--border)'}`,
+        transition: 'all 0.2s ease',
+        height: 32,
+      }}
+    >
       <button
         className={enabled ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
         onClick={handleToggle}
@@ -267,31 +284,34 @@ export default function EditorMetronome({
           gap: 4,
           background: enabled ? 'var(--accent)' : 'var(--bg-tertiary)',
           borderColor: enabled ? 'var(--accent)' : 'var(--border)',
-          color: enabled ? 'white' : 'var(--text-secondary)'
+          color: enabled ? 'white' : 'var(--text-secondary)',
         }}
         title={tr('editorMetronome') || 'Métronome'}
       >
         <i className="ti ti-music" style={{ fontSize: 14 }} />
         {enabled && isClicking && (
-          <span style={{
-            width: 6,
-            height: 6,
-            borderRadius: '50%',
-            background: 'var(--success)',
-            display: 'inline-block',
-            animation: 'pulse 0.5s ease-in-out infinite',
-            marginLeft: 2
-          }} />
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: 'var(--success)',
+              display: 'inline-block',
+              animation: 'pulse 0.5s ease-in-out infinite',
+              marginLeft: 2,
+            }}
+          />
         )}
       </button>
 
-      {/* BPM avec contrôle plus compact */}
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: 4,
-        minWidth: 80
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          minWidth: 80,
+        }}
+      >
         <input
           type="range"
           min="40"
@@ -305,29 +325,35 @@ export default function EditorMetronome({
             width: 60,
             accentColor: 'var(--accent)',
             height: 3,
-            cursor: 'pointer'
+            cursor: 'pointer',
           }}
           title={tr('editorTempo') || 'Tempo (BPM)'}
         />
-        <span style={{
-          fontSize: 11,
-          fontFamily: 'monospace',
-          color: 'var(--text-secondary)',
-          minWidth: 32,
-          textAlign: 'center'
-        }}>
+        <span
+          style={{
+            fontSize: 11,
+            fontFamily: 'monospace',
+            color: 'var(--text-secondary)',
+            minWidth: 32,
+            textAlign: 'center',
+          }}
+        >
           {tempo}
         </span>
       </div>
 
-      {/* Volume (optionnel) */}
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: 4,
-        opacity: 0.7
-      }}>
-        <i className="ti ti-volume" style={{ fontSize: 11, color: 'var(--text-tertiary)' }} />
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          opacity: 0.7,
+        }}
+      >
+        <i
+          className="ti ti-volume"
+          style={{ fontSize: 11, color: 'var(--text-tertiary)' }}
+        />
         <input
           type="range"
           min="0"
@@ -338,38 +364,40 @@ export default function EditorMetronome({
             width: 30,
             accentColor: 'var(--accent)',
             height: 3,
-            cursor: 'pointer'
+            cursor: 'pointer',
           }}
           title={tr('editorMetronomeVolume') || 'Volume du métronome'}
         />
       </div>
 
-      {/* Indicateur de beat actuel */}
       {enabled && isClicking && (
-        <span style={{
-          fontSize: 9,
-          color: 'var(--text-tertiary)',
-          fontFamily: 'monospace',
-          minWidth: 24,
-          textAlign: 'center',
-          background: 'var(--bg-tertiary)',
-          padding: '1px 6px',
-          borderRadius: 'var(--radius-sm)',
-          border: '1px solid var(--border)'
-        }}>
+        <span
+          style={{
+            fontSize: 9,
+            color: 'var(--text-tertiary)',
+            fontFamily: 'monospace',
+            minWidth: 24,
+            textAlign: 'center',
+            background: 'var(--bg-tertiary)',
+            padding: '1px 6px',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--border)',
+          }}
+        >
           {count + 1}/{timeSignature.beats}
         </span>
       )}
 
-      {/* Info BPM au survol */}
       {!enabled && (
-        <span style={{
-          fontSize: 9,
-          color: 'var(--text-tertiary)',
-          opacity: 0.5,
-          fontFamily: 'monospace',
-          padding: '0 4px'
-        }}>
+        <span
+          style={{
+            fontSize: 9,
+            color: 'var(--text-tertiary)',
+            opacity: 0.5,
+            fontFamily: 'monospace',
+            padding: '0 4px',
+          }}
+        >
           {tempo} BPM
         </span>
       )}
