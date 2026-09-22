@@ -3,6 +3,7 @@ export default {
   fr: {
     // ─── PAGE PRINCIPALE ──────────────────────────────────────────────────────
     youtubeTitle: 'Import YouTube',
+    pluginNameYoutube: 'Import YouTube',
     youtubeSub: "Extraire l'audio depuis une vidéo YouTube",
     pasteUrl: 'Collez le lien YouTube',
     ytUrlPlaceholder: 'https://www.youtube.com/watch?v=...',
@@ -163,6 +164,7 @@ export default {
   en: {
     // ─── MAIN PAGE ──────────────────────────────────────────────────────────
     youtubeTitle: 'YouTube Import',
+    pluginNameYoutube: 'YouTube Import',
     youtubeSub: 'Extract audio from a YouTube video',
     pasteUrl: 'Paste the YouTube link',
     ytUrlPlaceholder: 'https://www.youtube.com/watch?v=...',
@@ -323,6 +325,7 @@ export default {
   es: {
     // ─── PÁGINA PRINCIPAL ──────────────────────────────────────────────────
     youtubeTitle: 'Importar YouTube',
+    pluginNameYoutube: 'Importar YouTube',
     youtubeSub: 'Extraer audio de un vídeo de YouTube',
     pasteUrl: 'Pega el enlace de YouTube',
     ytUrlPlaceholder: 'https://www.youtube.com/watch?v=...',

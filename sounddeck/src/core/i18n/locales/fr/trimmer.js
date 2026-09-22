@@ -8,6 +8,8 @@ export default {
   trimmerFileSelected: 'Fichier sélectionné',
   trimmerTrimTitle: 'Rogner le son',
   trimmerRegionSelected: 'Sélection : {start} → {end}',
+  trimmerRegionSelectedWithDuration: 'Région sélectionnée : {start} → {end} ({duration})',
+  trimmerErrorWithDetail: 'Erreur : {error}',
   trimmerInstallFfmpeg: 'Installez ffmpeg-static via npm pour le rognage précis.',
 
   // ─── CONTROLES ──────────────────────────────────────────────────────

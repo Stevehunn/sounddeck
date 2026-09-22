@@ -4,6 +4,7 @@ import YouTube from './YouTube.jsx'
 const YouTubePlugin = {
   id: 'youtube',
   name: 'YouTube Import',
+  nameKey: 'pluginNameYoutube',
   version: '1.0.0',
   author: 'SoundDeck Team',
   description: 'Import audio from YouTube, Spotify and SoundCloud',

@@ -4,6 +4,7 @@ import EmojiDiscover from './EmojiDiscover.jsx'
 const EmojiPlugin = {
   id: 'emoji',
   name: 'Emoji Discovery',
+  nameKey: 'pluginNameEmoji',
   version: '1.0.0',
   author: 'SoundDeck Team',
   description: 'Découvrir et ajouter des emojis par catégorie',

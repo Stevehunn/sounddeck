@@ -111,11 +111,11 @@ export default {
   toggleShortcutSet: 'Toggle shortcut set:',
   toggleShortcutRemoved: 'Toggle shortcut removed',
   mixerResynced: 'Mixer resynced',
-  backupDeleted: 'Backup deleted',
+  backupDeleted: '✅ Backup deleted',
   backupSuccess: '✅ Backup completed',
   backupRestored: '✅ Backup restored',
   backupsExported: '✅ Backups exported',
-  backupsImported: 'backups imported',
+  backupsImported: '✅ {count} backups imported',
 
   // ─── MENU ─────────────────────────────────────────────────────────────
   menuFavoriteAdd: 'Add to favorites',

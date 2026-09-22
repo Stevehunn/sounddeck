@@ -111,11 +111,11 @@ export default {
   toggleShortcutSet: 'Raccourci toggle défini :',
   toggleShortcutRemoved: 'Raccourci toggle supprimé',
   mixerResynced: 'Mixeur resynchronisé',
-  backupDeleted: 'Sauvegarde supprimée',
+  backupDeleted: '✅ Sauvegarde supprimée',
   backupSuccess: '✅ Sauvegarde effectuée',
   backupRestored: '✅ Sauvegarde restaurée',
   backupsExported: '✅ Sauvegardes exportées',
-  backupsImported: 'sauvegardes importées',
+  backupsImported: '✅ {count} sauvegardes importées',
 
   // ─── MENU ─────────────────────────────────────────────────────────────
   menuFavoriteAdd: 'Ajouter aux favoris',

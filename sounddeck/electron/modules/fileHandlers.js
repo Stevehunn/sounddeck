@@ -10,31 +10,67 @@ const { normalizeNetworkError } = require('./networkUtils')
 // ─── FONCTION POUR TROUVER FFMPEG ───────────────────────────────────────
 
 function findFFmpeg() {
+  const { app } = require('electron')
+  const isDev = !app?.isPackaged
+
   try {
-    try {
-      const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg')
-      if (ffmpegInstaller && ffmpegInstaller.path) {
-        return ffmpegInstaller.path
+    const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg')
+    if (ffmpegInstaller && ffmpegInstaller.path) {
+      // En prod, electron-builder transforme le path pour pointer vers
+      // app.asar.unpacked si le package est dans asarUnpack.
+      const p = ffmpegInstaller.path.replace('app.asar', 'app.asar.unpacked')
+      if (fs.existsSync(p)) {
+        if (isDev) console.log('✅ [findFFmpeg] @ffmpeg-installer →', p)
+        return p
+      } else {
+        console.warn('⚠️ [findFFmpeg] @ffmpeg-installer path introuvable:', p)
       }
-    } catch (e) {}
-
-    try {
-      const ffmpegStatic = require('ffmpeg-static')
-      if (ffmpegStatic) {
-        return ffmpegStatic
-      }
-    } catch (e) {}
-
-    try {
-      const { execSync } = require('child_process')
-      execSync('ffmpeg -version', { stdio: 'ignore' })
-      return 'ffmpeg'
-    } catch (e) {}
-
-    return null
+    }
   } catch (e) {
-    return null
+    if (isDev) console.log('ℹ️ [findFFmpeg] @ffmpeg-installer indisponible')
   }
+
+  try {
+    const ffmpegStatic = require('ffmpeg-static')
+    if (ffmpegStatic) {
+      const p = String(ffmpegStatic).replace('app.asar', 'app.asar.unpacked')
+      if (fs.existsSync(p)) {
+        if (isDev) console.log('✅ [findFFmpeg] ffmpeg-static →', p)
+        return p
+      } else {
+        console.warn('⚠️ [findFFmpeg] ffmpeg-static path introuvable:', p)
+      }
+    }
+  } catch (e) {
+    if (isDev) console.log('ℹ️ [findFFmpeg] ffmpeg-static indisponible')
+  }
+
+  try {
+    const candidates = [
+      path.join(process.resourcesPath || '', 'app.asar.unpacked', 'node_modules', 'ffmpeg-static', 'ffmpeg.exe'),
+      path.join(process.resourcesPath || '', 'app.asar.unpacked', 'node_modules', 'ffmpeg-static', 'ffmpeg'),
+      path.join(process.resourcesPath || '', 'ffmpeg.exe'),
+      path.join(process.resourcesPath || '', 'ffmpeg'),
+    ]
+    for (const c of candidates) {
+      if (c && fs.existsSync(c)) {
+        console.log('✅ [findFFmpeg] resourcesPath fallback →', c)
+        return c
+      }
+    }
+  } catch (e) {
+  }
+
+  try {
+    const { execSync } = require('child_process')
+    execSync('ffmpeg -version', { stdio: 'ignore' })
+    if (isDev) console.log('✅ [findFFmpeg] ffmpeg système (PATH)')
+    return 'ffmpeg'
+  } catch (e) {
+  }
+
+  console.error('❌ [findFFmpeg] ffmpeg introuvable (dev + prod)')
+  return null
 }
 
 // ─── FONCTION POUR TROUVER YT-DLP ────────────────────────────────────────

@@ -111,11 +111,11 @@ export default {
   toggleShortcutSet: 'Atajo de alternancia definido:',
   toggleShortcutRemoved: 'Atajo de alternancia eliminado',
   mixerResynced: 'Mezclador resincronizado',
-  backupDeleted: 'Copia de seguridad eliminada',
+  backupDeleted: '✅ Copia de seguridad eliminada',
   backupSuccess: '✅ Copia de seguridad completada',
   backupRestored: '✅ Copia de seguridad restaurada',
   backupsExported: '✅ Copias de seguridad exportadas',
-  backupsImported: 'copias de seguridad importadas',
+  backupsImported: '✅ {count} copias de seguridad importadas',
 
   // ─── MENÚ ─────────────────────────────────────────────────────────────
   menuFavoriteAdd: 'Añadir a favoritos',

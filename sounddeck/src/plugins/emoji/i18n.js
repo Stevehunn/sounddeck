@@ -5,6 +5,7 @@ export default {
   fr: {
     // ─── PAGE PRINCIPALE ─────────────────────────────────────────────
     emojiDiscoverTitle: 'Découvrir des emojis',
+    pluginNameEmoji: 'Découverte d\'emojis',
     emojiDiscoverSub: 'Enrichissez votre collection',
     emojiDiscoverLoading: 'Chargement des emojis...',
     emojiDiscoverError: 'Erreur de chargement',
@@ -56,6 +57,7 @@ export default {
   en: {
     // ─── MAIN PAGE ───────────────────────────────────────────────────
     emojiDiscoverTitle: 'Discover emojis',
+    pluginNameEmoji: 'Emoji Discovery',
     emojiDiscoverSub: 'Expand your collection',
     emojiDiscoverLoading: 'Loading emojis...',
     emojiDiscoverError: 'Loading error',
@@ -107,6 +109,7 @@ export default {
   es: {
     // ─── PÁGINA PRINCIPAL ────────────────────────────────────────────
     emojiDiscoverTitle: 'Descubrir emojis',
+    pluginNameEmoji: 'Descubrir emojis',
     emojiDiscoverSub: 'Amplía tu colección',
     emojiDiscoverLoading: 'Cargando emojis...',
     emojiDiscoverError: 'Error de carga',

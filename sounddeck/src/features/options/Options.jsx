@@ -33,6 +33,7 @@ import {
 import { initBackupManager, stopAutoBackup, startAutoBackup } from '@shared/utils/backupManager'
 import useConfirm from '@shared/hooks/useConfirm'
 import { clearAllErrorLogs } from '@shared/utils/errorHandler'
+import { usePlugins } from '@core/plugins/PluginContext'
 
 const SECTIONS = [
   { id: 'appearance', icon: 'ti-palette', labelKey: 'optionsAppearance' },
@@ -128,6 +129,7 @@ export default function Options({ store, addToast }) {
   const { t, currentLang, changeLanguage, version: langVersion } = useLanguage()
   const [, setLangVersion] = useState(0)
   const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
+  const { pluginManager } = usePlugins()
   const [activeSection, setActiveSection] = useState('appearance')
   const [audioDevices, setAudioDevices] = useState([])
   const [isDetecting, setIsDetecting] = useState(false)
@@ -145,12 +147,22 @@ export default function Options({ store, addToast }) {
   // ─── CHARGEMENT DES PLUGINS ────────────────────────────────────────────────
   const loadPlugins = useCallback(async () => {
     try {
-      const installed = await window.electronAPI.getInstalledPlugins?.() || []
-      setPlugins(installed)
+      const loaded = pluginManager.getLoadedPlugins()
+
+      let diskPlugins = []
+      try {
+        diskPlugins = await window.electronAPI.getInstalledPlugins?.() || []
+      } catch (e) {
+      }
+
+      const loadedIds = new Set(loaded.map(p => p.id))
+      const diskOnly = diskPlugins.filter(p => !loadedIds.has(p.id))
+
+      setPlugins([...loaded, ...diskOnly])
     } catch (e) {
       console.warn('Erreur chargement plugins:', e)
     }
-  }, [])
+  }, [pluginManager])
 
   useEffect(() => {
     loadPlugins()
@@ -1354,7 +1366,7 @@ export default function Options({ store, addToast }) {
                     </div>
                     <div>
                       <div style={{ fontWeight: 500, fontSize: 13 }}>
-                        {plugin.name}
+                        {plugin.nameKey ? t(plugin.nameKey) : plugin.name}
                         <span style={{ 
                           fontSize: 10, 
                           color: 'var(--text-tertiary)',

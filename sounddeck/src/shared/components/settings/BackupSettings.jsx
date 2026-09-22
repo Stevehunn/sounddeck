@@ -124,7 +124,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
       try {
         const result = await importBackups(file)
         if (result.success) {
-          addToast(`${result.count} ${t('backupsImported')}`, 'success')
+          addToast(t('backupsImported', { count: result.count }), 'success')
           await loadBackups()
         } else {
           addToast(result.error || t('error'), 'error')

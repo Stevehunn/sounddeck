@@ -416,6 +416,7 @@ export class PluginManager {
     return Array.from(this.plugins.values()).map((p) => ({
       id: p.id,
       name: p.name || p.id,
+      nameKey: p.nameKey || null,
       version: p.version || '1.0.0',
       author: p.author || 'Inconnu',
       loadedAt: p.loadedAt,

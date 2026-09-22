@@ -7,6 +7,8 @@ export default {
   trimmerFileSelected: 'File selected',
   trimmerTrimTitle: 'Trim sound',
   trimmerRegionSelected: 'Selection: {start} → {end}',
+  trimmerRegionSelectedWithDuration: 'Selected region: {start} → {end} ({duration})',
+  trimmerErrorWithDetail: 'Error: {error}',
   trimmerInstallFfmpeg: 'Install ffmpeg-static via npm for precise trimming.',
 
   trimmerStart: 'Selection start',

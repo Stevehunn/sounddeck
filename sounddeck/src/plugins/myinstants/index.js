@@ -4,6 +4,7 @@ import MyInstantsDiscover from './Discover.jsx'
 const MyInstantsPlugin = {
   id: 'myinstants',
   name: 'MyInstants Discovery',
+  nameKey: 'pluginNameMyInstants',
   version: '1.0.0',
   author: 'SoundDeck Team',
   description: 'Recherche et ajout de sons depuis MyInstants',

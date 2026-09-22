@@ -6,6 +6,7 @@ export default {
   fr: {
     // ─── PAGE PRINCIPALE ──────────────────────────────────────────────────────
     myinstantsTitle: 'Découverte',
+    pluginNameMyInstants: 'Découverte MyInstants',
     myinstantsSub: 'Sons disponibles',
     myinstantsSearch: 'Rechercher ',
     myinstantsSearchPlaceholder: 'Rechercher un son...',
@@ -14,6 +15,7 @@ export default {
     myinstantsStop: 'Arrêter',
     myinstantsAdded: 'Son ajouté à la bibliothèque !',
     myinstantsError: 'Erreur lors de la recherche',
+    myinstantsErrorWithDetail: 'Erreur : {detail}',
     myinstantsNetworkError: 'Pas de connexion internet. Vérifiez votre réseau puis réessayez.',
     myinstantsNetworkTimeout: 'Le serveur met trop de temps à répondre. Réessayez plus tard.',
     myinstantsNoResults: 'Aucun son trouvé',
@@ -137,6 +139,7 @@ export default {
   en: {
     // ─── MAIN PAGE ──────────────────────────────────────────────────────────
     myinstantsTitle: 'Discovery',
+    pluginNameMyInstants: 'MyInstants Discovery',
     myinstantsSub: 'Sounds available',
     myinstantsSearch: 'Search ',
     myinstantsSearchPlaceholder: 'Search a sound...',
@@ -145,7 +148,7 @@ export default {
     myinstantsStop: 'Stop',
     myinstantsAdded: 'Sound added to library!',
     myinstantsError: 'Error during search',
-    // ✅ FIX S.C/T6+ : dedicated network error messages
+    myinstantsErrorWithDetail: 'Error: {detail}',
     myinstantsNetworkError: 'No internet connection. Check your network and try again.',
     myinstantsNetworkTimeout: 'Server is taking too long to respond. Please try again later.',
     myinstantsNoResults: 'No sounds found',
@@ -269,6 +272,7 @@ export default {
   es: {
     // ─── PÁGINA PRINCIPAL ──────────────────────────────────────────────────
     myinstantsTitle: 'Descubrimiento',
+    pluginNameMyInstants: 'Descubrir MyInstants',
     myinstantsSub: 'Sonidos disponibles',
     myinstantsSearch: 'Buscar ',
     myinstantsSearchPlaceholder: 'Buscar un sonido...',
@@ -277,7 +281,7 @@ export default {
     myinstantsStop: 'Detener',
     myinstantsAdded: '¡Sonido añadido a la biblioteca!',
     myinstantsError: 'Error durante la búsqueda',
-    // ✅ FIX S.C/T6+ : mensajes de error de red dedicados
+    myinstantsErrorWithDetail: 'Error: {detail}',
     myinstantsNetworkError: 'Sin conexión a internet. Verifica tu red e inténtalo de nuevo.',
     myinstantsNetworkTimeout: 'El servidor tarda demasiado en responder. Inténtalo más tarde.',
     myinstantsNoResults: 'No se encontraron sonidos',
