@@ -3,7 +3,6 @@ export default {
   fr: {
     // ─── PAGE PRINCIPALE ──────────────────────────────────────────────────────
     youtubeTitle: 'Import YouTube',
-    pluginNameYoutube: 'Import YouTube',
     youtubeSub: "Extraire l'audio depuis une vidéo YouTube",
     pasteUrl: 'Collez le lien YouTube',
     ytUrlPlaceholder: 'https://www.youtube.com/watch?v=...',
@@ -21,8 +20,8 @@ export default {
     downloadAudio: "Télécharger l'audio",
     ytDownloading: 'Téléchargement...',
     ytAudioDownloading: 'Téléchargement audio en cours...',
-    ytAudioReady: 'Audio téléchargé ! Configurez le son.',
-    ytDownloadError: 'Erreur téléchargement :',
+    ytAudioReady: '✅ Audio téléchargé ! Configurez le son.',
+    ytDownloadError: '❌ Erreur de téléchargement : {detail}',
     configSound: 'Configurer le son',
     ytSaveSubtitle: "Dernière étape avant l'ajout à votre bibliothèque",
     ytSuccessTitle: 'Audio téléchargé avec succès',
@@ -30,8 +29,8 @@ export default {
     ytSoundNamePlaceholder: 'Nom du son',
     ytProfilesLabel: 'Ajouter au(x) profil(s)',
     addToLibrary: 'Ajouter à la bibliothèque',
-    ytSoundAdded: 'ajouté à la bibliothèque !',
-    ytFetchError: 'Erreur :',
+    ytSoundAdded: '✅ "{name}" ajouté à la bibliothèque !',
+    ytFetchError: '❌ Erreur : {detail}',
     ytDownloadErrorUnknown: 'Erreur inconnue',
     ytImageAdded: '✅ Image ajoutée',
     ytImageChange: 'Changer',
@@ -40,6 +39,10 @@ export default {
     unknownTitle: 'Titre inconnu',
     unknownArtist: 'Artiste inconnu',
     videoThumbnail: 'Vignette de la vidéo',
+
+    ytGenericError: '❌ Erreur',
+    ytPreviewError: '❌ Impossible de lire ce son',
+    ytSaveError: '❌ Erreur lors de la sauvegarde : {detail}',
 
     // ─── PROGRESSION ───────────────────────────────────────────────────────────
     extractingAudio: 'Extraction de l\'audio...',
@@ -73,10 +76,10 @@ export default {
     ytdlpChecking: 'Vérification de yt-dlp...',
     ytdlpDownloading: 'Téléchargement de yt-dlp en cours...',
     ytdlpInstalled: 'yt-dlp installé avec succès !',
-    ytdlpInstallError: 'Erreur installation :',
+    ytdlpInstallError: '❌ Erreur d\'installation : {detail}',
 
     // ─── PLATEFORMES ─────────────────────────────────────────────────────────
-    platformDetected: 'Plateforme détectée : {platform}',
+    platformDetected: '✅ Plateforme détectée : {platform}',
     platformNotSupported: 'Plateforme non supportée',
     platformSpotify: 'Spotify',
     platformSoundCloud: 'SoundCloud',
@@ -139,23 +142,23 @@ export default {
     tutorialYoutubeStep1Title: 'Coller un lien YouTube',
     tutorialYoutubeStep1Desc: 'Collez l\'URL d\'une vidéo YouTube pour importer son audio dans SoundDeck.',
     tutorialYoutubeStep1Hint: '💡 Astuce : Fonctionne aussi avec YouTube Music, Spotify et SoundCloud.',
-    
+
     tutorialYoutubeStep2Title: 'Chargement des informations',
     tutorialYoutubeStep2Desc: 'SoundDeck récupère automatiquement les informations de la vidéo (titre, durée, vignette).',
     tutorialYoutubeStep2Hint: '💡 Astuce : Le chargement peut prendre quelques secondes selon la connexion.',
-    
+
     tutorialYoutubeStep3Title: 'Sélectionner une portion',
     tutorialYoutubeStep3Desc: 'Choisissez la portion de la vidéo à importer en ajustant les curseurs de début et de fin.',
     tutorialYoutubeStep3Hint: '💡 Astuce : Vous pouvez écouter la sélection avant de télécharger.',
-    
+
     tutorialYoutubeStep4Title: 'Télécharger l\'audio',
     tutorialYoutubeStep4Desc: 'Cliquez sur "Télécharger l\'audio" pour extraire la portion sélectionnée.',
     tutorialYoutubeStep4Hint: '💡 Astuce : Le téléchargement peut prendre quelques secondes selon la durée de la vidéo.',
-    
+
     tutorialYoutubeStep5Title: 'Configurer le son',
     tutorialYoutubeStep5Desc: 'Après le téléchargement, personnalisez le nom, l\'image et les profils du son.',
     tutorialYoutubeStep5Hint: '💡 Astuce : Vous pouvez ajouter une image personnalisée ou laisser l\'emoji par défaut.',
-    
+
     tutorialYoutubeStep6Title: 'Ajouter à la bibliothèque',
     tutorialYoutubeStep6Desc: 'Cliquez sur "Ajouter à la bibliothèque" pour enregistrer le son dans vos profils.',
     tutorialYoutubeStep6Hint: '💡 Astuce : Le son sera disponible dans la page d\'accueil et dans les profils sélectionnés.',
@@ -164,7 +167,6 @@ export default {
   en: {
     // ─── MAIN PAGE ──────────────────────────────────────────────────────────
     youtubeTitle: 'YouTube Import',
-    pluginNameYoutube: 'YouTube Import',
     youtubeSub: 'Extract audio from a YouTube video',
     pasteUrl: 'Paste the YouTube link',
     ytUrlPlaceholder: 'https://www.youtube.com/watch?v=...',
@@ -182,8 +184,8 @@ export default {
     downloadAudio: 'Download audio',
     ytDownloading: 'Downloading...',
     ytAudioDownloading: 'Downloading audio...',
-    ytAudioReady: 'Audio downloaded! Configure the sound.',
-    ytDownloadError: 'Download error:',
+    ytAudioReady: '✅ Audio downloaded! Configure the sound.',
+    ytDownloadError: '❌ Download error: {detail}',
     configSound: 'Configure sound',
     ytSaveSubtitle: 'Last step before adding to your library',
     ytSuccessTitle: 'Audio downloaded successfully',
@@ -191,8 +193,8 @@ export default {
     ytSoundNamePlaceholder: 'Sound name',
     ytProfilesLabel: 'Add to profile(s)',
     addToLibrary: 'Add to library',
-    ytSoundAdded: 'added to library!',
-    ytFetchError: 'Error:',
+    ytSoundAdded: '✅ "{name}" added to library!',
+    ytFetchError: '❌ Error: {detail}',
     ytDownloadErrorUnknown: 'Unknown error',
     ytImageAdded: '✅ Image added',
     ytImageChange: 'Change',
@@ -201,6 +203,10 @@ export default {
     unknownTitle: 'Unknown title',
     unknownArtist: 'Unknown artist',
     videoThumbnail: 'Video thumbnail',
+
+    ytGenericError: '❌ Error',
+    ytPreviewError: '❌ Unable to play this sound',
+    ytSaveError: '❌ Save error: {detail}',
 
     // ─── PROGRESS ────────────────────────────────────────────────────────────
     extractingAudio: 'Extracting audio...',
@@ -234,10 +240,10 @@ export default {
     ytdlpChecking: 'Checking yt-dlp...',
     ytdlpDownloading: 'Downloading yt-dlp...',
     ytdlpInstalled: 'yt-dlp installed successfully!',
-    ytdlpInstallError: 'Installation error:',
+    ytdlpInstallError: '❌ Installation error: {detail}',
 
     // ─── PLATFORMS ──────────────────────────────────────────────────────────
-    platformDetected: 'Platform detected: {platform}',
+    platformDetected: '✅ Platform detected: {platform}',
     platformNotSupported: 'Platform not supported',
     platformSpotify: 'Spotify',
     platformSoundCloud: 'SoundCloud',
@@ -300,23 +306,23 @@ export default {
     tutorialYoutubeStep1Title: 'Paste a YouTube link',
     tutorialYoutubeStep1Desc: 'Paste the URL of a YouTube video to import its audio into SoundDeck.',
     tutorialYoutubeStep1Hint: '💡 Tip: Also works with YouTube Music, Spotify and SoundCloud.',
-    
+
     tutorialYoutubeStep2Title: 'Loading information',
     tutorialYoutubeStep2Desc: 'SoundDeck automatically retrieves video information (title, duration, thumbnail).',
     tutorialYoutubeStep2Hint: '💡 Tip: Loading may take a few seconds depending on your connection.',
-    
+
     tutorialYoutubeStep3Title: 'Select a portion',
     tutorialYoutubeStep3Desc: 'Choose the portion of the video to import by adjusting the start and end sliders.',
     tutorialYoutubeStep3Hint: '💡 Tip: You can listen to the selection before downloading.',
-    
+
     tutorialYoutubeStep4Title: 'Download audio',
     tutorialYoutubeStep4Desc: 'Click "Download audio" to extract the selected portion.',
     tutorialYoutubeStep4Hint: '💡 Tip: Download may take a few seconds depending on the video length.',
-    
+
     tutorialYoutubeStep5Title: 'Configure the sound',
     tutorialYoutubeStep5Desc: 'After downloading, customize the name, image and profiles of the sound.',
     tutorialYoutubeStep5Hint: '💡 Tip: You can add a custom image or keep the default emoji.',
-    
+
     tutorialYoutubeStep6Title: 'Add to library',
     tutorialYoutubeStep6Desc: 'Click "Add to library" to save the sound to your profiles.',
     tutorialYoutubeStep6Hint: '💡 Tip: The sound will be available on the home page and in selected profiles.',
@@ -325,7 +331,6 @@ export default {
   es: {
     // ─── PÁGINA PRINCIPAL ──────────────────────────────────────────────────
     youtubeTitle: 'Importar YouTube',
-    pluginNameYoutube: 'Importar YouTube',
     youtubeSub: 'Extraer audio de un vídeo de YouTube',
     pasteUrl: 'Pega el enlace de YouTube',
     ytUrlPlaceholder: 'https://www.youtube.com/watch?v=...',
@@ -343,8 +348,8 @@ export default {
     downloadAudio: 'Descargar audio',
     ytDownloading: 'Descargando...',
     ytAudioDownloading: 'Descargando audio...',
-    ytAudioReady: '¡Audio descargado! Configura el sonido.',
-    ytDownloadError: 'Error de descarga:',
+    ytAudioReady: '✅ ¡Audio descargado! Configura el sonido.',
+    ytDownloadError: '❌ Error de descarga: {detail}',
     configSound: 'Configurar sonido',
     ytSaveSubtitle: 'Último paso antes de añadir a tu biblioteca',
     ytSuccessTitle: 'Audio descargado con éxito',
@@ -352,8 +357,8 @@ export default {
     ytSoundNamePlaceholder: 'Nombre del sonido',
     ytProfilesLabel: 'Añadir a perfil(es)',
     addToLibrary: 'Añadir a la biblioteca',
-    ytSoundAdded: '¡añadido a la biblioteca!',
-    ytFetchError: 'Error:',
+    ytSoundAdded: '✅ "{name}" añadido a la biblioteca!',
+    ytFetchError: '❌ Error: {detail}',
     ytDownloadErrorUnknown: 'Error desconocido',
     ytImageAdded: '✅ Imagen añadida',
     ytImageChange: 'Cambiar',
@@ -362,6 +367,10 @@ export default {
     unknownTitle: 'Título desconocido',
     unknownArtist: 'Artista desconocido',
     videoThumbnail: 'Miniatura del video',
+
+    ytGenericError: '❌ Error',
+    ytPreviewError: '❌ No se puede reproducir este sonido',
+    ytSaveError: '❌ Error al guardar: {detail}',
 
     // ─── PROGRESIÓN ──────────────────────────────────────────────────────────
     extractingAudio: 'Extrayendo audio...',
@@ -395,10 +404,10 @@ export default {
     ytdlpChecking: 'Verificando yt-dlp...',
     ytdlpDownloading: 'Descargando yt-dlp...',
     ytdlpInstalled: '¡yt-dlp instalado correctamente!',
-    ytdlpInstallError: 'Error de instalación:',
+    ytdlpInstallError: '❌ Error de instalación: {detail}',
 
     // ─── PLATAFORMAS ────────────────────────────────────────────────────────
-    platformDetected: 'Plataforma detectada: {platform}',
+    platformDetected: '✅ Plataforma detectada: {platform}',
     platformNotSupported: 'Plataforma no soportada',
     platformSpotify: 'Spotify',
     platformSoundCloud: 'SoundCloud',
@@ -461,23 +470,23 @@ export default {
     tutorialYoutubeStep1Title: 'Pegar un enlace de YouTube',
     tutorialYoutubeStep1Desc: 'Pega la URL de un video de YouTube para importar su audio a SoundDeck.',
     tutorialYoutubeStep1Hint: '💡 Consejo: También funciona con YouTube Music, Spotify y SoundCloud.',
-    
+
     tutorialYoutubeStep2Title: 'Cargando información',
     tutorialYoutubeStep2Desc: 'SoundDeck recupera automáticamente la información del video (título, duración, miniatura).',
     tutorialYoutubeStep2Hint: '💡 Consejo: La carga puede tardar unos segundos dependiendo de tu conexión.',
-    
+
     tutorialYoutubeStep3Title: 'Seleccionar una porción',
     tutorialYoutubeStep3Desc: 'Elige la porción del video para importar ajustando los controles de inicio y fin.',
     tutorialYoutubeStep3Hint: '💡 Consejo: Puedes escuchar la selección antes de descargar.',
-    
+
     tutorialYoutubeStep4Title: 'Descargar audio',
     tutorialYoutubeStep4Desc: 'Haz clic en "Descargar audio" para extraer la porción seleccionada.',
     tutorialYoutubeStep4Hint: '💡 Consejo: La descarga puede tardar unos segundos según la duración del video.',
-    
+
     tutorialYoutubeStep5Title: 'Configurar el sonido',
     tutorialYoutubeStep5Desc: 'Después de descargar, personaliza el nombre, la imagen y los perfiles del sonido.',
     tutorialYoutubeStep5Hint: '💡 Consejo: Puedes añadir una imagen personalizada o mantener el emoji por defecto.',
-    
+
     tutorialYoutubeStep6Title: 'Añadir a la biblioteca',
     tutorialYoutubeStep6Desc: 'Haz clic en "Añadir a la biblioteca" para guardar el sonido en tus perfiles.',
     tutorialYoutubeStep6Hint: '💡 Consejo: El sonido estará disponible en la página de inicio y en los perfiles seleccionados.',

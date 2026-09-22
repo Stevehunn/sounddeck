@@ -39,7 +39,7 @@ export default function YouTube({ store, addToast }) {
     const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
     const { showNoConnection, ensureOnline } = useNetwork()
 
-    // ─── ÉTATS ──────────────────────────────────────────────────────────────────
+    // ─── ÉTATS ──────────────────────────────────────────────────────────────
     const [ytdlpStatus, setYtdlpStatus] = useState(() => {
         if (globalCheckDone) {
             return globalYtdlpStatus ?? 'missing'
@@ -73,7 +73,7 @@ export default function YouTube({ store, addToast }) {
     const [useThumbnail, setUseThumbnail] = useState(false)
     const [showEmojiPicker, setShowEmojiPicker] = useState(false)
 
-    // ─── REFS ──────────────────────────────────────────────────────────────────
+    // ─── REFS ──────────────────────────────────────────────────────────────
     const isMounted = useRef(true)
     const fetchingRef = useRef(false)
     const initDone = useRef(false)
@@ -82,8 +82,10 @@ export default function YouTube({ store, addToast }) {
     const hasCompletedSave = useRef(false)
     const hideProgressTimeoutRef = useRef(null)
     const resetTimerRef = useRef(null)
+
     const isProcessingRef = useRef(false)
     const forceUpdateListenersRef = useRef([])
+
     const tRef = useRef(t)
     useEffect(() => { tRef.current = t }, [t])
 
@@ -106,7 +108,7 @@ export default function YouTube({ store, addToast }) {
             setShowProgress(false)
             setIsProcessing(false)
             setToastShown(true)
-            addToast('✅ ' + tRef.current('ytAudioReady'), 'success')
+            addToast(tRef.current('ytAudioReady'), 'success')
         }
     }, [step, showProgress, toastShown, addToast])
 
@@ -122,7 +124,12 @@ export default function YouTube({ store, addToast }) {
         if (targetProfiles.length > 0) return
 
         const userProfiles = store.profiles.filter(p => p.id !== 'all')
-        if (userProfiles.length === 0) return
+
+        // Cas limite : aucun profil custom → on pré-sélectionne "all"
+        if (userProfiles.length === 0) {
+            setTargetProfiles(['all'])
+            return
+        }
 
         if (isTutorialMode()) {
             setTargetProfiles(userProfiles.map(p => p.id))
@@ -387,18 +394,29 @@ export default function YouTube({ store, addToast }) {
                 addToast(t('ytdlpInstalled'), 'success')
             } else {
                 if (result?.isNetworkError) {
-                    showNoConnection()
+                    const online = await ensureOnline()
+                    if (!online) return
+                    addToast(
+                        t('ytdlpInstallError', { detail: result?.error || t('unknownError') }),
+                        'error'
+                    )
                 } else {
-                    addToast(t('ytdlpInstallError') + ' ' + (result?.error || t('unknownError')), 'error')
+                    addToast(
+                        t('ytdlpInstallError', { detail: result?.error || t('unknownError') }),
+                        'error'
+                    )
                 }
             }
         } catch (error) {
             setDownloading(false)
             if (error?.isNetworkError) {
-                showNoConnection()
-            } else {
-                addToast(t('ytdlpInstallError') + ' ' + error.message, 'error')
+                const online = await ensureOnline()
+                if (!online) return
             }
+            addToast(
+                t('ytdlpInstallError', { detail: error.message }),
+                'error'
+            )
         }
     }
 
@@ -440,16 +458,14 @@ export default function YouTube({ store, addToast }) {
 
             if (!result?.success && result?.isNetworkError) {
                 const online = await ensureOnline()
-                if (!online) {
-                    setLoadingInfo(false)
-                    fetchingRef.current = false
-                    setIsProcessing(false)
-                    return
-                }
-                addToast(t('ytFetchError') + ' ' + (result?.error || t('unknownError')), 'error')
                 setLoadingInfo(false)
                 fetchingRef.current = false
                 setIsProcessing(false)
+                if (!online) return
+                addToast(
+                    t('ytFetchError', { detail: result?.error || t('unknownError') }),
+                    'error'
+                )
                 return
             }
 
@@ -484,23 +500,35 @@ export default function YouTube({ store, addToast }) {
                     }, 100)
                 }
 
-                addToast(`✅ ${t('platformDetected').replace('{platform}', info.platform || t('platformYoutube'))}`, 'success')
+                addToast(
+                    t('platformDetected', { platform: info.platform || t('platformYoutube') }),
+                    'success'
+                )
             } else {
-                addToast(t('ytFetchError') + ' ' + (result?.error || t('unknownError')), 'error')
+                addToast(
+                    t('ytFetchError', { detail: result?.error || t('unknownError') }),
+                    'error'
+                )
             }
         } catch (error) {
             console.error('❌ [YouTube] Erreur handleFetchInfo:', error)
             if (error?.isNetworkError) {
-                showNoConnection()
-            } else {
-                addToast(t('ytFetchError') + ' ' + error.message, 'error')
+                const online = await ensureOnline()
+                setLoadingInfo(false)
+                fetchingRef.current = false
+                setIsProcessing(false)
+                if (!online) return
             }
+            addToast(
+                t('ytFetchError', { detail: error.message }),
+                'error'
+            )
         }
 
         setLoadingInfo(false)
         fetchingRef.current = false
         setIsProcessing(false)
-    }, [url, addToast, t, isTutorialMode, showNoConnection])
+    }, [url, addToast, t, isTutorialMode, ensureOnline])
 
     // ─── PRÉVISUALISATION ─────────────────────────────────────────────────────
     const togglePreview = (filePath) => {
@@ -524,7 +552,8 @@ export default function YouTube({ store, addToast }) {
                     setPreviewHowl(null)
                 },
                 onloaderror: () => {
-                    addToast('❌ ' + t('error'), 'error')
+                    // ✅ T4 : plus d'emoji hardcodé
+                    addToast(t('ytPreviewError'), 'error')
                     setIsPreviewPlaying(false)
                     setPreviewHowl(null)
                 }
@@ -535,7 +564,7 @@ export default function YouTube({ store, addToast }) {
             howl.play()
         } catch (error) {
             console.error('❌ [YouTube] Erreur togglePreview:', error)
-            addToast('❌ ' + t('error'), 'error')
+            addToast(t('ytPreviewError'), 'error')
         }
     }
 
@@ -545,7 +574,7 @@ export default function YouTube({ store, addToast }) {
         const currentPlatform = platform || globalPlatform
 
         if (!currentVideoInfo) {
-            addToast(t('ytFetchError'), 'error')
+            addToast(t('ytFetchError', { detail: t('unknownError') }), 'error')
             return
         }
 
@@ -634,10 +663,13 @@ export default function YouTube({ store, addToast }) {
                 setShowProgress(false)
                 setIsProcessing(false)
                 if (result?.isNetworkError) {
-                    showNoConnection()
-                } else {
-                    addToast(t('ytDownloadError') + ' ' + (result?.error || t('unknownError')), 'error')
+                    const online = await ensureOnline()
+                    if (!online) return
                 }
+                addToast(
+                    t('ytDownloadError', { detail: result?.error || t('unknownError') }),
+                    'error'
+                )
             }
         } catch (error) {
             console.error('❌ [YouTube] Erreur téléchargement:', error)
@@ -646,14 +678,16 @@ export default function YouTube({ store, addToast }) {
             isProcessingRef.current = false
             setImporting(false)
             setIsProcessing(false)
-            // ✅ FIX S.C
             if (error?.isNetworkError) {
-                showNoConnection()
-            } else {
-                addToast(t('ytDownloadError') + ' ' + error.message, 'error')
+                const online = await ensureOnline()
+                if (!online) return
             }
+            addToast(
+                t('ytDownloadError', { detail: error.message }),
+                'error'
+            )
         }
-    }, [videoInfo, platform, soundName, start, end, addToast, t, startProgressSimulation, stopProgressSimulation, isTutorialMode, showNoConnection])
+    }, [videoInfo, platform, soundName, start, end, addToast, t, startProgressSimulation, stopProgressSimulation, isTutorialMode, ensureOnline])
 
     // ─── SAUVEGARDE ──────────────────────────────────────────────────────────
     const handleSave = useCallback(async () => {
@@ -671,7 +705,7 @@ export default function YouTube({ store, addToast }) {
         }
 
         if (!currentDownloadedPath) {
-            addToast(t('ytDownloadError'), 'error')
+            addToast(t('ytDownloadError', { detail: t('unknownError') }), 'error')
             return
         }
 
@@ -760,8 +794,12 @@ export default function YouTube({ store, addToast }) {
 
             clearInterval(saveInterval)
 
-            addToast(`✅ "${currentSoundName.trim()}" ${t('ytSoundAdded')}`, 'success')
+            addToast(
+                t('ytSoundAdded', { name: currentSoundName.trim() }),
+                'success'
+            )
 
+            // Reset des states locaux
             setUrl('')
             setVideoInfo(null)
             setDownloadedPath(null)
@@ -812,7 +850,10 @@ export default function YouTube({ store, addToast }) {
             setShowProgress(false)
             setDownloadProgress(0)
             setDownloadStatus('')
-            addToast('❌ ' + t('error') + ': ' + error.message, 'error')
+            addToast(
+                t('ytSaveError', { detail: error.message }),
+                'error'
+            )
         }
     }, [soundName, downloadedPath, getFinalImage, useThumbnail, videoInfo, targetProfiles, store, addToast, t, confirm, previewHowl, emoji, isTutorialMode])
 
@@ -1168,9 +1209,9 @@ export default function YouTube({ store, addToast }) {
             return null
         }
 
-        const userProfiles = store.profiles.filter(p => p.id !== 'all')
+        const availableProfiles = store.profiles || []
         const noProfilesSelected = targetProfiles.length === 0
-        const noUserProfiles = userProfiles.length === 0
+        const noUserProfiles = availableProfiles.length === 0
 
         return (
             <>
@@ -1407,8 +1448,11 @@ export default function YouTube({ store, addToast }) {
                                     </div>
                                 ) : (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                        {userProfiles.map(p => {
+                                        {availableProfiles.map(p => {
                                             const isChecked = targetProfiles.includes(p.id)
+                                            const isAll = p.id === 'all'
+                                            const iconClass = isAll ? 'ti-stack' : 'ti-user'
+                                            const label = isAll ? t('allSounds') : p.name
                                             return (
                                                 <label
                                                     key={p.id}
@@ -1437,8 +1481,8 @@ export default function YouTube({ store, addToast }) {
                                                         }}
                                                         style={{ accentColor: 'var(--accent)', width: 'auto' }}
                                                     />
-                                                    <i className="ti ti-user" style={{ color: 'var(--text-secondary)' }} />
-                                                    {p.name}
+                                                    <i className={`ti ${iconClass}`} style={{ color: 'var(--text-secondary)' }} />
+                                                    {label}
                                                 </label>
                                             )
                                         })}
