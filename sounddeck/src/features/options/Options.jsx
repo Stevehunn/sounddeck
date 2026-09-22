@@ -129,7 +129,7 @@ export default function Options({ store, addToast }) {
   const { t, currentLang, changeLanguage, version: langVersion } = useLanguage()
   const [, setLangVersion] = useState(0)
   const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
-  const { pluginManager } = usePlugins()
+  const { pluginManager, refresh: refreshPlugins } = usePlugins()
   const [activeSection, setActiveSection] = useState('appearance')
   const [audioDevices, setAudioDevices] = useState([])
   const [isDetecting, setIsDetecting] = useState(false)
@@ -138,6 +138,7 @@ export default function Options({ store, addToast }) {
   const [isMicrophoneTesting, setIsMicrophoneTesting] = useState(false)
   const [showPluginInstaller, setShowPluginInstaller] = useState(false)
   const [plugins, setPlugins] = useState([])
+  const [disabledPlugins, setDisabledPlugins] = useState([])
   const [advancedAudioOpen, setAdvancedAudioOpen] = useState(false)
   const micTestRef = useRef(null)
   const sectionRefs = useRef({})
@@ -148,17 +149,9 @@ export default function Options({ store, addToast }) {
   const loadPlugins = useCallback(async () => {
     try {
       const loaded = pluginManager.getLoadedPlugins()
-
-      let diskPlugins = []
-      try {
-        diskPlugins = await window.electronAPI.getInstalledPlugins?.() || []
-      } catch (e) {
-      }
-
-      const loadedIds = new Set(loaded.map(p => p.id))
-      const diskOnly = diskPlugins.filter(p => !loadedIds.has(p.id))
-
-      setPlugins([...loaded, ...diskOnly])
+      const disabled = pluginManager.getDisabledPlugins()
+      setPlugins(loaded)
+      setDisabledPlugins(disabled)
     } catch (e) {
       console.warn('Erreur chargement plugins:', e)
     }
@@ -453,14 +446,53 @@ export default function Options({ store, addToast }) {
   }, [t, addToast])
 
   const handlePluginUninstall = useCallback(async (plugin) => {
-    const result = await window.electronAPI.uninstallPlugin?.(plugin.id)
-    if (result?.success) {
-      addToast(t('pluginsUninstallSuccess').replace('{name}', plugin.name), 'info')
+    try {
+      // 1. Décharge du PluginManager + marque comme désactivé (permanent)
+      await pluginManager.unloadPlugin(plugin.id, { permanent: true })
+
+      // 2. Pour les plugins externes, supprime aussi du disque
+      if (!plugin.isIntegrated) {
+        try {
+          await window.electronAPI.uninstallPlugin?.(plugin.id)
+        } catch (e) {
+          // silencieux — la suppression disque est secondaire
+        }
+      }
+
+      // 3. Rafraîchit l'UI plugin context (pages + plugins)
+      refreshPlugins?.()
+
+      // 4. Rafraîchit l'état local
       await loadPlugins()
-    } else {
-      addToast(t('pluginsUninstallError') + ': ' + (result?.error || ''), 'error')
+
+      addToast(
+        t('pluginsUninstallSuccess').replace('{name}', plugin.nameKey ? t(plugin.nameKey) : plugin.name),
+        'info'
+      )
+    } catch (e) {
+      console.error('Erreur uninstall plugin:', e)
+      addToast(t('pluginsUninstallError') + ': ' + e.message, 'error')
     }
-  }, [t, addToast, loadPlugins])
+  }, [t, addToast, loadPlugins, pluginManager, refreshPlugins])
+
+  const handlePluginEnable = useCallback(async (pluginMeta) => {
+    try {
+      const ok = await pluginManager.enablePlugin(pluginMeta.id)
+      if (ok) {
+        refreshPlugins?.()
+        await loadPlugins()
+        addToast(
+          t('pluginsUninstallSuccess').replace('{name}', pluginMeta.nameKey ? t(pluginMeta.nameKey) : pluginMeta.name),
+          'success'
+        )
+      } else {
+        addToast(t('pluginsUninstallError'), 'error')
+      }
+    } catch (e) {
+      console.error('Erreur enable plugin:', e)
+      addToast(t('pluginsUninstallError') + ': ' + e.message, 'error')
+    }
+  }, [t, addToast, loadPlugins, pluginManager, refreshPlugins])
 
   const handleDeleteBackup = useCallback(async (index) => {
     try {
@@ -1433,6 +1465,89 @@ export default function Options({ store, addToast }) {
                 </div>
               ))}
             </div>
+
+            {/* section plugins désactivés */}
+            {disabledPlugins.length > 0 && (
+              <div style={{
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                overflow: 'hidden',
+                marginTop: 12,
+              }}>
+                <div style={{
+                  padding: '8px 14px',
+                  background: 'var(--bg-tertiary)',
+                  borderBottom: '1px solid var(--border)',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: 'var(--text-secondary)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                }}>
+                  <span>🔒 {t('pluginsDisabledTitle')}</span>
+                  <span>{disabledPlugins.length}</span>
+                </div>
+
+                {disabledPlugins.map((plugin) => (
+                  <div
+                    key={plugin.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 14px',
+                      borderBottom: '1px solid var(--border)',
+                      background: 'var(--bg-secondary)',
+                      opacity: 0.75,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+                      <div style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 8,
+                        background: 'var(--bg-tertiary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 18,
+                        opacity: 0.5,
+                      }}>
+                        🧩
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 500, fontSize: 13, color: 'var(--text-secondary)' }}>
+                          {plugin.nameKey ? t(plugin.nameKey) : plugin.name}
+                          <span style={{
+                            fontSize: 10,
+                            color: 'var(--text-tertiary)',
+                            marginLeft: 8,
+                            fontWeight: 400,
+                          }}>
+                            v{plugin.version}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                          <i className="ti ti-lock" style={{ fontSize: 10, marginRight: 4 }} />
+                          {t('pluginsDisabledStatus')}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      className="btn-secondary btn-sm"
+                      onClick={() => handlePluginEnable(plugin)}
+                      style={{ fontSize: 11, padding: '4px 12px' }}
+                      title={t('pluginsEnableBtn')}
+                    >
+                      <i className="ti ti-refresh" /> {t('pluginsEnableBtn')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div style={{ 
               fontSize: 11, 

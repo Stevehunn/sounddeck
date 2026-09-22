@@ -4,10 +4,15 @@
  */
 import { DEFAULT_ICONS, DEFAULT_GROUPS } from '@shared/constants/navigation'
 
+// ─── CLÉS STORE ─────────────────────────────────────────────────────────
+
+const STORE_KEY_DISABLED = 'disabledPlugins'
+const STORE_KEY_DISABLED_META = 'disabledPluginsMeta'
+
 // ─── PLUGINS INTÉGRÉS (bundlés) ─────────────────────────────────────────
+
 const INTEGRATED_PLUGIN_LOADERS = import.meta.glob('../../plugins/*/index.js')
 
-// Map : { 'myinstants' → loader, 'youtube' → loader, 'emoji' → loader }
 const INTEGRATED_PLUGINS = (() => {
   const map = new Map()
   for (const [path, loader] of Object.entries(INTEGRATED_PLUGIN_LOADERS)) {
@@ -25,12 +30,11 @@ const INTEGRATED_PLUGIN_IDS = new Set(INTEGRATED_PLUGINS.keys())
 
 const CORE_PAGES_DEFS = [
   { id: 'home', labelKey: 'mySounds', group: 'navigation' },
-  { id: 'discover', labelKey: 'discover', group: 'navigation' },
   { id: 'trimmer', labelKey: 'trimmer', group: 'navigation' },
   { id: 'editor', labelKey: 'editor', group: 'navigation' },
   { id: 'sequencer', labelKey: 'sequencer', group: 'navigation' },
-  { id: 'youtube', labelKey: 'youtube', group: 'navigation' },
   { id: 'stats', labelKey: 'stats', group: 'navigation' },
+  { id: 'emoji', labelKey: 'emojiPageTitle', group: 'navigation' },
   { id: 'guide', labelKey: 'guide', group: 'footer' },
   { id: 'options', labelKey: 'options', group: 'footer' },
 ]
@@ -54,30 +58,92 @@ export class PluginManager {
     this._initialized = false
     this._loadingPlugins = new Set()
     this.store = null
+
+    // cache des pages
+    this._pagesCache = null
+    this._pagesCacheKey = null
+    this._pagesVersion = 0
+
+    // plugins désactivés (persistant)
+    this._disabledPlugins = new Set()
+    this._disabledPluginsMeta = {}
+    this._disabledLoaded = false
   }
 
-  /**
-   * Initialise le gestionnaire de plugins.
-   * Charge d'abord les plugins INTÉGRÉS (bundlés), puis les EXTERNES.
-   */
+  // ─── DISABLED PLUGINS ────────────────────────────────────────────────
+
+  async _ensureDisabledLoaded() {
+    if (this._disabledLoaded) return
+    this._disabledLoaded = true
+
+    try {
+      const rawList = await window.electronAPI?.storeGet?.(STORE_KEY_DISABLED)
+      if (Array.isArray(rawList)) {
+        this._disabledPlugins = new Set(rawList)
+      }
+      const rawMeta = await window.electronAPI?.storeGet?.(STORE_KEY_DISABLED_META)
+      if (rawMeta && typeof rawMeta === 'object') {
+        this._disabledPluginsMeta = { ...rawMeta }
+      }
+    } catch (e) {
+      console.warn('[PluginManager] Erreur chargement disabled plugins:', e)
+    }
+  }
+
+  async _saveDisabled() {
+    try {
+      await window.electronAPI?.storeSet?.(
+        STORE_KEY_DISABLED,
+        Array.from(this._disabledPlugins)
+      )
+      await window.electronAPI?.storeSet?.(
+        STORE_KEY_DISABLED_META,
+        this._disabledPluginsMeta
+      )
+    } catch (e) {
+      console.warn('[PluginManager] Erreur save disabled plugins:', e)
+    }
+  }
+
+  isPluginDisabled(pluginId) {
+    return this._disabledPlugins.has(pluginId)
+  }
+
+  getDisabledPlugins() {
+    return Object.values(this._disabledPluginsMeta || {})
+  }
+
+  // ─── INIT ────────────────────────────────────────────────────────────
+
   async initialize(store) {
     if (this._initialized) return
     this.store = store
 
     try {
-      // 1. Plugins intégrés — toujours chargés
+      await this._ensureDisabledLoaded()
+
+      // 1. Plugins intégrés — skip si désactivés
       for (const [pluginId, loader] of INTEGRATED_PLUGINS) {
-        await this.loadPlugin({ id: pluginId, enabled: true, _integrated: true, _loader: loader })
+        if (this._disabledPlugins.has(pluginId)) {
+          console.log(`⏸️ [PluginManager] Plugin intégré ${pluginId} désactivé`)
+          continue
+        }
+        await this.loadPlugin({
+          id: pluginId,
+          enabled: true,
+          _integrated: true,
+          _loader: loader,
+        })
       }
 
-      // 2. Plugins externes — installés par l'utilisateur dans userData/plugins
-      //    Note : les IDs déjà chargés (intégrés) sont skippés.
+      // 2. Plugins externes
       const installedPlugins =
         (await window.electronAPI?.getInstalledPlugins?.()) || []
 
       for (const pluginInfo of installedPlugins) {
         if (pluginInfo.enabled === false) continue
-        if (INTEGRATED_PLUGIN_IDS.has(pluginInfo.id)) continue // déjà chargé
+        if (INTEGRATED_PLUGIN_IDS.has(pluginInfo.id)) continue
+        if (this._disabledPlugins.has(pluginInfo.id)) continue
         await this.loadPlugin(pluginInfo)
       }
 
@@ -89,11 +155,8 @@ export class PluginManager {
     }
   }
 
-  /**
-   * Charge un plugin.
-   * - Si le plugin est INTÉGRÉ : utilise le loader pré-bundlé via import.meta.glob
-   * - Sinon : tentative de chargement dynamique (dev only en pratique)
-   */
+  // ─── LOAD PLUGIN ─────────────────────────────────────────────────────
+
   async loadPlugin(pluginInfo) {
     if (this._loadingPlugins.has(pluginInfo.id)) {
       console.warn(`⚠️ Plugin ${pluginInfo.id} déjà en cours de chargement`)
@@ -116,7 +179,6 @@ export class PluginManager {
 
       let pluginModule = null
 
-      //  Cas 1 : plugin intégré (bundlé par Vite)
       if (pluginInfo._loader) {
         try {
           pluginModule = await pluginInfo._loader()
@@ -126,8 +188,6 @@ export class PluginManager {
           return false
         }
       } else {
-        // Cas 2 : plugin externe — on tente les chemins connus
-        // (fonctionne en dev uniquement ; en prod c'est limité, cf O5)
         const paths = [
           `../../plugins/${pluginInfo.id}/index.js`,
           `../../plugins/${pluginInfo.id}/index.jsx`,
@@ -149,7 +209,6 @@ export class PluginManager {
         }
 
         if (!pluginModule) {
-          // Fallback : chemin disque (résolution par Vite en dev)
           try {
             const fullPath = await window.electronAPI?.getPluginPath?.(
               pluginInfo.id
@@ -183,6 +242,7 @@ export class PluginManager {
       this.plugins.set(plugin.id, {
         ...plugin,
         info: pluginInfo,
+        isIntegrated: INTEGRATED_PLUGIN_IDS.has(plugin.id),
         loadedAt: Date.now(),
       })
 
@@ -196,7 +256,6 @@ export class PluginManager {
           })
 
           if (page.component && typeof page.component !== 'string') {
-            // Composant React déjà résolu par l'import statique du plugin
             this.components.set(page.id, page.component)
           }
         }
@@ -207,6 +266,7 @@ export class PluginManager {
       }
 
       this.runHook('onPluginLoad', plugin)
+      this.invalidatePagesCache()
 
       this._loadingPlugins.delete(plugin.id)
       return true
@@ -217,17 +277,29 @@ export class PluginManager {
     }
   }
 
+  // ─── UNLOAD PLUGIN ───────────────────────────────────────────────────
+
   /**
    * Décharge un plugin.
+   * @param {string} pluginId
+   * @param {{ permanent?: boolean }} [options]
+   *   - permanent: true → ajoute le plugin à la liste des désactivés persistants
+   *     (à utiliser pour les plugins intégrés qu'on ne peut pas supprimer du disque)
    */
-  async unloadPlugin(pluginId) {
+  async unloadPlugin(pluginId, options = {}) {
+    const { permanent = false } = options
     const plugin = this.plugins.get(pluginId)
     if (!plugin) return false
 
-    if (typeof plugin.destroy === 'function') {
-      await plugin.destroy()
+    try {
+      if (typeof plugin.destroy === 'function') {
+        await plugin.destroy()
+      }
+    } catch (e) {
+      console.warn(`⚠️ Erreur destroy() du plugin ${pluginId}:`, e)
     }
 
+    // Retirer les pages enregistrées
     const pageIds = Array.from(this.pages.keys())
     for (const pageId of pageIds) {
       if (this.pages.get(pageId).pluginId === pluginId) {
@@ -238,14 +310,82 @@ export class PluginManager {
 
     this.plugins.delete(pluginId)
     this.runHook('onPluginUnload', plugin)
+    this.invalidatePagesCache()
+
+    if (permanent) {
+      await this._ensureDisabledLoaded()
+      this._disabledPlugins.add(pluginId)
+
+      // Stocker les métadonnées pour pouvoir les réafficher dans Options
+      this._disabledPluginsMeta[pluginId] = {
+        id: pluginId,
+        name: plugin.name || pluginId,
+        nameKey: plugin.nameKey || null,
+        version: plugin.version || '1.0.0',
+        author: plugin.author || 'Inconnu',
+        isIntegrated: INTEGRATED_PLUGIN_IDS.has(pluginId),
+        disabledAt: Date.now(),
+      }
+
+      await this._saveDisabled()
+    }
 
     return true
   }
 
+  // ─── ENABLE PLUGIN ───────────────────────────────────────────────────
+
   /**
-   * Récupère toutes les pages (core + plugins + profils).
+   * Réactive un plugin précédemment désactivé.
    */
+  async enablePlugin(pluginId) {
+    await this._ensureDisabledLoaded()
+
+    this._disabledPlugins.delete(pluginId)
+    delete this._disabledPluginsMeta[pluginId]
+    await this._saveDisabled()
+    this.invalidatePagesCache()
+
+    // Tentative de rechargement
+    if (INTEGRATED_PLUGINS.has(pluginId)) {
+      const loader = INTEGRATED_PLUGINS.get(pluginId)
+      return this.loadPlugin({
+        id: pluginId,
+        enabled: true,
+        _integrated: true,
+        _loader: loader,
+      })
+    }
+
+    // Plugin externe : rechargement depuis le disque
+    try {
+      const installedPlugins =
+        (await window.electronAPI?.getInstalledPlugins?.()) || []
+      const info = installedPlugins.find((p) => p.id === pluginId)
+      if (info) {
+        return this.loadPlugin(info)
+      }
+    } catch (e) {
+      // silencieux
+    }
+
+    return false
+  }
+
+  // ─── CACHE / PAGES ───────────────────────────────────────────────────
+
+  invalidatePagesCache() {
+    this._pagesVersion++
+    this._pagesCache = null
+    this._pagesCacheKey = null
+  }
+
   getAllPages(translateFn) {
+    const cacheKey = `${this._pagesVersion}|${translateFn ? 't' : 'no-t'}`
+    if (this._pagesCache && this._pagesCacheKey === cacheKey) {
+      return this._pagesCache
+    }
+
     const t = translateFn || ((key) => key)
 
     const corePages = CORE_PAGES_DEFS.map(({ id, labelKey, group }) => ({
@@ -265,7 +405,11 @@ export class PluginManager {
 
     const storePages = this._getStorePages()
 
-    return [...corePages, ...pluginPages, ...storePages]
+    const result = [...corePages, ...pluginPages, ...storePages]
+
+    this._pagesCache = result
+    this._pagesCacheKey = cacheKey
+    return result
   }
 
   _getStorePages() {
@@ -292,9 +436,6 @@ export class PluginManager {
     return this.pages.has(pageId)
   }
 
-  /**
-   * Récupère le composant d'une page plugin.
-   */
   async getPluginComponent(pageId) {
     if (this.components.has(pageId)) {
       return this.components.get(pageId)
@@ -331,7 +472,6 @@ export class PluginManager {
         return null
       }
 
-      // Production : tenté via IPC (limité, cf O5)
       const pluginPath = await window.electronAPI?.getPluginComponentPath?.(
         page.pluginId,
         page.id
@@ -350,6 +490,8 @@ export class PluginManager {
 
     return null
   }
+
+  // ─── COMPAT / UTILS ──────────────────────────────────────────────────
 
   _checkCompatibility(pluginInfo) {
     const appVersion = pluginInfo.appVersion || '1.3.0'
@@ -421,6 +563,7 @@ export class PluginManager {
       author: p.author || 'Inconnu',
       loadedAt: p.loadedAt,
       pages: p.pages?.length || 0,
+      isIntegrated: p.isIntegrated === true,
     }))
   }
 

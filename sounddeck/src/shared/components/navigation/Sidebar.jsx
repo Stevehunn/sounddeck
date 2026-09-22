@@ -18,7 +18,6 @@ const getDefaultLabels = (t) => ({
   editor: t('editor'),
   sequencer: t('sequencer'),
   youtube: t('youtube'),
-  // ✅ NOUVEAU
   emoji: t('emojiPageTitle'),
   loop: t('loop'),
   shortcuts: t('shortcuts'),
@@ -66,6 +65,17 @@ const Sidebar = memo(
     const stableVisibleItemsRef = useRef({ pinned: [], groups: {} })
     const [visibleItems, setVisibleItems] = useState({ pinned: [], groups: {} })
 
+    const CORE_PAGE_IDS = useMemo(() => new Set([
+      'home', 'trimmer', 'editor', 'sequencer', 'stats', 'emoji', 'guide', 'options',
+    ]), [])
+
+    const ACTION_IDS_SET = useMemo(() => new Set(ACTION_IDS), [])
+
+    const pluginPageIds = useMemo(
+      () => new Set((pluginPages || []).filter(p => p.isPlugin).map(p => p.id)),
+      [pluginPages]
+    )
+
     useEffect(() => {
       window.electronAPI
         .getGlobalShortcutsState()
@@ -104,7 +114,16 @@ const Sidebar = memo(
         group: getItemGroup(item),
       }))
 
-      const visible = updatedItems.filter((item) => item.visible !== false)
+      const visible = updatedItems.filter((item) => {
+        if (item.visible === false) return false
+        const id = item.id
+        if (!id) return false
+        if (id.startsWith('profile-')) return true
+        if (CORE_PAGE_IDS.has(id)) return true
+        if (ACTION_IDS_SET.has(id)) return true
+        // Sinon, c'est censé être une page plugin → doit être chargée
+        return pluginPageIds.has(id)
+      })
       const pinned = visible.filter((item) => item.pinned === true)
       const others = visible.filter((item) => item.pinned !== true)
 
@@ -124,8 +143,7 @@ const Sidebar = memo(
         setVisibleItems(newVisibleItems)
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sidebarConfig, t, profiles, pluginPages])
-
+    }, [sidebarConfig, t, profiles, pluginPages, CORE_PAGE_IDS, ACTION_IDS_SET, pluginPageIds])
     const getItemLabel = (item, defaultLabels) => {
       if (item.id && item.id.startsWith('profile-')) {
         const profileId = item.id.replace('profile-', '')
@@ -1095,12 +1113,9 @@ const Sidebar = memo(
       prevProps.loopEnabled === nextProps.loopEnabled &&
       prevProps.volume === nextProps.volume &&
       prevProps.sounds === nextProps.sounds &&
-      JSON.stringify(prevProps.profiles) ===
-        JSON.stringify(nextProps.profiles) &&
-      JSON.stringify(prevProps.sidebarConfig) ===
-        JSON.stringify(nextProps.sidebarConfig) &&
-      JSON.stringify(prevProps.pluginPages) ===
-        JSON.stringify(nextProps.pluginPages)
+      prevProps.profiles === nextProps.profiles &&
+      prevProps.sidebarConfig === nextProps.sidebarConfig &&
+      prevProps.pluginPages === nextProps.pluginPages
     )
   }
 )

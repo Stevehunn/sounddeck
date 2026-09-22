@@ -1,5 +1,5 @@
 // src/core/plugins/PluginContext.jsx
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { pluginManager } from './PluginManager'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
@@ -12,13 +12,17 @@ export function PluginProvider({ children, store }) {
   const [error, setError] = useState(null)
   const { t } = useLanguage()
 
+  const storeRef = useRef(store)
+  storeRef.current = store
+
   useEffect(() => {
     const init = async () => {
       try {
         if (!pluginManager._initialized) {
-          await pluginManager.initialize(store)
+          await pluginManager.initialize(storeRef.current)
           setPlugins(pluginManager.getLoadedPlugins())
         }
+        pluginManager.invalidatePagesCache()
         setPages(pluginManager.getAllPages(t))
         setLoaded(true)
       } catch (e) {
@@ -28,9 +32,16 @@ export function PluginProvider({ children, store }) {
       }
     }
     init()
-  }, [store, t])
+  }, [t])
+
+  useEffect(() => {
+    if (!loaded) return
+    pluginManager.invalidatePagesCache()
+    setPages(pluginManager.getAllPages(t))
+  }, [store.profiles, loaded, t])
 
   const refresh = useCallback(() => {
+    pluginManager.invalidatePagesCache()
     setPlugins(pluginManager.getLoadedPlugins())
     setPages(pluginManager.getAllPages(t))
   }, [t])
@@ -47,8 +58,6 @@ export function PluginProvider({ children, store }) {
     return result
   }, [refresh])
 
-  // ✅ FIX S.A/B3 : value mémoïsé → évite les cascades de re-renders
-  //    chez les consommateurs de usePlugins().
   const value = useMemo(() => ({
     pluginManager,
     plugins,

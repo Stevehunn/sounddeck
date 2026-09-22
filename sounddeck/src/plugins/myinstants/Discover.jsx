@@ -4,6 +4,7 @@ import { Howl } from 'howler'
 import { CATEGORIES, CATEGORIES_LIST, DEFAULT_CATEGORIES } from './categories'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { useNetwork } from '@shared/contexts'
+import { getItem, setItem } from '@shared/utils/appStorage'
 
 export default function MyInstantsDiscover({ store, addToast }) {
   const { t, currentLang } = useLanguage()
@@ -47,29 +48,39 @@ export default function MyInstantsDiscover({ store, addToast }) {
 
   const loadCategoryPreferences = useCallback(async () => {
     try {
-      let saved = await window.electronAPI?.storeGet?.(STORE_KEY_CATEGORIES)
+      let saved = await getItem(STORE_KEY_CATEGORIES)
 
-      if (!Array.isArray(saved)) {
-        const legacy = localStorage.getItem(LEGACY_LS_KEY)
-        if (legacy) {
-          try {
-            const parsed = JSON.parse(legacy)
-            if (Array.isArray(parsed)) {
-              saved = parsed
-              await window.electronAPI?.storeSet?.(STORE_KEY_CATEGORIES, parsed)
-              localStorage.removeItem(LEGACY_LS_KEY)
+      if (saved) {
+        try {
+          const parsed = typeof saved === 'string' ? JSON.parse(saved) : saved
+          if (Array.isArray(parsed)) {
+            const validCategories = parsed.filter(id => CATEGORIES[id])
+            if (validCategories.length > 0) {
+              setSelectedCategories(validCategories)
+              return validCategories
             }
-          } catch (e) {
-            // silencieux
           }
+        } catch (e) {
+          // silencieux
         }
       }
 
-      if (Array.isArray(saved) && saved.length > 0) {
-        const validCategories = saved.filter(id => CATEGORIES[id])
-        if (validCategories.length > 0) {
-          setSelectedCategories(validCategories)
-          return validCategories
+      // Migration legacy localStorage
+      const legacy = localStorage.getItem(LEGACY_LS_KEY)
+      if (legacy) {
+        try {
+          const parsed = JSON.parse(legacy)
+          if (Array.isArray(parsed)) {
+            await setItem(STORE_KEY_CATEGORIES, JSON.stringify(parsed))
+            localStorage.removeItem(LEGACY_LS_KEY)
+            const validCategories = parsed.filter(id => CATEGORIES[id])
+            if (validCategories.length > 0) {
+              setSelectedCategories(validCategories)
+              return validCategories
+            }
+          }
+        } catch (e) {
+          // silencieux
         }
       }
     } catch (e) {
@@ -83,7 +94,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
 
   const saveCategoryPreferences = useCallback(async (categoryIds) => {
     try {
-      await window.electronAPI?.storeSet?.(STORE_KEY_CATEGORIES, categoryIds)
+      await setItem(STORE_KEY_CATEGORIES, JSON.stringify(categoryIds))
       setSelectedCategories(categoryIds)
     } catch (e) {
       console.warn('Erreur sauvegarde préférences catégories:', e)
@@ -141,7 +152,9 @@ export default function MyInstantsDiscover({ store, addToast }) {
       let result
 
       if (mode === 'local' || mode === 'trending') {
-        result = await fetchWithTimeout(window.electronAPI.fetchMyinstants('', mode === 'local' ? 'local' : 'trending', currentLang))
+        result = await fetchWithTimeout(
+          window.electronAPI.fetchMyinstants('', mode === 'local' ? 'local' : 'trending', currentLang)
+        )
       } else if (mode === 'multi') {
         const terms = query.split(',').map(t => t.trim()).filter(Boolean)
         const allResults = []
@@ -745,6 +758,8 @@ export default function MyInstantsDiscover({ store, addToast }) {
 
   useEffect(() => {
     const init = async () => {
+      await ensureCacheLoaded()
+
       const selected = await loadCategoryPreferences()
 
       if (selected.length > 0) {
@@ -1216,9 +1231,60 @@ export default function MyInstantsDiscover({ store, addToast }) {
   )
 }
 
-// ─── FONCTIONS DE CACHE ──────────────────────────────────────────────────
+// ─── FONCTIONS DE CACHE (persistées via electron-store) ────────
 
+const STORE_KEY_CACHE = 'myinstantsCategoryCache'
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24h
+
+// Cache mémoire (rapide, source de vérité à la lecture)
 const categoryCache = new Map()
+let cacheLoaded = false
+let persistTimer = null
+
+/**
+ * Charge le cache depuis electron-store (une seule fois par session).
+ */
+async function ensureCacheLoaded() {
+  if (cacheLoaded) return
+  cacheLoaded = true
+
+  try {
+    const raw = await getItem(STORE_KEY_CACHE)
+    if (!raw) return
+
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (!parsed || typeof parsed !== 'object') return
+
+    const now = Date.now()
+    for (const [key, entry] of Object.entries(parsed)) {
+      if (!entry?.sounds || !entry?.fetchedAt) continue
+      if (now - entry.fetchedAt > CACHE_TTL_MS) continue // expiré
+      categoryCache.set(key, entry.sounds)
+    }
+  } catch (e) {
+    console.warn('[Discover] Erreur chargement cache:', e)
+  }
+}
+
+/**
+ * Persiste le cache (debounce 1s pour éviter les writes spam).
+ */
+function persistCache() {
+  if (persistTimer) clearTimeout(persistTimer)
+  persistTimer = setTimeout(async () => {
+    persistTimer = null
+    try {
+      const now = Date.now()
+      const toStore = {}
+      for (const [key, sounds] of categoryCache) {
+        toStore[key] = { sounds, fetchedAt: now }
+      }
+      await setItem(STORE_KEY_CACHE, JSON.stringify(toStore))
+    } catch (e) {
+      console.warn('[Discover] Erreur persistance cache:', e)
+    }
+  }, 1000)
+}
 
 function getCachedCategory(categoryId) {
   return categoryCache.get(categoryId) || null
@@ -1226,6 +1292,7 @@ function getCachedCategory(categoryId) {
 
 function setCachedCategory(categoryId, sounds) {
   categoryCache.set(categoryId, sounds)
+  persistCache()
 }
 
 function getCacheInfo() {

@@ -1,3 +1,4 @@
+// src/shared/hooks/useKeyboardNavigation.js
 import { useEffect, useRef, useState, useCallback } from 'react'
 
 export function useKeyboardNavigation({
@@ -8,12 +9,18 @@ export function useKeyboardNavigation({
   onDelete,
   containerRef,
   autoFocus = false,
-  loop = true
+  loop = true,
 }) {
   const [focusedIndex, setFocusedIndex] = useState(-1)
   const itemRefs = useRef({})
 
-  // Définir un élément comme focus
+  const [isReady, setIsReady] = useState(false)
+
+  useEffect(() => {
+    const t = setTimeout(() => setIsReady(true), 0)
+    return () => clearTimeout(t)
+  }, [])
+
   const setFocus = useCallback((index) => {
     if (index < 0 || index >= items.length) return
     setFocusedIndex(index)
@@ -24,32 +31,33 @@ export function useKeyboardNavigation({
     }
   }, [items.length])
 
-  // Naviguer vers le haut/bas
   const navigate = useCallback((direction) => {
     if (items.length === 0) return
-    
+
     let newIndex
     if (focusedIndex === -1) {
       newIndex = direction === 'down' ? 0 : items.length - 1
     } else {
       newIndex = focusedIndex + direction
     }
-    
+
     if (loop) {
       if (newIndex < 0) newIndex = items.length - 1
       if (newIndex >= items.length) newIndex = 0
     } else {
       if (newIndex < 0 || newIndex >= items.length) return
     }
-    
+
     setFocus(newIndex)
   }, [focusedIndex, items.length, loop, setFocus])
 
-  // Gestionnaire de touches
   const handleKeyDown = useCallback((e) => {
-    // Ignorer si on est dans un champ de texte
     const target = e.target
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+    if (
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.tagName === 'SELECT'
+    ) {
       return
     }
 
@@ -58,26 +66,26 @@ export function useKeyboardNavigation({
         e.preventDefault()
         navigate(1)
         break
-        
+
       case 'ArrowUp':
         e.preventDefault()
         navigate(-1)
         break
-        
+
       case 'ArrowRight':
         e.preventDefault()
         if (onSelect && focusedIndex !== -1) {
           onSelect(items[focusedIndex], 'right')
         }
         break
-        
+
       case 'ArrowLeft':
         e.preventDefault()
         if (onSelect && focusedIndex !== -1) {
           onSelect(items[focusedIndex], 'left')
         }
         break
-        
+
       case 'Enter':
       case 'Space':
         e.preventDefault()
@@ -85,35 +93,35 @@ export function useKeyboardNavigation({
           onEnter(items[focusedIndex])
         }
         break
-        
+
       case 'Escape':
         e.preventDefault()
         if (onEscape) onEscape()
         setFocusedIndex(-1)
         break
-        
+
       case 'Delete':
       case 'Backspace':
         if (onDelete && focusedIndex !== -1) {
           onDelete(items[focusedIndex])
         }
         break
-        
+
       case 'Home':
         e.preventDefault()
         if (items.length > 0) setFocus(0)
         break
-        
+
       case 'End':
         e.preventDefault()
         if (items.length > 0) setFocus(items.length - 1)
         break
-        
+
       default:
         // Recherche rapide par lettre
         if (e.key.length === 1 && e.key.match(/[a-zA-Z0-9]/)) {
           const searchTerm = e.key.toLowerCase()
-          const foundIndex = items.findIndex(item => 
+          const foundIndex = items.findIndex(item =>
             item.name?.toLowerCase().startsWith(searchTerm)
           )
           if (foundIndex !== -1) {
@@ -124,15 +132,16 @@ export function useKeyboardNavigation({
     }
   }, [focusedIndex, items, navigate, onSelect, onEnter, onEscape, onDelete, setFocus])
 
-  // Enregistrer les écouteurs
   useEffect(() => {
+    if (!isReady) return
+
     const element = containerRef?.current || document
     element.addEventListener('keydown', handleKeyDown)
-    
+
     return () => {
       element.removeEventListener('keydown', handleKeyDown)
     }
-  }, [containerRef, handleKeyDown])
+  }, [containerRef, handleKeyDown, isReady])
 
   // Auto-focus
   useEffect(() => {
@@ -141,39 +150,35 @@ export function useKeyboardNavigation({
     }
   }, [autoFocus, items.length, setFocus])
 
-  // Réinitialiser quand les items changent
   useEffect(() => {
     setFocusedIndex(-1)
-  }, [items.length])
+  }, [items])
 
   return {
     focusedIndex,
     setFocus,
     navigate,
     itemRefs,
-    handleKeyDown
+    handleKeyDown,
   }
 }
 
-/**
- * Hook pour la navigation par tabs
- */
 export function useTabNavigation(containerRef) {
   const [tabOrder, setTabOrder] = useState([])
-  
+
   useEffect(() => {
     if (!containerRef?.current) return
-    
+
     const elements = containerRef.current.querySelectorAll(
       'button, [role="button"], a, input, select, textarea, [tabindex="0"]'
     )
     setTabOrder(Array.from(elements))
   }, [containerRef])
-  
+
   return tabOrder
 }
 
 export default {
   useKeyboardNavigation,
-  useTabNavigation
+  useTabNavigation,
 }

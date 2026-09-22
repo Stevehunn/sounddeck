@@ -150,6 +150,18 @@ function AppContent({ store }) {
     checkFirstLaunch()
   }, [])
 
+  useEffect(() => {
+    if (store.loading) return
+    if (isFirstLaunch === true) return
+    if (!pluginsLoaded) return
+
+    const PLUGIN_PAGE_IDS = ['discover', 'youtube', 'emoji-discover']
+
+    if (PLUGIN_PAGE_IDS.includes(currentPage) && !isPluginPage(currentPage)) {
+      setCurrentPage('home')
+    }
+  }, [currentPage, isPluginPage, pluginsLoaded, store.loading, isFirstLaunch])
+
   // Molette pour changer de profil
   useEffect(() => {
     const handleWheel = (e) => {

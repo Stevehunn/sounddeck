@@ -11,6 +11,7 @@ import useConfirm from '@shared/hooks/useConfirm'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 import EmojiPicker from '@shared/components/ui/EmojiPicker'
 import { DEFAULT_EMOJIS } from '@shared/constants/emojis'
+import { compressFileIfNeeded } from '@shared/utils/fileCompression'
 
 
 function formatSize(bytes) {
@@ -263,41 +264,20 @@ export default function Home({ store, addToast, loopEnabled }) {
       const fp = filePaths[i]
       let result = await window.electronAPI.importSoundFile(fp)
 
-      if (result.success && compressOnImport) {
-        try {
-          const originalPath = result.path
-          const ext = originalPath.split('.').pop() || 'mp3'
-          const compressedPath = originalPath.replace(`.${ext}`, `_compressed.${ext}`)
-          const format = ext === 'mp3' ? 'mp3' : 'aac'
-
-          const compressionResult = await window.electronAPI.convertAudio(
-            originalPath,
-            compressedPath,
-            format,
-            compressionBitrate
-          )
-
-          if (compressionResult?.success) {
-            const originalSize = compressionResult.originalSize || 0
-            const compressedSize = compressionResult.size || 0
-
-            result.path = compressedPath
-            result.compressed = true
-            result.originalSize = originalSize
-            result.compressedSize = compressedSize
-            result.compressionRatio = originalSize > 0 ? compressedSize / originalSize : 1
-
-            await window.electronAPI.deleteSoundFile(originalPath)
-          } else {
-            console.warn('⚠️ Compression échouée, utilisation du fichier original:', compressionResult?.error)
-          }
-        } catch (e) {
-          console.warn('⚠️ Erreur compression:', e)
-        }
+      if (result.success) {
+        const comp = await compressFileIfNeeded(result.path, {
+          enabled: compressOnImport,
+          bitrate: compressionBitrate,
+          onWarning: (msg) => console.warn('⚠️ Compression:', msg),
+        })
+        result.path = comp.path
+        result.compressed = comp.compressed
+        result.originalSize = comp.originalSize
+        result.compressedSize = comp.compressedSize
+        result.compressionRatio = comp.compressionRatio
       }
 
       if (result.success) {
-        // ✅ MODIFIÉ : DEFAULT_EMOJIS au lieu de EMOJIS
         await store.addSound({
           name: result.name,
           path: result.path,
@@ -388,30 +368,13 @@ export default function Home({ store, addToast, loopEnabled }) {
         }
 
         if (result.success) {
-          if (compressOnImport) {
-            try {
-              const originalPath = result.path
-              const ext = originalPath.split('.').pop() || 'mp3'
-              const compressedPath = originalPath.replace(`.${ext}`, `_compressed.${ext}`)
-              const format = ext === 'mp3' ? 'mp3' : 'aac'
+          const comp = await compressFileIfNeeded(result.path, {
+            enabled: compressOnImport,
+            bitrate: compressionBitrate,
+            onWarning: (msg) => console.warn('⚠️ Compression:', msg),
+          })
+          result.path = comp.path
 
-              const compressionResult = await window.electronAPI.convertAudio(
-                originalPath,
-                compressedPath,
-                format,
-                compressionBitrate
-              )
-
-              if (compressionResult?.success) {
-                result.path = compressedPath
-                await window.electronAPI.deleteSoundFile(originalPath)
-              }
-            } catch (e) {
-              console.warn('⚠️ Erreur compression:', e)
-            }
-          }
-
-          // ✅ MODIFIÉ : DEFAULT_EMOJIS au lieu de EMOJIS
           await store.addSound({
             name: result.name,
             path: result.path,
@@ -680,30 +643,12 @@ export default function Home({ store, addToast, loopEnabled }) {
             currentProfileId={currentProfileId}
             store={store}
             onManualAdd={async (name, filePath, imagePath, emoji) => {
-              let finalPath = filePath
-              const compressOnImport = store.compressOnImport || false
-
-              if (compressOnImport) {
-                try {
-                  const ext = filePath.split('.').pop() || 'mp3'
-                  const compressedPath = filePath.replace(`.${ext}`, `_compressed.${ext}`)
-                  const format = ext === 'mp3' ? 'mp3' : 'aac'
-
-                  const compressionResult = await window.electronAPI.convertAudio(
-                    filePath,
-                    compressedPath,
-                    format,
-                    store.compressionBitrate || 128
-                  )
-
-                  if (compressionResult?.success) {
-                    finalPath = compressedPath
-                    await window.electronAPI.deleteSoundFile(filePath)
-                  }
-                } catch (e) {
-                  console.warn('⚠️ Erreur compression:', e)
-                }
-              }
+              const comp = await compressFileIfNeeded(filePath, {
+                enabled: store.compressOnImport,
+                bitrate: store.compressionBitrate || 128,
+                onWarning: (msg) => console.warn('⚠️ Compression:', msg),
+              })
+              const finalPath = comp.path
 
               await store.addSound({
                 name,
@@ -727,27 +672,14 @@ export default function Home({ store, addToast, loopEnabled }) {
                 return
               }
               
-              if (result.success && store.compressOnImport) {
-                try {
-                  const ext = result.path.split('.').pop() || 'mp3'
-                  const compressedPath = result.path.replace(`.${ext}`, `_compressed.${ext}`)
-                  const format = ext === 'mp3' ? 'mp3' : 'aac'
-                  const originalPath = result.path
-
-                  const compressionResult = await window.electronAPI.convertAudio(
-                    originalPath,
-                    compressedPath,
-                    format,
-                    store.compressionBitrate || 128
-                  )
-
-                  if (compressionResult?.success) {
-                    result.path = compressedPath
-                    await window.electronAPI.deleteSoundFile(originalPath)
-                  }
-                } catch (e) {
-                  console.warn('⚠️ Erreur compression:', e)
-                }
+              if (result.success) {
+                const comp = await compressFileIfNeeded(result.path, {
+                  enabled: store.compressOnImport,
+                  bitrate: store.compressionBitrate || 128,
+                  onWarning: (msg) => console.warn('⚠️ Compression:', msg),
+                })
+                result.path = comp.path
+              
               }
 
               if (result.success) {

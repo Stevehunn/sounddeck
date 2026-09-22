@@ -1,5 +1,5 @@
 // src/shared/hooks/useEmojis.jsx
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { emojiService } from '@core/services/EmojiService'
 import {
   DEFAULT_EMOJIS,
@@ -11,13 +11,15 @@ export function useEmojis() {
   const [version, setVersion] = useState(0)
   const [loading, setLoading] = useState(!emojiService.loaded)
 
-  // Charge initialement + s'abonne aux changements
   useEffect(() => {
     let mounted = true
 
     if (!emojiService.loaded) {
       emojiService.load().then(() => {
-        if (mounted) setLoading(false)
+        if (mounted) {
+          setLoading(false)
+          setVersion(v => v + 1)
+        }
       })
     } else {
       setLoading(false)
@@ -33,12 +35,23 @@ export function useEmojis() {
     }
   }, [])
 
-  // ─── DONNÉES DÉRIVÉES ───────────────────────────────────────────────────
-  // Note : on utilise `version` pour forcer le recalcul à chaque notify
+  const customEmojis = useMemo(
+    () => emojiService.getCustomEmojis(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [version]
+  )
 
-  const customEmojis = emojiService.getCustomEmojis()
-  const customGrouped = emojiService.getCustomGrouped()
-  const allEmojis = emojiService.getAllEmojis()
+  const customGrouped = useMemo(
+    () => emojiService.getCustomGrouped(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [version]
+  )
+
+  const allEmojis = useMemo(
+    () => emojiService.getAllEmojis(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [version]
+  )
 
   // ─── ACTIONS (stables) ──────────────────────────────────────────────────
 
@@ -76,16 +89,10 @@ export function useEmojis() {
 
   // ─── HELPERS ────────────────────────────────────────────────────────────
 
-  /**
-   * Récupère le label d'une catégorie (custom ou par défaut).
-   * Retourne { id, label, icon, isCustom } ou null.
-   */
   const getCategoryInfo = useCallback((categoryId) => {
-    // Catégorie par défaut ?
     const defCat = EMOJI_CATEGORIES.find(c => c.id === categoryId)
     if (defCat) return { ...defCat, isCustom: false }
 
-    // Catégorie custom (uniquement si l'utilisateur a ajouté des emojis dedans)
     const emojisInCat = customGrouped[categoryId]
     if (emojisInCat && emojisInCat.length > 0) {
       return {

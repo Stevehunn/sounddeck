@@ -395,6 +395,9 @@ export default {
   pluginsWhereToFind: '¿Dónde encontrar plugins?',
   pluginsDescription: 'Los plugins son extensiones que añaden nuevas funciones a SoundDeck, como la importación de YouTube o el descubrimiento de MyInstants.',
   pluginsCommunityTip: 'Consulta la comunidad de SoundDeck para descubrir plugins creados por otros usuarios.',
+  pluginsDisabledTitle: 'Desactivados',
+  pluginsEnableBtn: 'Reactivar',
+  pluginsDisabledStatus: 'Desactivado',
 
   // ─── FEEDBACK ──────────────────────────────────────────────────────
   feedback: 'Enviar comentario',

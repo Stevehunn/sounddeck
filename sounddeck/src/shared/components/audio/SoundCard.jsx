@@ -8,12 +8,7 @@ import useConfirm from '@shared/hooks/useConfirm'
 import { formatTime } from '@shared/utils/format'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 import EmojiPicker from '@shared/components/ui/EmojiPicker'
-
-function convertOldVolumeToDb(oldVolume) {
-  if (oldVolume === undefined || oldVolume === null) return 0
-  if (oldVolume >= -24 && oldVolume <= 24) return oldVolume
-  return Math.round(((oldVolume - 50) / 50) * 24 * 10) / 10
-}
+import { convertOldVolumeToDb } from '@core/store/utils/volumeUtils'
 
 export default function SoundCard({
   sound,

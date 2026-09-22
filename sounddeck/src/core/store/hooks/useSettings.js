@@ -43,23 +43,10 @@ export function useSettings(initialState = {}, save) {
     }
   }, [save])
 
-  /**
-   * ✅ Hydrate le customTheme SANS toucher au thème actif.
-   * Utilisé uniquement au chargement initial du store.
-   */
   const hydrateCustomTheme = useCallback((colors) => {
     setCustomTheme(colors || null)
   }, [])
 
-  /**
-   * ✅ updateCustomTheme : sauvegarde toujours le customTheme,
-   * mais n'active 'custom' QUE si `options.activate === true`.
-   *
-   * @param {Object|null} colors - Palette custom
-   * @param {{ activate?: boolean }} options
-   *   - activate: true → passe le thème actif à 'custom' (bouton "Appliquer")
-   *   - activate: false (défaut) → met juste à jour le customTheme en arrière-plan
-   */
   const updateCustomTheme = useCallback(async (colors, options = {}) => {
     const { activate = false } = options
     setCustomTheme(colors)
@@ -70,13 +57,10 @@ export function useSettings(initialState = {}, save) {
     await save('customTheme', colors)
   }, [save])
 
-  const updateLang = useCallback(
-    async (newLang) => {
-      setLang(newLang)
-      await save('lang', newLang)
-    },
-    [save]
-  )
+  const updateLang = useCallback(async (newLang) => {
+    setLang(newLang)
+    await save('lang', newLang)
+  }, [save])
 
   const updateAudioDevice = useCallback(async (deviceId) => {
     setAudioDevice(deviceId)
@@ -193,6 +177,16 @@ export function useSettings(initialState = {}, save) {
     await window.electronAPI.updatePresentationShortcut(accelerator)
   }, [save])
 
+  const updateStartMinimized = useCallback(async (val) => {
+    setStartMinimized(val)
+    await save('startMinimized', val)
+  }, [save])
+
+  const updateLaunchAtStartup = useCallback(async (val) => {
+    setLaunchAtStartup(val)
+    await save('launchAtStartup', val)
+  }, [save])
+
   return {
     // États
     theme,
@@ -224,8 +218,8 @@ export function useSettings(initialState = {}, save) {
     presentationShortcut,
 
     // Setters
-    setStartMinimized: (val) => { setStartMinimized(val); save('startMinimized', val) },
-    setLaunchAtStartup: (val) => { setLaunchAtStartup(val); save('launchAtStartup', val) },
+    setStartMinimized: updateStartMinimized,
+    setLaunchAtStartup: updateLaunchAtStartup,
     updateTheme,
     updateCustomTheme,
     hydrateCustomTheme,

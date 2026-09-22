@@ -8,7 +8,7 @@ import { useEditor } from './hooks/useEditor'
 import { useMixer } from './hooks/useMixer'
 import { DEFAULT_SIDEBAR_CONFIG } from './utils/constants'
 import { normalizePath } from './utils/normalizePath'
-// ✅ NOUVEAU : imports pour la migration des items core (emoji, etc.)
+import { migrateSoundVolume } from './utils/volumeUtils'
 import {
   DEFAULT_GROUPS,
   DEFAULT_ICONS,
@@ -143,14 +143,7 @@ export function useStore() {
           window.electronAPI.storeGet('monitoringEnabled'),
         ])
 
-        // ✅ Normalisation des valeurs (mêmes règles qu'avant, juste regroupées)
-        const savedSounds = (rawSounds || []).map((s) => {
-          if (s.volumeDb !== undefined) return s
-          const oldVolume = s.volume ?? 100
-          const newDb = Math.round(((oldVolume - 50) / 50) * 24 * 10) / 10
-          return { ...s, volume: newDb, volumeDb: newDb }
-        })
-
+        const savedSounds = (rawSounds || []).map(migrateSoundVolume)
         const allProfile = { id: 'all', name: 'Tous les sons', isDefault: true }
         const userProfiles = (savedProfiles || []).filter((p) => p.id !== 'all')
         const allProfiles = [allProfile, ...userProfiles]

@@ -3,25 +3,87 @@
 
 let obsWebSocket = null
 let obsConnected = false
+
+const RECONNECT_MAX_ATTEMPTS = 5
+const RECONNECT_BASE_DELAY = 5000    // 5s
+const RECONNECT_MAX_DELAY = 60000    // 60s max
+
 let reconnectTimer = null
+let reconnectAttempts = 0
 
 // Configuration OBS par défaut
 const DEFAULT_OBS_CONFIG = {
   host: 'localhost',
   port: 4455,
   password: '',
-  reconnectInterval: 5000
+  reconnectInterval: 5000,
 }
 
-// ✅ S5 : mémoriser la dernière config utilisée pour la reconnexion
+// Mémoriser la dernière config utilisée pour la reconnexion
 let lastUsedConfig = { ...DEFAULT_OBS_CONFIG }
 
-/**
- * Connecte SoundDeck à OBS via WebSocket
- */
+// ─── BACKOFF ─────────────────────────────────────────────────────────────
+function cancelReconnect() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
+  reconnectAttempts = 0
+}
+
+function scheduleReconnect() {
+  if (reconnectTimer) return // déjà programmé
+
+  if (reconnectAttempts >= RECONNECT_MAX_ATTEMPTS) {
+    console.warn(
+      `⚠️ [OBS] Abandon reconnexion après ${RECONNECT_MAX_ATTEMPTS} tentatives — cliquez sur "Se connecter" pour réessayer`
+    )
+    return
+  }
+
+  const attempt = reconnectAttempts + 1
+  const delay = Math.min(
+    RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts),
+    RECONNECT_MAX_DELAY
+  )
+  reconnectAttempts++
+
+  console.log(
+    `🔄 [OBS] Reconnexion dans ${delay}ms (tentative ${attempt}/${RECONNECT_MAX_ATTEMPTS})`
+  )
+
+  reconnectTimer = setTimeout(async () => {
+    reconnectTimer = null
+
+    // Guard : si on nous a déconnectés entre-temps
+    if (obsConnected) return
+
+    try {
+      const result = await connectOBS(lastUsedConfig)
+      if (result?.success) {
+        reconnectAttempts = 0
+        console.log('✅ [OBS] Reconnexion réussie')
+      } else {
+        scheduleReconnect()
+      }
+    } catch (e) {
+      scheduleReconnect()
+    }
+  }, delay)
+}
+
+// ─── CONNEXION / DÉCONNEXION ─────────────────────────────────────────────
+
 export async function connectOBS(config = {}) {
+  cancelReconnect()
+
+  // Fermer proprement l'ancienne connexion si elle existe
+  if (obsWebSocket) {
+    try { obsWebSocket.disconnect() } catch (e) {}
+    obsWebSocket = null
+  }
+
   const finalConfig = { ...DEFAULT_OBS_CONFIG, ...config }
-  // ✅ S5 : sauvegarder la config pour la reconnexion
   lastUsedConfig = { ...finalConfig }
 
   try {
@@ -36,6 +98,8 @@ export async function connectOBS(config = {}) {
     )
 
     obsConnected = true
+    reconnectAttempts = 0 // reset au succès
+
     setupOBSEvents()
 
     return { success: true, connected: true }
@@ -46,10 +110,9 @@ export async function connectOBS(config = {}) {
   }
 }
 
-/**
- * Déconnecte OBS
- */
 export function disconnectOBS() {
+  cancelReconnect()
+
   if (obsWebSocket) {
     try {
       obsWebSocket.disconnect()
@@ -59,27 +122,20 @@ export function disconnectOBS() {
     obsWebSocket = null
   }
   obsConnected = false
-  if (reconnectTimer) {
-    clearInterval(reconnectTimer)
-    reconnectTimer = null
-  }
 }
 
-/**
- * Configure les événements OBS
- */
+// ─── ÉVÉNEMENTS ──────────────────────────────────────────────────────────
+
 function setupOBSEvents() {
   if (!obsWebSocket) return
 
   try {
     obsWebSocket.on('ConnectionClosed', () => {
       obsConnected = false
-      if (!reconnectTimer) {
-        // ✅ S5 : utiliser lastUsedConfig au lieu des defaults
-        reconnectTimer = setInterval(() => {
-          connectOBS(lastUsedConfig)
-        }, lastUsedConfig.reconnectInterval)
-      }
+
+      if (!obsWebSocket) return
+
+      scheduleReconnect()
     })
 
     obsWebSocket.on('error', (error) => {
@@ -90,9 +146,8 @@ function setupOBSEvents() {
   }
 }
 
-/**
- * Envoie une commande à OBS
- */
+// ─── COMMANDES ───────────────────────────────────────────────────────────
+
 export async function sendOBSCommand(command, params = {}) {
   if (!obsConnected || !obsWebSocket) {
     console.warn('⚠️ OBS non connecté')
@@ -116,7 +171,7 @@ export async function toggleStudioMode() {
   const state = await sendOBSCommand('GetStudioModeEnabled')
   if (state.success) {
     return await sendOBSCommand('SetStudioModeEnabled', {
-      studioModeEnabled: !state.result.studioModeEnabled
+      studioModeEnabled: !state.result.studioModeEnabled,
     })
   }
   return state
@@ -145,7 +200,9 @@ export function sendOBSAlert(message, type = 'info', duration = 3000) {
 export function getOBSStatus() {
   return {
     connected: obsConnected,
-    websocket: !!obsWebSocket
+    websocket: !!obsWebSocket,
+    reconnectAttempts,
+    reconnectMaxAttempts: RECONNECT_MAX_ATTEMPTS,
   }
 }
 
@@ -160,5 +217,5 @@ export default {
   startOBSStreaming,
   stopOBSStreaming,
   sendOBSAlert,
-  getOBSStatus
+  getOBSStatus,
 }
