@@ -1,4 +1,4 @@
-// src/shared/components/audio/SoundCard.jsx
+// src/shared/components/audio/SoundCard/index.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { playSound, stopSound, isPlaying, getSoundProgress } from '@core/services/AudioService'
@@ -9,6 +9,9 @@ import { formatTime } from '@shared/utils/format'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 import EmojiPicker from '@shared/components/ui/EmojiPicker'
 import { convertOldVolumeToDb } from '@core/store/utils/volumeUtils'
+
+import VolumePanel from './VolumePanel'
+import ContextMenuPortal from './ContextMenuPortal'
 
 export default function SoundCard({
   sound,
@@ -38,6 +41,8 @@ export default function SoundCard({
 }) {
   const { t, currentLang } = useLanguage()
   const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
+
+  // ─── ÉTATS ─────────────────────────────────────────────────────────────
   const [playing, setPlaying] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showVolume, setShowVolume] = useState(false)
@@ -73,6 +78,8 @@ export default function SoundCard({
 
   const isFavorite = sound.favorites?.includes(currentProfileId) || false
 
+  // ─── EFFECTS ───────────────────────────────────────────────────────────
+
   useEffect(() => {
     const newVolume =
       sound.volumeDb !== undefined
@@ -85,6 +92,7 @@ export default function SoundCard({
     setImgError(false)
   }, [sound.image])
 
+  // Poll progression tant que playing
   useEffect(() => {
     if (!playing) {
       setProgress(null)
@@ -103,6 +111,7 @@ export default function SoundCard({
     return () => clearInterval(interval)
   }, [playing, sound.id])
 
+  // Stop si loop désactivé pendant lecture
   const prevLoopEnabledRef = useRef(loopEnabled)
 
   useEffect(() => {
@@ -116,6 +125,30 @@ export default function SoundCard({
       setPlaying(false)
     }
   }, [loopEnabled, playing, sound.id])
+
+  // Click outside pour fermer le menu
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (showMenu && menuRef.current && !menuRef.current.contains(e.target)) {
+        if (buttonRef.current && buttonRef.current.contains(e.target)) {
+          return
+        }
+        setShowMenu(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showMenu])
+
+  // Recalcul position menu quand hauteur mesurée
+  useEffect(() => {
+    if (showMenu && menuHeight > 0) {
+      calculateMenuPosition()
+    }
+  }, [showMenu, menuHeight]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── HANDLERS ──────────────────────────────────────────────────────────
 
   const handlePlay = async (e) => {
     e?.stopPropagation()
@@ -163,10 +196,6 @@ export default function SoundCard({
     if (cardRef.current)
       cardRef.current.style.cursor = draggable ? 'grab' : 'default'
   }, [draggable])
-
-  // ✅ S6 : buildFileUrl au lieu de buildImageUrl
-  const imageUrl = buildFileUrl(sound.image)
-  const showImage = !!sound.image && !imgError
 
   const calculateMenuPosition = useCallback(() => {
     if (!buttonRef.current) return
@@ -251,26 +280,6 @@ export default function SoundCard({
     }
   }
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (showMenu && menuRef.current && !menuRef.current.contains(e.target)) {
-        if (buttonRef.current && buttonRef.current.contains(e.target)) {
-          return
-        }
-        setShowMenu(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showMenu])
-
-  useEffect(() => {
-    if (showMenu && menuHeight > 0) {
-      calculateMenuPosition()
-    }
-  }, [showMenu, menuHeight, calculateMenuPosition])
-
   const handleDragStart = (e) => {
     if (isDraggingVolume || showVolume) {
       e.preventDefault()
@@ -307,6 +316,23 @@ export default function SoundCard({
     }
   }
 
+  // l'emoji soit bien visible (comportement symétrique à "changer l'image").
+  const handleEmojiSelect = (emoji) => {
+    if (onChangeEmoji) onChangeEmoji(sound.id, emoji)
+
+    // Si une image était définie, on l'efface pour laisser la place à l'emoji
+    if (sound.image && onChangeImage) {
+      onChangeImage(sound.id, null)
+    }
+
+    setShowEmojiPicker(false)
+  }
+
+  // ─── RENDU ─────────────────────────────────────────────────────────────
+
+  const imageUrl = buildFileUrl(sound.image)
+  const showImage = !!sound.image && !imgError
+
   return (
     <>
       <div
@@ -338,6 +364,7 @@ export default function SoundCard({
           boxShadow: playing ? '0 0 20px rgba(124,111,247,0.15)' : 'none',
         }}
       >
+        {/* Header : favori + loop + menu */}
         <div
           style={{
             display: 'flex',
@@ -399,6 +426,7 @@ export default function SoundCard({
           </div>
         </div>
 
+        {/* Preview / Play */}
         <div
           onClick={handlePlay}
           style={{
@@ -482,6 +510,7 @@ export default function SoundCard({
           </div>
         </div>
 
+        {/* Nom (éditable) */}
         {editingName ? (
           <input
             autoFocus
@@ -515,6 +544,7 @@ export default function SoundCard({
           </div>
         )}
 
+        {/* Tags */}
         {tags.length > 0 && (
           <div
             style={{
@@ -559,6 +589,7 @@ export default function SoundCard({
           </div>
         )}
 
+        {/* Ajout tag */}
         {onAddTag && (
           <div
             style={{
@@ -675,6 +706,7 @@ export default function SoundCard({
           </div>
         )}
 
+        {/* Enregistreur de raccourci */}
         <ShortcutRecorder
           value={shortcut || ''}
           onSave={(acc) => onSetShortcut(sound.id, acc)}
@@ -684,6 +716,7 @@ export default function SoundCard({
           layout={layout}
         />
 
+        {/* Barre de progression */}
         {progress && (
           <div style={{ marginTop: 4 }}>
             <div
@@ -722,6 +755,8 @@ export default function SoundCard({
             </div>
           </div>
         )}
+
+        {/* Compteur de lectures */}
         {sound.playCount > 0 && (
           <div
             style={{
@@ -741,6 +776,7 @@ export default function SoundCard({
         )}
       </div>
 
+      {/* Menu contextuel délégué */}
       {showMenu &&
         createPortal(
           <div ref={menuRef}>
@@ -778,6 +814,7 @@ export default function SoundCard({
           document.body
         )}
 
+      {/* VolumePanel délégué */}
       {showVolume &&
         createPortal(
           <VolumePanel
@@ -801,503 +838,11 @@ export default function SoundCard({
         isOpen={showEmojiPicker}
         onClose={() => setShowEmojiPicker(false)}
         currentEmoji={sound.emoji}
-        onSelect={(emoji) => {
-          if (onChangeEmoji) onChangeEmoji(sound.id, emoji)
-          setShowEmojiPicker(false)
-        }}
+        onSelect={handleEmojiSelect}
         onManageClick={handleManageEmojis}
       />
 
       <ConfirmWrapper />
     </>
-  )
-}
-
-function VolumePanel({
-  volume,
-  onChange,
-  onCommit,
-  onClose,
-  onDragStart,
-  onDragEnd,
-  soundName,
-  position,
-}) {
-  const { t } = useLanguage()
-  const [localVolume, setLocalVolume] = useState(volume)
-
-  useEffect(() => {
-    setLocalVolume(volume)
-  }, [volume])
-
-  const handleSliderChange = (e) => {
-    const newVal = parseFloat(e.target.value)
-    if (!isNaN(newVal)) {
-      setLocalVolume(newVal)
-      onChange(newVal)
-    }
-  }
-
-  const handleSliderMouseUp = () => {
-    onCommit(localVolume)
-    if (onDragEnd) onDragEnd()
-  }
-
-  const handleSliderMouseDown = () => {
-    if (onDragStart) onDragStart()
-  }
-
-  const resetToZero = () => {
-    setLocalVolume(0)
-    onChange(0)
-    onCommit(0)
-  }
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      const panel = document.getElementById('volume-panel')
-      if (panel && !panel.contains(e.target)) {
-        onClose()
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [onClose])
-
-  return (
-    <div
-      id="volume-panel"
-      onClick={(e) => e.stopPropagation()}
-      style={{
-        position: 'fixed',
-        top: position?.top || '50%',
-        left: position?.left || '50%',
-        transform: position?.top ? 'none' : 'translate(-50%, -50%)',
-        zIndex: 99999,
-        background: 'var(--bg-secondary)',
-        border: '2px solid var(--accent)',
-        borderRadius: 'var(--radius-lg)',
-        padding: '20px 24px',
-        width: 320,
-        maxWidth: '90vw',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-        backdropFilter: 'blur(8px)',
-        animation: 'fadeIn 0.15s ease',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 16,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: 'var(--bg-tertiary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 16,
-            }}
-          >
-            {soundName?.charAt(0)?.toUpperCase() || '🔊'}
-          </div>
-          <div>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-              }}
-            >
-              {t('menuVolume')}
-            </div>
-            <div
-              style={{
-                fontSize: 11,
-                color: 'var(--text-tertiary)',
-                maxWidth: 140,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {soundName || ''}
-            </div>
-          </div>
-        </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onClose()
-          }}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--text-tertiary)',
-            cursor: 'pointer',
-            padding: '4px',
-            fontSize: 18,
-            display: 'flex',
-            alignItems: 'center',
-            borderRadius: 4,
-            transition: 'all 0.15s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = 'var(--text-primary)'
-            e.currentTarget.style.background = 'var(--bg-hover)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = 'var(--text-tertiary)'
-            e.currentTarget.style.background = 'transparent'
-          }}
-        >
-          <i className="ti ti-x" />
-        </button>
-      </div>
-
-      <div
-        style={{
-          textAlign: 'center',
-          marginBottom: 16,
-          padding: '8px 0',
-          background: 'var(--bg-tertiary)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--border)',
-        }}
-      >
-        <span
-          style={{
-            fontSize: 32,
-            fontWeight: 700,
-            color:
-              localVolume === 0
-                ? 'var(--accent)'
-                : localVolume > 0
-                  ? 'var(--success)'
-                  : 'var(--danger)',
-          }}
-        >
-          {localVolume > 0 ? '+' : ''}
-          {localVolume}
-        </span>
-        <span style={{ fontSize: 16, color: 'var(--text-tertiary)', marginLeft: 4 }}>
-          dB
-        </span>
-      </div>
-
-      <div style={{ padding: '4px 0' }}>
-        <input
-          type="range"
-          min="-24"
-          max="24"
-          step="0.5"
-          value={localVolume}
-          onChange={handleSliderChange}
-          onMouseDown={handleSliderMouseDown}
-          onMouseUp={handleSliderMouseUp}
-          onTouchStart={handleSliderMouseDown}
-          onTouchEnd={handleSliderMouseUp}
-          style={{
-            width: '100%',
-            accentColor: 'var(--accent)',
-            background: 'transparent',
-            border: 'none',
-            padding: 0,
-            cursor: 'pointer',
-            height: 6,
-          }}
-        />
-      </div>
-
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontSize: 10,
-          color: 'var(--text-tertiary)',
-          marginBottom: 16,
-        }}
-      >
-        <span>-24 dB</span>
-        <span
-          style={{
-            color: localVolume === 0 ? 'var(--accent)' : 'var(--text-tertiary)',
-            fontWeight: localVolume === 0 ? 600 : 400,
-            background: localVolume === 0 ? 'var(--accent-light)' : 'transparent',
-            padding: '1px 8px',
-            borderRadius: 10,
-            fontSize: 9,
-          }}
-        >
-          ▸ 0 dB {t('volumeDefault')}
-        </span>
-        <span>+24 dB</span>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            resetToZero()
-          }}
-          style={{
-            flex: 1,
-            background:
-              localVolume === 0 ? 'var(--accent-light)' : 'var(--bg-tertiary)',
-            border: `1px solid ${
-              localVolume === 0 ? 'var(--accent)' : 'var(--border)'
-            }`,
-            borderRadius: 'var(--radius-md)',
-            color:
-              localVolume === 0 ? 'var(--accent)' : 'var(--text-secondary)',
-            cursor: 'pointer',
-            padding: '8px 12px',
-            fontSize: 12,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            transition: 'all 0.15s',
-          }}
-          onMouseEnter={(e) => {
-            if (localVolume !== 0) {
-              e.currentTarget.style.borderColor = 'var(--accent)'
-              e.currentTarget.style.color = 'var(--accent)'
-              e.currentTarget.style.background = 'var(--accent-light)'
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (localVolume !== 0) {
-              e.currentTarget.style.borderColor = 'var(--border)'
-              e.currentTarget.style.color = 'var(--text-secondary)'
-              e.currentTarget.style.background = 'var(--bg-tertiary)'
-            }
-          }}
-          title={t('volumeReset')}
-        >
-          <i className="ti ti-refresh" style={{ fontSize: 14 }} />
-          <span>{t('reset')}</span>
-        </button>
-
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onClose()
-          }}
-          className="btn-primary"
-          style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
-        >
-          <i className="ti ti-check" /> {t('volumePanelClose')}
-        </button>
-      </div>
-
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
-        }
-      `}</style>
-    </div>
-  )
-}
-
-function ContextMenuPortal({
-  sound,
-  isFavorite,
-  currentProfileId,
-  onClose,
-  onToggleFavorite,
-  onRename,
-  onVolumeOpen,
-  onRemoveFromProfile,
-  onDelete,
-  onChangeImage,
-  onChangeEmoji,
-  position,
-  onHeightMeasured,
-  onDeleteWithConfirm,
-  onRemoveFromProfileWithConfirm,
-}) {
-  const { t } = useLanguage()
-  const menuRef = useRef(null)
-
-  useEffect(() => {
-    if (!menuRef.current) return
-
-    requestAnimationFrame(() => {
-      if (!menuRef.current) return
-      const height = menuRef.current.getBoundingClientRect().height
-      if (onHeightMeasured && height > 0) onHeightMeasured(height)
-    })
-  }, [onHeightMeasured])
-
-  useEffect(() => {
-    if (!menuRef.current) return
-
-    requestAnimationFrame(() => {
-      if (!menuRef.current) return
-
-      const rect = menuRef.current.getBoundingClientRect()
-      let { top, left } = position
-
-      if (rect.right > window.innerWidth) {
-        left = Math.max(10, window.innerWidth - rect.width - 10)
-      }
-
-      if (rect.bottom > window.innerHeight) {
-        top = Math.max(10, window.innerHeight - rect.height - 10)
-      }
-
-      if (left < 10) left = 10
-      if (top < 10) top = 10
-
-      if (top !== position.top || left !== position.left) {
-        menuRef.current.style.top = top + 'px'
-        menuRef.current.style.left = left + 'px'
-      }
-    })
-  }, [position])
-
-  const handleMenuClick = (e) => e.stopPropagation()
-
-  const handleAction = (action) => {
-    action()
-    onClose()
-  }
-
-  return (
-    <div
-      ref={menuRef}
-      onClick={handleMenuClick}
-      data-testid="context-menu"
-      style={{
-        position: 'fixed',
-        top: position.top,
-        left: position.left,
-        background: 'var(--bg-secondary)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-md)',
-        padding: 4,
-        zIndex: 999,
-        minWidth: 200,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-        backdropFilter: 'blur(4px)',
-      }}
-    >
-      <MenuItem
-        icon={isFavorite ? 'ti-star-filled' : 'ti-star'}
-        label={isFavorite ? t('menuFavoriteRemove') : t('menuFavoriteAdd')}
-        onClick={() => handleAction(onToggleFavorite)}
-      />
-      <MenuItem
-        icon="ti-pencil"
-        label={t('menuRename')}
-        onClick={() => handleAction(onRename)}
-      />
-      <MenuItem
-        icon="ti-volume"
-        label={t('menuVolume')}
-        onClick={() => handleAction(onVolumeOpen)}
-      />
-
-      <MenuItem
-        icon="ti-photo"
-        label={t('menuChangeImage')}
-        onClick={() => handleAction(onChangeImage)}
-      />
-
-      <MenuItem
-        icon="ti-mood-smile"
-        label={t('menuChangeEmoji')}
-        onClick={() => handleAction(onChangeEmoji)}
-      />
-
-      {onRemoveFromProfile && currentProfileId !== 'all' && (
-        <>
-          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-          <MenuItem
-            icon="ti-folder-minus"
-            label={t('menuRemoveFromProfile')}
-            onClick={() => handleAction(onRemoveFromProfileWithConfirm)}
-            warning
-          />
-        </>
-      )}
-      <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-
-      <div style={{ padding: '2px 4px' }}>
-        <button
-          onClick={() => {
-            onClose()
-            onDeleteWithConfirm?.()
-          }}
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '6px 10px',
-            background: 'transparent',
-            border: 'none',
-            borderRadius: 6,
-            cursor: 'pointer',
-            textAlign: 'left',
-            transition: 'background 0.1s',
-            color: 'var(--danger)',
-            fontSize: 13,
-            fontFamily: 'inherit',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(224, 82, 82, 0.1)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent'
-          }}
-        >
-          <i className="ti ti-trash" style={{ fontSize: 16, minWidth: 20 }} />
-          {t('menuDelete') || 'Supprimer définitivement'}
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function MenuItem({ icon, label, onClick, danger, warning }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        width: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '6px 10px',
-        background: 'transparent',
-        border: 'none',
-        color: danger
-          ? 'var(--danger)'
-          : warning
-            ? 'var(--warning)'
-            : 'var(--text-primary)',
-        fontSize: 13,
-        borderRadius: 6,
-        cursor: 'pointer',
-        textAlign: 'left',
-        transition: 'background 0.1s',
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
-      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-    >
-      <i className={`ti ${icon}`} style={{ fontSize: 16, minWidth: 20 }} />
-      {label}
-    </button>
   )
 }
