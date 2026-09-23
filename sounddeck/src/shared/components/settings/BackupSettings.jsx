@@ -9,8 +9,8 @@ import {
   importBackups,
   performBackup,
   deleteBackup,
-} from '../../utils/backupManager.js'
-import useConfirm from '../../hooks/useConfirm.jsx'
+} from '@shared/utils/backupManager'
+import useConfirm from '@shared/hooks/useConfirm'
 
 export default function BackupSettings({ store, addToast, lang = 'fr' }) {
   const { t, currentLang } = useLanguage()

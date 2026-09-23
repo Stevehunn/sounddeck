@@ -1,5 +1,6 @@
-// src/plugins/youtube/index.js - CE FICHIER EST CORRECT
+// src/plugins/youtube/index.js
 import YouTube from './YouTube.jsx'
+import { logInfo } from '@shared/utils/logger'
 
 const YouTubePlugin = {
   id: 'youtube',
@@ -23,11 +24,11 @@ const YouTubePlugin = {
   ],
 
   init(store, manager) {
-    console.log('▶️ Plugin YouTube initialisé')
+    logInfo('YouTubePlugin', 'Initialisé')
   },
 
   destroy() {
-    console.log('🗑️ Plugin YouTube déchargé')
+    logInfo('YouTubePlugin', 'Déchargé')
   }
 }
 

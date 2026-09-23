@@ -1,5 +1,6 @@
 // src/plugins/emoji/index.js
 import EmojiDiscover from './EmojiDiscover.jsx'
+import { logInfo } from '@shared/utils/logger'
 
 const EmojiPlugin = {
   id: 'emoji',
@@ -23,11 +24,11 @@ const EmojiPlugin = {
   ],
 
   init(store, manager) {
-    console.log('😀 Plugin Emoji initialisé')
+    logInfo('EmojiPlugin', 'Initialisé')
   },
 
   destroy() {
-    console.log('🗑️ Plugin Emoji déchargé')
+    logInfo('EmojiPlugin', 'Déchargé')
   },
 }
 

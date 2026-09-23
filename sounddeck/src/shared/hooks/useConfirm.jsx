@@ -1,6 +1,6 @@
+// src/shared/hooks/useConfirm.jsx
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-// ✅ CORRIGER L'IMPORT - Utiliser le chemin correct
 import ConfirmModal from '@shared/components/modals/ConfirmModal'
 
 export function useConfirm({ lang = 'fr' } = {}) {
@@ -24,7 +24,7 @@ export function useConfirm({ lang = 'fr' } = {}) {
 
   const ConfirmWrapper = () => {
     if (!modalState) return null
-    
+
     return createPortal(
       <ConfirmModal
         title={modalState.title}

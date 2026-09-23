@@ -6,6 +6,7 @@ import {
   getDefaultEmojiCategory,
   isValidEmoji,
 } from '@shared/constants/emojis'
+import { logWarn } from '@shared/utils/logger'
 
 const STORE_KEY_EMOJIS = 'customEmojis'
 const STORE_KEY_METADATA = 'emojiMetadata'
@@ -35,7 +36,7 @@ class EmojiService {
         this.loaded = true
         this._notify()
       } catch (e) {
-        console.warn('[EmojiService] Erreur load:', e)
+        logWarn('EmojiService', 'Erreur load', e)
         this.loaded = true
       } finally {
         this.loadingPromise = null
@@ -69,7 +70,7 @@ class EmojiService {
         localStorage.setItem(`sounddeck-${key}`, JSON.stringify(value))
       }
     } catch (e) {
-      console.warn(`[EmojiService] Erreur write ${key}:`, e)
+      logWarn('EmojiService', `Erreur write ${key}`, e)
     }
   }
 
@@ -87,7 +88,7 @@ class EmojiService {
 
   _notify() {
     for (const listener of this.listeners) {
-      try { listener() } catch (e) { console.warn(e) }
+      try { listener() } catch (e) { logWarn('EmojiService', 'Erreur listener', e) }
     }
   }
 

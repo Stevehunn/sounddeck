@@ -9,7 +9,7 @@ import {
   stopOBSRecording,
   startOBSStreaming,
   stopOBSStreaming
-} from '../../utils/obsIntegration'
+} from '@shared/utils/obsIntegration'
 
 export default function OBSControl({ lang = 'fr' }) {
   const { t, currentLang } = useLanguage()
