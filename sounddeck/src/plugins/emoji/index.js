@@ -20,6 +20,7 @@ const EmojiPlugin = {
       group: 'navigation',
       pinned: false,
       visible: true,
+      sidebarVisible: false,
     },
   ],
 

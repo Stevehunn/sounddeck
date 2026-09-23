@@ -15,11 +15,6 @@ const isDev = !require('electron').app.isPackaged
 function createWindow(shouldStartMinimized = false) {
   const iconPath = path.join(__dirname, '../../public/icon.ico')
 
-  console.log('🔍 DIAGNOSTIC createWindow:')
-  console.log('📌 __dirname:', __dirname)
-  console.log('📌 app.isPackaged:', require('electron').app.isPackaged)
-  console.log('📌 app.getAppPath():', require('electron').app.getAppPath())
-
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 700,
@@ -29,7 +24,7 @@ function createWindow(shouldStartMinimized = false) {
       preload: path.join(__dirname, '../preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false,
+      webSecurity: true,
       allowRunningInsecureContent: false,
       experimentalFeatures: false,
     },
@@ -64,9 +59,6 @@ function createWindow(shouldStartMinimized = false) {
       }
     }
 
-    console.log('📄 Chargement de:', indexPath)
-    console.log('📄 Fichier existe:', fs.existsSync(indexPath))
-
     if (!fs.existsSync(indexPath)) {
       console.error('❌ ERREUR: index.html introuvable !')
       dialog.showErrorBox(
@@ -88,7 +80,6 @@ function createWindow(shouldStartMinimized = false) {
 
     e.preventDefault()
 
-    // Ouvre les liens externes dans le navigateur système au lieu de les bloquer silencieusement
     if (url.startsWith('http://') || url.startsWith('https://')) {
       try {
         require('electron').shell.openExternal(url)

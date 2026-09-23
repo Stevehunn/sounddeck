@@ -2,9 +2,9 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { useEmojis } from '@shared/hooks/useEmojis'
+import { usePlugins } from '@core/plugins/PluginContext'
 import useConfirm from '@shared/hooks/useConfirm'
 
-// ✅ Map des catégories du plugin → clés i18n (déjà présentes dans le core)
 const PLUGIN_CATEGORY_LABELS = {
   smileys: 'emojiDiscoverCatSmileys',
   people: 'emojiDiscoverCatPeople',
@@ -32,6 +32,7 @@ const PLUGIN_CATEGORY_ICONS = {
 export default function EmojiPage({ store, addToast }) {
   const { t, currentLang } = useLanguage()
   const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
+  const { pluginManager } = usePlugins()
 
   const {
     defaultEmojis,
@@ -49,26 +50,6 @@ export default function EmojiPage({ store, addToast }) {
   const [showManualAdd, setShowManualAdd] = useState(false)
   const [manualValue, setManualValue] = useState('')
   const [manualError, setManualError] = useState('')
-  // ✅ NOUVEAU : état local pour savoir si le plugin emoji est installé
-  const [hasPlugin, setHasPlugin] = useState(null) // null = inconnu, true/false
-
-  // ✅ NOUVEAU : vérifie une fois que le plugin emoji est installé
-  useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        const installed = (await window.electronAPI?.getInstalledPlugins?.()) || []
-        if (mounted) {
-          setHasPlugin(installed.some((p) => p.id === 'emoji'))
-        }
-      } catch (e) {
-        if (mounted) setHasPlugin(false)
-      }
-    })()
-    return () => {
-      mounted = false
-    }
-  }, [])
 
   // Filtre sur les customs si recherche
   const filteredCustomGroups = useMemo(() => {
@@ -189,16 +170,10 @@ export default function EmojiPage({ store, addToast }) {
     setManualError('')
   }, [])
 
-  // ✅ MODIFIÉ : vérifie que le plugin est installé avant de naviguer
   const handleOpenDiscover = useCallback(async () => {
-    // Vérification à la volée (le plugin a pu être installé depuis le 1er check)
-    let pluginAvailable = hasPlugin
-    try {
-      const installed = (await window.electronAPI?.getInstalledPlugins?.()) || []
-      pluginAvailable = installed.some((p) => p.id === 'emoji')
-    } catch (e) {
-      pluginAvailable = false
-    }
+    const pluginAvailable =
+      pluginManager.isPluginLoaded('emoji') &&
+      pluginManager.isPluginPage('emoji-discover')
 
     if (!pluginAvailable) {
       const goToOptions = await confirm({
@@ -219,7 +194,7 @@ export default function EmojiPage({ store, addToast }) {
     } else {
       addToast(t('emojiPageEmptyDesc'), 'info')
     }
-  }, [hasPlugin, confirm, addToast, t])
+  }, [pluginManager, confirm, addToast, t])
 
   // ─── RENDER ───────────────────────────────────────────────────────────
   if (loading) {
@@ -294,7 +269,7 @@ export default function EmojiPage({ store, addToast }) {
             style={{ width: 160, minWidth: 100 }}
           />
 
-          {/* ✅ NOUVEAU : bouton ajout manuel */}
+          {/* Bouton ajout manuel */}
           <button
             data-testid="emoji-page-add-manual-button"
             className="btn-secondary btn-sm"
@@ -336,7 +311,7 @@ export default function EmojiPage({ store, addToast }) {
               style={{ color: 'var(--accent)', fontSize: 20, flexShrink: 0 }}
             />
 
-            {/* ✅ Prévisualisation en direct — gros emoji à gauche */}
+            {/* Prévisualisation en direct — gros emoji à gauche */}
             <div
               style={{
                 width: 56,
@@ -356,7 +331,7 @@ export default function EmojiPage({ store, addToast }) {
               {manualValue.trim() || '❓'}
             </div>
 
-            {/* ✅ Input élargi : 320px, font généreuse */}
+            {/* Input élargi : 320px, font généreuse */}
             <input
               data-testid="emoji-page-add-manual-input"
               autoFocus
@@ -478,7 +453,6 @@ export default function EmojiPage({ store, addToast }) {
                     flexWrap: 'wrap',
                   }}
                 >
-                  {/* ✅ NOUVEAU : bouton ajout manuel dans l'empty state */}
                   <button
                     className="btn-secondary btn-sm"
                     onClick={() => setShowManualAdd(true)}
@@ -610,7 +584,7 @@ export default function EmojiPage({ store, addToast }) {
                         }}
                       >
                         {emoji}
-                        {/* ✅ MODIFIÉ : bouton × plus visible */}
+                        {/* Bouton × plus visible */}
                         <button
                           className="emoji-remove-btn"
                           data-testid={`emoji-page-remove-${emoji}`}

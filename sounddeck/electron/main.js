@@ -11,6 +11,7 @@ const {
   ipcHandlers,
   fileHandlers,
   diagnostic,
+  protocolHandler,
   registerProjectHandlers,
 } = require('./modules')
 
@@ -18,6 +19,8 @@ const store = require('./store')
 
 // Supprimer la barre de menu native
 Menu.setApplicationMenu(null)
+
+protocolHandler.registerLocalSchemes()
 
 let mainWindow = null
 let isQuitting = false
@@ -183,6 +186,8 @@ function updateTrayMenu() {
 // ─── APP ──────────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
+  protocolHandler.registerLocalFileProtocol()
+
   // Nettoyer les raccourcis orphelins
   const sounds = store.get('sounds', [])
   const soundIds = new Set(sounds.map(s => s.id))

@@ -242,20 +242,23 @@ export function useStore() {
             }
           })
 
-          const currentProfileIds = new Set(
-            allProfiles.map((p) => `profile-${p.id}`)
-          )
-          items = items.filter((item) => {
-            if (item.id.startsWith('profile-')) {
-              return currentProfileIds.has(item.id)
-            }
-            return true
-          })
-
           const KNOWN_CORE_IDS = [
             'home', 'discover', 'trimmer', 'editor', 'sequencer', 'youtube',
             'stats', 'emoji', 'loop', 'shortcuts', 'presentation', 'guide', 'options',
           ]
+
+          const currentProfileIds = new Set(
+            allProfiles.map((p) => `profile-${p.id}`)
+          )
+
+          const allowedIds = new Set([...KNOWN_CORE_IDS, ...ACTION_IDS])
+
+          items = items.filter((item) => {
+            if (item.id.startsWith('profile-')) {
+              return currentProfileIds.has(item.id)
+            }
+            return allowedIds.has(item.id)
+          })
 
           KNOWN_CORE_IDS.forEach((id) => {
             if (!items.find((i) => i.id === id)) {

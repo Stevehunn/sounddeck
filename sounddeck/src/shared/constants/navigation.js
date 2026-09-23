@@ -12,7 +12,6 @@ export const NAV_ITEMS = {
   sequencer: { icon: 'ti-playlist', group: 'navigation' },
   youtube: { icon: 'ti-brand-youtube', group: 'navigation' },
   stats: { icon: 'ti-chart-bar', group: 'navigation' },
-  // ✅ NOUVEAU : Mes emojis (page core, pas plugin)
   emoji: { icon: 'ti-mood-smile', group: 'navigation' },
 
   loop: { icon: 'ti-repeat', group: 'actions' },

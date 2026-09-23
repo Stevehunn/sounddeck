@@ -6,6 +6,7 @@ const shortcutManager = require('./shortcutManager')
 const ipcHandlers = require('./ipcHandlers')
 const fileHandlers = require('./fileHandlers')
 const diagnostic = require('./diagnostic')
+const protocolHandler = require('./protocolHandler')
 const { registerProjectHandlers } = require('./projectHandlers')
 
 module.exports = {
@@ -16,5 +17,6 @@ module.exports = {
   ipcHandlers,
   fileHandlers,
   diagnostic,
+  protocolHandler,
   registerProjectHandlers,
 }

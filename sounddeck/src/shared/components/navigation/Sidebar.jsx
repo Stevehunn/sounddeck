@@ -100,7 +100,11 @@ const Sidebar = memo(
     const ACTION_IDS_SET = useMemo(() => new Set(ACTION_IDS), [])
 
     const pluginPageIds = useMemo(
-      () => new Set((pluginPages || []).filter(p => p.isPlugin).map(p => p.id)),
+      () => new Set(
+        (pluginPages || [])
+          .filter(p => p.isPlugin && p.sidebarVisible !== false)
+          .map(p => p.id)
+      ),
       [pluginPages]
     )
 
@@ -150,7 +154,6 @@ const Sidebar = memo(
         if (id.startsWith('profile-')) return true
         if (CORE_PAGE_IDS.has(id)) return true
         if (ACTION_IDS_SET.has(id)) return true
-        // Sinon, c'est censé être une page plugin → doit être chargée
         return pluginPageIds.has(id)
       })
       const pinned = visible.filter((item) => item.pinned === true)
@@ -331,7 +334,6 @@ const Sidebar = memo(
           group: 'navigation',
           isCore: true,
         },
-        // Mes emojis (core page, pas plugin)
         {
           id: 'emoji',
           label: t('emojiPageTitle'),
@@ -356,7 +358,7 @@ const Sidebar = memo(
       ]
 
       const pluginPagesFormatted = (pluginPages || [])
-        .filter((p) => p.visible !== false)
+        .filter((p) => p.visible !== false && p.sidebarVisible !== false)
         .map((p) => ({ ...p, isCore: false, isPlugin: true }))
 
       return [...corePages, ...pluginPagesFormatted]
