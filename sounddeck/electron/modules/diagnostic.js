@@ -620,7 +620,6 @@ function exportDiagnosticToFile() {
 // ─── DIAGNOSTIC COMPLET ──────────────────────────────────────────────────
 
 function runFullDiagnostic() {
-  console.clear()
   console.log('═'.repeat(60))
   console.log('  🔍 SOUNDDECK - DIAGNOSTIC COMPLET')
   console.log('═'.repeat(60))

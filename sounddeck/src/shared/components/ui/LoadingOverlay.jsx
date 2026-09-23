@@ -51,16 +51,6 @@ export default function LoadingOverlay({ message, visible }) {
           {t('loadingSubtitle')}
         </div>
       </div>
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-      `}</style>
     </div>,
     document.body
   )

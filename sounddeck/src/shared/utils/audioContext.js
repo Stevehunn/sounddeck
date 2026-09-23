@@ -1,4 +1,5 @@
 // src/shared/utils/audioContext.js
+import { buildFileUrl } from './fileUrl.js'
 
 let sharedContext = null
 
@@ -76,9 +77,6 @@ export async function getAudioFileDuration(filePath, fallback = 3) {
   const buffer = await loadAudioBuffer(filePath)
   return buffer ? buffer.duration : fallback
 }
-
-// Import bottom pour éviter circular
-import { buildFileUrl } from './fileUrl.js'
 
 export default {
   getSharedAudioContext,

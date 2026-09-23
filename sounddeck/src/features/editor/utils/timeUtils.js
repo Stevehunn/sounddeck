@@ -1,4 +1,5 @@
 // src/features/editor/utils/timeUtils.js
+import { formatTime as sharedFormatTime } from '@shared/utils/format'
 
 /**
  * Formate un temps en secondes en format MM:SS ou MM:SS.ss
@@ -6,22 +7,12 @@
  * @param {boolean} showMilliseconds - Afficher les millisecondes
  * @returns {string} Temps formaté
  */
+
 export function formatTime(seconds, showMilliseconds = false) {
-  if (!seconds || isNaN(seconds) || seconds < 0) return '0:00'
-  
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  
-  if (showMilliseconds) {
-    const ms = Math.floor((seconds % 1) * 100)
-    return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`
-  }
-  
-  if (mins > 0) {
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
-  
-  return `${secs.toFixed(1)}s`
+  return sharedFormatTime(seconds, {
+    decimals: showMilliseconds ? 2 : 0,
+    alwaysMMSS: showMilliseconds,
+  })
 }
 
 /**

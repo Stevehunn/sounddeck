@@ -1,14 +1,8 @@
 // src/pages/editor/utils/index.js
+import { formatTime as sharedFormatTime } from '@shared/utils/format'
 
-// ✅ playb ackEngine supprimé - remplacé par les hooks Web Audio API
-
-// Utilitaires divers
-export const formatTime = (seconds) => {
-  if (!seconds || isNaN(seconds)) return '0:00'
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
+export const formatTime = (seconds) =>
+  sharedFormatTime(seconds, { alwaysMMSS: true })
 
 export const getClipById = (tracks, clipId) => {
   for (const track of tracks) {

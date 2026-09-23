@@ -3,6 +3,7 @@ import { Howl } from 'howler'
 import * as AudioMixerService from './AudioMixerService'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 import { withTemporaryAudioContext } from '@shared/utils/audioContext'
+import { logError, logWarn } from '@shared/utils/logger'
 
 const soundCache = {}
 const gainCache = {}
@@ -13,6 +14,7 @@ export function setStoreRef(store) {
 }
 
 // ─── SYSTÈME D'ÉVÉNEMENTS DE LECTURE ─────────────────────────────────────────
+
 const playbackListeners = new Set()
 let currentPlayingId = null
 
@@ -21,7 +23,7 @@ export function subscribeToPlayback(callback) {
   try {
     callback({ id: currentPlayingId })
   } catch (e) {
-    console.error('[AudioService] Erreur callback initial:', e)
+    logError('AudioService', 'Callback playback initial', e)
   }
   return () => playbackListeners.delete(callback)
 }
@@ -32,12 +34,13 @@ function notifyPlaybackListeners(id) {
     try {
       cb({ id })
     } catch (e) {
-      console.error('[AudioService] Erreur callback playback:', e)
+      logError('AudioService', 'Callback playback', e)
     }
   })
 }
 
 // ─── OVERRIDE POUR LECTEURS EXTERNES (séquenceur, etc.) ────────────────────
+
 let manualOverrideId = null
 let manualProgress = { id: null, current: 0, duration: 0, ratio: 0 }
 
@@ -55,18 +58,18 @@ export function setCurrentPlayingProgress(soundId, current, duration) {
     id: soundId,
     current: current || 0,
     duration: duration || 0,
-    ratio: duration > 0 ? Math.min(1, (current || 0) / duration) : 0
+    ratio: duration > 0 ? Math.min(1, (current || 0) / duration) : 0,
   }
 }
 
 // ─── ANALYSE GAIN ──────────────────────────────────────────────────────────
+
 export async function analyzeGain(filePath, sampleCount = 200) {
   if (gainCache[filePath]) return gainCache[filePath]
 
   try {
     const fileUrl = buildFileUrl(filePath)
 
-    // ✅ S6 : withTemporaryAudioContext gère fetch + decode + close
     const result = await withTemporaryAudioContext(fileUrl, (audioBuffer) => {
       const channelData = audioBuffer.getChannelData(0)
       let sumSquares = 0
@@ -88,7 +91,7 @@ export async function analyzeGain(filePath, sampleCount = 200) {
     gainCache[filePath] = result ?? 0
     return gainCache[filePath]
   } catch (e) {
-    console.warn('Gain analysis failed:', e)
+    logWarn('AudioService', 'Gain analysis failed', e)
     return 0
   }
 }
@@ -116,6 +119,7 @@ export function getFinalVolumeForSound(sound, globalVolume = 80) {
 }
 
 // ─── Mode Normal (sans mixeur) ─────────────────────────────────────────────
+
 function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
   const gainDb = gainCache[sound.path] || 0
   const volumeRatio = calculateFinalVolume(globalVolume, sound.volume ?? 0, gainDb)
@@ -154,10 +158,10 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
         if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
       },
       onloaderror: (id, err) => {
-        console.error('Erreur:', err)
+        logError('AudioService', 'playSoundNormal onloaderror', err)
         delete soundCache[sound.id]
         if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
-      }
+      },
     })
     soundCache[sound.id] = howl
     howl.play()
@@ -183,16 +187,20 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
         delete soundCache[sound.id]
         if (currentPlayingId === sound.id) notifyPlaybackListeners(null)
       },
-      onloaderror: (id, err) => { console.error('Erreur device virtuel:', err) }
+      onloaderror: (id, err) => {
+        logError('AudioService', 'device virtuel', err)
+      },
     })
 
     howlDiscord.once('play', () => {
       try {
         const audioNode = howlDiscord._sounds?.[0]?._node
         if (audioNode && audioNode.setSinkId) {
-          audioNode.setSinkId(audioDevice).catch(e => console.warn('setSinkId failed:', e))
+          audioNode.setSinkId(audioDevice).catch(e => logWarn('AudioService', 'setSinkId failed', e))
         }
-      } catch (e) { console.warn('setSinkId error:', e) }
+      } catch (e) {
+        logWarn('AudioService', 'setSinkId error', e)
+      }
     })
 
     howls.push(howlDiscord)
@@ -205,7 +213,9 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
         html5: true,
         loop,
         format: [format],
-        onloaderror: (id, err) => { console.error('Erreur local:', err) }
+        onloaderror: (id, err) => {
+          logError('AudioService', 'lecture locale', err)
+        },
       })
       howlLocal.once('play', () => {
         try {
@@ -222,7 +232,7 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
     soundCache[sound.id] = howls
 
   } catch (e) {
-    console.error('playSound error:', e)
+    logError('AudioService', 'playSound', e)
     const howl = new Howl({ src: [fileUrl], volume: volumeRatio, html5: false, loop, format: [format] })
     soundCache[sound.id] = howl
     howl.play()
@@ -230,6 +240,7 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
 }
 
 // ─── Mode Mixeur ───────────────────────────────────────────────────────────
+
 async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true) {
   const soundVolumeDb = sound.volumeDb ?? sound.volume ?? 0
   let soundRatio = Math.pow(10, soundVolumeDb / 20)
@@ -260,13 +271,13 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
     audioBuffer = await AudioMixerService.loadAudioBuffer(fileUrl)
   } catch (e) {
     delete soundCache[sound.id]
-    console.warn('⚠️ Erreur chargement buffer:', e?.message)
+    logWarn('AudioService', 'Erreur chargement buffer', e)
     return
   }
 
   if (!audioBuffer) {
     delete soundCache[sound.id]
-    console.warn('⚠️ Impossible de charger le son:', fileUrl)
+    logWarn('AudioService', `Impossible de charger: ${fileUrl}`)
     return
   }
 
@@ -298,8 +309,8 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
         format: ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'],
         onend: () => {},
         onloaderror: (id, err) => {
-          console.warn('⚠️ Erreur lecture locale:', err)
-        }
+          logWarn('AudioService', 'Erreur lecture locale (mixer)', err)
+        },
       })
 
       localHowl.once('play', () => {
@@ -322,12 +333,13 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
       }
 
     } catch (e) {
-      console.warn('⚠️ Erreur lecture locale:', e)
+      logWarn('AudioService', 'Erreur lecture locale (mixer, catch)', e)
     }
   }
 }
 
 // ─── API PRINCIPALE ────────────────────────────────────────────────────────
+
 export function playSound(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
   if (!sound?.path) return
   notifyPlaybackListeners(sound.id)
@@ -348,7 +360,7 @@ export async function playSoundAsync(sound, audioDevice = 'default', globalVolum
     try {
       await analyzeGain(sound.path)
     } catch (e) {
-      console.warn('Gain analysis failed, using default:', e)
+      logWarn('AudioService', 'Gain analysis fallback', e)
     }
   }
 
@@ -365,7 +377,7 @@ export async function analyzeAllGains(sounds, onProgress) {
         const gain = await analyzeGain(sound.path)
         gainCache[sound.path] = gain
       } catch (e) {
-        console.warn('Failed to analyze:', sound.path, e)
+        logWarn('AudioService', `Analyze failed: ${sound.path}`, e)
       }
     }
     done++
@@ -457,7 +469,7 @@ export function getSoundProgress(soundId) {
     return {
       current: manualProgress.current,
       duration: manualProgress.duration,
-      ratio: manualProgress.ratio
+      ratio: manualProgress.ratio,
     }
   }
 

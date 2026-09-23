@@ -13,13 +13,6 @@ import EmojiPicker from '@shared/components/ui/EmojiPicker'
 import { DEFAULT_EMOJIS } from '@shared/constants/emojis'
 import { compressFileIfNeeded } from '@shared/utils/fileCompression'
 
-
-function formatSize(bytes) {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
 export default function Home({ store, addToast, loopEnabled }) {
   const { t, currentLang } = useLanguage()
   const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })

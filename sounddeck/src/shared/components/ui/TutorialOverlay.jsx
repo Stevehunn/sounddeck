@@ -855,29 +855,6 @@ export default function TutorialOverlay({
           )}
         </div>
       )}
-
-      <style>{`
-        @keyframes highlightPulse {
-          0%, 100% { box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px rgba(124,111,247,0.15), 0 0 30px rgba(124,111,247,0.2); }
-          50% { box-shadow: 0 0 0 4px var(--accent), 0 0 0 8px rgba(124,111,247,0.25), 0 0 50px rgba(124,111,247,0.35); }
-        }
-        @keyframes borderPulse {
-          0%, 100% { opacity: 0.2; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(1.03); }
-        }
-        @keyframes bubbleAppear {
-          from { opacity: 0; transform: scale(0.97); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </>,
     document.body
   );

@@ -3,6 +3,7 @@
  * PluginManager - Gestionnaire central des plugins
  */
 import { DEFAULT_ICONS, DEFAULT_GROUPS } from '@shared/constants/navigation'
+import { logError, logWarn, logInfo } from '@shared/utils/logger'
 
 // ─── CLÉS STORE ─────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ export class PluginManager {
         this._disabledPluginsMeta = { ...rawMeta }
       }
     } catch (e) {
-      console.warn('[PluginManager] Erreur chargement disabled plugins:', e)
+      logWarn('PluginManager', 'Erreur chargement disabled plugins', e)
     }
   }
 
@@ -101,7 +102,7 @@ export class PluginManager {
         this._disabledPluginsMeta
       )
     } catch (e) {
-      console.warn('[PluginManager] Erreur save disabled plugins:', e)
+      logWarn('PluginManager', 'Erreur save disabled plugins', e)
     }
   }
 
@@ -125,7 +126,7 @@ export class PluginManager {
       // 1. Plugins intégrés — skip si désactivés
       for (const [pluginId, loader] of INTEGRATED_PLUGINS) {
         if (this._disabledPlugins.has(pluginId)) {
-          console.log(`⏸️ [PluginManager] Plugin intégré ${pluginId} désactivé`)
+          logInfo('PluginManager', `Plugin intégré ${pluginId} désactivé`)
           continue
         }
         await this.loadPlugin({
@@ -150,7 +151,7 @@ export class PluginManager {
       this._initialized = true
       this.runHook('onAppStart', store)
     } catch (e) {
-      console.error('❌ Erreur lors de l\'initialisation du PluginManager:', e)
+      logError('PluginManager', 'Erreur initialisation', e)
       this._initialized = true
     }
   }
@@ -159,12 +160,12 @@ export class PluginManager {
 
   async loadPlugin(pluginInfo) {
     if (this._loadingPlugins.has(pluginInfo.id)) {
-      console.warn(`⚠️ Plugin ${pluginInfo.id} déjà en cours de chargement`)
+      logWarn('PluginManager', `Plugin ${pluginInfo.id} déjà en cours de chargement`)
       return false
     }
 
     if (this.plugins.has(pluginInfo.id)) {
-      console.warn(`⚠️ Plugin ${pluginInfo.id} déjà chargé`)
+      logWarn('PluginManager', `Plugin ${pluginInfo.id} déjà chargé`)
       return true
     }
 
@@ -172,7 +173,7 @@ export class PluginManager {
 
     try {
       if (!this._checkCompatibility(pluginInfo)) {
-        console.error(`❌ Plugin ${pluginInfo.id} incompatible`)
+        logError('PluginManager', `Plugin ${pluginInfo.id} incompatible`)
         this._loadingPlugins.delete(pluginInfo.id)
         return false
       }
@@ -183,7 +184,7 @@ export class PluginManager {
         try {
           pluginModule = await pluginInfo._loader()
         } catch (e) {
-          console.error(`❌ Erreur chargement intégré ${pluginInfo.id}:`, e)
+          logError('PluginManager', `Chargement intégré ${pluginInfo.id}`, e)
           this._loadingPlugins.delete(pluginInfo.id)
           return false
         }
@@ -222,9 +223,10 @@ export class PluginManager {
         }
 
         if (!pluginModule) {
-          console.error(
-            `❌ Plugin ${pluginInfo.id} introuvable:`,
-            lastError?.message || 'aucun chemin valide'
+          logError(
+            'PluginManager',
+            `Plugin ${pluginInfo.id} introuvable`,
+            lastError
           )
           this._loadingPlugins.delete(pluginInfo.id)
           return false
@@ -234,7 +236,7 @@ export class PluginManager {
       const plugin = pluginModule.default || pluginModule
 
       if (!plugin.id) {
-        console.error('❌ Plugin invalide: id manquant')
+        logError('PluginManager', 'Plugin invalide: id manquant')
         this._loadingPlugins.delete(pluginInfo.id)
         return false
       }
@@ -271,7 +273,7 @@ export class PluginManager {
       this._loadingPlugins.delete(plugin.id)
       return true
     } catch (e) {
-      console.error(`❌ Erreur chargement plugin ${pluginInfo.id}:`, e)
+      logError('PluginManager', `Chargement plugin ${pluginInfo.id}`, e)
       this._loadingPlugins.delete(pluginInfo.id)
       return false
     }
@@ -284,7 +286,6 @@ export class PluginManager {
    * @param {string} pluginId
    * @param {{ permanent?: boolean }} [options]
    *   - permanent: true → ajoute le plugin à la liste des désactivés persistants
-   *     (à utiliser pour les plugins intégrés qu'on ne peut pas supprimer du disque)
    */
   async unloadPlugin(pluginId, options = {}) {
     const { permanent = false } = options
@@ -296,7 +297,7 @@ export class PluginManager {
         await plugin.destroy()
       }
     } catch (e) {
-      console.warn(`⚠️ Erreur destroy() du plugin ${pluginId}:`, e)
+      logWarn('PluginManager', `Erreur destroy() du plugin ${pluginId}`, e)
     }
 
     // Retirer les pages enregistrées
@@ -316,7 +317,6 @@ export class PluginManager {
       await this._ensureDisabledLoaded()
       this._disabledPlugins.add(pluginId)
 
-      // Stocker les métadonnées pour pouvoir les réafficher dans Options
       this._disabledPluginsMeta[pluginId] = {
         id: pluginId,
         name: plugin.name || pluginId,
@@ -468,7 +468,9 @@ export class PluginManager {
             // Essayer le chemin suivant
           }
         }
-        console.warn(`⚠️ Composant non trouvé pour la page ${pageId}`, paths)
+        logWarn('PluginManager', `Composant non trouvé pour la page ${pageId}`, {
+          paths,
+        })
         return null
       }
 
@@ -485,7 +487,7 @@ export class PluginManager {
         }
       }
     } catch (e) {
-      console.error(`❌ Erreur chargement du composant ${pageId}:`, e)
+      logError('PluginManager', `Chargement composant ${pageId}`, e)
     }
 
     return null
@@ -499,8 +501,9 @@ export class PluginManager {
       pluginInfo.requires &&
       !this._semverSatisfies(appVersion, pluginInfo.requires)
     ) {
-      console.warn(
-        `⚠️ Plugin ${pluginInfo.id} requiert ${pluginInfo.requires}, version actuelle ${appVersion}`
+      logWarn(
+        'PluginManager',
+        `Plugin ${pluginInfo.id} requiert ${pluginInfo.requires}, version actuelle ${appVersion}`
       )
       return false
     }

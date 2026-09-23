@@ -4,13 +4,26 @@ import { useLanguage } from '@core/i18n/LanguageContext'
 
 const STORAGE_KEY = 'autoTheme'
 
+function msUntilNextThemeCheck() {
+  const now = new Date()
+  const hour = now.getHours()
+  const minute = now.getMinutes()
+  const second = now.getSeconds()
+
+  // Prochain check à la minute 0 de la prochaine heure
+  const msToNextHour =
+    ((59 - minute) * 60 + (60 - second)) * 1000
+
+  return Math.max(msToNextHour, 60000) // sécurité mini 1 min
+}
+
 export default function ThemeToggle({ currentTheme, onThemeChange, lang = 'fr' }) {
   const { t } = useLanguage()
   const [autoTheme, setAutoTheme] = useState(false)
   const [currentHour, setCurrentHour] = useState(new Date().getHours())
   const initializedRef = useRef(false)
+  const timeoutRef = useRef(null)
 
-  // ✅ FIX S4 : migration localStorage → electron-store
   useEffect(() => {
     if (initializedRef.current) return
     initializedRef.current = true
@@ -46,17 +59,39 @@ export default function ThemeToggle({ currentTheme, onThemeChange, lang = 'fr' }
 
     init()
 
-    const interval = setInterval(() => {
-      const hour = new Date().getHours()
-      setCurrentHour(hour)
-      if (autoTheme) {
-        applyAutoTheme()
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
       }
-    }, 60000)
-
-    return () => clearInterval(interval)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (!autoTheme) return
+
+    const scheduleNextCheck = () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+
+      timeoutRef.current = setTimeout(() => {
+        const hour = new Date().getHours()
+        setCurrentHour(hour)
+        applyAutoTheme()
+        scheduleNextCheck()
+      }, msUntilNextThemeCheck())
+    }
+
+    scheduleNextCheck()
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoTheme])
 
   const applyAutoTheme = () => {
     const hour = new Date().getHours()
@@ -65,7 +100,6 @@ export default function ThemeToggle({ currentTheme, onThemeChange, lang = 'fr' }
     onThemeChange(theme)
   }
 
-  // ✅ FIX S4 : persister dans electron-store
   const toggleAutoTheme = async () => {
     const newState = !autoTheme
     setAutoTheme(newState)
@@ -101,7 +135,7 @@ export default function ThemeToggle({ currentTheme, onThemeChange, lang = 'fr' }
           alignItems: 'center',
           gap: 6,
           fontWeight: autoTheme ? 600 : 400,
-          transition: 'all 0.15s ease'
+          transition: 'all 0.15s ease',
         }}
       >
         <span style={{ fontSize: 16 }}>{timeEmoji}</span>
@@ -112,7 +146,7 @@ export default function ThemeToggle({ currentTheme, onThemeChange, lang = 'fr' }
             color: 'var(--text-tertiary)',
             background: 'var(--bg-tertiary)',
             padding: '0 6px',
-            borderRadius: 10
+            borderRadius: 10,
           }}>
             {isNight ? `🌙 ${t('themeNight')}` : `☀️ ${t('themeDay')}`}
           </span>

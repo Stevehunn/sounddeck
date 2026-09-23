@@ -101,7 +101,6 @@ export default function Tutorial({ pageId, onComplete }) {
             <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
             {t('loading')}
           </div>
-          <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
         </div>
       </div>
     )

@@ -82,14 +82,31 @@ function createWindow(shouldStartMinimized = false) {
     mainWindow.loadFile(indexPath)
   }
 
-  // Empêcher la navigation
   mainWindow.webContents.on('will-navigate', (e, url) => {
-    if (url !== mainWindow.webContents.getURL()) e.preventDefault()
+    const currentUrl = mainWindow.webContents.getURL()
+    if (url === currentUrl) return
+
+    e.preventDefault()
+
+    // Ouvre les liens externes dans le navigateur système au lieu de les bloquer silencieusement
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      try {
+        require('electron').shell.openExternal(url)
+      } catch (err) {
+        console.warn('[will-navigate] openExternal error:', err.message)
+      }
+    }
+
+    if (isDev) {
+      console.log(`🔒 [will-navigate] Navigation bloquée : ${url}`)
+    }
   })
 
-  // Bloquer les téléchargements
-  mainWindow.webContents.session.on('will-download', (e) => {
+  mainWindow.webContents.session.on('will-download', (e, item) => {
     e.preventDefault()
+    if (isDev) {
+      console.log(`🔒 [will-download] Téléchargement bloqué : ${item?.getURL?.() || 'unknown'}`)
+    }
   })
 
   return mainWindow
