@@ -10,18 +10,28 @@
  * Obtient les informations d'un morceau Spotify
  * Utilise l'API publique de Spotify
  */
+/**
+ * ⚠️ PLACEHOLDER DOCUMENTÉ
+ *
+ * Spotify a fermé son API publique en 2024. On ne peut donc PAS récupérer
+ * les métadonnées réelles (titre, artiste, durée, cover).
+ *
+ * L'utilisateur devra :
+ *   1. Fournir le titre manuellement dans l'UI YouTube.jsx
+ *   2. Le vrai téléchargement se fait via `downloadPlatformTrack` IPC
+ *      (qui utilise yt-dlp pour matcher le titre sur YouTube)
+ *
+ * Ce comportement est VOLONTAIRE — ne pas le "corriger".
+ */
 export async function getSpotifyTrack(url) {
   try {
     const match = url.match(/spotify\.com\/(?:intl-\w+\/)?track\/([a-zA-Z0-9]+)/)
     if (!match) {
       return { success: false, error: 'URL Spotify invalide' }
     }
-    
+
     const trackId = match[1]
-    
-    // ✅ PAS D'APPEL API - on utilise directement l'ID
-    // L'utilisateur entrera le titre manuellement
-    
+
     return {
       success: true,
       data: {

@@ -15,6 +15,9 @@ export function applyEffectsToBuffer(
   if (activeEffects.length === 0) return audioBuffer
 
   let result = audioBuffer
+  // ⚠️ NOTE : AudioContext dédié (non partagé) — chaque appel crée + ferme
+  // un contexte temporaire. C'est OK en pratique (fermé dans le `finally`),
+  // mais pourrait être optimisé plus tard (cf O(nettoyage) pour passer au shared).
   const ctx = new (window.AudioContext || window.webkitAudioContext)()
 
   try {

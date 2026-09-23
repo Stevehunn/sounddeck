@@ -1,10 +1,19 @@
 // src/plugins/myinstants/Discover.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Howl } from 'howler'
-import { CATEGORIES, CATEGORIES_LIST, DEFAULT_CATEGORIES } from './categories'
+import { CATEGORIES, DEFAULT_CATEGORIES } from './categories'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { useNetwork } from '@shared/contexts'
 import { getItem, setItem } from '@shared/utils/appStorage'
+import {
+  ensureCacheLoaded,
+  getCachedCategory,
+  setCachedCategory,
+  getCacheInfo,
+} from './useMyInstantsCache'
+import CategoryBar from './CategoryBar'
+import CategoryEditorModal from './CategoryEditorModal'
+import AddToProfileModal from './AddToProfileModal'
 
 export default function MyInstantsDiscover({ store, addToast }) {
   const { t, currentLang } = useLanguage()
@@ -215,7 +224,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
       return
     }
 
-    const categoryIds = CATEGORIES_LIST.map(cat => cat.id)
+    const categoryIds = Object.keys(CATEGORIES)
 
     const allCached = categoryIds.every(id => {
       const cached = getCachedCategory(id)
@@ -514,7 +523,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
   }
 
   const selectAllCategories = () => {
-    const allIds = CATEGORIES_LIST.map(cat => cat.id)
+    const allIds = Object.keys(CATEGORIES)
     setTempSelectedCategories(allIds)
   }
 
@@ -522,238 +531,16 @@ export default function MyInstantsDiscover({ store, addToast }) {
     setTempSelectedCategories([])
   }
 
-  const renderCategories = () => {
-    const visibleCategories = getVisibleCategories()
-    const displayCategories = showAllCategories ? visibleCategories : visibleCategories.slice(0, 8)
-
-    if (visibleCategories.length === 0) {
-      return (
-        <div style={{
-          textAlign: 'center',
-          padding: '8px',
-          color: 'var(--text-tertiary)',
-          fontSize: 12,
-        }}>
-          <i className="ti ti-category" style={{ marginRight: 4 }} />
-          {t('myinstantsNoCategories')}
-        </div>
-      )
+  const handleSelectCategoryFromBar = (catId) => {
+    setSearch('')
+    const cached = getCachedCategory(catId)
+    if (cached && cached.length > 0) {
+      setResults(cached)
+      setActiveCategory(catId)
+      setError('')
+    } else {
+      loadCategory(catId)
     }
-
-    return (
-      <div style={{ marginBottom: 12 }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 6,
-        }}>
-          <div style={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: 'var(--text-secondary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-          }}>
-            <i className="ti ti-category" style={{ marginRight: 4 }} />
-            {t('myinstantsCategories')} ({visibleCategories.length})
-          </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <button
-              data-testid="discover-category-editor-button"
-              className="btn-ghost btn-sm"
-              onClick={openCategoryEditor}
-              style={{ fontSize: 10, color: 'var(--text-tertiary)' }}
-            >
-              <i className="ti ti-edit" /> {t('myinstantsCategoryEditor')}
-            </button>
-            {visibleCategories.length > 8 && (
-              <button
-                className="btn-ghost btn-sm"
-                onClick={() => setShowAllCategories(!showAllCategories)}
-                style={{ fontSize: 10, color: 'var(--text-tertiary)' }}
-              >
-                {showAllCategories ? t('myinstantsShowLess') : t('myinstantsShowMore')}
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div
-          className="categories-container"
-          data-testid="discover-categories"
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 4,
-            maxHeight: showAllCategories ? 'none' : '80px',
-            overflow: 'hidden',
-          }}
-        >
-          {displayCategories.map(cat => {
-            const isActive = activeCategory === cat.id
-            const isCached = cacheInfo[cat.id]?.count > 0
-            const categoryLabel = t(cat.labelKey) || cat.labelKey
-
-            return (
-              <button
-                key={cat.id}
-                onClick={() => {
-                  setSearch('')
-                  const cached = getCachedCategory(cat.id)
-                  if (cached && cached.length > 0) {
-                    setResults(cached)
-                    setActiveCategory(cat.id)
-                    setError('')
-                  } else {
-                    loadCategory(cat.id)
-                  }
-                }}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: 12,
-                  fontSize: 11,
-                  cursor: 'pointer',
-                  border: `1px solid ${isActive ? cat.color : 'var(--border)'}`,
-                  background: isActive ? `${cat.color}22` : 'var(--bg-tertiary)',
-                  color: isActive ? cat.color : 'var(--text-secondary)',
-                  fontWeight: isActive ? 500 : 400,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => {
-                  if (!isActive) {
-                    e.currentTarget.style.borderColor = cat.color
-                    e.currentTarget.style.color = cat.color
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!isActive) {
-                    e.currentTarget.style.borderColor = 'var(--border)'
-                    e.currentTarget.style.color = 'var(--text-secondary)'
-                  }
-                }}
-              >
-                <span style={{ fontSize: 14 }}>{cat.emoji || cat.icon}</span>
-                <span>{categoryLabel}</span>
-                {isActive && <i className="ti ti-check" style={{ fontSize: 10, marginLeft: 2 }} />}
-                {isCached && !isActive && (
-                  <span style={{
-                    fontSize: 8,
-                    marginLeft: 2,
-                    color: 'var(--success)',
-                    opacity: 0.6,
-                  }}>
-                    💾
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-    )
-  }
-
-  const renderCategoryEditor = () => {
-    if (!showCategoryEditor) return null
-
-    return (
-      <div className="modal-overlay" onClick={closeCategoryEditor}>
-        <div
-          className="modal"
-          data-testid="discover-category-editor-modal"
-          style={{ width: 480, maxHeight: '80vh' }}
-          onClick={e => e.stopPropagation()}
-        >
-          <div className="modal-title">
-            <i className="ti ti-edit" style={{ color: 'var(--accent)' }} />
-            {t('myinstantsCategoryEditor')}
-          </div>
-
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>
-            {t('myinstantsCategoryEditorDesc')}
-            <span style={{ marginLeft: 8, color: 'var(--text-tertiary)' }}>
-              ({tempSelectedCategories.length} {t('myinstantsSelected')})
-            </span>
-          </div>
-
-          <div style={{
-            display: 'flex',
-            gap: 4,
-            marginBottom: 12,
-            flexWrap: 'wrap',
-          }}>
-            <button className="btn-secondary btn-sm" onClick={selectAllCategories}>
-              <i className="ti ti-checkbox" /> {t('myinstantsCategoryEditorSelectAll')}
-            </button>
-            <button className="btn-secondary btn-sm" onClick={deselectAllCategories}>
-              <i className="ti ti-checkbox" /> {t('myinstantsCategoryEditorDeselectAll')}
-            </button>
-            <button className="btn-ghost btn-sm" onClick={resetCategoryEditor}>
-              <i className="ti ti-refresh" /> {t('myinstantsCategoryEditorReset')}
-            </button>
-          </div>
-
-          <div style={{
-            maxHeight: 300,
-            overflowY: 'auto',
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 4,
-            padding: '4px 0',
-          }}>
-            {CATEGORIES_LIST.map(cat => {
-              const isSelected = tempSelectedCategories.includes(cat.id)
-              const categoryLabel = t(cat.labelKey) || cat.labelKey
-
-              return (
-                <label
-                  key={cat.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '6px 10px',
-                    borderRadius: 'var(--radius-sm)',
-                    cursor: 'pointer',
-                    border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
-                    background: isSelected ? 'var(--accent-light)' : 'var(--bg-tertiary)',
-                    transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={e => {
-                    if (!isSelected) e.currentTarget.style.borderColor = 'var(--accent)'
-                  }}
-                  onMouseLeave={e => {
-                    if (!isSelected) e.currentTarget.style.borderColor = 'var(--border)'
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleCategoryInEditor(cat.id)}
-                    style={{ accentColor: 'var(--accent)', width: 'auto' }}
-                  />
-                  <span style={{ fontSize: 14 }}>{cat.emoji || cat.icon}</span>
-                  <span style={{ fontSize: 12 }}>{categoryLabel}</span>
-                </label>
-              )
-            })}
-          </div>
-
-          <div className="modal-actions" style={{ marginTop: 16 }}>
-            <button className="btn-secondary btn-lg" onClick={closeCategoryEditor}>
-              <i className="ti ti-x" /> {t('myinstantsCategoryEditorCancel')}
-            </button>
-            <button className="btn-primary btn-lg" onClick={saveCategoryEditor}>
-              <i className="ti ti-check" /> {t('myinstantsCategoryEditorSave')}
-            </button>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   useEffect(() => {
@@ -804,6 +591,8 @@ export default function MyInstantsDiscover({ store, addToast }) {
       </div>
     )
   }
+
+  const visibleCategories = getVisibleCategories()
 
   return (
     <div style={{
@@ -960,14 +749,23 @@ export default function MyInstantsDiscover({ store, addToast }) {
         </button>
       </div>
 
-      {/* Catégories */}
+      {/* Catégories (extraites dans CategoryBar) */}
       <div style={{
         padding: '8px 20px',
         borderBottom: '1px solid var(--border)',
         flexShrink: 0,
         background: 'var(--bg-secondary)',
       }}>
-        {renderCategories()}
+        <CategoryBar
+          categories={visibleCategories}
+          activeCategory={activeCategory}
+          cacheInfo={cacheInfo}
+          showAllCategories={showAllCategories}
+          onSelectCategory={handleSelectCategoryFromBar}
+          onToggleShowAll={() => setShowAllCategories(!showAllCategories)}
+          onOpenEditor={openCategoryEditor}
+          t={t}
+        />
       </div>
 
       {/* Contenu */}
@@ -1156,139 +954,30 @@ export default function MyInstantsDiscover({ store, addToast }) {
         )}
       </div>
 
-      {/* Modal de sélection de profil */}
-      {showProfileModal && (
-        <div className="modal-overlay" onClick={() => setShowProfileModal(null)}>
-          <div className="modal" style={{ width: 400 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-title">
-              <span style={{ fontSize: 22 }}>{showProfileModal.emoji || '🔊'}</span>
-              {t('myinstantsAddToLibrary')}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {store.profiles.map(p => {
-                const isSelected = selectedProfile === p.id
-                return (
-                  <label
-                    key={p.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      padding: '8px 12px',
-                      borderRadius: 'var(--radius-md)',
-                      border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
-                      background: isSelected ? 'var(--accent-light)' : 'transparent',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s',
-                    }}
-                    onMouseEnter={e => {
-                      if (!isSelected) e.currentTarget.style.borderColor = 'var(--accent)'
-                    }}
-                    onMouseLeave={e => {
-                      if (!isSelected) e.currentTarget.style.borderColor = 'var(--border)'
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="profile"
-                      value={p.id}
-                      checked={isSelected}
-                      onChange={() => setSelectedProfile(p.id)}
-                      style={{ accentColor: 'var(--accent)', width: 'auto' }}
-                    />
-                    <i className={`ti ${p.isDefault ? 'ti-stack' : 'ti-user'}`} style={{ color: 'var(--text-secondary)' }} />
-                    <span style={{ fontSize: 13 }}>{p.id === 'all' ? t('allSounds') : p.name}</span>
-                  </label>
-                )
-              })}
-            </div>
-            <div className="modal-actions" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-              <button className="btn-secondary btn-lg" onClick={() => setShowProfileModal(null)} style={{ borderRadius: 'var(--radius-md)', minHeight: 40, padding: '8px 20px' }}>
-                <i className="ti ti-x" /> {t('myinstantsCancel')}
-              </button>
-              <button className="btn-primary btn-lg" onClick={confirmAddSound} style={{ borderRadius: 'var(--radius-md)', minHeight: 40, padding: '8px 20px' }}>
-                <i className="ti ti-download" /> {t('myinstantsAdd')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal de sélection de profil (extraite) */}
+      <AddToProfileModal
+        sound={showProfileModal}
+        profiles={store.profiles}
+        selectedProfile={selectedProfile}
+        onSelectProfile={setSelectedProfile}
+        onClose={() => setShowProfileModal(null)}
+        onConfirm={confirmAddSound}
+        t={t}
+      />
 
-      {/* Modal d'édition des catégories */}
-      {renderCategoryEditor()}
+      {/* Modal d'édition des catégories (extraite) */}
+      <CategoryEditorModal
+        isOpen={showCategoryEditor}
+        tempSelectedCategories={tempSelectedCategories}
+        onToggleCategory={toggleCategoryInEditor}
+        onSelectAll={selectAllCategories}
+        onDeselectAll={deselectAllCategories}
+        onReset={resetCategoryEditor}
+        onCancel={closeCategoryEditor}
+        onSave={saveCategoryEditor}
+        t={t}
+      />
 
     </div>
   )
-}
-
-// ─── FONCTIONS DE CACHE (persistées via electron-store) ────────
-
-const STORE_KEY_CACHE = 'myinstantsCategoryCache'
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24h
-
-// Cache mémoire (rapide, source de vérité à la lecture)
-const categoryCache = new Map()
-let cacheLoaded = false
-let persistTimer = null
-
-/**
- * Charge le cache depuis electron-store (une seule fois par session).
- */
-async function ensureCacheLoaded() {
-  if (cacheLoaded) return
-  cacheLoaded = true
-
-  try {
-    const raw = await getItem(STORE_KEY_CACHE)
-    if (!raw) return
-
-    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
-    if (!parsed || typeof parsed !== 'object') return
-
-    const now = Date.now()
-    for (const [key, entry] of Object.entries(parsed)) {
-      if (!entry?.sounds || !entry?.fetchedAt) continue
-      if (now - entry.fetchedAt > CACHE_TTL_MS) continue // expiré
-      categoryCache.set(key, entry.sounds)
-    }
-  } catch (e) {
-    console.warn('[Discover] Erreur chargement cache:', e)
-  }
-}
-
-/**
- * Persiste le cache (debounce 1s pour éviter les writes spam).
- */
-function persistCache() {
-  if (persistTimer) clearTimeout(persistTimer)
-  persistTimer = setTimeout(async () => {
-    persistTimer = null
-    try {
-      const now = Date.now()
-      const toStore = {}
-      for (const [key, sounds] of categoryCache) {
-        toStore[key] = { sounds, fetchedAt: now }
-      }
-      await setItem(STORE_KEY_CACHE, JSON.stringify(toStore))
-    } catch (e) {
-      console.warn('[Discover] Erreur persistance cache:', e)
-    }
-  }, 1000)
-}
-
-function getCachedCategory(categoryId) {
-  return categoryCache.get(categoryId) || null
-}
-
-function setCachedCategory(categoryId, sounds) {
-  categoryCache.set(categoryId, sounds)
-  persistCache()
-}
-
-function getCacheInfo() {
-  const info = {}
-  for (const [key, value] of categoryCache) {
-    info[key] = { count: value.length, cached: true }
-  }
-  return info
 }

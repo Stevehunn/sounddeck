@@ -3,34 +3,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { formatTime as formatTimeShared } from '@shared/utils/format'
 import { buildFileUrl } from '@shared/utils/fileUrl'
-
-async function generateWaveformData(fileUrl, samples = 200) {
-  try {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-    const response = await fetch(fileUrl)
-    const arrayBuffer = await response.arrayBuffer()
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-    await audioContext.close()
-
-    const rawData = audioBuffer.getChannelData(0)
-    const blockSize = Math.floor(rawData.length / samples)
-    const data = []
-
-    for (let i = 0; i < samples; i++) {
-      let sum = 0
-      for (let j = 0; j < blockSize; j++) {
-        sum += Math.abs(rawData[i * blockSize + j])
-      }
-      data.push(sum / blockSize)
-    }
-
-    const max = Math.max(...data)
-    return max > 0 ? data.map(v => v / max) : data
-  } catch (e) {
-    console.error('Waveform error:', e)
-    return null
-  }
-}
+// ✅ FIX 21 : utilise le module centralisé (avec withTemporaryAudioContext)
+// au lieu de recréer un AudioContext qui fuyait en cas d'erreur
+import { generateWaveformData } from '@shared/utils/waveformGenerator'
 
 export default function Waveform({
   filePath,
@@ -56,14 +31,27 @@ export default function Waveform({
   const fileUrl = filePath ? buildFileUrl(filePath) : null
 
   useEffect(() => {
-    if (!fileUrl) return
+    if (!filePath) return
+
+    let mounted = true
     setLoading(true)
     setWaveData(null)
-    generateWaveformData(fileUrl, 300).then(data => {
-      setWaveData(data)
-      setLoading(false)
-    })
-  }, [fileUrl])
+
+    generateWaveformData(filePath, 300)
+      .then(data => {
+        if (!mounted) return
+        setWaveData(data)
+        setLoading(false)
+      })
+      .catch(() => {
+        if (!mounted) return
+        setLoading(false)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [filePath])
 
   useEffect(() => {
     const canvas = canvasRef.current
