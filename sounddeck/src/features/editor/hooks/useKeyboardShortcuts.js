@@ -19,7 +19,6 @@ export function useKeyboardShortcuts({
   onCut,
   onPaste,
   onToggleClipLoop,
-  // ✅ NOUVEAU RACCOURCI MÉTRONOME
   onToggleMetronome,
   isPlaying,
   canUndo,
@@ -28,7 +27,7 @@ export function useKeyboardShortcuts({
 }) {
   const handleKeyDown = useCallback((e) => {
     if (!isEnabled) return
-    
+
     const target = e.target
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
       return
@@ -38,10 +37,9 @@ export function useKeyboardShortcuts({
     const shift = e.shiftKey
     const alt = e.altKey
 
-    // ✅ Espace - Play/Pause
+    // Espace - Play/Pause
     if (e.key === ' ' && !ctrl) {
       e.preventDefault()
-      console.log('⌨️ Espace: Play/Pause')
       if (isPlaying) {
         onPause?.()
       } else {
@@ -50,146 +48,128 @@ export function useKeyboardShortcuts({
       return
     }
 
-    // ✅ Escape - Stop
+    // Escape - Stop
     if (e.key === 'Escape') {
       e.preventDefault()
-      console.log('⌨️ Escape: Stop')
       onStop?.()
       return
     }
 
-    // ✅ Ctrl+Z - Undo
+    // Ctrl+Z - Undo
     if (ctrl && e.key === 'z' && !shift) {
       e.preventDefault()
-      console.log('⌨️ Ctrl+Z: Undo')
       onUndo?.()
       return
     }
 
-    // ✅ Ctrl+Y ou Ctrl+Shift+Z - Redo
+    // Ctrl+Y ou Ctrl+Shift+Z - Redo
     if (ctrl && (e.key === 'y' || (e.key === 'z' && shift))) {
       e.preventDefault()
-      console.log('⌨️ Ctrl+Y: Redo')
       onRedo?.()
       return
     }
 
-    // ✅ Ctrl+T - Add Track
+    // Ctrl+T - Add Track
     if (ctrl && e.key === 't' && !shift) {
       e.preventDefault()
-      console.log('⌨️ Ctrl+T: Add Track')
       onAddTrack?.()
       return
     }
 
-    // ✅ Ctrl+M - Add Marker
+    // Ctrl+M - Add Marker
     if (ctrl && e.key === 'm') {
       e.preventDefault()
-      console.log('⌨️ Ctrl+M: Add Marker')
       onAddMarker?.()
       return
     }
 
-    // ✅ Ctrl+C - Copier
+    // Ctrl+C - Copier
     if (ctrl && e.key === 'c' && !shift) {
       e.preventDefault()
-      console.log('⌨️ Ctrl+C: Copier')
       onCopy?.()
       return
     }
 
-    // ✅ Ctrl+X - Couper
+    // Ctrl+X - Couper
     if (ctrl && e.key === 'x' && !shift) {
       e.preventDefault()
-      console.log('⌨️ Ctrl+X: Couper')
       onCut?.()
       return
     }
 
-    // ✅ Ctrl+V - Coller
+    // Ctrl+V - Coller
     if (ctrl && e.key === 'v' && !shift) {
       e.preventDefault()
-      console.log('⌨️ Ctrl+V: Coller')
       onPaste?.()
       return
     }
 
-    // ✅ Delete / Backspace - Supprimer
+    // Delete / Backspace - Supprimer
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault()
-      console.log('⌨️ Delete: Supprimer')
       onDelete?.()
       return
     }
 
-    // ✅ Ctrl+Shift+S - Toggle Snap
+    // Ctrl+Shift+S - Toggle Snap
     if (ctrl && shift && e.key === 's') {
       e.preventDefault()
-      console.log('⌨️ Ctrl+Shift+S: Toggle Snap')
       onToggleSnap?.()
       return
     }
 
-    // ✅ Ctrl+= / Ctrl++ - Zoom In
+    // Ctrl+= / Ctrl++ - Zoom In
     if (ctrl && (e.key === '=' || e.key === '+')) {
       e.preventDefault()
-      console.log('⌨️ Ctrl+=: Zoom In')
       onZoomIn?.()
       return
     }
 
-    // ✅ Ctrl+- - Zoom Out
+    // Ctrl+- - Zoom Out
     if (ctrl && e.key === '-') {
       e.preventDefault()
-      console.log('⌨️ Ctrl+-: Zoom Out')
       onZoomOut?.()
       return
     }
 
-    // ✅ Ctrl+0 - Zoom Reset
+    // Ctrl+0 - Zoom Reset
     if (ctrl && e.key === '0') {
       e.preventDefault()
-      console.log('⌨️ Ctrl+0: Zoom Reset')
       onZoomReset?.()
       return
     }
 
-    // ✅ S - Split (sans modificateur)
+    // S - Split (sans modificateur)
     if (e.key === 's' && !ctrl && !shift && !alt) {
       e.preventDefault()
-      console.log('⌨️ S: Split')
       onSplit?.()
       return
     }
 
-    // ✅ L - Toggle Loop (sans modificateur)
+    // L - Toggle Loop (sans modificateur)
     if (e.key === 'l' && !ctrl && !shift && !alt) {
       e.preventDefault()
-      console.log('⌨️ L: Toggle Loop')
       onToggleClipLoop?.()
       return
     }
 
-    // ✅ Ctrl+L - Toggle Loop (avec modificateur)
+    // Ctrl+L - Toggle Loop (avec modificateur)
     if (ctrl && e.key === 'l' && !shift) {
       e.preventDefault()
-      console.log('⌨️ Ctrl+L: Toggle Loop')
       onToggleClipLoop?.()
       return
     }
 
-    // ✅ M - Toggle Métronome (sans modificateur)
+    // M - Toggle Métronome (sans modificateur)
     if (e.key === 'm' && !ctrl && !shift && !alt) {
       e.preventDefault()
-      console.log('⌨️ M: Toggle Métronome')
       onToggleMetronome?.()
       return
     }
 
-    // ✅ Ctrl+Shift+M - Toggle Métronome (avec modificateur)
+    // Ctrl+Shift+M - Toggle Métronome (avec modificateur)
     if (ctrl && shift && e.key === 'm') {
       e.preventDefault()
-      console.log('⌨️ Ctrl+Shift+M: Toggle Métronome')
       onToggleMetronome?.()
       return
     }
@@ -213,7 +193,6 @@ export function useKeyboardShortcuts({
     onCut,
     onPaste,
     onToggleClipLoop,
-    // ✅ AJOUT
     onToggleMetronome,
     canUndo,
     canRedo

@@ -32,10 +32,16 @@ const STORE_KEY_METRONOME_BPM = 'sounddeck_metronome_bpm'
 const STORE_KEY_MASTER_VOLUME = 'sounddeck_master_volume'
 
 export default function Editor({ store, addToast }) {
+  const { currentLang } = useLanguage()
+  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
+
   return (
-    <EditorProvider store={store} addToast={addToast}>
-      <EditorContent />
-    </EditorProvider>
+    <>
+      <EditorProvider store={store} addToast={addToast} confirm={confirm}>
+        <EditorContent />
+      </EditorProvider>
+      <ConfirmWrapper />
+    </>
   )
 }
 
@@ -127,9 +133,9 @@ function EditorContent() {
 }
 
 function EditorTimelineContent() {
-  const { t, currentLang } = useLanguage()
+  const { t } = useLanguage()
   const context = useEditor()
-  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
+  const { confirm } = context
 
   const {
     project,
@@ -260,7 +266,7 @@ function EditorTimelineContent() {
         masterVolumeRef.current = clampedVolume
         setMasterGain(clampedVolume / 100)
       } catch (e) {
-        console.warn('[Editor] Erreur chargement prefs:', e)
+        if (__DEBUG__) console.warn('[Editor] Erreur chargement prefs:', e)
       }
     })()
 
@@ -785,7 +791,7 @@ function EditorTimelineContent() {
           addToast?.(`Clip "${name}" supprimé`, 'info')
         }
       } catch (e) {
-        console.error('Erreur suppression clip:', e)
+        if (__DEBUG__) console.error('Erreur suppression clip:', e)
       } finally {
         setTimeout(() => setIsDeletingClip(false), 400)
       }
@@ -1664,8 +1670,6 @@ function EditorTimelineContent() {
           canMoveDown={getCanMoveDown(selectedTrackForMenu)}
         />
       )}
-
-      <ConfirmWrapper />
     </div>
   )
 }

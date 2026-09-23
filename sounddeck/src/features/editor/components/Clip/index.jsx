@@ -85,7 +85,6 @@ const EditorClip = ({
 
   const playheadPosition = Math.max(0, Math.min((currentTime - start) * pixelsPerSecond, clipWidth - 2))
 
-  // ✅ FIX : on passe trackId en 3ème argument pour que Editor.jsx puisse le propager
   const handleContextMenu = useCallback((e) => {
     e.preventDefault()
     e.stopPropagation()
@@ -537,7 +536,7 @@ const EditorClip = ({
                 border: '1px solid rgba(255,255,255,0.1)',
                 cursor: 'pointer'
               }}
-              title="Arrêter"
+              title={tr?.('editorClipTooltipStop') || 'Arrêter'}
             >
               <i className="ti ti-player-stop" />
             </button>
@@ -553,7 +552,7 @@ const EditorClip = ({
                 border: '1px solid rgba(255,255,255,0.1)',
                 cursor: 'pointer'
               }}
-              title="Jouer le clip"
+              title={tr?.('editorClipTooltipPlay') || 'Jouer le clip'}
             >
               <i className="ti ti-player-play" />
             </button>
@@ -570,7 +569,7 @@ const EditorClip = ({
               border: '1px solid rgba(255,255,255,0.1)',
               cursor: 'pointer'
             }}
-            title="Copier"
+            title={tr?.('editorClipTooltipCopy') || 'Copier'}
           >
             <i className="ti ti-copy" />
           </button>
@@ -586,7 +585,7 @@ const EditorClip = ({
               border: '1px solid rgba(255,255,255,0.1)',
               cursor: 'pointer'
             }}
-            title="Couper"
+            title={tr?.('editorClipTooltipCut') || 'Couper'}
           >
             <i className="ti ti-cut" />
           </button>

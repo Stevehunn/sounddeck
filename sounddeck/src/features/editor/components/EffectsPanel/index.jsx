@@ -21,14 +21,14 @@ const EFFECT_ICON_MAP = {
   reverb: 'ti-wave-sine',
 }
 
-const PARAM_LABELS = {
-  value: 'Volume',
-  duration: 'Durée (s)',
-  semitones: 'Demi-tons',
-  delay: 'Délai (s)',
-  decay: 'Atténuation',
-  mix: 'Mix',
-  roomSize: 'Taille',
+const PARAM_LABEL_KEYS = {
+  value: 'editorParamVolume',
+  duration: 'editorParamDuration',
+  semitones: 'editorParamSemitones',
+  delay: 'editorParamDelay',
+  decay: 'editorParamDecay',
+  mix: 'editorParamMix',
+  roomSize: 'editorParamRoomSize',
 }
 
 const PARAM_DEFAULTS = {
@@ -80,7 +80,6 @@ export default function EditorEffectsPanel({
   showAddMenu: showAddMenuProp = false,
   onShowAddMenuChange,
 }) {
-  // ─── HOOKS (TOUS DÉCLARÉS AVANT TOUT RETURN) ─────────────────────────────
   const [showAddEffect, setShowAddEffect] = useState(false)
   const [isProcessingPreview, setIsProcessingPreview] = useState(false)
   const [autoPreview, setAutoPreview] = useState(true)
@@ -88,13 +87,11 @@ export default function EditorEffectsPanel({
   const [previewProgress, setPreviewProgress] = useState(0)
   const [previewDuration, setPreviewDuration] = useState(0)
 
-  // ✅ FIX : un seul AudioContext partagé, réutilisé entre previews
   const audioContextRef = useRef(null)
   const previewSourceRef = useRef(null)
   const previewProgressIntervalRef = useRef(null)
   const autoPreviewTimerRef = useRef(null)
 
-  // ✅ getAudioContext mémorisé, réutilise ou crée le contexte
   const getAudioContext = useCallback(() => {
     if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
       audioContextRef.current = new (window.AudioContext ||
@@ -103,7 +100,6 @@ export default function EditorEffectsPanel({
     return audioContextRef.current
   }, [])
 
-  // ✅ stopPreview stable (ne dépend que de rien, utilise des refs)
   const stopPreview = useCallback(() => {
     if (autoPreviewTimerRef.current) {
       clearTimeout(autoPreviewTimerRef.current)
@@ -221,7 +217,6 @@ export default function EditorEffectsPanel({
     }, AUTO_PREVIEW_DELAY)
   }, [autoPreview, stopPreview, playPreview])
 
-  // ✅ Sync avec showAddMenu prop
   useEffect(() => {
     if (showAddMenuProp) {
       setShowAddEffect(true)
@@ -229,7 +224,6 @@ export default function EditorEffectsPanel({
     }
   }, [showAddMenuProp, onShowAddMenuChange])
 
-  // ✅ Cleanup à l'unmount
   useEffect(() => {
     return () => {
       stopPreview()
@@ -237,7 +231,6 @@ export default function EditorEffectsPanel({
         clearTimeout(autoPreviewTimerRef.current)
         autoPreviewTimerRef.current = null
       }
-      // Ferme le contexte audio proprement
       if (
         audioContextRef.current &&
         audioContextRef.current.state !== 'closed'
@@ -248,7 +241,6 @@ export default function EditorEffectsPanel({
     }
   }, [stopPreview])
 
-  // ─── HANDLERS ─────────────────────────────────────────────────────────────
   const handleParamChange = (effectId, param, value) => {
     if (onEffectUpdate) onEffectUpdate(trackId, clip.id, effectId, param, value)
     schedulePreview()
@@ -316,7 +308,6 @@ export default function EditorEffectsPanel({
     }
   }
 
-  // ─── RETURN CONDITIONNEL (APRÈS LES HOOKS) ────────────────────────────────
   if (!clip) return null
 
   return (
@@ -408,7 +399,11 @@ export default function EditorEffectsPanel({
               cursor: 'pointer',
             }}
             onClick={toggleAutoPreview}
-            title={autoPreview ? 'Désactiver l\'auto-preview' : 'Activer l\'auto-preview'}
+            title={
+              autoPreview
+                ? tr('editorAutoPreviewTooltipOn') || 'Désactiver l\'auto-preview'
+                : tr('editorAutoPreviewTooltipOff') || 'Activer l\'auto-preview'
+            }
           >
             <span
               style={{
@@ -572,6 +567,11 @@ export default function EditorEffectsPanel({
                 const max = range?.max !== undefined ? range.max : 1
                 const step = range?.step !== undefined ? range.step : 0.05
 
+                const paramLabelKey = PARAM_LABEL_KEYS[param]
+                const paramLabel = paramLabelKey
+                  ? tr(paramLabelKey) || param
+                  : param
+
                 return (
                   <div
                     key={param}
@@ -589,7 +589,7 @@ export default function EditorEffectsPanel({
                         minWidth: 50,
                       }}
                     >
-                      {PARAM_LABELS[param] || param}
+                      {paramLabel}
                     </span>
                     <input
                       type="range"

@@ -1,7 +1,5 @@
 // src/shared/utils/index.js
 export * from './format'
-export * from './fileUtils'
-export * from './pathUtils'
 export * from './errorHandler'
 export * from './waveformGenerator'
 export * from './backupManager'

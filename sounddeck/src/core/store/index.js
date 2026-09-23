@@ -22,6 +22,35 @@ const save = async (key, value) => {
   await window.electronAPI.storeSet(key, value)
 }
 
+async function hydrateStore(keysWithDefaults, ipcExtraGetters = {}) {
+  const keys = Object.keys(keysWithDefaults)
+  const results = {}
+
+  const promises = keys.map(async (key) => {
+    try {
+      // Priorité aux getters IPC personnalisés (ex: getStartMinimized)
+      const getter = ipcExtraGetters[key]
+      const value = getter
+        ? await getter()
+        : await window.electronAPI.storeGet(key)
+
+      // Fallback sur le défaut si la valeur est null/undefined
+      results[key] =
+        value !== undefined && value !== null
+          ? value
+          : keysWithDefaults[key]
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.warn(`⚠️ [store] storeGet(${key}) a échoué:`, e?.message || e)
+      }
+      results[key] = keysWithDefaults[key]
+    }
+  })
+
+  await Promise.all(promises)
+  return results
+}
+
 export function useStore() {
   const [loading, setLoading] = useState(true)
   const [sidebarConfig, setSidebarConfig] = useState(null)
@@ -53,151 +82,133 @@ export function useStore() {
     async function loadData() {
       try {
         isHydrating = true
-        const [
-          savedProfiles,
-          rawSounds,
-          savedShortcuts,
-          savedProfileShortcut,
-          savedCurrentProfileId,
-          savedSoundOrder,
-          savedTags,
-          savedSidebarConfig,
-          savedTheme,
-          savedCustomTheme,
-          savedLang,
-          savedAudioDevice,
-          savedLocalAudioDevice,
-          savedVolume,
-          savedPlayLocally,
-          savedPreviewVolume,
-          savedKeyboardLayout,
-          savedCardSize,
-          savedNormalizationEnabled,
-          savedNormalizationTarget,
-          savedStartMinimized,
-          savedLaunchAtStartup,
-          savedVirtualDriverInstalled,
-          savedVirtualDeviceActive,
-          savedAutoBackup,
-          savedBackupInterval,
-          savedLazyLoading,
-          savedCompressOnImport,
-          savedCompressionBitrate,
-          savedShortcutsEnabled,
-          savedToggleShortcutsAccelerator,
-          savedToggleWindowShortcut,
-          savedLoopShortcut,
-          savedStopAllShortcut,
-          savedPresentationShortcut,
-          savedMixerEnabled,
-          savedMicrophoneDevice,
-          savedMicrophoneVolume,
-          savedMixerSoundVolume,
-          savedNoiseSuppression,
-          savedNoiseSuppressionMode,
-          savedLowLatencyMode,
-          savedMonitoringEnabled,
-        ] = await Promise.all([
-          window.electronAPI.storeGet('profiles'),
-          window.electronAPI.storeGet('sounds'),
-          window.electronAPI.storeGet('shortcuts'),
-          window.electronAPI.storeGet('profileShortcut'),
-          window.electronAPI.storeGet('currentProfileId'),
-          window.electronAPI.storeGet('soundOrder'),
-          window.electronAPI.storeGet('tags'),
-          window.electronAPI.storeGet('sidebarConfig'),
-          window.electronAPI.storeGet('theme'),
-          window.electronAPI.storeGet('customTheme'),
-          window.electronAPI.storeGet('lang'),
-          window.electronAPI.storeGet('audioDevice'),
-          window.electronAPI.storeGet('localAudioDevice'),
-          window.electronAPI.storeGet('volume'),
-          window.electronAPI.storeGet('playLocally'),
-          window.electronAPI.storeGet('previewVolume'),
-          window.electronAPI.storeGet('keyboardLayout'),
-          window.electronAPI.storeGet('cardSize'),
-          window.electronAPI.storeGet('normalizationEnabled'),
-          window.electronAPI.storeGet('normalizationTarget'),
-          window.electronAPI.getStartMinimized?.() ?? Promise.resolve(null),
-          window.electronAPI.getLaunchAtStartup?.() ?? Promise.resolve(null),
-          window.electronAPI.storeGet('virtualDriverInstalled'),
-          window.electronAPI.storeGet('virtualDeviceActive'),
-          window.electronAPI.storeGet('autoBackupEnabled'),
-          window.electronAPI.storeGet('backupInterval'),
-          window.electronAPI.storeGet('lazyLoadingEnabled'),
-          window.electronAPI.storeGet('compressOnImport'),
-          window.electronAPI.storeGet('compressionBitrate'),
-          window.electronAPI.storeGet('shortcutsEnabled'),
-          window.electronAPI.storeGet('toggleShortcutsAccelerator'),
-          window.electronAPI.storeGet('toggleWindowShortcut'),
-          window.electronAPI.storeGet('loopShortcut'),
-          window.electronAPI.storeGet('stopAllShortcut'),
-          window.electronAPI.storeGet('presentationShortcut'),
-          window.electronAPI.storeGet('mixerEnabled'),
-          window.electronAPI.storeGet('microphoneDevice'),
-          window.electronAPI.storeGet('microphoneVolume'),
-          window.electronAPI.storeGet('mixerSoundVolume'),
-          window.electronAPI.storeGet('noiseSuppression'),
-          window.electronAPI.storeGet('noiseSuppressionMode'),
-          window.electronAPI.storeGet('lowLatencyMode'),
-          window.electronAPI.storeGet('monitoringEnabled'),
-        ])
 
-        const savedSounds = (rawSounds || []).map(migrateSoundVolume)
-        const allProfile = { id: 'all', name: 'Tous les sons', isDefault: true }
-        const userProfiles = (savedProfiles || []).filter((p) => p.id !== 'all')
+        const KEYS_WITH_DEFAULTS = {
+          // Sounds / profiles / shortcuts
+          profiles: null,
+          sounds: null,
+          shortcuts: null,
+          profileShortcut: null,
+          currentProfileId: null,
+          soundOrder: null,
+          tags: null,
+          sidebarConfig: null,
+
+          // Settings
+          theme: null,
+          customTheme: null,
+          lang: null,
+          audioDevice: null,
+          localAudioDevice: null,
+          volume: null,
+          playLocally: null,
+          previewVolume: null,
+          keyboardLayout: null,
+          cardSize: null,
+          normalizationEnabled: null,
+          normalizationTarget: null,
+          virtualDriverInstalled: null,
+          virtualDeviceActive: null,
+          autoBackupEnabled: null,
+          backupInterval: null,
+          lazyLoadingEnabled: null,
+          compressOnImport: null,
+          compressionBitrate: null,
+          shortcutsEnabled: null,
+          toggleShortcutsAccelerator: null,
+          toggleWindowShortcut: null,
+          loopShortcut: null,
+          stopAllShortcut: null,
+          presentationShortcut: null,
+
+          // Mixer
+          mixerEnabled: null,
+          microphoneDevice: null,
+          microphoneVolume: null,
+          mixerSoundVolume: null,
+          noiseSuppression: null,
+          noiseSuppressionMode: null,
+          lowLatencyMode: null,
+          monitoringEnabled: null,
+
+          // Start (avec getters IPC dédiés)
+          startMinimized: null,
+          launchAtStartup: null,
+        }
+
+        const IPC_EXTRA_GETTERS = {
+          startMinimized: () =>
+            window.electronAPI.getStartMinimized?.() ?? Promise.resolve(null),
+          launchAtStartup: () =>
+            window.electronAPI.getLaunchAtStartup?.() ?? Promise.resolve(null),
+        }
+
+        const data = await hydrateStore(KEYS_WITH_DEFAULTS, IPC_EXTRA_GETTERS)
+
+        const savedSounds = (data.sounds || []).map(migrateSoundVolume)
+        const allProfile = {
+          id: 'all',
+          name: 'Tous les sons',
+          nameKey: 'allSounds',
+          isDefault: true,
+        }
+        const userProfiles = (data.profiles || []).filter((p) => p.id !== 'all')
         const allProfiles = [allProfile, ...userProfiles]
 
         soundsHook.setSounds(savedSounds)
-        soundsHook.setSoundOrder(savedSoundOrder || {})
-        soundsHook.setTags(savedTags || {})
+        soundsHook.setSoundOrder(data.soundOrder || {})
+        soundsHook.setTags(data.tags || {})
 
         profilesHook.setProfiles(allProfiles)
-        profilesHook.setCurrentProfileId(savedCurrentProfileId || 'all')
+        profilesHook.setCurrentProfileId(data.currentProfileId || 'all')
 
-        shortcutsHook.setShortcuts(savedShortcuts || {})
-        shortcutsHook.setProfileShortcut(savedProfileShortcut || 'CommandOrControl+Tab')
+        shortcutsHook.setShortcuts(data.shortcuts || {})
+        shortcutsHook.setProfileShortcut(
+          data.profileShortcut || 'CommandOrControl+Tab'
+        )
 
-        settingsHook.updateTheme(savedTheme || 'dark')
-        settingsHook.updateCustomTheme(savedCustomTheme || null)
-        settingsHook.updateLang(savedLang || 'fr')
-        settingsHook.updateAudioDevice(savedAudioDevice || 'default')
-        settingsHook.updateLocalAudioDevice(savedLocalAudioDevice || 'default')
-        settingsHook.updateVolume(savedVolume ?? 80)
-        settingsHook.updatePlayLocally(savedPlayLocally ?? true)
-        settingsHook.updatePreviewVolume(savedPreviewVolume ?? 70)
-        settingsHook.updateKeyboardLayout(savedKeyboardLayout || 'qwerty')
-        settingsHook.updateCardSize(savedCardSize || 'medium')
-        settingsHook.updateNormalizationEnabled(savedNormalizationEnabled ?? true)
-        settingsHook.updateNormalizationTarget(savedNormalizationTarget ?? 0.2)
-        settingsHook.setStartMinimized(savedStartMinimized ?? false)
-        settingsHook.setLaunchAtStartup(savedLaunchAtStartup ?? false)
-        settingsHook.updateVirtualDriverInstalled(savedVirtualDriverInstalled || false)
-        settingsHook.updateVirtualDeviceActive(savedVirtualDeviceActive ?? false)
-        settingsHook.updateAutoBackupEnabled(savedAutoBackup ?? true)
-        settingsHook.updateBackupInterval(savedBackupInterval ?? 5)
-        settingsHook.updateLazyLoadingEnabled(savedLazyLoading ?? true)
-        settingsHook.updateCompressOnImport(savedCompressOnImport ?? false)
-        settingsHook.updateCompressionBitrate(savedCompressionBitrate ?? 128)
-        settingsHook.updateShortcutsEnabled(savedShortcutsEnabled ?? true)
+        settingsHook.updateTheme(data.theme || 'dark')
+        settingsHook.updateCustomTheme(data.customTheme || null)
+        settingsHook.updateLang(data.lang || 'fr')
+        settingsHook.updateAudioDevice(data.audioDevice || 'default')
+        settingsHook.updateLocalAudioDevice(data.localAudioDevice || 'default')
+        settingsHook.updateVolume(data.volume ?? 80)
+        settingsHook.updatePlayLocally(data.playLocally ?? true)
+        settingsHook.updatePreviewVolume(data.previewVolume ?? 70)
+        settingsHook.updateKeyboardLayout(data.keyboardLayout || 'qwerty')
+        settingsHook.updateCardSize(data.cardSize || 'medium')
+        settingsHook.updateNormalizationEnabled(data.normalizationEnabled ?? true)
+        settingsHook.updateNormalizationTarget(data.normalizationTarget ?? 0.2)
+        settingsHook.setStartMinimized(data.startMinimized ?? false)
+        settingsHook.setLaunchAtStartup(data.launchAtStartup ?? false)
+        settingsHook.updateVirtualDriverInstalled(
+          data.virtualDriverInstalled || false
+        )
+        settingsHook.updateVirtualDeviceActive(data.virtualDeviceActive ?? false)
+        settingsHook.updateAutoBackupEnabled(data.autoBackupEnabled ?? true)
+        settingsHook.updateBackupInterval(data.backupInterval ?? 5)
+        settingsHook.updateLazyLoadingEnabled(data.lazyLoadingEnabled ?? true)
+        settingsHook.updateCompressOnImport(data.compressOnImport ?? false)
+        settingsHook.updateCompressionBitrate(data.compressionBitrate ?? 128)
+        settingsHook.updateShortcutsEnabled(data.shortcutsEnabled ?? true)
         settingsHook.updateToggleShortcutsAccelerator(
-          savedToggleShortcutsAccelerator || 'CommandOrControl+Shift+K'
+          data.toggleShortcutsAccelerator || 'CommandOrControl+Shift+K'
         )
         settingsHook.updateToggleWindowShortcut(
-          savedToggleWindowShortcut || 'CommandOrControl+Shift+S'
+          data.toggleWindowShortcut || 'CommandOrControl+Shift+S'
         )
-        settingsHook.updateLoopShortcut(savedLoopShortcut || '')
-        settingsHook.updateStopAllShortcut(savedStopAllShortcut || '')
-        settingsHook.updatePresentationShortcut(savedPresentationShortcut || '')
+        settingsHook.updateLoopShortcut(data.loopShortcut || '')
+        settingsHook.updateStopAllShortcut(data.stopAllShortcut || '')
+        settingsHook.updatePresentationShortcut(data.presentationShortcut || '')
 
-        mixerHook.setMixerEnabled(savedMixerEnabled ?? false)
-        mixerHook.setMicrophoneDevice(savedMicrophoneDevice || 'default')
-        mixerHook.setMicrophoneVolume(savedMicrophoneVolume ?? 80)
-        mixerHook.setMixerSoundVolume(savedMixerSoundVolume ?? 100)
-        mixerHook.setNoiseSuppression(savedNoiseSuppression ?? false)
-        mixerHook.setNoiseSuppressionMode(savedNoiseSuppressionMode || 'auto')
-        mixerHook.setLowLatencyMode(savedLowLatencyMode ?? false)
-        mixerHook.setMonitoringEnabled(savedMonitoringEnabled ?? false)
+        mixerHook.setMixerEnabled(data.mixerEnabled ?? false)
+        mixerHook.setMicrophoneDevice(data.microphoneDevice || 'default')
+        mixerHook.setMicrophoneVolume(data.microphoneVolume ?? 80)
+        mixerHook.setMixerSoundVolume(data.mixerSoundVolume ?? 100)
+        mixerHook.setNoiseSuppression(data.noiseSuppression ?? false)
+        mixerHook.setNoiseSuppressionMode(data.noiseSuppressionMode || 'auto')
+        mixerHook.setLowLatencyMode(data.lowLatencyMode ?? false)
+        mixerHook.setMonitoringEnabled(data.monitoringEnabled ?? false)
 
         // Projets éditeur (parallélisables entre eux)
         await Promise.all([
@@ -206,8 +217,8 @@ export function useStore() {
         ])
 
         // Sidebar
-        if (savedSidebarConfig) {
-          let items = [...(savedSidebarConfig.items || [])]
+        if (data.sidebarConfig) {
+          let items = [...(data.sidebarConfig.items || [])]
 
           allProfiles.forEach((profile) => {
             const profileId = `profile-${profile.id}`
@@ -231,7 +242,9 @@ export function useStore() {
             }
           })
 
-          const currentProfileIds = new Set(allProfiles.map((p) => `profile-${p.id}`))
+          const currentProfileIds = new Set(
+            allProfiles.map((p) => `profile-${p.id}`)
+          )
           items = items.filter((item) => {
             if (item.id.startsWith('profile-')) {
               return currentProfileIds.has(item.id)
@@ -259,7 +272,7 @@ export function useStore() {
             }
           })
 
-          setSidebarConfig({ ...savedSidebarConfig, items })
+          setSidebarConfig({ ...data.sidebarConfig, items })
         } else {
           const defaultItems = [...DEFAULT_SIDEBAR_CONFIG.items]
           allProfiles.forEach((profile) => {
@@ -300,7 +313,12 @@ export function useStore() {
     async (profileList) => {
       const currentConfig = sidebarConfig || DEFAULT_SIDEBAR_CONFIG
       const allProfiles = [
-        { id: 'all', name: 'Tous les sons', isDefault: true },
+        {
+          id: 'all',
+          name: 'Tous les sons',
+          nameKey: 'allSounds',
+          isDefault: true,
+        },
         ...(profileList || []),
       ]
 
@@ -528,7 +546,7 @@ export function useStore() {
     initMixerOnStartup: mixerHook.initMixerOnStartup,
     toggleMonitoring: mixerHook.toggleMonitoring,
 
-    // ✅ S3c : uniquement la gestion multi-projets de l'éditeur
+    // Gestion multi-projets de l'éditeur
     editorProjects: editorHook.editorProjects,
     recentEditorProjects: editorHook.recentEditorProjects,
     loadAllEditorProjects: editorHook.loadAllEditorProjects,

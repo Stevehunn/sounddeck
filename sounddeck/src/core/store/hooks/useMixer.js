@@ -197,8 +197,8 @@ export function useMixer(save, storeValuesRef) {
     [save]
   )
 
-  const toggleMonitoring = useCallback(async () => {
-    const newState = !monitoringEnabled
+  const toggleMonitoring = useCallback(async (enabled) => {
+    const newState = typeof enabled === 'boolean' ? enabled : !monitoringEnabled
     setMonitoringEnabled(newState)
     await save('monitoringEnabled', newState)
 

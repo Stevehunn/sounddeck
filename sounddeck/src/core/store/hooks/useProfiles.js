@@ -2,6 +2,9 @@
 import { useState, useCallback } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 
+const ALL_PROFILE_NAME_KEY = 'allSounds'
+const ALL_PROFILE_FALLBACK_NAME = 'Tous les sons'
+
 export function useProfiles(initialProfiles = [], initialCurrentId = 'all', save) {
   const [profiles, setProfiles] = useState(initialProfiles)
   const [currentProfileId, setCurrentProfileId] = useState(initialCurrentId)
@@ -75,7 +78,12 @@ export function useProfiles(initialProfiles = [], initialCurrentId = 'all', save
   }, [profiles])
 
   const getAllProfiles = useCallback(() => {
-    const allProfile = { id: 'all', name: 'Tous les sons', isDefault: true }
+    const allProfile = {
+      id: 'all',
+      name: ALL_PROFILE_FALLBACK_NAME,
+      nameKey: ALL_PROFILE_NAME_KEY,
+      isDefault: true,
+    }
     const userProfiles = profiles.filter(p => p.id !== 'all')
     return [allProfile, ...userProfiles]
   }, [profiles])

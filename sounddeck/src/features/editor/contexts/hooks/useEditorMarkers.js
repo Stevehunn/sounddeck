@@ -8,7 +8,8 @@ function generateMarkerId() {
 
 export function useEditorMarkers(core, playback) {
   const {
-    projectRef, currentTimeRef, commitProject, setIsDirty, addToastRef,
+    projectRef, currentTimeRef, commitProject, setIsDirty,
+    addToastRef, tRef,
   } = core
   const { seek } = playback
 
@@ -18,7 +19,7 @@ export function useEditorMarkers(core, playback) {
 
     const newMarker = {
       id: generateMarkerId(),
-      name: markerData.name || `Marqueur ${(currentProject.markers?.length || 0) + 1}`,
+      name: markerData.name || `Marker ${(currentProject.markers?.length || 0) + 1}`,
       time: markerData.time || currentTimeRef.current,
       color: markerData.color || '#3b82f6'
     }
@@ -31,9 +32,12 @@ export function useEditorMarkers(core, playback) {
 
     commitProject(updatedProject)
     setIsDirty(true)
-    addToastRef.current?.(`Marqueur "${newMarker.name}" ajouté`, 'success')
+    addToastRef.current?.(
+      tRef.current('editorToastMarkerAdded', { name: newMarker.name }),
+      'success'
+    )
     return newMarker
-  }, [projectRef, currentTimeRef, commitProject, setIsDirty, addToastRef])
+  }, [projectRef, currentTimeRef, commitProject, setIsDirty, addToastRef, tRef])
 
   const removeMarker = useCallback((markerId) => {
     const currentProject = projectRef.current
@@ -50,8 +54,11 @@ export function useEditorMarkers(core, playback) {
 
     commitProject(updatedProject)
     setIsDirty(true)
-    addToastRef.current?.(`Marqueur "${markerToRemove.name}" supprimé`, 'info')
-  }, [projectRef, commitProject, setIsDirty, addToastRef])
+    addToastRef.current?.(
+      tRef.current('editorToastMarkerRemoved', { name: markerToRemove.name }),
+      'info'
+    )
+  }, [projectRef, commitProject, setIsDirty, addToastRef, tRef])
 
   const updateMarker = useCallback((markerId, updates) => {
     const currentProject = projectRef.current

@@ -9,6 +9,9 @@ const soundCache = {}
 const gainCache = {}
 let storeRef = null
 
+const DEFAULT_NORMALIZATION_TARGET_RMS = 0.2
+let normalizationTargetRMS = DEFAULT_NORMALIZATION_TARGET_RMS
+
 export function setStoreRef(store) {
   storeRef = store
 }
@@ -80,9 +83,7 @@ export async function analyzeGain(filePath, sampleCount = 200) {
       }
 
       const rms = Math.sqrt(sumSquares / (channelData.length / step))
-      const defaultTarget = 0.2
-      const targetRMS = gainCache.targetRMS || defaultTarget
-      const gain = rms > 0.001 ? targetRMS / rms : 1
+      const gain = rms > 0.001 ? normalizationTargetRMS / rms : 1
       const gainDb = 20 * Math.log10(Math.min(gain, 20))
 
       return gainDb
@@ -97,7 +98,12 @@ export async function analyzeGain(filePath, sampleCount = 200) {
 }
 
 export function setNormalizationTarget(targetRMS) {
-  gainCache.targetRMS = targetRMS
+  const clamped = Math.max(0.02, Math.min(1, Number(targetRMS) || DEFAULT_NORMALIZATION_TARGET_RMS))
+  normalizationTargetRMS = clamped
+}
+
+export function getNormalizationTarget() {
+  return normalizationTargetRMS
 }
 
 function calculateFinalVolume(globalVolume, soundVolumeDb, gainDb = 0) {
@@ -516,6 +522,7 @@ export default {
   setStoreRef,
   analyzeGain,
   setNormalizationTarget,
+  getNormalizationTarget,
   playSound,
   playSoundAsync,
   stopSound,

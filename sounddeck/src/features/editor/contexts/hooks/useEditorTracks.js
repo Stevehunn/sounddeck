@@ -5,7 +5,7 @@ export function useEditorTracks(core, audioPlayback) {
   const {
     projectRef, clipDurationsRef, commitProject, generateUniqueId,
     setClipDurations, setIsDirty, setSelectedClipId, setSelectedTrackId,
-    selectedClipIdRef, addToastRef,
+    selectedClipIdRef, addToastRef, tRef, confirm,
   } = core
 
   const { updateTrackVolume } = audioPlayback
@@ -58,37 +58,58 @@ export function useEditorTracks(core, audioPlayback) {
       clipDurationsRef.current = durations
 
       setIsDirty(true)
-      addToastRef.current?.(`${trackName} ajoutée`, 'success')
+      addToastRef.current?.(
+        tRef.current('editorToastTrackAdded', { name: trackName }),
+        'success'
+      )
       return newTrack
     } catch (e) {
-      addToastRef.current?.('Erreur lors de l\'ajout de la piste: ' + e.message, 'error')
+      addToastRef.current?.(
+        tRef.current('editorToastTrackAddError', { error: e.message }),
+        'error'
+      )
       return null
     }
   }, [projectRef, clipDurationsRef, commitProject, generateUniqueId,
-      setClipDurations, setIsDirty, addToastRef])
+      setClipDurations, setIsDirty, addToastRef, tRef])
 
   const removeTrack = useCallback(async (trackId) => {
     const currentProject = projectRef.current
     if (!currentProject) {
-      addToastRef.current?.('Aucun projet', 'error')
+      addToastRef.current?.(tRef.current('editorToastNoProject'), 'error')
       return
     }
 
     const trackToRemove = currentProject.tracks.find(t => t.id === trackId)
     if (!trackToRemove) {
-      addToastRef.current?.('Piste non trouvée', 'error')
+      addToastRef.current?.(tRef.current('editorToastTrackNotFound'), 'error')
       return
     }
 
     if (currentProject.tracks.length <= 1) {
-      addToastRef.current?.('Impossible de supprimer la dernière piste', 'warning')
+      addToastRef.current?.(tRef.current('editorToastLastTrack'), 'warning')
       return
     }
 
     if (trackToRemove.clips.length > 0) {
-      const confirmed = window.confirm(
-        `La piste "${trackToRemove.name}" contient ${trackToRemove.clips.length} clip(s). Voulez-vous vraiment la supprimer ?`
-      )
+      const message = tRef.current('editorToastDeleteTrackWithClips', {
+        name: trackToRemove.name,
+        count: trackToRemove.clips.length
+      })
+
+      let confirmed = false
+      if (confirm) {
+        confirmed = await confirm({
+          title: tRef.current('confirmDeleteTrack'),
+          message,
+          type: 'warning',
+          confirmText: tRef.current('delete'),
+          cancelText: tRef.current('cancel'),
+        })
+      } else {
+        // Fallback (ne devrait pas arriver si confirm est passé par le Provider)
+        confirmed = window.confirm(message)
+      }
       if (!confirmed) return
     }
 
@@ -102,7 +123,10 @@ export function useEditorTracks(core, audioPlayback) {
     clipDurationsRef.current = durations
 
     setIsDirty(true)
-    addToastRef.current?.(`Piste "${trackToRemove.name}" supprimée`, 'info')
+    addToastRef.current?.(
+      tRef.current('editorToastTrackRemoved', { name: trackToRemove.name }),
+      'info'
+    )
 
     if (selectedClipIdRef.current &&
         !updatedTracks.some(t => t.clips.some(c => c.id === selectedClipIdRef.current))) {
@@ -110,7 +134,8 @@ export function useEditorTracks(core, audioPlayback) {
       setSelectedClipId(null)
     }
   }, [projectRef, clipDurationsRef, commitProject, selectedClipIdRef,
-      setClipDurations, setIsDirty, setSelectedClipId, setSelectedTrackId, addToastRef])
+      setClipDurations, setIsDirty, setSelectedClipId, setSelectedTrackId,
+      addToastRef, tRef, confirm])
 
   const renameTrack = useCallback(async (trackId, newName) => {
     const currentProject = projectRef.current

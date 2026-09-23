@@ -1,6 +1,8 @@
 // src/core/i18n/locales/es/index.js
 import common from './common.js'
 import editor from './editor.js'
+import editorToasts from './editorToasts.js'
+import editorUI from './editorUI.js'
 import home from './home.js'
 import options from './options.js'
 import discover from './discover.js'
@@ -16,6 +18,8 @@ import emoji from './emoji.js'
 export default {
   ...common,
   ...editor,
+  ...editorToasts,
+  ...editorUI,
   ...home,
   ...options,
   ...discover,

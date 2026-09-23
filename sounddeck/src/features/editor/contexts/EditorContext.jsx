@@ -13,11 +13,11 @@ import { useEditorMarkers } from './hooks/useEditorMarkers'
 
 const EditorContext = createContext(null)
 
-export function EditorProvider({ children, store, addToast }) {
+export function EditorProvider({ children, store, addToast, confirm }) {
   const { t } = useLanguage()
 
-    // 1. Core : état + refs + helpers + persistance
-  const core = useEditorCore({ store, addToast, t })
+  // 1. Core : état + refs + helpers + persistance
+  const core = useEditorCore({ store, addToast, t, confirm })
 
   // 2. Audio + playback controls
   const audioPlayback = useEditorAudioPlayback(core)
@@ -119,8 +119,10 @@ export function EditorProvider({ children, store, addToast }) {
     updateEditorProjectName: core.updateEditorProjectName,
     reorderTracks: core.reorderTracks,
     loadProject: core.loadProject,
-    // ✅ S3b : commitProject exposé pour Editor.jsx (paste, normalize, reset volumes)
     commitProject: core.commitProject,
+
+    // confirm expose for EditorTimelineContent
+    confirm,
 
     // ─── TRACKS ────────────────────────────────────────────────────────
     addTrack: tracks.addTrack,
@@ -184,7 +186,7 @@ export function EditorProvider({ children, store, addToast }) {
     t,
   }), [
     core, tracks, clips, effects, loops, overlay, markers, audioPlayback,
-    handleZoomChange, store, addToast, t,
+    handleZoomChange, store, addToast, t, confirm,
   ])
 
   return (

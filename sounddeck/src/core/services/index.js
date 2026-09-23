@@ -1,12 +1,12 @@
 // src/core/services/index.js
 export * as AudioService from './AudioService'
 export * as AudioMixerService from './AudioMixerService'
-export { default as audioCache } from './AudioCache'
 
 export {
   setStoreRef,
   analyzeGain,
   setNormalizationTarget,
+  getNormalizationTarget,
   playSound,
   playSoundAsync,
   stopSound,

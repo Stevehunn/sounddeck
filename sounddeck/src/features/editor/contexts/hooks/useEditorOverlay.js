@@ -15,7 +15,7 @@ const INITIAL_OVERLAY_STATE = {
 export function useEditorOverlay(core, loops, clips) {
   const {
     projectRef, clipDurationsRef, totalDurationRef, actionOverlayRef,
-    setActionOverlay, addToastRef,
+    setActionOverlay, addToastRef, tRef,
   } = core
   const { toggleClipLoop, setTimelineLoop } = loops
   const { splitClip } = clips
@@ -41,8 +41,8 @@ export function useEditorOverlay(core, loops, clips) {
     }
     setActionOverlay(newOverlay)
     actionOverlayRef.current = newOverlay
-    addToastRef.current?.('🖱️ Mode clic activé', 'info')
-  }, [projectRef, actionOverlayRef, setActionOverlay, addToastRef])
+    addToastRef.current?.(tRef.current('editorToastClickModeActivated'), 'info')
+  }, [projectRef, actionOverlayRef, setActionOverlay, addToastRef, tRef])
 
   const activateTimelineLoopManualClick = useCallback(() => {
     const newOverlay = {
@@ -57,8 +57,8 @@ export function useEditorOverlay(core, loops, clips) {
     }
     setActionOverlay(newOverlay)
     actionOverlayRef.current = newOverlay
-    addToastRef.current?.('🖱️ Mode clic activé - Étape 1/3', 'info')
-  }, [actionOverlayRef, setActionOverlay, addToastRef])
+    addToastRef.current?.(tRef.current('editorToastClickModeStep1'), 'info')
+  }, [actionOverlayRef, setActionOverlay, addToastRef, tRef])
 
   const activateSplitManualClick = useCallback((clipId, trackId) => {
     const currentProject = projectRef.current
@@ -76,8 +76,8 @@ export function useEditorOverlay(core, loops, clips) {
     }
     setActionOverlay(newOverlay)
     actionOverlayRef.current = newOverlay
-    addToastRef.current?.('✂️ Mode clic activé', 'info')
-  }, [projectRef, actionOverlayRef, setActionOverlay, addToastRef])
+    addToastRef.current?.(tRef.current('editorToastSplitClickModeActivated'), 'info')
+  }, [projectRef, actionOverlayRef, setActionOverlay, addToastRef, tRef])
 
   const executeActionOverlay = useCallback((clickTime) => {
     const overlay = actionOverlayRef.current
@@ -90,7 +90,7 @@ export function useEditorOverlay(core, loops, clips) {
       const currentProject = projectRef.current
       const clip = currentProject?.tracks?.flatMap(t => t.clips).find(c => c.id === clipId)
       if (!clip) {
-        addToastRef.current?.('Clip non trouvé', 'error')
+        addToastRef.current?.(tRef.current('editorToastClipNotFound'), 'error')
         cancelActionOverlay()
         return
       }
@@ -99,7 +99,10 @@ export function useEditorOverlay(core, loops, clips) {
       const manualDuration = Math.max(duration, clampedTime - start)
 
       toggleClipLoop(clipId, { ...options, loopMode: 'manualDuration', manualDuration })
-      addToastRef.current?.(`🔄 Boucle définie jusqu'à ${manualDuration.toFixed(1)}s`, 'success')
+      addToastRef.current?.(
+        tRef.current('editorToastLoopDefinedUntil', { duration: manualDuration.toFixed(1) }),
+        'success'
+      )
       cancelActionOverlay()
     } else if (type === 'loop-timeline') {
       const newData = { ...data }
@@ -109,16 +112,22 @@ export function useEditorOverlay(core, loops, clips) {
         const next = { ...overlay, step: 1, data: newData }
         setActionOverlay(next)
         actionOverlayRef.current = next
-        addToastRef.current?.(`🖱️ Début défini à ${clampedTime.toFixed(1)}s (2/3)`, 'info')
+        addToastRef.current?.(
+          tRef.current('editorToastLoopStartDefined', { time: clampedTime.toFixed(1) }),
+          'info'
+        )
       } else if (step === 1) {
         if (clampedTime > data.start) {
           newData.end = clampedTime
           const next = { ...overlay, step: 2, data: newData }
           setActionOverlay(next)
           actionOverlayRef.current = next
-          addToastRef.current?.(`🖱️ Fin définie à ${clampedTime.toFixed(1)}s (3/3)`, 'info')
+          addToastRef.current?.(
+            tRef.current('editorToastLoopEndDefined', { time: clampedTime.toFixed(1) }),
+            'info'
+          )
         } else {
-          addToastRef.current?.('⚠️ La fin doit être après le début', 'warning')
+          addToastRef.current?.(tRef.current('editorToastLoopEndMustBeAfterStart'), 'warning')
         }
       } else if (step === 2) {
         const duration = clampedTime - data.start
@@ -130,17 +139,23 @@ export function useEditorOverlay(core, loops, clips) {
             manualDuration: duration,
             durationMode: 'manualDuration'
           })
-          addToastRef.current?.(`✅ Boucle définie: ${data.start.toFixed(1)}s → ${(data.end || clampedTime).toFixed(1)}s`, 'success')
+          addToastRef.current?.(
+            tRef.current('editorToastLoopDefined', {
+              start: data.start.toFixed(1),
+              end: (data.end || clampedTime).toFixed(1)
+            }),
+            'success'
+          )
           cancelActionOverlay()
         } else {
-          addToastRef.current?.('⚠️ La durée doit être d\'au moins 0.1s', 'warning')
+          addToastRef.current?.(tRef.current('editorToastLoopDurationTooShort'), 'warning')
         }
       }
     } else if (type === 'split') {
       const currentProject = projectRef.current
       const clip = currentProject?.tracks?.flatMap(t => t.clips).find(c => c.id === clipId)
       if (!clip) {
-        addToastRef.current?.('Clip non trouvé', 'error')
+        addToastRef.current?.(tRef.current('editorToastClipNotFound'), 'error')
         cancelActionOverlay()
         return
       }
@@ -150,15 +165,14 @@ export function useEditorOverlay(core, loops, clips) {
 
       if (clampedTime > start + 0.05 && clampedTime < end - 0.05) {
         splitClip(trackId, clipId, clampedTime)
-        addToastRef.current?.(`✂️ Clip coupé à ${clampedTime.toFixed(1)}s`, 'success')
       } else {
-        addToastRef.current?.('❌ Position invalide pour couper le clip', 'warning')
+        addToastRef.current?.(tRef.current('editorToastClipSplitInvalid'), 'warning')
       }
       cancelActionOverlay()
     }
   }, [projectRef, clipDurationsRef, totalDurationRef, actionOverlayRef,
       setActionOverlay, toggleClipLoop, setTimelineLoop, splitClip,
-      cancelActionOverlay, addToastRef])
+      cancelActionOverlay, addToastRef, tRef])
 
   return {
     cancelActionOverlay,

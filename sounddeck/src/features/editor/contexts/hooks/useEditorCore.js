@@ -45,7 +45,7 @@ const DEFAULT_TIMELINE_LOOP = {
   endManualTime: 10
 }
 
-export function useEditorCore({ store, addToast, t }) {
+export function useEditorCore({ store, addToast, t, confirm }) {
   // ─── STATES ─────────────────────────────────────────────────────────────
   const [project, setProject] = useState(null)
   const [clipDurations, setClipDurations] = useState({})
@@ -452,6 +452,9 @@ export function useEditorCore({ store, addToast, t }) {
 
     // Helpers
     generateUniqueId, findPreviousClip, calculateOverlap, getAudioDuration,
+
+    // Confirm expose for hooks
+    confirm,
 
     // Persistance
     persistProject, commitProject,

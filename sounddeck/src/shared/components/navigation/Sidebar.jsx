@@ -27,6 +27,34 @@ const getDefaultLabels = (t) => ({
   stats: t('stats'),
 })
 
+function buildVisibleItemsSignature(visibleItems) {
+  if (!visibleItems) return ''
+
+  const parts = []
+
+  const pushItem = (item) => {
+    if (!item || !item.id) return
+    parts.push(
+      `${item.id}|${item.label || ''}|${item.icon || ''}|${item.group || ''}|${
+        item.visible !== false ? 1 : 0
+      }|${item.pinned ? 1 : 0}`
+    )
+  }
+
+  const pinned = visibleItems.pinned || []
+  for (const item of pinned) pushItem(item)
+
+  const groups = visibleItems.groups || {}
+  const groupKeys = Object.keys(groups).sort()
+  for (const key of groupKeys) {
+    parts.push(`#${key}`)
+    const items = groups[key] || []
+    for (const item of items) pushItem(item)
+  }
+
+  return parts.join('§')
+}
+
 const Sidebar = memo(
   function Sidebar({
     profiles,
@@ -97,7 +125,8 @@ const Sidebar = memo(
       if (!sidebarConfig || !sidebarConfig.items) {
         const empty = { pinned: [], groups: {} }
         if (
-          JSON.stringify(stableVisibleItemsRef.current) !== JSON.stringify(empty)
+          buildVisibleItemsSignature(stableVisibleItemsRef.current) !==
+          buildVisibleItemsSignature(empty)
         ) {
           stableVisibleItemsRef.current = empty
           setVisibleItems(empty)
@@ -135,15 +164,17 @@ const Sidebar = memo(
       })
 
       const newVisibleItems = { pinned, groups }
-      const currentJson = JSON.stringify(stableVisibleItemsRef.current)
-      const newJson = JSON.stringify(newVisibleItems)
 
-      if (currentJson !== newJson) {
+      if (
+        buildVisibleItemsSignature(stableVisibleItemsRef.current) !==
+        buildVisibleItemsSignature(newVisibleItems)
+      ) {
         stableVisibleItemsRef.current = newVisibleItems
         setVisibleItems(newVisibleItems)
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sidebarConfig, t, profiles, pluginPages, CORE_PAGE_IDS, ACTION_IDS_SET, pluginPageIds])
+
     const getItemLabel = (item, defaultLabels) => {
       if (item.id && item.id.startsWith('profile-')) {
         const profileId = item.id.replace('profile-', '')
@@ -300,7 +331,7 @@ const Sidebar = memo(
           group: 'navigation',
           isCore: true,
         },
-        // ✅ NOUVEAU : Mes emojis (core page, pas plugin)
+        // Mes emojis (core page, pas plugin)
         {
           id: 'emoji',
           label: t('emojiPageTitle'),
@@ -351,7 +382,6 @@ const Sidebar = memo(
       else if (itemId === 'editor') onChangePage('editor')
       else if (itemId === 'sequencer') onChangePage('sequencer')
       else if (itemId === 'youtube') onChangePage('youtube')
-      // ✅ NOUVEAU : route emoji
       else if (itemId === 'emoji') onChangePage('emoji')
       else if (itemId === 'guide') onChangePage('guide')
       else if (itemId === 'options') onChangePage('options')
@@ -377,6 +407,8 @@ const Sidebar = memo(
     }
 
     const renderProfileItem = (profile, showDragHandle = false) => {
+      if (!profile) return null
+
       const isDragging = draggedProfileId === profile.id
       const isDragOver = dragOverProfileId === profile.id && !isDragging
 

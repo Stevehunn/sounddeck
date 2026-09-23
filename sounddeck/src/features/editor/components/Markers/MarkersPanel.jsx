@@ -114,7 +114,7 @@ const MarkersPanel = memo(({
         fontSize: 12,
         textAlign: 'center',
       }}>
-        Marqueurs non disponibles
+        {tr?.('editorMarkersNotAvailable') || 'Marqueurs non disponibles'}
       </div>
     )
   }

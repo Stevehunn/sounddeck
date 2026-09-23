@@ -1,5 +1,5 @@
 // src/features/presentation/Presentation.jsx
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { playSound, stopSound, isPlaying, getSoundProgress } from '@core/services/AudioService'
 import HelpButton from '@shared/components/ui/HelpButton'
@@ -7,19 +7,18 @@ import { formatTime } from '@shared/utils/format'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 
 export default function Presentation({ store, onExit }) {
-  const { t, currentLang } = useLanguage()
+  const { t } = useLanguage()
   const [playingId, setPlayingId] = useState(null)
   const [search, setSearch] = useState('')
-  const [refreshKey, setRefreshKey] = useState(0)
 
   const currentSounds = store.currentSounds || []
-  
-  // ✅ RÉCUPÉRER LES FAVORIS DIRECTEMENT DEPUIS LES SONS
+
+  // Récupérer les favoris directement depuis les sons
   const currentProfileId = store.currentProfileId
-  const favoriteSounds = (store.sounds || []).filter(s => 
+  const favoriteSounds = (store.sounds || []).filter(s =>
     s.favorites && s.favorites.includes(currentProfileId)
   )
-  
+
   const shortcuts = store.shortcuts || {}
   const audioDevice = store.audioDevice || 'default'
   const volume = store.volume || 80
@@ -31,17 +30,13 @@ export default function Presentation({ store, onExit }) {
 
   const currentProfile = store.profiles?.find(p => p.id === currentProfileId)
 
-  // ✅ Exposer le store pour le tutoriel
+  // Exposer le store pour le tutoriel
   useEffect(() => {
     window.__storeRef = { current: store }
     return () => {
       delete window.__storeRef
     }
   }, [store])
-
-  useEffect(() => {
-    setRefreshKey(prev => prev + 1)
-  }, [favoriteSounds.length, currentProfileId])
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onExit() }
@@ -84,10 +79,9 @@ export default function Presentation({ store, onExit }) {
   }
 
   return (
-    <div 
+    <div
       data-testid="presentation-container"
       className="presentation-overlay"
-      key={refreshKey}
     >
       <div className="presentation-header">
         <i className="ti ti-speakerphone" style={{ fontSize: 22, color: 'var(--accent)' }} />
@@ -129,9 +123,9 @@ export default function Presentation({ store, onExit }) {
         </button>
       </div>
 
-      {/* ✅ SECTION FAVORIS */}
+      {/* SECTION FAVORIS */}
       {favoriteSounds.length > 0 && !search && (
-        <div 
+        <div
           data-testid="presentation-favorites"
           className="presentation-favorites"
         >
@@ -160,12 +154,12 @@ export default function Presentation({ store, onExit }) {
             {t('noSounds')}
           </div>
         )}
-        <div 
+        <div
           data-testid="presentation-grid"
-          style={{ 
-            display: 'grid', 
-            gridTemplateColumns: `repeat(auto-fill, minmax(${cardSize === 'small' ? 130 : cardSize === 'large' ? 180 : 150}px, 1fr))`, 
-            gap: 12 
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(auto-fill, minmax(${cardSize === 'small' ? 130 : cardSize === 'large' ? 180 : 150}px, 1fr))`,
+            gap: 12
           }}
         >
           {filtered.map(s => (

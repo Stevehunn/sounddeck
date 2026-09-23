@@ -101,12 +101,9 @@ const TrackHeader = memo(({
         </div>
       )}
 
-      {/* ✅ Bouton Supprimer générique */}
+      {/* Bouton Supprimer générique */}
       <DeleteButton
-        onDelete={() => {
-          console.log('🗑️ [TrackHeader] Suppression de la piste:', track.id)
-          onTrackRemove?.(track.id)
-        }}
+        onDelete={() => onTrackRemove?.(track.id)}
         confirmTitle={tr('confirmDeleteTrack') || 'Confirmer la suppression de la piste'}
         confirmMessage={tr('confirmDeleteTrackMessage') || 'Voulez-vous vraiment supprimer cette piste ?'}
         itemName={name}

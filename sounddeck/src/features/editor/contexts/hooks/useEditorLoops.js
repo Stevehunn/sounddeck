@@ -5,7 +5,7 @@ export function useEditorLoops(core) {
   const {
     projectRef, loopStateRef, clipDurationsRef, totalDurationRef,
     commitProject, setLoopState, setLoopRegionState,
-    setIsDirty, addToastRef,
+    setIsDirty, addToastRef, tRef,
   } = core
 
   const toggleClipLoop = useCallback((clipId, options = {}) => {
@@ -33,7 +33,10 @@ export function useEditorLoops(core) {
       loopStateRef.current = updatedLoopState
 
       commitProject({ ...currentProject, loops: updatedLoopState, updatedAt: Date.now() })
-      addToastRef.current?.(`Boucle désactivée sur "${clip.name}"`, 'info')
+      addToastRef.current?.(
+        tRef.current('editorToastLoopDisabledOn', { name: clip.name }),
+        'info'
+      )
       return
     }
 
@@ -89,14 +92,18 @@ export function useEditorLoops(core) {
 
     commitProject({ ...currentProject, loops: updatedLoopState, updatedAt: Date.now() })
 
-    let toastMessage = `Boucle activée sur "${clip.name}"`
-    if (loopMode === 'cycles') toastMessage += ` (${cycleCount} cycles)`
-    else if (loopMode === 'endOfTrack') toastMessage += ` (jusqu'à la fin de la piste)`
-    else if (loopMode === 'manualDuration') toastMessage += ` (${manualDuration}s)`
-    else if (loopMode === 'manualClick') toastMessage += ` (clic sur la timeline)`
-    addToastRef.current?.(toastMessage, 'success')
+    let suffix = ''
+    if (loopMode === 'cycles') suffix = tRef.current('editorToastLoopWithCycles', { count: cycleCount })
+    else if (loopMode === 'endOfTrack') suffix = tRef.current('editorToastLoopUntilEndOfTrack')
+    else if (loopMode === 'manualDuration') suffix = tRef.current('editorToastLoopWithDuration', { duration: manualDuration })
+    else if (loopMode === 'manualClick') suffix = tRef.current('editorToastLoopWithClick')
+
+    addToastRef.current?.(
+      tRef.current('editorToastLoopEnabledOn', { name: clip.name }) + suffix,
+      'success'
+    )
   }, [projectRef, loopStateRef, clipDurationsRef, totalDurationRef,
-      commitProject, setLoopState, addToastRef])
+      commitProject, setLoopState, addToastRef, tRef])
 
   const updateClipLoopOptions = useCallback((clipId, options) => {
     const currentProject = projectRef.current

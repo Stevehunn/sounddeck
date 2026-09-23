@@ -929,8 +929,11 @@ export default function Options({ store, addToast }) {
                 <Toggle 
                   value={store.monitoringEnabled || false} 
                   onChange={async (val) => {
-                    await store.toggleMonitoring()
-                    addToast(val ? t('monitoringEnabled') : t('monitoringDisabled'), 'info')
+                    const newState = await store.toggleMonitoring(val)
+                    addToast(
+                      newState ? t('monitoringEnabled') : t('monitoringDisabled'),
+                      'info'
+                    )
                   }} 
                 />
               </OptionRow>

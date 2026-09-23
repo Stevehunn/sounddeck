@@ -6,20 +6,19 @@ export function useEditorClips(core) {
     projectRef, storeRef, clipDurationsRef, loopStateRef,
     commitProject, generateUniqueId, getAudioDuration,
     setClipDurations, setIsDirty, setSelectedClipId, setSelectedTrackId,
-    selectedClipIdRef, addToastRef, setLoopState,
+    selectedClipIdRef, addToastRef, tRef, setLoopState,
   } = core
 
-  // ✅ FIX S3c : logique inline, plus de dépendance à store.addClipToTrack
   const addClip = useCallback(async (trackId, soundId, startPosition = null) => {
     const currentStore = storeRef.current
     if (!currentStore) {
-      addToastRef.current?.('Store non disponible', 'error')
+      addToastRef.current?.(tRef.current('editorToastStoreNotAvailable'), 'error')
       return null
     }
 
     const sound = currentStore.sounds?.find(s => s.id === soundId)
     if (!sound) {
-      addToastRef.current?.('Son non trouvé', 'error')
+      addToastRef.current?.(tRef.current('editorToastSoundNotFound'), 'error')
       return null
     }
 
@@ -27,7 +26,7 @@ export function useEditorClips(core) {
       const currentProject = projectRef.current
       const track = currentProject?.tracks?.find(t => t.id === trackId)
       if (!track) {
-        addToastRef.current?.('Piste non trouvée', 'error')
+        addToastRef.current?.(tRef.current('editorToastTrackNotFound'), 'error')
         return null
       }
 
@@ -82,21 +81,21 @@ export function useEditorClips(core) {
       clipDurationsRef.current = newDurations
 
       setIsDirty(true)
-      addToastRef.current?.(`"${sound.name}" ajouté`, 'success')
+      addToastRef.current?.(tRef.current('editorToastClipAdded', { name: sound.name }), 'success')
       setSelectedClipId(newClip.id)
       setSelectedTrackId(trackId)
       return newClip
     } catch (e) {
-      addToastRef.current?.(e.message || 'Erreur lors de l\'ajout du clip', 'error')
+      addToastRef.current?.(tRef.current('editorToastClipAddError', { error: e.message }), 'error')
       return null
     }
   }, [projectRef, storeRef, clipDurationsRef, commitProject, generateUniqueId,
       getAudioDuration, setClipDurations, setIsDirty, setSelectedClipId,
-      setSelectedTrackId, addToastRef])
+      setSelectedTrackId, addToastRef, tRef])
 
   const addClipFromFile = useCallback(async (trackId, filePath, startPosition = null) => {
     if (!filePath) {
-      addToastRef.current?.('Aucun fichier sélectionné', 'error')
+      addToastRef.current?.(tRef.current('editorToastNoFileSelected'), 'error')
       return null
     }
 
@@ -104,13 +103,13 @@ export function useEditorClips(core) {
       const currentProject = projectRef.current
       const track = currentProject?.tracks?.find(t => t.id === trackId)
       if (!track) {
-        addToastRef.current?.('Piste non trouvée', 'error')
+        addToastRef.current?.(tRef.current('editorToastTrackNotFound'), 'error')
         return null
       }
 
       const importResult = await window.electronAPI.importSoundFile(filePath)
       if (!importResult?.success) {
-        addToastRef.current?.('Erreur lors de l\'import du fichier', 'error')
+        addToastRef.current?.(tRef.current('editorToastFileImportError'), 'error')
         return null
       }
 
@@ -167,17 +166,17 @@ export function useEditorClips(core) {
       clipDurationsRef.current = newDurations
 
       setIsDirty(true)
-      addToastRef.current?.(`"${fileName}" importé`, 'success')
+      addToastRef.current?.(tRef.current('editorToastFileImported', { name: fileName }), 'success')
       setSelectedClipId(newClip.id)
       setSelectedTrackId(trackId)
       return newClip
     } catch (e) {
-      addToastRef.current?.(e.message || 'Erreur lors de l\'import du fichier', 'error')
+      addToastRef.current?.(tRef.current('editorToastFileImportError'), 'error')
       return null
     }
   }, [projectRef, clipDurationsRef, commitProject, generateUniqueId,
       getAudioDuration, setClipDurations, setIsDirty, setSelectedClipId,
-      setSelectedTrackId, addToastRef])
+      setSelectedTrackId, addToastRef, tRef])
 
   const removeClip = useCallback((trackId, clipId) => {
     const currentProject = projectRef.current
@@ -218,10 +217,10 @@ export function useEditorClips(core) {
     }
 
     setIsDirty(true)
-    addToastRef.current?.('Clip supprimé', 'info')
+    addToastRef.current?.(tRef.current('editorToastClipRemoved'), 'info')
   }, [projectRef, clipDurationsRef, loopStateRef, commitProject,
       setClipDurations, setLoopState, setIsDirty, setSelectedClipId,
-      setSelectedTrackId, selectedClipIdRef, addToastRef])
+      setSelectedTrackId, selectedClipIdRef, addToastRef, tRef])
 
   const updateClip = useCallback((trackId, clipId, updates, options = {}) => {
     const currentProject = projectRef.current
@@ -281,10 +280,10 @@ export function useEditorClips(core) {
     clipDurationsRef.current = newDurations
 
     setIsDirty(true)
-    addToastRef.current?.('Clip dupliqué', 'success')
+    addToastRef.current?.(tRef.current('editorToastClipDuplicated'), 'success')
     return newClip
   }, [projectRef, clipDurationsRef, commitProject, generateUniqueId,
-      setClipDurations, setIsDirty, addToastRef])
+      setClipDurations, setIsDirty, addToastRef, tRef])
 
   const moveClip = useCallback((trackId, clipId, newStart, newTrackId, options = {}) => {
     const currentProject = projectRef.current
@@ -344,19 +343,19 @@ export function useEditorClips(core) {
   const splitClip = useCallback((trackId, clipId, splitTime) => {
     const currentProject = projectRef.current
     if (!currentProject) {
-      addToastRef.current?.('Aucun projet', 'error')
+      addToastRef.current?.(tRef.current('editorToastNoProject'), 'error')
       return null
     }
 
     const track = currentProject.tracks.find(t => t.id === trackId)
     if (!track) {
-      addToastRef.current?.('Piste non trouvée', 'error')
+      addToastRef.current?.(tRef.current('editorToastTrackNotFound'), 'error')
       return null
     }
 
     const clipIndex = track.clips.findIndex(c => c.id === clipId)
     if (clipIndex === -1) {
-      addToastRef.current?.('Clip non trouvé', 'error')
+      addToastRef.current?.(tRef.current('editorToastClipNotFound'), 'error')
       return null
     }
 
@@ -367,7 +366,7 @@ export function useEditorClips(core) {
 
     const clampedSplitTime = Math.max(start + 0.05, Math.min(end - 0.05, splitTime))
     if (clampedSplitTime - start < 0.05 || end - clampedSplitTime < 0.05) {
-      addToastRef.current?.('Position de coupe trop proche du bord', 'warning')
+      addToastRef.current?.(tRef.current('editorToastClipSplitTooClose'), 'warning')
       return null
     }
 
@@ -434,13 +433,17 @@ export function useEditorClips(core) {
     clipDurationsRef.current = newDurations
 
     setIsDirty(true)
-    addToastRef.current?.(`Clip "${clip.name}" coupé en deux`, 'success')
+    addToastRef.current?.(
+      tRef.current('editorToastClipSplitAt', { name: clip.name, time: splitTime.toFixed(1) }),
+      'success'
+    )
     setSelectedClipId(leftClip.id)
     setSelectedTrackId(trackId)
 
     return { leftClip, rightClip }
   }, [projectRef, clipDurationsRef, commitProject, generateUniqueId,
-      setClipDurations, setIsDirty, setSelectedClipId, setSelectedTrackId, addToastRef])
+      setClipDurations, setIsDirty, setSelectedClipId, setSelectedTrackId,
+      addToastRef, tRef])
 
   const selectClip = useCallback((clipId, trackId) => {
     setSelectedClipId(clipId)
