@@ -65,6 +65,75 @@ export function setCurrentPlayingProgress(soundId, current, duration) {
   }
 }
 
+// ─── détection des devices virtuels ─────────────────────────
+
+const VIRTUAL_DEVICE_KEYWORDS = [
+  'cable', 'vb-audio', 'vb audio', 'virtual', 'voicemeeter', 'scream',
+]
+
+async function getDeviceLabel(deviceId) {
+  if (!deviceId || deviceId === 'default') return ''
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    const device = devices.find(d => d.deviceId === deviceId && d.kind === 'audiooutput')
+    return (device?.label || '').toLowerCase()
+  } catch (e) {
+    return ''
+  }
+}
+
+function isVirtualDeviceLabel(label) {
+  if (!label) return false
+  return VIRTUAL_DEVICE_KEYWORDS.some(kw => label.includes(kw))
+}
+
+/**
+ * Détermine si on doit créer un Howl local.
+ * Skip si :
+ *   - localDeviceId est explicitement virtuel (CABLE, VB-Audio, etc.)
+ *   - localDeviceId === 'default' ET audioDevice est virtuel (Windows
+ *     default pointe probablement vers le même CABLE)
+ *   - localDeviceId === audioDevice (même device explicite)
+ */
+async function shouldCreateLocalHowl(audioDevice, localDeviceId, playLocally) {
+  if (!playLocally) return false
+
+  // Cas direct : device local = device virtuel explicite
+  if (localDeviceId === audioDevice) {
+    logWarn('AudioService', `Skip local : même device (${audioDevice})`)
+    return false
+  }
+
+  const audioLabel = await getDeviceLabel(audioDevice)
+  const localLabel = await getDeviceLabel(localDeviceId)
+
+  // Le device virtuel (audioDevice) est-il un device virtuel connu ?
+  const audioIsVirtual = isVirtualDeviceLabel(audioLabel)
+
+  // Le local est-il un device virtuel ?
+  const localIsVirtual = isVirtualDeviceLabel(localLabel)
+
+  if (localIsVirtual) {
+    logWarn(
+      'AudioService',
+      `Skip local : "${localLabel}" est un device virtuel. ` +
+      `Configure un casque/enceintes dans Options → Audio.`
+    )
+    return false
+  }
+
+  if (localDeviceId === 'default' && audioIsVirtual) {
+    logWarn(
+      'AudioService',
+      `Skip local : localDeviceId='default' + audioDevice virtuel. ` +
+      `Sélectionne explicitement ton casque dans Options → Audio pour jouer en local.`
+    )
+    return false
+  }
+
+  return true
+}
+
 // ─── ANALYSE GAIN ──────────────────────────────────────────────────────────
 
 export async function analyzeGain(filePath, sampleCount = 200) {
@@ -135,6 +204,7 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
   const validFormats = ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'opus', 'webm']
   const format = validFormats.includes(rawExt) ? rawExt : 'mp3'
 
+  // Si déjà en cache → stop et return
   if (soundCache[sound.id]) {
     const cached = soundCache[sound.id]
     if (Array.isArray(cached)) {
@@ -146,6 +216,7 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
     return
   }
 
+  // ─── Cas 1 : pas de device virtuel (device = default) ──────────────
   if (!audioDevice || audioDevice === 'default') {
     const howl = new Howl({
       src: [fileUrl],
@@ -174,6 +245,11 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
     return
   }
 
+  // ─── Cas 2 : device virtuel (CABLE) ───────────────────────────────
+
+  const localDeviceId = storeRef?.localAudioDevice || 'default'
+
+  // Howl Discord : synchrone, immédiat
   try {
     const howls = []
 
@@ -202,7 +278,9 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
       try {
         const audioNode = howlDiscord._sounds?.[0]?._node
         if (audioNode && audioNode.setSinkId) {
-          audioNode.setSinkId(audioDevice).catch(e => logWarn('AudioService', 'setSinkId failed', e))
+          audioNode.setSinkId(audioDevice).catch(e =>
+            logWarn('AudioService', 'setSinkId failed', e)
+          )
         }
       } catch (e) {
         logWarn('AudioService', 'setSinkId error', e)
@@ -212,7 +290,14 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
     howls.push(howlDiscord)
     howlDiscord.play()
 
-    if (playLocally) {
+    soundCache[sound.id] = howls
+
+    shouldCreateLocalHowl(audioDevice, localDeviceId, playLocally).then(shouldCreate => {
+      if (!shouldCreate) return
+
+      // Vérifier que le son n'a pas été stoppé entre-temps
+      if (!soundCache[sound.id]) return
+
       const howlLocal = new Howl({
         src: [fileUrl],
         volume: volumeRatio,
@@ -223,22 +308,28 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
           logError('AudioService', 'lecture locale', err)
         },
       })
+
       howlLocal.once('play', () => {
         try {
           const audioNode = howlLocal._sounds?.[0]?._node
           if (audioNode && audioNode.setSinkId) {
-            audioNode.setSinkId('default').catch(() => {})
+            audioNode.setSinkId(localDeviceId).catch(() => {})
           }
         } catch (e) {}
       })
-      howls.push(howlLocal)
-      howlLocal.play()
-    }
 
-    soundCache[sound.id] = howls
+      // Ré-ajouter le Howl local dans le cache
+      if (Array.isArray(soundCache[sound.id])) {
+        soundCache[sound.id].push(howlLocal)
+      } else {
+        soundCache[sound.id] = [howlLocal]
+      }
+
+      howlLocal.play()
+    })
 
   } catch (e) {
-    logError('AudioService', 'playSound', e)
+    logError('AudioService', 'playSoundNormal', e)
     const howl = new Howl({ src: [fileUrl], volume: volumeRatio, html5: false, loop, format: [format] })
     soundCache[sound.id] = howl
     howl.play()
@@ -259,13 +350,11 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
   const fileUrl = buildFileUrl(sound.path)
   const cached = soundCache[sound.id]
 
-  // Si un son joue ou est en cours de chargement, on l'arrête et on sort.
   if (cached && cached !== 'loading') {
     stopSound(sound.id)
     return
   }
 
-  // Si le son est déjà en chargement, on ignore le nouveau clic.
   if (cached === 'loading') {
     return
   }
@@ -305,8 +394,10 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
   }
 
   const shouldPlayLocally = playLocally || storeRef?.monitoringEnabled || false
+  const mixerStats = AudioMixerService.getMixerStats?.() || {}
+  const mixerAlreadyPlaysLocally = !!mixerStats.audioElementActive
 
-  if (shouldPlayLocally) {
+  if (shouldPlayLocally && !mixerAlreadyPlaysLocally) {
     try {
       const localHowl = new Howl({
         src: [fileUrl],
