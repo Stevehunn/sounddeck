@@ -41,6 +41,8 @@ function markTutorialDone(pageId) {
   }
 }
 
+const tick = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms))
+
 export default function Tutorial({ pageId, onComplete }) {
   const { t } = useLanguage()
   const [currentStep, setCurrentStep] = useState(0)
@@ -65,9 +67,9 @@ export default function Tutorial({ pageId, onComplete }) {
     return () => clearTimeout(timer)
   }, [pageId])
 
-  const handleNext = useCallback(() => {
+  const handleNext = useCallback(async () => {
     if (currentStep < steps.length - 1) {
-      setCurrentStep(prev => prev + 1)
+      setCurrentStep((prev) => prev + 1)
     } else {
       if (pageId === 'presentation') {
         const store = window.__storeRef?.current
@@ -75,19 +77,23 @@ export default function Tutorial({ pageId, onComplete }) {
       }
       if (pageId === 'youtube') {
         finishYoutubeTutorial()
+        // ✅ FIX 33 : laisser le temps au youtube-force-reset d'être traité
+        // avant que le composant ne soit démonté
+        await tick(80)
       }
       markTutorialDone(pageId)
       onComplete()
     }
   }, [currentStep, steps.length, pageId, onComplete])
 
-  const handleSkip = useCallback(() => {
+  const handleSkip = useCallback(async () => {
     if (pageId === 'presentation') {
       const store = window.__storeRef?.current
       cleanupTutorialFavorites(store)
     }
     if (pageId === 'youtube') {
       finishYoutubeTutorial()
+      await tick(80)
     }
     markTutorialDone(pageId)
     onComplete()
@@ -96,7 +102,7 @@ export default function Tutorial({ pageId, onComplete }) {
   if (!isReady) {
     return (
       <div className="modal-overlay" onClick={onComplete}>
-        <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+        <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
           <div className="modal-title">
             <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
             {t('loading')}
@@ -109,7 +115,7 @@ export default function Tutorial({ pageId, onComplete }) {
   if (!hasSteps) {
     return (
       <div className="modal-overlay" onClick={onComplete}>
-        <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+        <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
           <div className="modal-title">
             <i className="ti ti-info-circle" style={{ color: 'var(--warning)' }} />
             {t('tutorialNotFound')}

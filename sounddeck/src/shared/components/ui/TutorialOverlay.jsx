@@ -437,17 +437,20 @@ export default function TutorialOverlay({
 
     if (stepData?.afterNextStep && typeof stepData.afterNextStep === 'function') {
       setIsExecutingAction(true)
-      try {
-        stepData.afterNextStep()
-      } catch (err) {
-        console.error('❌ [TutorialOverlay] Erreur afterNextStep:', err)
-      }
-      const delay = stepData.afterNextStepDelay || 2000
-      actionTimeoutRef.current = setTimeout(() => {
-        handleLeave()
-        setIsExecutingAction(false)
-        onNext?.()
-      }, delay)
+
+      Promise.resolve()
+        .then(() => stepData.afterNextStep())
+        .catch((err) => {
+          console.error('❌ [TutorialOverlay] Erreur afterNextStep:', err)
+        })
+        .finally(() => {
+          const delay = stepData.afterNextStepDelay || 2000
+          actionTimeoutRef.current = setTimeout(() => {
+            handleLeave()
+            setIsExecutingAction(false)
+            onNext?.()
+          }, delay)
+        })
       return
     }
 
@@ -462,11 +465,16 @@ export default function TutorialOverlay({
       actionTimeoutRef.current = null
     }
     handleLeave()
-    if (pageId) {
-      setItem(`sounddeck-tutorial-${pageId}-done`, true).catch(() => {})
+    if (typeof onSkip === 'function') {
+      onSkip()
+    } else {
+      // Fallback (au cas où onSkip n'est pas fourni)
+      if (pageId) {
+        setItem(`sounddeck-tutorial-${pageId}-done`, true).catch(() => {})
+      }
+      onComplete?.()
     }
-    onComplete?.()
-  }, [handleLeave, pageId, onComplete])
+  }, [handleLeave, pageId, onSkip, onComplete])
 
   // ─── Rendu ────────────────────────────────────────────────────────────────
   if (!isOpen || !stepData) return null

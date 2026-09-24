@@ -11,6 +11,10 @@ const MOCK_VIDEO_INFO = {
 }
 
 export const startYoutubeTutorial = () => {
+  window.dispatchEvent(new CustomEvent('youtube-force-reset', {
+    detail: { timestamp: Date.now() }
+  }))
+
   window.__youtubeTutorialActive = true
   window.__youtubeTutorialStartedAt = Date.now()
   window.__youtubeTutorialState = {
@@ -39,26 +43,26 @@ export const deactivateYoutubeTutorialMode = () => {
 
 export const finishYoutubeTutorial = () => {
   deactivateYoutubeTutorialMode()
-  window.dispatchEvent(new CustomEvent('youtube-force-reset', { 
-    detail: { timestamp: Date.now() } 
+  window.dispatchEvent(new CustomEvent('youtube-force-reset', {
+    detail: { timestamp: Date.now() }
   }))
 }
 
 export const forceResetYoutubeComponent = () => {
   deactivateYoutubeTutorialMode()
-  window.dispatchEvent(new CustomEvent('youtube-force-reset', { 
-    detail: { timestamp: Date.now() } 
+  window.dispatchEvent(new CustomEvent('youtube-force-reset', {
+    detail: { timestamp: Date.now() }
   }))
 }
 
 export const cleanupYoutubeTutorial = () => {
   const startedAt = window.__youtubeTutorialStartedAt || 0
   const elapsed = Date.now() - startedAt
-  
+
   if (elapsed < 500 && window.__youtubeTutorialActive) {
     return
   }
-  
+
   finishYoutubeTutorial()
 }
 
@@ -102,28 +106,45 @@ export const mockSaveSound = () => new Promise((resolve) => {
   setTimeout(() => resolve({ success: true, message: 'Son sauvegardé avec succès' }), 400)
 })
 
+function clickWithRetry(selector, maxAttempts = 10, delayMs = 250) {
+  return new Promise((resolve) => {
+    let attempts = 0
+    const tryClick = () => {
+      const btn = document.querySelector(selector)
+      // offsetParent !== null : garantit que l'élément est visible
+      if (btn && btn.offsetParent !== null) {
+        try {
+          btn.click()
+          resolve(true)
+          return
+        } catch (e) {
+          // continue
+        }
+      }
+      attempts++
+      if (attempts >= maxAttempts) {
+        console.warn(`⚠️ [YouTube tutorial] Élément introuvable: ${selector}`)
+        resolve(false)
+        return
+      }
+      setTimeout(tryClick, delayMs)
+    }
+    tryClick()
+  })
+}
+
 export const clickLoadButton = () => {
-  const btn = document.querySelector('[data-testid="youtube-load-button"]') ||
-              document.querySelector('.youtube-load-button')
-  if (btn) { btn.click(); return true }
-  return false
+  return clickWithRetry('[data-testid="youtube-load-button"], .youtube-load-button', 8, 250)
 }
 
 export const clickDownloadButton = () => {
-  const btn = document.querySelector('[data-testid="youtube-download-button"]') ||
-              document.querySelector('.youtube-download-button')
-  if (btn) { btn.click(); return true }
-  return false
+  return clickWithRetry('[data-testid="youtube-download-button"], .youtube-download-button', 10, 250)
 }
 
 export const clickSaveButton = () => {
-  const btn = document.querySelector('[data-testid="youtube-save-button"]') ||
-              document.querySelector('.youtube-save-button')
-  if (btn) { btn.click(); return true }
-  return false
+  return clickWithRetry('[data-testid="youtube-save-button"], .youtube-save-button', 10, 250)
 }
 
-// ✅ TUTORIAL STEPS — plus de texte en dur, uniquement des clés i18n
 export const TUTORIAL_STEPS = (t) => {
   const steps = [
     {
@@ -146,7 +167,7 @@ export const TUTORIAL_STEPS = (t) => {
       hint: t('tutorialYoutubeStep2Hint'),
       position: 'bottom',
       afterNextStep: () => clickLoadButton(),
-      afterNextStepDelay: 1200,
+      afterNextStepDelay: 2200,
     },
     {
       id: 'youtube-3',
@@ -168,7 +189,7 @@ export const TUTORIAL_STEPS = (t) => {
       hint: t('tutorialYoutubeStep4Hint'),
       position: 'bottom',
       afterNextStep: () => clickDownloadButton(),
-      afterNextStepDelay: 1500,
+      afterNextStepDelay: 2800,
     },
     {
       id: 'youtube-5',
