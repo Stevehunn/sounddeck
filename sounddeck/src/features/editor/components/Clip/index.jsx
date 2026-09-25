@@ -1,44 +1,65 @@
 // src/features/editor/components/Clip/index.jsx
-import React, { useState, useRef, useCallback, useEffect } from 'react'
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import ClipWaveform from './ClipWaveform'
 import ClipFadeHandles from './ClipFadeHandles'
 import ClipActions from './ClipActions'
 
-const EditorClip = ({
+const DRAG_SENSITIVITY = 1.0
+const SNAP_VALUE = 0.01
+
+/**
+ * EditorClip — un clip audio dans la timeline.
+ *
+ * Props regroupées en 4 objets :
+ *  - clip      : { id, name, path, effects, fadeIn, fadeOut, ... }
+ *  - layout    : { start, duration, pixelsPerSecond, totalDuration, snapEnabled }
+ *  - state     : { isSelected, isPlaying, currentTime, loopState }
+ *  - handlers  : { onSelect, onMove, onUpdate, onRemove, onDuplicate, onFade,
+ *                  onContextMenu, onUpdateDuration, onPlayClip, onStopClip,
+ *                  onCopyClip, onCutClip, onPasteClip }
+ *  - ui        : { trackId, trackColor, waveformData, tr }
+ */
+export default function EditorClip({
   clip,
-  duration,
-  start,
-  trackId,
-  trackColor,
-  isSelected,
-  pixelsPerSecond,
-  snapEnabled,
-  onSelect,
-  onMove,
-  onUpdate,
-  onRemove,
-  onDuplicate,
-  onFade,
-  onContextMenu,
-  onUpdateDuration,
-  waveformData,
-  isPlaying,
-  currentTime,
-  tr,
-  onPlayClip,
-  onStopClip,
-  onCopyClip,
-  onCutClip,
-  onPasteClip,
-  loopState = {},
-  totalDuration = 10,
-}) => {
+  layout,
+  state,
+  handlers,
+  ui,
+}) {
+  const {
+    start,
+    duration,
+    pixelsPerSecond,
+    totalDuration = 10,
+    snapEnabled,
+  } = layout
+
+  const {
+    isSelected,
+    isPlaying,
+    currentTime,
+    loopState = {},
+  } = state
+
+  const {
+    onSelect,
+    onMove,
+    onRemove,
+    onDuplicate,
+    onFade,
+    onContextMenu,
+    onPlayClip,
+    onStopClip,
+    onCopyClip,
+    onCutClip,
+  } = handlers
+
+  const { trackId, trackColor, waveformData, tr } = ui
+
   const [isDragging, setIsDragging] = useState(false)
   const [dragStartX, setDragStartX] = useState(0)
-  const [dragMode, setDragMode] = useState('move')
   const [isHovering, setIsHovering] = useState(false)
   const [isClipPlaying, setIsClipPlaying] = useState(false)
-
   const [localStart, setLocalStart] = useState(start)
 
   const clipRef = useRef(null)
@@ -53,54 +74,64 @@ const EditorClip = ({
 
   const clipWidth = Math.max(duration * pixelsPerSecond, 20)
   const clipLeft = localStart * pixelsPerSecond
-  const SNAP_VALUE = 0.01
-  const DRAG_SENSITIVITY = 1.0
 
   const isClipLooping = clip?.id && loopState?.clips?.[clip.id]?.enabled || false
   const clipLoopData = clip?.id ? loopState?.clips?.[clip.id] : null
 
-  const loopVisual = clipLoopData?.visual || 'arrow'
   const loopColor = clipLoopData?.arrowColor || '#22c55e'
   const loopEnd = clipLoopData?.end || totalDuration
   const loopMode = clipLoopData?.loopMode || 'endOfTrack'
 
   const clipEndPosition = clipWidth
-  const loopEndRelativePosition = Math.max(0, (loopEnd - start) * pixelsPerSecond)
+  const loopEndRelativePosition = Math.max(
+    0,
+    (loopEnd - start) * pixelsPerSecond
+  )
   const loopWidth = Math.max(0, loopEndRelativePosition - clipEndPosition)
 
-  const cycleCount = clipLoopData?.cycleCount || 1
   const totalCycles = clipLoopData?.totalCycles || 1
 
+  // Sync start externe → localStart
   useEffect(() => {
     dragStartTimeRef.current = start
-
     if (!isDragging && localStart !== start) {
       setLocalStart(start)
     }
   }, [start, isDragging, localStart])
 
+  // Statut lecture
   useEffect(() => {
-    setIsClipPlaying(isPlaying && currentTime >= start && currentTime <= start + duration)
+    setIsClipPlaying(
+      isPlaying && currentTime >= start && currentTime <= start + duration
+    )
   }, [isPlaying, currentTime, start, duration])
 
-  const playheadPosition = Math.max(0, Math.min((currentTime - start) * pixelsPerSecond, clipWidth - 2))
+  const playheadPosition = Math.max(
+    0,
+    Math.min((currentTime - start) * pixelsPerSecond, clipWidth - 2)
+  )
 
-  const handleContextMenu = useCallback((e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (onContextMenu) {
-      onContextMenu(e, clip.id, trackId)
-    }
-  }, [clip.id, trackId, onContextMenu])
+  // ─── Handlers ────────────────────────────────────────────────────────
+
+  const handleContextMenu = useCallback(
+    (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (onContextMenu) {
+        onContextMenu(e, clip.id, trackId)
+      }
+    },
+    [clip.id, trackId, onContextMenu]
+  )
 
   const handleMouseDown = (e) => {
     if (e.button !== 0) return
 
     const target = e.target
-
-    const isActionButton = target.closest?.('.delete-button') ||
-                          target.closest?.('[data-action]') ||
-                          target.closest?.('button')
+    const isActionButton =
+      target.closest?.('.delete-button') ||
+      target.closest?.('[data-action]') ||
+      target.closest?.('button')
 
     if (isActionButton) {
       e.stopPropagation()
@@ -122,37 +153,40 @@ const EditorClip = ({
     e.preventDefault()
   }
 
-  const handleMouseMove = useCallback((e) => {
-    if (!isDraggingRef.current) return
+  const handleMouseMove = useCallback(
+    (e) => {
+      if (!isDraggingRef.current) return
 
-    if (frameIdRef.current) {
-      cancelAnimationFrame(frameIdRef.current)
-      frameIdRef.current = null
-    }
-
-    frameIdRef.current = requestAnimationFrame(() => {
-      const deltaPixels = e.clientX - lastClientXRef.current
-      lastClientXRef.current = e.clientX
-
-      accumulatedDeltaRef.current += deltaPixels
-
-      const totalDeltaSeconds = (accumulatedDeltaRef.current / pixelsPerSecond) * DRAG_SENSITIVITY
-      let newStart = Math.max(0, dragStartTimeRef.current + totalDeltaSeconds)
-
-      if (snapEnabled) {
-        newStart = Math.round(newStart / SNAP_VALUE) * SNAP_VALUE
-        newStart = Math.round(newStart * 1000) / 1000
+      if (frameIdRef.current) {
+        cancelAnimationFrame(frameIdRef.current)
+        frameIdRef.current = null
       }
 
-      if (Math.abs(accumulatedDeltaRef.current) > 1) {
-        hasMovedRef.current = true
-      }
+      frameIdRef.current = requestAnimationFrame(() => {
+        const deltaPixels = e.clientX - lastClientXRef.current
+        lastClientXRef.current = e.clientX
 
-      setLocalStart(newStart)
+        accumulatedDeltaRef.current += deltaPixels
 
-      frameIdRef.current = null
-    })
-  }, [pixelsPerSecond, snapEnabled])
+        const totalDeltaSeconds =
+          (accumulatedDeltaRef.current / pixelsPerSecond) * DRAG_SENSITIVITY
+        let newStart = Math.max(0, dragStartTimeRef.current + totalDeltaSeconds)
+
+        if (snapEnabled) {
+          newStart = Math.round(newStart / SNAP_VALUE) * SNAP_VALUE
+          newStart = Math.round(newStart * 1000) / 1000
+        }
+
+        if (Math.abs(accumulatedDeltaRef.current) > 1) {
+          hasMovedRef.current = true
+        }
+
+        setLocalStart(newStart)
+        frameIdRef.current = null
+      })
+    },
+    [pixelsPerSecond, snapEnabled]
+  )
 
   const handleMouseUp = useCallback(() => {
     if (!isDraggingRef.current) return
@@ -165,12 +199,7 @@ const EditorClip = ({
     const finalStart = localStart
 
     if (hasMovedRef.current && onMove && dragStartClipId.current) {
-      onMove(
-        dragStartClipId.current,
-        finalStart,
-        null,
-        { skipHistory: true }
-      )
+      onMove(dragStartClipId.current, finalStart, null, { skipHistory: true })
     }
 
     setIsDragging(false)
@@ -188,7 +217,6 @@ const EditorClip = ({
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
-
       if (frameIdRef.current) {
         cancelAnimationFrame(frameIdRef.current)
         frameIdRef.current = null
@@ -211,15 +239,15 @@ const EditorClip = ({
     onStopClip?.(clip.id)
   }
 
-  const handleDuplicate = (clipId, trackId) => {
-    if (onDuplicate && clipId && trackId) {
-      onDuplicate(clipId, trackId)
+  const handleDuplicate = (clipId, tid) => {
+    if (onDuplicate && clipId && tid) {
+      onDuplicate(clipId, tid)
     }
   }
 
-  const handleRemove = (trackId, clipId) => {
-    if (onRemove && clipId && trackId) {
-      onRemove(trackId, clipId)
+  const handleRemove = (tid, clipId) => {
+    if (onRemove && clipId && tid) {
+      onRemove(tid, clipId)
     }
   }
 
@@ -233,7 +261,9 @@ const EditorClip = ({
     onCutClip?.(clip)
   }
 
-  const renderLoopOverlay = () => {
+  // ─── Rendu loop overlay ──────────────────────────────────────────────
+
+  const renderLoopOverlay = useMemo(() => {
     if (!isClipLooping) return null
     if (loopWidth <= 0) return null
 
@@ -256,44 +286,50 @@ const EditorClip = ({
           borderRadius: '0 4px 4px 0',
         }}
       >
-        <div style={{
-          position: 'absolute',
-          right: -2,
-          top: 0,
-          bottom: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          pointerEvents: 'none',
-        }}>
-          <span style={{
-            fontSize: 34,
-            fontWeight: 900,
-            color: loopColor,
-            opacity: 0.9,
-            textShadow: `0 0 20px ${loopColor}60, 0 0 40px ${loopColor}30`,
-            lineHeight: 1,
-          }}>
+        <div
+          style={{
+            position: 'absolute',
+            right: -2,
+            top: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          <span
+            style={{
+              fontSize: 34,
+              fontWeight: 900,
+              color: loopColor,
+              opacity: 0.9,
+              textShadow: `0 0 20px ${loopColor}60, 0 0 40px ${loopColor}30`,
+              lineHeight: 1,
+            }}
+          >
             ]
           </span>
         </div>
 
-        <div style={{
-          position: 'absolute',
-          right: -2,
-          bottom: 4,
-          fontSize: 7,
-          fontWeight: 600,
-          color: loopColor,
-          opacity: 0.7,
-          background: 'rgba(0,0,0,0.8)',
-          padding: '2px 8px',
-          borderRadius: 3,
-          border: `1px solid ${loopColor}40`,
-          fontFamily: 'monospace',
-          whiteSpace: 'nowrap',
-          pointerEvents: 'none'
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            right: -2,
+            bottom: 4,
+            fontSize: 7,
+            fontWeight: 600,
+            color: loopColor,
+            opacity: 0.7,
+            background: 'rgba(0,0,0,0.8)',
+            padding: '2px 8px',
+            borderRadius: 3,
+            border: `1px solid ${loopColor}40`,
+            fontFamily: 'monospace',
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+          }}
+        >
           FIN {(loopWidth / pixelsPerSecond).toFixed(1)}s
         </div>
 
@@ -308,84 +344,97 @@ const EditorClip = ({
             pointerEvents: 'none',
           }}
         >
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: `repeating-linear-gradient(90deg, ${loopColor}, ${loopColor} 6px, transparent 6px, transparent 12px)`,
-            opacity: 0.4,
-          }} />
-
-          <div style={{
-            position: 'absolute',
-            right: -6,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            width: 0,
-            height: 0,
-            borderLeft: `6px solid ${loopColor}`,
-            borderTop: '4px solid transparent',
-            borderBottom: '4px solid transparent',
-            opacity: 0.6
-          }} />
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: `repeating-linear-gradient(90deg, ${loopColor}, ${loopColor} 6px, transparent 6px, transparent 12px)`,
+              opacity: 0.4,
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              right: -6,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: 0,
+              height: 0,
+              borderLeft: `6px solid ${loopColor}`,
+              borderTop: '4px solid transparent',
+              borderBottom: '4px solid transparent',
+              opacity: 0.6,
+            }}
+          />
         </div>
 
-        <div style={{
-          position: 'absolute',
-          top: -24,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          fontSize: 8,
-          fontWeight: 600,
-          color: loopColor,
-          background: 'rgba(0,0,0,0.9)',
-          padding: '2px 12px',
-          borderRadius: 4,
-          border: `1px solid ${loopColor}`,
-          whiteSpace: 'nowrap',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
-          pointerEvents: 'none',
-          zIndex: 6
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: -24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontSize: 8,
+            fontWeight: 600,
+            color: loopColor,
+            background: 'rgba(0,0,0,0.9)',
+            padding: '2px 12px',
+            borderRadius: 4,
+            border: `1px solid ${loopColor}`,
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
+            pointerEvents: 'none',
+            zIndex: 6,
+          }}
+        >
           <span>🔁 LOOP</span>
           {loopMode === 'cycles' && totalCycles > 1 && (
-            <span style={{
-              fontSize: 7,
-              opacity: 0.7,
-              background: 'rgba(255,255,255,0.1)',
-              padding: '0 6px',
-              borderRadius: 2
-            }}>
+            <span
+              style={{
+                fontSize: 7,
+                opacity: 0.7,
+                background: 'rgba(255,255,255,0.1)',
+                padding: '0 6px',
+                borderRadius: 2,
+              }}
+            >
               {totalCycles}x
             </span>
           )}
           {loopMode === 'manualDuration' && (
-            <span style={{
-              fontSize: 7,
-              opacity: 0.7,
-              fontFamily: 'monospace'
-            }}>
+            <span style={{ fontSize: 7, opacity: 0.7, fontFamily: 'monospace' }}>
               {(loopWidth / pixelsPerSecond).toFixed(1)}s
             </span>
           )}
-          <span style={{
-            fontSize: 7,
-            opacity: 0.5,
-            fontFamily: 'monospace',
-            borderLeft: '1px solid rgba(255,255,255,0.2)',
-            paddingLeft: 6
-          }}>
+          <span
+            style={{
+              fontSize: 7,
+              opacity: 0.5,
+              fontFamily: 'monospace',
+              borderLeft: '1px solid rgba(255,255,255,0.2)',
+              paddingLeft: 6,
+            }}
+          >
             +{(loopWidth / pixelsPerSecond).toFixed(1)}s
           </span>
         </div>
       </div>
     )
-  }
+  }, [
+    isClipLooping,
+    loopWidth,
+    clipWidth,
+    loopColor,
+    loopMode,
+    totalCycles,
+    pixelsPerSecond,
+  ])
 
   return (
     <div
@@ -402,11 +451,23 @@ const EditorClip = ({
         width: clipWidth,
         minWidth: 10,
         background: getClipColor(trackColor),
-        border: `2px solid ${isSelected ? 'var(--accent)' : isClipLooping ? 'var(--success)' : trackColor}`,
+        border: `2px solid ${
+          isSelected
+            ? 'var(--accent)'
+            : isClipLooping
+              ? 'var(--success)'
+              : trackColor
+        }`,
         borderRadius: 6,
         cursor: isDragging ? 'grabbing' : 'grab',
-        transition: isDragging ? 'none' : 'border-color 0.15s, box-shadow 0.15s, left 0.05s ease',
-        boxShadow: isSelected ? '0 0 20px rgba(124,111,247,0.3)' : isClipLooping ? '0 0 15px rgba(34,197,94,0.2)' : 'none',
+        transition: isDragging
+          ? 'none'
+          : 'border-color 0.15s, box-shadow 0.15s, left 0.05s ease',
+        boxShadow: isSelected
+          ? '0 0 20px rgba(124,111,247,0.3)'
+          : isClipLooping
+            ? '0 0 15px rgba(34,197,94,0.2)'
+            : 'none',
         zIndex: isDragging ? 10 : isSelected ? 3 : 2,
         opacity: isDragging ? 0.8 : 1,
         overflow: 'visible',
@@ -418,46 +479,48 @@ const EditorClip = ({
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      {renderLoopOverlay()}
+      {renderLoopOverlay}
 
       {isClipLooping && (
-        <div style={{
-          position: 'absolute',
-          top: 2,
-          left: 4,
-          zIndex: 8,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          background: 'rgba(0,0,0,0.8)',
-          padding: '1px 8px 1px 4px',
-          borderRadius: 3,
-          pointerEvents: 'none',
-          border: `1px solid ${loopColor}40`
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: 2,
+            left: 4,
+            zIndex: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            background: 'rgba(0,0,0,0.8)',
+            padding: '1px 8px 1px 4px',
+            borderRadius: 3,
+            pointerEvents: 'none',
+            border: `1px solid ${loopColor}40`,
+          }}
+        >
           <span style={{ fontSize: 10 }}>🔁</span>
-          <span style={{
-            fontSize: 7,
-            fontWeight: 600,
-            color: 'var(--success)'
-          }}>
+          <span style={{ fontSize: 7, fontWeight: 600, color: 'var(--success)' }}>
             LOOP
           </span>
           {loopMode === 'cycles' && totalCycles > 1 && (
-            <span style={{
-              fontSize: 7,
-              color: 'var(--text-tertiary)',
-              opacity: 0.7
-            }}>
+            <span
+              style={{
+                fontSize: 7,
+                color: 'var(--text-tertiary)',
+                opacity: 0.7,
+              }}
+            >
               {totalCycles}x
             </span>
           )}
-          <span style={{
-            fontSize: 7,
-            color: 'var(--text-tertiary)',
-            opacity: 0.5,
-            fontFamily: 'monospace'
-          }}>
+          <span
+            style={{
+              fontSize: 7,
+              color: 'var(--text-tertiary)',
+              opacity: 0.5,
+              fontFamily: 'monospace',
+            }}
+          >
             → {loopEnd.toFixed(1)}s
           </span>
         </div>
@@ -469,61 +532,71 @@ const EditorClip = ({
         duration={duration}
       />
 
-      <div style={{
-        position: 'absolute',
-        bottom: 4,
-        left: 6,
-        right: 6,
-        fontSize: 9,
-        fontWeight: 500,
-        color: 'var(--text-secondary)',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-        pointerEvents: 'none',
-        textShadow: '0 1px 4px rgba(0,0,0,0.5)'
-      }}>
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 4,
+          left: 6,
+          right: 6,
+          fontSize: 9,
+          fontWeight: 500,
+          color: 'var(--text-secondary)',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none',
+          textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+        }}
+      >
         {clip.name || 'Clip'}
-        <span style={{
-          marginLeft: 4,
-          fontSize: 8,
-          opacity: 0.6,
-          color: 'var(--text-tertiary)'
-        }}>
+        <span
+          style={{
+            marginLeft: 4,
+            fontSize: 8,
+            opacity: 0.6,
+            color: 'var(--text-tertiary)',
+          }}
+        >
           {duration.toFixed(1)}s
         </span>
         {isClipLooping && (
-          <span style={{
-            marginLeft: 4,
-            fontSize: 7,
-            color: 'var(--success)',
-            opacity: 0.8
-          }}>
+          <span
+            style={{
+              marginLeft: 4,
+              fontSize: 7,
+              color: 'var(--success)',
+              opacity: 0.8,
+            }}
+          >
             🔁
           </span>
         )}
         {isClipLooping && loopMode === 'cycles' && totalCycles > 1 && (
-          <span style={{
-            marginLeft: 4,
-            fontSize: 7,
-            color: 'var(--text-tertiary)',
-            opacity: 0.6
-          }}>
+          <span
+            style={{
+              marginLeft: 4,
+              fontSize: 7,
+              color: 'var(--text-tertiary)',
+              opacity: 0.6,
+            }}
+          >
             {totalCycles}x
           </span>
         )}
       </div>
 
       {isHovering && (
-        <div style={{
-          position: 'absolute',
-          top: 2,
-          left: 4,
-          display: 'flex',
-          gap: 2,
-          zIndex: 7,
-          pointerEvents: 'auto'
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: 2,
+            left: 4,
+            display: 'flex',
+            gap: 2,
+            zIndex: 7,
+            pointerEvents: 'auto',
+          }}
+        >
           {isClipPlaying ? (
             <button
               onClick={handleStop}
@@ -534,7 +607,7 @@ const EditorClip = ({
                 background: 'rgba(0,0,0,0.6)',
                 borderRadius: 3,
                 border: '1px solid rgba(255,255,255,0.1)',
-                cursor: 'pointer'
+                cursor: 'pointer',
               }}
               title={tr?.('editorClipTooltipStop') || 'Arrêter'}
             >
@@ -550,7 +623,7 @@ const EditorClip = ({
                 background: 'rgba(0,0,0,0.6)',
                 borderRadius: 3,
                 border: '1px solid rgba(255,255,255,0.1)',
-                cursor: 'pointer'
+                cursor: 'pointer',
               }}
               title={tr?.('editorClipTooltipPlay') || 'Jouer le clip'}
             >
@@ -567,7 +640,7 @@ const EditorClip = ({
               background: 'rgba(0,0,0,0.6)',
               borderRadius: 3,
               border: '1px solid rgba(255,255,255,0.1)',
-              cursor: 'pointer'
+              cursor: 'pointer',
             }}
             title={tr?.('editorClipTooltipCopy') || 'Copier'}
           >
@@ -583,7 +656,7 @@ const EditorClip = ({
               background: 'rgba(0,0,0,0.6)',
               borderRadius: 3,
               border: '1px solid rgba(255,255,255,0.1)',
-              cursor: 'pointer'
+              cursor: 'pointer',
             }}
             title={tr?.('editorClipTooltipCut') || 'Couper'}
           >
@@ -611,22 +684,28 @@ const EditorClip = ({
         tr={tr}
       />
 
-      {isPlaying && currentTime >= start && currentTime <= start + duration && (
-        <div style={{
-          position: 'absolute',
-          left: playheadPosition,
-          top: 0,
-          bottom: 0,
-          width: 2,
-          background: isClipPlaying ? 'var(--accent)' : 'rgba(124,111,247,0.4)',
-          zIndex: 4,
-          boxShadow: isClipPlaying ? '0 0 10px rgba(124,111,247,0.5)' : 'none',
-          pointerEvents: 'none',
-          transition: isClipPlaying ? 'none' : 'left 0.05s ease'
-        }} />
-      )}
+      {isPlaying &&
+        currentTime >= start &&
+        currentTime <= start + duration && (
+          <div
+            style={{
+              position: 'absolute',
+              left: playheadPosition,
+              top: 0,
+              bottom: 0,
+              width: 2,
+              background: isClipPlaying
+                ? 'var(--accent)'
+                : 'rgba(124,111,247,0.4)',
+              zIndex: 4,
+              boxShadow: isClipPlaying
+                ? '0 0 10px rgba(124,111,247,0.5)'
+                : 'none',
+              pointerEvents: 'none',
+              transition: isClipPlaying ? 'none' : 'left 0.05s ease',
+            }}
+          />
+        )}
     </div>
   )
 }
-
-export default EditorClip

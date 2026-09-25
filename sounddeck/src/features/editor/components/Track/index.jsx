@@ -35,50 +35,37 @@ const EditorTrack = ({
   loopState = {},
 }) => {
   const color = useMemo(
-    () => trackColor || getTrackColor(trackIndex),
+    () => trackColor || TRACK_COLORS[trackIndex % TRACK_COLORS.length],
     [trackColor, trackIndex]
   )
 
-  // ✅ Handlers stables (évitent de recréer les fonctions)
-  const handleClipSelect = useCallback(
-    (clipId) => onClipSelect?.(clipId, track.id),
-    [onClipSelect, track.id]
-  )
-
-  const handleClipMove = useCallback(
-    (clipId, newStart, newTrackId, options) =>
+  // Handlers stables (regroupés dans un objet, mémoïsé)
+  const handlers = useMemo(() => ({
+    onSelect: (clipId) => onClipSelect?.(clipId, track.id),
+    onMove: (clipId, newStart, newTrackId, options) =>
       onClipMove?.(track.id, clipId, newStart, newTrackId, options),
-    [onClipMove, track.id]
-  )
-
-  const handleClipUpdate = useCallback(
-    (clipId, updates) => onClipUpdate?.(track.id, clipId, updates),
-    [onClipUpdate, track.id]
-  )
-
-  const handleClipRemove = useCallback(
-    (trackId, clipId) => onClipRemove?.(trackId, clipId),
-    [onClipRemove]
-  )
-
-  const handleClipDuplicate = useCallback(
-    (clipId) => onClipDuplicate?.(clipId, track.id),
-    [onClipDuplicate, track.id]
-  )
-
-  const handleClipFade = useCallback(
-    (clipId, edge, duration) => onClipFade?.(track.id, clipId, edge, duration),
-    [onClipFade, track.id]
-  )
-
-  const handleClipContextMenu = useCallback(
-    (e, clipId) => {
+    onUpdate: (clipId, updates) => onClipUpdate?.(track.id, clipId, updates),
+    onRemove: (trackId, clipId) => onClipRemove?.(trackId, clipId),
+    onDuplicate: (clipId) => onClipDuplicate?.(clipId, track.id),
+    onFade: (clipId, edge, duration) =>
+      onClipFade?.(track.id, clipId, edge, duration),
+    onContextMenu: (e, clipId) => {
       if (onClipContextMenu) {
         onClipContextMenu(e, clipId, track.id)
       }
     },
-    [onClipContextMenu, track.id]
-  )
+    onUpdateDuration: onUpdateClipDuration,
+    onPlayClip,
+    onStopClip,
+    onCopyClip,
+    onCutClip,
+    onPasteClip,
+  }), [
+    track.id,
+    onClipSelect, onClipMove, onClipUpdate, onClipRemove,
+    onClipDuplicate, onClipFade, onClipContextMenu, onUpdateClipDuration,
+    onPlayClip, onStopClip, onCopyClip, onCutClip, onPasteClip,
+  ])
 
   return (
     <div
@@ -101,36 +88,28 @@ const EditorTrack = ({
 
         return (
           <EditorClip
-            // ✅ FIX : la key est juste clip.id — plus de clipVersion / loopStateHash
-            // → React préserve l'état interne (isDragging, isHovering, etc.)
             key={clip.id}
             clip={clip}
-            duration={duration}
-            start={clipStart}
-            trackId={track.id}
-            trackColor={color}
-            isSelected={isSelected}
-            pixelsPerSecond={pixelsPerSecond}
-            snapEnabled={snapEnabled}
-            onSelect={handleClipSelect}
-            onMove={handleClipMove}
-            onUpdate={handleClipUpdate}
-            onRemove={handleClipRemove}
-            onDuplicate={handleClipDuplicate}
-            onFade={handleClipFade}
-            onContextMenu={handleClipContextMenu}
-            onUpdateDuration={onUpdateClipDuration}
-            waveformData={waveformData?.[clip.id]}
-            isPlaying={isPlaying}
-            currentTime={currentTime}
-            tr={tr}
-            onPlayClip={onPlayClip}
-            onStopClip={onStopClip}
-            onCopyClip={onCopyClip}
-            onCutClip={onCutClip}
-            onPasteClip={onPasteClip}
-            loopState={loopState}
-            totalDuration={totalDuration}
+            layout={{
+              start: clipStart,
+              duration,
+              pixelsPerSecond,
+              totalDuration,
+              snapEnabled,
+            }}
+            state={{
+              isSelected,
+              isPlaying,
+              currentTime,
+              loopState,
+            }}
+            handlers={handlers}
+            ui={{
+              trackId: track.id,
+              trackColor: color,
+              waveformData: waveformData?.[clip.id],
+              tr,
+            }}
           />
         )
       })}
