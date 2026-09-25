@@ -1,6 +1,6 @@
 // src/core/store/hooks/useSounds.js
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { v4 as uuidv4 } from 'uuid'
+import { uuid } from '@shared/utils/uuid'
 import { normalizePath } from '../utils/normalizePath'
 
 export function useSounds(initialSounds = [], initialSoundOrder = {}, initialTags = {}, save) {
@@ -25,7 +25,7 @@ export function useSounds(initialSounds = [], initialSoundOrder = {}, initialTag
 
   const addSound = useCallback(async (soundData) => {
     const newSound = {
-      id: uuidv4(),
+      id: uuid(),
       name: soundData.name,
       path: normalizePath(soundData.path),
       image: normalizePath(soundData.image) || null,

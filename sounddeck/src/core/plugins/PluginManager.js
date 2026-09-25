@@ -4,6 +4,7 @@
  */
 import { DEFAULT_ICONS, DEFAULT_GROUPS } from '@shared/constants/navigation'
 import { logError, logWarn, logInfo } from '@shared/utils/logger'
+import { CORE_PAGES } from '@shared/constants/pages'
 
 // ─── CLÉS STORE ─────────────────────────────────────────────────────────
 
@@ -29,16 +30,11 @@ const INTEGRATED_PLUGIN_IDS = new Set(INTEGRATED_PLUGINS.keys())
 
 // ─── PAGES CORE ─────────────────────────────────────────────────────────
 
-const CORE_PAGES_DEFS = [
-  { id: 'home', labelKey: 'mySounds', group: 'navigation' },
-  { id: 'trimmer', labelKey: 'trimmer', group: 'navigation' },
-  { id: 'editor', labelKey: 'editor', group: 'navigation' },
-  { id: 'sequencer', labelKey: 'sequencer', group: 'navigation' },
-  { id: 'stats', labelKey: 'stats', group: 'navigation' },
-  { id: 'emoji', labelKey: 'emojiPageTitle', group: 'navigation' },
-  { id: 'guide', labelKey: 'guide', group: 'footer' },
-  { id: 'options', labelKey: 'options', group: 'footer' },
-]
+const CORE_PAGES_DEFS = CORE_PAGES.map((p) => ({
+  id: p.id,
+  labelKey: p.labelKey,
+  group: p.group,
+}))
 
 // ─── CLASSE ─────────────────────────────────────────────────────────────
 

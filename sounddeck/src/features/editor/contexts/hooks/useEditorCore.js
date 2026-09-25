@@ -1,6 +1,7 @@
 // src/features/editor/contexts/hooks/useEditorCore.js
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { getAudioFileDuration } from '@shared/utils/audioContext'
+import { uuid } from '@shared/utils/uuid'
 
 const __DEBUG__ = typeof import.meta !== 'undefined' && import.meta.env?.DEV
 const log = __DEBUG__ ? console.log.bind(console) : () => {}
@@ -90,7 +91,6 @@ export function useEditorCore({ store, addToast, t, confirm }) {
   const actionOverlayRef = useRef(INITIAL_OVERLAY_STATE)
   const addToastRef = useRef(addToast)
   const tRef = useRef(t)
-  const idCounterRef = useRef(0)
 
   const currentTimeRef = useRef(0)
   const isPlayingRef = useRef(false)
@@ -125,10 +125,8 @@ export function useEditorCore({ store, addToast, t, confirm }) {
   useEffect(() => { masterGainRef.current = masterGain }, [masterGain])
 
   // ─── HELPERS ────────────────────────────────────────────────────────────
-  const generateUniqueId = useCallback((prefix) => {
-    idCounterRef.current += 1
-    return `${prefix}-${Date.now()}-${idCounterRef.current}`
-  }, [])
+  // ✅ FIX D10 : UUID canonique (au lieu de Date.now() + counter)
+  const generateUniqueId = useCallback((prefix) => uuid(prefix), [])
 
   const findPreviousClip = useCallback((clip, track) => {
     if (!track || !track.clips) return null
@@ -155,7 +153,7 @@ export function useEditorCore({ store, addToast, t, confirm }) {
     } catch (e) {}
   }, [])
 
-  // ─── COMMIT (avec historique) ───────────────────────────────────────────
+  // ─── COMMIT ─────────────────────────────────────────────────────────────
   const commitProject = useCallback((newProject, options = {}) => {
     if (!newProject) return
     const { skipHistory = false } = options
@@ -359,7 +357,7 @@ export function useEditorCore({ store, addToast, t, confirm }) {
           } catch (e) {}
         }
 
-        // ✅ FIX S3c : migration depuis l'ancien format singulier
+        // Migration depuis l'ancien format singulier
         if (!editorProject) {
           try {
             const oldFormat = await window.electronAPI.storeGet?.('editorProject')
@@ -374,9 +372,9 @@ export function useEditorCore({ store, addToast, t, confirm }) {
         if (editorProject) {
           await loadProject(editorProject)
         } else {
-          // ✅ FIX S3c : créer un nouveau projet en local
+          // ✅ FIX D10 : UUID canonique
           const newProject = {
-            id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            id: uuid('project'),
             name: 'Nouveau projet',
             tracks: [],
             markers: [],
@@ -393,8 +391,9 @@ export function useEditorCore({ store, addToast, t, confirm }) {
         }
       } catch (e) {
         console.error('❌ Erreur initialisation:', e)
+        // ✅ FIX D10 : UUID canonique
         const fallbackProject = {
-          id: `project-${Date.now()}`,
+          id: uuid('project'),
           name: 'Nouveau projet',
           tracks: [],
           markers: [],
@@ -446,7 +445,7 @@ export function useEditorCore({ store, addToast, t, confirm }) {
 
     // Refs
     projectRef, storeRef, clipDurationsRef, loopStateRef, totalDurationRef,
-    autoCrossfadeRef, actionOverlayRef, addToastRef, tRef, idCounterRef,
+    autoCrossfadeRef, actionOverlayRef, addToastRef, tRef,
     currentTimeRef, isPlayingRef, isPausedRef, selectedClipIdRef,
     stopAtTimeRef, soloPlayClipIdRef, masterGainRef,
 

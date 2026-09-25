@@ -9,6 +9,7 @@ import {
   DEFAULT_ICONS,
 } from '@shared/constants/navigation'
 import { buildFileUrl } from '@shared/utils/fileUrl'
+import { CORE_PAGES } from '@shared/constants/pages'
 
 // Map des labels par défaut pour les éléments (traductions)
 const getDefaultLabels = (t) => ({
@@ -284,78 +285,13 @@ const Sidebar = memo(
     }
 
     const allPages = useMemo(() => {
-      const corePages = [
-        {
-          id: 'home',
-          label: t('mySounds'),
-          icon: 'ti-home',
-          group: 'navigation',
-          isCore: true,
-        },
-        {
-          id: 'discover',
-          label: t('discover'),
-          icon: 'ti-compass',
-          group: 'navigation',
-          isCore: true,
-        },
-        {
-          id: 'trimmer',
-          label: t('trimmer'),
-          icon: 'ti-cut',
-          group: 'navigation',
-          isCore: true,
-        },
-        {
-          id: 'editor',
-          label: t('editor'),
-          icon: 'ti-wand',
-          group: 'navigation',
-          isCore: true,
-        },
-        {
-          id: 'sequencer',
-          label: t('sequencer'),
-          icon: 'ti-playlist',
-          group: 'navigation',
-          isCore: true,
-        },
-        {
-          id: 'youtube',
-          label: t('youtube'),
-          icon: 'ti-brand-youtube',
-          group: 'navigation',
-          isCore: true,
-        },
-        {
-          id: 'stats',
-          label: t('stats'),
-          icon: 'ti-chart-bar',
-          group: 'navigation',
-          isCore: true,
-        },
-        {
-          id: 'emoji',
-          label: t('emojiPageTitle'),
-          icon: 'ti-mood-smile',
-          group: 'navigation',
-          isCore: true,
-        },
-        {
-          id: 'guide',
-          label: t('guide'),
-          icon: 'ti-book',
-          group: 'footer',
-          isCore: true,
-        },
-        {
-          id: 'options',
-          label: t('options'),
-          icon: 'ti-settings',
-          group: 'footer',
-          isCore: true,
-        },
-      ]
+      const corePages = CORE_PAGES.map((p) => ({
+        id: p.id,
+        label: t(p.labelKey),
+        icon: p.icon,
+        group: p.group,
+        isCore: true,
+      }))
 
       const pluginPagesFormatted = (pluginPages || [])
         .filter((p) => p.visible !== false && p.sidebarVisible !== false)

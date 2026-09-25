@@ -1,6 +1,6 @@
 // src/core/store/hooks/useProfiles.js
 import { useState, useCallback } from 'react'
-import { v4 as uuidv4 } from 'uuid'
+import { uuid } from '@shared/utils/uuid'
 
 const ALL_PROFILE_NAME_KEY = 'allSounds'
 const ALL_PROFILE_FALLBACK_NAME = 'Tous les sons'
@@ -10,7 +10,7 @@ export function useProfiles(initialProfiles = [], initialCurrentId = 'all', save
   const [currentProfileId, setCurrentProfileId] = useState(initialCurrentId)
 
   const createProfile = useCallback(async (name) => {
-    const newProfile = { id: uuidv4(), name, isDefault: false }
+    const newProfile = { id: uuid(), name, isDefault: false }
     const updated = [...profiles, newProfile]
     setProfiles(updated)
     const userProfiles = updated.filter(p => p.id !== 'all')

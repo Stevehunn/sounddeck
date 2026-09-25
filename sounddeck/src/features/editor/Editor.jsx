@@ -23,6 +23,7 @@ import useConfirm from '@shared/hooks/useConfirm'
 import useProjectManager from './hooks/useProjectManager'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 import { getBoolean, getNumber, setItem } from '@shared/utils/appStorage'
+import { uuid } from '@shared/utils/uuid'
 
 const __DEBUG__ = typeof import.meta !== 'undefined' && import.meta.env?.DEV
 const log = __DEBUG__ ? console.log.bind(console) : () => {}
@@ -98,7 +99,7 @@ function EditorContent() {
           className="btn-primary btn-sm"
           onClick={() => {
             const newProject = {
-              id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              id: uuid('project'),
               name: 'Nouveau projet',
               tracks: [],
               markers: [],
@@ -699,10 +700,7 @@ function EditorTimelineContent() {
       return
     }
 
-    const clipId =
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? `clip-${crypto.randomUUID().slice(0, 8)}`
-        : `clip-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    const clipId = uuid('clip')
 
     const newClip = {
       id: clipId,
@@ -718,7 +716,7 @@ function EditorTimelineContent() {
           typeof crypto !== 'undefined' && crypto.randomUUID
             ? `effect-${crypto.randomUUID().slice(0, 8)}`
             : `effect-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-        return { ...e, id: effId }
+        return { ...e, id: uuid('effect'), }
       }),
       fadeIn: clip.fadeIn || 0,
       fadeOut: clip.fadeOut || 0,

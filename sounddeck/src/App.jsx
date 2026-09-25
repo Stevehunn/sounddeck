@@ -18,14 +18,12 @@ import Tutorial from '@shared/components/ui/Tutorial'
 import HelpButton from '@shared/components/ui/HelpButton'
 import EmojiPage from '@features/emoji/EmojiPage'
 import { getItem, setItem } from '@shared/utils/appStorage'
-
 import { playSound, stopAllSounds, setStoreRef } from '@core/services/AudioService'
 import { warmupAudioContext } from '@core/services/AudioMixerService'
-
 import { PluginProvider, usePlugins } from '@core/plugins/PluginContext'
 import { usePluginPage } from '@core/plugins/hooks/usePluginPage'
-
 import { NetworkProvider } from '@shared/contexts'
+import { uuid } from '@shared/utils/uuid'
 
 function PageWrapper({ children, pageId, onHelpClick }) {
   const showHelp = pageId !== 'guide'
@@ -419,9 +417,7 @@ function AppContent({ store }) {
   }, [store.mixerEnabled, t])
 
   const addToast = useCallback((message, type = 'info') => {
-    const id = crypto.randomUUID
-      ? crypto.randomUUID()
-      : Date.now() + '_' + Math.random()
+    const id = uuid()
     setToasts((prev) => [...prev, { id, message, type }])
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000)
   }, [])

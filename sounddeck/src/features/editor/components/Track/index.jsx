@@ -2,17 +2,7 @@
 
 import React, { useMemo, useCallback } from 'react'
 import EditorClip from '../Clip'
-
-const TRACK_COLORS = [
-  'hsl(220, 70%, 55%)',
-  'hsl(340, 70%, 55%)',
-  'hsl(40, 70%, 55%)',
-  'hsl(160, 70%, 55%)',
-  'hsl(280, 70%, 55%)',
-  'hsl(10, 70%, 55%)',
-  'hsl(190, 70%, 55%)',
-  'hsl(70, 70%, 55%)',
-]
+import { TRACK_COLORS, getTrackColor } from '../../utils/trackColors'
 
 const EditorTrack = ({
   track,
@@ -44,9 +34,8 @@ const EditorTrack = ({
   onPasteClip,
   loopState = {},
 }) => {
-  // ✅ Couleur stable (pas recalculée à chaque render)
   const color = useMemo(
-    () => trackColor || TRACK_COLORS[trackIndex % TRACK_COLORS.length],
+    () => trackColor || getTrackColor(trackIndex),
     [trackColor, trackIndex]
   )
 

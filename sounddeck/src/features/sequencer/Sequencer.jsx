@@ -14,6 +14,7 @@ import {
 import useConfirm from '@shared/hooks/useConfirm'
 import { formatTime } from '@shared/utils/format'
 import { buildFileUrl } from '@shared/utils/fileUrl'
+import { uuid } from '@shared/utils/uuid'
 
 export default function Sequencer({ store, addToast, lang = 'fr' }) {
   const { t, currentLang } = useLanguage()
@@ -63,7 +64,7 @@ export default function Sequencer({ store, addToast, lang = 'fr' }) {
   const createPlaylist = async () => {
     if (!newPlaylistName.trim()) return
     const playlist = {
-      id: crypto.randomUUID(),
+      id: uuid(),
       name: newPlaylistName.trim(),
       items: [],
       createdAt: Date.now()
@@ -531,7 +532,7 @@ function PlaylistEditor({ playlist, sounds, audioDevice, volume, onUpdate, onSav
 
   const addSounds = (soundIds) => {
     const newItems = soundIds.map(id => ({
-      id: crypto.randomUUID(),
+      id: uuid(),      
       soundId: id,
       delay: 0
     }))

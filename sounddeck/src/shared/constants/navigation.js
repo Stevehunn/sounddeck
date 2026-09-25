@@ -1,56 +1,33 @@
 // src/shared/constants/navigation.js
+// ⚠️ DÉPRÉCIÉ — conservé pour compat. Utiliser `pages.js` directement.
+import { CORE_PAGES, CORE_PAGE_IDS, CORE_PAGES_MAP, DEFAULT_ITEM_ORDER } from './pages'
 
 /**
- * Éléments de navigation par défaut
- * Source de vérité unique pour Sidebar, SidebarEditor et PluginManager
+ * Map rétro-compat : { [id]: { icon, group } }
+ * @deprecated Utiliser CORE_PAGES_MAP
  */
-export const NAV_ITEMS = {
-  home: { icon: 'ti-home', group: 'navigation' },
-  discover: { icon: 'ti-compass', group: 'navigation' },
-  trimmer: { icon: 'ti-cut', group: 'navigation' },
-  editor: { icon: 'ti-wand', group: 'navigation' },
-  sequencer: { icon: 'ti-playlist', group: 'navigation' },
-  youtube: { icon: 'ti-brand-youtube', group: 'navigation' },
-  stats: { icon: 'ti-chart-bar', group: 'navigation' },
-  emoji: { icon: 'ti-mood-smile', group: 'navigation' },
+export const NAV_ITEMS = Object.fromEntries(
+  CORE_PAGES.map((p) => [p.id, { icon: p.icon, group: p.group }])
+)
 
-  loop: { icon: 'ti-repeat', group: 'actions' },
-  shortcuts: { icon: 'ti-keyboard', group: 'actions' },
-  presentation: { icon: 'ti-layout-grid', group: 'actions' },
+/** @deprecated Utiliser `canHide` dans CORE_PAGES */
+export const ACTION_IDS = CORE_PAGES
+  .filter((p) => p.canHide === false)
+  .map((p) => p.id)
 
-  guide: { icon: 'ti-book', group: 'footer' },
-  options: { icon: 'ti-settings', group: 'footer' },
-}
-
-/**
- * IDs qui ne peuvent pas être masqués ni réordonnés librement
- */
-export const ACTION_IDS = ['loop', 'shortcuts', 'presentation']
-
-/**
- * Ordre par défaut des sections de la sidebar
- */
 export const DEFAULT_SECTION_ORDER = [
-  'pinned',
-  'profiles',
-  'navigation',
-  'actions',
-  'footer',
+  'pinned', 'profiles', 'navigation', 'actions', 'footer',
 ]
 
-/**
- * Map dérivée : id → icône
- */
 export const DEFAULT_ICONS = Object.fromEntries(
-  Object.entries(NAV_ITEMS).map(([id, item]) => [id, item.icon])
+  CORE_PAGES.map((p) => [p.id, p.icon])
 )
 
-/**
- * Map dérivée : id → groupe
- */
 export const DEFAULT_GROUPS = Object.fromEntries(
-  Object.entries(NAV_ITEMS).map(([id, item]) => [id, item.group])
+  CORE_PAGES.map((p) => [p.id, p.group])
 )
+
+export { CORE_PAGES, CORE_PAGE_IDS, CORE_PAGES_MAP, DEFAULT_ITEM_ORDER }
 
 export default {
   NAV_ITEMS,
@@ -58,4 +35,8 @@ export default {
   DEFAULT_SECTION_ORDER,
   DEFAULT_ICONS,
   DEFAULT_GROUPS,
+  CORE_PAGES,
+  CORE_PAGE_IDS,
+  CORE_PAGES_MAP,
+  DEFAULT_ITEM_ORDER,
 }

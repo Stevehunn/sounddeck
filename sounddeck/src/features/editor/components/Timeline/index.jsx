@@ -16,6 +16,7 @@ import { useTimelineClickHandlers } from './useTimelineClickHandlers'
 import { useClipIndex } from './useClipIndex'
 import { formatTime } from '@shared/utils/format'
 import { getBoolean, setItem } from '@shared/utils/appStorage'
+import { getTrackColor } from '../../utils/trackColors'
 
 const TRACK_HEAD_WIDTH = 200
 const BASE_PIXELS_PER_SECOND = 80
@@ -190,15 +191,6 @@ export default function EditorTimeline({
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
   }, [zoomLevel, onZoomChange, scroll.clipsContainerRef])
-
-  const getTrackColor = (index) => {
-    const colors = [
-      'hsl(220, 70%, 55%)', 'hsl(340, 70%, 55%)', 'hsl(40, 70%, 55%)',
-      'hsl(160, 70%, 55%)', 'hsl(280, 70%, 55%)', 'hsl(10, 70%, 55%)',
-      'hsl(190, 70%, 55%)', 'hsl(70, 70%, 55%)',
-    ]
-    return colors[index % colors.length]
-  }
 
   const shouldShowPanel = isInitialized && showMarkersPanel && onAddMarker
 
