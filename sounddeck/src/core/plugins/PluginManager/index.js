@@ -28,6 +28,7 @@ export class PluginManager {
       onPluginUnload: [],
     }
     this._initialized = false
+    this._initPromise = null
     this._loadingPlugins = new Set()
     this.store = null
 
@@ -49,45 +50,52 @@ export class PluginManager {
     return this._disabled.list()
   }
 
-  // ─── INIT ────────────────────────────────────────────────────────────
+  // ─── INIT (idempotent, safe pour React StrictMode) ────────────────────
   async initialize(store) {
     if (this._initialized) return
-    this.store = store
 
-    try {
-      await this._disabled.ensureLoaded()
+    if (this._initPromise) return this._initPromise
 
-      // 1. Plugins intégrés — skip si désactivés
-      for (const [pluginId, loader] of INTEGRATED_PLUGINS) {
-        if (this._disabled.has(pluginId)) {
-          logInfo('PluginManager', `Plugin intégré ${pluginId} désactivé`)
-          continue
+    this._initPromise = (async () => {
+      this.store = store
+
+      try {
+        await this._disabled.ensureLoaded()
+
+        // 1. Plugins intégrés — skip si désactivés
+        for (const [pluginId, loader] of INTEGRATED_PLUGINS) {
+          if (this._disabled.has(pluginId)) {
+            logInfo('PluginManager', `Plugin intégré ${pluginId} désactivé`)
+            continue
+          }
+          await this.loadPlugin({
+            id: pluginId,
+            enabled: true,
+            _integrated: true,
+            _loader: loader,
+          })
         }
-        await this.loadPlugin({
-          id: pluginId,
-          enabled: true,
-          _integrated: true,
-          _loader: loader,
-        })
+
+        // 2. Plugins externes
+        const installedPlugins =
+          (await window.electronAPI?.getInstalledPlugins?.()) || []
+
+        for (const pluginInfo of installedPlugins) {
+          if (pluginInfo.enabled === false) continue
+          if (INTEGRATED_PLUGIN_IDS.has(pluginInfo.id)) continue
+          if (this._disabled.has(pluginInfo.id)) continue
+          await this.loadPlugin(pluginInfo)
+        }
+
+        this._initialized = true
+        this.runHook('onAppStart', store)
+      } catch (e) {
+        logError('PluginManager', 'Erreur initialisation', e)
+        this._initialized = true
       }
+    })()
 
-      // 2. Plugins externes
-      const installedPlugins =
-        (await window.electronAPI?.getInstalledPlugins?.()) || []
-
-      for (const pluginInfo of installedPlugins) {
-        if (pluginInfo.enabled === false) continue
-        if (INTEGRATED_PLUGIN_IDS.has(pluginInfo.id)) continue
-        if (this._disabled.has(pluginInfo.id)) continue
-        await this.loadPlugin(pluginInfo)
-      }
-
-      this._initialized = true
-      this.runHook('onAppStart', store)
-    } catch (e) {
-      logError('PluginManager', 'Erreur initialisation', e)
-      this._initialized = true
-    }
+    return this._initPromise
   }
 
   // ─── LOAD PLUGIN ─────────────────────────────────────────────────────
@@ -132,7 +140,7 @@ export class PluginManager {
       this.runHook('onPluginLoad', plugin)
       this.invalidatePagesCache()
 
-      this._loadingPlugins.delete(plugin.id)
+      this._loadingPlugins.delete(pluginInfo.id)
       return true
     } catch (e) {
       logError('PluginManager', `Chargement plugin ${pluginInfo.id}`, e)

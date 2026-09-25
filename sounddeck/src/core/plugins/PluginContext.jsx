@@ -1,6 +1,6 @@
 // src/core/plugins/PluginContext.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { pluginManager } from './PluginManager'
+import { pluginManager } from './PluginManager/index.js'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
 const PluginContext = createContext(null)
