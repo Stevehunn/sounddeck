@@ -318,17 +318,37 @@ export default function EditorToolbar({
         </button>
 
         <button
+          data-testid="editor-crossfade-toggle-button"
           className={
             autoCrossfade ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'
           }
           onClick={onToggleCrossfade}
-          style={{ fontSize: 10, padding: '2px 8px', minHeight: 24 }}
+          style={{
+            minHeight: 28,
+            padding: '2px 10px',
+            borderRadius: 'var(--radius-sm)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            fontSize: 11,
+          }}
           title={tr('editorAutoCrossfade') || 'Crossfade automatique'}
         >
           <i className="ti ti-transition-right" />
-          {autoCrossfade
-            ? tr('crossfadeOn') || 'Crossfade ON'
-            : tr('crossfadeOff') || 'Crossfade OFF'}
+          <span>{tr('editorCrossfadeShort') || 'Crossfade'}</span>
+          <span
+            style={{
+              fontSize: 8,
+              padding: '1px 6px',
+              borderRadius: 10,
+              background: autoCrossfade
+                ? 'rgba(255,255,255,0.2)'
+                : 'var(--bg-tertiary)',
+              color: autoCrossfade ? 'white' : 'var(--text-tertiary)',
+            }}
+          >
+            {autoCrossfade ? 'ON' : 'OFF'}
+          </span>
         </button>
 
         <span

@@ -1,5 +1,5 @@
 // src/features/editor/components/Timeline/index.jsx
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useEditor } from '../../contexts/EditorContext'
 import EditorTrack from '../Track'
 import TrackHeader from '../Track/TrackHeader'
@@ -14,9 +14,9 @@ import TimelineMarkersPanel from './TimelineMarkersPanel'
 import { useTimelineScroll } from './useTimelineScroll'
 import { useTimelineClickHandlers } from './useTimelineClickHandlers'
 import { useClipIndex } from './useClipIndex'
+import { getTrackColor } from '../../utils/trackColors'
 import { formatTime } from '@shared/utils/format'
 import { getBoolean, setItem } from '@shared/utils/appStorage'
-import { getTrackColor } from '../../utils/trackColors'
 
 const TRACK_HEAD_WIDTH = 200
 const BASE_PIXELS_PER_SECOND = 80
@@ -101,6 +101,26 @@ export default function EditorTimeline({
 
   const pixelsPerSecond = BASE_PIXELS_PER_SECOND * zoomLevel
   const totalWidth = Math.max(totalDuration * pixelsPerSecond + 100, 600)
+
+  // Contexte de snap partagé par tous les clips (bords clips, marqueurs, playhead, timeline)
+  const snapContext = useMemo(() => {
+    const allClips = []
+    for (const track of tracks || []) {
+      for (const clip of track.clips || []) {
+        allClips.push({
+          id: clip.id,
+          start: clip.start || 0,
+          duration: clipDurations?.[clip.id] || clip.duration || 3,
+        })
+      }
+    }
+    return {
+      allClips,
+      markers: markers || [],
+      playhead: currentTime,
+      totalDuration,
+    }
+  }, [tracks, clipDurations, markers, currentTime, totalDuration])
 
   // Click handlers (ruler + timeline)
   const {
@@ -516,6 +536,7 @@ export default function EditorTimeline({
                   onUpdateClipDuration={onUpdateClipDuration}
                   trackColor={trackColor}
                   snapEnabled={snapEnabled}
+                  snapContext={snapContext}
                   tr={tr}
                   onPlayClip={onPlayClip}
                   onStopClip={onStopClip}

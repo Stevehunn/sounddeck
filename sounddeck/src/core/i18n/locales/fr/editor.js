@@ -39,8 +39,8 @@ export default {
   editorResetSelection: 'Réinitialiser la sélection',
   editorAuto: ' Auto',
   editorManual: ' Manuel',
-  editorCrossfadeOn: ' Crossfade ON',
-  editorCrossfadeOff: ' Crossfade OFF',
+  editorCrossfadeOn: ' Fondu enchaîné ON',
+  editorCrossfadeOff: ' Fondu enchaîné OFF',
   editorTrim: 'Rogner',
   editorNormalize: 'Normaliser',
   editorEffectsActive: 'actif(s)',
@@ -118,8 +118,9 @@ export default {
   editorClipboardExpired: 'Presse-papiers expiré',
   editorPasted: 'collé(s)',
   editorClipMoved: 'Clip déplacé',
-  editorAutoCrossfade: 'Crossfade automatique',
-  editorCrossfadeActive: 'Crossfade actif',
+  editorAutoCrossfade: 'Fondu enchaîné automatique',
+  editorCrossfadeShort: 'Fondu enchaîné',
+  editorCrossfadeActive: 'Fondu enchaîné actif',
   exportLocation: 'Emplacement d\'export',
   exportLocationDefault: '📁 Dossier par défaut (SoundDeck/exports)',
   exportLocationCustom: '📁 Dossier personnalisé',
@@ -448,8 +449,8 @@ export default {
   adjust: 'Ajuster',
 
   // ─── CROSSFADE ────────────────────────────────────────────────────────
-  crossfadeOn: 'Crossfade ON',
-  crossfadeOff: 'Crossfade OFF',
+  crossfadeOn: 'Fondu enchaîné ON',
+  crossfadeOff: 'Fondu enchaîné OFF',
 
   // ─── TUTORIAL ─────────────────────────────────────────────────────────
   tutorialRestart: 'Revoir le tutoriel',

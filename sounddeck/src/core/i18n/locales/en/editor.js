@@ -119,6 +119,7 @@ export default {
   editorPasted: 'pasted',
   editorClipMoved: 'Clip moved',
   editorAutoCrossfade: 'Auto crossfade',
+  editorCrossfadeShort: 'Crossfade',
   editorCrossfadeActive: 'Crossfade active',
   exportLocation: 'Export location',
   exportLocationDefault: '📁 Default folder (SoundDeck/exports)',

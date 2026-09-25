@@ -1,6 +1,5 @@
 // src/features/editor/components/Track/index.jsx
-
-import React, { useMemo, useCallback } from 'react'
+import React, { useMemo } from 'react'
 import EditorClip from '../Clip'
 import { TRACK_COLORS, getTrackColor } from '../../utils/trackColors'
 
@@ -26,6 +25,7 @@ const EditorTrack = ({
   onUpdateClipDuration,
   trackColor,
   snapEnabled,
+  snapContext,
   tr,
   onPlayClip,
   onStopClip,
@@ -35,37 +35,49 @@ const EditorTrack = ({
   loopState = {},
 }) => {
   const color = useMemo(
-    () => trackColor || TRACK_COLORS[trackIndex % TRACK_COLORS.length],
+    () => trackColor || getTrackColor(trackIndex),
     [trackColor, trackIndex]
   )
 
-  // Handlers stables (regroupés dans un objet, mémoïsé)
-  const handlers = useMemo(() => ({
-    onSelect: (clipId) => onClipSelect?.(clipId, track.id),
-    onMove: (clipId, newStart, newTrackId, options) =>
-      onClipMove?.(track.id, clipId, newStart, newTrackId, options),
-    onUpdate: (clipId, updates) => onClipUpdate?.(track.id, clipId, updates),
-    onRemove: (trackId, clipId) => onClipRemove?.(trackId, clipId),
-    onDuplicate: (clipId) => onClipDuplicate?.(clipId, track.id),
-    onFade: (clipId, edge, duration) =>
-      onClipFade?.(track.id, clipId, edge, duration),
-    onContextMenu: (e, clipId) => {
-      if (onClipContextMenu) {
-        onClipContextMenu(e, clipId, track.id)
-      }
-    },
-    onUpdateDuration: onUpdateClipDuration,
-    onPlayClip,
-    onStopClip,
-    onCopyClip,
-    onCutClip,
-    onPasteClip,
-  }), [
-    track.id,
-    onClipSelect, onClipMove, onClipUpdate, onClipRemove,
-    onClipDuplicate, onClipFade, onClipContextMenu, onUpdateClipDuration,
-    onPlayClip, onStopClip, onCopyClip, onCutClip, onPasteClip,
-  ])
+  const handlers = useMemo(
+    () => ({
+      onSelect: (clipId) => onClipSelect?.(clipId, track.id),
+      onMove: (clipId, newStart, newTrackId, options) =>
+        onClipMove?.(track.id, clipId, newStart, newTrackId, options),
+      onUpdate: (clipId, updates) => onClipUpdate?.(track.id, clipId, updates),
+      onRemove: (trackId, clipId) => onClipRemove?.(trackId, clipId),
+      onDuplicate: (clipId) => onClipDuplicate?.(clipId, track.id),
+      onFade: (clipId, edge, duration) =>
+        onClipFade?.(track.id, clipId, edge, duration),
+      onContextMenu: (e, clipId) => {
+        if (onClipContextMenu) {
+          onClipContextMenu(e, clipId, track.id)
+        }
+      },
+      onUpdateDuration: onUpdateClipDuration,
+      onPlayClip,
+      onStopClip,
+      onCopyClip,
+      onCutClip,
+      onPasteClip,
+    }),
+    [
+      track.id,
+      onClipSelect,
+      onClipMove,
+      onClipUpdate,
+      onClipRemove,
+      onClipDuplicate,
+      onClipFade,
+      onClipContextMenu,
+      onUpdateClipDuration,
+      onPlayClip,
+      onStopClip,
+      onCopyClip,
+      onCutClip,
+      onPasteClip,
+    ]
+  )
 
   return (
     <div
@@ -76,7 +88,9 @@ const EditorTrack = ({
         width: '100%',
         borderBottom: '1px solid var(--border)',
         background:
-          selectedTrackId === track.id ? 'rgba(124,111,247,0.05)' : 'transparent',
+          selectedTrackId === track.id
+            ? 'rgba(124,111,247,0.05)'
+            : 'transparent',
         userSelect: 'none',
         transition: 'background 0.15s',
       }}
@@ -110,6 +124,7 @@ const EditorTrack = ({
               waveformData: waveformData?.[clip.id],
               tr,
             }}
+            snapContext={snapContext}
           />
         )
       })}

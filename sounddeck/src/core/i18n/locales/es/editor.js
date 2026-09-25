@@ -39,8 +39,8 @@ export default {
   editorResetSelection: 'Restablecer selección',
   editorAuto: ' Auto',
   editorManual: ' Manual',
-  editorCrossfadeOn: ' Crossfade ON',
-  editorCrossfadeOff: ' Crossfade OFF',
+  editorCrossfadeOn: ' fundido cruzado ON',
+  editorCrossfadeOff: ' fundido cruzado OFF',
   editorTrim: 'Recortar',
   editorNormalize: 'Normalizar',
   editorEffectsActive: 'activos',
@@ -118,8 +118,9 @@ export default {
   editorClipboardExpired: 'Portapapeles caducado',
   editorPasted: 'pegado(s)',
   editorClipMoved: 'Clip movido',
-  editorAutoCrossfade: 'Crossfade automático',
-  editorCrossfadeActive: 'Crossfade activo',
+  editorAutoCrossfade: 'fundido cruzado automático',
+  editorCrossfadeShort: 'fundido cruzado',
+  editorCrossfadeActive: 'fundido cruzado activo',
   exportLocation: 'Ubicación de exportación',
   exportLocationDefault: '📁 Carpeta por defecto (SoundDeck/exports)',
   exportLocationCustom: '📁 Carpeta personalizada',
@@ -448,8 +449,8 @@ export default {
   adjust: 'Ajustar',
 
   // ─── CROSSFADE ──────────────────────────────────────────────────────
-  crossfadeOn: 'Crossfade ON',
-  crossfadeOff: 'Crossfade OFF',
+  crossfadeOn: 'fundido cruzado ON',
+  crossfadeOff: 'fundido cruzado OFF',
 
   // ─── TUTORIAL ────────────────────────────────────────────────────────
   tutorialRestart: 'Ver el tutorial de nuevo',

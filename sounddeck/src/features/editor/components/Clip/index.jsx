@@ -3,28 +3,17 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import ClipWaveform from './ClipWaveform'
 import ClipFadeHandles from './ClipFadeHandles'
 import ClipActions from './ClipActions'
+import { computeSnapTarget } from '../../utils/snapUtils'
 
 const DRAG_SENSITIVITY = 1.0
-const SNAP_VALUE = 0.01
 
-/**
- * EditorClip — un clip audio dans la timeline.
- *
- * Props regroupées en 4 objets :
- *  - clip      : { id, name, path, effects, fadeIn, fadeOut, ... }
- *  - layout    : { start, duration, pixelsPerSecond, totalDuration, snapEnabled }
- *  - state     : { isSelected, isPlaying, currentTime, loopState }
- *  - handlers  : { onSelect, onMove, onUpdate, onRemove, onDuplicate, onFade,
- *                  onContextMenu, onUpdateDuration, onPlayClip, onStopClip,
- *                  onCopyClip, onCutClip, onPasteClip }
- *  - ui        : { trackId, trackColor, waveformData, tr }
- */
 export default function EditorClip({
   clip,
   layout,
   state,
   handlers,
   ui,
+  snapContext,
 }) {
   const {
     start,
@@ -57,10 +46,10 @@ export default function EditorClip({
   const { trackId, trackColor, waveformData, tr } = ui
 
   const [isDragging, setIsDragging] = useState(false)
-  const [dragStartX, setDragStartX] = useState(0)
   const [isHovering, setIsHovering] = useState(false)
   const [isClipPlaying, setIsClipPlaying] = useState(false)
   const [localStart, setLocalStart] = useState(start)
+  const [snapGuide, setSnapGuide] = useState(null)
 
   const clipRef = useRef(null)
   const clipContainerRef = useRef(null)
@@ -91,7 +80,6 @@ export default function EditorClip({
 
   const totalCycles = clipLoopData?.totalCycles || 1
 
-  // Sync start externe → localStart
   useEffect(() => {
     dragStartTimeRef.current = start
     if (!isDragging && localStart !== start) {
@@ -99,7 +87,6 @@ export default function EditorClip({
     }
   }, [start, isDragging, localStart])
 
-  // Statut lecture
   useEffect(() => {
     setIsClipPlaying(
       isPlaying && currentTime >= start && currentTime <= start + duration
@@ -143,7 +130,6 @@ export default function EditorClip({
     dragStartClipId.current = clip.id
     setIsDragging(true)
     isDraggingRef.current = true
-    setDragStartX(e.clientX)
     lastClientXRef.current = e.clientX
     accumulatedDeltaRef.current = 0
     hasMovedRef.current = false
@@ -170,11 +156,37 @@ export default function EditorClip({
 
         const totalDeltaSeconds =
           (accumulatedDeltaRef.current / pixelsPerSecond) * DRAG_SENSITIVITY
-        let newStart = Math.max(0, dragStartTimeRef.current + totalDeltaSeconds)
 
-        if (snapEnabled) {
-          newStart = Math.round(newStart / SNAP_VALUE) * SNAP_VALUE
-          newStart = Math.round(newStart * 1000) / 1000
+        let newStart = Math.max(
+          0,
+          dragStartTimeRef.current + totalDeltaSeconds
+        )
+
+        // Alt enfoncé → désactive temporairement le snap
+        const snapActive = snapEnabled && !e.altKey
+
+        if (snapActive && snapContext) {
+          const result = computeSnapTarget({
+            proposedStart: newStart,
+            clipDuration: duration,
+            clipId: clip.id,
+            allClips: snapContext.allClips,
+            markers: snapContext.markers,
+            playhead: snapContext.playhead,
+            totalDuration: snapContext.totalDuration,
+            pixelsPerSecond,
+          })
+
+          newStart = result.start
+
+          // Guide visuel : ligne sur la cible si trouvée
+          if (result.snappedTo !== null) {
+            setSnapGuide(result.snappedTo)
+          } else {
+            setSnapGuide(null)
+          }
+        } else {
+          setSnapGuide(null)
         }
 
         if (Math.abs(accumulatedDeltaRef.current) > 1) {
@@ -185,7 +197,7 @@ export default function EditorClip({
         frameIdRef.current = null
       })
     },
-    [pixelsPerSecond, snapEnabled]
+    [pixelsPerSecond, snapEnabled, snapContext, duration, clip.id]
   )
 
   const handleMouseUp = useCallback(() => {
@@ -207,6 +219,7 @@ export default function EditorClip({
     dragStartClipId.current = null
     accumulatedDeltaRef.current = 0
     hasMovedRef.current = false
+    setSnapGuide(null)   
   }, [localStart, onMove])
 
   useEffect(() => {
@@ -479,6 +492,38 @@ export default function EditorClip({
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
+      {/* guide visuel de snap */}
+      {snapGuide !== null && (
+        <div
+          style={{
+            position: 'absolute',
+            top: -8,
+            bottom: -8,
+            left: snapGuide * pixelsPerSecond - clipLeft,
+            width: 2,
+            background: 'var(--warning)',
+            zIndex: 20,
+            pointerEvents: 'none',
+            boxShadow: '0 0 12px var(--warning), 0 0 4px var(--warning)',
+            transform: 'translateX(-1px)',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: -4,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 0,
+              height: 0,
+              borderLeft: '4px solid transparent',
+              borderRight: '4px solid transparent',
+              borderTop: '6px solid var(--warning)',
+            }}
+          />
+        </div>
+      )}
+
       {renderLoopOverlay}
 
       {isClipLooping && (
