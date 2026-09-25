@@ -1,5 +1,6 @@
 // src/core/store/hooks/useMixer.js
 import { useState, useCallback, useRef } from 'react'
+import { logWarn, logError } from '@shared/utils/logger'
 
 export function useMixer(save, storeValuesRef) {
   const [mixerEnabled, setMixerEnabled] = useState(false)
@@ -63,7 +64,7 @@ export function useMixer(save, storeValuesRef) {
             return { success: false, message: 'mixerActivationError' }
           }
         } catch (e) {
-          console.error('Erreur activation mixeur:', e)
+          logError('useMixer', 'Erreur activation mixeur', e)          
           setMixerEnabled(false)
           await save('mixerEnabled', false)
           return { success: false, message: 'error', error: e.message }
@@ -206,7 +207,7 @@ export function useMixer(save, storeValuesRef) {
       const { setMonitoring } = await import('@core/services/AudioMixerService')
       setMonitoring(newState)
     } catch (e) {
-      console.warn('Erreur mise à jour monitoring:', e)
+      logWarn('useMixer', 'Erreur mise à jour monitoring', e)    
     }
     return newState
   }, [monitoringEnabled, save])

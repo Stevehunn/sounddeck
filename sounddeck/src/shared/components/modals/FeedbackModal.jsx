@@ -1,6 +1,7 @@
 // src/shared/components/modals/FeedbackModal.jsx
 import { useState } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
+import { logError, logWarn } from '@shared/utils/logger'
 
 const FEEDBACK_TYPES = [
   { id: 'bug', labelKey: 'feedbackBug', icon: 'ti-bug' },
@@ -35,7 +36,7 @@ export default function FeedbackModal({ onClose, lang = 'fr', onSubmit, store })
         try {
           logs = await window.electronAPI.storeGet('errorLogs') || []
         } catch (e) {
-          console.warn('Impossible de récupérer les logs:', e)
+          logWarn('FeedbackModal', 'Impossible de récupérer les logs', e)
         }
       }
 
@@ -44,7 +45,7 @@ export default function FeedbackModal({ onClose, lang = 'fr', onSubmit, store })
         try {
           screenshot = await window.electronAPI.captureScreen()
         } catch (e) {
-          console.warn('Impossible de capturer l\'écran:', e)
+          logWarn('FeedbackModal', 'Impossible de capturer l\'écran', e)
         }
       }
 
@@ -80,7 +81,7 @@ export default function FeedbackModal({ onClose, lang = 'fr', onSubmit, store })
       }, 2000)
 
     } catch (e) {
-      console.error('Erreur envoi feedback:', e)
+      logError('FeedbackModal', 'Erreur envoi feedback', e)
       setError(t('feedbackError') + ': ' + e.message)
     } finally {
       setIsSubmitting(false)
@@ -89,7 +90,7 @@ export default function FeedbackModal({ onClose, lang = 'fr', onSubmit, store })
 
   const submitFeedback = async (feedback) => {
     if (import.meta.env.DEV) {
-      console.log('📤 Feedback envoyé:', feedback)
+      logInfo('FeedbackModal', '📤 Feedback envoyé', feedback)
     }
 
     await new Promise(resolve => setTimeout(resolve, 1000))

@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { usePlugins } from '@core/plugins/PluginContext'
+import { logWarn, logError } from '@shared/utils/logger'
 
 export function usePluginsManagement({ addToast }) {
   const { t } = useLanguage()
@@ -16,7 +17,7 @@ export function usePluginsManagement({ addToast }) {
       setPlugins(loaded)
       setDisabledPlugins(disabled)
     } catch (e) {
-      console.warn('Erreur chargement plugins:', e)
+      logWarn('usePluginsManagement', 'Erreur chargement plugins', e)
     }
   }, [pluginManager])
 
@@ -48,7 +49,7 @@ export function usePluginsManagement({ addToast }) {
           'info'
         )
       } catch (e) {
-        console.error('Erreur uninstall plugin:', e)
+        logError('usePluginsManagement', 'Erreur uninstall plugin', e)        
         addToast(t('pluginsUninstallError') + ': ' + e.message, 'error')
       }
     },

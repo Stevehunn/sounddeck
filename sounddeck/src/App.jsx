@@ -18,12 +18,17 @@ import Tutorial from '@shared/components/ui/Tutorial'
 import HelpButton from '@shared/components/ui/HelpButton'
 import EmojiPage from '@features/emoji/EmojiPage'
 import { getItem, setItem } from '@shared/utils/appStorage'
+import { uuid } from '@shared/utils/uuid'
+import { logWarn } from '@shared/utils/logger'
+import { useLatestRefs } from '@shared/hooks/useLatestRefs'
+
 import { playSound, stopAllSounds, setStoreRef } from '@core/services/AudioService'
 import { warmupAudioContext } from '@core/services/AudioMixerService'
+
 import { PluginProvider, usePlugins } from '@core/plugins/PluginContext'
 import { usePluginPage } from '@core/plugins/hooks/usePluginPage'
+
 import { NetworkProvider } from '@shared/contexts'
-import { uuid } from '@shared/utils/uuid'
 
 function PageWrapper({ children, pageId, onHelpClick }) {
   const showHelp = pageId !== 'guide'
@@ -56,19 +61,32 @@ function AppContent({ store }) {
     error: pluginError,
   } = usePluginPage(isPluginPage(currentPage) ? currentPage : null)
 
-  const soundsRef = useRef([])
-  const addToastRef = useRef(null)
-  const switchToNextProfileRef = useRef(null)
-  const toggleLoopRef = useRef(null)
-  const playLocallyRef = useRef(true)
-  const audioDeviceRef = useRef('default')
-  const volumeRef = useRef(80)
-  const setPresentationRef = useRef(null)
+  // ─── addToast (défini tôt pour être inclus dans useLatestRefs) ──────────
+  const addToast = useCallback((message, type = 'info') => {
+    const id = uuid()
+    setToasts((prev) => [...prev, { id, message, type }])
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000)
+  }, [])
+
+  // ─── Refs "latest" centralisées ────────────────────────────────────────
+  const refs = useLatestRefs({
+    sounds: store.sounds,
+    switchToNextProfile: store.switchToNextProfile,
+    toggleLoop: store.toggleLoop,
+    playLocally: store.playLocally,
+    audioDevice: store.audioDevice,
+    volume: store.volume,
+    setPresentation: setPresentationMode,
+    loopEnabled: store.loopEnabled,
+    addToast,
+  })
+
+  // ─── Refs mutables (ne suivent PAS une valeur) ──────────────────────────
   const isQuittingRef = useRef(false)
   const isPopupBlockedRef = useRef(false)
   const blockTimerRef = useRef(null)
-  const loopEnabledRef = useRef(false)
 
+  // ─── Init AudioService ──────────────────────────────────────────────────
   useEffect(() => {
     setStoreRef(store)
   }, [store])
@@ -81,32 +99,7 @@ function AppContent({ store }) {
     return () => clearTimeout(timer)
   }, [store.loading])
 
-  useEffect(() => {
-    soundsRef.current = store.sounds
-  }, [store.sounds])
-  useEffect(() => {
-    switchToNextProfileRef.current = store.switchToNextProfile
-  }, [store.switchToNextProfile])
-  useEffect(() => {
-    toggleLoopRef.current = store.toggleLoop
-  }, [store.toggleLoop])
-  useEffect(() => {
-    playLocallyRef.current = store.playLocally
-  }, [store.playLocally])
-  useEffect(() => {
-    audioDeviceRef.current = store.audioDevice
-  }, [store.audioDevice])
-  useEffect(() => {
-    volumeRef.current = store.volume
-  }, [store.volume])
-  useEffect(() => {
-    setPresentationRef.current = setPresentationMode
-  }, [setPresentationMode])
-
-  useEffect(() => {
-    loopEnabledRef.current = store.loopEnabled
-  }, [store.loopEnabled])
-
+  // ─── Tutoriel global ────────────────────────────────────────────────────
   const openTutorial = useCallback((pageId) => {
     setTutorialPageId(pageId)
     setShowTutorial(true)
@@ -119,7 +112,7 @@ function AppContent({ store }) {
     }
   }, [openTutorial])
 
-  // navigation programmatique (pour les pages/plugins)
+  // ─── Navigation programmatique (pour les pages/plugins) ─────────────────
   useEffect(() => {
     window.__navigateTo = setCurrentPage
     return () => {
@@ -127,6 +120,7 @@ function AppContent({ store }) {
     }
   }, [])
 
+  // ─── Check first launch ─────────────────────────────────────────────────
   useEffect(() => {
     const checkFirstLaunch = async () => {
       try {
@@ -141,13 +135,14 @@ function AppContent({ store }) {
           setTimeout(() => setShowTutorial(true), 500)
         }
       } catch (e) {
-        console.warn('⚠️ Erreur vérification premier lancement:', e)
+        logWarn('App', 'Erreur vérification premier lancement', e)
         setIsFirstLaunch(false)
       }
     }
     checkFirstLaunch()
   }, [])
 
+  // ─── Redirection pages plugin si plugins pas chargés ────────────────────
   useEffect(() => {
     if (store.loading) return
     if (isFirstLaunch === true) return
@@ -160,7 +155,7 @@ function AppContent({ store }) {
     }
   }, [currentPage, isPluginPage, pluginsLoaded, store.loading, isFirstLaunch])
 
-  // Molette pour changer de profil
+  // ─── Molette pour changer de profil ─────────────────────────────────────
   useEffect(() => {
     const handleWheel = (e) => {
       const target = e.target
@@ -187,7 +182,7 @@ function AppContent({ store }) {
     return () => window.removeEventListener('wheel', handleWheel)
   }, [store.currentProfileId, store.profiles])
 
-  // Popup de fermeture
+  // ─── Popup de fermeture ─────────────────────────────────────────────────
   useEffect(() => {
     const blockPopup = () => {
       isPopupBlockedRef.current = true
@@ -223,16 +218,17 @@ function AppContent({ store }) {
     }
   }, [])
 
+  // ─── Persist theme ──────────────────────────────────────────────────────
   useEffect(() => {
     if (store.loading) return
     if (!store.theme) return
 
     window.electronAPI.storeSet('theme', store.theme).catch((e) => {
-      console.warn('⚠️ Erreur persist theme:', e)
+      logWarn('App', 'Erreur persist theme', e)
     })
   }, [store.theme, store.loading])
 
-  // Appliquer thème
+  // ─── Appliquer thème ────────────────────────────────────────────────────
   useEffect(() => {
     if (store.loading) return
 
@@ -298,14 +294,14 @@ function AppContent({ store }) {
     }
   }, [store.theme, store.customTheme, store.loading])
 
-  // Tray language
+  // ─── Tray language ──────────────────────────────────────────────────────
   useEffect(() => {
     if (window.electronAPI?.updateTrayLanguage) {
       window.electronAPI.updateTrayLanguage(currentLang)
     }
   }, [currentLang])
 
-  // Init mixer
+  // ─── Init mixer ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (store.loading) return
     if (mixerInitialized) return
@@ -315,7 +311,7 @@ function AppContent({ store }) {
         await new Promise((resolve) => setTimeout(resolve, 500))
         const success = await store.initMixerOnStartup()
         setMixerInitialized(true)
-        if (!success) console.warn('⚠️ Échec init mixeur')
+        if (!success) logWarn('App', 'Échec init mixeur')
       } else {
         setMixerInitialized(true)
       }
@@ -328,7 +324,7 @@ function AppContent({ store }) {
     mixerInitialized,
   ])
 
-  // Vérif mixer quand langue change
+  // ─── Vérif mixer quand langue change ────────────────────────────────────
   useEffect(() => {
     if (!store.loading && store.mixerEnabled && mixerInitialized) {
       const checkMixer = async () => {
@@ -338,14 +334,14 @@ function AppContent({ store }) {
           )
           if (!isMixerOperational()) repairMixer()
         } catch (e) {
-          console.warn('Erreur vérification mixeur:', e)
+          logWarn('App', 'Erreur vérification mixeur', e)
         }
       }
       checkMixer()
     }
   }, [currentLang, store.loading, store.mixerEnabled, mixerInitialized])
 
-  // Vérif micro
+  // ─── Vérif micro ────────────────────────────────────────────────────────
   useEffect(() => {
     if (store.loading) return
 
@@ -359,52 +355,52 @@ function AppContent({ store }) {
           )
           if (!deviceExists) await store.updateMicrophoneDeviceId('default')
         } catch (e) {
-          console.warn('⚠️ Erreur vérif micro:', e)
+          logWarn('App', 'Erreur vérif micro', e)
         }
       }
     }
     checkMicrophoneDevice()
   }, [store.loading, store.microphoneDevice])
 
-  // IPC listeners
+  // ─── IPC listeners ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!window.electronAPI) return
 
     window.electronAPI.onPlaySound((soundId) => {
-      const sound = soundsRef.current.find((s) => s.id === soundId)
+      const sound = refs.sounds.current.find((s) => s.id === soundId)
       if (sound) {
         playSound(
           sound,
-          audioDeviceRef.current,
-          volumeRef.current,
+          refs.audioDevice.current,
+          refs.volume.current,
           false,
-          playLocallyRef.current
+          refs.playLocally.current
         )
       }
     })
 
     window.electronAPI.onSwitchProfile(async () => {
-      if (switchToNextProfileRef.current) {
-        await switchToNextProfileRef.current()
-        addToastRef.current?.(t('toastProfileChanged'), 'info')
+      if (refs.switchToNextProfile.current) {
+        await refs.switchToNextProfile.current()
+        refs.addToast.current?.(t('toastProfileChanged'), 'info')
       }
     })
 
     window.electronAPI.onToggleLoop(async () => {
-      if (toggleLoopRef.current) toggleLoopRef.current()
-      addToastRef.current?.(
-        loopEnabledRef.current ? t('toastLoopOff') : t('toastLoopOn'),
+      if (refs.toggleLoop.current) refs.toggleLoop.current()
+      refs.addToast.current?.(
+        refs.loopEnabled.current ? t('toastLoopOff') : t('toastLoopOn'),
         'info'
       )
     })
 
     window.electronAPI.onStopAllSounds(() => {
       stopAllSounds()
-      addToastRef.current?.(t('toastAllStopped'), 'info')
+      refs.addToast.current?.(t('toastAllStopped'), 'info')
     })
 
     window.electronAPI.onTogglePresentation(() => {
-      setPresentationRef.current?.((prev) => !prev)
+      refs.setPresentation.current?.((prev) => !prev)
     })
 
     return () => {
@@ -416,16 +412,7 @@ function AppContent({ store }) {
     }
   }, [store.mixerEnabled, t])
 
-  const addToast = useCallback((message, type = 'info') => {
-    const id = uuid()
-    setToasts((prev) => [...prev, { id, message, type }])
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000)
-  }, [])
-
-  useEffect(() => {
-    addToastRef.current = addToast
-  }, [addToast])
-
+  // ─── Render page ────────────────────────────────────────────────────────
   const renderPage = useCallback(() => {
     if (currentPage === 'home') {
       return (
@@ -498,7 +485,7 @@ function AppContent({ store }) {
       )
     }
 
-    // ✅ NOUVEAU : route "emoji" (page "Mes emojis")
+    // Route "emoji" (page "Mes emojis")
     if (currentPage === 'emoji') {
       return (
         <PageWrapper pageId="emoji" onHelpClick={openTutorial}>
@@ -727,7 +714,6 @@ function AppContent({ store }) {
           onComplete={() => setShowTutorial(false)}
         />
       )}
-
     </div>
   )
 }

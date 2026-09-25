@@ -1,6 +1,7 @@
 // src/shared/components/modals/QuitConfirm.jsx
 import { useState } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
+import { logError } from '@shared/utils/logger'
 
 export default function QuitConfirm({ onClose, lang = 'fr' }) {
   const { t, currentLang } = useLanguage()
@@ -23,7 +24,7 @@ export default function QuitConfirm({ onClose, lang = 'fr' }) {
         onClose()
       }
     } catch (e) {
-      console.error('❌ Erreur lors de la confirmation:', e)
+      logError('QuitConfirm', 'Erreur lors de la confirmation', e)
       onClose()
     } finally {
       setProcessing(false)

@@ -11,6 +11,7 @@ import {
   deleteBackup,
 } from '@shared/utils/backupManager'
 import useConfirm from '@shared/hooks/useConfirm'
+import { logError } from '@shared/utils/logger'
 
 export default function BackupSettings({ store, addToast, lang = 'fr' }) {
   const { t, currentLang } = useLanguage()
@@ -28,7 +29,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
       withIndex.reverse()
       setBackups(withIndex)
     } catch (e) {
-      console.error('❌ [BackupSettings] Erreur loadBackups:', e)
+      logError('BackupSettings', 'Erreur loadBackups', e)
       setBackups([])
     }
   }
@@ -52,7 +53,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
         addToast(result.error || t('error'), 'error')
       }
     } catch (e) {
-      console.error('❌ [BackupSettings] Erreur backup:', e)
+      logError('BackupSettings', 'Erreur backup', e)   // ✅ CHANGÉ
       addToast(e.message, 'error')
     }
     setIsLoading(false)
@@ -76,7 +77,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
         addToast(result.error || t('error'), 'error')
       }
     } catch (e) {
-      console.error('❌ [BackupSettings] Erreur restore:', e)
+      logError('BackupSettings', 'Erreur restore', e)
       addToast(e.message, 'error')
     }
     setIsLoading(false)
@@ -93,7 +94,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
         addToast(result.error || t('error'), 'error')
       }
     } catch (e) {
-      console.error('❌ [BackupSettings] Erreur delete:', e)
+      logError('BackupSettings', 'Erreur delete', e)   // ✅ CHANGÉ
       addToast(e.message, 'error')
     }
   }
@@ -108,7 +109,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
         addToast(result.error || t('error'), 'error')
       }
     } catch (e) {
-      console.error('❌ [BackupSettings] Erreur export:', e)
+      logError('BackupSettings', 'Erreur export', e)   // ✅ CHANGÉ
       addToast(e.message, 'error')
     }
   }
@@ -130,7 +131,7 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
           addToast(result.error || t('error'), 'error')
         }
       } catch (err) {
-        console.error('❌ [BackupSettings] Erreur import:', err)
+        logError('BackupSettings', 'Erreur import', err)   // ✅ CHANGÉ
         addToast(err.message, 'error')
       }
     }
@@ -267,8 +268,6 @@ export default function BackupSettings({ store, addToast, lang = 'fr' }) {
             </div>
           ))}
         </div>
-
-  
       </div>
       <ConfirmWrapper />
     </>

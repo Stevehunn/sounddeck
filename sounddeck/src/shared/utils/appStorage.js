@@ -1,4 +1,6 @@
 // src/shared/utils/appStorage.js
+import { logWarn, logInfo } from './logger'
+
 const PREFIX = 'appStorage.'
 const MIGRATION_FLAG = 'sounddeck_appStorage_migrated'
 
@@ -8,7 +10,7 @@ async function readStore(key) {
   try {
     return await window.electronAPI?.storeGet?.(PREFIX + key)
   } catch (e) {
-    console.warn(`[appStorage] read error for ${key}:`, e)
+    logWarn('appStorage', `read error for ${key}`, e)
     return undefined
   }
 }
@@ -17,7 +19,7 @@ async function writeStore(key, value) {
   try {
     await window.electronAPI?.storeSet?.(PREFIX + key, value)
   } catch (e) {
-    console.warn(`[appStorage] write error for ${key}:`, e)
+    logWarn('appStorage', `write error for ${key}`, e)
   }
 }
 
@@ -25,14 +27,10 @@ async function deleteStore(key) {
   try {
     await window.electronAPI?.storeDelete?.(PREFIX + key)
   } catch (e) {
-    console.warn(`[appStorage] delete error for ${key}:`, e)
+    logWarn('appStorage', `delete error for ${key}`, e)
   }
 }
 
-/**
- * Migration one-shot : scan toutes les clés localStorage qui appartiennent
- * à SoundDeck (préfixe "sounddeck") et les migre vers electron-store.
- */
 async function migrateOnce() {
   if (migrationDone) return
   migrationDone = true
@@ -60,7 +58,6 @@ async function migrateOnce() {
         const raw = localStorage.getItem(key)
         if (raw === null) continue
 
-        // Stocke la valeur brute (string) dans electron-store
         await window.electronAPI?.storeSet?.(PREFIX + key, raw)
         localStorage.removeItem(key)
         migratedCount++
@@ -71,27 +68,21 @@ async function migrateOnce() {
 
     await window.electronAPI?.storeSet?.(MIGRATION_FLAG, true)
     if (migratedCount > 0) {
-      console.log(`[appStorage] ✅ Migré ${migratedCount} clé(s) localStorage`)
+      logInfo('appStorage', `✅ Migré ${migratedCount} clé(s) localStorage`)
     }
   } catch (e) {
-    console.warn('[appStorage] migration error:', e)
+    logWarn('appStorage', 'migration error', e)
   }
 }
 
-/**
- * getItem - Lit une valeur depuis electron-store.
- * Fallback transparent vers localStorage si la clé y existe encore.
- */
 export async function getItem(key) {
   await migrateOnce()
 
-  // 1. Lecture electron-store
   const value = await readStore(key)
   if (value !== undefined && value !== null) {
     return value
   }
 
-  // 2. Fallback localStorage (migration au cas par cas)
   try {
     const legacy = localStorage.getItem(key)
     if (legacy !== null) {
@@ -106,10 +97,6 @@ export async function getItem(key) {
   return null
 }
 
-/**
- * setItem - Écrit une valeur dans electron-store.
- * Les primitives sont stockées en string, les objets sont sérialisés JSON.
- */
 export async function setItem(key, value) {
   await migrateOnce()
 
@@ -127,9 +114,6 @@ export async function setItem(key, value) {
   await writeStore(key, toStore)
 }
 
-/**
- * removeItem - Supprime une clé.
- */
 export async function removeItem(key) {
   await migrateOnce()
   await deleteStore(key)
@@ -140,9 +124,6 @@ export async function removeItem(key) {
   }
 }
 
-/**
- * getBoolean - Helper qui parse "true"/"false"/undefined.
- */
 export async function getBoolean(key, defaultValue = false) {
   const raw = await getItem(key)
   if (raw === null || raw === undefined) return defaultValue
@@ -150,9 +131,6 @@ export async function getBoolean(key, defaultValue = false) {
   return String(raw) === 'true'
 }
 
-/**
- * getNumber - Helper qui parse en nombre.
- */
 export async function getNumber(key, defaultValue = 0) {
   const raw = await getItem(key)
   if (raw === null || raw === undefined) return defaultValue

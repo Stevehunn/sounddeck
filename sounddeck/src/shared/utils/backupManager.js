@@ -1,4 +1,5 @@
 // src/shared/utils/backupManager.js
+import { logWarn, logError } from './logger'
 
 let backupInterval = null
 let backupConfig = {
@@ -12,13 +13,10 @@ const STORE_KEY_BACKUPS = 'sounddeckBackups'
 const STORE_KEY_LAST_TIME = 'lastBackupTime'
 const LEGACY_LS_KEY = 'sounddeck-backups'
 
-// ─── STORAGE HELPERS ────────────────────────────────────────────────────────
-
 async function readBackups() {
   try {
     let data = await window.electronAPI?.storeGet?.(STORE_KEY_BACKUPS)
 
-    // Migration douce depuis localStorage (une seule fois)
     if (!Array.isArray(data)) {
       const legacy = localStorage.getItem(LEGACY_LS_KEY)
       if (legacy) {
@@ -37,7 +35,7 @@ async function readBackups() {
 
     return Array.isArray(data) ? data : []
   } catch (e) {
-    console.warn('⚠️ [backupManager] Erreur lecture backups:', e)
+    logWarn('backupManager', 'Erreur lecture backups', e)
     return []
   }
 }
@@ -46,11 +44,9 @@ async function writeBackups(list) {
   try {
     await window.electronAPI?.storeSet?.(STORE_KEY_BACKUPS, list)
   } catch (e) {
-    console.warn('⚠️ [backupManager] Erreur écriture backups:', e)
+    logWarn('backupManager', 'Erreur écriture backups', e)
   }
 }
-
-// ─── INIT ───────────────────────────────────────────────────────────────────
 
 export function initBackupManager(store, config = {}) {
   backupConfig = { ...backupConfig, ...config }
@@ -80,8 +76,6 @@ export function stopAutoBackup() {
     backupInterval = null
   }
 }
-
-// ─── ACTIONS ────────────────────────────────────────────────────────────────
 
 export async function performBackup(store) {
   try {
@@ -114,7 +108,7 @@ export async function performBackup(store) {
 
     return { success: true, timestamp: backupData.timestamp }
   } catch (e) {
-    console.error('❌ Erreur sauvegarde automatique:', e)
+    logError('backupManager', 'Erreur sauvegarde automatique', e)
     return { success: false, error: e.message }
   }
 }
@@ -138,7 +132,7 @@ export async function restoreBackup(store, index) {
     if (backup.profiles) {
       for (const profile of backup.profiles) {
         if (profile.id !== 'all') {
-          const exists = store.profiles.find(p => p.id === profile.id)
+          const exists = store.profiles.find((p) => p.id === profile.id)
           if (!exists) {
             await store.createProfile(profile.name)
           }
@@ -151,7 +145,7 @@ export async function restoreBackup(store, index) {
         if (sound.path) {
           const exists = await window.electronAPI.fileExists(sound.path)
           if (exists) {
-            const soundExists = store.sounds.find(s => s.id === sound.id)
+            const soundExists = store.sounds.find((s) => s.id === sound.id)
             if (!soundExists) {
               await store.addSound({
                 name: sound.name,
@@ -178,11 +172,12 @@ export async function restoreBackup(store, index) {
     if (backup.customTheme) await store.updateCustomTheme(backup.customTheme)
     if (backup.audioDevice) await store.updateAudioDevice(backup.audioDevice)
     if (backup.volume) await store.updateVolume(backup.volume)
-    if (backup.playLocally !== undefined) await store.updatePlayLocally(backup.playLocally)
+    if (backup.playLocally !== undefined)
+      await store.updatePlayLocally(backup.playLocally)
 
     return { success: true, timestamp: backup.timestamp }
   } catch (e) {
-    console.error('❌ Erreur restauration:', e)
+    logError('backupManager', 'Erreur restauration', e)
     return { success: false, error: e.message }
   }
 }
@@ -200,14 +195,16 @@ export async function deleteBackup(index) {
 
     return { success: true }
   } catch (e) {
-    console.error('❌ [backupManager] Erreur deleteBackup:', e)
+    logError('backupManager', 'Erreur deleteBackup', e)
     return { success: false, error: e.message }
   }
 }
 
 async function checkAndRestoreBackup(store) {
   try {
-    const lastBackupTime = await window.electronAPI?.storeGet?.(STORE_KEY_LAST_TIME)
+    const lastBackupTime = await window.electronAPI?.storeGet?.(
+      STORE_KEY_LAST_TIME
+    )
     if (lastBackupTime) {
       const backups = await readBackups()
       const lastIndex = backups.length - 1
@@ -216,11 +213,9 @@ async function checkAndRestoreBackup(store) {
       }
     }
   } catch (e) {
-    console.warn('⚠️ Erreur restauration automatique:', e)
+    logWarn('backupManager', 'Erreur restauration automatique', e)
   }
 }
-
-// ─── IMPORT / EXPORT ────────────────────────────────────────────────────────
 
 export async function exportBackups() {
   try {
@@ -231,7 +226,9 @@ export async function exportBackups() {
     }
 
     const json = JSON.stringify(backups, null, 2)
-    const defaultName = `sounddeck-backups-${new Date().toISOString().slice(0, 10)}.json`
+    const defaultName = `sounddeck-backups-${new Date()
+      .toISOString()
+      .slice(0, 10)}.json`
 
     const r = await window.electronAPI.exportJsonFile(
       json,
@@ -247,7 +244,7 @@ export async function exportBackups() {
       return { success: false, error: r?.error || 'Erreur inconnue' }
     }
   } catch (e) {
-    console.error('❌ [backupManager] exportBackups error:', e)
+    logError('backupManager', 'exportBackups error', e)
     return { success: false, error: e.message }
   }
 }

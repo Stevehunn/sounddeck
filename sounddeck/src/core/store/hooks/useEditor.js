@@ -1,12 +1,10 @@
 // src/core/store/hooks/useEditor.js
 import { useState, useCallback } from 'react'
+import { logError } from '@shared/utils/logger'
 
 export function useEditor(save) {
-  // Liste des projets d'édition + récents
   const [editorProjects, setEditorProjects] = useState([])
   const [recentEditorProjects, setRecentEditorProjects] = useState([])
-
-  // ─── CHARGEMENT ─────────────────────────────────────────────────────────
 
   const loadAllEditorProjects = useCallback(async () => {
     try {
@@ -14,7 +12,7 @@ export function useEditor(save) {
       setEditorProjects(projects)
       return projects
     } catch (e) {
-      console.error('Erreur chargement projets:', e)
+      logError('useEditor', 'Erreur chargement projets', e)
       return []
     }
   }, [])
@@ -25,12 +23,10 @@ export function useEditor(save) {
       setRecentEditorProjects(recent)
       return recent
     } catch (e) {
-      console.error('Erreur chargement projets récents:', e)
+      logError('useEditor', 'Erreur chargement projets récents', e)
       return []
     }
   }, [])
-
-  // ─── CRUD ───────────────────────────────────────────────────────────────
 
   const saveEditorProject = useCallback(async (projectData) => {
     try {
@@ -41,7 +37,7 @@ export function useEditor(save) {
       }
       return null
     } catch (e) {
-      console.error('Erreur sauvegarde projet:', e)
+      logError('useEditor', 'Erreur sauvegarde projet', e)
       return null
     }
   }, [loadRecentEditorProjects])
@@ -55,7 +51,7 @@ export function useEditor(save) {
       }
       return null
     } catch (e) {
-      console.error('Erreur chargement projet:', e)
+      logError('useEditor', 'Erreur chargement projet', e)
       return null
     }
   }, [loadRecentEditorProjects])
@@ -70,7 +66,7 @@ export function useEditor(save) {
       }
       return false
     } catch (e) {
-      console.error('Erreur suppression projet:', e)
+      logError('useEditor', 'Erreur suppression projet', e)
       return false
     }
   }, [loadAllEditorProjects, loadRecentEditorProjects])
@@ -80,7 +76,7 @@ export function useEditor(save) {
       const result = await window.electronAPI.exportEditorProject?.(project, filePath)
       return result
     } catch (e) {
-      console.error('Erreur export projet:', e)
+      logError('useEditor', 'Erreur export projet', e)
       return { success: false, error: e.message }
     }
   }, [])
@@ -95,7 +91,7 @@ export function useEditor(save) {
       }
       return null
     } catch (e) {
-      console.error('Erreur import projet:', e)
+      logError('useEditor', 'Erreur import projet', e)
       return null
     }
   }, [loadAllEditorProjects, loadRecentEditorProjects])
@@ -110,7 +106,7 @@ export function useEditor(save) {
       }
       return null
     } catch (e) {
-      console.error('Erreur renommage projet:', e)
+      logError('useEditor', 'Erreur renommage projet', e)
       return null
     }
   }, [loadAllEditorProjects, loadRecentEditorProjects])
@@ -125,19 +121,16 @@ export function useEditor(save) {
       }
       return null
     } catch (e) {
-      console.error('Erreur duplication projet:', e)
+      logError('useEditor', 'Erreur duplication projet', e)
       return null
     }
   }, [loadAllEditorProjects, loadRecentEditorProjects])
 
   return {
-    // État
     editorProjects,
     recentEditorProjects,
-    // Chargement
     loadAllEditorProjects,
     loadRecentEditorProjects,
-    // CRUD
     saveEditorProject,
     loadEditorProject,
     deleteEditorProject,

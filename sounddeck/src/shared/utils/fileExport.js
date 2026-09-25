@@ -1,17 +1,6 @@
 // src/shared/utils/fileExport.js
+import { logWarn, logError } from './logger'
 
-/**
- * Sauvegarde un buffer audio (WAV) via l'API Electron, avec fallbacks.
- * Essaie dans l'ordre :
- *   1. writeSoundFile (chemin direct)
- *   2. saveFileDialog (dialogue natif)
- *   3. exportAudioFile (2ᵉ tentative via dialogue)
- *   4. Download navigateur (dernier recours)
- *
- * @param {ArrayBuffer|Uint8Array} data
- * @param {string} outputPath
- * @returns {Promise<{success: boolean, path?: string, downloaded?: boolean, error?: string}>}
- */
 export async function saveAudioBuffer(data, outputPath) {
   if (!outputPath) {
     return { success: false, error: 'outputPath manquant' }
@@ -29,7 +18,7 @@ export async function saveAudioBuffer(data, outputPath) {
       return { success: true, path: outputPath }
     }
   } catch (e) {
-    console.warn('⚠️ [saveAudioBuffer] writeSoundFile exception:', e)
+    logWarn('fileExport', 'writeSoundFile exception', e)
   }
 
   // Méthode 2 : saveFileDialog
@@ -43,9 +32,10 @@ export async function saveAudioBuffer(data, outputPath) {
       return { success: true, path: result.path }
     }
   } catch (e) {
-    console.warn('⚠️ [saveAudioBuffer] saveFileDialog exception:', e)
+    logWarn('fileExport', 'saveFileDialog exception', e)
   }
 
+  // Méthode 3 : exportAudioFile
   try {
     const fileName =
       outputPath.split('/').pop() ||
@@ -60,7 +50,7 @@ export async function saveAudioBuffer(data, outputPath) {
       return { success: true, path: result.path }
     }
   } catch (e) {
-    console.warn('⚠️ [saveAudioBuffer] exportAudioFile exception:', e)
+    logWarn('fileExport', 'exportAudioFile exception', e)
   }
 
   // Méthode 4 : download navigateur
@@ -79,7 +69,7 @@ export async function saveAudioBuffer(data, outputPath) {
     setTimeout(() => URL.revokeObjectURL(url), 10000)
     return { success: true, path: 'download://' + a.download, downloaded: true }
   } catch (e) {
-    console.error('❌ [saveAudioBuffer] Échec de tous les fallbacks:', e)
+    logError('fileExport', 'Échec de tous les fallbacks', e)
     return { success: false, error: e.message }
   }
 }

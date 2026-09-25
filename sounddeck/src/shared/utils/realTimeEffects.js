@@ -1,4 +1,5 @@
 // src/shared/utils/realTimeEffects.js
+import { logError } from './logger'
 
 const effectCache = new Map()
 
@@ -68,7 +69,7 @@ export function applyEffectsToBuffer(
 
     return result
   } catch (e) {
-    console.error('❌ [realTimeEffects] Erreur application effets:', e)
+    logError('realTimeEffects', 'Erreur application effets', e)   // ✅ CHANGÉ
     return audioBuffer
   } finally {
     if (ctx.state !== 'closed') {
@@ -229,7 +230,6 @@ function applyEchoEffect(buffer, delay, decay, mix, ctx) {
   return newBuffer
 }
 
-// ✅ FIX : remplace la double boucle O(n²) par des taps fixes (O(n × taps))
 function applyReverbEffect(buffer, roomSize, mix, ctx) {
   const clampedRoomSize = Math.max(0.05, Math.min(1, roomSize))
   const clampedMix = Math.max(0, Math.min(1, mix))
@@ -240,9 +240,8 @@ function applyReverbEffect(buffer, roomSize, mix, ctx) {
   const channels = buffer.numberOfChannels
   const length = buffer.length
 
-  // Nombre de taps et délai max proportionnels à la taille de la pièce
-  const numTaps = Math.round(6 + clampedRoomSize * 18) // 6 à 24 taps
-  const maxDelaySamples = Math.round(clampedRoomSize * 0.2 * sampleRate) // max 200ms
+  const numTaps = Math.round(6 + clampedRoomSize * 18)
+  const maxDelaySamples = Math.round(clampedRoomSize * 0.2 * sampleRate)
   const baseGain = clampedMix * 0.35
   const decayFactor = 0.68
 
@@ -252,16 +251,12 @@ function applyReverbEffect(buffer, roomSize, mix, ctx) {
     const data = buffer.getChannelData(channel)
     const newData = newBuffer.getChannelData(channel)
 
-    // Signal dry
     for (let i = 0; i < length; i++) {
       newData[i] = data[i] * (1 - clampedMix)
     }
 
-    // Ajout de taps espacés avec décroissance
     for (let tap = 0; tap < numTaps; tap++) {
-      const delaySamples = Math.floor(
-        ((tap + 1) * maxDelaySamples) / numTaps
-      )
+      const delaySamples = Math.floor(((tap + 1) * maxDelaySamples) / numTaps)
       const tapGain = Math.pow(decayFactor, tap) * baseGain
 
       if (tapGain < 0.001) continue
@@ -272,7 +267,6 @@ function applyReverbEffect(buffer, roomSize, mix, ctx) {
       }
     }
 
-    // Clamp pour éviter l'écrêtage
     for (let i = 0; i < length; i++) {
       const v = newData[i]
       if (v > 1) newData[i] = 1

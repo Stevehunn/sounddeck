@@ -1,19 +1,14 @@
-/**
- * Analyse et normalisation du volume audio
- */
+// src/shared/utils/normalizeUtils.js
 import { audioBufferToWav } from './wavEncoder'
 import { withTemporaryAudioContext } from './audioContext'
 import { saveAudioBuffer } from './fileExport'
 import { buildFileUrl } from './fileUrl'
+import { logWarn, logError, logInfo } from './logger'
 
-/**
- * Analyse le volume d'un fichier audio
- */
 export async function analyzeVolume(filePath) {
   try {
     const fileUrl = buildFileUrl(filePath)
 
-    // ✅ S6 : withTemporaryAudioContext gère fetch + decode + close
     const result = await withTemporaryAudioContext(fileUrl, (audioBuffer) => {
       let maxPeak = 0
       let rms = 0
@@ -49,15 +44,17 @@ export async function analyzeVolume(filePath) {
 
     return result
   } catch (e) {
-    console.warn('Erreur analyse volume:', e)
+    logWarn('normalizeUtils', 'Erreur analyse volume', e)
     return null
   }
 }
 
-/**
- * Normalise le volume d'un clip avec options avancées
- */
-export async function normalizeClip(clip, targetPeak = 0.95, store, options = {}) {
+export async function normalizeClip(
+  clip,
+  targetPeak = 0.95,
+  store,
+  options = {}
+) {
   if (!clip || !clip.path) return null
 
   const {
@@ -73,7 +70,7 @@ export async function normalizeClip(clip, targetPeak = 0.95, store, options = {}
   try {
     const analysis = await analyzeVolume(clip.path)
     if (!analysis || !analysis.hasAudio) {
-      console.warn('⚠️ Aucun signal audio détecté dans', clip.name)
+      logWarn('normalizeUtils', `Aucun signal audio détecté dans ${clip.name}`)
       return null
     }
 
@@ -95,92 +92,101 @@ export async function normalizeClip(clip, targetPeak = 0.95, store, options = {}
       }
     }
 
-    console.log(
+    logInfo(
+      'normalizeUtils',
       `🔊 Normalisation de "${clip.name}": gain = ${gain.toFixed(2)}x (${analysis.peakDb.toFixed(1)}dB → ${(20 * Math.log10(targetPeak)).toFixed(1)}dB)`
     )
 
     const fileUrl = buildFileUrl(clip.path)
 
-    // ✅ S6 : withTemporaryAudioContext gère fetch + decode + close
-    const normalizedResult = await withTemporaryAudioContext(fileUrl, async (audioBuffer, audioContext) => {
-      const channels = audioBuffer.numberOfChannels
-      const length = audioBuffer.length
+    const normalizedResult = await withTemporaryAudioContext(
+      fileUrl,
+      async (audioBuffer) => {
+        const channels = audioBuffer.numberOfChannels
+        const length = audioBuffer.length
 
-      for (let channel = 0; channel < channels; channel++) {
-        const data = audioBuffer.getChannelData(channel)
-        for (let i = 0; i < length; i++) {
-          data[i] *= gain
-        }
-      }
-
-      let maxPeakAfter = 0
-      for (let channel = 0; channel < channels; channel++) {
-        const data = audioBuffer.getChannelData(channel)
-        for (let i = 0; i < length; i++) {
-          const abs = Math.abs(data[i])
-          if (abs > maxPeakAfter) maxPeakAfter = abs
-        }
-      }
-
-      if (maxPeakAfter > 1.0) {
-        const reduction = 0.95 / maxPeakAfter
-        console.warn(
-          `⚠️ Écrêtage détecté (${maxPeakAfter.toFixed(2)}), réduction du gain à ${(gain * reduction).toFixed(2)}x`
-        )
         for (let channel = 0; channel < channels; channel++) {
           const data = audioBuffer.getChannelData(channel)
           for (let i = 0; i < length; i++) {
-            data[i] *= reduction
+            data[i] *= gain
           }
         }
-        gain *= reduction
-      }
 
-      const ext = outputFormat === 'mp3' ? 'mp3' : 'wav'
-      const fileName = `normalized_${Date.now()}_${clip.name.replace(/[^a-zA-Z0-9]/g, '_')}.${ext}`
-      const soundsDir = await window.electronAPI.getSoundsDir()
-      const outputPath = soundsDir + '/' + fileName
+        let maxPeakAfter = 0
+        for (let channel = 0; channel < channels; channel++) {
+          const data = audioBuffer.getChannelData(channel)
+          for (let i = 0; i < length; i++) {
+            const abs = Math.abs(data[i])
+            if (abs > maxPeakAfter) maxPeakAfter = abs
+          }
+        }
 
-      const wavBuffer = audioBufferToWav(audioBuffer)
-      const uint8Array = new Uint8Array(wavBuffer)
+        if (maxPeakAfter > 1.0) {
+          const reduction = 0.95 / maxPeakAfter
+          logWarn(
+            'normalizeUtils',
+            `Écrêtage détecté (${maxPeakAfter.toFixed(2)}), réduction du gain à ${(gain * reduction).toFixed(2)}x`
+          )
+          for (let channel = 0; channel < channels; channel++) {
+            const data = audioBuffer.getChannelData(channel)
+            for (let i = 0; i < length; i++) {
+              data[i] *= reduction
+            }
+          }
+          gain *= reduction
+        }
 
-      let finalPath = outputPath
+        const ext = outputFormat === 'mp3' ? 'mp3' : 'wav'
+        const fileName = `normalized_${Date.now()}_${clip.name.replace(
+          /[^a-zA-Z0-9]/g,
+          '_'
+        )}.${ext}`
+        const soundsDir = await window.electronAPI.getSoundsDir()
+        const outputPath = soundsDir + '/' + fileName
 
-      if (outputFormat === 'mp3') {
-        const tempPath = outputPath.replace('.mp3', '.temp.wav')
-        // ✅ S6 : saveAudioBuffer centralisé
-        await saveAudioBuffer(uint8Array, tempPath)
+        const wavBuffer = audioBufferToWav(audioBuffer)
+        const uint8Array = new Uint8Array(wavBuffer)
 
-        const conversionResult = await window.electronAPI.convertAudio?.(
-          tempPath,
-          outputPath,
-          'mp3',
-          bitrate
-        )
+        let finalPath = outputPath
 
-        if (conversionResult?.success) {
-          try {
-            await window.electronAPI.deleteSoundFile?.(tempPath)
-          } catch (e) {}
-          finalPath = outputPath
+        if (outputFormat === 'mp3') {
+          const tempPath = outputPath.replace('.mp3', '.temp.wav')
+          await saveAudioBuffer(uint8Array, tempPath)
+
+          const conversionResult = await window.electronAPI.convertAudio?.(
+            tempPath,
+            outputPath,
+            'mp3',
+            bitrate
+          )
+
+          if (conversionResult?.success) {
+            try {
+              await window.electronAPI.deleteSoundFile?.(tempPath)
+            } catch (e) {}
+            finalPath = outputPath
+          } else {
+            logWarn(
+              'normalizeUtils',
+              'Conversion MP3 échouée, utilisation du WAV'
+            )
+            finalPath = tempPath
+          }
         } else {
-          console.warn('⚠️ Conversion MP3 échouée, utilisation du WAV')
-          finalPath = tempPath
+          const result = await saveAudioBuffer(uint8Array, outputPath)
+          if (!result.success) {
+            throw new Error('Impossible de sauvegarder le fichier normalisé')
+          }
+          finalPath = outputPath
         }
-      } else {
-        const result = await saveAudioBuffer(uint8Array, outputPath)
-        if (!result.success) {
-          throw new Error('Impossible de sauvegarder le fichier normalisé')
-        }
-        finalPath = outputPath
-      }
 
-      return {
-        gain,
-        maxPeakAfter,
-        finalPath,
+        return {
+          gain,
+          maxPeakAfter,
+          finalPath,
+        }
       }
-    })
+    )
 
     if (!normalizedResult) return null
 
@@ -188,7 +194,11 @@ export async function normalizeClip(clip, targetPeak = 0.95, store, options = {}
       try {
         await store.updateClipWithPath(clip.id, normalizedResult.finalPath)
       } catch (e) {
-        console.warn('⚠️ [normalizeClip] updateClipWithPath a échoué:', e?.message)
+        logWarn(
+          'normalizeUtils',
+          'updateClipWithPath a échoué',
+          e
+        )
       }
     }
 
@@ -201,14 +211,11 @@ export async function normalizeClip(clip, targetPeak = 0.95, store, options = {}
       newPath: normalizedResult.finalPath,
     }
   } catch (e) {
-    console.error('❌ Erreur normalisation:', e)
+    logError('normalizeUtils', 'Erreur normalisation', e)
     return null
   }
 }
 
-/**
- * Normalise tous les clips d'une piste ou du projet
- */
 export async function normalizeAll(
   clips,
   targetPeak = 0.95,
@@ -239,9 +246,6 @@ export async function normalizeAll(
   }
 }
 
-/**
- * Analyse et retourne des informations sur le volume d'un fichier
- */
 export async function getVolumeInfo(filePath) {
   const analysis = await analyzeVolume(filePath)
   if (!analysis) return null
@@ -259,7 +263,7 @@ export async function getVolumeInfo(filePath) {
       analysis.maxPeak < 0.1
         ? '⚠️ Fichier très silencieux, normalisation recommandée'
         : analysis.maxPeak > 0.9
-          ? '⚠️ Fichier proche de l\'écrêtage, réduire le volume'
+          ? "⚠️ Fichier proche de l'écrêtage, réduire le volume"
           : '✅ Niveau correct',
   }
 }

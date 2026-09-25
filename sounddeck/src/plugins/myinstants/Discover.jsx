@@ -5,6 +5,7 @@ import { CATEGORIES, DEFAULT_CATEGORIES } from './categories'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { useNetwork } from '@shared/contexts'
 import { getItem, setItem } from '@shared/utils/appStorage'
+import { logError, logWarn } from '@shared/utils/logger'
 import {
   ensureCacheLoaded,
   getCachedCategory,
@@ -48,7 +49,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
 
   const checkApi = useCallback(() => {
     if (!window.electronAPI?.fetchMyinstants) {
-      console.error('❌ [Discover] window.electronAPI.fetchMyinstants non disponible')
+      logError('Discover', 'window.electronAPI.fetchMyinstants non disponible')
       setError(t('myinstantsError') || 'API MyInstants non disponible')
       return false
     }
@@ -74,7 +75,6 @@ export default function MyInstantsDiscover({ store, addToast }) {
         }
       }
 
-      // Migration legacy localStorage
       const legacy = localStorage.getItem(LEGACY_LS_KEY)
       if (legacy) {
         try {
@@ -93,7 +93,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
         }
       }
     } catch (e) {
-      console.warn('Erreur chargement préférences catégories:', e)
+      logWarn('Discover', 'Erreur chargement préférences catégories', e)
     }
 
     const defaults = DEFAULT_CATEGORIES.map(cat => cat.id)
@@ -106,7 +106,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
       await setItem(STORE_KEY_CATEGORIES, JSON.stringify(categoryIds))
       setSelectedCategories(categoryIds)
     } catch (e) {
-      console.warn('Erreur sauvegarde préférences catégories:', e)
+      logWarn('Discover', 'Erreur sauvegarde préférences catégories', e)
     }
   }, [])
 
@@ -202,7 +202,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
         }
       }
     } catch (e) {
-      console.error('❌ [Discover] Erreur chargement catégorie:', e)
+      logError('Discover', 'Erreur chargement catégorie', e)
       const online = await ensureOnline()
       if (!online) {
         setError('')
@@ -307,7 +307,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
         }
         return false
       } catch (e) {
-        console.warn(`⚠️ [Discover] Échec préchargement de ${id}:`, e.message)
+        logWarn('Discover', `Échec préchargement de ${id}`, e)
         return false
       }
     }
@@ -370,7 +370,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
         }
       }
     } catch (e) {
-      console.error('❌ [Discover] Erreur recherche:', e)
+      logError('Discover', 'Erreur recherche', e)
       const online = await ensureOnline()
       if (!online) {
         setError('')
@@ -414,7 +414,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
       addToast(t('myinstantsAdded'), 'success')
       setShowProfileModal(null)
     } catch (e) {
-      console.error('❌ [Discover] Erreur ajout:', e)
+      logError('Discover', 'Erreur ajout', e)
       addToast(t('myinstantsErrorWithDetail', { detail: e.message }), 'error')
     } finally {
       setDownloading(prev => ({ ...prev, [showProfileModal.id]: false }))
@@ -468,7 +468,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
       setPreviewing(sound.id)
       howl.play()
     } catch (e) {
-      console.error('❌ [Discover] Erreur preview:', e)
+      logError('Discover', 'Erreur preview', e)
       addToast(t('myinstantsPreviewError'), 'error')
     }
   }
@@ -749,7 +749,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
         </button>
       </div>
 
-      {/* Catégories (extraites dans CategoryBar) */}
+      {/* Catégories */}
       <div style={{
         padding: '8px 20px',
         borderBottom: '1px solid var(--border)',
@@ -954,7 +954,6 @@ export default function MyInstantsDiscover({ store, addToast }) {
         )}
       </div>
 
-      {/* Modal de sélection de profil (extraite) */}
       <AddToProfileModal
         sound={showProfileModal}
         profiles={store.profiles}
@@ -965,7 +964,6 @@ export default function MyInstantsDiscover({ store, addToast }) {
         t={t}
       />
 
-      {/* Modal d'édition des catégories (extraite) */}
       <CategoryEditorModal
         isOpen={showCategoryEditor}
         tempSelectedCategories={tempSelectedCategories}
@@ -977,7 +975,6 @@ export default function MyInstantsDiscover({ store, addToast }) {
         onSave={saveCategoryEditor}
         t={t}
       />
-
     </div>
   )
 }

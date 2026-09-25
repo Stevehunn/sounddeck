@@ -2,6 +2,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { getAudioFileDuration } from '@shared/utils/audioContext'
 import { uuid } from '@shared/utils/uuid'
+import { logWarn, logError } from '@shared/utils/logger'
 
 const __DEBUG__ = typeof import.meta !== 'undefined' && import.meta.env?.DEV
 const log = __DEBUG__ ? console.log.bind(console) : () => {}
@@ -301,7 +302,7 @@ export function useEditorCore({ store, addToast, t, confirm }) {
       await window.electronAPI.storeSet?.('currentEditorProjectId', projectData.id)
       persistProject(projectData)
     } catch (e) {
-      console.warn('⚠️ [EditorCore] Erreur sauvegarde:', e)
+      logWarn('EditorCore', 'Erreur sauvegarde', e)
     }
 
     if (projectData.loops) {
@@ -390,8 +391,7 @@ export function useEditorCore({ store, addToast, t, confirm }) {
           await loadProject(newProject)
         }
       } catch (e) {
-        console.error('❌ Erreur initialisation:', e)
-        // ✅ FIX D10 : UUID canonique
+        logError('EditorCore', 'Erreur initialisation', e)
         const fallbackProject = {
           id: uuid('project'),
           name: 'Nouveau projet',

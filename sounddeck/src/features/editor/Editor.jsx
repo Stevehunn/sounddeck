@@ -24,6 +24,7 @@ import useProjectManager from './hooks/useProjectManager'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 import { getBoolean, getNumber, setItem } from '@shared/utils/appStorage'
 import { uuid } from '@shared/utils/uuid'
+import { logError } from '@shared/utils/logger'
 
 const __DEBUG__ = typeof import.meta !== 'undefined' && import.meta.env?.DEV
 const log = __DEBUG__ ? console.log.bind(console) : () => {}
@@ -373,6 +374,7 @@ function EditorTimelineContent() {
         await removeTrack(trackId)
         addToast?.(`Piste "${track.name}" supprimée`, 'info')
       } catch (e) {
+        logError('Editor', 'Erreur lors de la suppression de piste', e)
         addToast?.('Erreur lors de la suppression', 'error')
       }
     },
@@ -404,6 +406,7 @@ function EditorTimelineContent() {
       setSelectedImportTrackId(tracks[0].id)
       setShowImportModal(true)
     } catch (e) {
+      logError('Editor', 'Erreur ouverture dialog fichier', e)
       addToast?.(t('editorFileImportError') + ': ' + e.message, 'error')
     }
   }, [tracks, addToast, t])
@@ -423,6 +426,7 @@ function EditorTimelineContent() {
           addToast?.(t('editorFileImportError'), 'error')
         }
       } catch (e) {
+        logError('Editor', 'Erreur import fichier', e)
         addToast?.(t('editorFileImportError') + ': ' + e.message, 'error')
       }
 
@@ -789,7 +793,7 @@ function EditorTimelineContent() {
           addToast?.(`Clip "${name}" supprimé`, 'info')
         }
       } catch (e) {
-        if (__DEBUG__) console.error('Erreur suppression clip:', e)
+        logError('Editor', 'Erreur suppression clip', e)
       } finally {
         setTimeout(() => setIsDeletingClip(false), 400)
       }
@@ -850,6 +854,7 @@ function EditorTimelineContent() {
           } catch (e) {}
         }, Math.min(processedBuffer.duration * 1000, 5000))
       } catch (e) {
+        logError('Editor', 'Erreur prévisualisation effets', e)
         addToast?.(
           t('editorEffectPreviewError') || 'Erreur lors de la prévisualisation',
           'error'
@@ -1521,6 +1526,7 @@ function EditorTimelineContent() {
               setShowExportModal(false)
               return { success: true, results: exportResults }
             } catch (e) {
+              logError('Editor', 'Erreur export', e)
               addToast?.(`${t('editorExportError')}: ${e.message}`, 'error')
               setIsExporting(false)
               return { success: false, error: e.message }

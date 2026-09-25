@@ -1,14 +1,17 @@
 // src/shared/utils/waveformGenerator.js
 import { withTemporaryAudioContext } from './audioContext.js'
 import { buildFileUrl } from './fileUrl.js'
+import { logError, logWarn } from './logger'
 
-// Cache des waveforms
 const waveformCache = new Map()
 
-/**
- * Génère les données de waveform depuis un fichier audio
- */
-export async function generateWaveformData(filePath, samples = 200, startOffset = 0, sliceDuration = null, useCache = true) {
+export async function generateWaveformData(
+  filePath,
+  samples = 200,
+  startOffset = 0,
+  sliceDuration = null,
+  useCache = true
+) {
   try {
     const cacheKey = `${filePath}_${samples}_${startOffset}_${sliceDuration || 'full'}`
     if (useCache && waveformCache.has(cacheKey)) {
@@ -18,16 +21,15 @@ export async function generateWaveformData(filePath, samples = 200, startOffset 
     try {
       const exists = await window.electronAPI.fileExists(filePath)
       if (!exists) {
-        console.error(`❌ Fichier non trouvé: ${filePath}`)
+        logError('waveformGenerator', `Fichier non trouvé: ${filePath}`)
         return null
       }
     } catch (e) {
-      console.warn(`⚠️ Erreur vérification existence:`, e)
+      logWarn('waveformGenerator', 'Erreur vérification existence', e)
     }
 
     const fileUrl = buildFileUrl(filePath)
 
-    // ✅ S6 : utilise withTemporaryAudioContext (gère fetch + decode + close)
     const result = await withTemporaryAudioContext(fileUrl, (audioBuffer) => {
       const fullData = audioBuffer.getChannelData(0)
       const startSample = Math.max(
@@ -37,15 +39,16 @@ export async function generateWaveformData(filePath, samples = 200, startOffset 
           Math.floor(startOffset * audioBuffer.sampleRate)
         )
       )
-      const endSample = sliceDuration != null
-        ? Math.max(
-            startSample,
-            Math.min(
-              fullData.length,
-              startSample + Math.floor(sliceDuration * audioBuffer.sampleRate)
+      const endSample =
+        sliceDuration != null
+          ? Math.max(
+              startSample,
+              Math.min(
+                fullData.length,
+                startSample + Math.floor(sliceDuration * audioBuffer.sampleRate)
+              )
             )
-          )
-        : fullData.length
+          : fullData.length
 
       const rawData = fullData.subarray(startSample, endSample)
 
@@ -63,7 +66,7 @@ export async function generateWaveformData(filePath, samples = 200, startOffset 
       }
 
       const max = Math.max(...data)
-      return max > 0 ? data.map(v => v / max) : data
+      return max > 0 ? data.map((v) => v / max) : data
     })
 
     if (!result) return null
@@ -74,18 +77,17 @@ export async function generateWaveformData(filePath, samples = 200, startOffset 
 
     return result
   } catch (e) {
-    console.error('❌ Waveform generation error:', e)
+    logError('waveformGenerator', 'Generation error', e)
     return null
   }
 }
 
-/**
- * Invalide le cache pour un fichier
- */
 export function invalidateWaveformCache(filePath) {
   if (filePath) {
-    const keys = Array.from(waveformCache.keys()).filter(k => k.startsWith(filePath))
-    keys.forEach(k => waveformCache.delete(k))
+    const keys = Array.from(waveformCache.keys()).filter((k) =>
+      k.startsWith(filePath)
+    )
+    keys.forEach((k) => waveformCache.delete(k))
   } else {
     waveformCache.clear()
   }
@@ -93,5 +95,5 @@ export function invalidateWaveformCache(filePath) {
 
 export default {
   generateWaveformData,
-  invalidateWaveformCache
+  invalidateWaveformCache,
 }

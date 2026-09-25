@@ -1,17 +1,16 @@
 // src/shared/utils/obsIntegration.js
-// Intégration OBS WebSocket
+import { logInfo, logWarn, logError } from './logger'
 
 let obsWebSocket = null
 let obsConnected = false
 
 const RECONNECT_MAX_ATTEMPTS = 5
-const RECONNECT_BASE_DELAY = 5000    // 5s
-const RECONNECT_MAX_DELAY = 60000    // 60s max
+const RECONNECT_BASE_DELAY = 5000
+const RECONNECT_MAX_DELAY = 60000
 
 let reconnectTimer = null
 let reconnectAttempts = 0
 
-// Configuration OBS par défaut
 const DEFAULT_OBS_CONFIG = {
   host: 'localhost',
   port: 4455,
@@ -19,10 +18,8 @@ const DEFAULT_OBS_CONFIG = {
   reconnectInterval: 5000,
 }
 
-// Mémoriser la dernière config utilisée pour la reconnexion
 let lastUsedConfig = { ...DEFAULT_OBS_CONFIG }
 
-// ─── BACKOFF ─────────────────────────────────────────────────────────────
 function cancelReconnect() {
   if (reconnectTimer) {
     clearTimeout(reconnectTimer)
@@ -32,11 +29,12 @@ function cancelReconnect() {
 }
 
 function scheduleReconnect() {
-  if (reconnectTimer) return // déjà programmé
+  if (reconnectTimer) return
 
   if (reconnectAttempts >= RECONNECT_MAX_ATTEMPTS) {
-    console.warn(
-      `⚠️ [OBS] Abandon reconnexion après ${RECONNECT_MAX_ATTEMPTS} tentatives — cliquez sur "Se connecter" pour réessayer`
+    logWarn(
+      'obsIntegration',
+      `Abandon reconnexion après ${RECONNECT_MAX_ATTEMPTS} tentatives — cliquez sur "Se connecter" pour réessayer`
     )
     return
   }
@@ -48,21 +46,21 @@ function scheduleReconnect() {
   )
   reconnectAttempts++
 
-  console.log(
-    `🔄 [OBS] Reconnexion dans ${delay}ms (tentative ${attempt}/${RECONNECT_MAX_ATTEMPTS})`
+  logInfo(
+    'obsIntegration',
+    `🔄 Reconnexion dans ${delay}ms (tentative ${attempt}/${RECONNECT_MAX_ATTEMPTS})`
   )
 
   reconnectTimer = setTimeout(async () => {
     reconnectTimer = null
 
-    // Guard : si on nous a déconnectés entre-temps
     if (obsConnected) return
 
     try {
       const result = await connectOBS(lastUsedConfig)
       if (result?.success) {
         reconnectAttempts = 0
-        console.log('✅ [OBS] Reconnexion réussie')
+        logInfo('obsIntegration', '✅ Reconnexion réussie')
       } else {
         scheduleReconnect()
       }
@@ -72,14 +70,13 @@ function scheduleReconnect() {
   }, delay)
 }
 
-// ─── CONNEXION / DÉCONNEXION ─────────────────────────────────────────────
-
 export async function connectOBS(config = {}) {
   cancelReconnect()
 
-  // Fermer proprement l'ancienne connexion si elle existe
   if (obsWebSocket) {
-    try { obsWebSocket.disconnect() } catch (e) {}
+    try {
+      obsWebSocket.disconnect()
+    } catch (e) {}
     obsWebSocket = null
   }
 
@@ -98,13 +95,13 @@ export async function connectOBS(config = {}) {
     )
 
     obsConnected = true
-    reconnectAttempts = 0 // reset au succès
+    reconnectAttempts = 0
 
     setupOBSEvents()
 
     return { success: true, connected: true }
   } catch (e) {
-    console.error('❌ Erreur connexion OBS:', e.message)
+    logError('obsIntegration', 'Erreur connexion OBS', e)
     obsConnected = false
     return { success: false, error: e.message }
   }
@@ -117,14 +114,12 @@ export function disconnectOBS() {
     try {
       obsWebSocket.disconnect()
     } catch (e) {
-      console.warn('Erreur déconnexion OBS:', e.message)
+      logWarn('obsIntegration', 'Erreur déconnexion OBS', e)
     }
     obsWebSocket = null
   }
   obsConnected = false
 }
-
-// ─── ÉVÉNEMENTS ──────────────────────────────────────────────────────────
 
 function setupOBSEvents() {
   if (!obsWebSocket) return
@@ -132,25 +127,21 @@ function setupOBSEvents() {
   try {
     obsWebSocket.on('ConnectionClosed', () => {
       obsConnected = false
-
       if (!obsWebSocket) return
-
       scheduleReconnect()
     })
 
     obsWebSocket.on('error', (error) => {
-      console.error('❌ Erreur OBS:', error)
+      logError('obsIntegration', 'Erreur OBS', error)
     })
   } catch (e) {
-    console.warn('⚠️ Erreur configuration événements OBS:', e.message)
+    logWarn('obsIntegration', 'Erreur configuration événements OBS', e)
   }
 }
 
-// ─── COMMANDES ───────────────────────────────────────────────────────────
-
 export async function sendOBSCommand(command, params = {}) {
   if (!obsConnected || !obsWebSocket) {
-    console.warn('⚠️ OBS non connecté')
+    logWarn('obsIntegration', 'OBS non connecté')
     return { success: false, error: 'OBS non connecté' }
   }
 
@@ -158,7 +149,7 @@ export async function sendOBSCommand(command, params = {}) {
     const result = await obsWebSocket.call(command, params)
     return { success: true, result }
   } catch (e) {
-    console.error(`❌ Erreur commande OBS ${command}:`, e.message)
+    logError('obsIntegration', `Erreur commande OBS ${command}`, e)
     return { success: false, error: e.message }
   }
 }

@@ -10,6 +10,7 @@ import {
   startOBSStreaming,
   stopOBSStreaming
 } from '@shared/utils/obsIntegration'
+import { logWarn } from '@shared/utils/logger'
 
 export default function OBSControl({ lang = 'fr' }) {
   const { t, currentLang } = useLanguage()
@@ -29,7 +30,7 @@ export default function OBSControl({ lang = 'fr' }) {
         const obsStatus = getOBSStatus()
         setIsConnected(obsStatus.connected)
       } catch (e) {
-        console.warn('Erreur vérification OBS:', e)
+        logWarn('OBSControl', 'Erreur vérification OBS', e)
       }
     }
 

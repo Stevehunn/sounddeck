@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 import Waveform from './Waveform'
+import { logError } from '@shared/utils/logger'
 
 export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
   const { t } = useLanguage()
@@ -83,7 +84,7 @@ export default function AudioTrimmer({ filePath, onConfirm, onCancel }) {
     try {
       result = await window.electronAPI.trimSoundFile(filePath, start, end)
     } catch (e) {
-      console.error('❌ [AudioTrimmer] Exception trimSoundFile:', e)
+      logError('AudioTrimmer', 'Exception trimSoundFile', e)
       setTrimming(false)
       setTrimWarning(t('trimmerErrorWithDetail', { error: e.message }))
       return

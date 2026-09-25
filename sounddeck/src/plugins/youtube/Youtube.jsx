@@ -11,6 +11,7 @@ import {
 import { Howl } from 'howler'
 import useConfirm from '@shared/hooks/useConfirm'
 import LoadingOverlay from '@shared/components/ui/LoadingOverlay'
+import { logWarn, logError } from '@shared/utils/logger'
 
 import {
   mockFetchVideoInfo,
@@ -28,7 +29,6 @@ import SaveStep from './components/SaveStep'
 import { CheckingView, MissingYtdlpView } from './components/StatusViews'
 import DownloadProgressModal from './components/DownloadProgressModal'
 
-// État partagé entre instances, regroupé dans un objet unique
 const youtubeModuleState = {
   ytdlpStatus: null,
   checkDone: false,
@@ -47,7 +47,6 @@ export default function YouTube({ store, addToast }) {
   const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
   const { showNoConnection, ensureOnline } = useNetwork()
 
-  // ─── ÉTATS ──────────────────────────────────────────────────────────────
   const [ytdlpStatus, setYtdlpStatus] = useState(() =>
     youtubeModuleState.checkDone ? youtubeModuleState.ytdlpStatus ?? 'missing' : 'checking'
   )
@@ -77,7 +76,6 @@ export default function YouTube({ store, addToast }) {
   const [useThumbnail, setUseThumbnail] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
 
-  // ─── REFS ──────────────────────────────────────────────────────────────
   const isMounted = useRef(true)
   const fetchingRef = useRef(false)
   const initDone = useRef(false)
@@ -102,7 +100,6 @@ export default function YouTube({ store, addToast }) {
     return customImage || null
   }, [useThumbnail, videoInfo, customImage])
 
-  // ─── SURVEILLANCE DU CHANGEMENT DE STEP ────────────────────────────────
   useEffect(() => {
     if (step === 'save' && showProgress && !toastShown) {
       setShowProgress(false)
@@ -117,7 +114,6 @@ export default function YouTube({ store, addToast }) {
     return () => { isMounted.current = false }
   }, [])
 
-  // Auto-sélection des profils à l'étape save
   useEffect(() => {
     if (step !== 'save') return
     if (targetProfiles.length > 0) return
@@ -143,7 +139,6 @@ export default function YouTube({ store, addToast }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, store.profiles.length, store.currentProfileId])
 
-  // Reset sur événement global
   useEffect(() => {
     const handleForceReset = () => {
       if (resetTimerRef.current) {
@@ -188,7 +183,6 @@ export default function YouTube({ store, addToast }) {
     return () => window.removeEventListener('youtube-force-reset', handleForceReset)
   }, [])
 
-  // ─── VÉRIFICATION DE yt-dlp ───────────────────────────────────────────
   const checkYtdlp = useCallback(async () => {
     if (isTutorialMode()) {
       youtubeModuleState.ytdlpStatus = 'available'
@@ -212,7 +206,7 @@ export default function YouTube({ store, addToast }) {
         }
         return youtubeModuleState.ytdlpStatus
       } catch (error) {
-        console.error('❌ [YouTube] Erreur dans la promesse existante:', error)
+        logError('YouTube', 'Erreur dans la promesse existante', error)
         setYtdlpStatus('missing')
         return 'missing'
       }
@@ -229,7 +223,7 @@ export default function YouTube({ store, addToast }) {
         })
         return youtubeModuleState.ytdlpStatus
       } catch (error) {
-        console.error('❌ [YouTube] Erreur checkYtdlp:', error)
+        logError('YouTube', 'Erreur checkYtdlp', error)
         youtubeModuleState.ytdlpStatus = 'missing'
         youtubeModuleState.checkDone = true
         setYtdlpStatus('missing')
@@ -247,7 +241,6 @@ export default function YouTube({ store, addToast }) {
     }
   }, [ytdlpStatus, isTutorialMode])
 
-  // ─── INITIALISATION ───────────────────────────────────────────────────
   useEffect(() => {
     if (initDone.current) return
     initDone.current = true
@@ -314,7 +307,6 @@ export default function YouTube({ store, addToast }) {
     }
   }, [checkYtdlp, isTutorialMode])
 
-  // Nettoyage preview
   useEffect(() => {
     return () => {
       if (previewHowl) {
@@ -324,7 +316,6 @@ export default function YouTube({ store, addToast }) {
     }
   }, [previewHowl])
 
-  // ─── SIMULATION DE PROGRESSION ────────────────────────────────────────
   const startProgressSimulation = useCallback(() => {
     setShowProgress(true)
     setDownloadProgress(0)
@@ -357,7 +348,6 @@ export default function YouTube({ store, addToast }) {
     }
   }, [])
 
-  // ─── INSTALLATION YT-DLP ──────────────────────────────────────────────
   const handleInstallYtdlp = async () => {
     setDownloading(true)
     addToast(t('ytdlpDownloading'), 'info')
@@ -390,7 +380,6 @@ export default function YouTube({ store, addToast }) {
     }
   }
 
-  // ─── RÉCUPÉRATION DES INFOS ───────────────────────────────────────────
   const handleFetchInfo = useCallback(async () => {
     if (fetchingRef.current) return
 
@@ -473,7 +462,7 @@ export default function YouTube({ store, addToast }) {
         addToast(t('ytFetchError', { detail: result?.error || t('unknownError') }), 'error')
       }
     } catch (error) {
-      console.error('❌ [YouTube] Erreur handleFetchInfo:', error)
+      logError('YouTube', 'Erreur handleFetchInfo', error)
       if (error?.isNetworkError) {
         const online = await ensureOnline()
         setLoadingInfo(false)
@@ -489,7 +478,6 @@ export default function YouTube({ store, addToast }) {
     setIsProcessing(false)
   }, [url, addToast, t, isTutorialMode, ensureOnline])
 
-  // ─── PRÉVISUALISATION ─────────────────────────────────────────────────
   const togglePreview = useCallback((filePath) => {
     if (!filePath) return
 
@@ -521,12 +509,11 @@ export default function YouTube({ store, addToast }) {
       setIsPreviewPlaying(true)
       howl.play()
     } catch (error) {
-      console.error('❌ [YouTube] Erreur togglePreview:', error)
+      logError('YouTube', 'Erreur togglePreview', error)
       addToast(t('ytPreviewError'), 'error')
     }
   }, [previewHowl, isPreviewPlaying, addToast, t])
 
-  // ─── TÉLÉCHARGEMENT ───────────────────────────────────────────────────
   const handleDownloadAudio = useCallback(async () => {
     const currentVideoInfo = videoInfo || youtubeModuleState.videoInfo
     const currentPlatform = platform || youtubeModuleState.platform
@@ -623,7 +610,7 @@ export default function YouTube({ store, addToast }) {
         addToast(t('ytDownloadError', { detail: result?.error || t('unknownError') }), 'error')
       }
     } catch (error) {
-      console.error('❌ [YouTube] Erreur téléchargement:', error)
+      logError('YouTube', 'Erreur téléchargement', error)
       stopProgressSimulation()
       setShowProgress(false)
       isProcessingRef.current = false
@@ -641,7 +628,6 @@ export default function YouTube({ store, addToast }) {
     isTutorialMode, ensureOnline,
   ])
 
-  // ─── SAUVEGARDE ────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
     if (savingRef.current || hasCompletedSave.current) return
 
@@ -724,7 +710,7 @@ export default function YouTube({ store, addToast }) {
               imageToSave = videoInfo.thumbnail
             }
           } catch (e) {
-            console.warn('⚠️ Erreur téléchargement miniature:', e.message)
+            logWarn('YouTube', 'Erreur téléchargement miniature', e)
             imageToSave = videoInfo.thumbnail
           }
         }
@@ -773,7 +759,7 @@ export default function YouTube({ store, addToast }) {
         hasCompletedSave.current = false
       }, 500)
     } catch (error) {
-      console.error('❌ [YouTube] Erreur sauvegarde:', error)
+      logError('YouTube', 'Erreur sauvegarde', error)
       clearInterval(saveInterval)
 
       youtubeModuleState.step = savedGlobals.step
@@ -796,7 +782,6 @@ export default function YouTube({ store, addToast }) {
     targetProfiles, store, addToast, t, confirm, previewHowl, emoji, isTutorialMode,
   ])
 
-  // ─── PICK IMAGE ────────────────────────────────────────────────────────
   const handlePickImage = useCallback(async () => {
     const imgPath = await window.electronAPI.openImageDialog()
     if (imgPath) {
@@ -809,7 +794,6 @@ export default function YouTube({ store, addToast }) {
     }
   }, [addToast, t])
 
-  // ─── RENDU ────────────────────────────────────────────────────────────
   const currentStep = step || youtubeModuleState.step
   const currentVideoInfo = videoInfo || youtubeModuleState.videoInfo
   const currentDownloadedPath = downloadedPath || youtubeModuleState.downloadedPath

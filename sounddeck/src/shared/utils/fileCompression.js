@@ -1,24 +1,6 @@
 // src/shared/utils/fileCompression.js
+import { logWarn } from './logger'
 
-/**
- * Compresse un fichier audio si `enabled === true`.
- * Ne throw jamais : retourne toujours un chemin valide (original si échec).
- *
- * @param {string} filePath - Chemin absolu du fichier source
- * @param {Object} options
- * @param {boolean} options.enabled - Active la compression
- * @param {number}  options.bitrate - Bitrate en kbps (défaut 128)
- * @param {boolean} options.deleteOriginal - Supprime le fichier source après succès
- * @param {Function} options.onWarning - Callback(warningMessage)
- * @returns {Promise<{
- *   success: boolean,
- *   path: string,
- *   compressed: boolean,
- *   originalSize?: number,
- *   compressedSize?: number,
- *   compressionRatio?: number,
- * }>}
- */
 export async function compressFileIfNeeded(filePath, options = {}) {
   const {
     enabled = false,
@@ -27,12 +9,10 @@ export async function compressFileIfNeeded(filePath, options = {}) {
     onWarning = null,
   } = options
 
-  // Pas de compression demandée → retour direct
   if (!enabled || !filePath) {
     return { success: true, path: filePath, compressed: false }
   }
 
-  // API non disponible → warn et skip
   if (typeof window.electronAPI?.convertAudio !== 'function') {
     onWarning?.('convertAudio non disponible')
     return { success: true, path: filePath, compressed: false }
@@ -56,7 +36,6 @@ export async function compressFileIfNeeded(filePath, options = {}) {
       return { success: true, path: originalPath, compressed: false }
     }
 
-    // Supprimer l'original après succès
     if (deleteOriginal) {
       try {
         await window.electronAPI.deleteSoundFile(originalPath)
@@ -67,7 +46,8 @@ export async function compressFileIfNeeded(filePath, options = {}) {
 
     const originalSize = result.originalSize || 0
     const compressedSize = result.size || 0
-    const compressionRatio = originalSize > 0 ? compressedSize / originalSize : 1
+    const compressionRatio =
+      originalSize > 0 ? compressedSize / originalSize : 1
 
     return {
       success: true,
@@ -78,7 +58,7 @@ export async function compressFileIfNeeded(filePath, options = {}) {
       compressionRatio,
     }
   } catch (e) {
-    console.warn('⚠️ [compressFileIfNeeded] Erreur:', e)
+    logWarn('fileCompression', 'Erreur', e)
     onWarning?.(e.message)
     return { success: true, path: filePath, compressed: false }
   }

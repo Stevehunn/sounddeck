@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react
 import { createPortal } from 'react-dom';
 import { useLanguage } from '@core/i18n/LanguageContext';
 import { setItem } from '@shared/utils/appStorage'
+import { logError } from '@shared/utils/logger'
 
 // ─── CONSTANTES ─────────────────────────────────────────────────────────────
 
@@ -416,7 +417,7 @@ export default function TutorialOverlay({
       try {
         stepData.onShow()
       } catch (e) {
-        console.error('[TutorialOverlay] Erreur onShow:', e)
+        logError('TutorialOverlay', 'Erreur onShow', e)
       }
     }
   }, [showBubble, currentStep, stepData])
