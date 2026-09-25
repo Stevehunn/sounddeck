@@ -4,29 +4,38 @@ import {
   subscribeToPlayback,
   isPlaying,
   getSoundProgress,
+  isPausedSound,
 } from '@core/services/AudioService'
 
 const PROGRESS_POLL_MS = 250
 const MIN_DURATION_FOR_BAR = 2
+const MAX_MISS_TOLERANCE = 4
 
 /**
- * Hook qui retourne le son actuellement en lecture + sa progression
+ * Hook qui retourne le son actuellement en lecture + sa progression + état pause
  * @param {Array} sounds - Liste de tous les sons du store
- * @returns {{ sound: object|null, progress: {current, duration, ratio}|null }}
+ * @returns {{ sound: object|null, progress: object|null, isPaused: boolean }}
  */
 export function useCurrentPlaying(sounds) {
   const [playingId, setPlayingId] = useState(null)
   const [progress, setProgress] = useState(null)
+  const [isPaused, setIsPaused] = useState(false)
   const soundsRef = useRef(sounds)
+  const missCountRef = useRef(0)
 
   useEffect(() => {
     soundsRef.current = sounds
   }, [sounds])
 
-  // S'abonner aux événements de lecture (play / stop)
   useEffect(() => {
     const unsubscribe = subscribeToPlayback((state) => {
-      setPlayingId(state.id || null)
+      const newId = state.id || null
+      setPlayingId(newId)
+      missCountRef.current = 0
+      if (!newId) {
+        setProgress(null)
+        setIsPaused(false)
+      }
     })
     return unsubscribe
   }, [])
@@ -34,35 +43,46 @@ export function useCurrentPlaying(sounds) {
   useEffect(() => {
     if (!playingId) {
       setProgress(null)
+      setIsPaused(false)
+      missCountRef.current = 0
       return
     }
 
     const interval = setInterval(() => {
-      // Guard : si le son n'est plus en lecture, on reset
+      // Sync pause state
+      setIsPaused(isPausedSound(playingId))
+
       if (!isPlaying(playingId)) {
-        setPlayingId(null)
-        setProgress(null)
+        missCountRef.current += 1
+        if (missCountRef.current >= MAX_MISS_TOLERANCE) {
+          if (!isPausedSound(playingId)) {
+            setPlayingId(null)
+            setProgress(null)
+            setIsPaused(false)
+            missCountRef.current = 0
+          }
+        }
         return
       }
 
-      const p = getSoundProgress(playingId)
+      missCountRef.current = 0
 
-      // Guard : on n'affiche la barre que pour les sons assez longs
+      const p = getSoundProgress(playingId)
       if (p && p.duration > MIN_DURATION_FOR_BAR) {
         setProgress(p)
-      } else if (progress !== null) {
+      } else {
         setProgress(null)
       }
     }, PROGRESS_POLL_MS)
 
     return () => clearInterval(interval)
-  }, [playingId, progress])
+  }, [playingId])
 
   const sound = playingId
-    ? soundsRef.current?.find(s => s.id === playingId) || null
+    ? soundsRef.current?.find((s) => s.id === playingId) || null
     : null
 
-  return { sound, progress }
+  return { sound, progress, isPaused }
 }
 
 export default useCurrentPlaying

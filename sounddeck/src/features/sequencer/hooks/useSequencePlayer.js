@@ -7,6 +7,8 @@ import {
   setCurrentPlayingProgress,
   getFinalVolumeForSound,
   analyzeGain,
+  registerExternalPlayback,
+  unregisterExternalPlayback,
 } from '@core/services/AudioService'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 
@@ -27,11 +29,12 @@ export function useSequencePlayer({
   const playingRef = useRef(false)
   const currentIdxRef = useRef(-1)
 
-  // ✅ FIX : ref pour loopPlaylist (évite les stale closures)
   const loopPlaylistRef = useRef(loopPlaylist)
   useEffect(() => {
     loopPlaylistRef.current = loopPlaylist
   }, [loopPlaylist])
+
+  const lastRegisteredSoundIdRef = useRef(null)
 
   useEffect(() => {
     playingRef.current = playing
@@ -40,6 +43,13 @@ export function useSequencePlayer({
   useEffect(() => {
     currentIdxRef.current = currentIdx
   }, [currentIdx])
+
+  const cleanupExternalPlayback = useCallback(() => {
+    if (lastRegisteredSoundIdRef.current) {
+      unregisterExternalPlayback(lastRegisteredSoundIdRef.current)
+      lastRegisteredSoundIdRef.current = null
+    }
+  }, [])
 
   // ─── PROGRESSION ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -77,9 +87,9 @@ export function useSequencePlayer({
   // ─── LECTURE ─────────────────────────────────────────────────────────
   const playFrom = useCallback(
     async (idx) => {
+      cleanupExternalPlayback()
+
       if (idx >= items.length) {
-        // ✅ FIX : on lit loopPlaylistRef.current (valeur actuelle)
-        // et non loopPlaylist capturé dans la closure
         if (loopPlaylistRef.current) {
           playFrom(0)
           return
@@ -125,10 +135,33 @@ export function useSequencePlayer({
           }, delay * 1000)
         },
       })
+      const soundId = item.soundId
+      registerExternalPlayback(soundId, {
+        isPaused: () => {
+          if (!howlRef.current) return false
+
+          return !howlRef.current.playing()
+        },
+        pause: () => {
+          if (howlRef.current && howlRef.current.playing()) {
+            howlRef.current.pause()
+            return true
+          }
+          return false
+        },
+        resume: () => {
+          if (howlRef.current) {
+            howlRef.current.play()
+            return true
+          }
+          return false
+        },
+      })
+      lastRegisteredSoundIdRef.current = soundId
+
       howlRef.current.play()
     },
-    // ✅ FIX : loopPlaylist retiré des dépendances (via ref désormais)
-    [items, sounds, volume]
+    [items, sounds, volume, cleanupExternalPlayback]
   )
 
   const start = useCallback(() => {
@@ -139,6 +172,8 @@ export function useSequencePlayer({
   }, [items.length, playFrom])
 
   const stop = useCallback(() => {
+    cleanupExternalPlayback()
+
     setPlaying(false)
     setCurrentIdx(-1)
     playingRef.current = false
@@ -152,7 +187,7 @@ export function useSequencePlayer({
       howlRef.current = null
     }
     setCurrentPlayingSound(null)
-  }, [])
+  }, [cleanupExternalPlayback])
 
   const goNext = useCallback(() => {
     if (sequenceRef.current) {
@@ -168,7 +203,6 @@ export function useSequencePlayer({
     if (next < itemsRef.current.length) {
       playFrom(next)
     } else if (loopPlaylistRef.current) {
-      // ✅ FIX : ref
       playFrom(0)
     } else {
       stop()

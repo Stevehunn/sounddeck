@@ -12,6 +12,9 @@ let storeRef = null
 const DEFAULT_NORMALIZATION_TARGET_RMS = 0.2
 let normalizationTargetRMS = DEFAULT_NORMALIZATION_TARGET_RMS
 
+const pausedSounds = new Set()
+const externalPlaybackHandlers = new Map()
+
 export function setStoreRef(store) {
   storeRef = store
 }
@@ -33,7 +36,7 @@ export function subscribeToPlayback(callback) {
 
 function notifyPlaybackListeners(id) {
   currentPlayingId = id
-  playbackListeners.forEach(cb => {
+  playbackListeners.forEach((cb) => {
     try {
       cb({ id })
     } catch (e) {
@@ -42,7 +45,7 @@ function notifyPlaybackListeners(id) {
   })
 }
 
-// ─── OVERRIDE POUR LECTEURS EXTERNES (séquenceur, etc.) ────────────────────
+// ─── OVERRIDE POUR LECTEURS EXTERNES ────────────────────────────────────────
 
 let manualOverrideId = null
 let manualProgress = { id: null, current: 0, duration: 0, ratio: 0 }
@@ -65,17 +68,47 @@ export function setCurrentPlayingProgress(soundId, current, duration) {
   }
 }
 
-// ─── détection des devices virtuels ─────────────────────────
+// ─── REGISTRE DES LECTEURS EXTERNES ────────────────────────────────────────
+
+/**
+ * Enregistre des handlers de pause/resume/isPaused pour un soundId donné.
+ * Utilisé par les lecteurs externes (ex: Séquenceur) qui gèrent leur propre
+ * source audio en dehors de soundCache.
+ *
+ * @param {string} soundId
+ * @param {{ pause?: () => boolean, resume?: () => boolean, isPaused?: () => boolean }} handlers
+ */
+export function registerExternalPlayback(soundId, handlers) {
+  if (!soundId || !handlers) return
+  externalPlaybackHandlers.set(soundId, handlers)
+}
+
+/**
+ * Retire les handlers d'un soundId.
+ */
+export function unregisterExternalPlayback(soundId) {
+  if (!soundId) return
+  externalPlaybackHandlers.delete(soundId)
+}
+
+// ─── DÉTECTION DES DEVICES VIRTUELS ────────────────────────────────────────
 
 const VIRTUAL_DEVICE_KEYWORDS = [
-  'cable', 'vb-audio', 'vb audio', 'virtual', 'voicemeeter', 'scream',
+  'cable',
+  'vb-audio',
+  'vb audio',
+  'virtual',
+  'voicemeeter',
+  'scream',
 ]
 
 async function getDeviceLabel(deviceId) {
   if (!deviceId || deviceId === 'default') return ''
   try {
     const devices = await navigator.mediaDevices.enumerateDevices()
-    const device = devices.find(d => d.deviceId === deviceId && d.kind === 'audiooutput')
+    const device = devices.find(
+      (d) => d.deviceId === deviceId && d.kind === 'audiooutput'
+    )
     return (device?.label || '').toLowerCase()
   } catch (e) {
     return ''
@@ -84,21 +117,12 @@ async function getDeviceLabel(deviceId) {
 
 function isVirtualDeviceLabel(label) {
   if (!label) return false
-  return VIRTUAL_DEVICE_KEYWORDS.some(kw => label.includes(kw))
+  return VIRTUAL_DEVICE_KEYWORDS.some((kw) => label.includes(kw))
 }
 
-/**
- * Détermine si on doit créer un Howl local.
- * Skip si :
- *   - localDeviceId est explicitement virtuel (CABLE, VB-Audio, etc.)
- *   - localDeviceId === 'default' ET audioDevice est virtuel (Windows
- *     default pointe probablement vers le même CABLE)
- *   - localDeviceId === audioDevice (même device explicite)
- */
 async function shouldCreateLocalHowl(audioDevice, localDeviceId, playLocally) {
   if (!playLocally) return false
 
-  // Cas direct : device local = device virtuel explicite
   if (localDeviceId === audioDevice) {
     logWarn('AudioService', `Skip local : même device (${audioDevice})`)
     return false
@@ -107,17 +131,13 @@ async function shouldCreateLocalHowl(audioDevice, localDeviceId, playLocally) {
   const audioLabel = await getDeviceLabel(audioDevice)
   const localLabel = await getDeviceLabel(localDeviceId)
 
-  // Le device virtuel (audioDevice) est-il un device virtuel connu ?
   const audioIsVirtual = isVirtualDeviceLabel(audioLabel)
-
-  // Le local est-il un device virtuel ?
   const localIsVirtual = isVirtualDeviceLabel(localLabel)
 
   if (localIsVirtual) {
     logWarn(
       'AudioService',
-      `Skip local : "${localLabel}" est un device virtuel. ` +
-      `Configure un casque/enceintes dans Options → Audio.`
+      `Skip local : "${localLabel}" est un device virtuel. Configure un casque/enceintes dans Options → Audio.`
     )
     return false
   }
@@ -125,8 +145,7 @@ async function shouldCreateLocalHowl(audioDevice, localDeviceId, playLocally) {
   if (localDeviceId === 'default' && audioIsVirtual) {
     logWarn(
       'AudioService',
-      `Skip local : localDeviceId='default' + audioDevice virtuel. ` +
-      `Sélectionne explicitement ton casque dans Options → Audio pour jouer en local.`
+      `Skip local : localDeviceId='default' + audioDevice virtuel. Sélectionne explicitement ton casque dans Options → Audio pour jouer en local.`
     )
     return false
   }
@@ -167,7 +186,10 @@ export async function analyzeGain(filePath, sampleCount = 200) {
 }
 
 export function setNormalizationTarget(targetRMS) {
-  const clamped = Math.max(0.02, Math.min(1, Number(targetRMS) || DEFAULT_NORMALIZATION_TARGET_RMS))
+  const clamped = Math.max(
+    0.02,
+    Math.min(1, Number(targetRMS) || DEFAULT_NORMALIZATION_TARGET_RMS)
+  )
   normalizationTargetRMS = clamped
 }
 
@@ -178,7 +200,7 @@ export function getNormalizationTarget() {
 function calculateFinalVolume(globalVolume, soundVolumeDb, gainDb = 0) {
   const normalizedGlobal = globalVolume / 100
   const globalRatio = Math.pow(normalizedGlobal, 1.8)
-  const individualGain = (soundVolumeDb || 0)
+  const individualGain = soundVolumeDb || 0
   const normalizationGain = gainDb || 0
   const totalGainDb = individualGain + normalizationGain
   const linearGain = Math.pow(10, totalGainDb / 20)
@@ -195,28 +217,49 @@ export function getFinalVolumeForSound(sound, globalVolume = 80) {
 
 // ─── Mode Normal (sans mixeur) ─────────────────────────────────────────────
 
-function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
+function playSoundNormal(
+  sound,
+  audioDevice = 'default',
+  globalVolume = 80,
+  loop = false,
+  playLocally = true
+) {
   const gainDb = gainCache[sound.path] || 0
-  const volumeRatio = calculateFinalVolume(globalVolume, sound.volume ?? 0, gainDb)
+  const volumeRatio = calculateFinalVolume(
+    globalVolume,
+    sound.volume ?? 0,
+    gainDb
+  )
   const fileUrl = buildFileUrl(sound.path)
 
-  const rawExt = sound.path.split('.').pop()?.split('?')[0]?.split('#')[0]?.toLowerCase()
+  const rawExt = sound.path
+    .split('.')
+    .pop()
+    ?.split('?')[0]
+    ?.split('#')[0]
+    ?.toLowerCase()
   const validFormats = ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'opus', 'webm']
   const format = validFormats.includes(rawExt) ? rawExt : 'mp3'
 
-  // Si déjà en cache → stop et return
   if (soundCache[sound.id]) {
     const cached = soundCache[sound.id]
     if (Array.isArray(cached)) {
-      cached.forEach(h => { try { h.stop(); h.unload() } catch(e){} })
+      cached.forEach((h) => {
+        try {
+          h.stop()
+          h.unload()
+        } catch (e) {}
+      })
     } else {
-      try { cached.stop(); cached.unload() } catch(e){}
+      try {
+        cached.stop()
+        cached.unload()
+      } catch (e) {}
     }
     delete soundCache[sound.id]
     return
   }
 
-  // ─── Cas 1 : pas de device virtuel (device = default) ──────────────
   if (!audioDevice || audioDevice === 'default') {
     const howl = new Howl({
       src: [fileUrl],
@@ -245,11 +288,8 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
     return
   }
 
-  // ─── Cas 2 : device virtuel (CABLE) ───────────────────────────────
-
   const localDeviceId = storeRef?.localAudioDevice || 'default'
 
-  // Howl Discord : synchrone, immédiat
   try {
     const howls = []
 
@@ -278,9 +318,9 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
       try {
         const audioNode = howlDiscord._sounds?.[0]?._node
         if (audioNode && audioNode.setSinkId) {
-          audioNode.setSinkId(audioDevice).catch(e =>
-            logWarn('AudioService', 'setSinkId failed', e)
-          )
+          audioNode
+            .setSinkId(audioDevice)
+            .catch((e) => logWarn('AudioService', 'setSinkId failed', e))
         }
       } catch (e) {
         logWarn('AudioService', 'setSinkId error', e)
@@ -292,45 +332,50 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
 
     soundCache[sound.id] = howls
 
-    shouldCreateLocalHowl(audioDevice, localDeviceId, playLocally).then(shouldCreate => {
-      if (!shouldCreate) return
+    shouldCreateLocalHowl(audioDevice, localDeviceId, playLocally).then(
+      (shouldCreate) => {
+        if (!shouldCreate) return
 
-      // Vérifier que le son n'a pas été stoppé entre-temps
-      if (!soundCache[sound.id]) return
+        if (!soundCache[sound.id]) return
 
-      const howlLocal = new Howl({
-        src: [fileUrl],
-        volume: volumeRatio,
-        html5: true,
-        loop,
-        format: [format],
-        onloaderror: (id, err) => {
-          logError('AudioService', 'lecture locale', err)
-        },
-      })
+        const howlLocal = new Howl({
+          src: [fileUrl],
+          volume: volumeRatio,
+          html5: true,
+          loop,
+          format: [format],
+          onloaderror: (id, err) => {
+            logError('AudioService', 'lecture locale', err)
+          },
+        })
 
-      howlLocal.once('play', () => {
-        try {
-          const audioNode = howlLocal._sounds?.[0]?._node
-          if (audioNode && audioNode.setSinkId) {
-            audioNode.setSinkId(localDeviceId).catch(() => {})
-          }
-        } catch (e) {}
-      })
+        howlLocal.once('play', () => {
+          try {
+            const audioNode = howlLocal._sounds?.[0]?._node
+            if (audioNode && audioNode.setSinkId) {
+              audioNode.setSinkId(localDeviceId).catch(() => {})
+            }
+          } catch (e) {}
+        })
 
-      // Ré-ajouter le Howl local dans le cache
-      if (Array.isArray(soundCache[sound.id])) {
-        soundCache[sound.id].push(howlLocal)
-      } else {
-        soundCache[sound.id] = [howlLocal]
+        if (Array.isArray(soundCache[sound.id])) {
+          soundCache[sound.id].push(howlLocal)
+        } else {
+          soundCache[sound.id] = [howlLocal]
+        }
+
+        howlLocal.play()
       }
-
-      howlLocal.play()
-    })
-
+    )
   } catch (e) {
     logError('AudioService', 'playSoundNormal', e)
-    const howl = new Howl({ src: [fileUrl], volume: volumeRatio, html5: false, loop, format: [format] })
+    const howl = new Howl({
+      src: [fileUrl],
+      volume: volumeRatio,
+      html5: false,
+      loop,
+      format: [format],
+    })
     soundCache[sound.id] = howl
     howl.play()
   }
@@ -338,7 +383,12 @@ function playSoundNormal(sound, audioDevice = 'default', globalVolume = 80, loop
 
 // ─── Mode Mixeur ───────────────────────────────────────────────────────────
 
-async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true) {
+async function playSoundWithMixer(
+  sound,
+  globalVolume,
+  loop,
+  playLocally = true
+) {
   const soundVolumeDb = sound.volumeDb ?? sound.volume ?? 0
   let soundRatio = Math.pow(10, soundVolumeDb / 20)
   soundRatio = Math.min(1, soundRatio)
@@ -428,7 +478,6 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
       if (Array.isArray(soundCache[sound.id])) {
         soundCache[sound.id].push(localHowl)
       }
-
     } catch (e) {
       logWarn('AudioService', 'Erreur lecture locale (mixer, catch)', e)
     }
@@ -437,7 +486,13 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
 
 // ─── API PRINCIPALE ────────────────────────────────────────────────────────
 
-export function playSound(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
+export function playSound(
+  sound,
+  audioDevice = 'default',
+  globalVolume = 80,
+  loop = false,
+  playLocally = true
+) {
   if (!sound?.path) return
   notifyPlaybackListeners(sound.id)
 
@@ -449,7 +504,13 @@ export function playSound(sound, audioDevice = 'default', globalVolume = 80, loo
   }
 }
 
-export async function playSoundAsync(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
+export async function playSoundAsync(
+  sound,
+  audioDevice = 'default',
+  globalVolume = 80,
+  loop = false,
+  playLocally = true
+) {
   if (!sound?.path) return
   notifyPlaybackListeners(sound.id)
 
@@ -487,6 +548,9 @@ export async function analyzeAllGains(sounds, onProgress) {
 export function stopSound(soundId) {
   const cached = soundCache[soundId]
 
+  // Cleanup du paused set
+  pausedSounds.delete(soundId)
+
   if (currentPlayingId === soundId) {
     notifyPlaybackListeners(null)
   }
@@ -503,7 +567,8 @@ export function stopSound(soundId) {
   if (!cached) return
 
   const isBufferSource = (h) =>
-    typeof AudioBufferSourceNode !== 'undefined' && h instanceof AudioBufferSourceNode
+    typeof AudioBufferSourceNode !== 'undefined' &&
+    h instanceof AudioBufferSourceNode
 
   const safeStop = (h) => {
     try {
@@ -535,9 +600,130 @@ export function registerStopSequencerCallback(cb) {
 }
 
 export function stopAllSounds() {
-  Object.keys(soundCache).forEach(k => stopSound(k))
+  Object.keys(soundCache).forEach((k) => stopSound(k))
   if (stopSequencerCallback) stopSequencerCallback()
 }
+
+// ─── PAUSE / RESUME ────────────────────────────────────────────────────────
+
+/**
+ * Met en pause le son spécifié.
+ * - Howl → howl.pause()
+ * - AudioBufferSourceNode (mixer) → suspendAudioContext()
+ */
+export function pauseSound(soundId) {
+  const cached = soundCache[soundId]
+  if (!cached || cached === 'loading') return false
+
+  const isBufferSource = (h) =>
+    typeof AudioBufferSourceNode !== 'undefined' &&
+    h instanceof AudioBufferSourceNode
+
+  try {
+    const items = Array.isArray(cached) ? cached : [cached]
+    let suspendedCtx = false
+
+    for (const h of items) {
+      if (isBufferSource(h)) {
+        if (!suspendedCtx) {
+          AudioMixerService.suspendAudioContext?.()
+          suspendedCtx = true
+        }
+      } else if (h?.pause && typeof h.pause === 'function') {
+        try {
+          h.pause()
+        } catch (e) {}
+      }
+    }
+
+    pausedSounds.add(soundId)
+    return true
+  } catch (e) {
+    logWarn('AudioService', 'Erreur pauseSound', e)
+    return false
+  }
+}
+
+/**
+ * Reprend la lecture du son spécifié.
+ */
+export function resumeSound(soundId) {
+  const cached = soundCache[soundId]
+  if (!cached || cached === 'loading') return false
+
+  const isBufferSource = (h) =>
+    typeof AudioBufferSourceNode !== 'undefined' &&
+    h instanceof AudioBufferSourceNode
+
+  try {
+    const items = Array.isArray(cached) ? cached : [cached]
+    let resumedCtx = false
+
+    for (const h of items) {
+      if (isBufferSource(h)) {
+        if (!resumedCtx) {
+          AudioMixerService.resumeAudioContext?.()
+          resumedCtx = true
+        }
+      } else if (h?.play && typeof h.play === 'function') {
+        try {
+          h.play()
+        } catch (e) {}
+      }
+    }
+
+    pausedSounds.delete(soundId)
+    return true
+  } catch (e) {
+    logWarn('AudioService', 'Erreur resumeSound', e)
+    return false
+  }
+}
+
+/**
+ * Retourne true si le son est en pause.
+ * consulte d'abord les handlers externes (Séquenceur, etc.)
+ */
+export function isPausedSound(soundId) {
+  // Priorité aux handlers externes (Séquenceur, etc.)
+  const ext = externalPlaybackHandlers.get(soundId)
+  if (ext?.isPaused) {
+    try {
+      return ext.isPaused()
+    } catch (e) {
+      logWarn('AudioService', 'Erreur ext.isPaused', e)
+    }
+  }
+
+  return pausedSounds.has(soundId)
+}
+
+/**
+ * Toggle pause/resume.
+ * si le sonId a un handler externe (Séquenceur), on l'utilise.
+ */
+export function togglePauseSound(soundId) {
+  // Priorité aux handlers externes (Séquenceur, etc.)
+  const ext = externalPlaybackHandlers.get(soundId)
+  if (ext) {
+    try {
+      const isPaused = ext.isPaused?.() ?? false
+      return isPaused
+        ? (ext.resume?.() ?? false)
+        : (ext.pause?.() ?? false)
+    } catch (e) {
+      logWarn('AudioService', 'Erreur togglePauseSound (ext)', e)
+      return false
+    }
+  }
+
+  if (pausedSounds.has(soundId)) {
+    return resumeSound(soundId)
+  }
+  return pauseSound(soundId)
+}
+
+// ─── API DE LECTURE ────────────────────────────────────────────────────────
 
 export function isPlaying(soundId) {
   if (manualOverrideId === soundId) return true
@@ -546,7 +732,7 @@ export function isPlaying(soundId) {
   if (!cached) return false
 
   if (Array.isArray(cached)) {
-    return cached.some(h => h.playing && h.playing())
+    return cached.some((h) => h.playing && h.playing())
   }
 
   if (cached.playing && typeof cached.playing === 'function') {
@@ -628,4 +814,11 @@ export default {
   setCurrentPlayingSound,
   setCurrentPlayingProgress,
   getFinalVolumeForSound,
+  // Pause / Resume
+  pauseSound,
+  resumeSound,
+  isPausedSound,
+  togglePauseSound,
+  registerExternalPlayback,
+  unregisterExternalPlayback,
 }

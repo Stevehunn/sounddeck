@@ -71,6 +71,8 @@ export default {
   stopAll: 'Detener todo',
   volume: 'Volumen',
   resetVolume: 'Reiniciar volumen',
+  pause: 'Pausa',
+  resume: 'Reanudar',
 
   // ─── PERFILES ──────────────────────────────────────────────────────────
   profiles: 'Perfiles',

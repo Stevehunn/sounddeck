@@ -71,6 +71,8 @@ export default {
   stopAll: 'Stop all',
   volume: 'Volume',
   resetVolume: 'Reset volume',
+  pause: 'Pause',
+  resume: 'Resume',
 
   // ─── PROFILES ────────────────────────────────────────────────────────
   profiles: 'Profiles',

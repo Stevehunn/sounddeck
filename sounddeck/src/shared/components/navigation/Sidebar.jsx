@@ -3,13 +3,14 @@ import { useState, useEffect, useMemo, useRef, memo } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { useCurrentPlaying } from '@shared/hooks/useCurrentPlaying'
 import { formatTime } from '@shared/utils/format'
+import { togglePauseSound } from '@core/services/AudioService'
 import {
   ACTION_IDS,
   DEFAULT_GROUPS,
   DEFAULT_ICONS,
+  CORE_PAGES,
 } from '@shared/constants/navigation'
 import { buildFileUrl } from '@shared/utils/fileUrl'
-import { CORE_PAGES } from '@shared/constants/pages'
 
 // Map des labels par défaut pour les éléments (traductions)
 const getDefaultLabels = (t) => ({
@@ -83,29 +84,32 @@ const Sidebar = memo(
     const [newProfileName, setNewProfileName] = useState('')
     const [showNewProfile, setShowNewProfile] = useState(false)
     const [shortcutsEnabled, setShortcutsEnabled] = useState(true)
+    const [isHoveringNowPlaying, setIsHoveringNowPlaying] = useState(false)
 
     const [draggedProfileId, setDraggedProfileId] = useState(null)
     const [dragOverProfileId, setDragOverProfileId] = useState(null)
 
-    const { sound: playingSound, progress } = useCurrentPlaying(sounds)
+    const { sound: playingSound, progress, isPaused } = useCurrentPlaying(sounds)
     const showNowPlaying =
       (currentPage === 'home' || currentPage === 'sequencer') && playingSound
 
     const stableVisibleItemsRef = useRef({ pinned: [], groups: {} })
     const [visibleItems, setVisibleItems] = useState({ pinned: [], groups: {} })
 
-    const CORE_PAGE_IDS = useMemo(() => new Set([
-      'home', 'trimmer', 'editor', 'sequencer', 'stats', 'emoji', 'guide', 'options',
-    ]), [])
+    const CORE_PAGE_IDS = useMemo(
+      () => new Set(CORE_PAGES.map((p) => p.id)),
+      []
+    )
 
     const ACTION_IDS_SET = useMemo(() => new Set(ACTION_IDS), [])
 
     const pluginPageIds = useMemo(
-      () => new Set(
-        (pluginPages || [])
-          .filter(p => p.isPlugin && p.sidebarVisible !== false)
-          .map(p => p.id)
-      ),
+      () =>
+        new Set(
+          (pluginPages || [])
+            .filter((p) => p.isPlugin && p.sidebarVisible !== false)
+            .map((p) => p.id)
+        ),
       [pluginPages]
     )
 
@@ -176,8 +180,15 @@ const Sidebar = memo(
         stableVisibleItemsRef.current = newVisibleItems
         setVisibleItems(newVisibleItems)
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sidebarConfig, t, profiles, pluginPages, CORE_PAGE_IDS, ACTION_IDS_SET, pluginPageIds])
+    }, [
+      sidebarConfig,
+      t,
+      profiles,
+      pluginPages,
+      CORE_PAGE_IDS,
+      ACTION_IDS_SET,
+      pluginPageIds,
+    ])
 
     const getItemLabel = (item, defaultLabels) => {
       if (item.id && item.id.startsWith('profile-')) {
@@ -225,6 +236,11 @@ const Sidebar = memo(
       } catch (e) {
         console.error('Erreur toggle shortcuts:', e)
       }
+    }
+
+    const handleTogglePause = () => {
+      if (!playingSound) return
+      togglePauseSound(playingSound.id)
     }
 
     const handleProfileDragStart = (e, profileId) => {
@@ -489,7 +505,9 @@ const Sidebar = memo(
               }`}
               style={{ fontSize: 15 }}
             />
-            <span style={{ flex: 1, textAlign: 'left' }}>{t('shortcuts')}</span>
+            <span style={{ flex: 1, textAlign: 'left' }}>
+              {t('shortcuts')}
+            </span>
             <span
               style={{
                 fontSize: 10,
@@ -670,8 +688,11 @@ const Sidebar = memo(
                 {t('profiles')}
               </div>
             </div>
-            {!allPinned && renderProfileItem(profiles.find((p) => p.id === 'all'))}
-            {nonPinnedProfiles.map((profile) => renderProfileItem(profile, true))}
+            {!allPinned &&
+              renderProfileItem(profiles.find((p) => p.id === 'all'))}
+            {nonPinnedProfiles.map((profile) =>
+              renderProfileItem(profile, true)
+            )}
             {showNewProfile ? (
               <div
                 style={{
@@ -855,7 +876,15 @@ const Sidebar = memo(
           }}
         >
           {showNowPlaying ? (
-            <div style={{ width: '100%', minWidth: 0 }}>
+            <div
+              onMouseEnter={() => setIsHoveringNowPlaying(true)}
+              onMouseLeave={() => setIsHoveringNowPlaying(false)}
+              style={{
+                width: '100%',
+                minWidth: 0,
+                position: 'relative',
+              }}
+            >
               <div
                 style={{
                   display: 'flex',
@@ -865,11 +894,13 @@ const Sidebar = memo(
                 }}
               >
                 <i
-                  className="ti ti-volume"
+                  className={isPaused ? 'ti ti-player-pause' : 'ti ti-volume'}
                   style={{
                     fontSize: 11,
                     color: 'var(--accent)',
-                    animation: 'pulse 1.2s ease-in-out infinite',
+                    animation: isPaused
+                      ? 'none'
+                      : 'pulse 1.2s ease-in-out infinite',
                   }}
                 />
                 <span
@@ -881,7 +912,7 @@ const Sidebar = memo(
                     letterSpacing: '0.08em',
                   }}
                 >
-                  {t('nowPlaying')}
+                  {isPaused ? t('paused') : t('nowPlaying')}
                 </span>
               </div>
 
@@ -892,6 +923,8 @@ const Sidebar = memo(
                   gap: 8,
                   marginBottom: 8,
                   minWidth: 0,
+                  paddingRight: isHoveringNowPlaying ? 32 : 0,
+                  transition: 'padding-right 0.15s ease',
                 }}
               >
                 {playingSound.image ? (
@@ -911,7 +944,9 @@ const Sidebar = memo(
                     }}
                   />
                 ) : (
-                  <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1 }}>
+                  <span
+                    style={{ fontSize: 18, flexShrink: 0, lineHeight: 1 }}
+                  >
                     {playingSound.emoji || '🔊'}
                   </span>
                 )}
@@ -929,6 +964,48 @@ const Sidebar = memo(
                   {playingSound.name}
                 </span>
               </div>
+
+              {/* bouton pause/play au survol */}
+              {isHoveringNowPlaying && (
+                <button
+                  onClick={handleTogglePause}
+                  title={isPaused ? t('resume') : t('pause')}
+                  data-testid="sidebar-toggle-pause-button"
+                  style={{
+                    position: 'absolute',
+                    top: 18,
+                    right: 0,
+                    width: 26,
+                    height: 26,
+                    borderRadius: '50%',
+                    background: 'var(--accent)',
+                    border: 'none',
+                    color: 'white',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 8px rgba(124,111,247,0.4)',
+                    transition: 'transform 0.15s ease, background 0.15s ease',
+                    zIndex: 10,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.1)'
+                    e.currentTarget.style.background = 'var(--accent-hover)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)'
+                    e.currentTarget.style.background = 'var(--accent)'
+                  }}
+                >
+                  <i
+                    className={`ti ${
+                      isPaused ? 'ti-player-play-filled' : 'ti-player-pause-filled'
+                    }`}
+                    style={{ fontSize: 14 }}
+                  />
+                </button>
+              )}
 
               {progress ? (
                 <>
@@ -972,7 +1049,7 @@ const Sidebar = memo(
                     fontStyle: 'italic',
                   }}
                 >
-                  ▶️ {t('playing')}
+                  {isPaused ? `⏸️ ${t('paused')}` : `▶️ ${t('playing')}`}
                 </div>
               )}
             </div>
