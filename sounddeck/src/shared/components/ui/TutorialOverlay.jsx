@@ -15,6 +15,9 @@ const PREFERRED_BUBBLE_WIDTH = 400
 const PREFERRED_BUBBLE_HEIGHT = 340
 const FOOTER_RESERVED = 60
 
+//  Seuil au-delà duquel on considère la zone "trop grande"
+const BIG_ZONE_RATIO = 0.6
+
 // ─── UTILS ──────────────────────────────────────────────────────────────────
 
 function clamp(v, min, max) {
@@ -48,6 +51,34 @@ function findElement(selector, fallbackSelector) {
     return null
   }
   return tryGet(selector) || tryGet(fallbackSelector)
+}
+
+/**
+ * Clampe un rect au viewport visible.
+ * Garantit que la zone de highlight ne dépasse jamais de l'écran.
+ */
+function clampRectToViewport(rect) {
+  const { vw, vh } = getViewport()
+  const p = VIEWPORT_PADDING
+
+  const top = Math.max(p, Math.min(vh - p, rect.top))
+  const bottom = Math.max(p, Math.min(vh - p, rect.bottom))
+  const left = Math.max(p, Math.min(vw - p, rect.left))
+  const right = Math.max(p, Math.min(vw - p, rect.right))
+
+  const width = Math.max(0, right - left)
+  const height = Math.max(0, bottom - top)
+
+  return {
+    top,
+    left,
+    width,
+    height,
+    centerX: left + width / 2,
+    centerY: top + height / 2,
+    bottom,
+    right,
+  }
 }
 
 function getElementRect(el) {
@@ -213,8 +244,6 @@ export default function TutorialOverlay({
   const actionTimeoutRef = useRef(null)
   const layoutReadyStepRef = useRef(-1)
   const correctedForStepRef = useRef(-1)
-
-  // ✅ NOUVEAU : évite d'appeler onShow plusieurs fois pour la même étape
   const onShowCalledRef = useRef(-1)
 
   const stepData = steps[currentStep] || steps[0]
@@ -261,7 +290,7 @@ export default function TutorialOverlay({
     const data = steps[currentStep] || steps[0]
     const { vw, vh } = getViewport()
 
-    if (!data?.target) {
+    const centerFallbackLayout = () => {
       const bw = Math.min(PREFERRED_BUBBLE_WIDTH, vw - 2 * VIEWPORT_PADDING)
       const bh = Math.min(PREFERRED_BUBBLE_HEIGHT, vh - 2 * VIEWPORT_PADDING)
       setLayout({
@@ -275,25 +304,18 @@ export default function TutorialOverlay({
       setTargetRect(null)
       setArrowPos({ x: null, y: null })
       layoutReadyStepRef.current = currentStep
+    }
+
+    // Pas de target → bulle centrée
+    if (!data?.target) {
+      centerFallbackLayout()
       return
     }
 
     const el = findElement(data.target, data.fallbackTarget)
 
     if (!el) {
-      const bw = Math.min(PREFERRED_BUBBLE_WIDTH, vw - 2 * VIEWPORT_PADDING)
-      const bh = Math.min(PREFERRED_BUBBLE_HEIGHT, vh - 2 * VIEWPORT_PADDING)
-      setLayout({
-        top: (vh - bh) / 2,
-        left: (vw - bw) / 2,
-        width: bw,
-        height: bh,
-        arrow: null,
-        direction: 'center',
-      })
-      setTargetRect(null)
-      setArrowPos({ x: null, y: null })
-      layoutReadyStepRef.current = currentStep
+      centerFallbackLayout()
       return
     }
 
@@ -301,9 +323,41 @@ export default function TutorialOverlay({
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const rect = getElementRect(el)
-        if (!rect) return
+        const rawRect = getElementRect(el)
+        if (!rawRect) {
+          centerFallbackLayout()
+          return
+        }
 
+        // On clampe au viewport (highlight ne déborde plus)
+        const rect = clampRectToViewport(rawRect)
+
+        // Détection "zone trop grande" → bulle ancrée en bas de l'écran
+        const isBigZone =
+          rect.height > vh * BIG_ZONE_RATIO ||
+          rect.width > vw * BIG_ZONE_RATIO
+
+        if (isBigZone) {
+          const bw = Math.min(PREFERRED_BUBBLE_WIDTH, vw - 2 * VIEWPORT_PADDING)
+          const bh = Math.min(
+            PREFERRED_BUBBLE_HEIGHT,
+            vh - 2 * VIEWPORT_PADDING
+          )
+          setLayout({
+            top: vh - bh - VIEWPORT_PADDING,
+            left: (vw - bw) / 2,
+            width: bw,
+            height: bh,
+            arrow: null,
+            direction: 'bottom-fixed',
+          })
+          setTargetRect(rect)
+          setArrowPos({ x: null, y: null })
+          layoutReadyStepRef.current = currentStep
+          return
+        }
+
+        // Comportement classique pour les zones raisonnables
         const newLayout = computeBubbleLayout(rect, data.position)
         const offset = computeArrowOffset(newLayout, rect)
 
@@ -345,8 +399,7 @@ export default function TutorialOverlay({
     }
   }, [isOpen, updateTarget])
 
-  // ✅ Expose une fonction globale pour forcer le recalcul de la position
-  // Utilisé par les steps qui ouvrent un menu/panneau après onShow
+  // Fonction globale pour forcer le recalcul (utilisée par certains steps)
   useEffect(() => {
     if (!isOpen) return
     window.__tutorialUpdateTarget = () => {
@@ -407,7 +460,6 @@ export default function TutorialOverlay({
     }
   }, [layout, currentStep, targetRect])
 
-  // ✅ NOUVEAU : appel onShow UNE SEULE FOIS par étape, dès que la bulle est prête
   const showBubble = layoutReadyStepRef.current === currentStep && layout !== null
   useEffect(() => {
     if (!showBubble) return
@@ -469,7 +521,6 @@ export default function TutorialOverlay({
     if (typeof onSkip === 'function') {
       onSkip()
     } else {
-      // Fallback (au cas où onSkip n'est pas fourni)
       if (pageId) {
         setItem(`sounddeck-tutorial-${pageId}-done`, true).catch(() => {})
       }

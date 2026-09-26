@@ -400,7 +400,7 @@ export default {
   pluginsDisabledStatus: 'Désactivé',
 
   // ─── FEEDBACK ──────────────────────────────────────────────────────
-  feedback: 'Envoyer un feedback',
+  feedback: 'Envoyer un retour',
   feedbackDesc: 'Signalez un bug ou proposez une idée',
 
   // ─── SAUVEGARDE AUTOMATIQUE ────────────────────────────────────────

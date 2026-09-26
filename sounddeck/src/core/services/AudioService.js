@@ -70,22 +70,11 @@ export function setCurrentPlayingProgress(soundId, current, duration) {
 
 // ─── REGISTRE DES LECTEURS EXTERNES ────────────────────────────────────────
 
-/**
- * Enregistre des handlers de pause/resume/isPaused pour un soundId donné.
- * Utilisé par les lecteurs externes (ex: Séquenceur) qui gèrent leur propre
- * source audio en dehors de soundCache.
- *
- * @param {string} soundId
- * @param {{ pause?: () => boolean, resume?: () => boolean, isPaused?: () => boolean }} handlers
- */
 export function registerExternalPlayback(soundId, handlers) {
   if (!soundId || !handlers) return
   externalPlaybackHandlers.set(soundId, handlers)
 }
 
-/**
- * Retire les handlers d'un soundId.
- */
 export function unregisterExternalPlayback(soundId) {
   if (!soundId) return
   externalPlaybackHandlers.delete(soundId)
@@ -443,12 +432,12 @@ async function playSoundWithMixer(
     return
   }
 
-  const shouldPlayLocally = playLocally || storeRef?.monitoringEnabled || false
-  const mixerStats = AudioMixerService.getMixerStats?.() || {}
-  const mixerAlreadyPlaysLocally = !!mixerStats.audioElementActive
+  const shouldPlayLocally = playLocally || false
 
-  if (shouldPlayLocally && !mixerAlreadyPlaysLocally) {
+  if (shouldPlayLocally) {
     try {
+      const localDevice = storeRef?.localAudioDevice || 'default'
+
       const localHowl = new Howl({
         src: [fileUrl],
         volume: volumeRatio * 0.8,
@@ -464,7 +453,6 @@ async function playSoundWithMixer(
         try {
           const audioNode = localHowl._sounds?.[0]?._node
           if (audioNode && audioNode.setSinkId) {
-            const localDevice = storeRef?.localAudioDevice || 'default'
             audioNode.setSinkId(localDevice).catch(() => {})
           }
         } catch (e) {}
@@ -548,7 +536,6 @@ export async function analyzeAllGains(sounds, onProgress) {
 export function stopSound(soundId) {
   const cached = soundCache[soundId]
 
-  // Cleanup du paused set
   pausedSounds.delete(soundId)
 
   if (currentPlayingId === soundId) {
@@ -606,11 +593,6 @@ export function stopAllSounds() {
 
 // ─── PAUSE / RESUME ────────────────────────────────────────────────────────
 
-/**
- * Met en pause le son spécifié.
- * - Howl → howl.pause()
- * - AudioBufferSourceNode (mixer) → suspendAudioContext()
- */
 export function pauseSound(soundId) {
   const cached = soundCache[soundId]
   if (!cached || cached === 'loading') return false
@@ -644,9 +626,6 @@ export function pauseSound(soundId) {
   }
 }
 
-/**
- * Reprend la lecture du son spécifié.
- */
 export function resumeSound(soundId) {
   const cached = soundCache[soundId]
   if (!cached || cached === 'loading') return false
@@ -680,12 +659,7 @@ export function resumeSound(soundId) {
   }
 }
 
-/**
- * Retourne true si le son est en pause.
- * consulte d'abord les handlers externes (Séquenceur, etc.)
- */
 export function isPausedSound(soundId) {
-  // Priorité aux handlers externes (Séquenceur, etc.)
   const ext = externalPlaybackHandlers.get(soundId)
   if (ext?.isPaused) {
     try {
@@ -698,12 +672,7 @@ export function isPausedSound(soundId) {
   return pausedSounds.has(soundId)
 }
 
-/**
- * Toggle pause/resume.
- * si le sonId a un handler externe (Séquenceur), on l'utilise.
- */
 export function togglePauseSound(soundId) {
-  // Priorité aux handlers externes (Séquenceur, etc.)
   const ext = externalPlaybackHandlers.get(soundId)
   if (ext) {
     try {
@@ -814,7 +783,6 @@ export default {
   setCurrentPlayingSound,
   setCurrentPlayingProgress,
   getFinalVolumeForSound,
-  // Pause / Resume
   pauseSound,
   resumeSound,
   isPausedSound,

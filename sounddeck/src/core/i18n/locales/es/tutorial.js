@@ -166,16 +166,40 @@ export default {
 
   // ─── OPTIONS ────────────────────────────────────────────────────────
   tutorialOptionsStep1Title: 'Personalizar la apariencia',
-  tutorialOptionsStep1Desc: 'Cambia el tema (oscuro, claro, personalizado), el tamaño de las tarjetas y el idioma de la aplicación.',
-  tutorialOptionsStep1Hint: '💡 Consejo: El tema automático se adapta a la hora del día.',
-  
+  tutorialOptionsStep1Desc: 'Cambia el tema (oscuro, claro, personalizado), el tamaño de las tarjetas, el idioma y personaliza tu barra lateral.',
+  tutorialOptionsStep1Hint: '💡 Consejo: Puedes elegir un tema predefinido (Medianoche Azul, Bosque, Brasa) o crear tu propio tema personalizado.',
+
   tutorialOptionsStep2Title: 'Configurar el audio',
-  tutorialOptionsStep2Desc: 'Configura el mezclador para Discord, selecciona tu micrófono y ajusta los volúmenes.',
-  tutorialOptionsStep2Hint: '💡 Consejo: Activa el monitoreo para escucharte en tus auriculares.',
-  
+  tutorialOptionsStep2Desc: 'Configura el mezclador micro + sonidos para Discord, selecciona tu dispositivo de salida (CABLE Input) y tu micro, y ajusta los volúmenes.',
+  tutorialOptionsStep2Hint: '💡 Consejo: Activa "Escucharse" para monitorearte en tus auriculares. En Discord, desactiva "Supresión de ruido" y "Cancelación de eco" (SoundDeck se encarga).',
+
   tutorialOptionsStep3Title: 'Gestionar los atajos',
-  tutorialOptionsStep3Desc: 'Define tus atajos de teclado para cambiar de perfil, activar el bucle o detener todos los sonidos.',
-  tutorialOptionsStep3Hint: '💡 Consejo: El visualizador de teclado muestra todas las teclas utilizadas.',
+  tutorialOptionsStep3Desc: 'Define tus atajos globales: cambiar de perfil, activar el bucle, detener todos los sonidos, modo presentación, alternar ventana.',
+  tutorialOptionsStep3Hint: '💡 Consejo: El visualizador de teclado muestra todas las teclas utilizadas y los conflictos. Los atajos por sonido se configuran en cada tarjeta.',
+
+  tutorialOptionsStep4Title: 'Gestión de sonidos',
+  tutorialOptionsStep4Desc: 'Normaliza automáticamente el volumen de tus sonidos para evitar grandes diferencias, y vacía la caché de ganancias si es necesario.',
+  tutorialOptionsStep4Hint: '💡 Consejo: La normalización iguala el volumen percibido entre todos tus sonidos. Si cambias el objetivo, haz clic en "Reanalizar ganancias".',
+
+  tutorialOptionsStep5Title: 'Plugins',
+  tutorialOptionsStep5Desc: 'Instala plugins para añadir funciones: importación de YouTube, descubrimiento de MyInstants, descubrimiento de emojis, etc.',
+  tutorialOptionsStep5Hint: '💡 Consejo: Los plugins integrados (YouTube, MyInstants, Emoji) vienen preinstalados. Puedes desactivarlos si no los usas.',
+
+  tutorialOptionsStep6Title: 'Integraciones',
+  tutorialOptionsStep6Desc: 'Conecta SoundDeck a OBS vía WebSocket para iniciar/detener la grabación y el streaming desde SoundDeck.',
+  tutorialOptionsStep6Hint: '💡 Consejo: Activa "WebSocket server" en OBS (Herramientas → WebSocket Server Settings) y configura host/puerto/contraseña aquí.',
+
+  tutorialOptionsStep7Title: 'Opciones avanzadas',
+  tutorialOptionsStep7Desc: 'Activa la compresión automática al importar, exporta los registros de errores para depuración, o envíanos un comentario.',
+  tutorialOptionsStep7Hint: '💡 Consejo: La compresión reduce el tamaño de los archivos importados (MP3 128 kbps recomendado). Requiere ffmpeg.',
+
+  tutorialOptionsStep8Title: 'Copia de seguridad',
+  tutorialOptionsStep8Desc: 'Configura la copia automática de tu configuración, exporta/importa tus datos (config JSON, archivo completo, o solo sonidos).',
+  tutorialOptionsStep8Hint: '💡 Consejo: Exporta regularmente para no perder nada. La importación de una config o archivo completo requiere reiniciar.',
+
+  tutorialOptionsStep9Title: 'Perfiles',
+  tutorialOptionsStep9Desc: 'Gestiona tus perfiles: renómbralos, expórtalos para compartir, o importa un perfil compartido por otra persona.',
+  tutorialOptionsStep9Hint: '💡 Consejo: Cada perfil se puede exportar independientemente con sus sonidos y su orden personalizado. Perfecto para compartir un pack de sonidos.',
 
   // ─── STATS ──────────────────────────────────────────────────────────
   tutorialStatsStep1Title: 'Vista general de estadísticas',

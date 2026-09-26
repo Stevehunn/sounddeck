@@ -166,16 +166,40 @@ export default {
 
   // ─── OPTIONS ────────────────────────────────────────────────────────
   tutorialOptionsStep1Title: 'Customize appearance',
-  tutorialOptionsStep1Desc: 'Change the theme (dark, light, custom), card size and application language.',
-  tutorialOptionsStep1Hint: '💡 Tip: The auto theme adapts to the time of day.',
-  
+  tutorialOptionsStep1Desc: 'Change the theme (dark, light, custom), card size, app language, and customize your sidebar.',
+  tutorialOptionsStep1Hint: '💡 Tip: You can pick a preset theme (Midnight Blue, Forest, Ember) or create your own custom theme.',
+
   tutorialOptionsStep2Title: 'Configure audio',
-  tutorialOptionsStep2Desc: 'Configure the mixer for Discord, select your microphone and adjust volumes.',
-  tutorialOptionsStep2Hint: '💡 Tip: Enable monitoring to hear yourself in your headphones.',
-  
+  tutorialOptionsStep2Desc: 'Configure the mic + sounds mixer for Discord, select your output device (CABLE Input) and mic, and adjust volumes.',
+  tutorialOptionsStep2Hint: '💡 Tip: Enable "Self-hear" to monitor yourself in your headphones. On Discord, disable "Noise Suppression" and "Echo Cancellation" (SoundDeck handles it).',
+
   tutorialOptionsStep3Title: 'Manage shortcuts',
-  tutorialOptionsStep3Desc: 'Set your keyboard shortcuts to switch profiles, toggle loop or stop all sounds.',
-  tutorialOptionsStep3Hint: '💡 Tip: The keyboard visualizer shows all keys in use.',
+  tutorialOptionsStep3Desc: 'Set your global shortcuts: switch profile, toggle loop, stop all sounds, presentation mode, toggle window.',
+  tutorialOptionsStep3Hint: '💡 Tip: The keyboard visualizer shows all keys in use and any conflicts. Per-sound shortcuts are set on each card.',
+
+  tutorialOptionsStep4Title: 'Sound management',
+  tutorialOptionsStep4Desc: 'Automatically normalize your sounds\' volume to avoid big jumps, and clear the gain cache if needed.',
+  tutorialOptionsStep4Hint: '💡 Tip: Normalization equalizes the perceived volume across all your sounds. If you change the target, click "Reanalyze gains".',
+
+  tutorialOptionsStep5Title: 'Plugins',
+  tutorialOptionsStep5Desc: 'Install plugins to add features: YouTube import, MyInstants discovery, emoji discovery, etc.',
+  tutorialOptionsStep5Hint: '💡 Tip: Integrated plugins (YouTube, MyInstants, Emoji) are pre-installed. You can disable them if unused.',
+
+  tutorialOptionsStep6Title: 'Integrations',
+  tutorialOptionsStep6Desc: 'Connect SoundDeck to OBS via WebSocket to start/stop recording and streaming from SoundDeck.',
+  tutorialOptionsStep6Hint: '💡 Tip: Enable "WebSocket server" in OBS (Tools → WebSocket Server Settings) then configure host/port/password here.',
+
+  tutorialOptionsStep7Title: 'Advanced options',
+  tutorialOptionsStep7Desc: 'Enable automatic compression on import, export error logs for debug, or send us feedback.',
+  tutorialOptionsStep7Hint: '💡 Tip: Compression reduces imported file sizes (MP3 128 kbps recommended). It requires ffmpeg.',
+
+  tutorialOptionsStep8Title: 'Backup',
+  tutorialOptionsStep8Desc: 'Configure auto-backup of your configuration, export/import your data (JSON config, full archive, or sounds only).',
+  tutorialOptionsStep8Hint: '💡 Tip: Export regularly so you don\'t lose anything. Importing a config or full archive requires a restart.',
+
+  tutorialOptionsStep9Title: 'Profiles',
+  tutorialOptionsStep9Desc: 'Manage your profiles: rename them, export them to share, or import a profile shared by someone else.',
+  tutorialOptionsStep9Hint: '💡 Tip: Each profile can be exported independently with its sounds and custom order. Perfect for sharing a sound pack.',
 
   // ─── STATS ──────────────────────────────────────────────────────────
   tutorialStatsStep1Title: 'Statistics overview',

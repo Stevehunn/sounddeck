@@ -2,7 +2,6 @@
 import { useLanguage } from '@core/i18n/LanguageContext'
 import {
   changeMicrophone,
-  setMicrophoneVolume,
   setSoundVolume,
 } from '@core/services/AudioMixerService'
 import OptionRow from '../../OptionRow'
@@ -59,24 +58,6 @@ export default function MixerSection({
                 </option>
               ))}
             </select>
-          </OptionRow>
-
-          <OptionRow
-            label={t('microphoneVolume')}
-            sub={`${store.microphoneVolume}%`}
-          >
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={store.microphoneVolume}
-              onChange={async (e) => {
-                const val = Number(e.target.value)
-                await store.updateMicrophoneVolume(val)
-                setMicrophoneVolume(val / 100)
-              }}
-              style={{ width: 140, accentColor: 'var(--accent)' }}
-            />
           </OptionRow>
 
           <OptionRow

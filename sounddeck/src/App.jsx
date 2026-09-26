@@ -48,6 +48,7 @@ function AppContent({ store }) {
   const [presentationMode, setPresentationMode] = useState(false)
   const [toasts, setToasts] = useState([])
   const [mixerInitialized, setMixerInitialized] = useState(false)
+  const mixerInitStartedRef = useRef(false)
   const [isFirstLaunch, setIsFirstLaunch] = useState(null)
   const [showTutorial, setShowTutorial] = useState(false)
   const [showQuitConfirm, setShowQuitConfirm] = useState(false)
@@ -305,6 +306,9 @@ function AppContent({ store }) {
   useEffect(() => {
     if (store.loading) return
     if (mixerInitialized) return
+    if (mixerInitStartedRef.current) return
+
+    mixerInitStartedRef.current = true
 
     const initMixer = async () => {
       if (store.mixerEnabled && store.initMixerOnStartup) {
