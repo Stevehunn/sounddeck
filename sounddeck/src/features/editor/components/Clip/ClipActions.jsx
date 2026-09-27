@@ -1,6 +1,4 @@
 // src/features/editor/components/Clip/ClipActions.jsx
-// ✅ FIX : retrait des console.log de debug qui spammaient la console à 60fps
-//         pendant la lecture (EditorTimeline re-render à chaque update de currentTime)
 
 import React, { memo, useState, useRef, useEffect } from 'react'
 import { DeleteButton } from '@shared/components/ui'

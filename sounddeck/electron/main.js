@@ -17,6 +17,74 @@ const {
 
 const store = require('./store')
 
+// ─── CONFIGURATION DES WEBHOOKS FEEDBACK ──────────────────────────────
+// Charge les webhooks depuis :
+//   1. Variables d'environnement (SOUNDDECK_FEEDBACK_*)
+//   2. Fichier electron/feedback-config.js (bundlé au build)
+// Ne remplace JAMAIS une valeur déjà définie dans le store utilisateur.
+function initFeedbackWebhooks() {
+  try {
+    let fileConfig = {}
+    try {
+      // Fichier optionnel — peut ne pas exister
+      // eslint-disable-next-line global-require
+      fileConfig = require('./feedback-config')
+    } catch (e) {
+      // Aucun fichier config — c'est OK
+    }
+
+    // ─── 1. Webhook par défaut ─────────────────────────────────────
+    const envDefault = process.env.SOUNDDECK_FEEDBACK_WEBHOOK
+    const fileDefault = fileConfig?.default
+    const finalDefault = envDefault || fileDefault
+
+    const existingDefault = store.get('feedbackWebhookUrl')
+    if (finalDefault && !existingDefault) {
+      store.set('feedbackWebhookUrl', finalDefault)
+    }
+
+    // ─── 2. Webhooks par type ──────────────────────────────────────
+    const envPerType = {
+      bug: process.env.SOUNDDECK_FEEDBACK_WEBHOOK_BUG,
+      feature: process.env.SOUNDDECK_FEEDBACK_WEBHOOK_FEATURE,
+      question: process.env.SOUNDDECK_FEEDBACK_WEBHOOK_QUESTION,
+      praise: process.env.SOUNDDECK_FEEDBACK_WEBHOOK_PRAISE,
+    }
+    const filePerType = fileConfig?.perType || {}
+
+    const finalPerType = {}
+    for (const type of ['bug', 'feature', 'question', 'praise']) {
+      const v = envPerType[type] || filePerType[type]
+      if (v) finalPerType[type] = v
+    }
+
+    const existingPerType = store.get('feedbackWebhookUrls') || {}
+    const mergedPerType = { ...finalPerType, ...existingPerType }
+
+    const hasNew = Object.keys(finalPerType).some(
+      (k) => finalPerType[k] && !existingPerType[k]
+    )
+    if (hasNew) {
+      store.set('feedbackWebhookUrls', mergedPerType)
+      const count = Object.keys(finalPerType).length
+    }
+
+    // ─── 3. Log récapitulatif (DEV uniquement) ─────────────────────
+    if (!app.isPackaged) {
+      const finalDefaultState = store.get('feedbackWebhookUrl')
+      const finalPerTypeState = store.get('feedbackWebhookUrls') || {}
+      console.log('📬 [feedback-config] État final:', {
+        default: finalDefaultState ? '(défini)' : '(vide)',
+        perType: Object.keys(finalPerTypeState).length > 0
+          ? Object.keys(finalPerTypeState)
+          : '(aucun)',
+      })
+    }
+  } catch (e) {
+    console.warn('⚠️ [feedback-config] Erreur init:', e.message)
+  }
+}
+
 // Supprimer la barre de menu native
 Menu.setApplicationMenu(null)
 
@@ -187,6 +255,9 @@ function updateTrayMenu() {
 
 app.whenReady().then(async () => {
   protocolHandler.registerLocalFileProtocol()
+
+  // injecte les webhooks feedback (avant de créer la fenêtre)
+  initFeedbackWebhooks()
 
   // Nettoyer les raccourcis orphelins
   const sounds = store.get('sounds', [])

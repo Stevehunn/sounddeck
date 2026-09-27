@@ -357,6 +357,17 @@ function registerFileHandlers(mainWindow, soundsDir) {
     }
   })
 
+  // lit un fichier et renvoie son contenu en base64
+  // (utilisé pour les pièces jointes feedback)
+  ipcMain.handle('read-file-base64', async (event, filePath) => {
+    try {
+      const data = fs.readFileSync(filePath)
+      return { success: true, base64: data.toString('base64') }
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+  })
+
   ipcMain.handle('write-sound-file', async (event, filePath, data) => {
     try {
       const uint8Array = new Uint8Array(data)

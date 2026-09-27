@@ -1,7 +1,8 @@
 {
   "name": "sounddeck",
   "version": "1.3.0",
-  "description": "Soundboard local pour Discord et autres apps de discussion",
+  "description": "Soundboard local for Discord or other applications with voice chat",
+  "author": "SteveHun <stevehun09@gmail.com>",
   "license": "MIT",
   "main": "electron/main.js",
   "scripts": {
@@ -84,7 +85,6 @@
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
-    "@tensorflow/tfjs": "^4.22.0",
     "adm-zip": "^0.6.0",
     "archiver": "^8.0.0",
     "electron-store": "^8.1.0",

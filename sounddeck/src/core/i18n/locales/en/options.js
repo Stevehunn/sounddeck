@@ -402,6 +402,15 @@ export default {
   // ─── FEEDBACK ──────────────────────────────────────────────────────
   feedback: 'Send feedback',
   feedbackDesc: 'Report a bug or suggest an idea',
+  feedbackScreenshotReady: 'Screenshot ready to be sent',
+  feedbackScreenshotRetake: 'Retake screenshot',
+  feedbackScreenshotRetakeShort: 'Retake',
+  feedbackScreenshotCapturing: 'Capturing...',
+  feedbackAttachImage: 'Attachment (optional)',
+  feedbackAttachImageBtn: 'Attach an image',
+  feedbackAttachImageLoading: 'Loading...',
+  feedbackAttachImageRemove: 'Remove image',
+  feedbackAttachImageRemoveShort: 'Remove',
 
   // ─── AUTO BACKUP ───────────────────────────────────────────────────
   autoBackup: 'Auto backup',

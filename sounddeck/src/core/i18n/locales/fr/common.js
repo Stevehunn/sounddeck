@@ -153,9 +153,9 @@ export default {
   soundExists: 'Son existant',
   soundExistsConfirm: 'Un son nommé "{name}" existe déjà. Voulez-vous quand même l\'ajouter ?',
   quitConfirmTitle: 'Quitter SoundDeck ?',
-  quitConfirmMessage: 'Voulez-vous quitter l\'application ou la réduire dans le tray ?',
+  quitConfirmMessage: 'Voulez-vous quitter l\'application ou la réduire parmi les icones cachées ?',
   quitConfirmQuit: 'Quitter',
-  quitConfirmMinimize: 'Réduire dans le tray',
+  quitConfirmMinimize: 'Réduire parmi les icones cachées',
   quitConfirmCancel: 'Annuler',
   quitConfirmRemember: 'Ne plus me demander',
 

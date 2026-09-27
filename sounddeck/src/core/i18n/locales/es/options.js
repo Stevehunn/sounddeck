@@ -402,6 +402,15 @@ export default {
   // ─── FEEDBACK ──────────────────────────────────────────────────────
   feedback: 'Enviar comentario',
   feedbackDesc: 'Reporta un error o propone una idea',
+  feedbackScreenshotReady: 'Captura lista para enviar',
+  feedbackScreenshotRetake: 'Volver a capturar',
+  feedbackScreenshotRetakeShort: 'Repetir',
+  feedbackScreenshotCapturing: 'Capturando...',
+  feedbackAttachImage: 'Adjunto (opcional)',
+  feedbackAttachImageBtn: 'Adjuntar una imagen',
+  feedbackAttachImageLoading: 'Cargando...',
+  feedbackAttachImageRemove: 'Quitar imagen',
+  feedbackAttachImageRemoveShort: 'Quitar',
 
   // ─── COPIA AUTOMÁTICA ──────────────────────────────────────────────
   autoBackup: 'Copia automática',

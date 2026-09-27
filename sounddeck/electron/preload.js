@@ -108,6 +108,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   convertAudio: (inputPath, outputPath, format, bitrate) => ipcRenderer.invoke('convert-audio', inputPath, outputPath, format, bitrate),
   openDirectoryDialog: () => ipcRenderer.invoke('open-directory-dialog'),
   readFile: (filePath) => ipcRenderer.invoke('read-file', filePath),
+  readFileBase64: (filePath) => ipcRenderer.invoke('read-file-base64', filePath),
 
   // ─── PROJETS D'ÉDITION ────────────────────────────────────────────────────
   saveEditorProject: (projectData) => ipcRenderer.invoke('save-editor-project', projectData),

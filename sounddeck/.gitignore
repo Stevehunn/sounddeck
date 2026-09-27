@@ -23,3 +23,6 @@ dist-plugins
 *.njsproj
 *.sln
 *.sw?
+
+# Feedback webhooks (contient des secrets)
+electron/feedback-config.js

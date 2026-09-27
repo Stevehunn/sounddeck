@@ -153,9 +153,9 @@ export default {
   soundExists: 'Sonido existente',
   soundExistsConfirm: 'Ya existe un sonido llamado "{name}". ¿Quieres añadirlo de todos modos?',
   quitConfirmTitle: '¿Salir de SoundDeck?',
-  quitConfirmMessage: '¿Quieres salir de la aplicación o minimizarla a la bandeja?',
+  quitConfirmMessage: '¿Desea cerrar la aplicación o minimizarla a iconos ocultos?',
   quitConfirmQuit: 'Salir',
-  quitConfirmMinimize: 'Minimizar a la bandeja',
+  quitConfirmMinimize: 'Minimizar entre los iconos ocultos',
   quitConfirmCancel: 'Cancelar',
   quitConfirmRemember: 'Recordar mi elección',
 
