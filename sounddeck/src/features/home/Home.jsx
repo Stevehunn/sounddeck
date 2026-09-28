@@ -212,13 +212,12 @@ export default function Home({ store, addToast, loopEnabled }) {
     if (globalEndIndex < 0) globalEndIndex = 0
     if (globalEndIndex > currentSounds.length) globalEndIndex = currentSounds.length
 
-    await store.reorderSounds(globalStartIndex, globalEndIndex)
+    const ok = await store.reorderSounds(globalStartIndex, globalEndIndex)
 
     setDraggedSoundId(null)
     setDragOverIndex(null)
     setIsDragging(false)
-    setDragSource(null)
-    addToast(t('soundMoved'), 'success')
+    if (ok) addToast(t('soundMoved'), 'success')
   }
 
   const handleMainDrop = async (e, dropIndex) => {
@@ -243,13 +242,12 @@ export default function Home({ store, addToast, loopEnabled }) {
       return
     }
 
-    await store.reorderSounds(startIndex, endIndex)
+    const ok = await store.reorderSounds(startIndex, endIndex)
 
     setDraggedSoundId(null)
     setDragOverIndex(null)
     setIsDragging(false)
-    setDragSource(null)
-    addToast(t('soundMoved'), 'success')
+    if (ok) addToast(t('soundMoved'), 'success')
   }
 
   // ─── IMPORT ─────────────────────────────────────────────────────────
@@ -278,10 +276,8 @@ export default function Home({ store, addToast, loopEnabled }) {
 
     const confirmed = await confirm({
       title: t('confirmDeleteSound') || 'Confirmer la suppression du son',
-      message: (
-        t('confirmDeleteSoundMessage') ||
-        `Voulez-vous vraiment supprimer définitivement le son "{name}" ?`
-      ).replace('{name}', sound.name),
+      message: t('confirmDeleteSoundMessage', { name: sound.name }) ||
+        `Voulez-vous vraiment supprimer définitivement le son "${sound.name}" ?`,
       type: 'danger',
       confirmText: t('menuDelete') || 'Supprimer définitivement',
       cancelText: t('cancel') || 'Annuler',

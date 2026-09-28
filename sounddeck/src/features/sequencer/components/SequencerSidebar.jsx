@@ -107,7 +107,7 @@ export default function SequencerSidebar({
                   minHeight: 28,
                   opacity: newPlaylistName.trim() ? 1 : 0.5,
                 }}
-                data-testid="new-playlist-button"
+                data-testid="new-playlist-confirm-button"
               >
                 <i className="ti ti-check" /> {t('add')}
               </button>
@@ -125,7 +125,7 @@ export default function SequencerSidebar({
               minHeight: 34,
             }}
             onClick={() => setShowNewPlaylist(true)}
-            data-testid="new-playlist-button"
+            data-testid="new-playlist-open-button"
           >
             <i className="ti ti-plus" /> {t('newPlaylist')}
           </button>

@@ -1,7 +1,11 @@
 // src/features/editor/hooks/useProjectManager.js
 import { useState, useCallback, useEffect } from 'react'
+import { useLanguage } from '@core/i18n/LanguageContext'
+import { logError } from '@shared/utils/logger'
 
 export function useProjectManager(store, project, setProject, addToast) {
+  const { t } = useLanguage()
+
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [projectList, setProjectList] = useState([])
@@ -13,11 +17,11 @@ export function useProjectManager(store, project, setProject, addToast) {
       setProjectList(projects)
       return projects
     } catch (e) {
-      console.error('❌ Erreur chargement projets:', e)
-      addToast?.('Erreur lors du chargement des projets', 'error')
+      logError('useProjectManager', 'Erreur chargement projets', e)
+      addToast?.(t('toastProjectLoadListError'), 'error')
       return []
     }
-  }, [addToast])
+  }, [addToast, t])
 
   const loadRecentProjects = useCallback(async () => {
     try {
@@ -25,81 +29,85 @@ export function useProjectManager(store, project, setProject, addToast) {
       setRecentProjects(recent)
       return recent
     } catch (e) {
-      console.error('❌ Erreur chargement projets récents:', e)
-      addToast?.('Erreur lors du chargement des projets récents', 'error')
+      logError('useProjectManager', 'Erreur chargement projets récents', e)
+      addToast?.(t('toastProjectLoadRecentError'), 'error')
       return []
     }
-  }, [addToast])
+  }, [addToast, t])
 
   const saveProject = useCallback(async () => {
     if (!project) {
-      addToast?.('Aucun projet à sauvegarder', 'warning')
+      addToast?.(t('toastProjectNoProjectToSave'), 'warning')
       return null
     }
 
     setIsSaving(true)
-    
+
     try {
       const result = await window.electronAPI.saveEditorProject?.(project)
-      
+
       if (result?.success) {
         setProject(result.project)
         await loadProjectList()
         await loadRecentProjects()
-        addToast?.(`Projet "${result.project.name}" sauvegardé`, 'success')
+        addToast?.(
+          t('toastProjectSaved', { name: result.project.name }),
+          'success'
+        )
         return result.project
       }
-      
-      addToast?.('Erreur lors de la sauvegarde', 'error')
+
+      addToast?.(t('toastProjectSaveError'), 'error')
       return null
     } catch (e) {
-      console.error('❌ Erreur sauvegarde:', e)
-      addToast?.('Erreur lors de la sauvegarde: ' + e.message, 'error')
+      logError('useProjectManager', 'Erreur sauvegarde', e)
+      addToast?.(`${t('toastProjectSaveError')}: ${e.message}`, 'error')
       return null
     } finally {
       setIsSaving(false)
     }
-  }, [project, setProject, addToast, loadProjectList, loadRecentProjects])
+  }, [project, setProject, addToast, t, loadProjectList, loadRecentProjects])
 
   const loadProject = useCallback(async (projectId) => {
     setIsLoading(true)
-    
+
     try {
       const result = await window.electronAPI.loadEditorProject?.(projectId)
-      
+
       if (result?.success) {
         setProject(result.project)
-        
+
         try {
           await window.electronAPI.storeSet?.('currentEditorProjectId', projectId)
-          // ✅ FIX S3c : saveEditorProject écrit dans editorProjects[id] + currentEditorProjectId
-          // Plus besoin d'appeler store.updateEditorProject
           await window.electronAPI.saveEditorProject?.(result.project)
         } catch (e) {
-          console.warn('⚠️ Impossible de sauvegarder:', e)
+          logError('useProjectManager', 'Erreur store currentEditorProjectId', e)
         }
-        
+
         await loadRecentProjects()
-        addToast?.(`Projet "${result.project.name}" chargé`, 'success')
+        addToast?.(
+          t('toastProjectLoaded', { name: result.project.name }),
+          'success'
+        )
         return result.project
       }
-      
-      addToast?.('Projet non trouvé', 'error')
+
+      addToast?.(t('toastProjectNotFound'), 'error')
       return null
     } catch (e) {
-      console.error('❌ Erreur chargement:', e)
-      addToast?.('Erreur lors du chargement: ' + e.message, 'error')
+      logError('useProjectManager', 'Erreur chargement', e)
+      addToast?.(`${t('toastProjectLoadError')}: ${e.message}`, 'error')
       return null
     } finally {
       setIsLoading(false)
     }
-  }, [setProject, addToast, loadRecentProjects])
+  }, [setProject, addToast, t, loadRecentProjects])
 
   const createProject = useCallback(async (name) => {
     try {
       const newProject = {
-        id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        name: name || 'Nouveau projet',
+        id: uuid('project'),
+        name: name || t('editorNoProject'),
         tracks: [],
         markers: [],
         loops: {
@@ -120,142 +128,154 @@ export function useProjectManager(store, project, setProject, addToast) {
       }
 
       const result = await window.electronAPI.saveEditorProject?.(newProject)
-      
+
       if (result?.success) {
         setProject(result.project)
         await loadProjectList()
         await loadRecentProjects()
-        addToast?.(`Projet "${result.project.name}" créé`, 'success')
+        addToast?.(
+          t('toastProjectCreated', { name: result.project.name }),
+          'success'
+        )
         return result.project
       }
-      
-      addToast?.('Erreur lors de la création du projet', 'error')
+
+      addToast?.(t('toastProjectCreateError'), 'error')
       return null
     } catch (e) {
-      console.error('❌ Erreur création projet:', e)
-      addToast?.('Erreur lors de la création: ' + e.message, 'error')
+      logError('useProjectManager', 'Erreur création projet', e)
+      addToast?.(`${t('toastProjectCreateError')}: ${e.message}`, 'error')
       return null
     }
-  }, [setProject, addToast, loadProjectList, loadRecentProjects])
+  }, [setProject, addToast, t, loadProjectList, loadRecentProjects])
 
   const deleteProject = useCallback(async (projectId) => {
     try {
       const result = await window.electronAPI.deleteEditorProject?.(projectId)
-      
+
       if (result?.success) {
         await loadProjectList()
         await loadRecentProjects()
-        addToast?.('Projet supprimé', 'info')
+        addToast?.(t('toastProjectDeleted'), 'info')
         return true
       }
       return false
     } catch (e) {
-      console.error('❌ Erreur suppression:', e)
-      addToast?.('Erreur lors de la suppression: ' + e.message, 'error')
+      logError('useProjectManager', 'Erreur suppression', e)
+      addToast?.(`${t('toastProjectDeleteError')}: ${e.message}`, 'error')
       return false
     }
-  }, [addToast, loadProjectList, loadRecentProjects])
+  }, [addToast, t, loadProjectList, loadRecentProjects])
 
   const exportProject = useCallback(async (projectData, filePath) => {
     try {
       const result = await window.electronAPI.exportEditorProject?.(projectData, filePath)
       if (result?.success) {
-        addToast?.('Projet exporté avec succès', 'success')
+        addToast?.(t('toastProjectExported'), 'success')
         return result
       }
-      addToast?.('Erreur lors de l\'export: ' + (result?.error || 'Erreur inconnue'), 'error')
+      addToast?.(`${t('toastProjectExportError')}: ${result?.error || t('unknown')}`, 'error')
       return null
     } catch (e) {
-      console.error('❌ Erreur export:', e)
-      addToast?.('Erreur lors de l\'export: ' + e.message, 'error')
+      logError('useProjectManager', 'Erreur export', e)
+      addToast?.(`${t('toastProjectExportError')}: ${e.message}`, 'error')
       return null
     }
-  }, [addToast])
+  }, [addToast, t])
 
   const importProject = useCallback(async (filePath) => {
     try {
       const result = await window.electronAPI.importEditorProject?.(filePath)
-      
+
       if (result?.success) {
         setProject(result.project)
         await loadProjectList()
         await loadRecentProjects()
-        addToast?.(`Projet "${result.project.name}" importé`, 'success')
+        addToast?.(
+          t('toastProjectImported', { name: result.project.name }),
+          'success'
+        )
         return result.project
       }
-      addToast?.('Erreur lors de l\'import', 'error')
+      addToast?.(t('toastProjectImportError'), 'error')
       return null
     } catch (e) {
-      console.error('❌ Erreur import:', e)
-      addToast?.('Erreur lors de l\'import: ' + e.message, 'error')
+      logError('useProjectManager', 'Erreur import', e)
+      addToast?.(`${t('toastProjectImportError')}: ${e.message}`, 'error')
       return null
     }
-  }, [setProject, addToast, loadProjectList, loadRecentProjects])
+  }, [setProject, addToast, t, loadProjectList, loadRecentProjects])
 
   const duplicateProject = useCallback(async (projectId) => {
     try {
       const result = await window.electronAPI.duplicateEditorProject?.(projectId)
-      
+
       if (result?.success) {
         await loadProjectList()
         await loadRecentProjects()
-        addToast?.(`Projet "${result.project.name}" dupliqué`, 'success')
+        addToast?.(
+          t('toastProjectDuplicated', { name: result.project.name }),
+          'success'
+        )
         return result.project
       }
       return null
     } catch (e) {
-      console.error('❌ Erreur duplication:', e)
-      addToast?.('Erreur lors de la duplication: ' + e.message, 'error')
+      logError('useProjectManager', 'Erreur duplication', e)
+      addToast?.(`${t('toastProjectDuplicateError')}: ${e.message}`, 'error')
       return null
     }
-  }, [addToast, loadProjectList, loadRecentProjects])
+  }, [addToast, t, loadProjectList, loadRecentProjects])
 
   const renameProject = useCallback(async (projectId, newName) => {
     if (!projectId) {
-      addToast?.('ID de projet manquant', 'error')
+      addToast?.(t('toastProjectMissingId'), 'error')
       return null
     }
-    
+
     if (!newName || !newName.trim()) {
       return null
     }
-    
+
     const trimmedName = newName.trim()
-    
+
     try {
       const result = await window.electronAPI.renameEditorProject?.(projectId, trimmedName)
-      
+
       if (result?.success) {
         await loadProjectList()
         await loadRecentProjects()
-        
+
         if (project?.id === projectId) {
           setProject(result.project)
-          
+
           try {
             await window.electronAPI.storeSet?.('currentEditorProjectId', projectId)
-            // ✅ FIX S3c : pas besoin de store.updateEditorProject
           } catch (e) {
-            console.warn('⚠️ Impossible de sauvegarder:', e)
+            logError('useProjectManager', 'Erreur store après rename', e)
           }
         }
-        
-        addToast?.(`Projet renommé en "${result.project.name}"`, 'success')
+
+        addToast?.(
+          t('toastProjectRenamed', { name: result.project.name }),
+          'success'
+        )
         return result.project
       }
-      
-      addToast?.('Erreur lors du renommage: ' + (result?.error || 'Erreur inconnue'), 'error')
+
+      addToast?.(`${t('toastProjectRenameError')}: ${result?.error || t('unknown')}`, 'error')
       return null
     } catch (e) {
-      console.error('❌ Erreur renommage:', e)
-      addToast?.('Erreur lors du renommage: ' + e.message, 'error')
+      logError('useProjectManager', 'Erreur renommage', e)
+      addToast?.(`${t('toastProjectRenameError')}: ${e.message}`, 'error')
       return null
     }
-  }, [project, setProject, addToast, loadProjectList, loadRecentProjects])
+  }, [project, setProject, addToast, t, loadProjectList, loadRecentProjects])
 
   useEffect(() => {
     loadRecentProjects()
     loadProjectList()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return {

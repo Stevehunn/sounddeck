@@ -36,7 +36,7 @@ export function useAudioDevices({ store, addToast }) {
 
         if (hasVirtualDevice && !store.virtualDriverInstalled) {
           store.updateVirtualDriverInstalled?.(true)
-          addToast('🔊 ' + t('virtualDriverDetected'), 'success')
+          addToast(t('virtualDriverDetected'), 'success')
         } else if (!hasVirtualDevice && store.virtualDriverInstalled) {
           store.updateVirtualDriverInstalled?.(false)
         }
@@ -62,13 +62,13 @@ export function useAudioDevices({ store, addToast }) {
   const handleInstallDriver = async () => {
     setIsInstallingDriver(true)
     try {
-      addToast('📦 ' + t('downloadingDriver'), 'info')
+      addToast(t('downloadingDriver'), 'info')
       const result = await window.electronAPI.installVirtualDriver()
       if (result.success) {
         if (result.warning) {
-          addToast('⚠️ ' + result.warning, 'info')
+          addToast(result.warning, 'info')
         } else {
-          addToast('✅ ' + t('driverInstalled'), 'success')
+          addToast(t('driverInstalled'), 'success')
         }
         setTimeout(async () => {
           const devices = await navigator.mediaDevices.enumerateDevices()
@@ -83,10 +83,10 @@ export function useAudioDevices({ store, addToast }) {
           }
         }, 3000)
       } else {
-        addToast('❌ ' + t('installError') + ': ' + (result.error || t('unknown')), 'error')
+        addToast(`${t('installError')}: ${result.error || t('unknown')}`, 'error')
       }
     } catch (e) {
-      addToast('❌ ' + t('error') + ': ' + e.message, 'error')
+      addToast(`${t('error')}: ${e.message}`, 'error')
     }
     setIsInstallingDriver(false)
   }
@@ -111,7 +111,7 @@ export function useAudioDevices({ store, addToast }) {
 
       if (hasVirtualDevice) {
         store.updateVirtualDriverInstalled?.(true)
-        addToast('✅ ' + t('virtualDriverDetected'), 'success')
+        addToast(t('virtualDriverDetected'), 'success')
       } else {
         store.updateVirtualDriverInstalled?.(false)
         addToast(t('virtualDriverNotDetected'), 'info')
@@ -127,13 +127,13 @@ export function useAudioDevices({ store, addToast }) {
       micTestRef.current.stop()
       micTestRef.current = null
       setIsMicrophoneTesting(false)
-      addToast('🔇 ' + t('micTestStopped'), 'info')
+      addToast(t('micTestStopped'), 'info')
       return
     }
 
     try {
       setIsMicrophoneTesting(true)
-      addToast('🎤 ' + t('micTestInProgress'), 'info')
+      addToast(t('micTestInProgress'), 'info')
 
       const deviceId = store.microphoneDevice || 'default'
       const result = await testMicrophoneOnce(deviceId)
@@ -145,26 +145,26 @@ export function useAudioDevices({ store, addToast }) {
           context: result.context,
         }
 
-        addToast(`✅ ${t('microphoneConnected')}`, 'success')
+        addToast(t('microphoneConnected'), 'success')
 
         setTimeout(() => {
           if (micTestRef.current) {
             micTestRef.current.stop()
             micTestRef.current = null
             setIsMicrophoneTesting(false)
-            addToast('🔇 ' + t('micTestFinished'), 'info')
+            addToast(t('micTestFinished'), 'info')
           }
         }, 3000)
       } else {
         setIsMicrophoneTesting(false)
         addToast(
-          `❌ ${t('microphoneTestError')}: ${result.error || t('microphoneNotConnected')}`,
+          `${t('microphoneTestError')}: ${result.error || t('microphoneNotConnected')}`,
           'error'
         )
       }
     } catch (e) {
       setIsMicrophoneTesting(false)
-      addToast('❌ ' + t('error') + ': ' + e.message, 'error')
+      addToast(`${t('error')}: ${e.message}`, 'error')
     }
   }
 

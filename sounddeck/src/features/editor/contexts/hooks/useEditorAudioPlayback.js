@@ -52,11 +52,6 @@ function isClipInZone(start, end, loopStart, loopEnd) {
   )
 }
 
-/**
- * Cherche le clip qui chevauche `clip` et qui démarre juste avant lui,
- * dans TOUTES les pistes non-mutées (pas juste la track courante).
- * Retourne { clip, track } ou null.
- */
 function findOverlappingPreviousClip(clip, project, clipDurations) {
   const tracks = project?.tracks || []
   let best = null
@@ -71,7 +66,6 @@ function findOverlappingPreviousClip(clip, project, clipDurations) {
       const cDur = clipDurations[c.id] || c.duration || 3
       const cEnd = c.start + cDur
 
-      // Ne garde que ceux qui chevauchent le clip courant
       if (cEnd > clip.start + 0.01) {
         if (!best || c.start > best.start) {
           best = c
@@ -111,18 +105,38 @@ export function useEditorAudioPlayback(core) {
   const audioContextRef = useRef(null)
   const audioSourcesRef = useRef({})
   const animationRef = useRef(null)
-  const lastPlayedClipsRef = useRef(new Set())
+
+  // Helper : récupère (et maintient à jour) le contexte partagé
+  const getCtx = useCallback(() => {
+    const ctx = getSharedAudioContext()
+    audioContextRef.current = ctx
+    return ctx
+  }, [])
 
   // ─── STOP SOURCE ────────────────────────────────────────────────────
   const stopSource = useCallback((clipId) => {
     const entry = audioSourcesRef.current[clipId]
-    if (entry) {
+    if (!entry) return
+
+    if (entry.source) {
       try {
         entry.source.stop()
+      } catch (e) {}
+      try {
         entry.source.disconnect()
       } catch (e) {}
-      delete audioSourcesRef.current[clipId]
+      try {
+        entry.source.onended = null
+      } catch (e) {}
     }
+
+    if (entry.gainNode) {
+      try {
+        entry.gainNode.disconnect()
+      } catch (e) {}
+    }
+
+    delete audioSourcesRef.current[clipId]
   }, [])
 
   const stopAllSources = useCallback(() => {
@@ -194,12 +208,11 @@ export function useEditorAudioPlayback(core) {
         const buffer = await loadAudioBuffer(clip.path)
         if (!buffer) return
 
-        const ctx = getSharedAudioContext()
+        const ctx = getCtx()
         if (!ctx) return
 
         let sourceBuffer = buffer
 
-        // Effets
         if (clip.effects?.length > 0) {
           const hasActive = clip.effects.some((e) => e.enabled)
           if (hasActive) {
@@ -249,7 +262,6 @@ export function useEditorAudioPlayback(core) {
               const fadeDuration = Math.min(overlap, 0.5)
               const now = ctx.currentTime
 
-              // Fade OUT du clip précédent
               const prevEntry = audioSourcesRef.current[prev.clip.id]
               if (prevEntry) {
                 const prevGain = prevEntry.gainNode
@@ -261,7 +273,6 @@ export function useEditorAudioPlayback(core) {
                 prevGain.gain.linearRampToValueAtTime(0, now + fadeDuration)
               }
 
-              // Fade IN du nouveau clip
               gainNode.gain.cancelScheduledValues(now)
               gainNode.gain.setValueAtTime(0, now)
               gainNode.gain.linearRampToValueAtTime(
@@ -282,7 +293,6 @@ export function useEditorAudioPlayback(core) {
         source.connect(gainNode)
         gainNode.connect(ctx.destination)
 
-        // Offset
         let offset = 0
         if (customOffset !== null && customOffset !== undefined) {
           offset = Math.max(
@@ -316,6 +326,7 @@ export function useEditorAudioPlayback(core) {
       currentTimeRef,
       projectRef,
       clipDurationsRef,
+      getCtx,
     ]
   )
 
@@ -362,7 +373,6 @@ export function useEditorAudioPlayback(core) {
       const globalTime = currentTimeRef.current + accumulated
       accumulated = 0
 
-      // Boucle globale
       const timelineLoop = loopStateRef.current?.timeline || {
         enabled: false,
         start: 0,
@@ -383,7 +393,6 @@ export function useEditorAudioPlayback(core) {
       const soloClipId = soloPlayClipIdRef.current
       const activeClipsThisFrame = new Set()
 
-      // Clips en boucle individuelle
       const individualLoopClips = new Set()
       for (const track of tracks) {
         for (const clip of track.clips) {
@@ -393,7 +402,6 @@ export function useEditorAudioPlayback(core) {
         }
       }
 
-      // Traite chaque clip
       for (const track of tracks) {
         if (track.muted) continue
 
@@ -403,7 +411,6 @@ export function useEditorAudioPlayback(core) {
           const end = start + duration
           const isClipLooping = individualLoopClips.has(clip.id)
 
-          // Solo
           if (soloClipId && clip.id !== soloClipId) {
             if (playingClips.has(clip.id)) {
               stopAndForget(clip.id)
@@ -411,7 +418,6 @@ export function useEditorAudioPlayback(core) {
             continue
           }
 
-          // Cas 1 : boucle individuelle
           if (isClipLooping) {
             const clipLoopData = loopStateRef.current.clips[clip.id]
             const clipLoopStart = clipLoopData?.start || start
@@ -437,8 +443,6 @@ export function useEditorAudioPlayback(core) {
             continue
           }
 
-          // Cas 2 : boucle globale
-          // ✅ FIX 2 : ne joue le clip que si loopTime est DANS [start, end]
           if (isInLoopZone) {
             const inZone = isClipInZone(start, end, loopStart, loopEnd)
 
@@ -457,7 +461,6 @@ export function useEditorAudioPlayback(core) {
             continue
           }
 
-          // Cas 3 : lecture normale
           if (globalTime >= start && globalTime < end) {
             activeClipsThisFrame.add(clip.id)
             if (!playingClips.has(clip.id)) {
@@ -470,7 +473,6 @@ export function useEditorAudioPlayback(core) {
         }
       }
 
-      // Arrête les clips qui ne jouent plus
       for (const clipId of playingClips) {
         if (activeClipsThisFrame.has(clipId)) continue
         if (individualLoopClips.has(clipId)) continue
@@ -497,7 +499,6 @@ export function useEditorAudioPlayback(core) {
         }
       }
 
-      // Nettoie les cycles obsolètes
       if (isInLoopZone) {
         for (const [clipId, cycle] of generalLoopClipsStarted) {
           if (cycle < currentCycle && !playingClips.has(clipId)) {
@@ -508,11 +509,9 @@ export function useEditorAudioPlayback(core) {
         generalLoopClipsStarted.clear()
       }
 
-      // Update time
       setCurrentTime(globalTime)
       currentTimeRef.current = globalTime
 
-      // Fin de lecture
       const totalDuration = totalDurationRef.current
       if (globalTime >= totalDuration) {
         setIsPlaying(false)
@@ -556,6 +555,7 @@ export function useEditorAudioPlayback(core) {
   ])
 
   // ─── CONTRÔLES ──────────────────────────────────────────────────────
+
   const play = useCallback(async () => {
     setIsPaused(false)
     isPausedRef.current = false
@@ -563,14 +563,9 @@ export function useEditorAudioPlayback(core) {
     stopAtTimeRef.current = null
 
     stopAllSources()
-    lastPlayedClipsRef.current = new Set()
 
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext ||
-          window.webkitAudioContext)()
-      }
-      const ctx = audioContextRef.current
+      const ctx = getCtx()
       if (ctx.state === 'suspended') await ctx.resume()
 
       setCurrentTime(0)
@@ -597,6 +592,7 @@ export function useEditorAudioPlayback(core) {
     setIsPaused,
     setStopAtTime,
     stopAtTimeRef,
+    getCtx,
   ])
 
   const playClipOnly = useCallback(
@@ -615,18 +611,13 @@ export function useEditorAudioPlayback(core) {
       stopAtTimeRef.current = clipEnd
 
       try {
-        if (!audioContextRef.current) {
-          audioContextRef.current = new (window.AudioContext ||
-            window.webkitAudioContext)()
-        }
-        const ctx = audioContextRef.current
+        const ctx = getCtx()
         if (ctx.state === 'suspended') await ctx.resume()
 
         setIsPlaying(true)
         isPlayingRef.current = true
         setIsPaused(false)
         isPausedRef.current = false
-        lastPlayedClipsRef.current = new Set()
 
         setTimeout(() => startPlaybackLoop(), 50)
       } catch (e) {
@@ -650,23 +641,24 @@ export function useEditorAudioPlayback(core) {
       setSoloPlayClipId,
       setStopAtTime,
       stopAtTimeRef,
+      getCtx,
     ]
   )
 
   const resume = useCallback(async () => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext ||
-        window.webkitAudioContext)()
-    }
-    if (audioContextRef.current.state === 'suspended') {
-      await audioContextRef.current.resume()
+    try {
+      const ctx = getCtx()
+      if (ctx.state === 'suspended') {
+        await ctx.resume()
+      }
+    } catch (e) {
+      logWarn('AudioPlayback', 'Erreur resume ctx', e)
     }
 
     setIsPaused(false)
     isPausedRef.current = false
     setIsPlaying(true)
     isPlayingRef.current = true
-    lastPlayedClipsRef.current = new Set()
 
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current)
@@ -674,9 +666,8 @@ export function useEditorAudioPlayback(core) {
     }
 
     setTimeout(() => startPlaybackLoop(), 50)
-  }, [startPlaybackLoop, isPlayingRef, isPausedRef, setIsPlaying, setIsPaused])
+  }, [startPlaybackLoop, isPlayingRef, isPausedRef, setIsPlaying, setIsPaused, getCtx])
 
-  // Coupe les sources audio quand on pause
   const pause = useCallback(() => {
     setIsPaused(true)
     isPausedRef.current = true
@@ -688,15 +679,7 @@ export function useEditorAudioPlayback(core) {
       animationRef.current = null
     }
 
-    // Stoppe toutes les sources (sinon elles continuent en arrière-plan)
     stopAllSources()
-
-    if (
-      audioContextRef.current &&
-      audioContextRef.current.state === 'running'
-    ) {
-      audioContextRef.current.suspend().catch(() => {})
-    }
   }, [
     stopAllSources,
     isPlayingRef,
@@ -712,7 +695,6 @@ export function useEditorAudioPlayback(core) {
     isPausedRef.current = false
     setCurrentTime(0)
     currentTimeRef.current = 0
-    lastPlayedClipsRef.current = new Set()
     setStopAtTime(null)
     stopAtTimeRef.current = null
     setSoloPlayClipId(null)
@@ -745,7 +727,6 @@ export function useEditorAudioPlayback(core) {
       currentTimeRef.current = clamped
 
       stopAllSources()
-      lastPlayedClipsRef.current = new Set()
     },
     [stopAllSources, totalDurationRef, currentTimeRef, setCurrentTime]
   )

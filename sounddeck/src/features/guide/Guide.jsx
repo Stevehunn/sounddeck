@@ -66,7 +66,11 @@ export default function Guide() {
     setActiveStep(steps[currentIdx + 1].id)
   }, [isLast, currentIdx, steps])
 
-  // navigation clavier (← ↑ → ↓)
+  const toggleMode = useCallback(() => {
+    setMode((prev) => (prev === 'simple' ? 'advanced' : 'simple'))
+  }, [])
+
+  // navigation clavier : ← ↑ → ↓ + M (toggle mode)
   useEffect(() => {
     const handler = (e) => {
       // Ignore si l'utilisateur tape dans un champ
@@ -86,12 +90,15 @@ export default function Guide() {
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
         e.preventDefault()
         goPrev()
+      } else if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault()
+        toggleMode()
       }
     }
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [goPrev, goNext])
+  }, [goPrev, goNext, toggleMode])
 
   // ─── CONTENU ─────────────────────────────────────────────────────────
   const renderContent = () => {
@@ -377,6 +384,35 @@ export default function Guide() {
               ? t('guideModeSimpleDesc')
               : t('guideModeAdvancedDesc')}
           </div>
+
+          {/* Hint raccourci clavier M */}
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: 9,
+              color: 'var(--text-tertiary)',
+              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+            }}
+          >
+            <kbd
+              style={{
+                fontSize: 9,
+                padding: '1px 5px',
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border)',
+                borderBottom: '2px solid var(--text-tertiary)',
+                borderRadius: 3,
+                fontFamily: 'SFMono-Regular, Consolas, monospace',
+              }}
+            >
+              M
+            </kbd>
+            <span style={{ opacity: 0.75 }}>{t('guideModeToggleHint')}</span>
+          </div>
         </div>
 
         {/* ─── ÉTAPES ───────────────────────────────────────────────── */}
@@ -565,7 +601,7 @@ export default function Guide() {
             {renderContent()}
           </div>
 
-          {/* Indice de navigation clavier en bas */}
+          {/* Indice de navigation clavier en bas (inclut M) */}
           <div
             style={{
               marginTop: 24,
@@ -577,6 +613,7 @@ export default function Guide() {
               alignItems: 'center',
               gap: 8,
               justifyContent: 'center',
+              flexWrap: 'wrap',
             }}
           >
             <i className="ti ti-keyboard" style={{ fontSize: 13 }} />
@@ -588,6 +625,11 @@ export default function Guide() {
               <kbd>↓</kbd>
             </span>
             <span>{t('guideKeyboardHint')}</span>
+            <span style={{ opacity: 0.5 }}>·</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <kbd>M</kbd>
+            </span>
+            <span>{t('guideModeToggleHint')}</span>
           </div>
         </div>
       </div>

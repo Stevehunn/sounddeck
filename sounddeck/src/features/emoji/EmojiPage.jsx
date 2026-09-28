@@ -1,5 +1,5 @@
 // src/features/emoji/EmojiPage.jsx
-import React, { useState, useMemo, useCallback, useEffect } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { useEmojis } from '@shared/hooks/useEmojis'
 import { usePlugins } from '@core/plugins/PluginContext'
@@ -46,31 +46,15 @@ export default function EmojiPage({ store, addToast }) {
     loading,
   } = useEmojis()
 
-  const [search, setSearch] = useState('')
   const [showManualAdd, setShowManualAdd] = useState(false)
   const [manualValue, setManualValue] = useState('')
   const [manualError, setManualError] = useState('')
 
-  // Filtre sur les customs si recherche
-  const filteredCustomGroups = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return customGrouped
-
-    const groups = {}
-    for (const [catId, emojis] of Object.entries(customGrouped)) {
-      const filtered = emojis.filter((e) => e.includes(q))
-      if (filtered.length > 0) groups[catId] = filtered
-    }
-    return groups
-  }, [customGrouped, search])
-
   const totalCustom = customEmojis.length
   const totalDefault = defaultEmojis.length
 
-  // ✅ NOUVEAU : helper pour traduire le label d'une catégorie custom
   const getCustomCategoryInfo = useCallback(
     (catId) => {
-      // Cas 1 : catégorie "sans catégorie"
       if (catId === '__uncategorized__') {
         return {
           label: t('emojiPickerUncategorized'),
@@ -78,7 +62,6 @@ export default function EmojiPage({ store, addToast }) {
         }
       }
 
-      // Cas 2 : catégorie par défaut du core (audio, reactions, animals, ...)
       const coreInfo = getCategoryInfo(catId)
       if (coreInfo && coreInfo.labelKey) {
         return {
@@ -87,7 +70,6 @@ export default function EmojiPage({ store, addToast }) {
         }
       }
 
-      // Cas 3 : catégorie du plugin (smileys, people, travel, ...)
       const pluginKey = PLUGIN_CATEGORY_LABELS[catId]
       if (pluginKey) {
         return {
@@ -96,7 +78,6 @@ export default function EmojiPage({ store, addToast }) {
         }
       }
 
-      // Fallback
       return {
         label: coreInfo?.label || catId,
         icon: coreInfo?.icon || 'ti-folder',
@@ -211,7 +192,7 @@ export default function EmojiPage({ store, addToast }) {
     )
   }
 
-  const customGroupEntries = Object.entries(filteredCustomGroups)
+  const customGroupEntries = Object.entries(customGrouped)
 
   return (
     <>
@@ -260,16 +241,6 @@ export default function EmojiPage({ store, addToast }) {
             </div>
           </div>
 
-          <input
-            data-testid="emoji-page-search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('search')}
-            className="input-sm"
-            style={{ width: 160, minWidth: 100 }}
-          />
-
-          {/* Bouton ajout manuel */}
           <button
             data-testid="emoji-page-add-manual-button"
             className="btn-secondary btn-sm"
@@ -281,7 +252,6 @@ export default function EmojiPage({ store, addToast }) {
             {t('emojiPickerAddManual')}
           </button>
 
-          {/* Bouton Discover (avec check plugin) */}
           <button
             data-testid="emoji-page-open-discover-button"
             className="btn-primary btn-sm"
@@ -293,7 +263,7 @@ export default function EmojiPage({ store, addToast }) {
           </button>
         </div>
 
-        {/* Input ajout manuel (inline, sous le header) */}
+        {/* Input ajout manuel */}
         {showManualAdd && (
           <div
             style={{
@@ -311,7 +281,6 @@ export default function EmojiPage({ store, addToast }) {
               style={{ color: 'var(--accent)', fontSize: 20, flexShrink: 0 }}
             />
 
-            {/* Prévisualisation en direct — gros emoji à gauche */}
             <div
               style={{
                 width: 56,
@@ -331,7 +300,6 @@ export default function EmojiPage({ store, addToast }) {
               {manualValue.trim() || '❓'}
             </div>
 
-            {/* Input élargi : 320px, font généreuse */}
             <input
               data-testid="emoji-page-add-manual-input"
               autoFocus
@@ -480,7 +448,6 @@ export default function EmojiPage({ store, addToast }) {
                   data-testid={`emoji-page-custom-group-${catId}`}
                   style={{ marginBottom: 16 }}
                 >
-                  {/* En-tête du groupe */}
                   <div
                     style={{
                       display: 'flex',
@@ -542,7 +509,6 @@ export default function EmojiPage({ store, addToast }) {
                     )}
                   </div>
 
-                  {/* Grille d'emojis */}
                   <div
                     style={{
                       display: 'grid',
@@ -584,7 +550,6 @@ export default function EmojiPage({ store, addToast }) {
                         }}
                       >
                         {emoji}
-                        {/* Bouton × plus visible */}
                         <button
                           className="emoji-remove-btn"
                           data-testid={`emoji-page-remove-${emoji}`}

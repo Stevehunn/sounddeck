@@ -49,7 +49,7 @@ export function usePluginsManagement({ addToast }) {
           'info'
         )
       } catch (e) {
-        logError('usePluginsManagement', 'Erreur uninstall plugin', e)        
+        logError('usePluginsManagement', 'Erreur uninstall plugin', e)
         addToast(t('pluginsUninstallError') + ': ' + e.message, 'error')
       }
     },
@@ -64,18 +64,18 @@ export function usePluginsManagement({ addToast }) {
           refreshPlugins?.()
           await loadPlugins()
           addToast(
-            t('pluginsUninstallSuccess').replace(
+            t('pluginsEnableSuccess').replace(
               '{name}',
               pluginMeta.nameKey ? t(pluginMeta.nameKey) : pluginMeta.name
             ),
             'success'
           )
         } else {
-          addToast(t('pluginsUninstallError'), 'error')
+          addToast(t('pluginsEnableError'), 'error')
         }
       } catch (e) {
-        console.error('Erreur enable plugin:', e)
-        addToast(t('pluginsUninstallError') + ': ' + e.message, 'error')
+        logError('usePluginsManagement', 'Erreur enable plugin', e)
+        addToast(t('pluginsEnableError') + ': ' + e.message, 'error')
       }
     },
     [t, addToast, loadPlugins, pluginManager, refreshPlugins]

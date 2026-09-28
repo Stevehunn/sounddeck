@@ -37,7 +37,8 @@ export default function BackupSection({ sectionRef, store, addToast }) {
               stopAutoBackup()
               startAutoBackup(store)
             }
-            addToast(`${t('backupIntervalChanged')} ${val} ${t('minutes')}`, 'info')
+            const unit = val === 1 ? t('minute') : t('minutes')
+            addToast(`${t('backupIntervalChanged')} ${val} ${unit}`, 'info')
           }}
           style={{ width: 120, fontSize: 12 }}
         >

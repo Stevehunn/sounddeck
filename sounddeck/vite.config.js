@@ -1,3 +1,4 @@
+// vite.config.js
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
@@ -5,13 +6,11 @@ import path from 'path'
 // ─── CSP DEV (avec HMR + eval) ──────────────────────────────────────────
 const CSP_DEV = [
   "default-src 'self'",
-  // 'unsafe-eval' nécessaire pour Vite HMR / React Refresh
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' sounddeck-local: blob:",
   "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
   "img-src 'self' data: blob: sounddeck-local: file: https:",
   "media-src 'self' data: blob: sounddeck-local: file: https:",
   "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com",
-  // ws: / http://localhost:* nécessaires pour HMR
   "connect-src 'self' sounddeck-local: ws: wss: http://localhost:* https: file: blob:",
   "worker-src 'self' blob: sounddeck-local:",
   "object-src 'none'",
@@ -22,14 +21,11 @@ const CSP_DEV = [
 // ─── CSP PROD (stricte) ─────────────────────────────────────────────────
 const CSP_PROD = [
   "default-src 'self'",
-  // PAS de 'unsafe-eval', PAS de 'unsafe-inline' sur les scripts
   "script-src 'self' 'wasm-unsafe-eval' sounddeck-local: blob:",
-  // 'unsafe-inline' reste nécessaire pour les styles inline React
   "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
   "img-src 'self' data: blob: sounddeck-local: file: https:",
   "media-src 'self' data: blob: sounddeck-local: file: https:",
   "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com",
-  // ✅ PAS de ws: ni http://localhost:* en prod
   "connect-src 'self' sounddeck-local: https: file: blob:",
   "worker-src 'self' blob: sounddeck-local:",
   "object-src 'none'",
@@ -83,11 +79,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.js'],
     include: ['src/test/**/*.{test,spec}.{js,jsx}'],
-    exclude: [
-      'node_modules/',
-      'src/**/*.test.{js,jsx}',
-      'src/**/*.spec.{js,jsx}',
-    ],
+    exclude: ['node_modules/', 'dist/'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

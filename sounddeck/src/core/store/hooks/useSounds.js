@@ -53,6 +53,36 @@ export function useSounds(initialSounds = [], initialSoundOrder = {}, initialTag
     return newSound
   }, [sounds, soundOrder, save])
 
+  const restoreSounds = useCallback(async (soundList) => {
+    if (!Array.isArray(soundList) || soundList.length === 0) return 0
+
+    const existingIds = new Set(soundsRef.current.map((s) => s.id))
+    const toRestore = soundList
+      .filter((s) => s && s.id && !existingIds.has(s.id))
+      .map((s) => ({
+        id: s.id,
+        name: s.name || 'Son restauré',
+        path: normalizePath(s.path),
+        image: normalizePath(s.image) || null,
+        emoji: s.emoji || '🔊',
+        favorites: Array.isArray(s.favorites) ? s.favorites : [],
+        profiles: Array.isArray(s.profiles) ? s.profiles : ['all'],
+        volume: s.volume ?? 0,
+        volumeDb: s.volumeDb ?? 0,
+        createdAt: s.createdAt || Date.now(),
+        playCount: s.playCount || 0,
+        lastPlayed: s.lastPlayed || null,
+      }))
+
+    if (toRestore.length === 0) return 0
+
+    const updated = [...soundsRef.current, ...toRestore]
+    setSounds(updated)
+    soundsRef.current = updated
+    await save('sounds', updated)
+    return toRestore.length
+  }, [save])
+
   const deleteSound = useCallback(async (soundId) => {
     const sound = sounds.find(s => s.id === soundId)
     if (!sound) return false
@@ -285,6 +315,7 @@ export function useSounds(initialSounds = [], initialSoundOrder = {}, initialTag
     tags,
     setTags,
     addSound,
+    restoreSounds,
     deleteSound,
     updateSound,
     updateSoundVolume,

@@ -18,6 +18,13 @@ export function useProfiles(initialProfiles = [], initialCurrentId = 'all', save
     return newProfile
   }, [profiles, save])
 
+  const replaceAllProfiles = useCallback(async (newProfiles) => {
+    if (!Array.isArray(newProfiles)) return
+    setProfiles(newProfiles)
+    const userProfiles = newProfiles.filter(p => p.id !== 'all')
+    await save('profiles', userProfiles)
+  }, [save])
+
   const deleteProfile = useCallback(async (profileId) => {
     if (profileId === 'all') return
 
@@ -94,6 +101,7 @@ export function useProfiles(initialProfiles = [], initialCurrentId = 'all', save
     currentProfileId,
     setCurrentProfileId,
     createProfile,
+    replaceAllProfiles,
     deleteProfile,
     renameProfile,
     switchProfile,

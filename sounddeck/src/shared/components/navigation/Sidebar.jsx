@@ -12,7 +12,6 @@ import {
 } from '@shared/constants/navigation'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 
-// Map des labels par défaut pour les éléments (traductions)
 const getDefaultLabels = (t) => ({
   home: t('mySounds'),
   discover: t('discover'),
@@ -965,7 +964,6 @@ const Sidebar = memo(
                 </span>
               </div>
 
-              {/* bouton pause/play au survol */}
               {isHoveringNowPlaying && (
                 <button
                   onClick={handleTogglePause}
@@ -1168,8 +1166,6 @@ const Sidebar = memo(
 )
 
 export default Sidebar
-
-// ─── COMPOSANT SidebarItem ──────────────────────────────────────────────────
 
 function SidebarItem({
   icon,

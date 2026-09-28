@@ -59,21 +59,31 @@ export function initBackupManager(store, config = {}) {
   }
 }
 
+let initialTimeout = null
+
 export function startAutoBackup(store) {
   if (backupInterval) clearInterval(backupInterval)
+  if (initialTimeout) clearTimeout(initialTimeout)
 
   const intervalMs = backupConfig.interval * 60 * 1000
   backupInterval = setInterval(() => {
     performBackup(store)
   }, intervalMs)
 
-  setTimeout(() => performBackup(store), 5000)
+  initialTimeout = setTimeout(() => {
+    initialTimeout = null
+    performBackup(store)
+  }, 5000)
 }
 
 export function stopAutoBackup() {
   if (backupInterval) {
     clearInterval(backupInterval)
     backupInterval = null
+  }
+  if (initialTimeout) {
+    clearTimeout(initialTimeout)
+    initialTimeout = null
   }
 }
 
@@ -129,35 +139,19 @@ export async function restoreBackup(store, index) {
   }
 
   try {
-    if (backup.profiles) {
-      for (const profile of backup.profiles) {
-        if (profile.id !== 'all') {
-          const exists = store.profiles.find((p) => p.id === profile.id)
-          if (!exists) {
-            await store.createProfile(profile.name)
-          }
-        }
+    if (backup.profiles && typeof store.replaceAllProfiles === 'function') {
+      const allProfile = {
+        id: 'all',
+        name: 'Tous les sons',
+        nameKey: 'allSounds',
+        isDefault: true,
       }
+      const userProfiles = backup.profiles.filter((p) => p.id !== 'all')
+      await store.replaceAllProfiles([allProfile, ...userProfiles])
     }
 
-    if (backup.sounds) {
-      for (const sound of backup.sounds) {
-        if (sound.path) {
-          const exists = await window.electronAPI.fileExists(sound.path)
-          if (exists) {
-            const soundExists = store.sounds.find((s) => s.id === sound.id)
-            if (!soundExists) {
-              await store.addSound({
-                name: sound.name,
-                path: sound.path,
-                image: sound.image,
-                emoji: sound.emoji || '🔊',
-                profiles: sound.profiles || ['all'],
-              })
-            }
-          }
-        }
-      }
+    if (backup.sounds && typeof store.restoreSounds === 'function') {
+      await store.restoreSounds(backup.sounds)
     }
 
     if (backup.tags) {

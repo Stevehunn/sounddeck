@@ -85,15 +85,7 @@ export function unregisterExternalPlayback(soundId) {
 // ─── HELPERS CACHE ─────────────────────────────────────────────────────────
 
 /**
- * Cherche un Howl "trackable" (avec .playing()/.seek()/.duration())
- * dans le cache, peu importe sa position dans le tableau.
- *
- * Un entrée de soundCache peut être :
- *   - un Howl simple
- *   - un AudioBufferSourceNode (mode mixer, playLocally=false)
- *   - un tableau [AudioBufferSourceNode, Howl] (mode mixer, playLocally=true)
- *   - un tableau [Howl, Howl] (mode normal, sortie virtuelle + locale)
- *   - la string 'loading'
+ * Cherche un Howl "trackable" dans le cache, peu importe sa position.
  */
 function findTrackableHowl(cached) {
   if (!cached || cached === 'loading') return null
@@ -440,6 +432,10 @@ async function playSoundWithMixer(
     return
   }
 
+  if (soundCache[sound.id] !== 'loading') {
+    return
+  }
+
   if (!audioBuffer) {
     delete soundCache[sound.id]
     logWarn('AudioService', `Impossible de charger: ${fileUrl}`)
@@ -741,7 +737,6 @@ export function isPlaying(soundId) {
 }
 
 export function getSoundProgress(soundId) {
-  // Manuel (Séquenceur, etc.)
   if (manualOverrideId === soundId && manualProgress.id === soundId) {
     if (manualProgress.duration <= 0) return null
     return {

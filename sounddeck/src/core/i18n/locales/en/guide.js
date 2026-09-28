@@ -85,6 +85,8 @@ export default {
   guideStepOf: 'of',
   guideAudioFlow: 'Audio flow diagram:',
   guideYourMic: 'Your mic',
+  guideKeyboardHint: 'to navigate between steps',
+  guideModeToggleHint: 'to switch Simple ⇄ Advanced',
   
   // ─── QUICK RECAP ────────────────────────────────────────────────────
   quickRecap: 'Quick recap:',

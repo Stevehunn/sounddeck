@@ -32,7 +32,6 @@ export default function PlaylistEditor({
     itemsRef.current = items
   }, [items])
 
-  // ─── LECTEUR ────────────────────────────────────────────────────────
   const player = useSequencePlayer({
     items,
     itemsRef,
@@ -42,7 +41,6 @@ export default function PlaylistEditor({
     loopPlaylist,
   })
 
-  // ─── PERSISTANCE ────────────────────────────────────────────────────
   const saveItemsOnly = async (updatedItems) => {
     setItems(updatedItems)
     if (onSaveItems) {
@@ -52,8 +50,7 @@ export default function PlaylistEditor({
 
   const saveItems = async (updatedItems, loop = loopPlaylist) => {
     setItems(updatedItems)
-    await onSaveItems(playlistIdRef.current, updatedItems)
-    // Note : le "loop" est persisté côté parent si nécessaire
+    await onSaveItems(playlistIdRef.current, updatedItems, loop)
   }
 
   const updateItem = (idx, changes) => {
@@ -70,9 +67,9 @@ export default function PlaylistEditor({
 
   const addSounds = (soundIds) => {
     const newItems = soundIds.map((id) => ({
-        id: uuid(),
-        soundId: id,
-        delay: 0,
+      id: uuid(),
+      soundId: id,
+      delay: 0,
     }))
     const updated = [...items, ...newItems]
     saveItems(updated)

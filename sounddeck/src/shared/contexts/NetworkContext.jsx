@@ -5,8 +5,6 @@ import { useLanguage } from '@core/i18n/LanguageContext'
 
 const NetworkContext = createContext(null)
 
-// ─── SONDE RÉSEAU RÉELLE ────────────────────────────────────────────────
-// Liste d'URLs "ping" fiables (favicons légers, toujours dispo)
 const PROBE_URLS = [
   'https://www.google.com/favicon.ico',
   'https://www.cloudflare.com/favicon.ico',
@@ -14,7 +12,7 @@ const PROBE_URLS = [
 ]
 
 const PROBE_TIMEOUT_MS = 3000
-const PROBE_CACHE_MS = 3000 // évite de spammer si clics rapides
+const PROBE_CACHE_MS = 3000
 
 let lastProbeTime = 0
 let lastProbeResult = true
@@ -46,16 +44,10 @@ function probeOneUrl(baseUrl) {
       resolve(false)
     }
 
-    // Cache-busting pour forcer un vrai round-trip réseau
     img.src = `${baseUrl}?_=${Date.now()}`
   })
 }
 
-/**
- * Sonde réseau réelle.
- * Fiable même quand `navigator.onLine === true` (cas DNS down).
- * @returns {Promise<boolean>}
- */
 export async function probeNetwork() {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     return false
@@ -80,7 +72,6 @@ export async function probeNetwork() {
   return false
 }
 
-// ─── PROVIDER ───────────────────────────────────────────────────────────
 export function NetworkProvider({ children }) {
   const { t } = useLanguage()
 
@@ -88,14 +79,13 @@ export function NetworkProvider({ children }) {
     typeof navigator !== 'undefined' ? navigator.onLine : true
   )
   const [showModal, setShowModal] = useState(false)
-  const probingRef = useRef(false)
+  const probingPromiseRef = useRef(null)
 
-  // Écoute les événements natifs (câble débranché, wifi désactivé)
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true)
       setShowModal(false)
-      lastProbeTime = 0 // force un nouveau probe la prochaine fois
+      lastProbeTime = 0
     }
     const handleOffline = () => {
       setIsOnline(false)
@@ -112,7 +102,6 @@ export function NetworkProvider({ children }) {
     }
   }, [])
 
-  // Forcer l'affichage du modal (appelé par les composants sur erreur IPC)
   const showNoConnection = useCallback(() => {
     setIsOnline(false)
     setShowModal(true)
@@ -122,35 +111,28 @@ export function NetworkProvider({ children }) {
     setShowModal(false)
   }, [])
 
-  /**
-   * ✅ FIX — Helper principal :
-   * Vérifie la connectivité via sonde RÉELLE. Si offline, affiche le modal.
-   *
-   * Usage :
-   *   const ok = await ensureOnline()
-   *   if (!ok) return   // abort l'action
-   *
-   * @returns {Promise<boolean>} true si en ligne, false sinon (modal affiché)
-   */
-  const ensureOnline = useCallback(async () => {
-    if (probingRef.current) {
-      // Une probe est déjà en cours → on attend son résultat
-      return lastProbeResult
+  const ensureOnline = useCallback(() => {
+    if (probingPromiseRef.current) {
+      return probingPromiseRef.current
     }
 
-    probingRef.current = true
-    try {
-      const online = await probeNetwork()
-      if (!online) {
-        setIsOnline(false)
-        setShowModal(true)
-        return false
+    const promise = (async () => {
+      try {
+        const online = await probeNetwork()
+        if (!online) {
+          setIsOnline(false)
+          setShowModal(true)
+          return false
+        }
+        setIsOnline(true)
+        return true
+      } finally {
+        probingPromiseRef.current = null
       }
-      setIsOnline(true)
-      return true
-    } finally {
-      probingRef.current = false
-    }
+    })()
+
+    probingPromiseRef.current = promise
+    return promise
   }, [])
 
   const value = useMemo(
@@ -158,8 +140,8 @@ export function NetworkProvider({ children }) {
       isOnline,
       showNoConnection,
       hideNoConnection,
-      ensureOnline,   // ✅ NOUVEAU
-      probeNetwork,   // ✅ NOUVEAU (bas niveau si besoin)
+      ensureOnline,
+      probeNetwork,
     }),
     [isOnline, showNoConnection, hideNoConnection, ensureOnline]
   )
@@ -184,7 +166,6 @@ export function useNetwork() {
   return ctx
 }
 
-// ─── MODAL ──────────────────────────────────────────────────────────────
 function NoConnectionModal({ t, onClose }) {
   useEffect(() => {
     const handler = (e) => {

@@ -1,10 +1,6 @@
 // src/features/editor/contexts/hooks/useEditorMarkers.js
 import { useCallback } from 'react'
-
-function generateMarkerId() {
-  const rand = Math.random().toString(36).slice(2, 7)
-  return `marker-${Date.now()}-${rand}`
-}
+import { uuid } from '@shared/utils/uuid'
 
 export function useEditorMarkers(core, playback) {
   const {
@@ -18,7 +14,7 @@ export function useEditorMarkers(core, playback) {
     if (!currentProject) return null
 
     const newMarker = {
-      id: generateMarkerId(),
+      id: uuid('marker'),
       name: markerData.name || `Marker ${(currentProject.markers?.length || 0) + 1}`,
       time: markerData.time || currentTimeRef.current,
       color: markerData.color || '#3b82f6'

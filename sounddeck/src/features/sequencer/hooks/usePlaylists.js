@@ -20,7 +20,6 @@ export function usePlaylists() {
     activePlaylistIdRef.current = activePlaylistId
   }, [activePlaylistId])
 
-  // ─── CHARGEMENT INITIAL ──────────────────────────────────────────────
   useEffect(() => {
     let mounted = true
     window.electronAPI
@@ -45,14 +44,12 @@ export function usePlaylists() {
     }
   }, [])
 
-  // ─── PERSISTANCE ─────────────────────────────────────────────────────
   const persist = useCallback(async (updated) => {
     setPlaylists(updated)
     playlistsRef.current = updated
     await window.electronAPI.storeSet(STORE_KEY, updated)
   }, [])
 
-  // ─── CRUD ────────────────────────────────────────────────────────────
   const createPlaylist = useCallback(
     async (name) => {
       if (!name?.trim()) return null
@@ -60,6 +57,7 @@ export function usePlaylists() {
         id: uuid(),
         name: name.trim(),
         items: [],
+        loop: false,
         createdAt: Date.now(),
       }
       const updated = [...playlistsRef.current, playlist]
@@ -95,27 +93,21 @@ export function usePlaylists() {
   )
 
   const savePlaylistItems = useCallback(
-    async (playlistId, items) => {
-      const currentActiveId =
-        activePlaylistIdRef.current || activePlaylistId
-
+    async (playlistId, items, loop) => {
       const index = playlistsRef.current.findIndex((p) => p.id === playlistId)
       if (index === -1) return
 
       const next = [...playlistsRef.current]
-      next[index] = { ...next[index], items }
+      const patch = { items }
+      if (typeof loop === 'boolean') patch.loop = loop
+      next[index] = { ...next[index], ...patch }
 
       setPlaylists(next)
       playlistsRef.current = next
 
-      if (currentActiveId) {
-        setActivePlaylistId(currentActiveId)
-        activePlaylistIdRef.current = currentActiveId
-      }
-
       await window.electronAPI.storeSet(STORE_KEY, next)
     },
-    [activePlaylistId]
+    []
   )
 
   const selectPlaylist = useCallback((id) => {
@@ -123,7 +115,6 @@ export function usePlaylists() {
     activePlaylistIdRef.current = id
   }, [])
 
-  // ─── MÉMOÏSATION ─────────────────────────────────────────────────────
   const activePlaylist = useMemo(() => {
     if (!activePlaylistId) return null
     return playlists.find((p) => p.id === activePlaylistId) || null

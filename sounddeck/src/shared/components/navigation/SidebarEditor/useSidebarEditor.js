@@ -30,7 +30,6 @@ export function useSidebarEditor({ config, profiles, t }) {
     if (initializingRef.current || !config || isInitialized) return
     initializingRef.current = true
 
-    // Section order
     let newSectionOrder = config.sectionOrder || DEFAULT_SECTION_ORDER
     const allGroups = new Set([
       'pinned', 'profiles', 'navigation', 'actions', 'footer',
@@ -54,7 +53,6 @@ export function useSidebarEditor({ config, profiles, t }) {
     setSectionOrder(newSectionOrder)
     setFixedSections(config.fixedSections || [])
 
-    // Items
     const existingItems = config.items || []
     const userProfiles = profiles || []
     const allProfile = { id: 'all', name: t('allSounds'), isDefault: true }
@@ -97,7 +95,6 @@ export function useSidebarEditor({ config, profiles, t }) {
       newItems.push(item)
     })
 
-    // Ajouter les profils manquants
     allProfiles.forEach((profile) => {
       const profileId = `profile-${profile.id}`
       if (processedIds.has(profileId)) return
@@ -116,7 +113,6 @@ export function useSidebarEditor({ config, profiles, t }) {
       })
     })
 
-    // Ajouter les items manquants
     DEFAULT_ITEM_IDS.forEach((id) => {
       if (processedIds.has(id)) return
 
@@ -154,8 +150,13 @@ export function useSidebarEditor({ config, profiles, t }) {
 
     const newOrder = [...sectionOrder]
     const sectionIndex = newOrder.indexOf(section)
+
+    const prevSectionKey = reorderable[currentIndex - 1]
+    const prevIndex = newOrder.indexOf(prevSectionKey)
+    if (prevIndex === -1) return
+
     const [removed] = newOrder.splice(sectionIndex, 1)
-    newOrder.splice(sectionIndex - 1, 0, removed)
+    newOrder.splice(prevIndex, 0, removed)
 
     setSectionOrder(newOrder)
   }, [sectionOrder])
@@ -171,8 +172,15 @@ export function useSidebarEditor({ config, profiles, t }) {
 
     const newOrder = [...sectionOrder]
     const sectionIndex = newOrder.indexOf(section)
+
+    const nextSectionKey = reorderable[currentIndex + 1]
+    const nextIndex = newOrder.indexOf(nextSectionKey)
+    if (nextIndex === -1) return
+
     const [removed] = newOrder.splice(sectionIndex, 1)
-    newOrder.splice(Math.min(sectionIndex + 1, newOrder.length), 0, removed)
+    // Après retrait, nextIndex peut avoir bougé de 1 si section était avant next
+    const insertAt = sectionIndex < nextIndex ? nextIndex : nextIndex + 1
+    newOrder.splice(insertAt, 0, removed)
 
     setSectionOrder(newOrder)
   }, [sectionOrder])
@@ -302,7 +310,6 @@ export function useSidebarEditor({ config, profiles, t }) {
 
       const sourceItem = sourceItems[sourceIndex]
 
-      // Règles de compatibilité
       if (targetGroup === 'actions' && !sourceItem.isAction) {
         resetDragState()
         return
@@ -324,7 +331,6 @@ export function useSidebarEditor({ config, profiles, t }) {
         return
       }
 
-      // Réordonner dans le même groupe
       if (sourceGroup === targetGroup) {
         const groupItems = items.filter((item) => item.group === sourceGroup)
         const reordered = [...groupItems]
@@ -351,7 +357,6 @@ export function useSidebarEditor({ config, profiles, t }) {
         return
       }
 
-      // Déplacer entre groupes
       const movedItem = { ...sourceItems[sourceIndex] }
       const sourceId = movedItem.id
       const newItems = items.filter((i) => i.id !== sourceId)

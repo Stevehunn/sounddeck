@@ -27,7 +27,6 @@ import { uuid } from '@shared/utils/uuid'
 import { logError } from '@shared/utils/logger'
 
 const __DEBUG__ = typeof import.meta !== 'undefined' && import.meta.env?.DEV
-const log = __DEBUG__ ? console.log.bind(console) : () => {}
 
 const STORE_KEY_METRONOME_ENABLED = 'sounddeck_metronome_enabled'
 const STORE_KEY_METRONOME_BPM = 'sounddeck_metronome_bpm'
@@ -297,7 +296,7 @@ function EditorTimelineContent() {
   const handleAddTrackConfirm = useCallback(
     async (name, color) => {
       if (typeof addTrack !== 'function') {
-        addToast?.('Erreur: addTrack non disponible', 'error')
+        addToast?.(t('toastEditorAddTrackUnavailable'), 'error')
         setShowAddTrackModal(false)
         return null
       }
@@ -305,19 +304,19 @@ function EditorTimelineContent() {
       try {
         const result = await addTrack(name, color)
         if (result) {
-          addToast?.(`Piste "${result.name}" ajoutée`, 'success')
+          addToast?.(t('toastEditorTrackAdded', { name: result.name }), 'success')
         } else {
-          addToast?.('Erreur lors de l\'ajout de la piste', 'error')
+          addToast?.(t('toastEditorTrackAddError'), 'error')
         }
         setShowAddTrackModal(false)
         return result
       } catch (e) {
-        addToast?.('Erreur lors de l\'ajout de la piste: ' + e.message, 'error')
+        addToast?.(`${t('toastEditorTrackAddError')}: ${e.message}`, 'error')
         setShowAddTrackModal(false)
         return null
       }
     },
-    [addTrack, addToast]
+    [addTrack, addToast, t]
   )
 
   const handlePlayToggle = useCallback(() => {
@@ -354,7 +353,7 @@ function EditorTimelineContent() {
         if (!track) return
 
         if (tracks.length <= 1) {
-          addToast?.('Impossible de supprimer la dernière piste', 'warning')
+          addToast?.(t('toastEditorLastTrackCannotBeRemoved'), 'warning')
           return
         }
 
@@ -372,10 +371,10 @@ function EditorTimelineContent() {
         }
 
         await removeTrack(trackId)
-        addToast?.(`Piste "${track.name}" supprimée`, 'info')
+        addToast?.(t('toastEditorTrackRemoved', { name: track.name }), 'info')
       } catch (e) {
         logError('Editor', 'Erreur lors de la suppression de piste', e)
-        addToast?.('Erreur lors de la suppression', 'error')
+        addToast?.(t('toastProjectDeleteError'), 'error')
       }
     },
     [tracks, removeTrack, addToast, confirm, t]
@@ -407,27 +406,27 @@ function EditorTimelineContent() {
       setShowImportModal(true)
     } catch (e) {
       logError('Editor', 'Erreur ouverture dialog fichier', e)
-      addToast?.(t('editorFileImportError') + ': ' + e.message, 'error')
+      addToast?.(`${t('editorFileImportError')}: ${e.message}`, 'error')
     }
   }, [tracks, addToast, t])
 
   const handleImportConfirm = useCallback(
     async ({ filePath, fileName, trackId, startTime }) => {
       if (!filePath) {
-        addToast?.('Aucun fichier sélectionné', 'error')
+        addToast?.(t('toastEditorNoTrackAvailable'), 'error')
         return
       }
 
       try {
         const result = await addClipFromFile(trackId, filePath, startTime)
         if (result) {
-          addToast?.(`"${fileName}" ${t('editorFileImported')}`, 'success')
+          addToast?.(t('editorFileImported'), 'success')
         } else {
           addToast?.(t('editorFileImportError'), 'error')
         }
       } catch (e) {
         logError('Editor', 'Erreur import fichier', e)
-        addToast?.(t('editorFileImportError') + ': ' + e.message, 'error')
+        addToast?.(`${t('editorFileImportError')}: ${e.message}`, 'error')
       }
 
       setShowImportModal(false)
@@ -540,7 +539,7 @@ function EditorTimelineContent() {
 
       context.setMasterGain(1)
       addToast?.(
-        t('editorResetVolumesSuccess') || '✅ Tous les volumes réinitialisés à 100%',
+        t('editorResetVolumesSuccess') || 'Tous les volumes réinitialisés à 100%',
         'success'
       )
     }
@@ -563,21 +562,21 @@ function EditorTimelineContent() {
       setShowEffectsAddMenu(true)
 
       const clipName = getClipById(tracks, clipId)?.name || 'clip'
-      addToast?.(`Panneau des effets ouvert pour "${clipName}"`, 'info')
+      addToast?.(t('toastEditorEffectPanelOpened', { name: clipName }), 'info')
     },
-    [selectClip, tracks, addToast]
+    [selectClip, tracks, addToast, t]
   )
 
   const handleNormalizeWithOptions = useCallback(
     async (clipId, options) => {
       const clip = getClipById(tracks, clipId)
       if (!clip) {
-        addToast?.('Clip non trouvé', 'error')
+        addToast?.(t('toastEditorClipNotFound'), 'error')
         return
       }
 
       const { method, target, maxGain, outputFormat = 'wav' } = options
-      addToast?.(`Normalisation de "${clip.name}" en cours...`, 'info')
+      addToast?.(t('toastEditorNormalizing', { name: clip.name }), 'info')
 
       try {
         const result = await normalizeClip(clip, target, store, {
@@ -613,25 +612,28 @@ function EditorTimelineContent() {
           }
 
           addToast?.(
-            `"${clip.name}" normalisé (gain: ${result.gain.toFixed(2)}x)`,
+            t('toastEditorNormalizeSuccess', {
+              name: clip.name,
+              gain: result.gain.toFixed(2),
+            }),
             'success'
           )
         } else if (result === null) {
-          addToast?.(`Erreur lors de la normalisation de "${clip.name}"`, 'error')
+          addToast?.(t('toastEditorNormalizeError', { name: clip.name }), 'error')
         } else {
-          addToast?.(`"${clip.name}" est déjà à un niveau optimal`, 'info')
+          addToast?.(t('toastEditorAlreadyOptimal', { name: clip.name }), 'info')
         }
       } catch (e) {
-        addToast?.(`Erreur: ${e.message}`, 'error')
+        addToast?.(`${t('error')}: ${e.message}`, 'error')
       }
     },
-    [tracks, selectedTrackId, project, store, context, addToast]
+    [tracks, selectedTrackId, project, store, context, addToast, t]
   )
 
   const handleCopyClip = useCallback(
     (clip) => {
       if (!clip) {
-        addToast?.('Aucun clip à copier', 'warning')
+        addToast?.(t('toastEditorNoClipToCopy'), 'warning')
         return
       }
 
@@ -652,7 +654,7 @@ function EditorTimelineContent() {
   const handleCutClip = useCallback(
     (clip) => {
       if (!clip) {
-        addToast?.('Aucun clip à couper', 'warning')
+        addToast?.(t('toastEditorNoClipToCut'), 'warning')
         return
       }
 
@@ -669,7 +671,7 @@ function EditorTimelineContent() {
         removeClip(selectedTrackId, clip.id)
         addToast?.(`"${clip.name}" ${t('editorCutAction')}`, 'info')
       } else {
-        addToast?.('Impossible de couper le clip', 'error')
+        addToast?.(t('toastEditorClipCannotBeCut'), 'error')
       }
     },
     [selectedTrackId, removeClip, addToast, t]
@@ -695,12 +697,12 @@ function EditorTimelineContent() {
 
     const targetTrackId = selectedTrackId || sourceTrackId || tracks[0]?.id
     if (!targetTrackId) {
-      addToast?.('Aucune piste disponible', 'error')
+      addToast?.(t('toastEditorNoTrackAvailable'), 'error')
       return
     }
 
     if (!project) {
-      addToast?.('Impossible de coller le clip', 'error')
+      addToast?.(t('toastEditorClipCannotBeCut'), 'error')
       return
     }
 
@@ -715,13 +717,7 @@ function EditorTimelineContent() {
       offset: clip.offset || 0,
       volume: clip.volume || 0,
       volumeDb: clip.volumeDb || 0,
-      effects: (clip.effects || []).map((e) => {
-        const effId =
-          typeof crypto !== 'undefined' && crypto.randomUUID
-            ? `effect-${crypto.randomUUID().slice(0, 8)}`
-            : `effect-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-        return { ...e, id: uuid('effect'), }
-      }),
+      effects: (clip.effects || []).map((e) => ({ ...e, id: uuid('effect') })),
       fadeIn: clip.fadeIn || 0,
       fadeOut: clip.fadeOut || 0,
       pitch: clip.pitch || 0,
@@ -775,10 +771,7 @@ function EditorTimelineContent() {
           name = clip?.name || 'ce clip'
         }
 
-        const message = (
-          t('confirmDeleteClipMessage') ||
-          `Voulez-vous vraiment supprimer le clip "{name}" ?`
-        ).replace('{name}', name)
+        const message = t('confirmDeleteClipMessage', { name })
 
         const confirmed = await confirm({
           title: t('confirmDeleteClip') || 'Confirmer la suppression du clip',
@@ -790,7 +783,7 @@ function EditorTimelineContent() {
 
         if (confirmed) {
           removeClip(trackId, clipId)
-          addToast?.(`Clip "${name}" supprimé`, 'info')
+          addToast?.(t('toastEditorClipRemoved', { name }), 'info')
         }
       } catch (e) {
         logError('Editor', 'Erreur suppression clip', e)
@@ -868,9 +861,9 @@ function EditorTimelineContent() {
     (markerData) => {
       const { addMarker } = context
       if (addMarker) addMarker(markerData)
-      else addToast?.('Erreur: addMarker non disponible', 'error')
+      else addToast?.(t('toastEditorAddMarkerUnavailable'), 'error')
     },
-    [context, addToast]
+    [context, addToast, t]
   )
 
   const handleRemoveMarker = useCallback(
@@ -1138,18 +1131,18 @@ function EditorTimelineContent() {
         const clip = getClipById(tracks, selectedClipId)
         handleDeleteWithConfirm(selectedTrackId, selectedClipId, clip?.name)
       } else {
-        addToast?.('Aucun clip sélectionné', 'info')
+        addToast?.(t('toastEditorNoClipSelected'), 'info')
       }
     },
     onCopy: () => {
       const clip = getClipById(tracks, selectedClipId)
       if (clip) handleCopyClip(clip)
-      else addToast?.('Aucun clip sélectionné', 'warning')
+      else addToast?.(t('toastEditorNoClipSelected'), 'warning')
     },
     onCut: () => {
       const clip = getClipById(tracks, selectedClipId)
       if (clip) handleCutClip(clip)
-      else addToast?.('Aucun clip sélectionné', 'warning')
+      else addToast?.(t('toastEditorNoClipSelected'), 'warning')
     },
     onPaste: handlePasteClip,
     onSplit: () => {
@@ -1161,11 +1154,11 @@ function EditorTimelineContent() {
           if (currentTime > start && currentTime < start + duration) {
             splitClip(selectedTrackId, selectedClipId, currentTime)
           } else {
-            addToast?.('Le playhead doit être à l\'intérieur du clip', 'warning')
+            addToast?.(t('toastEditorPlayheadMustBeInside'), 'warning')
           }
         }
       } else {
-        addToast?.('Aucun clip sélectionné', 'info')
+        addToast?.(t('toastEditorNoClipSelected'), 'info')
       }
     },
     onToggleSnap: () => setSnapEnabled(!snapEnabled),
@@ -1214,7 +1207,7 @@ function EditorTimelineContent() {
         projectName={project?.name || 'Nouveau projet'}
         onRenameProject={async (newName) => {
           if (!newName || !newName.trim()) {
-            addToast?.('Nom invalide', 'warning')
+            addToast?.(t('toastProjectRenameError'), 'warning')
             return
           }
           const trimmed = newName.trim()
@@ -1223,9 +1216,8 @@ function EditorTimelineContent() {
             try {
               await projectManager.renameProject(project.id, trimmed)
             } catch (e) {
-              // silencieux — commitProject a déjà persisté
+              logError('Editor', 'Erreur rename fallback', e)
             }
-            addToast?.(`Projet renommé en "${trimmed}"`, 'success')
           }
         }}
         onRefreshDurations={() => {}}
@@ -1516,7 +1508,7 @@ function EditorTimelineContent() {
                     profiles,
                   })
                   exportResults.push({ type: 'library', name: options.name })
-                  addToast?.(`"${options.name}" ${t('editorCreated')}`, 'success')
+                  addToast?.(t('editorCreated'), 'success')
                 } else {
                   throw new Error('Erreur ajout à la bibliothèque')
                 }

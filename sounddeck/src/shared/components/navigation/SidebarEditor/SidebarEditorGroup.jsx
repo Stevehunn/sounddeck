@@ -6,7 +6,6 @@ import { useLanguage } from '@core/i18n/LanguageContext'
 export default function SidebarEditorGroup({ groupKey, items, editor }) {
   const { t } = useLanguage()
   const groupLabels = getGroupLabels(t)
-
   const isDraggingOverGroup =
     editor.dragOverGroup === groupKey && editor.draggedGroup !== groupKey
   const isFooter = groupKey === 'footer'
@@ -57,7 +56,6 @@ export default function SidebarEditorGroup({ groupKey, items, editor }) {
         return
       }
     }
-    editor.setDragOverGroup?.(groupKey) // pas exposé, on laisse l'over sur items
   }
 
   const handleGroupDrop = (e) => {
@@ -89,7 +87,6 @@ export default function SidebarEditorGroup({ groupKey, items, editor }) {
     <div
       style={containerStyles}
       onDragOver={handleGroupDragOver}
-      onDragLeave={() => editor.setDragOverGroup?.(null)}
       onDrop={handleGroupDrop}
     >
       <GroupHeader

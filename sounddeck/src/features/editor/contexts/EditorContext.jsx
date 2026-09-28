@@ -1,5 +1,5 @@
 // src/features/editor/contexts/EditorContext.jsx
-import React, { createContext, useContext, useMemo } from 'react'
+import React, { createContext, useContext } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
 import { useEditorCore } from './hooks/useEditorCore'
@@ -16,36 +16,20 @@ const EditorContext = createContext(null)
 export function EditorProvider({ children, store, addToast, confirm }) {
   const { t } = useLanguage()
 
-  // 1. Core : état + refs + helpers + persistance
   const core = useEditorCore({ store, addToast, t, confirm })
-
-  // 2. Audio + playback controls
   const audioPlayback = useEditorAudioPlayback(core)
-
-  // 3. Tracks (dépend de audioPlayback pour updateTrackVolume)
   const tracks = useEditorTracks(core, audioPlayback)
-
-  // 4. Clips (+ split + move + fade)
   const clips = useEditorClips(core)
-
-  // 5. Effects (add/remove/update/toggle/fade)
   const effects = useEditorEffects(core)
-
-  // 6. Loops (clip + timeline + region)
   const loops = useEditorLoops(core)
-
-  // 7. Overlay (mode clic)
   const overlay = useEditorOverlay(core, loops, clips)
-
-  // 8. Markers
   const markers = useEditorMarkers(core, audioPlayback)
 
-  // 9. Zoom (simple, inline)
-  const handleZoomChange = useMemo(() => (newZoom) => {
+  const handleZoomChange = (newZoom) => {
     core.setZoomLevel(Math.max(0.05, Math.min(10, newZoom)))
-  }, [core.setZoomLevel])
+  }
 
-  const value = useMemo(() => ({
+  const value = {
     // ─── ÉTAT ──────────────────────────────────────────────────────────
     project: core.project,
     setProject: core.setProject,
@@ -121,7 +105,6 @@ export function EditorProvider({ children, store, addToast, confirm }) {
     loadProject: core.loadProject,
     commitProject: core.commitProject,
 
-    // confirm expose for EditorTimelineContent
     confirm,
 
     // ─── TRACKS ────────────────────────────────────────────────────────
@@ -184,10 +167,7 @@ export function EditorProvider({ children, store, addToast, confirm }) {
     store: core.storeRef.current,
     addToast,
     t,
-  }), [
-    core, tracks, clips, effects, loops, overlay, markers, audioPlayback,
-    handleZoomChange, store, addToast, t, confirm,
-  ])
+  }
 
   return (
     <EditorContext.Provider value={value}>

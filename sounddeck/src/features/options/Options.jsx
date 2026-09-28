@@ -50,22 +50,20 @@ export default function Options({ store, addToast }) {
     handlePluginEnable,
   } = usePluginsManagement({ addToast })
 
-  // Sync mixer : si mixerEnabled est false mais l'AudioContext tourne, on stop
   useEffect(() => {
     const syncMixer = async () => {
       try {
         const isActive = isMixerActive()
         if (!store.mixerEnabled && isActive) {
           await stopMixer()
-          addToast('🔄 ' + t('mixerResynced'), 'info')
+          addToast(t('mixerResynced'), 'info')
         }
       } catch (e) {
         logWarn('Options', 'Erreur sync mixer', e)
       }
     }
     syncMixer()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [store.mixerEnabled, t, addToast])
 
   const handleResetSidebar = useCallback(async () => {
     const confirmed = await confirm({

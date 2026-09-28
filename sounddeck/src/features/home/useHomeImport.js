@@ -7,13 +7,6 @@ import { logWarn } from '@shared/utils/logger'
 
 const AUDIO_REGEX = /\.(mp3|wav|ogg|flac|m4a|aac|opus|weba)$/i
 
-/**
- * Hook qui centralise la logique d'import de sons :
- *   - import depuis paths (dialog)
- *   - import depuis drag & drop de fichiers
- *
- * Gère la compression optionnelle, la progression, et les toasts.
- */
 export function useHomeImport({ store, addToast, currentProfileId, t }) {
   const [isImporting, setIsImporting] = useState(false)
   const [importProgress, setImportProgress] = useState(0)
@@ -40,6 +33,7 @@ export function useHomeImport({ store, addToast, currentProfileId, t }) {
     setTotalFiles(filePaths.length)
     setImportProgress(0)
     let count = 0
+    let failed = 0
 
     const compress = store.compressOnImport || false
 
@@ -67,6 +61,9 @@ export function useHomeImport({ store, addToast, currentProfileId, t }) {
           compressedSize: result.compressedSize,
         })
         count++
+      } else {
+        failed++
+        logWarn('HomeImport', `Échec import ${fp}`, result?.error)
       }
       setImportProgress(i + 1)
     }
@@ -74,10 +71,18 @@ export function useHomeImport({ store, addToast, currentProfileId, t }) {
     if (count > 0) {
       addToast(buildSuccessMessage(count, compress), 'success')
     }
+
+    if (failed > 0) {
+      addToast(
+        t('toastImportPartialErrors', { count: failed }),
+        'warning'
+      )
+    }
+
     setImportProgress(0)
     setTotalFiles(0)
     return count
-  }, [store, currentProfileId, addToast, compressOptions, buildSuccessMessage])
+  }, [store, currentProfileId, addToast, compressOptions, buildSuccessMessage, t])
 
   // ─── IMPORT DEPUIS DRAG & DROP ──────────────────────────────────────
   const importFromDrop = useCallback(async (dataTransfer) => {
@@ -115,6 +120,7 @@ export function useHomeImport({ store, addToast, currentProfileId, t }) {
     }
 
     let imported = 0
+    let failed = 0
     const compress = store.compressOnImport || false
 
     for (const file of audioFiles) {
@@ -145,9 +151,11 @@ export function useHomeImport({ store, addToast, currentProfileId, t }) {
           })
           imported++
         } else {
+          failed++
           addToast(`${t('errorFor')} ${file.name} : ${result?.error || t('unknown')}`, 'error')
         }
       } catch (err) {
+        failed++
         logWarn('HomeImport', `Erreur drop ${file.name}`, err)
         addToast(`${t('cannotImport')} ${file.name}`, 'error')
       }
@@ -158,6 +166,13 @@ export function useHomeImport({ store, addToast, currentProfileId, t }) {
       setImportSuccess(imported)
       addToast(buildSuccessMessage(imported, compress), 'success')
       setTimeout(() => setImportSuccess(0), 3000)
+    }
+
+    if (failed > 0 && imported > 0) {
+      addToast(
+        t('toastImportPartialErrors', { count: failed }),
+        'warning'
+      )
     }
 
     return imported
