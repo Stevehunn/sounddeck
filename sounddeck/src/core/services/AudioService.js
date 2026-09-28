@@ -13,6 +13,8 @@ const DEFAULT_NORMALIZATION_TARGET_RMS = 0.2
 let normalizationTargetRMS = DEFAULT_NORMALIZATION_TARGET_RMS
 
 const pausedSounds = new Set()
+
+// Registre des lecteurs externes (Séquenceur, etc.)
 const externalPlaybackHandlers = new Map()
 
 export function setStoreRef(store) {
@@ -78,6 +80,35 @@ export function registerExternalPlayback(soundId, handlers) {
 export function unregisterExternalPlayback(soundId) {
   if (!soundId) return
   externalPlaybackHandlers.delete(soundId)
+}
+
+// ─── HELPERS CACHE ─────────────────────────────────────────────────────────
+
+/**
+ * Cherche un Howl "trackable" (avec .playing()/.seek()/.duration())
+ * dans le cache, peu importe sa position dans le tableau.
+ *
+ * Un entrée de soundCache peut être :
+ *   - un Howl simple
+ *   - un AudioBufferSourceNode (mode mixer, playLocally=false)
+ *   - un tableau [AudioBufferSourceNode, Howl] (mode mixer, playLocally=true)
+ *   - un tableau [Howl, Howl] (mode normal, sortie virtuelle + locale)
+ *   - la string 'loading'
+ */
+function findTrackableHowl(cached) {
+  if (!cached || cached === 'loading') return null
+
+  const isHowl = (h) =>
+    h &&
+    typeof h.playing === 'function' &&
+    typeof h.seek === 'function' &&
+    typeof h.duration === 'function'
+
+  if (Array.isArray(cached)) {
+    return cached.find(isHowl) || null
+  }
+
+  return isHowl(cached) ? cached : null
 }
 
 // ─── DÉTECTION DES DEVICES VIRTUELS ────────────────────────────────────────
@@ -698,24 +729,19 @@ export function isPlaying(soundId) {
   if (manualOverrideId === soundId) return true
 
   const cached = soundCache[soundId]
-  if (!cached) return false
+  if (!cached || cached === 'loading') return false
+
+  const howl = findTrackableHowl(cached)
+  if (howl) return howl.playing()
 
   if (Array.isArray(cached)) {
-    return cached.some((h) => h.playing && h.playing())
+    return cached.length > 0
   }
-
-  if (cached.playing && typeof cached.playing === 'function') {
-    return cached.playing()
-  }
-
-  try {
-    return !!cached
-  } catch (e) {
-    return false
-  }
+  return !!cached
 }
 
 export function getSoundProgress(soundId) {
+  // Manuel (Séquenceur, etc.)
   if (manualOverrideId === soundId && manualProgress.id === soundId) {
     if (manualProgress.duration <= 0) return null
     return {
@@ -726,34 +752,31 @@ export function getSoundProgress(soundId) {
   }
 
   const cached = soundCache[soundId]
-  if (!cached) return null
+  if (!cached || cached === 'loading') return null
 
-  if (Array.isArray(cached)) {
-    const howl = cached[0]
-    if (!howl || !howl.playing || !howl.playing()) return null
-    const seek = howl.seek()
-    const duration = howl.duration()
-    if (typeof seek !== 'number' || typeof duration !== 'number') return null
-    if (!duration || duration <= 0) return null
-    return { current: seek, duration, ratio: Math.min(1, seek / duration) }
+  const howl = findTrackableHowl(cached)
+  if (!howl) return null
+
+  if (!howl.playing()) return null
+
+  const seek = howl.seek()
+  const duration = howl.duration()
+
+  if (typeof seek !== 'number' || typeof duration !== 'number') return null
+  if (!duration || duration <= 0) return null
+
+  return {
+    current: seek,
+    duration,
+    ratio: Math.min(1, seek / duration),
   }
-
-  if (cached.playing && typeof cached.playing === 'function') {
-    if (!cached.playing()) return null
-    const seek = cached.seek()
-    const duration = cached.duration()
-    if (typeof seek !== 'number' || typeof duration !== 'number') return null
-    if (!duration || duration <= 0) return null
-    return { current: seek, duration, ratio: Math.min(1, seek / duration) }
-  }
-
-  return null
 }
 
 export function getSoundDuration(soundId) {
   const cached = soundCache[soundId]
   if (!cached) return null
-  const howl = Array.isArray(cached) ? cached[0] : cached
+
+  const howl = findTrackableHowl(cached)
   return howl?.duration() || null
 }
 

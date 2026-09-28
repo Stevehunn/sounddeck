@@ -93,4 +93,66 @@ export default {
   guideRecap3: '3. CABLE Output → VoiceMeeter Input 2',
   guideRecap4: '4. SoundDeck → CABLE Input',
   guideRecap5: '5. Discord → VoiceMeeter Output',
+
+    // ─── MODE SIMPLE / AVANCÉ ──────────────────────────────────────────────
+  guideModeSimple: 'Simple',
+  guideModeAdvanced: 'Avancé',
+  guideModeSimpleTooltip: 'VB-Cable seul + mixeur SoundDeck (recommandé)',
+  guideModeAdvancedTooltip: 'VB-Cable + VoiceMeeter Banana',
+  guideModeSimpleDesc: '🟢 VB-Cable seul · Plus simple',
+  guideModeAdvancedDesc: '🔵 Avec VoiceMeeter · Plus de contrôle',
+
+  // ─── MODE SIMPLE — ÉTAPES ──────────────────────────────────────────────
+  guideSimpleStep1Title: 'Étape 1 — Installer VB-Cable',
+  guideSimpleStep1Desc: 'Le pilote audio virtuel',
+  guideSimpleStep2Title: 'Étape 2 — Configurer SoundDeck',
+  guideSimpleStep2Desc: 'Mixeur + périphériques',
+  guideSimpleStep3Title: 'Étape 3 — Configurer Discord',
+  guideSimpleStep3Desc: 'Entrée + traitement vocal',
+  guideSimpleStep4Title: 'Étape 4 — Conseils & dépannage',
+  guideSimpleStep4Desc: 'Solutions aux problèmes',
+
+  // ─── MODE SIMPLE — CONTENU ────────────────────────────────────────────
+  guideSimpleIntro: 'VB-Cable est un pilote audio virtuel gratuit qui crée un "câble" entre SoundDeck et Discord. Installe-le une fois, et c\'est prêt — aucune configuration complexe nécessaire.',
+  guideSimpleVBCableDesc: 'Crée un câble audio virtuel pour envoyer le mix micro + sons vers Discord',
+  guideSimpleNoVoiceMeeter: 'Pas besoin de VoiceMeeter ! Le mixeur interne de SoundDeck fait tout le travail : il mélange ton micro avec les sons en un seul flux, plus simple et plus léger.',
+
+  guideSimpleStep2Intro: 'Dans SoundDeck, va dans Options → Audio et configure les éléments suivants :',
+  guideSimpleStep2Mixer: 'Active "Mixeur micro + sons"',
+  guideSimpleStep2MixerDesc: 'C\'est le cœur du système : SoundDeck mélange ton micro et les sons en temps réel',
+  guideSimpleStep2Mic: 'Sélectionne ton micro',
+  guideSimpleStep2MicDesc: 'Choisis ton micro physique (pas le micro par défaut si tu en as plusieurs)',
+  guideSimpleStep2Output: 'Périphérique de sortie → "CABLE Input (VB-Audio Virtual Cable)"',
+  guideSimpleStep2OutputDesc: 'C\'est par ce câble que les sons mélangés partent vers Discord',
+  guideSimpleStep2Local: 'Active "Jouer en local aussi"',
+  guideSimpleStep2LocalDesc: 'Permet de t\'entendre toi-même (les sons partent aussi dans ton casque)',
+  guideSimpleStep2LocalDevice: 'Périphérique de sortie local → ton casque',
+  guideSimpleStep2LocalDeviceDesc: 'Important : choisis ton casque, surtout pas "CABLE Input" — sinon tu n\'entendras rien en local',
+  guideSimpleStep2Note: 'Le mixeur de SoundDeck gère tout automatiquement. Sur Discord, tu entendras ton micro ET les sons comme un seul flux continu.',
+
+  guideSimpleStep3Intro: 'Dans Discord → Paramètres (⚙️) → Voix & Vidéo :',
+  guideSimpleStep3Input: '"Périphérique d\'entrée" → CABLE Output (VB-Audio Virtual Cable)',
+  guideSimpleStep3InputDesc: 'C\'est la sortie du câble virtuel — Discord y reçoit ton micro et les sons déjà mélangés par SoundDeck',
+  guideSimpleStep3Output: '"Périphérique de sortie" → ton casque habituel',
+  guideSimpleStep3OutputDesc: 'Pour entendre les autres membres (indépendant du mixage)',
+  guideSimpleStep3Noise: 'Désactive la suppression de bruit',
+  guideSimpleStep3NoiseDesc: 'Dans Traitement vocal → désactive Suppression de bruit, Annulation d\'écho et Contrôle automatique de gain. Sinon Discord va filtrer tes sons.',
+  guideSimpleStep3Success: 'C\'est tout ! Tu peux maintenant parler dans ton micro ET jouer des sons depuis SoundDeck — les deux arrivent dans Discord en même temps.',
+
+  guideSimpleTipMixer: 'Le mixeur ne démarre pas ?',
+  guideSimpleTipMixerDesc: 'Vérifie que ton micro est bien autorisé (icône 🔒 dans la barre d\'adresse) et que tu as sélectionné le bon périphérique. Essaie de désactiver puis réactiver le mixeur.',
+  guideSimpleTipEcho: 'Tu t\'entends en écho ?',
+  guideSimpleTipEchoDesc: 'Désactive "S\'entendre" dans Options → Audio si tu utilises un casque. Sinon baisse le volume du monitoring.',
+  guideSimpleTipNoSound: 'Les autres n\'entendent pas les sons ?',
+  guideSimpleTipNoSoundDesc: 'Vérifie que Discord utilise bien "CABLE Output" comme entrée, et que le mixeur SoundDeck est activé. Redémarre Discord si besoin.',
+  guideSimpleTipCable: 'CABLE Input n\'apparaît pas dans SoundDeck ?',
+  guideSimpleTipCableDesc: 'Redémarre SoundDeck après avoir installé VB-Cable. Si toujours absent, vérifie dans le Gestionnaire de périphériques Windows que le driver est bien installé.',
+  guideSimpleTipLatency: 'Latence ou lag micro ?',
+  guideSimpleTipLatencyDesc: 'Active le "Mode basse latence" dans Options → Audio → Options audio avancées. Ça retire les filtres pour réduire la latence.',
+
+  // ─── MODE SIMPLE — RÉCAP ───────────────────────────────────────────────
+  guideSimpleRecap1: '1. Installer VB-Cable',
+  guideSimpleRecap2: '2. Activer le mixeur SoundDeck',
+  guideSimpleRecap3: '3. Discord → CABLE Output',
+  guideSimpleRecap4: '4. Désactiver traitement vocal',
 }

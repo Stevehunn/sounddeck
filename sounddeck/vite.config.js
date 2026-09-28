@@ -2,10 +2,64 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+// ─── CSP DEV (avec HMR + eval) ──────────────────────────────────────────
+const CSP_DEV = [
+  "default-src 'self'",
+  // 'unsafe-eval' nécessaire pour Vite HMR / React Refresh
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' sounddeck-local: blob:",
+  "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+  "img-src 'self' data: blob: sounddeck-local: file: https:",
+  "media-src 'self' data: blob: sounddeck-local: file: https:",
+  "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com",
+  // ws: / http://localhost:* nécessaires pour HMR
+  "connect-src 'self' sounddeck-local: ws: wss: http://localhost:* https: file: blob:",
+  "worker-src 'self' blob: sounddeck-local:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ')
+
+// ─── CSP PROD (stricte) ─────────────────────────────────────────────────
+const CSP_PROD = [
+  "default-src 'self'",
+  // PAS de 'unsafe-eval', PAS de 'unsafe-inline' sur les scripts
+  "script-src 'self' 'wasm-unsafe-eval' sounddeck-local: blob:",
+  // 'unsafe-inline' reste nécessaire pour les styles inline React
+  "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+  "img-src 'self' data: blob: sounddeck-local: file: https:",
+  "media-src 'self' data: blob: sounddeck-local: file: https:",
+  "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com",
+  // ✅ PAS de ws: ni http://localhost:* en prod
+  "connect-src 'self' sounddeck-local: https: file: blob:",
+  "worker-src 'self' blob: sounddeck-local:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ')
+
+// ─── Plugin Vite : injecte la CSP selon le mode ─────────────────────────
+function cspPlugin() {
+  return {
+    name: 'sounddeck-csp',
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html, ctx) {
+        const isDev = !!ctx.server
+        const csp = isDev ? CSP_DEV : CSP_PROD
+        const metaTag = `    <meta http-equiv="Content-Security-Policy" content="${csp}">`
+        return html.replace('<!-- CSP_PLACEHOLDER -->', metaTag)
+      },
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react({
-    include: /\.(js|jsx|ts|tsx)$/,
-  })],
+  plugins: [
+    react({
+      include: /\.(js|jsx|ts|tsx)$/,
+    }),
+    cspPlugin(),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -13,16 +67,16 @@ export default defineConfig({
       '@shared': path.resolve(__dirname, './src/shared'),
       '@features': path.resolve(__dirname, './src/features'),
       '@plugins': path.resolve(__dirname, './src/plugins'),
-    }
+    },
   },
   base: './',
   build: {
     outDir: 'dist',
-    assetsDir: 'assets'
+    assetsDir: 'assets',
   },
   server: {
     port: 5173,
-    strictPort: true
+    strictPort: true,
   },
   test: {
     globals: true,
@@ -41,8 +95,8 @@ export default defineConfig({
         'node_modules/',
         'src/test/',
         'src/main.jsx',
-        'src/App.css'
-      ]
-    }
-  }
+        'src/App.css',
+      ],
+    },
+  },
 })

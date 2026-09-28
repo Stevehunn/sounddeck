@@ -53,8 +53,10 @@ export function useSounds(initialSounds = [], initialSoundOrder = {}, initialTag
     return newSound
   }, [sounds, soundOrder, save])
 
-    const deleteSound = useCallback(async (soundId) => {
+  const deleteSound = useCallback(async (soundId) => {
     const sound = sounds.find(s => s.id === soundId)
+    if (!sound) return false
+
     const updated = sounds.filter(s => s.id !== soundId)
     setSounds(updated)
 
@@ -75,10 +77,23 @@ export function useSounds(initialSounds = [], initialSoundOrder = {}, initialTag
     }
 
     if (sound?.path) {
-      try {
-        await window.electronAPI.deleteSoundFile(sound.path)
-      } catch (e) {
-        console.warn('⚠️ [useSounds] échec suppression fichier:', e)
+      const normalizedPath = normalizePath(sound.path)
+
+      const pathStillUsed = updated.some(
+        (s) => s.path && normalizePath(s.path) === normalizedPath
+      )
+
+      if (pathStillUsed) {
+        console.info(
+          'ℹ️ [useSounds] Fichier conservé (encore utilisé par un autre son):',
+          normalizedPath
+        )
+      } else {
+        try {
+          await window.electronAPI.deleteSoundFile(normalizedPath)
+        } catch (e) {
+          console.warn('⚠️ [useSounds] échec suppression fichier:', e)
+        }
       }
     }
 

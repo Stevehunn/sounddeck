@@ -9,7 +9,7 @@ function registerProjectHandlers(store) {
   // ─── SAUVEGARDER UN PROJET ─────────────────────────────────────────────
   ipcMain.handle('save-editor-project', async (event, projectData) => {
     console.log('💾 [projectHandlers] save-editor-project:', projectData?.name)
-    
+
     try {
       if (!projectData || !projectData.id) {
         return { success: false, error: 'Données de projet invalides' }
@@ -17,7 +17,7 @@ function registerProjectHandlers(store) {
 
       const updatedProject = {
         ...projectData,
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
       }
 
       const projects = store.get('editorProjects', {})
@@ -26,7 +26,7 @@ function registerProjectHandlers(store) {
       store.set('currentEditorProjectId', projectData.id)
 
       const recent = store.get('recentEditorProjects', [])
-      const filtered = recent.filter(id => id !== projectData.id)
+      const filtered = recent.filter((id) => id !== projectData.id)
       filtered.unshift(projectData.id)
       store.set('recentEditorProjects', filtered.slice(0, 20))
 
@@ -41,7 +41,7 @@ function registerProjectHandlers(store) {
   // ─── CHARGER UN PROJET ──────────────────────────────────────────────────
   ipcMain.handle('load-editor-project', async (event, projectId) => {
     console.log('📂 [projectHandlers] load-editor-project:', projectId)
-    
+
     try {
       const projects = store.get('editorProjects', {})
       const project = projects[projectId]
@@ -51,7 +51,7 @@ function registerProjectHandlers(store) {
       }
 
       const recent = store.get('recentEditorProjects', [])
-      const filtered = recent.filter(id => id !== projectId)
+      const filtered = recent.filter((id) => id !== projectId)
       filtered.unshift(projectId)
       store.set('recentEditorProjects', filtered.slice(0, 20))
       store.set('currentEditorProjectId', projectId)
@@ -67,10 +67,12 @@ function registerProjectHandlers(store) {
   // ─── OBTENIR TOUS LES PROJETS ──────────────────────────────────────────
   ipcMain.handle('get-all-editor-projects', async () => {
     console.log('📋 [projectHandlers] get-all-editor-projects')
-    
+
     try {
       const projects = store.get('editorProjects', {})
-      const result = Object.values(projects).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+      const result = Object.values(projects).sort(
+        (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)
+      )
       console.log(`📋 ${result.length} projets trouvés`)
       return result
     } catch (e) {
@@ -82,12 +84,15 @@ function registerProjectHandlers(store) {
   // ─── OBTENIR LES PROJETS RÉCENTS ──────────────────────────────────────
   ipcMain.handle('get-recent-editor-projects', async () => {
     console.log('🔄 [projectHandlers] get-recent-editor-projects')
-    
+
     try {
       const recentIds = store.get('recentEditorProjects', [])
       const projects = store.get('editorProjects', {})
-      
-      const result = recentIds.map(id => projects[id]).filter(Boolean).slice(0, 10)
+
+      const result = recentIds
+        .map((id) => projects[id])
+        .filter(Boolean)
+        .slice(0, 10)
       console.log(`🔄 ${result.length} projets récents`)
       return result
     } catch (e) {
@@ -99,10 +104,10 @@ function registerProjectHandlers(store) {
   // ─── SUPPRIMER UN PROJET ───────────────────────────────────────────────
   ipcMain.handle('delete-editor-project', async (event, projectId) => {
     console.log('🗑️ [projectHandlers] delete-editor-project:', projectId)
-    
+
     try {
       const projects = store.get('editorProjects', {})
-      
+
       if (!projects[projectId]) {
         return { success: false, error: 'Projet non trouvé' }
       }
@@ -111,7 +116,10 @@ function registerProjectHandlers(store) {
       store.set('editorProjects', projects)
 
       const recent = store.get('recentEditorProjects', [])
-      store.set('recentEditorProjects', recent.filter(id => id !== projectId))
+      store.set(
+        'recentEditorProjects',
+        recent.filter((id) => id !== projectId)
+      )
 
       if (store.get('currentEditorProjectId') === projectId) {
         store.delete('currentEditorProjectId')
@@ -126,43 +134,50 @@ function registerProjectHandlers(store) {
   })
 
   // ─── EXPORTER UN PROJET ─────────────────────────────────────────────────
-  ipcMain.handle('export-editor-project', async (event, { project, filePath }) => {
-    console.log('📤 [projectHandlers] export-editor-project:', project?.name)
-    
-    try {
-      if (!project) {
-        return { success: false, error: 'Aucun projet à exporter' }
-      }
+  ipcMain.handle(
+    'export-editor-project',
+    async (event, { project, filePath }) => {
+      console.log('📤 [projectHandlers] export-editor-project:', project?.name)
 
-      const exportData = {
-        version: '1.0.0',
-        type: 'sounddeck-project',
-        exportedAt: Date.now(),
-        project: {
-          ...project,
-          exportedAt: Date.now()
+      try {
+        if (!project) {
+          return { success: false, error: 'Aucun projet à exporter' }
         }
-      }
 
-      const dir = path.dirname(filePath)
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true })
-      }
+        const exportData = {
+          version: '1.0.0',
+          type: 'sounddeck-project',
+          exportedAt: Date.now(),
+          project: {
+            ...project,
+            exportedAt: Date.now(),
+          },
+        }
 
-      fs.writeFileSync(filePath, JSON.stringify(exportData, null, 2), 'utf-8')
-      
-      console.log(`✅ Projet exporté vers: ${filePath}`)
-      return { success: true, path: filePath }
-    } catch (e) {
-      console.error('❌ Erreur export projet:', e)
-      return { success: false, error: e.message }
+        const dir = path.dirname(filePath)
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true })
+        }
+
+        fs.writeFileSync(
+          filePath,
+          JSON.stringify(exportData, null, 2),
+          'utf-8'
+        )
+
+        console.log(`✅ Projet exporté vers: ${filePath}`)
+        return { success: true, path: filePath }
+      } catch (e) {
+        console.error('❌ Erreur export projet:', e)
+        return { success: false, error: e.message }
+      }
     }
-  })
+  )
 
   // ─── IMPORTER UN PROJET ─────────────────────────────────────────────────
   ipcMain.handle('import-editor-project', async (event, filePath) => {
     console.log('📥 [projectHandlers] import-editor-project:', filePath)
-    
+
     try {
       if (!fs.existsSync(filePath)) {
         return { success: false, error: 'Fichier non trouvé' }
@@ -183,7 +198,7 @@ function registerProjectHandlers(store) {
         ...data.project,
         id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         importedAt: Date.now(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
       }
 
       const projects = store.get('editorProjects', {})
@@ -203,46 +218,52 @@ function registerProjectHandlers(store) {
   })
 
   // ─── RENOMMER UN PROJET ─────────────────────────────────────────────────
+  ipcMain.handle(
+    'rename-editor-project',
+    async (event, { projectId, newName }) => {
+      console.log(
+        '✏️ [projectHandlers] rename-editor-project:',
+        projectId,
+        '->',
+        newName
+      )
 
-  ipcMain.handle('rename-editor-project', async (event, { projectId, newName }) => {
-    console.log('✏️ [projectHandlers] rename-editor-project:', projectId, '->', newName)
-    
-    try {
-      if (!newName || !newName.trim()) {
-        return { success: false, error: 'Nom invalide' }
+      try {
+        if (!newName || !newName.trim()) {
+          return { success: false, error: 'Nom invalide' }
+        }
+
+        const projects = store.get('editorProjects', {})
+        const project = projects[projectId]
+
+        if (!project) {
+          return { success: false, error: 'Projet non trouvé' }
+        }
+
+        // ✅ Mise à jour du nom + timestamp
+        project.name = newName.trim()
+        project.updatedAt = Date.now()
+
+        // ✅ Sauvegarde dans le store
+        store.set('editorProjects', projects)
+
+        // ✅ FIX : suppression de l'écriture orpheline `currentEditorProject`
+        // Le projet "actuel" est identifié via `currentEditorProjectId` uniquement.
+        // Le store n'a pas besoin d'une copie séparée du projet en cours.
+
+        console.log(`✅ Projet renommé: "${newName}"`)
+        return { success: true, project }
+      } catch (e) {
+        console.error('❌ Erreur renommage projet:', e)
+        return { success: false, error: e.message }
       }
-
-      const projects = store.get('editorProjects', {})
-      const project = projects[projectId]
-
-      if (!project) {
-        return { success: false, error: 'Projet non trouvé' }
-      }
-
-      // ✅ Mettre à jour le nom
-      project.name = newName.trim()
-      project.updatedAt = Date.now()
-      
-      // ✅ Sauvegarder dans le store
-      store.set('editorProjects', projects)
-
-      // ✅ Mettre à jour le projet actuel si c'est le même
-      if (store.get('currentEditorProjectId') === projectId) {
-        store.set('currentEditorProject', project)
-      }
-
-      console.log(`✅ Projet renommé: "${newName}"`)
-      return { success: true, project }
-    } catch (e) {
-      console.error('❌ Erreur renommage projet:', e)
-      return { success: false, error: e.message }
     }
-  })
+  )
 
   // ─── DUPLIQUER UN PROJET ──────────────────────────────────────────────
   ipcMain.handle('duplicate-editor-project', async (event, projectId) => {
     console.log('📋 [projectHandlers] duplicate-editor-project:', projectId)
-    
+
     try {
       const projects = store.get('editorProjects', {})
       const project = projects[projectId]
@@ -256,11 +277,17 @@ function registerProjectHandlers(store) {
         id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         name: `${project.name} (copie)`,
         createdAt: Date.now(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
       }
 
       projects[duplicatedProject.id] = duplicatedProject
       store.set('editorProjects', projects)
+
+      // ✅ Cohérence avec save/load/import : on ajoute aux récents
+      const recent = store.get('recentEditorProjects', [])
+      const filtered = recent.filter((id) => id !== duplicatedProject.id)
+      filtered.unshift(duplicatedProject.id)
+      store.set('recentEditorProjects', filtered.slice(0, 20))
 
       console.log(`✅ Projet dupliqué: "${duplicatedProject.name}"`)
       return { success: true, project: duplicatedProject }
