@@ -39,10 +39,15 @@ describe('parseTime', () => {
   })
 
   it('devrait parser "1:30" en 90 secondes', () => {
-    // ⚠️ BUG P3 : parseFloat('1:30') = 1 → retourne 1 au lieu de 90.
-    // Le regex est du code mort pour les cas commençant par un chiffre.
-    // On lock le comportement réel actuel (bug documenté).
-    expect(parseTime('1:30')).toBe(1)
+    expect(parseTime('1:30')).toBe(90)
+  })
+
+  it('devrait parser "1:30.5" en 90.5 secondes', () => {
+    expect(parseTime('1:30.5')).toBe(90.5)
+  })
+
+  it('devrait parser "0:00" en 0', () => {
+    expect(parseTime('0:00')).toBe(0)
   })
 
   it('devrait retourner 0 pour une chaîne vide', () => {
@@ -115,27 +120,24 @@ describe('isInLoopRegion', () => {
 })
 
 describe('getTotalDuration', () => {
-  it('devrait retourner 12 pour un projet vide (10 de base + 2)', () => {
-    // ⚠️ getTotalDuration initialise maxDuration=10 puis ajoute +2
-    expect(getTotalDuration(null)).toBe(10)         // early return (pas de +2)
-    expect(getTotalDuration({})).toBe(10)           // early return (pas de +2)
-    expect(getTotalDuration({ tracks: [] })).toBe(12) // → Math.max(10+2, 10)
+  it('devrait retourner 10 pour un projet vide ou null', () => {
+    expect(getTotalDuration(null)).toBe(10)
+    expect(getTotalDuration({})).toBe(10)
+    expect(getTotalDuration({ tracks: [] })).toBe(10)  // ✅ FIX
   })
 
-  it('devrait retourner 12 pour un projet court (end < 10)', () => {
+  it('devrait retourner au minimum 10 pour un projet court', () => {
     const project = {
       tracks: [{ clips: [{ id: 'c1', start: 0, duration: 5 }] }],
     }
-    // end=5 n'est pas > 10 → maxDuration reste 10 → +2 = 12
-    expect(getTotalDuration(project)).toBe(12)
+    expect(getTotalDuration(project)).toBe(10)
   })
 
   it('devrait retourner end + 2 pour un projet long', () => {
     const project = {
       tracks: [{ clips: [{ id: 'c1', start: 20, duration: 3 }] }],
     }
-    // end = 23 → maxDuration = 23 → +2 = 25
-    expect(getTotalDuration(project)).toBe(25)
+    expect(getTotalDuration(project)).toBe(25)  // end=23, +2
   })
 })
 

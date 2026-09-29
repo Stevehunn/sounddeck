@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">25% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>3/12</span>
+                <span class='fraction'>12/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">42.85% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>6/14</span>
+                <span class='fraction'>14/14</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">50% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/2</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">25% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>2/8</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -95,21 +95,9 @@
 <a name='L30'></a><a href='#L30'>30</a>
 <a name='L31'></a><a href='#L31'>31</a>
 <a name='L32'></a><a href='#L32'>32</a>
-<a name='L33'></a><a href='#L33'>33</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">14x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">14x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -120,11 +108,27 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// src/core/store/utils/volumeUtils.js
@@ -136,12 +140,14 @@
  * @param {number|undefined|null} oldVolume
  * @returns {number} Valeur en dB
  */
+// ⚠️ NOTE : `0` est ambigu — peut signifier 0% de l'ancien système OU 0 dB.
+// Le choix actuel : 0 est traité comme "déjà en dB" (retourné tel quel).
+// Conséquence : un ancien volume muet (0%) devient 0 dB (neutre).
+// À revoir si des utilisateurs remontent ce cas.
 export function convertOldVolumeToDb(oldVolume) {
-  <span class="missing-if-branch" title="if path not taken" >I</span>if (oldVolume === undefined || oldVolume === null) <span class="cstat-no" title="statement not covered" >return 0</span>
-  // Déjà en dB ?
-  <span class="missing-if-branch" title="else path not taken" >E</span>if (oldVolume &gt;= -24 &amp;&amp; oldVolume &lt;= 24) return oldVolume
-  // Ancienne échelle 0..100 → dB centré sur 50
-<span class="cstat-no" title="statement not covered" >  return Math.round(((oldVolume - 50) / 50) * 24 * 10) / 10</span>
+  if (oldVolume === undefined || oldVolume === null) return 0
+  if (oldVolume &gt;= -24 &amp;&amp; oldVolume &lt;= 24) return oldVolume
+  return Math.round(((oldVolume - 50) / 50) * 24 * 10) / 10
 }
 &nbsp;
 /**
@@ -151,12 +157,12 @@ export function convertOldVolumeToDb(oldVolume) {
  * @param {Object} sound
  * @returns {Object}
  */
-export function <span class="fstat-no" title="function not covered" >migrateSoundVolume(s</span>ound) {
-<span class="cstat-no" title="statement not covered" >  if (!sound) <span class="cstat-no" title="statement not covered" >return sound</span></span>
-<span class="cstat-no" title="statement not covered" >  if (sound.volumeDb !== undefined) <span class="cstat-no" title="statement not covered" >return sound</span></span>
-  const oldVolume = <span class="cstat-no" title="statement not covered" >sound.volume ?? 100</span>
-  const newDb = <span class="cstat-no" title="statement not covered" >convertOldVolumeToDb(oldVolume)</span>
-<span class="cstat-no" title="statement not covered" >  return { ...sound, volume: newDb, volumeDb: newDb }</span>
+export function migrateSoundVolume(sound) {
+  if (!sound) return sound
+  if (sound.volumeDb !== undefined) return sound
+  const oldVolume = sound.volume ?? 100
+  const newDb = convertOldVolumeToDb(oldVolume)
+  return { ...sound, volume: newDb, volumeDb: newDb }
 }
 &nbsp;
 export default { convertOldVolumeToDb, migrateSoundVolume }</pre></td></tr></table></pre>
@@ -166,7 +172,7 @@ export default { convertOldVolumeToDb, migrateSoundVolume }</pre></td></tr></tab
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-09-29T14:44:15.801Z
+                at 2026-09-29T17:25:14.580Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

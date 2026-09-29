@@ -7,11 +7,13 @@
  * @param {number|undefined|null} oldVolume
  * @returns {number} Valeur en dB
  */
+// ⚠️ NOTE : `0` est ambigu — peut signifier 0% de l'ancien système OU 0 dB.
+// Le choix actuel : 0 est traité comme "déjà en dB" (retourné tel quel).
+// Conséquence : un ancien volume muet (0%) devient 0 dB (neutre).
+// À revoir si des utilisateurs remontent ce cas.
 export function convertOldVolumeToDb(oldVolume) {
   if (oldVolume === undefined || oldVolume === null) return 0
-  // Déjà en dB ?
   if (oldVolume >= -24 && oldVolume <= 24) return oldVolume
-  // Ancienne échelle 0..100 → dB centré sur 50
   return Math.round(((oldVolume - 50) / 50) * 24 * 10) / 10
 }
 

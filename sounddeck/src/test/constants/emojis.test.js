@@ -57,9 +57,12 @@ describe('getDefaultEmojiCategory', () => {
     expect(getDefaultEmojiCategory('🦥')).toBeNull()
   })
 
+  it('devrait avoir des emojis UNIQUES dans DEFAULT_EMOJIS', () => {
+    const unique = new Set(DEFAULT_EMOJIS)
+    expect(unique.size).toBe(DEFAULT_EMOJIS.length)
+  })
+
   it('DEFAULT_EMOJI_MAP devrait avoir la taille des emojis uniques', () => {
-    // ⚠️ Certains emojis sont volontairement en doublon (ex: 🎤 dans audio + games)
-    // Le Map déduplique → size = DEFAULT_EMOJIS.length - nb_doublons
     const uniqueEmojis = new Set(DEFAULT_EMOJIS)
     expect(DEFAULT_EMOJI_MAP.size).toBe(uniqueEmojis.size)
   })

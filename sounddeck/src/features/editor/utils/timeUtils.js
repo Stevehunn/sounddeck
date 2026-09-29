@@ -22,20 +22,22 @@ export function formatTime(seconds, showMilliseconds = false) {
  */
 export function parseTime(timeString) {
   if (!timeString) return 0
-  
-  // Si c'est déjà un nombre
-  const num = parseFloat(timeString)
-  if (!isNaN(num)) return num
-  
+
+  // ✅ FIX P3 : on essaie d'abord le format MM:SS
+  // (sinon parseFloat('1:30') retourne 1 et on ne matche jamais le regex)
+  const str = String(timeString).trim()
+
   // Format MM:SS ou MM:SS.ss
-  const match = timeString.match(/^(\d+):(\d+(?:\.\d+)?)$/)
+  const match = str.match(/^(\d+):(\d+(?:\.\d+)?)$/)
   if (match) {
-    const mins = parseInt(match[1])
+    const mins = parseInt(match[1], 10)
     const secs = parseFloat(match[2])
     return mins * 60 + secs
   }
-  
-  return 0
+
+  // Sinon, nombre simple (ex: "90" → 90, "1.5" → 1.5)
+  const num = parseFloat(str)
+  return Number.isFinite(num) ? num : 0
 }
 
 /**
@@ -83,9 +85,10 @@ export function isInLoopRegion(time, loopRegion) {
  * @returns {number} Durée totale en secondes
  */
 export function getTotalDuration(project, clipDurations = {}) {
-  if (!project?.tracks) return 10
-  
-  let maxDuration = 10
+  // ✅ FIX P3 : cohérence — tous les cas vides retournent 10
+  if (!project?.tracks || project.tracks.length === 0) return 10
+
+  let maxDuration = 0
   for (const track of project.tracks) {
     for (const clip of track.clips) {
       const duration = clipDurations[clip.id] || clip.duration || 3
