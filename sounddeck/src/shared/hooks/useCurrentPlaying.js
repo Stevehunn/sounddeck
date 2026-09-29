@@ -1,88 +1,114 @@
 // src/shared/hooks/useCurrentPlaying.js
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   subscribeToPlayback,
-  isPlaying,
   getSoundProgress,
   isPausedSound,
+  togglePauseSound,
+  stopSound,
 } from '@core/services/AudioService'
 
-const PROGRESS_POLL_MS = 250
+const PROGRESS_POLL_MS = 100
 const MIN_DURATION_FOR_BAR = 2
-const MAX_MISS_TOLERANCE = 4
 
 /**
- * Hook qui retourne le son actuellement en lecture + sa progression + état pause
+ * Hook qui retourne TOUS les sons en cours de lecture + progression + état pause.
+ *
+ * AudioService est responsable du cycle de vie :
+ *   - Ajout  : playSound() → markSoundPlaying()
+ *   - Retrait: stopSound(), onend, onstop, onloaderror → markSoundStopped()
+ *   - Clear  : stopAllSounds(), setCurrentPlayingSound(null)
+ *
  * @param {Array} sounds - Liste de tous les sons du store
- * @returns {{ sound: object|null, progress: object|null, isPaused: boolean }}
+ * @returns {{
+ *   sound: object|null,
+ *   progress: object|null,
+ *   isPaused: boolean,
+ *   playingSounds: Array<{
+ *     id: string,
+ *     sound: object,
+ *     progress: object|null,
+ *     isPaused: boolean,
+ *   }>,
+ *   togglePause: (id: string) => void,
+ *   stop: (id: string) => void,
+ * }}
  */
 export function useCurrentPlaying(sounds) {
-  const [playingId, setPlayingId] = useState(null)
-  const [progress, setProgress] = useState(null)
-  const [isPaused, setIsPaused] = useState(false)
+  const [playingIds, setPlayingIds] = useState([])
+  const [stateById, setStateById] = useState({})
+
   const soundsRef = useRef(sounds)
-  const missCountRef = useRef(0)
 
-  useEffect(() => {
-    soundsRef.current = sounds
-  }, [sounds])
+  useEffect(() => { soundsRef.current = sounds }, [sounds])
 
+  // ─── ABONNEMENT AUX ÉVÉNEMENTS AUDIO ────────────────────────────────
   useEffect(() => {
-    const unsubscribe = subscribeToPlayback((state) => {
-      const newId = state.id || null
-      setPlayingId(newId)
-      missCountRef.current = 0
-      if (!newId) {
-        setProgress(null)
-        setIsPaused(false)
-      }
+    const unsubscribe = subscribeToPlayback((snapshot) => {
+      const ids = snapshot.playingIds || (snapshot.id ? [snapshot.id] : [])
+      setPlayingIds(ids)
     })
     return unsubscribe
   }, [])
 
+  // ─── POLL PROGRESS + ÉTAT PAUSE ─────────────────────────────────────
   useEffect(() => {
-    if (!playingId) {
-      setProgress(null)
-      setIsPaused(false)
-      missCountRef.current = 0
+    if (playingIds.length === 0) {
+      setStateById({})
       return
     }
 
-    const interval = setInterval(() => {
-      // Sync pause state
-      setIsPaused(isPausedSound(playingId))
-
-      if (!isPlaying(playingId)) {
-        missCountRef.current += 1
-        if (missCountRef.current >= MAX_MISS_TOLERANCE) {
-          if (!isPausedSound(playingId)) {
-            setPlayingId(null)
-            setProgress(null)
-            setIsPaused(false)
-            missCountRef.current = 0
-          }
-        }
-        return
+    const tick = () => {
+      const updates = {}
+      for (const id of playingIds) {
+        const paused = isPausedSound(id)
+        const p = getSoundProgress(id)
+        const showProgress =
+          p && p.duration > MIN_DURATION_FOR_BAR ? p : null
+        updates[id] = { progress: showProgress, isPaused: paused }
       }
+      setStateById(updates)
+    }
 
-      missCountRef.current = 0
-
-      const p = getSoundProgress(playingId)
-      if (p && p.duration > MIN_DURATION_FOR_BAR) {
-        setProgress(p)
-      } else {
-        setProgress(null)
-      }
-    }, PROGRESS_POLL_MS)
-
+    tick()
+    const interval = setInterval(tick, PROGRESS_POLL_MS)
     return () => clearInterval(interval)
-  }, [playingId])
+  }, [playingIds])
 
-  const sound = playingId
-    ? soundsRef.current?.find((s) => s.id === playingId) || null
-    : null
+  // ─── CONSTRUCTION DE LA LISTE ENRICHIE ─────────────────────────────
+  // Ordre : plus récent en premier (Set conserve l'ordre d'insertion)
+  const playingSounds = playingIds
+    .slice()
+    .reverse()
+    .map((id) => {
+      const sound = soundsRef.current?.find((s) => s.id === id)
+      if (!sound) return null
+      const s = stateById[id] || { progress: null, isPaused: false }
+      return {
+        id,
+        sound,
+        progress: s.progress,
+        isPaused: s.isPaused,
+      }
+    })
+    .filter(Boolean)
 
-  return { sound, progress, isPaused }
+  // Compat : dernier son (le plus récemment lancé)
+  const last = playingSounds[0] || null
+
+  const togglePause = useCallback((id) => togglePauseSound(id), [])
+  const stop = useCallback((id) => stopSound(id), [])
+
+  return {
+    // Compat (dernier son)
+    sound: last?.sound || null,
+    progress: last?.progress || null,
+    isPaused: last?.isPaused || false,
+    // Nouveau (liste complète)
+    playingSounds,
+    togglePause,
+    stop,
+  }
 }
 
 export default useCurrentPlaying

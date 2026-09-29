@@ -512,6 +512,25 @@ export function useEditorAudioPlayback(core) {
       setCurrentTime(globalTime)
       currentTimeRef.current = globalTime
 
+      const stopAt = stopAtTimeRef.current
+      if (stopAt !== null && stopAt !== undefined && globalTime >= stopAt) {
+        setCurrentTime(stopAt)
+        currentTimeRef.current = stopAt
+        setIsPlaying(false)
+        isPlayingRef.current = false
+        setStopAtTime(null)
+        stopAtTimeRef.current = null
+        setSoloPlayClipId(null)
+        soloPlayClipIdRef.current = null
+
+        stopAllSources()
+        playingClips.clear()
+        clipsStartedThisCycle.clear()
+        generalLoopClipsStarted.clear()
+        isLoopRunning = false
+        return
+      }
+
       const totalDuration = totalDurationRef.current
       if (globalTime >= totalDuration) {
         setIsPlaying(false)
@@ -547,11 +566,11 @@ export function useEditorAudioPlayback(core) {
     isPlayingRef,
     isPausedRef,
     totalDurationRef,
+    stopAtTimeRef,
     setCurrentTime,
     setIsPlaying,
     setStopAtTime,
     setSoloPlayClipId,
-    stopAtTimeRef,
   ])
 
   // ─── CONTRÔLES ──────────────────────────────────────────────────────

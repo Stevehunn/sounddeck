@@ -56,6 +56,303 @@ function buildVisibleItemsSignature(visibleItems) {
   return parts.join('§')
 }
 
+// ─── COMPOSANT : LISTE DES SONS EN LECTURE (FEATURE multi-sons) ─────────────
+
+const NowPlayingList = memo(function NowPlayingList({
+  playingSounds,
+  onTogglePause,
+  onStop,
+  t,
+}) {
+  if (!playingSounds || playingSounds.length === 0) return null
+
+  const count = playingSounds.length
+
+  return (
+    <div style={{ width: '100%', minWidth: 0 }}>
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 5,
+          marginBottom: 6,
+        }}
+      >
+        <i
+          className="ti ti-volume"
+          style={{
+            fontSize: 11,
+            color: 'var(--accent)',
+            animation: 'pulse 1.2s ease-in-out infinite',
+          }}
+        />
+        <span
+          style={{
+            fontSize: 9,
+            fontWeight: 600,
+            color: 'var(--accent)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+          }}
+        >
+          {t('nowPlaying')}
+        </span>
+        <span
+          style={{
+            fontSize: 9,
+            color: 'var(--text-tertiary)',
+            background: 'var(--bg-tertiary)',
+            padding: '0 5px',
+            borderRadius: 8,
+            marginLeft: 'auto',
+          }}
+        >
+          {count}
+        </span>
+      </div>
+
+      {/* Liste scrollable */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          maxHeight: 200,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          paddingRight: 2,
+        }}
+      >
+        {playingSounds.map((item) => (
+          <NowPlayingItem
+            key={item.id}
+            item={item}
+            onTogglePause={onTogglePause}
+            onStop={onStop}
+            t={t}
+          />
+        ))}
+      </div>
+    </div>
+  )
+})
+
+const NowPlayingItem = memo(function NowPlayingItem({
+  item,
+  onTogglePause,
+  onStop,
+  t,
+}) {
+  const { sound, progress, isPaused } = item
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
+        padding: '5px 6px',
+        borderRadius: 6,
+        background: isPaused
+          ? 'var(--bg-tertiary)'
+          : 'rgba(124,111,247,0.08)',
+        border: `1px solid ${
+          isPaused ? 'var(--border)' : 'var(--accent)'
+        }`,
+        transition: 'all 0.15s',
+        opacity: isPaused ? 0.75 : 1,
+      }}
+    >
+      {/* Ligne principale */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          minWidth: 0,
+        }}
+      >
+        {/* Image / Emoji */}
+        {sound.image ? (
+          <img
+            src={buildFileUrl(sound.image)}
+            alt=""
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 4,
+              objectFit: 'cover',
+              flexShrink: 0,
+              border: '1px solid var(--border)',
+            }}
+            onError={(e) => { e.target.style.display = 'none' }}
+          />
+        ) : (
+          <span
+            style={{
+              width: 22,
+              height: 22,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 16,
+              flexShrink: 0,
+              lineHeight: 1,
+            }}
+          >
+            {sound.emoji || '🔊'}
+          </span>
+        )}
+
+        {/* Nom */}
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 500,
+            color: isPaused ? 'var(--text-secondary)' : 'var(--text-primary)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            flex: 1,
+            minWidth: 0,
+          }}
+          title={sound.name}
+        >
+          {sound.name}
+        </span>
+
+        {/* Bouton pause/resume */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onTogglePause(item.id)
+          }}
+          title={isPaused ? t('resume') : t('pause')}
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: '50%',
+            background: isPaused ? 'var(--accent)' : 'var(--warning)',
+            border: 'none',
+            color: 'white',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            padding: 0,
+            transition: 'transform 0.15s ease',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)' }}
+        >
+          <i
+            className={`ti ${
+              isPaused ? 'ti-player-play-filled' : 'ti-player-pause-filled'
+            }`}
+            style={{ fontSize: 11 }}
+          />
+        </button>
+
+        {/* Bouton stop */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onStop(item.id)
+          }}
+          title={t('stopAll')}
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: '50%',
+            background: 'var(--bg-tertiary)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-tertiary)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            padding: 0,
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(224,82,82,0.15)'
+            e.currentTarget.style.color = 'var(--danger)'
+            e.currentTarget.style.borderColor = 'var(--danger)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'var(--bg-tertiary)'
+            e.currentTarget.style.color = 'var(--text-tertiary)'
+            e.currentTarget.style.borderColor = 'var(--border)'
+          }}
+        >
+          <i className="ti ti-player-stop-filled" style={{ fontSize: 10 }} />
+        </button>
+      </div>
+
+      {/* Barre de progression */}
+      {progress ? (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            paddingLeft: 28,
+          }}
+        >
+          <div
+            style={{
+              flex: 1,
+              height: 3,
+              background: 'var(--bg-tertiary)',
+              borderRadius: 2,
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                width: `${(progress.ratio || 0) * 100}%`,
+                background: isPaused ? 'var(--warning)' : 'var(--accent)',
+                borderRadius: 2,
+                transition: 'width 0.1s linear',
+              }}
+            />
+          </div>
+          <span
+            style={{
+              fontSize: 8,
+              color: 'var(--text-tertiary)',
+              fontVariantNumeric: 'tabular-nums',
+              minWidth: 54,
+              textAlign: 'right',
+            }}
+          >
+            {formatTime(progress.current)}/{formatTime(progress.duration)}
+          </span>
+        </div>
+      ) : (
+        isPaused && (
+          <div
+            style={{
+              fontSize: 9,
+              color: 'var(--text-tertiary)',
+              fontStyle: 'italic',
+              paddingLeft: 28,
+            }}
+          >
+            ⏸️ {t('paused')}
+          </div>
+        )
+      )}
+    </div>
+  )
+})
+
+// ─── SIDEBAR PRINCIPAL ───────────────────────────────────────────────────
+
 const Sidebar = memo(
   function Sidebar({
     profiles,
@@ -83,14 +380,20 @@ const Sidebar = memo(
     const [newProfileName, setNewProfileName] = useState('')
     const [showNewProfile, setShowNewProfile] = useState(false)
     const [shortcutsEnabled, setShortcutsEnabled] = useState(true)
-    const [isHoveringNowPlaying, setIsHoveringNowPlaying] = useState(false)
 
     const [draggedProfileId, setDraggedProfileId] = useState(null)
     const [dragOverProfileId, setDragOverProfileId] = useState(null)
 
-    const { sound: playingSound, progress, isPaused } = useCurrentPlaying(sounds)
+    // FEATURE multi-sons : liste des sons en lecture
+    const {
+      playingSounds,
+      togglePause: togglePauseSoundById,
+      stop: stopSoundById,
+    } = useCurrentPlaying(sounds)
+
     const showNowPlaying =
-      (currentPage === 'home' || currentPage === 'sequencer') && playingSound
+      (currentPage === 'home' || currentPage === 'sequencer') &&
+      playingSounds.length > 0
 
     const stableVisibleItemsRef = useRef({ pinned: [], groups: {} })
     const [visibleItems, setVisibleItems] = useState({ pinned: [], groups: {} })
@@ -237,11 +540,6 @@ const Sidebar = memo(
       }
     }
 
-    const handleTogglePause = () => {
-      if (!playingSound) return
-      togglePauseSound(playingSound.id)
-    }
-
     const handleProfileDragStart = (e, profileId) => {
       if (profileId === 'all') {
         e.preventDefault()
@@ -298,22 +596,6 @@ const Sidebar = memo(
       setDraggedProfileId(null)
       setDragOverProfileId(null)
     }
-
-    const allPages = useMemo(() => {
-      const corePages = CORE_PAGES.map((p) => ({
-        id: p.id,
-        label: t(p.labelKey),
-        icon: p.icon,
-        group: p.group,
-        isCore: true,
-      }))
-
-      const pluginPagesFormatted = (pluginPages || [])
-        .filter((p) => p.visible !== false && p.sidebarVisible !== false)
-        .map((p) => ({ ...p, isCore: false, isPlugin: true }))
-
-      return [...corePages, ...pluginPagesFormatted]
-    }, [t, pluginPages])
 
     const isItemActive = (itemId) => {
       if (!itemId) return false
@@ -862,203 +1144,40 @@ const Sidebar = memo(
           height: '100vh',
         }}
       >
+        {/* FEATURE multi-sons : header compact + liste */}
         <div
           style={{
-            padding: '14px 14px 12px',
+            padding: showNowPlaying ? '8px 10px 10px' : '14px 14px 12px',
             display: 'flex',
-            alignItems: 'center',
-            gap: 8,
+            flexDirection: 'column',
+            gap: 0,
             borderBottom: '1px solid var(--border)',
             flexShrink: 0,
-            minHeight: 58,
-            transition: 'background 0.2s ease',
+            minHeight: showNowPlaying ? 'auto' : 58,
+            transition: 'all 0.2s ease',
           }}
         >
           {showNowPlaying ? (
+            <NowPlayingList
+              playingSounds={playingSounds}
+              onTogglePause={togglePauseSoundById}
+              onStop={stopSoundById}
+              t={t}
+            />
+          ) : (
             <div
-              onMouseEnter={() => setIsHoveringNowPlaying(true)}
-              onMouseLeave={() => setIsHoveringNowPlaying(false)}
               style={{
-                width: '100%',
-                minWidth: 0,
-                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  marginBottom: 6,
-                }}
-              >
-                <i
-                  className={isPaused ? 'ti ti-player-pause' : 'ti ti-volume'}
-                  style={{
-                    fontSize: 11,
-                    color: 'var(--accent)',
-                    animation: isPaused
-                      ? 'none'
-                      : 'pulse 1.2s ease-in-out infinite',
-                  }}
-                />
-                <span
-                  style={{
-                    fontSize: 9,
-                    fontWeight: 600,
-                    color: 'var(--accent)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.08em',
-                  }}
-                >
-                  {isPaused ? t('paused') : t('nowPlaying')}
-                </span>
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  marginBottom: 8,
-                  minWidth: 0,
-                  paddingRight: isHoveringNowPlaying ? 32 : 0,
-                  transition: 'padding-right 0.15s ease',
-                }}
-              >
-                {playingSound.image ? (
-                  <img
-                    src={buildFileUrl(playingSound.image)}
-                    alt=""
-                    style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 5,
-                      objectFit: 'cover',
-                      flexShrink: 0,
-                      border: '1px solid var(--border)',
-                    }}
-                    onError={(e) => {
-                      e.target.style.display = 'none'
-                    }}
-                  />
-                ) : (
-                  <span
-                    style={{ fontSize: 18, flexShrink: 0, lineHeight: 1 }}
-                  >
-                    {playingSound.emoji || '🔊'}
-                  </span>
-                )}
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: 'var(--text-primary)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    minWidth: 0,
-                  }}
-                >
-                  {playingSound.name}
-                </span>
-              </div>
-
-              {isHoveringNowPlaying && (
-                <button
-                  onClick={handleTogglePause}
-                  title={isPaused ? t('resume') : t('pause')}
-                  data-testid="sidebar-toggle-pause-button"
-                  style={{
-                    position: 'absolute',
-                    top: 18,
-                    right: 0,
-                    width: 26,
-                    height: 26,
-                    borderRadius: '50%',
-                    background: 'var(--accent)',
-                    border: 'none',
-                    color: 'white',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 2px 8px rgba(124,111,247,0.4)',
-                    transition: 'transform 0.15s ease, background 0.15s ease',
-                    zIndex: 10,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.1)'
-                    e.currentTarget.style.background = 'var(--accent-hover)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)'
-                    e.currentTarget.style.background = 'var(--accent)'
-                  }}
-                >
-                  <i
-                    className={`ti ${
-                      isPaused ? 'ti-player-play-filled' : 'ti-player-pause-filled'
-                    }`}
-                    style={{ fontSize: 14 }}
-                  />
-                </button>
-              )}
-
-              {progress ? (
-                <>
-                  <div
-                    style={{
-                      height: 3,
-                      background: 'var(--bg-tertiary)',
-                      borderRadius: 2,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: '100%',
-                        width: `${(progress.ratio || 0) * 100}%`,
-                        background: 'var(--accent)',
-                        borderRadius: 2,
-                        transition: 'width 0.1s linear',
-                      }}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      fontSize: 9,
-                      color: 'var(--text-tertiary)',
-                      marginTop: 3,
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    <span>{formatTime(progress.current)}</span>
-                    <span>{formatTime(progress.duration)}</span>
-                  </div>
-                </>
-              ) : (
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: 'var(--text-tertiary)',
-                    fontStyle: 'italic',
-                  }}
-                >
-                  {isPaused ? `⏸️ ${t('paused')}` : `▶️ ${t('playing')}`}
-                </div>
-              )}
-            </div>
-          ) : (
-            <>
               <i
                 className="ti ti-speakerphone"
                 style={{ fontSize: 22, color: 'var(--accent)' }}
               />
               <span style={{ fontWeight: 600, fontSize: 15 }}>SoundDeck</span>
-            </>
+            </div>
           )}
         </div>
 
@@ -1166,6 +1285,8 @@ const Sidebar = memo(
 )
 
 export default Sidebar
+
+// ─── SidebarItem ────────────────────────────────────────────────────────────
 
 function SidebarItem({
   icon,

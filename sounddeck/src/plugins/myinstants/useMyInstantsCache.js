@@ -6,13 +6,13 @@ import { logWarn } from '@shared/utils/logger'
 const STORE_KEY_CACHE = 'myinstantsCategoryCache'
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24h
 
-// Cache mémoire (rapide, source de vérité à la lecture)
 const categoryCache = new Map()
 let cacheLoaded = false
 let persistTimer = null
 
 /**
  * Charge le cache depuis electron-store (une seule fois par session).
+ * Ignore les entrées expirées.
  */
 export async function ensureCacheLoaded() {
   if (cacheLoaded) return
@@ -29,7 +29,10 @@ export async function ensureCacheLoaded() {
     for (const [key, entry] of Object.entries(parsed)) {
       if (!entry?.sounds || !entry?.fetchedAt) continue
       if (now - entry.fetchedAt > CACHE_TTL_MS) continue // expiré
-      categoryCache.set(key, entry.sounds)
+      categoryCache.set(key, {
+        sounds: entry.sounds,
+        fetchedAt: entry.fetchedAt,
+      })
     }
   } catch (e) {
     logWarn('Discover', 'Erreur chargement cache', e)
@@ -38,16 +41,19 @@ export async function ensureCacheLoaded() {
 
 /**
  * Persiste le cache (debounce 1s pour éviter les writes spam).
+ * chaque entrée conserve SON fetchedAt (plus d'écrasement global).
  */
 function persistCache() {
   if (persistTimer) clearTimeout(persistTimer)
   persistTimer = setTimeout(async () => {
     persistTimer = null
     try {
-      const now = Date.now()
       const toStore = {}
-      for (const [key, sounds] of categoryCache) {
-        toStore[key] = { sounds, fetchedAt: now }
+      for (const [key, entry] of categoryCache) {
+        toStore[key] = {
+          sounds: entry.sounds,
+          fetchedAt: entry.fetchedAt,
+        }
       }
       await setItem(STORE_KEY_CACHE, JSON.stringify(toStore))
     } catch (e) {
@@ -57,18 +63,33 @@ function persistCache() {
 }
 
 export function getCachedCategory(categoryId) {
-  return categoryCache.get(categoryId) || null
+  const entry = categoryCache.get(categoryId)
+  if (!entry) return null
+  if (Date.now() - entry.fetchedAt > CACHE_TTL_MS) {
+    categoryCache.delete(categoryId)
+    return null
+  }
+  return entry.sounds
 }
 
 export function setCachedCategory(categoryId, sounds) {
-  categoryCache.set(categoryId, sounds)
+  categoryCache.set(categoryId, {
+    sounds,
+    fetchedAt: Date.now(),
+  })
   persistCache()
 }
 
 export function getCacheInfo() {
   const info = {}
-  for (const [key, value] of categoryCache) {
-    info[key] = { count: value.length, cached: true }
+  const now = Date.now()
+  for (const [key, entry] of categoryCache) {
+    if (now - entry.fetchedAt > CACHE_TTL_MS) continue
+    info[key] = {
+      count: entry.sounds.length,
+      cached: true,
+      age: now - entry.fetchedAt,
+    }
   }
   return info
 }

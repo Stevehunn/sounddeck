@@ -146,6 +146,24 @@ export function useEditorCore({ store, addToast, t, confirm }) {
     return await getAudioFileDuration(filePath, 3)
   }, [])
 
+  /**
+   * Recalcule la durée totale du projet à partir des clips.
+   * Utilise clip.duration en priorité, puis clipDurationsRef en fallback.
+   * Garantit un minimum de 10s + 2s de marge.
+   */
+  const recalculateTotalDuration = useCallback((proj) => {
+    if (!proj?.tracks) return 10
+    let max = 10
+    for (const track of proj.tracks) {
+      for (const clip of track.clips || []) {
+        const dur = clipDurationsRef.current[clip.id] || clip.duration || 3
+        const end = (clip.start || 0) + dur
+        if (end > max) max = end
+      }
+    }
+    return Math.max(max + 2, 10)
+  }, [])
+
   // ─── PERSISTANCE ────────────────────────────────────────────────────────
   const persistProject = useCallback((projectData) => {
     if (!projectData?.id) return
@@ -173,7 +191,14 @@ export function useEditorCore({ store, addToast, t, confirm }) {
     setProject(newProject)
     projectRef.current = newProject
     persistProject(newProject)
-  }, [persistProject])
+
+    // ✅ FIX : recalcul auto de la durée totale
+    const newTotal = recalculateTotalDuration(newProject)
+    if (newTotal !== totalDurationRef.current) {
+      setTotalDuration(newTotal)
+      totalDurationRef.current = newTotal
+    }
+  }, [persistProject, recalculateTotalDuration])
 
   const pushEditorHistoryCheckpoint = useCallback(() => {
     const currentProject = projectRef.current
@@ -200,11 +225,18 @@ export function useEditorCore({ store, addToast, t, confirm }) {
     projectRef.current = previous
     persistProject(previous)
 
+    // ✅ FIX : recalcul auto de la durée totale
+    const newTotal = recalculateTotalDuration(previous)
+    if (newTotal !== totalDurationRef.current) {
+      setTotalDuration(newTotal)
+      totalDurationRef.current = newTotal
+    }
+
     setCanUndoEditor(undoStackRef.current.length > 0)
     setCanRedoEditor(true)
     setTimeout(() => { isUndoingRef.current = false }, 0)
     return true
-  }, [persistProject])
+  }, [persistProject, recalculateTotalDuration])
 
   const redoEditor = useCallback(() => {
     if (redoStackRef.current.length === 0) return false
@@ -219,11 +251,18 @@ export function useEditorCore({ store, addToast, t, confirm }) {
     projectRef.current = next
     persistProject(next)
 
+    // ✅ FIX : recalcul auto de la durée totale
+    const newTotal = recalculateTotalDuration(next)
+    if (newTotal !== totalDurationRef.current) {
+      setTotalDuration(newTotal)
+      totalDurationRef.current = newTotal
+    }
+
     setCanUndoEditor(true)
     setCanRedoEditor(redoStackRef.current.length > 0)
     setTimeout(() => { isUndoingRef.current = false }, 0)
     return true
-  }, [persistProject])
+  }, [persistProject, recalculateTotalDuration])
 
   // ─── RENAME ─────────────────────────────────────────────────────────────
   const updateEditorProjectName = useCallback((newName) => {
@@ -451,6 +490,7 @@ export function useEditorCore({ store, addToast, t, confirm }) {
 
     // Helpers
     generateUniqueId, findPreviousClip, calculateOverlap, getAudioDuration,
+    recalculateTotalDuration,
 
     // Confirm expose for hooks
     confirm,

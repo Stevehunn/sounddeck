@@ -1,14 +1,46 @@
 // electron/modules/protocolHandler.js
-// Protocole custom `sounddeck-local://` pour servir les fichiers userData
-// en respectant webSecurity: true (contourne la restriction file:// cross-origin).
-//
-// Format d'URL : sounddeck-local://file/<encoded-absolute-path>
-// Exemple     : sounddeck-local://file/C%3A%2FUsers%2F...%2Fsounds%2Ffoo.mp3
 
-const { protocol, net } = require('electron')
+const { protocol } = require('electron')
 const path = require('path')
 const fs = require('fs')
-const { pathToFileURL } = require('url')
+const { Readable } = require('stream')
+
+// ─── MIME ────────────────────────────────────────────────────────────────
+
+const MIME_MAP = {
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.oga': 'audio/ogg',
+  '.opus': 'audio/ogg',
+  '.flac': 'audio/flac',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
+  '.weba': 'audio/webm',
+  '.webm': 'audio/webm',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.json': 'application/json',
+  '.js': 'application/javascript',
+  '.mjs': 'application/javascript',
+  '.css': 'text/css',
+  '.html': 'text/html',
+}
+
+function getMime(filePath) {
+  const ext = path.extname(filePath).toLowerCase()
+  return MIME_MAP[ext] || 'application/octet-stream'
+}
+
+// Convertit un Readable Node en Web ReadableStream (requis par Response)
+function nodeStreamToWeb(nodeStream) {
+  return Readable.toWeb(nodeStream)
+}
 
 // ─── SCHEME PRIVILÉGIÉ (à appeler AVANT app.whenReady()) ────────────────
 
@@ -95,19 +127,68 @@ function registerLocalFileProtocol() {
         return new Response('Not found', { status: 404 })
       }
 
-      // Utilise net.fetch pour bénéficier du streaming + bon MIME
-      const fileUrl = pathToFileURL(filePath).toString()
-      const response = await net.fetch(fileUrl)
+      // Stat pour connaître la taille du fichier
+      const stat = await fs.promises.stat(filePath)
+      const mime = getMime(filePath)
 
-      // Surcharge des headers (CORS + cache)
-      const headers = new Headers(response.headers)
-      headers.set('Access-Control-Allow-Origin', '*')
-      headers.set('Cache-Control', 'public, max-age=3600')
+      // Lit le header Range de la requête entrante
+      const rangeHeader = request.headers.get('Range')
 
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
+      // ─── Cas 1 : requête Range (seek) ────────────────────────────────
+      if (rangeHeader) {
+        const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim())
+
+        if (match) {
+          const startStr = match[1]
+          const endStr = match[2]
+
+          let start = startStr ? parseInt(startStr, 10) : 0
+          let end = endStr ? parseInt(endStr, 10) : stat.size - 1
+
+          if (isNaN(start)) start = 0
+          if (isNaN(end) || end >= stat.size) end = stat.size - 1
+
+          if (start >= stat.size || start > end) {
+            return new Response(null, {
+              status: 416,
+              headers: {
+                'Content-Range': `bytes */${stat.size}`,
+                'Accept-Ranges': 'bytes',
+              },
+            })
+          }
+
+          const chunkSize = end - start + 1
+          const nodeStream = fs.createReadStream(filePath, { start, end })
+
+          return new Response(nodeStreamToWeb(nodeStream), {
+            status: 206,
+            headers: {
+              'Content-Type': mime,
+              'Content-Length': String(chunkSize),
+              'Content-Range': `bytes ${start}-${end}/${stat.size}`,
+              'Accept-Ranges': 'bytes',
+              'Access-Control-Allow-Origin': '*',
+              'Cache-Control': 'no-store',
+            },
+          })
+        }
+      }
+
+      // ─── Cas 2 : requête complète ────────────────────────────────────
+      const nodeStream = fs.createReadStream(filePath)
+
+      return new Response(nodeStreamToWeb(nodeStream), {
+        status: 200,
+        headers: {
+          'Content-Type': mime,
+          'Content-Length': String(stat.size),
+          'Accept-Ranges': 'bytes',
+          'Access-Control-Allow-Origin': '*',
+          // Pas de cache agressif : sinon le browser croit avoir le
+          // fichier complet en cache et ne redemande pas de Range.
+          'Cache-Control': 'no-store',
+        },
       })
     } catch (e) {
       console.error('❌ [protocol] Erreur handler:', e)
@@ -115,8 +196,9 @@ function registerLocalFileProtocol() {
     }
   })
 
-  console.log('✅ [protocol] sounddeck-local:// enregistré')
 }
+
+// ─── EXPORTS ─────────────────────────────────────────────────────────────
 
 module.exports = {
   registerLocalSchemes,

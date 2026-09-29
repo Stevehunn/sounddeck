@@ -186,9 +186,9 @@ export async function initAudioMixer(
         latencyHint: 'interactive',
       })
 
-      console.log(
-        audioContext.sampleRate
-      )
+      if (import.meta.env?.DEV) {
+        console.log('🎛️ [mixer] sampleRate:', audioContext.sampleRate)
+      }
 
       if (audioContext.state === 'suspended') {
         await audioContext.resume()
@@ -533,12 +533,14 @@ async function initMicrophone(deviceId) {
       },
     }
 
-    console.log('🎤 [mixer] getUserMedia constraints:', {
-      highQualityMicMode,
-      echoCancellation: constraints.audio.echoCancellation,
-      noiseSuppression: constraints.audio.noiseSuppression,
-      autoGainControl: constraints.audio.autoGainControl,
-    })
+    if (import.meta.env?.DEV) {
+      console.log('🎤 [mixer] getUserMedia constraints:', {
+        highQualityMicMode,
+        echoCancellation: constraints.audio.echoCancellation,
+        noiseSuppression: constraints.audio.noiseSuppression,
+        autoGainControl: constraints.audio.autoGainControl,
+      })
+    }
 
     const stream = await navigator.mediaDevices.getUserMedia(constraints)
 
@@ -550,13 +552,15 @@ async function initMicrophone(deviceId) {
 
     const track = stream.getAudioTracks()[0]
     const settings = track.getSettings?.() || {}
-    console.log('🎤 [mixer] Micro natif:', {
-      sampleRate: settings.sampleRate,
-      channelCount: settings.channelCount,
-      echoCancellation: settings.echoCancellation,
-      noiseSuppression: settings.noiseSuppression,
-      autoGainControl: settings.autoGainControl,
-    })
+    if (import.meta.env?.DEV) {
+      console.log('🎤 [mixer] Micro natif:', {
+        sampleRate: settings.sampleRate,
+        channelCount: settings.channelCount,
+        echoCancellation: settings.echoCancellation,
+        noiseSuppression: settings.noiseSuppression,
+        autoGainControl: settings.autoGainControl,
+      })
+    }
 
     microphoneSource = audioContext.createMediaStreamSource(stream)
 
@@ -734,7 +738,7 @@ export function getNoiseSuppressionStatus() {
 
 // ─── LECTURE DANS LE MIXEUR ──────────────────────────────────────────────
 
-export function playSoundInMixer(audioBuffer, volume = 1.0) {
+export function playSoundInMixer(audioBuffer, volume = 1.0, offset = 0) {
   if (!isInitialized || !audioContext || !destination) {
     return null
   }
@@ -752,7 +756,23 @@ export function playSoundInMixer(audioBuffer, volume = 1.0) {
 
     source.connect(gain)
     gain.connect(soundGain)
-    source.start(0)
+
+    // Démarre à l'offset (reprise après pause)
+    const safeOffset = Math.max(
+      0,
+      Math.min(offset, audioBuffer.duration - 0.01)
+    )
+    source.start(0, safeOffset)
+
+    // DEBUG
+    if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
+      // eslint-disable-next-line no-console
+      console.log('[AudioMixerService][playSoundInMixer]', {
+        receivedOffset: offset,
+        safeOffset,
+        bufferDuration: audioBuffer.duration,
+      })
+    }
 
     return source
   } catch (e) {
@@ -810,6 +830,11 @@ export function resumeAudioContext() {
   if (audioContext && audioContext.state === 'suspended') {
     audioContext.resume()
   }
+}
+
+export function getAudioContextTime() {
+  if (!audioContext || audioContext.state === 'closed') return 0
+  return audioContext.currentTime || 0
 }
 
 export function suspendAudioContext() {
@@ -1154,6 +1179,7 @@ export default {
   getMixedStream,
   isMixerActive,
   resumeAudioContext,
+  getAudioContextTime,
   suspendAudioContext,
   stopMixer,
   getAudioInputDevices,

@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { logError } from '@shared/utils/logger'
+import { uuid } from '@shared/utils/uuid'
 
 export function useProjectManager(store, project, setProject, addToast) {
   const { t } = useLanguage()

@@ -27,9 +27,7 @@ async function readBackups() {
             await window.electronAPI?.storeSet?.(STORE_KEY_BACKUPS, parsed)
             localStorage.removeItem(LEGACY_LS_KEY)
           }
-        } catch (e) {
-          // silencieux
-        }
+        } catch (e) {}
       }
     }
 
@@ -91,7 +89,7 @@ export async function performBackup(store) {
   try {
     const backupData = {
       timestamp: Date.now(),
-      version: '1.0',
+      version: '1.1',
       profiles: store.profiles,
       sounds: store.sounds,
       shortcuts: store.shortcuts,
@@ -100,6 +98,7 @@ export async function performBackup(store) {
       theme: store.theme,
       customTheme: store.customTheme,
       audioDevice: store.audioDevice,
+      localAudioDevice: store.localAudioDevice,
       volume: store.volume,
       playLocally: store.playLocally,
       normalizationEnabled: store.normalizationEnabled,
@@ -139,6 +138,7 @@ export async function restoreBackup(store, index) {
   }
 
   try {
+    // ─── PROFILS ─────────────────────────────────────────────────────
     if (backup.profiles && typeof store.replaceAllProfiles === 'function') {
       const allProfile = {
         id: 'all',
@@ -150,24 +150,63 @@ export async function restoreBackup(store, index) {
       await store.replaceAllProfiles([allProfile, ...userProfiles])
     }
 
+    // ─── SONS ────────────────────────────────────────────────────────
     if (backup.sounds && typeof store.restoreSounds === 'function') {
       await store.restoreSounds(backup.sounds)
     }
 
+    // ─── RACCOURCIS ✅ FIX ─────────────────────────────────────────
+    if (backup.shortcuts) {
+      if (typeof store.setShortcuts === 'function') {
+        await store.setShortcuts(backup.shortcuts)
+      }
+      // Re-register dans le main process
+      try {
+        await window.electronAPI?.updateShortcuts?.(backup.shortcuts)
+      } catch (e) {
+        logWarn('backupManager', 'Erreur réenregistrement shortcuts', e)
+      }
+    }
+
+    // ─── ORDRE DES SONS ✅ FIX ─────────────────────────────────────
+    if (backup.soundOrder && typeof store.setSoundOrder === 'function') {
+      await store.setSoundOrder(backup.soundOrder)
+      try {
+        await window.electronAPI?.storeSet?.('soundOrder', backup.soundOrder)
+      } catch (e) {}
+    }
+
+    // ─── TAGS ────────────────────────────────────────────────────────
     if (backup.tags) {
-      for (const [soundId, tags] of Object.entries(backup.tags)) {
-        for (const tag of tags) {
-          await store.addTagToSound(soundId, tag)
+      if (typeof store.setTags === 'function') {
+        await store.setTags(backup.tags)
+      } else if (typeof store.addTagToSound === 'function') {
+        // Fallback : ajout tag par tag
+        for (const [soundId, tags] of Object.entries(backup.tags)) {
+          for (const tag of tags) {
+            await store.addTagToSound(soundId, tag)
+          }
         }
       }
     }
 
-    if (backup.theme) await store.updateTheme(backup.theme)
-    if (backup.customTheme) await store.updateCustomTheme(backup.customTheme)
-    if (backup.audioDevice) await store.updateAudioDevice(backup.audioDevice)
-    if (backup.volume) await store.updateVolume(backup.volume)
-    if (backup.playLocally !== undefined)
-      await store.updatePlayLocally(backup.playLocally)
+    // ─── SETTINGS ────────────────────────────────────────────────────
+    if (backup.theme !== undefined) await store.updateTheme(backup.theme)
+    if (backup.customTheme !== undefined) await store.updateCustomTheme(backup.customTheme)
+    if (backup.audioDevice !== undefined) await store.updateAudioDevice(backup.audioDevice)
+    if (backup.localAudioDevice !== undefined) {
+      await store.updateLocalAudioDevice?.(backup.localAudioDevice)
+    }
+    if (backup.volume !== undefined) await store.updateVolume(backup.volume)
+    if (backup.playLocally !== undefined) await store.updatePlayLocally(backup.playLocally)
+
+    // Normalisation restaurée
+    if (backup.normalizationEnabled !== undefined) {
+      await store.updateNormalizationEnabled?.(backup.normalizationEnabled)
+    }
+    if (backup.normalizationTarget !== undefined) {
+      await store.updateNormalizationTarget?.(backup.normalizationTarget)
+    }
 
     return { success: true, timestamp: backup.timestamp }
   } catch (e) {
@@ -196,9 +235,7 @@ export async function deleteBackup(index) {
 
 async function checkAndRestoreBackup(store) {
   try {
-    const lastBackupTime = await window.electronAPI?.storeGet?.(
-      STORE_KEY_LAST_TIME
-    )
+    const lastBackupTime = await window.electronAPI?.storeGet?.(STORE_KEY_LAST_TIME)
     if (lastBackupTime) {
       const backups = await readBackups()
       const lastIndex = backups.length - 1
@@ -220,9 +257,7 @@ export async function exportBackups() {
     }
 
     const json = JSON.stringify(backups, null, 2)
-    const defaultName = `sounddeck-backups-${new Date()
-      .toISOString()
-      .slice(0, 10)}.json`
+    const defaultName = `sounddeck-backups-${new Date().toISOString().slice(0, 10)}.json`
 
     const r = await window.electronAPI.exportJsonFile(
       json,

@@ -14,9 +14,8 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "test:ci": "vitest run --coverage",
-    "build:plugin": "node scripts/build-plugin.js",
-    "migrate": "node scripts/migrate-architecture.js",
-    "audit:i18n": "node scripts/audit-i18n.js"
+    "build:plugin": "node scripts/build-plugin.mjs",
+    "audit:i18n": "node scripts/audit-i18n.mjs"
   },
   "build": {
     "appId": "com.sounddeck.app",
