@@ -19,7 +19,7 @@ export default function WelcomeScreen({ onComplete }) {
             await changeLanguage(systemLang)
           }
         }
-        
+
         const systemLayout = await window.electronAPI?.getSystemKeyboardLayout?.()
         if (systemLayout) {
           setKeyboardLayout(systemLayout)
@@ -47,28 +47,34 @@ export default function WelcomeScreen({ onComplete }) {
 
   if (loading) {
     return (
-      <div style={{
-        height: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'var(--bg-primary)',
-        color: 'var(--text-secondary)'
-      }}>
+      <div
+        data-testid="welcome-loading"
+        style={{
+          height: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--bg-primary)',
+          color: 'var(--text-secondary)'
+        }}
+      >
         <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite', fontSize: 24 }} />
       </div>
     )
   }
 
   return (
-    <div style={{
-      height: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'var(--bg-primary)',
-      padding: 20
-    }}>
+    <div
+      data-testid="welcome-container"
+      style={{
+        height: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--bg-primary)',
+        padding: 20
+      }}
+    >
       <div style={{
         maxWidth: 480,
         width: '100%',
@@ -95,6 +101,7 @@ export default function WelcomeScreen({ onComplete }) {
             {LANGUAGES.map(l => (
               <button
                 key={l.code}
+                data-testid={`welcome-lang-${l.code}`}
                 onClick={() => setSelectedLang(l.code)}
                 style={{
                   padding: '8px 16px',
@@ -127,6 +134,7 @@ export default function WelcomeScreen({ onComplete }) {
             {['qwerty', 'azerty'].map(layout => (
               <button
                 key={layout}
+                data-testid={`welcome-keyboard-${layout}`}
                 onClick={() => setKeyboardLayout(layout)}
                 style={{
                   flex: 1,
@@ -149,6 +157,7 @@ export default function WelcomeScreen({ onComplete }) {
         </div>
 
         <button
+          data-testid="welcome-continue"
           onClick={handleConfirm}
           className="btn-primary btn-xl"
           style={{ width: '100%', justifyContent: 'center', minHeight: 48 }}
@@ -160,8 +169,6 @@ export default function WelcomeScreen({ onComplete }) {
           {t('welcomeNote')}
         </p>
       </div>
-
-
     </div>
   )
 }

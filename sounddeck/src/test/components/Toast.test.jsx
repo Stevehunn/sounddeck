@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import Toast from './Toast'
+import Toast from '@shared/components/ui/Toast'
 
 describe('Toast', () => {
   it('ne devrait rien afficher quand la liste est vide', () => {

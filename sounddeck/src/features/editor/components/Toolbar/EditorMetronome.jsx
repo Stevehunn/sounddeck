@@ -258,6 +258,7 @@ export default function EditorMetronome({
 
   return (
     <div
+      data-testid="metronome-container"
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -271,6 +272,7 @@ export default function EditorMetronome({
       }}
     >
       <button
+        data-testid="metronome-toggle"
         className={enabled ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
         onClick={handleToggle}
         style={{
@@ -313,6 +315,7 @@ export default function EditorMetronome({
         }}
       >
         <input
+          data-testid="metronome-bpm-slider"
           type="range"
           min="40"
           max="240"
@@ -330,6 +333,7 @@ export default function EditorMetronome({
           title={tr('editorTempo') || 'Tempo (BPM)'}
         />
         <span
+          data-testid="metronome-bpm-value"
           style={{
             fontSize: 11,
             fontFamily: 'monospace',
@@ -355,6 +359,7 @@ export default function EditorMetronome({
           style={{ fontSize: 11, color: 'var(--text-tertiary)' }}
         />
         <input
+          data-testid="metronome-volume-slider"
           type="range"
           min="0"
           max="100"
@@ -372,6 +377,7 @@ export default function EditorMetronome({
 
       {enabled && isClicking && (
         <span
+          data-testid="metronome-beat-indicator"
           style={{
             fontSize: 9,
             color: 'var(--text-tertiary)',

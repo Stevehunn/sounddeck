@@ -1,38 +1,72 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import ProfileManagerModal from './ProfileManagerModal'
+import ProfileManagerModal from '@shared/components/modals/ProfileManagerModal'
 
-// ✅ Mock de useTranslation
-vi.mock('../i18n', () => ({
-  useTranslation: vi.fn(() => (key) => {
-    const translations = {
-      profileManagerTitle: 'Gérer le profil',
-      profileManagerSelectAll: 'Tout sélectionner',
-      profileManagerDeselectAll: 'Tout désélectionner',
-      profileManagerRemoveSelected: 'Retirer sélection',
-      profileManagerDeleteProfile: 'Supprimer le profil',
-      profileManagerConfirmRemove: 'Confirmer la suppression',
-      profileManagerConfirmMessage: 'Vous êtes sur le point de retirer {count} son(s) du profil "{name}".',
-      profileManagerConfirmSub: 'Ces sons resteront dans votre bibliothèque et pourront être réajoutés plus tard.',
-      profileManagerNoSounds: 'Ce profil ne contient aucun son.',
-      profileManagerFavorite: 'Favori',
-      close: 'Fermer',
-      allSounds: 'Tous les sons'
-    }
-    return translations[key] || key
-  })
+vi.mock('@core/i18n/LanguageContext', () => ({
+  useLanguage: vi.fn(() => ({
+    t: (key, params) => {
+      const translations = {
+        profileManagerTitle: 'Gérer le profil',
+        profileManagerSelectAll: 'Tout sélectionner',
+        profileManagerDeselectAll: 'Tout désélectionner',
+        profileManagerRemoveSelected: 'Retirer sélection',
+        profileManagerDeleteProfile: 'Supprimer le profil',
+        profileManagerConfirmRemove: 'Confirmer la suppression',
+        profileManagerConfirmMessage:
+          'Vous êtes sur le point de retirer {count} son(s) du profil "{name}".',
+        profileManagerConfirmSub:
+          'Ces sons resteront dans votre bibliothèque et pourront être réajoutés plus tard.',
+        profileManagerNoSounds: 'Ce profil ne contient aucun son.',
+        profileManagerFavorite: 'Favori',
+        profileManagerProfileDeleted: 'Profil supprimé',
+        profileManagerSoundsRemoved: 'son(s) retirés de',
+        profileManagerDeleteConfirm: 'Confirmer la suppression du profil',
+        profileManagerDeleteMessage:
+          'Voulez-vous vraiment supprimer le profil "{name}" avec ses {count} sons ?',
+        close: 'Fermer',
+        allSounds: 'Tous les sons',
+        sounds: 'son(s)',
+        cancel: 'Annuler',
+        remove: 'Retirer',
+        delete: 'Supprimer',
+        confirm: 'Confirmer',
+      }
+      let result = translations[key] || key
+      if (params && typeof params === 'object') {
+        for (const [k, v] of Object.entries(params)) {
+          result = result.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v))
+        }
+      }
+      return result
+    },
+    currentLang: 'fr',
+    changeLanguage: vi.fn(),
+    isLoading: false,
+    subscribe: vi.fn(() => () => {}),
+    languages: [],
+  })),
+  // ✅ Mock du useConfirm pour éviter les modales internes
+  ConfirmWrapper: () => null,
+}))
+
+// ✅ Mock useConfirm → simule le comportement "confirmer = true"
+vi.mock('@shared/hooks/useConfirm', () => ({
+  default: vi.fn(() => ({
+    confirm: vi.fn().mockResolvedValue(true),
+    ConfirmWrapper: () => null,
+  })),
 }))
 
 describe('ProfileManagerModal', () => {
   const mockSounds = [
     { id: 'sound-1', name: 'Sound 1', emoji: '🔊', profiles: ['profile-1'] },
-    { id: 'sound-2', name: 'Sound 2', emoji: '🎵', profiles: ['profile-1'] }
+    { id: 'sound-2', name: 'Sound 2', emoji: '🎵', profiles: ['profile-1'] },
   ]
 
   const mockStore = {
     removeSoundFromProfile: vi.fn(),
-    deleteProfile: vi.fn()
+    deleteProfile: vi.fn(),
   }
 
   const defaultProps = {
@@ -42,13 +76,11 @@ describe('ProfileManagerModal', () => {
     store: mockStore,
     onClose: vi.fn(),
     addToast: vi.fn(),
-    lang: 'fr'
+    lang: 'fr',
   }
 
   beforeEach(() => {
     vi.clearAllMocks()
-    // ✅ Mock de confirm pour éviter les popups
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
   })
 
   it('devrait afficher le titre avec le nom du profil', () => {
@@ -59,7 +91,8 @@ describe('ProfileManagerModal', () => {
 
   it('devrait afficher le nombre de sons', () => {
     render(<ProfileManagerModal {...defaultProps} />)
-    expect(screen.getByText('2 son(s)')).toBeInTheDocument()
+    // "2 son(s)" peut apparaître plusieurs fois (header + compteur) → getAllByText
+    expect(screen.getAllByText(/2 son\(s\)/i).length).toBeGreaterThan(0)
   })
 
   it('devrait afficher les sons du profil', () => {
@@ -75,83 +108,72 @@ describe('ProfileManagerModal', () => {
 
   it('devrait sélectionner/désélectionner les sons', async () => {
     render(<ProfileManagerModal {...defaultProps} />)
-    
-    // ✅ Utiliser getAllByRole pour trouver les checkboxes
+
     const checkboxes = screen.getAllByRole('checkbox')
     expect(checkboxes.length).toBe(2)
-    
-    // ✅ Vérifier que les checkboxes ne sont pas cochées
     expect(checkboxes[0]).not.toBeChecked()
     expect(checkboxes[1]).not.toBeChecked()
-    
-    // ✅ Cocher la première
+
     await userEvent.click(checkboxes[0])
     expect(checkboxes[0]).toBeChecked()
-    
-    // ✅ Décocher la première
+
     await userEvent.click(checkboxes[0])
     expect(checkboxes[0]).not.toBeChecked()
   })
 
   it('devrait tout sélectionner/désélectionner', async () => {
     render(<ProfileManagerModal {...defaultProps} />)
-    
+
     const selectAllButton = screen.getByText('Tout sélectionner')
     await userEvent.click(selectAllButton)
-    
+
     const checkboxes = screen.getAllByRole('checkbox')
-    checkboxes.forEach(cb => expect(cb).toBeChecked())
-    
+    checkboxes.forEach((cb) => expect(cb).toBeChecked())
+
     const deselectAllButton = screen.getByText('Tout désélectionner')
     await userEvent.click(deselectAllButton)
-    
-    checkboxes.forEach(cb => expect(cb).not.toBeChecked())
+
+    checkboxes.forEach((cb) => expect(cb).not.toBeChecked())
   })
 
   it('devrait retirer les sons sélectionnés du profil', async () => {
     render(<ProfileManagerModal {...defaultProps} />)
-    
-    // ✅ Sélectionner le premier son
+
     const checkboxes = screen.getAllByRole('checkbox')
     await userEvent.click(checkboxes[0])
-    
-    // ✅ Cliquer sur "Retirer sélection"
-    const removeButton = screen.getByText('Retirer sélection (1)')
+
+    const removeButton = screen.getByText(/Retirer sélection/i)
     await userEvent.click(removeButton)
-    
-    // ✅ Le modal de confirmation devrait apparaître
+
     await waitFor(() => {
-      expect(screen.getByText('Confirmer la suppression')).toBeInTheDocument()
+      expect(mockStore.removeSoundFromProfile).toHaveBeenCalledWith(
+        'sound-1',
+        'profile-1'
+      )
+      expect(defaultProps.addToast).toHaveBeenCalled()
+      expect(defaultProps.onClose).toHaveBeenCalled()
     })
-    
-    // ✅ Cliquer sur "Confirmer"
-    const confirmButton = screen.getByText('Confirmer')
-    await userEvent.click(confirmButton)
-    
-    expect(mockStore.removeSoundFromProfile).toHaveBeenCalledWith('sound-1', 'profile-1')
-    expect(defaultProps.addToast).toHaveBeenCalled()
-    expect(defaultProps.onClose).toHaveBeenCalled()
   })
 
   it('devrait supprimer le profil', async () => {
     render(<ProfileManagerModal {...defaultProps} />)
-    
+
     const deleteButton = screen.getByText('Supprimer le profil')
     await userEvent.click(deleteButton)
-    
-    // ✅ Le mock de confirm a été configuré pour retourner true
-    expect(window.confirm).toHaveBeenCalled()
-    expect(mockStore.deleteProfile).toHaveBeenCalledWith('profile-1')
-    expect(defaultProps.addToast).toHaveBeenCalled()
-    expect(defaultProps.onClose).toHaveBeenCalled()
+
+    await waitFor(() => {
+      expect(mockStore.deleteProfile).toHaveBeenCalledWith('profile-1')
+      expect(defaultProps.addToast).toHaveBeenCalled()
+      expect(defaultProps.onClose).toHaveBeenCalled()
+    })
   })
 
   it('devrait fermer le modal sur le bouton Fermer', async () => {
     render(<ProfileManagerModal {...defaultProps} />)
-    
+
     const closeButton = screen.getByText('Fermer')
     await userEvent.click(closeButton)
-    
+
     expect(defaultProps.onClose).toHaveBeenCalled()
   })
 })

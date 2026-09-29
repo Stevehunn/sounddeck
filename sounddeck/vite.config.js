@@ -78,8 +78,19 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.js'],
-    include: ['src/test/**/*.{test,spec}.{js,jsx}'],
-    exclude: ['node_modules/', 'dist/'],
+    // ✅ ÉLARGI : inclut tous les tests dans src/ + electron/
+    include: [
+      'src/test/**/*.{test,spec}.{js,jsx}',
+      'src/**/*.{test,spec}.{js,jsx}',
+      'electron/**/*.{test,spec}.js',
+    ],
+    exclude: [
+      'node_modules/',
+      'dist/',
+      'dist-electron/',
+      'dist-plugins/',
+      'src/test/_obsolete/**',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -88,7 +99,18 @@ export default defineConfig({
         'src/test/',
         'src/main.jsx',
         'src/App.css',
+        '**/*.config.js',
+        '**/index.js',
+        '**/index.jsx',
       ],
+      // ⚠️ Thresholds volontairement désactivés pour le moment.
+      // À activer progressivement après la Phase 1 (~30% de couverture).
+      // thresholds: {
+      //   lines: 30,
+      //   functions: 30,
+      //   branches: 30,
+      //   statements: 30,
+      // },
     },
   },
 })

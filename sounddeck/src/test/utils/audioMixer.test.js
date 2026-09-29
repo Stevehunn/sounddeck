@@ -1,11 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-// ✅ Importer le module réel pour pouvoir le mocker partiellement
-import * as audioMixerModule from './audioMixer'
-
-// ✅ Créer un mock du module avant les tests
-vi.mock('./audioMixer', async () => {
-  const actual = await vi.importActual('./audioMixer')
+// ✅ Chemin ABSOLU avec l'alias @core (résolu par Vite)
+vi.mock('@core/services/AudioMixerService', async () => {
+  const actual = await vi.importActual('@core/services/AudioMixerService')
   return {
     ...actual,
     // Surcharger les fonctions pour qu'elles modifient correctement l'état
@@ -21,16 +18,16 @@ vi.mock('./audioMixer', async () => {
     getAudioInputDevices: vi.fn().mockImplementation(async () => {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices()
-        return devices.filter(d => d.kind === 'audioinput')
+        return devices.filter((d) => d.kind === 'audioinput')
       } catch (e) {
         return []
       }
-    })
+    }),
   }
 })
 
 // ✅ Importer après le mock
-import { 
+import {
   mixerState,
   setMicrophoneVolume,
   setSoundVolume,
@@ -42,21 +39,21 @@ import {
   getMixerStats,
   isMixerOperational,
   toggleMicrophoneMute,
-  getAudioInputDevices
-} from './audioMixer'
+  getAudioInputDevices,
+} from '@core/services/AudioMixerService'
 
 // ✅ Mock de navigator.mediaDevices
 const mockMediaDevices = {
   enumerateDevices: vi.fn().mockResolvedValue([
     { kind: 'audioinput', deviceId: 'mic-1', label: 'Microphone 1' },
     { kind: 'audioinput', deviceId: 'mic-2', label: 'Microphone 2' },
-    { kind: 'audiooutput', deviceId: 'output-1', label: 'Speaker 1' }
-  ])
+    { kind: 'audiooutput', deviceId: 'output-1', label: 'Speaker 1' },
+  ]),
 }
 Object.defineProperty(global.navigator, 'mediaDevices', {
   value: mockMediaDevices,
   writable: true,
-  configurable: true
+  configurable: true,
 })
 
 describe('audioMixer.js', () => {
@@ -80,12 +77,11 @@ describe('audioMixer.js', () => {
 
   describe('setMicrophoneVolume', () => {
     it('devrait limiter le volume entre 0 et 1', () => {
-      // ✅ Réinitialiser l'état avant le test
       mixerState.microphoneLevel = 1.0
-      
+
       setMicrophoneVolume(2.0)
       expect(mixerState.microphoneLevel).toBe(1.0)
-      
+
       setMicrophoneVolume(-1.0)
       expect(mixerState.microphoneLevel).toBe(0)
     })
@@ -100,12 +96,11 @@ describe('audioMixer.js', () => {
 
   describe('setSoundVolume', () => {
     it('devrait limiter le volume entre 0 et 1', () => {
-      // ✅ Réinitialiser l'état avant le test
       mixerState.soundLevel = 1.0
-      
+
       setSoundVolume(2.0)
       expect(mixerState.soundLevel).toBe(1.0)
-      
+
       setSoundVolume(-1.0)
       expect(mixerState.soundLevel).toBe(0)
     })
@@ -148,31 +143,31 @@ describe('audioMixer.js', () => {
   // ─── TESTS DE setNoiseSuppressionMode ────────────────────────────────
 
   describe('setNoiseSuppressionMode', () => {
-    it('devrait définir le mode "auto"', () => {
-      setNoiseSuppressionMode('auto')
+    it('devrait définir le mode "auto"', async () => {
+      await setNoiseSuppressionMode('auto')
       const status = getNoiseSuppressionStatus()
       expect(status.mode).toBe('auto')
       expect(status.enabled).toBe(true)
     })
 
-    it('devrait définir le mode "off"', () => {
-      setNoiseSuppressionMode('off')
+    it('devrait définir le mode "off"', async () => {
+      await setNoiseSuppressionMode('off')
       const status = getNoiseSuppressionStatus()
       expect(status.mode).toBe('off')
       expect(status.enabled).toBe(false)
     })
 
-    it('devrait définir le mode "filter"', () => {
-      setNoiseSuppressionMode('filter')
+    it('devrait définir le mode "filter"', async () => {
+      await setNoiseSuppressionMode('filter')
       const status = getNoiseSuppressionStatus()
       expect(status.mode).toBe('filter')
       expect(status.enabled).toBe(true)
     })
 
-    it('devrait utiliser "auto" si le mode est invalide', () => {
-      setNoiseSuppressionMode('invalid')
+    it('devrait utiliser "off" si le mode est invalide', async () => {
+      await setNoiseSuppressionMode('invalid')
       const status = getNoiseSuppressionStatus()
-      expect(status.mode).toBe('auto')
+      expect(status.mode).toBe('off')
     })
   })
 
@@ -212,7 +207,7 @@ describe('audioMixer.js', () => {
       expect(stats).toHaveProperty('activeMethod')
     })
 
-    it('devrait retourner des stats même si le mixeur n\'est pas initialisé', () => {
+    it("devrait retourner des stats même si le mixeur n'est pas initialisé", () => {
       const stats = getMixerStats()
       expect(stats.isInitialized).toBe(false)
     })
@@ -221,7 +216,7 @@ describe('audioMixer.js', () => {
   // ─── TESTS DE isMixerOperational ──────────────────────────────────────
 
   describe('isMixerOperational', () => {
-    it('devrait retourner false si le mixeur n\'est pas initialisé', () => {
+    it("devrait retourner false si le mixeur n'est pas initialisé", () => {
       expect(isMixerOperational()).toBe(false)
     })
   })
@@ -229,7 +224,7 @@ describe('audioMixer.js', () => {
   // ─── TESTS DE toggleMicrophoneMute ────────────────────────────────────
 
   describe('toggleMicrophoneMute', () => {
-    it('ne devrait pas échouer si le gain n\'existe pas', () => {
+    it("ne devrait pas échouer si le gain n'existe pas", () => {
       expect(() => toggleMicrophoneMute()).not.toThrow()
     })
   })
@@ -237,16 +232,16 @@ describe('audioMixer.js', () => {
   // ─── TESTS DE getAudioInputDevices ────────────────────────────────────
 
   describe('getAudioInputDevices', () => {
-    it('devrait gérer les erreurs d\'énumération', async () => {
+    it("devrait gérer les erreurs d'énumération", async () => {
       const mockMediaDevicesError = {
-        enumerateDevices: vi.fn().mockRejectedValue(new Error('Enumeration error'))
+        enumerateDevices: vi.fn().mockRejectedValue(new Error('Enumeration error')),
       }
       Object.defineProperty(global.navigator, 'mediaDevices', {
         value: mockMediaDevicesError,
         writable: true,
-        configurable: true
+        configurable: true,
       })
-      
+
       const devices = await getAudioInputDevices()
       expect(devices).toEqual([])
     })

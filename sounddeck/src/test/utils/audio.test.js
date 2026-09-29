@@ -18,7 +18,7 @@ vi.mock('howler', () => ({
 }))
 
 // ✅ Mock de audioMixer (simplifié)
-vi.mock('../utils/audioMixer', () => ({
+vi.mock('@core/services/AudioMixerService', () => ({
   isMixerActive: vi.fn(() => false),
   playSoundInMixer: vi.fn(() => ({ onended: null, start: vi.fn() })),
   loadAudioBuffer: vi.fn().mockResolvedValue({

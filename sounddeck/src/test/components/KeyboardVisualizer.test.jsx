@@ -1,11 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import KeyboardVisualizer from './KeyboardVisualizer'
+import KeyboardVisualizer from '@shared/components/settings/KeyboardVisualizer'
 
-// ✅ Mock de useTranslation
-vi.mock('../i18n', () => ({
-  useTranslation: vi.fn(() => (key) => {
-    const translations = {
+// ✅ Mock de useLanguage
+vi.mock('@core/i18n/LanguageContext', () => ({
+  useLanguage: vi.fn(() => ({
+    t: (key) => {
+      const translations = {
+
       keyboardVisualizerTitle: 'Visualisation du clavier',
       keyboardVisualizerUsed: 'raccourci utilisé',
       keyboardVisualizerUsedPlural: 'raccourcis utilisés',
@@ -23,9 +25,15 @@ vi.mock('../i18n', () => ({
       showAll: 'Tout afficher',
       numpad: 'Pavé num.',
       activeCombinations: 'Combinaisons actives'
-    }
-    return translations[key] || key
-  })
+      }
+      return translations[key] || key
+    },
+    currentLang: 'fr',
+    changeLanguage: vi.fn(),
+    isLoading: false,
+    subscribe: vi.fn(() => () => {}),
+    languages: [],
+  })),
 }))
 
 describe('KeyboardVisualizer', () => {

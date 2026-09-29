@@ -78,7 +78,7 @@ export function applyEffectsToBuffer(
   }
 }
 
-function applyVolumeEffect(buffer, volume, ctx) {
+export function applyVolumeEffect(buffer, volume, ctx) {
   const clampedVolume = Math.max(0, Math.min(5, volume))
 
   if (Math.abs(clampedVolume - 1) < 0.001) return buffer
@@ -99,7 +99,7 @@ function applyVolumeEffect(buffer, volume, ctx) {
   return newBuffer
 }
 
-function applyFadeInEffect(buffer, duration, ctx) {
+export function applyFadeInEffect(buffer, duration, ctx) {
   if (duration <= 0.05) return buffer
 
   const sampleRate = buffer.sampleRate
@@ -135,7 +135,7 @@ function applyFadeInEffect(buffer, duration, ctx) {
   return newBuffer
 }
 
-function applyFadeOutEffect(buffer, duration, ctx) {
+export function applyFadeOutEffect(buffer, duration, ctx) {
   if (duration <= 0.05) return buffer
 
   const sampleRate = buffer.sampleRate
@@ -172,7 +172,7 @@ function applyFadeOutEffect(buffer, duration, ctx) {
   return newBuffer
 }
 
-function applySpeedEffect(buffer, speed, ctx) {
+export function applySpeedEffect(buffer, speed, ctx) {
   const clampedSpeed = Math.max(0.1, Math.min(4, speed))
 
   if (clampedSpeed === 1) return buffer
@@ -199,7 +199,7 @@ function applySpeedEffect(buffer, speed, ctx) {
   return newBuffer
 }
 
-function applyEchoEffect(buffer, delay, decay, mix, ctx) {
+export function applyEchoEffect(buffer, delay, decay, mix, ctx) {
   const clampedDelay = Math.max(0.05, Math.min(3, delay))
   const clampedDecay = Math.max(0, Math.min(1, decay))
   const clampedMix = Math.max(0, Math.min(1, mix))
@@ -230,7 +230,7 @@ function applyEchoEffect(buffer, delay, decay, mix, ctx) {
   return newBuffer
 }
 
-function applyReverbEffect(buffer, roomSize, mix, ctx) {
+export function applyReverbEffect(buffer, roomSize, mix, ctx) {
   const clampedRoomSize = Math.max(0.05, Math.min(1, roomSize))
   const clampedMix = Math.max(0, Math.min(1, mix))
 
@@ -277,7 +277,7 @@ function applyReverbEffect(buffer, roomSize, mix, ctx) {
   return newBuffer
 }
 
-function normalizeBuffer(buffer, ctx) {
+export function normalizeBuffer(buffer, ctx) {
   const channels = buffer.numberOfChannels
   const length = buffer.length
   let maxPeak = 0

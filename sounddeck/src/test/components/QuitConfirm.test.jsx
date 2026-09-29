@@ -1,21 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import QuitConfirm from './QuitConfirm'
+import QuitConfirm from '@shared/components/modals/QuitConfirm'
 
-// ✅ Mock de useTranslation
-vi.mock('../i18n', () => ({
-  useTranslation: vi.fn(() => (key) => {
-    const translations = {
+// ✅ Mock de useLanguage
+vi.mock('@core/i18n/LanguageContext', () => ({
+  useLanguage: vi.fn(() => ({
+    t: (key) => {
+      const translations = {
+
       quitConfirmTitle: 'Quitter SoundDeck ?',
       quitConfirmMessage: 'Que voulez-vous faire ?',
       quitConfirmQuit: 'Quitter complètement',
       quitConfirmMinimize: 'Réduire dans la barre d\'état',
       quitConfirmCancel: 'Annuler',
       quitConfirmRemember: 'Ne plus me demander'
-    }
-    return translations[key] || key
-  })
+      }
+      return translations[key] || key
+    },
+    currentLang: 'fr',
+    changeLanguage: vi.fn(),
+    isLoading: false,
+    subscribe: vi.fn(() => () => {}),
+    languages: [],
+  })),
 }))
 
 describe('QuitConfirm', () => {

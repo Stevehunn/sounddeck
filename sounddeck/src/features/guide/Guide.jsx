@@ -288,6 +288,7 @@ export default function Guide() {
   return (
     <div
       key={`${renderKey}-${mode}`}
+      data-testid="guide-container"
       style={{ display: 'flex', height: '100%', overflow: 'hidden' }}
     >
       {/* ─── SIDEBAR GAUCHE ─────────────────────────────────────────── */}
@@ -324,6 +325,7 @@ export default function Guide() {
             }}
           >
             <button
+              data-testid="guide-mode-simple"
               onClick={() => setMode('simple')}
               style={{
                 flex: 1,
@@ -347,6 +349,7 @@ export default function Guide() {
               {t('guideModeSimple')}
             </button>
             <button
+              data-testid="guide-mode-advanced"
               onClick={() => setMode('advanced')}
               style={{
                 flex: 1,
@@ -420,6 +423,7 @@ export default function Guide() {
           {steps.map((step) => (
             <button
               key={step.id}
+              data-testid={`guide-step-${step.id}`}
               onClick={() => setActiveStep(step.id)}
               className={`sidebar-item ${activeStep === step.id ? 'active' : ''}`}
               style={{
@@ -558,6 +562,7 @@ export default function Guide() {
           {/* Boutons Précédent/Suivant */}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
             <button
+              data-testid="guide-prev"
               className="btn-secondary btn-sm"
               disabled={isFirst}
               onClick={goPrev}
@@ -571,6 +576,7 @@ export default function Guide() {
               <i className="ti ti-arrow-left" /> {t('guidePrev')}
             </button>
             <button
+              data-testid="guide-next"
               className="btn-primary btn-sm"
               disabled={isLast}
               onClick={goNext}

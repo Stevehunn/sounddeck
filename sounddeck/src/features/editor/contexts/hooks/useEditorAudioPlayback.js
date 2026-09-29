@@ -9,7 +9,7 @@ import { logWarn, logError, logInfo } from '@shared/utils/logger'
 
 // ─── HELPERS PURS ──────────────────────────────────────────────────────
 
-function computeLoopTiming(globalTime, timelineLoop) {
+export function computeLoopTiming(globalTime, timelineLoop) {
   if (!timelineLoop?.enabled) {
     return { loopTime: globalTime, isInLoopZone: false, currentCycle: -1 }
   }
@@ -44,7 +44,7 @@ function computeLoopTiming(globalTime, timelineLoop) {
   }
 }
 
-function isClipInZone(start, end, loopStart, loopEnd) {
+export function isClipInZone(start, end, loopStart, loopEnd) {
   return (
     (start >= loopStart && start < loopEnd) ||
     (end > loopStart && end <= loopEnd) ||
@@ -52,7 +52,7 @@ function isClipInZone(start, end, loopStart, loopEnd) {
   )
 }
 
-function findOverlappingPreviousClip(clip, project, clipDurations) {
+export function findOverlappingPreviousClip(clip, project, clipDurations) {
   const tracks = project?.tracks || []
   let best = null
   let bestTrack = null

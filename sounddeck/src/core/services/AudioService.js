@@ -286,6 +286,7 @@ export function setNormalizationTarget(targetRMS) {
     Math.min(1, Number(targetRMS) || DEFAULT_NORMALIZATION_TARGET_RMS)
   )
   normalizationTargetRMS = clamped
+  gainCache.targetRMS = clamped
 }
 
 export function getNormalizationTarget() {

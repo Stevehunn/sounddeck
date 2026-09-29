@@ -118,7 +118,12 @@ export default function Presentation({ store, onExit }) {
 
         <HelpButton onClick={handleHelpClick} />
 
-        <button className="btn-secondary btn-lg" onClick={onExit} style={{ minWidth: 120 }}>
+        <button
+          data-testid="presentation-exit"
+          className="btn-secondary btn-lg"
+          onClick={onExit}
+          style={{ minWidth: 120 }}
+        >
           <i className="ti ti-x" /> {t('presentationExit')}
         </button>
       </div>
@@ -229,6 +234,7 @@ function PresentationCard({ sound, shortcut, playing, onPlay, size }) {
   return (
     <div
       data-testid="presentation-card"
+      data-sound-id={sound.id}
       className={`presentation-card ${playing ? 'playing' : ''}`}
       onClick={onPlay}
       style={{ width: cardSize }}

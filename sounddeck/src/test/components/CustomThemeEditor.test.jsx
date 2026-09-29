@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import CustomThemeEditor from './CustomThemeEditor'
+import CustomThemeEditor from '@shared/components/ui/CustomThemeEditor'
 
 // ✅ Mock du composant pour éviter la complexité
-vi.mock('../components/CustomThemeEditor', () => ({
+vi.mock('@shared/components/ui/CustomThemeEditor', () => ({
   default: ({ current, onSave }) => (
     <div data-testid="custom-theme-editor">
       <div data-testid="current-theme">{JSON.stringify(current)}</div>

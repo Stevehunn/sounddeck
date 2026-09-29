@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import SidebarEditor from './SidebarEditor'
+import SidebarEditor from '@shared/components/navigation/SidebarEditor'
 
-// ✅ Mock de useTranslation
-vi.mock('../i18n', () => ({
-  useTranslation: vi.fn(() => (key) => {
-    const translations = {
+// ✅ Mock de useLanguage
+vi.mock('@core/i18n/LanguageContext', () => ({
+  useLanguage: vi.fn(() => ({
+    t: (key) => {
+      const translations = {
+
       sidebarEditorTitle: 'Personnaliser la sidebar',
       sidebarEditorSub: 'Glissez, épinglez, masquez les éléments',
       sidebarEditorSave: 'Enregistrer',
@@ -33,9 +35,15 @@ vi.mock('../i18n', () => ({
       unfixed: 'Défixer',
       lockSection: 'Rendre cette section fixe',
       unlockSection: 'Rendre cette section scrollable'
-    }
-    return translations[key] || key
-  })
+      }
+      return translations[key] || key
+    },
+    currentLang: 'fr',
+    changeLanguage: vi.fn(),
+    isLoading: false,
+    subscribe: vi.fn(() => () => {}),
+    languages: [],
+  })),
 }))
 
 // ✅ Mock de l'API Electron

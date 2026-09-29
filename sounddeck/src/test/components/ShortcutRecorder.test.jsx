@@ -1,21 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import ShortcutRecorder from './ShortcutRecorder'
+import ShortcutRecorder from '@shared/components/settings/ShortcutRecorder'
 
-// ✅ Mock de useTranslation
-vi.mock('../i18n', () => ({
-  useTranslation: vi.fn(() => (key) => {
-    const translations = {
+// ✅ Mock de useLanguage
+vi.mock('@core/i18n/LanguageContext', () => ({
+  useLanguage: vi.fn(() => ({
+    t: (key) => {
+      const translations = {
+
       shortcutPlaceholder: '+ Raccourci',
       shortcutPressKey: '⌨️ Appuyez sur une touche...',
       shortcutPressCompact: 'Appuyez...',
       shortcutNeedMod: '⚠️ Ajoutez Ctrl/Alt/Shift',
       shortcutHintMod: 'Combinaison requise (ex: Ctrl+Shift+P)',
       shortcutHintAny: 'Une touche ou une combinaison (ex: F1, Ctrl+1)'
-    }
-    return translations[key] || key
-  })
+      }
+      return translations[key] || key
+    },
+    currentLang: 'fr',
+    changeLanguage: vi.fn(),
+    isLoading: false,
+    subscribe: vi.fn(() => () => {}),
+    languages: [],
+  })),
 }))
 
 describe('ShortcutRecorder', () => {
