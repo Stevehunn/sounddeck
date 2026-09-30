@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">50% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>4/8</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">50% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>5/10</span>
+                <span class='fraction'>10/10</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">33.33% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/3</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">42.85% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>3/7</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line medium'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -142,18 +142,16 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-yes">35x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-yes">35x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">23x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">35x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -193,7 +191,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">34x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -212,11 +212,11 @@ export default function PlaylistProgressBar({
 }) {
   const { t } = useLanguage()
 &nbsp;
-  <span class="missing-if-branch" title="else path not taken" >E</span>if (!playing || !currentProgress) return null
+  if (!playing || !currentProgress) return null
 &nbsp;
-  const currentItem = <span class="cstat-no" title="statement not covered" >items[currentIdx]</span>
-  const currentSound = <span class="cstat-no" title="statement not covered" >currentItem</span>
-    ? sounds.<span class="fstat-no" title="function not covered" >find((s</span>) =&gt; <span class="cstat-no" title="statement not covered" >s.id === currentItem.soundId)</span>
+  const currentItem = items[currentIdx]
+  const currentSound = currentItem
+    ? sounds.find((s) =&gt; s.id === currentItem.soundId)
     : null
 &nbsp;
   return (
@@ -232,7 +232,7 @@ export default function PlaylistProgressBar({
       &gt;
         &lt;span style={{ display: 'flex', alignItems: 'center', gap: 4 }}&gt;
           &lt;i className="ti ti-music" style={{ color: 'var(--accent)' }} /&gt;
-          {currentSound?.name || <span class="branch-1 cbranch-no" title="branch not covered" >t('unknownSound')}</span>
+          {currentSound?.name || t('unknownSound')}
         &lt;/span&gt;
         &lt;span style={{ fontFamily: 'monospace' }}&gt;
           {formatTime(currentProgress.current)} /{' '}
@@ -248,7 +248,7 @@ export default function PlaylistProgressBar({
         &lt;/div&gt;
       &lt;/div&gt;
       {items.length &gt; 0 &amp;&amp; (
-<span class="branch-1 cbranch-no" title="branch not covered" >        &lt;div</span>
+        &lt;div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -261,7 +261,7 @@ export default function PlaylistProgressBar({
             {t('playing')} {currentIdx + 1} / {items.length}
           &lt;/span&gt;
           &lt;span&gt;
-            {items.<span class="fstat-no" title="function not covered" >filter((_</span>, i) =&gt; <span class="cstat-no" title="statement not covered" >i &gt; currentIdx)</span>.length} {t('remaining')}
+            {items.filter((_, i) =&gt; i &gt; currentIdx).length} {t('remaining')}
           &lt;/span&gt;
         &lt;/div&gt;
       )}
@@ -274,7 +274,7 @@ export default function PlaylistProgressBar({
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-09-29T17:25:14.580Z
+                at 2026-09-30T11:43:57.608Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

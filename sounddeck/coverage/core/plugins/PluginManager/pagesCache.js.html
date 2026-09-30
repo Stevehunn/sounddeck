@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/13</span>
+                <span class='fraction'>13/13</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">91.66% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>11/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/6</span>
+                <span class='fraction'>6/6</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -116,33 +116,33 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">36x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -160,34 +160,34 @@ import { DEFAULT_ICONS, DEFAULT_GROUPS } from '@shared/constants/navigation'
 /**
  * Construit la liste complète des pages (core + plugins + profils).
  */
-export function <span class="fstat-no" title="function not covered" >buildAllPages(p</span>luginManager, translateFn) {
-  const t = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >translateFn || ((k</span>ey) =&gt; <span class="cstat-no" title="statement not covered" >key)</span></span>
+export function buildAllPages(pluginManager, translateFn) {
+  const t = translateFn || ((key) =&gt; key)
 &nbsp;
-  const corePages = <span class="cstat-no" title="statement not covered" >CORE_PAGES.<span class="fstat-no" title="function not covered" >map(({</span> id, labelKey, group }) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
+  const corePages = CORE_PAGES.map(({ id, labelKey, group }) =&gt; ({
     id,
     label: t(labelKey),
     icon: DEFAULT_ICONS[id],
-    group: DEFAULT_GROUPS[id] || group,
+    group: DEFAULT_GROUPS[id] || <span class="branch-1 cbranch-no" title="branch not covered" >group,</span>
     isCore: true,
   }))
 &nbsp;
-  const pluginPages = <span class="cstat-no" title="statement not covered" >Array.from(pluginManager.pages.values()).<span class="fstat-no" title="function not covered" >map((p</span>) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
+  const pluginPages = Array.from(pluginManager.pages.values()).map((p) =&gt; ({
     ...p,
     label: p.labelKey ? t(p.labelKey) : p.label,
     isCore: false,
     isPlugin: true,
   }))
 &nbsp;
-  const storePages = <span class="cstat-no" title="statement not covered" >buildStorePages(pluginManager.store)</span>
+  const storePages = buildStorePages(pluginManager.store)
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  return [...corePages, ...pluginPages, ...storePages]</span>
+  return [...corePages, ...pluginPages, ...storePages]
 }
 &nbsp;
-function <span class="fstat-no" title="function not covered" >buildStorePages(s</span>tore) {
-<span class="cstat-no" title="statement not covered" >  if (!store) <span class="cstat-no" title="statement not covered" >return []</span></span>
+function buildStorePages(store) {
+  if (!store) return []
 &nbsp;
-  const profiles = <span class="cstat-no" title="statement not covered" >store.profiles || []</span>
-<span class="cstat-no" title="statement not covered" >  return profiles.<span class="fstat-no" title="function not covered" >map((p</span>) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
+  const profiles = store.profiles || []
+  return profiles.map((p) =&gt; ({
     id: `profile-${p.id}`,
     label: p.name,
     icon: p.id === 'all' ? 'ti-stack' : 'ti-user',
@@ -205,7 +205,7 @@ export default { buildAllPages }</pre></td></tr></table></pre>
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-09-29T17:25:14.580Z
+                at 2026-09-30T11:43:57.608Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

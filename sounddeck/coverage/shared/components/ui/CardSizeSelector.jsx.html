@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/11</span>
+                <span class='fraction'>11/11</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">86.66% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/15</span>
+                <span class='fraction'>13/15</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/5</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/11</span>
+                <span class='fraction'>11/11</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -117,22 +117,20 @@
 <a name='L52'></a><a href='#L52'>52</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">21x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -146,15 +144,17 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -167,21 +167,21 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useLanguage } from '@core/i18n/LanguageContext'
 &nbsp;
-export default function <span class="fstat-no" title="function not covered" >CardSizeSelector({</span> value, onChange, lang = <span class="branch-0 cbranch-no" title="branch not covered" >'fr' }) {</span>
-  const { t, <span class="cstat-no" title="statement not covered" >currentLang } = useLanguage()</span>
+export default function CardSizeSelector({ value, onChange, lang = 'fr' }) {
+  const { t, currentLang } = useLanguage()
   
-  const sizes = <span class="cstat-no" title="statement not covered" >[</span>
+  const sizes = [
     { val: 'small', label: t('cardSizeSmall'), icon: 'ti-layout-grid' },
     { val: 'medium', label: t('cardSizeMedium'), icon: 'ti-layout-grid' },
     { val: 'large', label: t('cardSizeLarge'), icon: 'ti-layout-grid' },
   ]
   
-<span class="cstat-no" title="statement not covered" >  return (</span>
+  return (
     &lt;div style={{ display: 'flex', gap: 6 }}&gt;
-      {sizes.<span class="fstat-no" title="function not covered" >map(({</span> val, label, icon }) =&gt; (
-<span class="cstat-no" title="statement not covered" >        &lt;button</span>
+      {sizes.map(({ val, label, icon }) =&gt; (
+        &lt;button
           key={val}
-<span class="fstat-no" title="function not covered" >          onClick={() =&gt; <span class="cstat-no" title="statement not covered" >o</span>nChange(val)}</span>
+          onClick={() =&gt; onChange(val)}
           style={{
             padding: '6px 12px',
             borderRadius: 8,
@@ -196,16 +196,16 @@ export default function <span class="fstat-no" title="function not covered" >Car
             fontWeight: value === val ? 600 : 400,
             transition: 'all 0.15s ease'
           }}
-<span class="fstat-no" title="function not covered" >          onMouseEnter={e</span> =&gt; {
-<span class="cstat-no" title="statement not covered" >            if (value !== val) {</span>
-<span class="cstat-no" title="statement not covered" >              e.currentTarget.style.borderColor = 'var(--accent)'</span>
-<span class="cstat-no" title="statement not covered" >              e.currentTarget.style.color = 'var(--text-primary)'</span>
+          onMouseEnter={e =&gt; {
+            <span class="missing-if-branch" title="else path not taken" >E</span>if (value !== val) {
+              e.currentTarget.style.borderColor = 'var(--accent)'
+              e.currentTarget.style.color = 'var(--text-primary)'
             }
           }}
-<span class="fstat-no" title="function not covered" >          onMouseLeave={e</span> =&gt; {
-<span class="cstat-no" title="statement not covered" >            if (value !== val) {</span>
-<span class="cstat-no" title="statement not covered" >              e.currentTarget.style.borderColor = 'var(--border)'</span>
-<span class="cstat-no" title="statement not covered" >              e.currentTarget.style.color = 'var(--text-secondary)'</span>
+          onMouseLeave={e =&gt; {
+            <span class="missing-if-branch" title="else path not taken" >E</span>if (value !== val) {
+              e.currentTarget.style.borderColor = 'var(--border)'
+              e.currentTarget.style.color = 'var(--text-secondary)'
             }
           }}
         &gt;
@@ -223,7 +223,7 @@ export default function <span class="fstat-no" title="function not covered" >Car
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-09-29T17:25:14.580Z
+                at 2026-09-30T11:43:57.608Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

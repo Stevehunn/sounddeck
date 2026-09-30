@@ -36,7 +36,7 @@ export function useKeyboardNavigation({
 
     let newIndex
     if (focusedIndex === -1) {
-      newIndex = direction === 'down' ? 0 : items.length - 1
+      newIndex = direction > 0 ? 0 : items.length - 1
     } else {
       newIndex = focusedIndex + direction
     }
@@ -143,16 +143,24 @@ export function useKeyboardNavigation({
     }
   }, [containerRef, handleKeyDown, isReady])
 
-  // Auto-focus
+  // ─── Reset quand items change VRAIMENT (pas au mount) ─────────────────
+  // ⚠️ Doit être AVANT l'autoFocus pour ne pas écraser son setFocus(0)
+  const prevItemsRef = useRef(items)
+
+  useEffect(() => {
+    // Skip le mount (sinon ça écrase l'autoFocus)
+    if (prevItemsRef.current !== items) {
+      prevItemsRef.current = items
+      setFocusedIndex(-1)
+    }
+  }, [items])
+
+  // ─── Auto-focus (exécuté en dernier, une seule fois au mount) ─────────
   useEffect(() => {
     if (autoFocus && items.length > 0) {
       setFocus(0)
     }
   }, [autoFocus, items.length, setFocus])
-
-  useEffect(() => {
-    setFocusedIndex(-1)
-  }, [items])
 
   return {
     focusedIndex,

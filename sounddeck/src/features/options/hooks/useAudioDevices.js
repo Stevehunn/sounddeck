@@ -53,7 +53,9 @@ export function useAudioDevices({ store, addToast }) {
   useEffect(() => {
     return () => {
       if (micTestRef.current) {
-        micTestRef.current.stop()
+        if (typeof micTestRef.current.stop === 'function') {
+          micTestRef.current.stop()
+        }
         micTestRef.current = null
       }
     }
@@ -122,9 +124,11 @@ export function useAudioDevices({ store, addToast }) {
     setIsDetecting(false)
   }
 
-  const testMicrophone = async () => {
+    const testMicrophone = async () => {
     if (micTestRef.current) {
-      micTestRef.current.stop()
+      if (typeof micTestRef.current.stop === 'function') {
+        micTestRef.current.stop()
+      }
       micTestRef.current = null
       setIsMicrophoneTesting(false)
       addToast(t('micTestStopped'), 'info')
@@ -149,7 +153,9 @@ export function useAudioDevices({ store, addToast }) {
 
         setTimeout(() => {
           if (micTestRef.current) {
-            micTestRef.current.stop()
+            if (typeof micTestRef.current.stop === 'function') {
+              micTestRef.current.stop()
+            }
             micTestRef.current = null
             setIsMicrophoneTesting(false)
             addToast(t('micTestFinished'), 'info')
