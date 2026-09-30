@@ -147,7 +147,7 @@ export function useSettings(initialState = {}, save) {
     await save('shortcutsEnabled', enabled)
   }, [save])
 
-  const updateToggleShortcutsAccelerator = useCallback(async (accelerator) => {
+    const updateToggleShortcutsAccelerator = useCallback(async (accelerator) => {
     setToggleShortcutsAccelerator(accelerator)
     await save('toggleShortcutsAccelerator', accelerator)
     await window.electronAPI?.updateToggleShortcutsAccelerator?.(accelerator)
@@ -156,25 +156,25 @@ export function useSettings(initialState = {}, save) {
   const updateToggleWindowShortcut = useCallback(async (accelerator) => {
     setToggleWindowShortcut(accelerator)
     await save('toggleWindowShortcut', accelerator)
-    await window.electronAPI.updateToggleWindowShortcut?.(accelerator)
+    await window.electronAPI?.updateToggleWindowShortcut?.(accelerator)
   }, [save])
 
   const updateLoopShortcut = useCallback(async (accelerator) => {
     setLoopShortcut(accelerator)
     await save('loopShortcut', accelerator)
-    await window.electronAPI.updateLoopShortcut(accelerator)
+    await window.electronAPI?.updateLoopShortcut?.(accelerator)
   }, [save])
 
   const updateStopAllShortcut = useCallback(async (accelerator) => {
     setStopAllShortcut(accelerator)
     await save('stopAllShortcut', accelerator)
-    await window.electronAPI.updateStopAllShortcut(accelerator)
+    await window.electronAPI?.updateStopAllShortcut?.(accelerator)
   }, [save])
 
   const updatePresentationShortcut = useCallback(async (accelerator) => {
     setPresentationShortcut(accelerator)
     await save('presentationShortcut', accelerator)
-    await window.electronAPI.updatePresentationShortcut(accelerator)
+    await window.electronAPI?.updatePresentationShortcut?.(accelerator)
   }, [save])
 
   const updateStartMinimized = useCallback(async (val) => {

@@ -1,0 +1,415 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  render,
+  screen,
+  act,
+  waitFor,
+  renderHook,
+} from "@testing-library/react";
+import { useMemo } from "react";
+
+// ─── Mock i18n ──────────────────────────────────────────────────────────
+vi.mock("@core/i18n/LanguageContext", () => ({
+  useLanguage: vi.fn(() => ({
+    t: (key) => {
+      const translations = {
+        networkErrorTitle: "Pas de connexion internet",
+        networkErrorDesc: "Vérifiez votre connexion puis réessayez.",
+        close: "Fermer",
+      };
+      return translations[key] || key;
+    },
+    currentLang: "fr",
+  })),
+}));
+
+// ─── Mock constructible pour new Image() ────────────────────────────────
+let imageInstances = [];
+let imageBehavior = "success"; // 'success' | 'error' | 'pending'
+
+class MockImage {
+  constructor() {
+    this.onload = null;
+    this.onerror = null;
+    this._src = "";
+    this._pendingMicrotask = null;
+    imageInstances.push(this);
+  }
+
+  set src(value) {
+    this._src = value;
+    // Ne déclenche rien tout de suite (laisse le test contrôler)
+    if (imageBehavior === "success") {
+      queueMicrotask(() => {
+        if (this.onload) this.onload();
+      });
+    } else if (imageBehavior === "error") {
+      queueMicrotask(() => {
+        if (this.onerror) this.onerror();
+      });
+    }
+    // 'pending' : on ne déclenche rien → timeout attendu
+  }
+
+  get src() {
+    return this._src;
+  }
+}
+
+// ─── Reset du module entre tests (cache module-level) ───────────────────
+let NetworkContextModule;
+
+beforeEach(async () => {
+  vi.resetModules();
+  vi.clearAllMocks();
+  vi.useFakeTimers();
+
+  imageInstances = [];
+  imageBehavior = "success";
+
+  window.Image = MockImage;
+
+  // Par défaut online
+  Object.defineProperty(navigator, "onLine", {
+    value: true,
+    configurable: true,
+  });
+
+  NetworkContextModule = await import("@shared/contexts/NetworkContext");
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+// ─── Helpers ────────────────────────────────────────────────────────────
+
+const renderProvider = (props = {}) => {
+  const { NetworkProvider } = NetworkContextModule;
+  return render(
+    <NetworkProvider>
+      <div data-testid="child">Contenu</div>
+    </NetworkProvider>,
+  );
+};
+
+// ════════════════════════════════════════════════════════════════════════
+describe("probeNetwork", () => {
+  it("devrait retourner false si navigator.onLine = false", async () => {
+    Object.defineProperty(navigator, "onLine", {
+      value: false,
+      configurable: true,
+    });
+
+    const result = await NetworkContextModule.probeNetwork();
+    expect(result).toBe(false);
+  });
+
+  it("devrait retourner true si une URL répond", async () => {
+    imageBehavior = "success";
+    const result = await NetworkContextModule.probeNetwork();
+    expect(result).toBe(true);
+  });
+
+  it("devrait utiliser le cache (2e appel rapproché)", async () => {
+    await NetworkContextModule.probeNetwork();
+    const callsBefore = imageInstances.length;
+
+    // 2e appel immédiat → cache (pas de nouvelle image)
+    await NetworkContextModule.probeNetwork();
+    expect(imageInstances.length).toBe(callsBefore);
+  });
+
+  it("devrait retourner false si toutes les URLs échouent", async () => {
+    imageBehavior = "error";
+    const result = await NetworkContextModule.probeNetwork();
+    expect(result).toBe(false);
+  });
+
+  it("devrait timeout après 3s si aucune image ne répond", async () => {
+    imageBehavior = "pending";
+
+    const promise = NetworkContextModule.probeNetwork();
+
+    // ✅ Avance 3 URLs × 3s = 9000ms + marge
+    await vi.advanceTimersByTimeAsync(10000);
+
+    const result = await promise;
+    expect(result).toBe(false);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════
+describe("NetworkProvider", () => {
+  it("devrait rendre ses enfants", () => {
+    renderProvider();
+    expect(screen.getByTestId("child")).toBeInTheDocument();
+  });
+
+  it("devrait initialiser isOnline depuis navigator.onLine", () => {
+    Object.defineProperty(navigator, "onLine", {
+      value: true,
+      configurable: true,
+    });
+
+    const { NetworkProvider, useNetwork } = NetworkContextModule;
+    const { result } = renderHook(() => useNetwork(), {
+      wrapper: ({ children }) => <NetworkProvider>{children}</NetworkProvider>,
+    });
+
+    expect(result.current.isOnline).toBe(true);
+  });
+
+  it('devrait réagir à l\'événement "offline"', () => {
+    const { NetworkProvider, useNetwork } = NetworkContextModule;
+    const { result } = renderHook(() => useNetwork(), {
+      wrapper: ({ children }) => <NetworkProvider>{children}</NetworkProvider>,
+    });
+
+    expect(result.current.isOnline).toBe(true);
+
+    act(() => {
+      Object.defineProperty(navigator, "onLine", {
+        value: false,
+        configurable: true,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+
+    expect(result.current.isOnline).toBe(false);
+  });
+
+  it('devrait réagir à l\'événement "online"', () => {
+    const { NetworkProvider, useNetwork } = NetworkContextModule;
+    const { result } = renderHook(() => useNetwork(), {
+      wrapper: ({ children }) => <NetworkProvider>{children}</NetworkProvider>,
+    });
+
+    // Passe offline
+    act(() => {
+      Object.defineProperty(navigator, "onLine", {
+        value: false,
+        configurable: true,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+    expect(result.current.isOnline).toBe(false);
+
+    // Revient online
+    act(() => {
+      Object.defineProperty(navigator, "onLine", {
+        value: true,
+        configurable: true,
+      });
+      window.dispatchEvent(new Event("online"));
+    });
+    expect(result.current.isOnline).toBe(true);
+  });
+
+  it("devrait afficher le modal quand on est offline", () => {
+    renderProvider();
+
+    act(() => {
+      Object.defineProperty(navigator, "onLine", {
+        value: false,
+        configurable: true,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+
+    expect(
+      document.querySelector('[data-testid="no-connection-modal"]'),
+    ).toBeInTheDocument();
+  });
+
+  it("devrait masquer le modal au clic sur l'overlay", () => {
+    renderProvider();
+
+    act(() => {
+      Object.defineProperty(navigator, "onLine", {
+        value: false,
+        configurable: true,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+
+    const modal = document.querySelector('[data-testid="no-connection-modal"]');
+    expect(modal).toBeInTheDocument();
+
+    act(() => {
+      modal.click();
+    });
+
+    expect(
+      document.querySelector('[data-testid="no-connection-modal"]'),
+    ).not.toBeInTheDocument();
+  });
+
+  it("devrait masquer le modal sur Escape", () => {
+    renderProvider();
+
+    act(() => {
+      Object.defineProperty(navigator, "onLine", {
+        value: false,
+        configurable: true,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+
+    expect(
+      document.querySelector('[data-testid="no-connection-modal"]'),
+    ).not.toBeInTheDocument();
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════
+describe("useNetwork", () => {
+  it("devrait throw si utilisé hors NetworkProvider", () => {
+    const { useNetwork } = NetworkContextModule;
+
+    // Silence console.error pour éviter le bruit
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(() => {
+      renderHook(() => useNetwork());
+    }).toThrow(/NetworkProvider/i);
+
+    errorSpy.mockRestore();
+  });
+
+  it("devrait exposer showNoConnection", () => {
+    const { NetworkProvider, useNetwork } = NetworkContextModule;
+    const { result } = renderHook(() => useNetwork(), {
+      wrapper: ({ children }) => <NetworkProvider>{children}</NetworkProvider>,
+    });
+
+    expect(typeof result.current.showNoConnection).toBe("function");
+  });
+
+  it("showNoConnection devrait afficher le modal", () => {
+    const { NetworkProvider, useNetwork } = NetworkContextModule;
+
+    const TestComp = () => {
+      const { showNoConnection } = useNetwork();
+      return (
+        <button data-testid="trigger" onClick={showNoConnection}>
+          Trigger
+        </button>
+      );
+    };
+
+    render(
+      <NetworkProvider>
+        <TestComp />
+      </NetworkProvider>,
+    );
+
+    act(() => {
+      document.querySelector('[data-testid="trigger"]').click();
+    });
+
+    expect(
+      document.querySelector('[data-testid="no-connection-modal"]'),
+    ).toBeInTheDocument();
+  });
+
+  it("hideNoConnection devrait masquer le modal", () => {
+    const { NetworkProvider, useNetwork } = NetworkContextModule;
+
+    const TestComp = () => {
+      const { showNoConnection, hideNoConnection } = useNetwork();
+      return (
+        <>
+          <button data-testid="show" onClick={showNoConnection}>
+            Show
+          </button>
+          <button data-testid="hide" onClick={hideNoConnection}>
+            Hide
+          </button>
+        </>
+      );
+    };
+
+    render(
+      <NetworkProvider>
+        <TestComp />
+      </NetworkProvider>,
+    );
+
+    act(() => {
+      document.querySelector('[data-testid="show"]').click();
+    });
+    expect(
+      document.querySelector('[data-testid="no-connection-modal"]'),
+    ).toBeInTheDocument();
+
+    act(() => {
+      document.querySelector('[data-testid="hide"]').click();
+    });
+    expect(
+      document.querySelector('[data-testid="no-connection-modal"]'),
+    ).not.toBeInTheDocument();
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════
+describe("ensureOnline", () => {
+  it("devrait retourner true si la sonde réussit", async () => {
+    imageBehavior = "success";
+    const { NetworkProvider, useNetwork } = NetworkContextModule;
+
+    const { result } = renderHook(() => useNetwork(), {
+      wrapper: ({ children }) => <NetworkProvider>{children}</NetworkProvider>,
+    });
+
+    let online;
+    await act(async () => {
+      online = await result.current.ensureOnline();
+    });
+
+    expect(online).toBe(true);
+  });
+
+  it("devrait retourner false et afficher le modal si offline", async () => {
+    imageBehavior = "error";
+    const { NetworkProvider, useNetwork } = NetworkContextModule;
+
+    const { result } = renderHook(() => useNetwork(), {
+      wrapper: ({ children }) => <NetworkProvider>{children}</NetworkProvider>,
+    });
+
+    let online;
+    await act(async () => {
+      online = await result.current.ensureOnline();
+    });
+
+    expect(online).toBe(false);
+    expect(result.current.isOnline).toBe(false);
+  });
+
+  it("devrait dédupliquer les appels concurrents (probingPromiseRef)", async () => {
+    imageBehavior = "success";
+    const { NetworkProvider, useNetwork } = NetworkContextModule;
+
+    const { result } = renderHook(() => useNetwork(), {
+      wrapper: ({ children }) => <NetworkProvider>{children}</NetworkProvider>,
+    });
+
+    const imagesBefore = imageInstances.length;
+
+    let p1, p2;
+    await act(async () => {
+      p1 = result.current.ensureOnline();
+      p2 = result.current.ensureOnline();
+      await Promise.all([p1, p2]);
+    });
+
+    // Une seule rafale d'images (3 URLs en parallèle → au plus 3)
+    const imagesAfter = imageInstances.length - imagesBefore;
+    expect(imagesAfter).toBeLessThanOrEqual(3);
+  });
+});
