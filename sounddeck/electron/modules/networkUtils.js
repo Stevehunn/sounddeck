@@ -40,7 +40,9 @@ function normalizeNetworkError(err) {
     }
   }
 
-  if (lower.includes('timeout')) return 'NETWORK_TIMEOUT'
+  if (lower.includes('timeout') || lower.includes('timed out')) {
+    return 'NETWORK_TIMEOUT'
+  }
 
   return null
 }

@@ -1,0 +1,484 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for electron/preload.js</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">electron</a> preload.js</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">10.89% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>11/101</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/2</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">8.33% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>8/96</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">9.78% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>9/92</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// electron/preload.js
+const { contextBridge, ipcRenderer } = require('electron')
+&nbsp;
+contextBridge.exposeInMainWorld('electronAPI', {
+  // ─── FICHIERS ────────────────────────────────────────────────────────────
+<span class="fstat-no" title="function not covered" >  openFileDialog: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('open-file-dialog'),</span>
+<span class="fstat-no" title="function not covered" >  openImageDialog: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('open-image-dialog'),</span>
+<span class="fstat-no" title="function not covered" >  importSoundFile: (f</span>ilePath) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('import-sound-file', filePath),</span>
+<span class="fstat-no" title="function not covered" >  importImageFile: (f</span>ilePath) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('import-image-file', filePath),</span>
+<span class="fstat-no" title="function not covered" >  downloadSoundUrl: (u</span>rl, fileName) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('download-sound-url', url, fileName),</span>
+<span class="fstat-no" title="function not covered" >  trimSoundFile: (f</span>ilePath, start, end) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('trim-sound-file', filePath, start, end),</span>
+<span class="fstat-no" title="function not covered" >  deleteSoundFile: (f</span>ilePath) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('delete-sound-file', filePath),</span>
+<span class="fstat-no" title="function not covered" >  getSoundsDir: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('get-sounds-dir'),</span>
+<span class="fstat-no" title="function not covered" >  fileExists: (f</span>ilePath) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('file-exists', filePath),</span>
+<span class="fstat-no" title="function not covered" >  writeDroppedFile: (f</span>ileName, arrayBuffer) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('write-dropped-file', fileName, arrayBuffer),</span>
+&nbsp;
+  // ✅ Export JSON générique (logs d'erreur, backups, etc.)
+<span class="fstat-no" title="function not covered" >  exportJsonFile: (j</span>son, defaultName, title) =&gt;
+<span class="cstat-no" title="statement not covered" >    ipcRenderer.invoke('export-json-file', json, defaultName, title),</span>
+&nbsp;
+  // ─── STORE ──────────────────────────────────────────────────────────────
+  storeGet: (key) =&gt; ipcRenderer.invoke('store-get', key),
+  storeSet: (key, value) =&gt; ipcRenderer.invoke('store-set', key, value),
+  storeDelete: (key) =&gt; ipcRenderer.invoke('store-delete', key),
+<span class="fstat-no" title="function not covered" >  storeSetLang: (l</span>ang) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('store-set-lang', lang),</span>
+&nbsp;
+  // ─── MYINSTANTS ──────────────────────────────────────────────────────────
+<span class="fstat-no" title="function not covered" >  fetchMyinstants: (q</span>uery, mode, lang) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('fetch-myinstants', query, mode, lang),</span>
+&nbsp;
+  // ✅ NOUVEAU : Emoji Discovery (getemoji.com)
+<span class="fstat-no" title="function not covered" >  fetchEmojis: (c</span>ategoryId) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('fetch-emojis', categoryId),</span>
+&nbsp;
+  // ─── RACCOURCIS ──────────────────────────────────────────────────────────
+  updateShortcuts: (shortcuts) =&gt; ipcRenderer.invoke('update-shortcuts', shortcuts),
+<span class="fstat-no" title="function not covered" >  updateProfileShortcut: (a</span>cc) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('update-profile-shortcut', acc),</span>
+<span class="fstat-no" title="function not covered" >  updateLoopShortcut: (a</span>cc) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('update-loop-shortcut', acc),</span>
+<span class="fstat-no" title="function not covered" >  updateStopAllShortcut: (a</span>cc) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('update-stop-all-shortcut', acc),</span>
+<span class="fstat-no" title="function not covered" >  updatePresentationShortcut: (a</span>cc) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('update-presentation-shortcut', acc),</span>
+<span class="fstat-no" title="function not covered" >  updateToggleShortcutsAccelerator: (a</span>ccelerator) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('update-toggle-shortcuts-accelerator', accelerator),</span>
+<span class="fstat-no" title="function not covered" >  updateToggleWindowShortcut: (a</span>ccelerator) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('update-toggle-window-shortcut', accelerator),</span>
+<span class="fstat-no" title="function not covered" >  toggleGlobalShortcuts: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('toggle-global-shortcuts'),</span>
+<span class="fstat-no" title="function not covered" >  getGlobalShortcutsState: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('get-global-shortcuts-state'),</span>
+&nbsp;
+  // ─── IPC LISTENERS ──────────────────────────────────────────────────────
+  onPlaySound: (cb) =&gt; ipcRenderer.on('play-sound', (e, id) =&gt; cb(id)),
+<span class="fstat-no" title="function not covered" >  onSwitchProfile: (c</span>b) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.on(<span class="fstat-no" title="function not covered" >'switch-profile', () =&gt; <span class="cstat-no" title="statement not covered" >c</span>b())</span>,</span>
+<span class="fstat-no" title="function not covered" >  onToggleLoop: (c</span>b) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.on(<span class="fstat-no" title="function not covered" >'toggle-loop', () =&gt; <span class="cstat-no" title="statement not covered" >c</span>b())</span>,</span>
+<span class="fstat-no" title="function not covered" >  onStopAllSounds: (c</span>b) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.on(<span class="fstat-no" title="function not covered" >'stop-all-sounds', () =&gt; <span class="cstat-no" title="statement not covered" >c</span>b())</span>,</span>
+<span class="fstat-no" title="function not covered" >  onTogglePresentation: (c</span>b) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.on(<span class="fstat-no" title="function not covered" >'toggle-presentation', () =&gt; <span class="cstat-no" title="statement not covered" >c</span>b())</span>,</span>
+  onShortcutsToggle: (cb) =&gt; ipcRenderer.on('shortcuts-toggle', (e, enabled) =&gt; cb(enabled)),
+<span class="fstat-no" title="function not covered" >  onShowQuitConfirm: (c</span>b) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.on(<span class="fstat-no" title="function not covered" >'show-quit-confirm', () =&gt; <span class="cstat-no" title="statement not covered" >c</span>b())</span>,</span>
+<span class="fstat-no" title="function not covered" >  onHideQuitConfirm: (c</span>b) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.on(<span class="fstat-no" title="function not covered" >'hide-quit-confirm', () =&gt; <span class="cstat-no" title="statement not covered" >c</span>b())</span>,</span>
+<span class="fstat-no" title="function not covered" >  onShowWindow: (c</span>b) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.on(<span class="fstat-no" title="function not covered" >'show-window', () =&gt; <span class="cstat-no" title="statement not covered" >c</span>b())</span>,</span>
+<span class="fstat-no" title="function not covered" >  removeAllListeners: (c</span>h) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.removeAllListeners(ch),</span>
+&nbsp;
+  // ─── TRAY ────────────────────────────────────────────────────────────────
+<span class="fstat-no" title="function not covered" >  updateTrayLanguage: (l</span>ang) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('update-tray-language', lang),</span>
+<span class="fstat-no" title="function not covered" >  getStartMinimized: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('get-start-minimized'),</span>
+<span class="fstat-no" title="function not covered" >  setStartMinimized: (v</span>alue) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('set-start-minimized', value),</span>
+<span class="fstat-no" title="function not covered" >  getLaunchAtStartup: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('get-launch-at-startup'),</span>
+<span class="fstat-no" title="function not covered" >  setLaunchAtStartup: (v</span>alue) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('set-launch-at-startup', value),</span>
+<span class="fstat-no" title="function not covered" >  quitApp: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('quit-app'),</span>
+<span class="fstat-no" title="function not covered" >  hideWindow: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('hide-window'),</span>
+<span class="fstat-no" title="function not covered" >  showWindow: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('show-window'),</span>
+<span class="fstat-no" title="function not covered" >  confirmQuit: (a</span>ction, remember) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('confirm-quit', action, remember),</span>
+&nbsp;
+  // ─── PILOTE AUDIO ────────────────────────────────────────────────────────
+<span class="fstat-no" title="function not covered" >  installVirtualDriver: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('install-virtual-driver'),</span>
+<span class="fstat-no" title="function not covered" >  uninstallVirtualDriver: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('uninstall-virtual-driver'),</span>
+<span class="fstat-no" title="function not covered" >  getVirtualDriverStatus: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('get-virtual-driver-status'),</span>
+&nbsp;
+  // ─── YOUTUBE ─────────────────────────────────────────────────────────────
+<span class="fstat-no" title="function not covered" >  checkYtdlp: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('check-ytdlp'),</span>
+<span class="fstat-no" title="function not covered" >  downloadYtdlp: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('download-ytdlp'),</span>
+<span class="fstat-no" title="function not covered" >  youtubeInfo: (u</span>rl) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('youtube-info', url),</span>
+<span class="fstat-no" title="function not covered" >  youtubeDownload: (u</span>rl, start, end, title) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('youtube-download', url, start, end, title),</span>
+<span class="fstat-no" title="function not covered" >  downloadThumbnail: (u</span>rl, soundName) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('download-thumbnail', url, soundName),</span>
+<span class="fstat-no" title="function not covered" >  openExternal: (u</span>rl) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('open-external', url),</span>
+&nbsp;
+  // ─── SPOTIFY / SOUNDCLOUD ───────────────────────────────────────────────
+<span class="fstat-no" title="function not covered" >  spotifyTrackInfo: (t</span>rackId) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('spotify-track-info', trackId),</span>
+<span class="fstat-no" title="function not covered" >  soundcloudTrackInfo: (u</span>rl) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('soundcloud-track-info', url),</span>
+<span class="fstat-no" title="function not covered" >  downloadPlatformTrack: (p</span>arams) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('download-platform-track', params),</span>
+&nbsp;
+  // ─── EXPORT / IMPORT ────────────────────────────────────────────────────
+<span class="fstat-no" title="function not covered" >  exportProfile: (p</span>rofileId) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('export-profile', profileId),</span>
+<span class="fstat-no" title="function not covered" >  importProfile: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('import-profile'),</span>
+<span class="fstat-no" title="function not covered" >  exportConfig: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('export-config'),</span>
+<span class="fstat-no" title="function not covered" >  exportFull: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('export-full'),</span>
+<span class="fstat-no" title="function not covered" >  exportSoundsOnly: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('export-sounds-only'),</span>
+<span class="fstat-no" title="function not covered" >  importBackup: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('import-backup'),</span>
+&nbsp;
+  // ─── SYSTÈME ─────────────────────────────────────────────────────────────
+<span class="fstat-no" title="function not covered" >  getSystemLanguage: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('get-system-language'),</span>
+<span class="fstat-no" title="function not covered" >  getSystemKeyboardLayout: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('get-system-keyboard-layout'),</span>
+&nbsp;
+  // ─── PLUGINS ─────────────────────────────────────────────────────────────
+<span class="fstat-no" title="function not covered" >  getInstalledPlugins: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('get-installed-plugins'),</span>
+<span class="fstat-no" title="function not covered" >  getPluginPath: (p</span>luginId) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('get-plugin-path', pluginId),</span>
+<span class="fstat-no" title="function not covered" >  getPluginComponentPath: (p</span>luginId, pageId) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('get-plugin-component-path', pluginId, pageId),</span>
+<span class="fstat-no" title="function not covered" >  installPluginFromBuffer: (b</span>uffer, fileName) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('install-plugin-from-buffer', buffer, fileName),</span>
+<span class="fstat-no" title="function not covered" >  uninstallPlugin: (p</span>luginId) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('uninstall-plugin', pluginId),</span>
+&nbsp;
+  // ─── ADVANCED EDITOR ────────────────────────────────────────────────────
+<span class="fstat-no" title="function not covered" >  saveFileDialog: (f</span>ileName, buffer) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('save-file-dialog', fileName, buffer),</span>
+<span class="fstat-no" title="function not covered" >  writeSoundFile: (f</span>ilePath, data) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('write-sound-file', filePath, data),</span>
+<span class="fstat-no" title="function not covered" >  exportAudioFile: (d</span>ata, fileName, format) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('export-audio-file', { data, fileName, format }),</span>
+<span class="fstat-no" title="function not covered" >  convertAudio: (i</span>nputPath, outputPath, format, bitrate) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('convert-audio', inputPath, outputPath, format, bitrate),</span>
+<span class="fstat-no" title="function not covered" >  openDirectoryDialog: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('open-directory-dialog'),</span>
+<span class="fstat-no" title="function not covered" >  readFile: (f</span>ilePath) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('read-file', filePath),</span>
+<span class="fstat-no" title="function not covered" >  readFileBase64: (f</span>ilePath) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('read-file-base64', filePath),</span>
+&nbsp;
+  // ─── PROJETS D'ÉDITION ────────────────────────────────────────────────────
+<span class="fstat-no" title="function not covered" >  saveEditorProject: (p</span>rojectData) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('save-editor-project', projectData),</span>
+<span class="fstat-no" title="function not covered" >  loadEditorProject: (p</span>rojectId) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('load-editor-project', projectId),</span>
+<span class="fstat-no" title="function not covered" >  getAllEditorProjects: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('get-all-editor-projects'),</span>
+<span class="fstat-no" title="function not covered" >  getRecentEditorProjects: () =&gt; <span class="cstat-no" title="statement not covered" >i</span>pcRenderer.invoke('get-recent-editor-projects'),</span>
+<span class="fstat-no" title="function not covered" >  deleteEditorProject: (p</span>rojectId) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('delete-editor-project', projectId),</span>
+<span class="fstat-no" title="function not covered" >  renameEditorProject: (p</span>rojectId, newName) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('rename-editor-project', { projectId, newName }),</span>
+<span class="fstat-no" title="function not covered" >  duplicateEditorProject: (p</span>rojectId) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('duplicate-editor-project', projectId),</span>
+<span class="fstat-no" title="function not covered" >  exportEditorProject: (p</span>roject, filePath) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('export-editor-project', { project, filePath }),</span>
+<span class="fstat-no" title="function not covered" >  importEditorProject: (f</span>ilePath) =&gt; <span class="cstat-no" title="statement not covered" >ipcRenderer.invoke('import-editor-project', filePath),</span>
+&nbsp;
+  // ─── DIVERS ──────────────────────────────────────────────────────────────
+  isElectron: true,
+})
+&nbsp;
+// Exposer également via window pour accès direct dans les event handlers
+window.addEventListener(<span class="fstat-no" title="function not covered" >'DOMContentLoaded', () =&gt; {</span>
+  const originalFileDescriptor = <span class="cstat-no" title="statement not covered" >Object.getOwnPropertyDescriptor(File.prototype, 'path')</span>
+<span class="cstat-no" title="statement not covered" >  if (!originalFileDescriptor) {</span>
+<span class="cstat-no" title="statement not covered" >    console.warn('File.path non disponible nativement — drop limité')</span>
+  }
+})</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-10-01T13:23:17.802Z
+            </div>
+        <script src="../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
+    </body>
+</html>
+    

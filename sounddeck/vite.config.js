@@ -3,7 +3,6 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-// ─── CSP DEV (avec HMR + eval) ──────────────────────────────────────────
 const CSP_DEV = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' sounddeck-local: blob:",
@@ -18,7 +17,6 @@ const CSP_DEV = [
   "form-action 'self'",
 ].join('; ')
 
-// ─── CSP PROD (stricte) ─────────────────────────────────────────────────
 const CSP_PROD = [
   "default-src 'self'",
   "script-src 'self' 'wasm-unsafe-eval' sounddeck-local: blob:",
@@ -33,7 +31,6 @@ const CSP_PROD = [
   "form-action 'self'",
 ].join('; ')
 
-// ─── Plugin Vite : injecte la CSP selon le mode ─────────────────────────
 function cspPlugin() {
   return {
     name: 'sounddeck-csp',
@@ -49,47 +46,69 @@ function cspPlugin() {
   }
 }
 
+// vite.config.js
+// ... (CSP + cspPlugin inchangés)
+
+const SHARED_ALIASES = {
+  '@': path.resolve(__dirname, './src'),
+  '@core': path.resolve(__dirname, './src/core'),
+  '@shared': path.resolve(__dirname, './src/shared'),
+  '@features': path.resolve(__dirname, './src/features'),
+  '@plugins': path.resolve(__dirname, './src/plugins'),
+}
+
 export default defineConfig({
   plugins: [
-    react({
-      include: /\.(js|jsx|ts|tsx)$/,
-    }),
+    react({ include: /\.(js|jsx|ts|tsx)$/ }),
     cspPlugin(),
   ],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-      '@core': path.resolve(__dirname, './src/core'),
-      '@shared': path.resolve(__dirname, './src/shared'),
-      '@features': path.resolve(__dirname, './src/features'),
-      '@plugins': path.resolve(__dirname, './src/plugins'),
-    },
-  },
+  resolve: { alias: SHARED_ALIASES },
   base: './',
-  build: {
-    outDir: 'dist',
-    assetsDir: 'assets',
-  },
-  server: {
-    port: 5173,
-    strictPort: true,
-  },
+  build: { outDir: 'dist', assetsDir: 'assets' },
+  server: { port: 5173, strictPort: true },
   test: {
     globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.js'],
-    // ✅ ÉLARGI : inclut tous les tests dans src/ + electron/
-    include: [
-      'src/test/**/*.{test,spec}.{js,jsx}',
-      'src/**/*.{test,spec}.{js,jsx}',
-      'electron/**/*.{test,spec}.js',
-    ],
-    exclude: [
-      'node_modules/',
-      'dist/',
-      'dist-electron/',
-      'dist-plugins/',
-      'src/test/_obsolete/**',
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'frontend',
+          environment: 'jsdom',
+          setupFiles: ['./src/test/setup.js'],
+          include: [
+            'src/test/**/*.{test,spec}.{js,jsx}',
+            'src/**/*.{test,spec}.{js,jsx}',
+          ],
+          exclude: [
+            'node_modules/',
+            'dist/',
+            'dist-electron/',
+            'dist-plugins/',
+            'src/test/_obsolete/**',
+          ],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'electron',
+          environment: 'node',
+          setupFiles: ['./src/test/setup-electron.js'],
+          include: ['electron/**/*.{test,spec}.js'],
+          exclude: [
+            'node_modules/',
+            'dist/',
+            'dist-electron/',
+            'electron/__test-mocks__/**',
+          ],
+          // ✅ Garder UNIQUEMENT les modules tests inline (pour transformation)
+          server: {
+            deps: {
+              inline: [/electron[\\/]modules[\\/]/],
+            },
+          },
+        },
+      },
     ],
     coverage: {
       provider: 'v8',
@@ -102,15 +121,8 @@ export default defineConfig({
         '**/*.config.js',
         '**/index.js',
         '**/index.jsx',
+        'electron/__test-mocks__/**',
       ],
-      // ⚠️ Thresholds volontairement désactivés pour le moment.
-      // À activer progressivement après la Phase 1 (~30% de couverture).
-      // thresholds: {
-      //   lines: 30,
-      //   functions: 30,
-      //   branches: 30,
-      //   statements: 30,
-      // },
     },
   },
 })
