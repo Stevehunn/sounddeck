@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">9.09% </span>
+                <span class="strong">72.72% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>1/11</span>
+                <span class='fraction'>8/11</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/6</span>
+                <span class='fraction'>3/6</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">12.5% </span>
+                <span class="strong">75% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>1/8</span>
+                <span class='fraction'>6/8</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line medium'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -125,7 +125,7 @@
 <a name='L60'></a><a href='#L60'>60</a>
 <a name='L61'></a><a href='#L61'>61</a>
 <a name='L62'></a><a href='#L62'>62</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -142,14 +142,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -186,7 +186,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// src/features/stats/tutorialSteps.js
-export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS = (t</span>) =&gt; <span class="cstat-no" title="statement not covered" >[</span>
+export const TUTORIAL_STEPS = (t) =&gt; [
   {
     id: 'stats-1',
     title: t('tutorialStatsStep1Title'),
@@ -202,15 +202,15 @@ export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS
     title: t('tutorialStatsStep2Title'),
     description: t('tutorialStatsStep2Desc'),
     icon: '📈',
-<span class="fstat-no" title="function not covered" >    target: () =&gt; {</span>
-      const cards = <span class="cstat-no" title="statement not covered" >document.querySelectorAll('[data-testid="stat-card"]');</span>
-<span class="cstat-no" title="statement not covered" >      if (cards.length &gt; 0) <span class="cstat-no" title="statement not covered" >return cards[0];</span></span>
-      const grid = <span class="cstat-no" title="statement not covered" >document.querySelector('.stats-grid');</span>
-<span class="cstat-no" title="statement not covered" >      if (grid) {</span>
+    target: () =&gt; {
+      const cards = document.querySelectorAll('[data-testid="stat-card"]');
+      if (cards.length &gt; 0) return cards[0];
+      const grid = document.querySelector('.stats-grid');
+      <span class="missing-if-branch" title="if path not taken" >I</span>if (grid) {
         const firstChild = <span class="cstat-no" title="statement not covered" >grid.querySelector('div, [class*="stat"]');</span>
 <span class="cstat-no" title="statement not covered" >        if (firstChild) <span class="cstat-no" title="statement not covered" >return firstChild;</span></span>
       }
-<span class="cstat-no" title="statement not covered" >      return null;</span>
+      return null;
     },
     fallbackTarget: '.stats-grid, .stat-cards',
     hint: t('tutorialStatsStep2Hint'),
@@ -253,7 +253,7 @@ export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-01T19:42:37.290Z
+                at 2026-10-02T11:07:27.301Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>
