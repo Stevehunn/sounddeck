@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">55.17% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/29</span>
+                <span class='fraction'>16/29</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">38.88% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/18</span>
+                <span class='fraction'>7/18</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/1</span>
+                <span class='fraction'>1/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">51.85% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/27</span>
+                <span class='fraction'>14/27</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line medium'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -137,41 +137,41 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -201,29 +201,29 @@ import { logWarn, logError } from '@shared/utils/logger'
  * En DEV : essaie plusieurs chemins Vite.
  * En PROD : utilise le chemin fourni par le main process.
  */
-export async function <span class="fstat-no" title="function not covered" >loadPluginComponent(p</span>luginManager, pageId) {
-<span class="cstat-no" title="statement not covered" >  if (pluginManager.components.has(pageId)) {</span>
-<span class="cstat-no" title="statement not covered" >    return pluginManager.components.get(pageId)</span>
+export async function loadPluginComponent(pluginManager, pageId) {
+  if (pluginManager.components.has(pageId)) {
+    return pluginManager.components.get(pageId)
   }
 &nbsp;
-  const page = <span class="cstat-no" title="statement not covered" >pluginManager.pages.get(pageId)</span>
-<span class="cstat-no" title="statement not covered" >  if (!page) <span class="cstat-no" title="statement not covered" >return null</span></span>
+  const page = pluginManager.pages.get(pageId)
+  if (!page) return null
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  try {</span>
-<span class="cstat-no" title="statement not covered" >    if (import.meta.env.DEV) {</span>
-      const plugin = <span class="cstat-no" title="statement not covered" >pluginManager.plugins.get(page.pluginId)</span>
-<span class="cstat-no" title="statement not covered" >      if (!plugin) <span class="cstat-no" title="statement not covered" >return null</span></span>
+  try {
+    <span class="missing-if-branch" title="else path not taken" >E</span>if (import.meta.env.DEV) {
+      const plugin = pluginManager.plugins.get(page.pluginId)
+      if (!plugin) return null
 &nbsp;
-      const paths = <span class="cstat-no" title="statement not covered" >[</span>
+      const paths = [
         `../../plugins/${page.pluginId}/${page.componentPath}`,
         `../../plugins/${page.pluginId}/pages/${page.id}`,
         `../../plugins/${page.pluginId}/${page.id}`,
         `../../plugins/${page.pluginId}/components/${page.id}`,
       ]
 &nbsp;
-<span class="cstat-no" title="statement not covered" >      for (const importPath of paths) {</span>
-<span class="cstat-no" title="statement not covered" >        try {</span>
-          const mod = <span class="cstat-no" title="statement not covered" >await import(/* @vite-ignore */ importPath)</span>
+      for (const importPath of paths) {
+        try {
+          const mod = await import(/* @vite-ignore */ importPath)
 <span class="cstat-no" title="statement not covered" >          if (mod) {</span>
             const Component = <span class="cstat-no" title="statement not covered" >mod.default || mod</span>
 <span class="cstat-no" title="statement not covered" >            pluginManager.components.set(pageId, Component)</span>
@@ -233,10 +233,10 @@ export async function <span class="fstat-no" title="function not covered" >loadP
           // Essayer le chemin suivant
         }
       }
-<span class="cstat-no" title="statement not covered" >      logWarn('PluginManager', `Composant non trouvé pour la page ${pageId}`, {</span>
+      logWarn('PluginManager', `Composant non trouvé pour la page ${pageId}`, {
         paths,
       })
-<span class="cstat-no" title="statement not covered" >      return null</span>
+      return null
     }
 &nbsp;
     const pluginPath = <span class="cstat-no" title="statement not covered" >await window.electronAPI?.getPluginComponentPath?.(</span>
@@ -265,7 +265,7 @@ export default { loadPluginComponent }</pre></td></tr></table></pre>
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-02T11:07:27.301Z
+                at 2026-10-02T14:30:48.295Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>
