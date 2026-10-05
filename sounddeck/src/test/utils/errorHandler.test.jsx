@@ -616,35 +616,32 @@ describe("errorHandler", () => {
         expect.any(Array),
       );
 
-      // ✅ Flush les microtasks résiduelles
+      // Flush les microtasks résiduelles
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1000);
       });
     });
 
     it("ne devrait écrire qu'une fois pour plusieurs erreurs rapprochées", async () => {
-      // ✅ 1. Vide la queue des timers au cas où un timer serait en vol
-      vi.clearAllTimers();
-
-      // ✅ 2. Re-importe le module DANS le test → state vraiment vierge
-      //       (contourne toute microtask résiduelle de l'ancien module)
-      vi.resetModules();
-      const freshHandler = await import("@shared/utils/errorHandler");
-
-      // ✅ 3. Reset complet du spy (calls + implementations)
-      electronMock.storeSet.mockReset();
-      electronMock.storeSet.mockResolvedValue();
-
-      // ✅ 4. Les 3 erreurs rapprochées
-      freshHandler.handleError(new Error("a"), "test");
-      freshHandler.handleError(new Error("b"), "test");
-      freshHandler.handleError(new Error("c"), "test");
-
+      //  1. Flush du débounce résiduel du test précédent.
+      //    Sans ce flush, le `pendingWrite` du module reste truthy
+      //    (clearAllTimers() détruit le timer mais pas la variable JS).
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(350);
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      electronMock.storeSet.mockClear();
+
+      //  2. Trois erreurs rapprochées (le débounce doit les fusionner)
+      errorHandler.handleError(new Error("err1"), "test");
+      errorHandler.handleError(new Error("err2"), "test");
+      errorHandler.handleError(new Error("err3"), "test");
+
+      // 3. Avance au-delà de 300ms
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
       });
 
-      // Le débounce fait qu'on n'a qu'un seul storeSet pour 3 erreurs rapprochées
+      // 4. Un SEUL storeSet pour les 3 erreurs
       expect(electronMock.storeSet).toHaveBeenCalledTimes(1);
     });
 
