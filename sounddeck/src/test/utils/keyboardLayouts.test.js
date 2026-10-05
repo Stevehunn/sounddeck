@@ -1,3 +1,4 @@
+// src/test/utils/keyboardLayouts.test.js
 import { describe, it, expect } from 'vitest'
 import {
   PHYSICAL_TO_AZERTY,
@@ -8,83 +9,113 @@ import {
 } from '@shared/utils/keyboardLayouts'
 
 describe('PHYSICAL_TO_AZERTY', () => {
-  it('devrait être un objet non vide', () => {
-    expect(Object.keys(PHYSICAL_TO_AZERTY).length).toBeGreaterThan(0)
-  })
-
-  it('devrait mapper Q physique → A affiché', () => {
+  it('mappe les lettres principales', () => {
     expect(PHYSICAL_TO_AZERTY['Q']).toBe('A')
-  })
-
-  it('devrait mapper A physique → Q affiché', () => {
-    expect(PHYSICAL_TO_AZERTY['A']).toBe('Q')
-  })
-
-  it('devrait mapper W physique → Z affiché', () => {
     expect(PHYSICAL_TO_AZERTY['W']).toBe('Z')
+    expect(PHYSICAL_TO_AZERTY['A']).toBe('Q')
+    expect(PHYSICAL_TO_AZERTY['Z']).toBe('W')
+    expect(PHYSICAL_TO_AZERTY['M']).toBe('M') // inchangé
+  })
+
+  it('mappe les chiffres', () => {
+    expect(PHYSICAL_TO_AZERTY['1']).toBe('&')
+    expect(PHYSICAL_TO_AZERTY['2']).toBe('é')
+    expect(PHYSICAL_TO_AZERTY['3']).toBe('"')
+    expect(PHYSICAL_TO_AZERTY['0']).toBe('à')
+  })
+
+  it('mappe la ponctuation', () => {
+    expect(PHYSICAL_TO_AZERTY[';']).toBe('M')
+    expect(PHYSICAL_TO_AZERTY["'"]).toBe('ù')
+    expect(PHYSICAL_TO_AZERTY['/']).toBe('!')
   })
 })
 
 describe('AZERTY_TO_PHYSICAL', () => {
-  it('devrait être un objet non vide', () => {
-    expect(Object.keys(AZERTY_TO_PHYSICAL).length).toBeGreaterThan(0)
-  })
-
-  it('devrait mapper A affiché → Q physique', () => {
+  it('est l\'inverse de PHYSICAL_TO_AZERTY', () => {
     expect(AZERTY_TO_PHYSICAL['A']).toBe('Q')
+    expect(AZERTY_TO_PHYSICAL['Z']).toBe('W')
+    expect(AZERTY_TO_PHYSICAL['Q']).toBe('A')
   })
 
-  it('devrait mapper Z affiché → W physique', () => {
+  it('ne contient QUE les majuscules (les valeurs de PHYSICAL_TO_AZERTY sont uppercase)', () => {
+    // Les valeurs azerty dans PHYSICAL_TO_AZERTY sont 'A', 'Z', 'Q'...
+    // La condition `azerty.match(/[a-z]/)` ne matche jamais → pas de lowercase.
+    expect(AZERTY_TO_PHYSICAL['A']).toBe('Q')
     expect(AZERTY_TO_PHYSICAL['Z']).toBe('W')
+    expect(AZERTY_TO_PHYSICAL['Q']).toBe('A')
+    expect(AZERTY_TO_PHYSICAL['a']).toBeUndefined()
+    expect(AZERTY_TO_PHYSICAL['z']).toBeUndefined()
+  })
+
+  it('retourne undefined pour un caractère inconnu', () => {
+    expect(AZERTY_TO_PHYSICAL['🚀']).toBeUndefined()
+  })
+})
+
+describe('getModifierLabel', () => {
+  it('CommandOrControl → Ctrl', () => {
+    expect(getModifierLabel('CommandOrControl')).toBe('Ctrl')
+  })
+
+  it('Shift → Shift en qwerty', () => {
+    expect(getModifierLabel('Shift', 'qwerty')).toBe('Shift')
+  })
+
+  it('Shift → Maj en azerty', () => {
+    expect(getModifierLabel('Shift', 'azerty')).toBe('Maj')
+  })
+
+  it('Alt → Alt', () => {
+    expect(getModifierLabel('Alt')).toBe('Alt')
+  })
+
+  it('modificateur inconnu retourné tel quel', () => {
+    expect(getModifierLabel('Meta')).toBe('Meta')
+  })
+
+  it('qwerty par défaut', () => {
+    expect(getModifierLabel('Shift')).toBe('Shift')
   })
 })
 
 describe('displayKey', () => {
-  it('devrait convertir Q → A en AZERTY', () => {
-    expect(displayKey('Q', 'azerty')).toBe('A')
-  })
-
-  it('devrait laisser Q inchangé en QWERTY', () => {
+  it('qwerty : retourne la touche telle quelle', () => {
     expect(displayKey('Q', 'qwerty')).toBe('Q')
+    expect(displayKey('A', 'qwerty')).toBe('A')
   })
 
-  it('devrait laisser une touche inconnue inchangée', () => {
+  it('azerty : convertit Q → A', () => {
+    expect(displayKey('Q', 'azerty')).toBe('A')
+    expect(displayKey('A', 'azerty')).toBe('Q')
+    expect(displayKey('W', 'azerty')).toBe('Z')
+  })
+
+  it('azerty : retourne la touche si non mappée', () => {
     expect(displayKey('F1', 'azerty')).toBe('F1')
+    expect(displayKey('Enter', 'azerty')).toBe('Enter')
   })
 
-  it('devrait utiliser QWERTY par défaut', () => {
+  it('qwerty par défaut', () => {
     expect(displayKey('Q')).toBe('Q')
   })
 })
 
 describe('physicalKey', () => {
-  it('devrait convertir A → Q en AZERTY', () => {
-    expect(physicalKey('A', 'azerty')).toBe('Q')
-  })
-
-  it('devrait laisser A inchangé en QWERTY', () => {
+  it('qwerty : retourne la touche telle quelle', () => {
     expect(physicalKey('A', 'qwerty')).toBe('A')
   })
-})
 
-describe('getModifierLabel', () => {
-  it('devrait retourner Ctrl pour CommandOrControl', () => {
-    expect(getModifierLabel('CommandOrControl')).toBe('Ctrl')
+  it('azerty : convertit A → Q', () => {
+    expect(physicalKey('A', 'azerty')).toBe('Q')
+    expect(physicalKey('Z', 'azerty')).toBe('W')
   })
 
-  it('devrait retourner Shift en QWERTY', () => {
-    expect(getModifierLabel('Shift', 'qwerty')).toBe('Shift')
+  it('azerty : retourne la touche si non mappée', () => {
+    expect(physicalKey('Enter', 'azerty')).toBe('Enter')
   })
 
-  it('devrait retourner Maj en AZERTY', () => {
-    expect(getModifierLabel('Shift', 'azerty')).toBe('Maj')
-  })
-
-  it('devrait retourner Alt inchangé', () => {
-    expect(getModifierLabel('Alt')).toBe('Alt')
-  })
-
-  it('devrait retourner un modificateur inconnu inchangé', () => {
-    expect(getModifierLabel('Meta')).toBe('Meta')
+  it('qwerty par défaut', () => {
+    expect(physicalKey('A')).toBe('A')
   })
 })

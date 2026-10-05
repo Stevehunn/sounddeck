@@ -1,197 +1,263 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+// src/test/utils/appStorage.test.js
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// ─── Spy logger pour éviter le bruit ────────────────────────────────────
 vi.mock('@shared/utils/logger', () => ({
   logWarn: vi.fn(),
-  logError: vi.fn(),
   logInfo: vi.fn(),
 }))
 
-describe('appStorage', () => {
-  let electronMock
-  let appStorage
+let storeData
 
-  beforeEach(async () => {
-    // ✅ Reset le cache module → migrationDone repart à false
-    vi.resetModules()
+beforeEach(() => {
+  storeData = {}
+  localStorage.clear()
 
-    electronMock = {
-      storeGet: vi.fn().mockImplementation((key) => {
-        // Skip la migration par défaut
-        if (key === 'sounddeck_appStorage_migrated') return Promise.resolve(true)
-        return Promise.resolve(undefined)
-      }),
-      storeSet: vi.fn().mockResolvedValue(),
-      storeDelete: vi.fn().mockResolvedValue(),
-    }
-    window.electronAPI = electronMock
-
-    // Reset localStorage mock (ne persiste pas entre les tests)
-    localStorage.getItem.mockReset()
-    localStorage.setItem.mockReset()
-    localStorage.removeItem.mockReset()
-    localStorage.getItem.mockReturnValue(null)
-
-    // ✅ Import dynamique APRÈS resetModules
-    appStorage = await import('@shared/utils/appStorage')
+  // Mock localStorage plus complet que dans setup global
+  const lsData = {}
+  Object.defineProperty(window, 'localStorage', {
+    value: {
+      getItem: vi.fn((k) => (k in lsData ? lsData[k] : null)),
+      setItem: vi.fn((k, v) => { lsData[k] = String(v) }),
+      removeItem: vi.fn((k) => { delete lsData[k] }),
+      clear: vi.fn(() => { Object.keys(lsData).forEach((k) => delete lsData[k]) }),
+      key: vi.fn((i) => Object.keys(lsData)[i] ?? null),
+      get length() { return Object.keys(lsData).length },
+      _data: lsData,
+    },
+    writable: true,
+    configurable: true,
   })
 
-  afterEach(() => {
-    vi.clearAllMocks()
+  global.window.electronAPI = {
+    storeGet: vi.fn((key) => Promise.resolve(storeData[key] ?? undefined)),
+    storeSet: vi.fn((key, val) => {
+      storeData[key] = val
+      return Promise.resolve()
+    }),
+    storeDelete: vi.fn((key) => {
+      delete storeData[key]
+      return Promise.resolve()
+    }),
+  }
+})
+
+// Reset module à chaque test pour repartir d'un état propre
+// (car appStorage a un `migrationDone` module-level)
+const freshImport = async () => {
+  vi.resetModules()
+  return await import('@shared/utils/appStorage')
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// getItem / setItem / removeItem
+// ═══════════════════════════════════════════════════════════════════════
+describe('appStorage > getItem', () => {
+  it('retourne la valeur du store si présente', async () => {
+    storeData['appStorage.lang'] = 'fr'
+    const { getItem } = await freshImport()
+    const v = await getItem('lang')
+    expect(v).toBe('fr')
   })
 
-  // ─── getItem ─────────────────────────────────────────────────────────
-
-  describe('getItem', () => {
-    it('devrait retourner la valeur du store si elle existe', async () => {
-      electronMock.storeGet.mockImplementation((key) => {
-        if (key === 'appStorage.myKey') return Promise.resolve('stored-value')
-        if (key === 'sounddeck_appStorage_migrated') return Promise.resolve(true)
-        return Promise.resolve(undefined)
-      })
-
-      const result = await appStorage.getItem('myKey')
-
-      expect(result).toBe('stored-value')
-      expect(electronMock.storeGet).toHaveBeenCalledWith('appStorage.myKey')
-    })
-
-    it('devrait préfixer la clé avec "appStorage."', async () => {
-      await appStorage.getItem('userTheme')
-      expect(electronMock.storeGet).toHaveBeenCalledWith('appStorage.userTheme')
-    })
-
-    it('devrait retourner null si ni store ni localStorage', async () => {
-      const result = await appStorage.getItem('missing')
-      expect(result).toBeNull()
-    })
-
-    it('devrait migrer depuis localStorage si store vide', async () => {
-      electronMock.storeGet.mockImplementation((key) => {
-        if (key === 'appStorage.legacyKey') return Promise.resolve(undefined)
-        if (key === 'sounddeck_appStorage_migrated') return Promise.resolve(true)
-        return Promise.resolve(undefined)
-      })
-      localStorage.getItem.mockImplementation((k) =>
-        k === 'legacyKey' ? 'legacy-value' : null
-      )
-
-      const result = await appStorage.getItem('legacyKey')
-
-      expect(result).toBe('legacy-value')
-      expect(electronMock.storeSet).toHaveBeenCalledWith(
-        'appStorage.legacyKey',
-        'legacy-value'
-      )
-      expect(localStorage.removeItem).toHaveBeenCalledWith('legacyKey')
-    })
-
-    it('devrait gérer une erreur storeGet sans planter', async () => {
-      electronMock.storeGet.mockRejectedValue(new Error('store error'))
-
-      const result = await appStorage.getItem('key')
-      expect(result).toBeNull()
-    })
+  it('retourne null si absent', async () => {
+    const { getItem } = await freshImport()
+    expect(await getItem('unknown')).toBeNull()
   })
 
-  // ─── setItem ─────────────────────────────────────────────────────────
-
-  describe('setItem', () => {
-    it('devrait stringifier les objets', async () => {
-      await appStorage.setItem('obj', { a: 1, b: 'test' })
-
-      expect(electronMock.storeSet).toHaveBeenCalledWith(
-        'appStorage.obj',
-        '{"a":1,"b":"test"}'
-      )
-    })
-
-    it('devrait convertir les nombres en string', async () => {
-      await appStorage.setItem('num', 42)
-      expect(electronMock.storeSet).toHaveBeenCalledWith('appStorage.num', '42')
-    })
-
-    it('devrait convertir les booleans en string', async () => {
-      await appStorage.setItem('bool', true)
-      expect(electronMock.storeSet).toHaveBeenCalledWith('appStorage.bool', 'true')
-    })
-
-    it('devrait garder les strings tel quel', async () => {
-      await appStorage.setItem('str', 'hello')
-      expect(electronMock.storeSet).toHaveBeenCalledWith('appStorage.str', 'hello')
-    })
-
-    it('devrait gérer null (stocké tel quel)', async () => {
-      await appStorage.setItem('nil', null)
-      expect(electronMock.storeSet).toHaveBeenCalledWith('appStorage.nil', null)
-    })
+  it('préfixe la clé avec "appStorage."', async () => {
+    const { getItem } = await freshImport()
+    await getItem('myKey')
+    expect(window.electronAPI.storeGet).toHaveBeenCalledWith('appStorage.myKey')
   })
 
-  // ─── removeItem ──────────────────────────────────────────────────────
+  it('migre depuis localStorage si store vide', async () => {
+    localStorage.setItem('myKey', 'legacy-value')
+    const { getItem } = await freshImport()
+    const v = await getItem('myKey')
+    expect(v).toBe('legacy-value')
+    expect(window.electronAPI.storeSet).toHaveBeenCalledWith(
+      'appStorage.myKey',
+      'legacy-value'
+    )
+  })
+})
 
-  describe('removeItem', () => {
-    it('devrait appeler storeDelete + localStorage.removeItem', async () => {
-      await appStorage.removeItem('myKey')
-
-      expect(electronMock.storeDelete).toHaveBeenCalledWith('appStorage.myKey')
-      expect(localStorage.removeItem).toHaveBeenCalledWith('myKey')
-    })
+describe('appStorage > setItem', () => {
+  it('stocke une string telle quelle', async () => {
+    const { setItem } = await freshImport()
+    await setItem('foo', 'bar')
+    expect(storeData['appStorage.foo']).toBe('bar')
   })
 
-  // ─── getBoolean ──────────────────────────────────────────────────────
-
-  describe('getBoolean', () => {
-    it('devrait retourner true pour la string "true"', async () => {
-      electronMock.storeGet.mockImplementation((key) => {
-        if (key === 'appStorage.b') return Promise.resolve('true')
-        return Promise.resolve(true)
-      })
-      expect(await appStorage.getBoolean('b')).toBe(true)
-    })
-
-    it('devrait retourner false pour la string "false"', async () => {
-      electronMock.storeGet.mockImplementation((key) => {
-        if (key === 'appStorage.b') return Promise.resolve('false')
-        return Promise.resolve(true)
-      })
-      expect(await appStorage.getBoolean('b')).toBe(false)
-    })
-
-    it('devrait retourner la valeur par défaut si absent', async () => {
-      expect(await appStorage.getBoolean('missing', true)).toBe(true)
-      expect(await appStorage.getBoolean('missing', false)).toBe(false)
-    })
-
-    it('devrait retourner la valeur boolean brute si elle est déjà boolean', async () => {
-      electronMock.storeGet.mockImplementation((key) => {
-        if (key === 'appStorage.b') return Promise.resolve(true)
-        return Promise.resolve(true)
-      })
-      expect(await appStorage.getBoolean('b')).toBe(true)
-    })
+  it('stringify les objets', async () => {
+    const { setItem } = await freshImport()
+    await setItem('obj', { a: 1 })
+    expect(storeData['appStorage.obj']).toBe('{"a":1}')
   })
 
-  // ─── getNumber ───────────────────────────────────────────────────────
+  it('stringify les nombres', async () => {
+    const { setItem } = await freshImport()
+    await setItem('num', 42)
+    expect(storeData['appStorage.num']).toBe('42')
+  })
 
-  describe('getNumber', () => {
-    it('devrait retourner un nombre valide', async () => {
-      electronMock.storeGet.mockImplementation((key) => {
-        if (key === 'appStorage.n') return Promise.resolve('42')
-        return Promise.resolve(true)
-      })
-      expect(await appStorage.getNumber('n')).toBe(42)
-    })
+  it('stringify les booléens', async () => {
+    const { setItem } = await freshImport()
+    await setItem('flag', true)
+    expect(storeData['appStorage.flag']).toBe('true')
+  })
 
-    it('devrait retourner la valeur par défaut si absent', async () => {
-      expect(await appStorage.getNumber('missing', 10)).toBe(10)
-    })
+  it('gère les objets cycliques (fallback String)', async () => {
+    const cyclic = { a: 1 }
+    cyclic.self = cyclic
+    const { setItem } = await freshImport()
+    await setItem('cyclic', cyclic)
+    expect(storeData['appStorage.cyclic']).toBeDefined()
+  })
+})
 
-    it('devrait retourner la valeur par défaut pour NaN', async () => {
-      electronMock.storeGet.mockImplementation((key) => {
-        if (key === 'appStorage.n') return Promise.resolve('not-a-number')
-        return Promise.resolve(true)
-      })
-      expect(await appStorage.getNumber('n', 5)).toBe(5)
+describe('appStorage > removeItem', () => {
+  it('supprime du store', async () => {
+    storeData['appStorage.x'] = 'val'
+    const { removeItem } = await freshImport()
+    await removeItem('x')
+    expect(storeData['appStorage.x']).toBeUndefined()
+  })
+
+  it('supprime aussi du localStorage', async () => {
+    localStorage.setItem('x', 'legacy')
+    const { removeItem } = await freshImport()
+    await removeItem('x')
+    expect(localStorage.getItem('x')).toBeNull()
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════
+// getBoolean / getNumber
+// ═══════════════════════════════════════════════════════════════════════
+describe('appStorage > getBoolean', () => {
+  it('retourne true si valeur "true"', async () => {
+    storeData['appStorage.flag'] = 'true'
+    const { getBoolean } = await freshImport()
+    expect(await getBoolean('flag')).toBe(true)
+  })
+
+  it('retourne false si valeur "false"', async () => {
+    storeData['appStorage.flag'] = 'false'
+    const { getBoolean } = await freshImport()
+    expect(await getBoolean('flag')).toBe(false)
+  })
+
+  it('retourne le booléen brut si déjà bool', async () => {
+    storeData['appStorage.flag'] = true
+    const { getBoolean } = await freshImport()
+    expect(await getBoolean('flag')).toBe(true)
+  })
+
+  it('retourne defaultValue si absent', async () => {
+    const { getBoolean } = await freshImport()
+    expect(await getBoolean('missing', true)).toBe(true)
+    expect(await getBoolean('missing')).toBe(false)
+  })
+})
+
+describe('appStorage > getNumber', () => {
+  it('retourne un nombre parsé', async () => {
+    storeData['appStorage.count'] = '42'
+    const { getNumber } = await freshImport()
+    expect(await getNumber('count')).toBe(42)
+  })
+
+  it('retourne defaultValue si non-fini', async () => {
+    storeData['appStorage.bad'] = 'not-a-number'
+    const { getNumber } = await freshImport()
+    expect(await getNumber('bad', 99)).toBe(99)
+  })
+
+  it('retourne defaultValue si absent', async () => {
+    const { getNumber } = await freshImport()
+    expect(await getNumber('missing', 5)).toBe(5)
+  })
+
+  it('retourne 0 par défaut', async () => {
+    const { getNumber } = await freshImport()
+    expect(await getNumber('missing')).toBe(0)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════
+// Migration localStorage
+// ═══════════════════════════════════════════════════════════════════════
+describe('appStorage > Migration', () => {
+  it('ne migre pas si flag déjà présent', async () => {
+    storeData['sounddeck_appStorage_migrated'] = true
+    localStorage.setItem('sounddeck-old', 'val')
+    const { getItem } = await freshImport()
+    await getItem('any')
+    // L'ancienne clé n'a PAS été supprimée
+    expect(localStorage.getItem('sounddeck-old')).toBe('val')
+  })
+
+  it('migre les clés sounddeck* en une fois', async () => {
+    localStorage.setItem('sounddeck-tutorial-home-done', 'true')
+    localStorage.setItem('sounddeck-error-logs', '[1,2]')
+    const { getItem } = await freshImport()
+    await getItem('any')
+
+    expect(storeData['sounddeck_appStorage_migrated']).toBe(true)
+    expect(window.electronAPI.storeSet).toHaveBeenCalledWith(
+      'appStorage.sounddeck-tutorial-home-done',
+      'true'
+    )
+  })
+
+  it('migre autoTheme et myinstants_selected_categories', async () => {
+    localStorage.setItem('autoTheme', 'dark')
+    localStorage.setItem('myinstants_selected_categories', '[1,2]')
+    const { getItem } = await freshImport()
+    await getItem('any')
+
+    expect(storeData['appStorage.autoTheme']).toBe('dark')
+    expect(storeData['appStorage.myinstants_selected_categories']).toBe('[1,2]')
+  })
+
+  it('ignore les autres clés localStorage', async () => {
+    localStorage.setItem('unrelated_key', 'val')
+    const { getItem } = await freshImport()
+    await getItem('any')
+    // unrelated_key n'a PAS été migré
+    expect(storeData['appStorage.unrelated_key']).toBeUndefined()
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════
+// Robustesse
+// ═══════════════════════════════════════════════════════════════════════
+describe('appStorage > Robustesse', () => {
+  it('getItem retourne null si storeGet throw', async () => {
+    window.electronAPI.storeGet.mockRejectedValueOnce(new Error('boom'))
+    const { getItem } = await freshImport()
+    expect(await getItem('x')).toBeNull()
+  })
+
+  it('setItem ne crash pas si storeSet throw', async () => {
+    window.electronAPI.storeSet.mockRejectedValueOnce(new Error('boom'))
+    const { setItem } = await freshImport()
+    await expect(setItem('x', 'val')).resolves.toBeUndefined()
+  })
+
+  it('removeItem ne crash pas si storeDelete throw', async () => {
+    window.electronAPI.storeDelete.mockRejectedValueOnce(new Error('boom'))
+    const { removeItem } = await freshImport()
+    await expect(removeItem('x')).resolves.toBeUndefined()
+  })
+
+  it('getItem ne crash pas si localStorage.getItem throw', async () => {
+    window.electronAPI.storeGet.mockResolvedValueOnce(undefined)
+    localStorage.getItem.mockImplementationOnce(() => {
+      throw new Error('quota')
     })
+    const { getItem } = await freshImport()
+    await expect(getItem('x')).resolves.toBeNull()
   })
 })

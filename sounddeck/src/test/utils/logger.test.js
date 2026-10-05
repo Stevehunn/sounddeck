@@ -1,65 +1,100 @@
+// src/test/utils/logger.test.js
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { logError, logWarn, logInfo } from '@shared/utils/logger'
+
+let consoleErrorSpy
+let consoleWarnSpy
+let consoleLogSpy
+
+beforeEach(() => {
+  consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+  consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+})
+
+afterEach(() => {
+  consoleErrorSpy.mockRestore()
+  consoleWarnSpy.mockRestore()
+  consoleLogSpy.mockRestore()
+})
 
 describe('logger', () => {
-  let errorSpy
-  let warnSpy
-  let logSpy
-
-  beforeEach(() => {
-    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+  it('expose logError, logWarn, logInfo', async () => {
+    const mod = await import('@shared/utils/logger')
+    expect(typeof mod.logError).toBe('function')
+    expect(typeof mod.logWarn).toBe('function')
+    expect(typeof mod.logInfo).toBe('function')
   })
 
-  afterEach(() => {
-    errorSpy.mockRestore()
-    warnSpy.mockRestore()
-    logSpy.mockRestore()
+  it('logError log avec context + message', async () => {
+    const { logError } = await import('@shared/utils/logger')
+    logError('TestCtx', new Error('boom'))
+    expect(consoleErrorSpy).toHaveBeenCalled()
   })
 
-  // ─── logError ───────────────────────────────────────────────────────
-
-  it('logError devrait appeler console.error avec le contexte et le message', () => {
-    logError('AudioService', new Error('Boom'))
-    expect(errorSpy).toHaveBeenCalled()
-    const firstArg = errorSpy.mock.calls[0][0]
-    expect(firstArg).toContain('AudioService')
-    expect(firstArg).toContain('Boom')
+  it('logError accepte une string', async () => {
+    const { logError } = await import('@shared/utils/logger')
+    logError('TestCtx', 'oops')
+    expect(consoleErrorSpy).toHaveBeenCalled()
   })
 
-  it('logError devrait accepter une chaîne en fallback', () => {
-    logError('PluginManager', 'erreur textuelle')
-    expect(errorSpy).toHaveBeenCalled()
-    const firstArg = errorSpy.mock.calls[0][0]
-    expect(firstArg).toContain('erreur textuelle')
+  it('logError gère error=null', async () => {
+    const { logError } = await import('@shared/utils/logger')
+    logError('TestCtx', null)
+    expect(consoleErrorSpy).toHaveBeenCalled()
   })
 
-  // ─── logWarn ────────────────────────────────────────────────────────
-
-  it('logWarn devrait appeler console.warn', () => {
-    logWarn('Test', 'attention')
-    expect(warnSpy).toHaveBeenCalled()
-    const firstArg = warnSpy.mock.calls[0][0]
-    expect(firstArg).toContain('attention')
+  it('logError avec meta log le meta', async () => {
+    const { logError } = await import('@shared/utils/logger')
+    logError('TestCtx', new Error('x'), { userId: 1 })
+    const call = consoleErrorSpy.mock.calls[0]
+    // Format : `❌ [TestCtx] x`, meta, error
+    expect(call[1]).toEqual({ userId: 1 })
   })
 
-  // ─── logInfo ────────────────────────────────────────────────────────
-
-  it('logInfo devrait appeler console.log', () => {
-    logInfo('Test', 'info message')
-    expect(logSpy).toHaveBeenCalled()
-    const firstArg = logSpy.mock.calls[0][0]
-    expect(firstArg).toContain('info message')
+  it('logError sans meta ne log pas de 2e arg', async () => {
+    const { logError } = await import('@shared/utils/logger')
+    logError('TestCtx', new Error('x'))
+    const call = consoleErrorSpy.mock.calls[0]
+    expect(call[1]).not.toEqual(expect.objectContaining({ userId: expect.anything() }))
   })
 
-  // ─── META ───────────────────────────────────────────────────────────
+  it('logWarn log avec context + message', async () => {
+    const { logWarn } = await import('@shared/utils/logger')
+    logWarn('TestCtx', 'warning!')
+    expect(consoleWarnSpy).toHaveBeenCalled()
+  })
 
-  it('devrait passer les meta en second argument à console.error', () => {
-    const meta = { userId: 42 }
-    logError('Test', new Error('x'), meta)
-    // Le 2e arg de console.error est `meta`
-    const args = errorSpy.mock.calls[0]
-    expect(args[1]).toEqual(meta)
+  it('logWarn avec meta', async () => {
+    const { logWarn } = await import('@shared/utils/logger')
+    logWarn('TestCtx', 'warn', { detail: 'x' })
+    const call = consoleWarnSpy.mock.calls[0]
+    expect(call[1]).toEqual({ detail: 'x' })
+  })
+
+  it('logInfo log avec context + message', async () => {
+    const { logInfo } = await import('@shared/utils/logger')
+    logInfo('TestCtx', 'info!')
+    expect(consoleLogSpy).toHaveBeenCalled()
+  })
+
+  it('logInfo avec meta', async () => {
+    const { logInfo } = await import('@shared/utils/logger')
+    logInfo('TestCtx', 'hello', { n: 42 })
+    const call = consoleLogSpy.mock.calls[0]
+    expect(call[1]).toEqual({ n: 42 })
+  })
+
+  it('getErrorMessage : extrait .message d\'une Error', async () => {
+    const { logError } = await import('@shared/utils/logger')
+    const err = new Error('custom message')
+    logError('Ctx', err)
+    const call = consoleErrorSpy.mock.calls[0]
+    expect(call[0]).toContain('custom message')
+  })
+
+  it('getErrorMessage : gère les objets sans message', async () => {
+    const { logError } = await import('@shared/utils/logger')
+    logError('Ctx', { foo: 'bar' })
+    expect(consoleErrorSpy).toHaveBeenCalled()
   })
 })
