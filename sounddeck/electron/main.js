@@ -15,18 +15,15 @@ const {
   registerProjectHandlers,
 } = require('./modules')
 
+const { registerSoundPopupHandlers } = require('./modules/soundPopupManager')
+
 const store = require('./store')
 
 // ─── CONFIGURATION DES WEBHOOKS FEEDBACK ──────────────────────────────
-// Charge les webhooks depuis :
-//   1. Variables d'environnement (SOUNDDECK_FEEDBACK_*)
-//   2. Fichier electron/feedback-config.js (bundlé au build)
-// Ne remplace JAMAIS une valeur déjà définie dans le store utilisateur.
 function initFeedbackWebhooks() {
   try {
     let fileConfig = {}
     try {
-      // Fichier optionnel — peut ne pas exister
       // eslint-disable-next-line global-require
       fileConfig = require('./feedback-config')
     } catch (e) {
@@ -151,6 +148,8 @@ function registerAllHandlers() {
       updateTrayMenu()
     })
   }
+
+  registerSoundPopupHandlers(ipcMain, { getMainWindow: () => mainWindow })
 }
 
 // ─── CRÉATION DE LA FENÊTRE ─────────────────────────────────────────────

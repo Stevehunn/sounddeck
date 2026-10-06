@@ -104,6 +104,13 @@ function findFirstPlaylistItem() {
   return null;
 }
 
+// ✅ NOUVEAU : cible de l'étape 8 (popup sonore)
+function findSoundPopupConfigButton() {
+  const btn = document.querySelector('[data-testid="sound-popup-config-button"]');
+  if (btn && btn.offsetParent !== null) return btn;
+  return null;
+}
+
 export const TUTORIAL_STEPS = (t) => [
   {
     id: 'sequencer-step1',
@@ -171,5 +178,14 @@ export const TUTORIAL_STEPS = (t) => [
       return document.querySelector('.btn-danger:has(.ti-player-stop)');
     },
     fallbackTarget: '.sequencer-item:first-child, .btn-danger',
+  },
+  {
+    id: 'sequencer-step8',
+    icon: '🔔',
+    title: t('tutorialSequencerStep8Title'),
+    description: t('tutorialSequencerStep8Desc'),
+    hint: t('tutorialSequencerStep8Hint'),
+    target: findSoundPopupConfigButton,
+    fallbackTarget: '[data-testid="sound-popup-config-button"]',
   },
 ];

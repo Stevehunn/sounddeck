@@ -9,6 +9,9 @@ export default function SequencerSidebar({
   onCreatePlaylist,
   onSelectPlaylist,
   onDeletePlaylist,
+  soundPopupEnabled,
+  onToggleSoundPopup,
+  onOpenSoundPopupConfig,
 }) {
   const { t } = useLanguage()
   const [showNewPlaylist, setShowNewPlaylist] = useState(false)
@@ -153,12 +156,8 @@ export default function SequencerSidebar({
               onClick={() => onSelectPlaylist(pl.id)}
               className={`sidebar-item ${isActive ? 'active' : ''}`}
               style={{
-                borderLeft: `2px solid ${
-                  isActive ? 'var(--accent)' : 'transparent'
-                }`,
-                backgroundColor: isActive
-                  ? 'var(--accent-light)'
-                  : 'transparent',
+                borderLeft: `2px solid ${isActive ? 'var(--accent)' : 'transparent'}`,
+                backgroundColor: isActive ? 'var(--accent-light)' : 'transparent',
                 color: isActive ? 'var(--accent)' : undefined,
               }}
               data-testid={`playlist-item-${pl.id}`}
@@ -201,6 +200,99 @@ export default function SequencerSidebar({
             </div>
           )
         })}
+      </div>
+
+      {/* ─── SECTION POPUP SONORE ───────────────────────────────────────── */}
+      <div
+        style={{
+          borderTop: '1px solid var(--border)',
+          padding: '10px 12px',
+          flexShrink: 0,
+          background: 'var(--bg-secondary)',
+        }}
+      >
+        <div
+          style={{
+            fontSize: 10,
+            color: 'var(--text-tertiary)',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+            marginBottom: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+        >
+          <i className="ti ti-bell" style={{ fontSize: 12 }} />
+          {t('soundPopupEnabled')}
+        </div>
+
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={onToggleSoundPopup}
+            data-testid="sound-popup-toggle-button"
+            aria-pressed={soundPopupEnabled}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '6px 10px',
+              borderRadius: 'var(--radius-md)',
+              border: `1px solid ${soundPopupEnabled ? 'var(--accent)' : 'var(--border)'}`,
+              background: soundPopupEnabled ? 'var(--accent-light)' : 'var(--bg-tertiary)',
+              color: soundPopupEnabled ? 'var(--accent)' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              fontSize: 11,
+              fontWeight: 500,
+              transition: 'all 0.15s ease',
+              minHeight: 30,
+            }}
+            title={soundPopupEnabled ? t('disable') : t('enable')}
+          >
+            <span>{soundPopupEnabled ? t('on') : t('off')}</span>
+            <div
+              className={`toggle ${soundPopupEnabled ? 'active' : ''}`}
+              style={{ width: 28, height: 16, borderRadius: 8, flexShrink: 0 }}
+            >
+              <div
+                className="knob"
+                style={{
+                  width: 12,
+                  height: 12,
+                  top: 1,
+                  left: soundPopupEnabled ? 13 : 2,
+                }}
+              />
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenSoundPopupConfig}
+            data-testid="sound-popup-config-button"
+            title={t('soundPopupConfigure')}
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-tertiary)',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 14,
+              transition: 'all 0.15s ease',
+              flexShrink: 0,
+              padding: 0,
+            }}
+          >
+            <i className="ti ti-settings" />
+          </button>
+        </div>
       </div>
     </div>
   )

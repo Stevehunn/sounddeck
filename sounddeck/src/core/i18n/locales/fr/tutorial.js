@@ -15,39 +15,39 @@ export default {
   tutorialHomeStep1Title: 'Jouer un son',
   tutorialHomeStep1Desc: 'Cliquez sur une carte pour lancer le son. Une barre de progression s\'affiche pour suivre la lecture.',
   tutorialHomeStep1Hint: '💡 Astuce : Vous pouvez aussi utiliser les raccourcis clavier si vous en avez défini.',
-  
+
   tutorialHomeStep2Title: 'Ajouter un son',
   tutorialHomeStep2Desc: 'Cliquez sur le bouton "Ajouter un son" en haut de la page pour importer un fichier audio.',
   tutorialHomeStep2Hint: '💡 Astuce : Les formats supportés sont MP3, WAV, OGG, FLAC, M4A et AAC.',
-  
+
   tutorialHomeStep3Title: 'Ajouter aux favoris',
   tutorialHomeStep3Desc: 'Cliquez sur l\'étoile ⭐ en haut à gauche de chaque carte pour ajouter le son à vos favoris. Les favoris apparaissent en haut de la page.',
   tutorialHomeStep3Hint: '💡 Astuce : Les favoris sont spécifiques à chaque profil.',
-  
+
   tutorialHomeStep4Title: 'Menu contextuel - options',
   tutorialHomeStep4Desc: 'Vous y trouverez toutes les options pour gérer votre son : renommer, régler le volume, changer l\'image ou l\'emoji, et supprimer le son.',
   tutorialHomeStep4Hint: '💡 Astuce : Ce menu est disponible sur chaque carte son. Cliquez sur les trois points pour l\'ouvrir.',
-  
+
   tutorialHomeStep5Title: 'Gérer vos profils',
   tutorialHomeStep5Desc: 'La section "Profils" dans la sidebar contient "Tous les sons", vos profils personnalisés et le bouton "+" pour en créer de nouveaux.',
   tutorialHomeStep5Hint: '💡 Astuce : Chaque profil a ses propres sons et favoris. Changez de profil pour organiser vos sons par thème.',
-  
+
   tutorialHomeStep6Title: 'Créer un nouveau profil',
   tutorialHomeStep6Desc: 'Cliquez sur le bouton "+" en bas de la section "Profils" pour créer un nouveau profil. Donnez-lui un nom et commencez à y ajouter des sons.',
   tutorialHomeStep6Hint: '💡 Astuce : Les profils vous permettent d\'organiser vos sons par thème : Gaming, Musique, Mèmes, etc.',
-  
+
   tutorialHomeStep7Title: 'Ajouter un son depuis "Autres sons"',
   tutorialHomeStep7Desc: 'La section "Autres sons" en bas de la page affiche les sons qui ne sont pas dans votre profil actuel. Cliquez sur le bouton "Ajouter" sur une carte pour l\'intégrer à votre profil.',
   tutorialHomeStep7Hint: '💡 Astuce : C\'est un moyen rapide d\'ajouter des sons existants à votre profil sans les réimporter.',
-  
+
   tutorialHomeStep8Title: 'Ajouter un tag',
   tutorialHomeStep8Desc: 'Sur chaque carte son, cliquez sur "+ Tag" pour ajouter un tag. Les tags vous permettent de catégoriser et de rechercher vos sons plus facilement.',
   tutorialHomeStep8Hint: '💡 Astuce : Utilisez des tags comme #meme, #gaming, #musique pour organiser vos sons.',
-  
+
   tutorialHomeStep9Title: 'Recherche et tri des sons',
   tutorialHomeStep9Desc: 'Utilisez la barre de recherche pour filtrer vos sons par nom ou tag. Le menu déroulant "Trier par" vous permet d\'organiser l\'affichage.',
   tutorialHomeStep9Hint: '💡 Astuce : Le tri "Personnalisé" vous permet de glisser-déposer les sons dans l\'ordre de votre choix.',
-  
+
   tutorialHomeStep10Title: 'Drag & Drop pour réorganiser',
   tutorialHomeStep10Desc: 'Activez le tri "Personnalisé" puis glissez-déposez les sons pour les réorganiser dans l\'ordre de votre choix.',
   tutorialHomeStep10Hint: '💡 Astuce : Le Drag & Drop fonctionne aussi pour les favoris et entre les sections.',
@@ -101,40 +101,45 @@ export default {
   tutorialSequencerStep1Title: 'Créer une playlist',
   tutorialSequencerStep1Desc: 'Cliquez sur "Nouvelle playlist" pour créer une playlist. Donnez-lui un nom et commencez à y ajouter des sons.',
   tutorialSequencerStep1Hint: '💡 Astuce : Les playlists sont sauvegardées automatiquement.',
-  
+
   tutorialSequencerStep2Title: 'Sélectionner une playlist',
   tutorialSequencerStep2Desc: 'Cliquez sur une playlist dans la sidebar pour l\'ouvrir. Vous verrez son contenu et pourrez y ajouter des sons.',
   tutorialSequencerStep2Hint: '💡 Astuce : Vous pouvez avoir plusieurs playlists pour organiser vos sons par thème.',
-  
+
   tutorialSequencerStep3Title: 'Ajouter des sons à la playlist',
   tutorialSequencerStep3Desc: 'Cliquez sur "Ajouter des sons" pour sélectionner des sons depuis votre bibliothèque. Vous pouvez définir un délai entre chaque son.',
   tutorialSequencerStep3Hint: '💡 Astuce : Glissez-déposez les sons pour les réorganiser dans la playlist.',
-  
+
   tutorialSequencerStep4Title: 'Réorganiser les sons (Drag & Drop)',
   tutorialSequencerStep4Desc: 'Glissez-déposez les sons dans la playlist pour les réorganiser. Utilisez la poignée ☰ pour déplacer un son.',
   tutorialSequencerStep4Hint: '💡 Astuce : Le Drag & Drop fonctionne dans toute la playlist.',
-  
+
   tutorialSequencerStep5Title: 'Activer la boucle',
   tutorialSequencerStep5Desc: 'Cliquez sur le bouton "Loop" pour répéter la playlist en continu. La boucle est utile pour les sessions de jeu ou les streams.',
   tutorialSequencerStep5Hint: '💡 Astuce : Le bouton devient vert lorsque la boucle est active.',
-  
+
   tutorialSequencerStep6Title: 'Lancer la séquence',
   tutorialSequencerStep6Desc: 'Appuyez sur le bouton "Play" pour lancer la séquence. Les sons seront joués dans l\'ordre avec les délais définis.',
   tutorialSequencerStep6Hint: '💡 Astuce : Utilisez les touches ← et → pour naviguer manuellement.',
-  
+
   tutorialSequencerStep7Title: 'Navigation avec les touches ← et →',
   tutorialSequencerStep7Desc: 'Pendant la lecture, utilisez les touches fléchées ← et → pour passer au son précédent ou suivant. Pratique pour contrôler la séquence sans souris.',
   tutorialSequencerStep7Hint: '💡 Astuce : Appuyez sur Espace pour mettre en pause/reprendre la séquence.',
+
+  // ─── SEQUENCER — POPUP SONORE ───────────────────────────────────────
+  tutorialSequencerStep8Title: 'Configurer la popup sonore',
+  tutorialSequencerStep8Desc: 'Activez ou désactivez la popup, et choisissez sa position à l\'écran. La popup affiche l\'image du son, son nom, sa durée et des boutons de contrôle (précédent, pause, suivant).',
+  tutorialSequencerStep8Hint: '💡 Astuce : Cliquez sur l\'un des 8 emplacements autour de l\'écran pour définir la position. Valider la position réactive la popup.',
 
   // ─── DISCOVER ────────────────────────────────────────────────────────
   tutorialDiscoverStep1Title: 'Explorer les catégories',
   tutorialDiscoverStep1Desc: 'La barre des catégories vous permet de naviguer parmi des milliers de sons organisés par thème.',
   tutorialDiscoverStep1Hint: '💡 Astuce : Vous pouvez personnaliser les catégories affichées via le bouton "Personnaliser".',
-  
+
   tutorialDiscoverStep2Title: 'Rechercher des sons',
   tutorialDiscoverStep2Desc: 'Utilisez la barre de recherche pour trouver un son spécifique par nom ou mot-clé.',
   tutorialDiscoverStep2Hint: '💡 Astuce : La recherche est instantanée, pas besoin d\'appuyer sur Entrée !',
-  
+
   tutorialDiscoverStep3Title: 'Ajouter un son à votre bibliothèque',
   tutorialDiscoverStep3Desc: 'Cliquez sur "Ajouter" sur un son pour l\'importer dans votre bibliothèque. Vous pouvez choisir le profil de destination.',
   tutorialDiscoverStep3Hint: '💡 Astuce : Les sons déjà dans votre bibliothèque sont marqués "Ajouté" en vert.',
@@ -251,11 +256,11 @@ export default {
   tutorialYoutubeStep1Title: 'Coller un lien YouTube',
   tutorialYoutubeStep1Desc: 'Collez l\'URL d\'une vidéo YouTube pour importer son audio dans SoundDeck.',
   tutorialYoutubeStep1Hint: '💡 Astuce : Fonctionne aussi avec YouTube Music et d\'autres plateformes.',
-  
+
   tutorialYoutubeStep2Title: 'Sélectionner une portion',
   tutorialYoutubeStep2Desc: 'Choisissez la portion de la vidéo à importer en ajustant les curseurs de début et de fin.',
   tutorialYoutubeStep2Hint: '💡 Astuce : Vous pouvez écouter la sélection avant de télécharger.',
-  
+
   tutorialYoutubeStep3Title: 'Télécharger et configurer',
   tutorialYoutubeStep3Desc: 'Téléchargez l\'audio, puis configurez le nom, l\'image et les profils avant de l\'ajouter à votre bibliothèque.',
   tutorialYoutubeStep3Hint: '💡 Astuce : Vous pouvez ajouter une image personnalisée ou laisser l\'emoji par défaut.',
@@ -280,4 +285,4 @@ export default {
   tutorialEmojiPageStep5Title: 'Découvrir plus d\'emojis',
   tutorialEmojiPageStep5Desc: 'Cliquez sur "Ajouter plus d\'emojis" pour ouvrir la page Découvrir et enrichir votre collection par catégorie entière.',
   tutorialEmojiPageStep5Hint: '💡 Astuce : Vous pouvez ajouter 30 emojis d\'un seul clic depuis la page Découvrir.',
-};
+}

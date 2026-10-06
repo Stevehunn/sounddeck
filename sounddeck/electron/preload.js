@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath),
   writeDroppedFile: (fileName, arrayBuffer) => ipcRenderer.invoke('write-dropped-file', fileName, arrayBuffer),
 
-  // ✅ Export JSON générique (logs d'erreur, backups, etc.)
+  // Export JSON générique (logs d'erreur, backups, etc.)
   exportJsonFile: (json, defaultName, title) =>
     ipcRenderer.invoke('export-json-file', json, defaultName, title),
 
@@ -27,7 +27,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ─── MYINSTANTS ──────────────────────────────────────────────────────────
   fetchMyinstants: (query, mode, lang) => ipcRenderer.invoke('fetch-myinstants', query, mode, lang),
 
-  // ✅ NOUVEAU : Emoji Discovery (getemoji.com)
+  // Emoji Discovery (getemoji.com)
   fetchEmojis: (categoryId) => ipcRenderer.invoke('fetch-emojis', categoryId),
 
   // ─── RACCOURCIS ──────────────────────────────────────────────────────────
@@ -52,6 +52,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onHideQuitConfirm: (cb) => ipcRenderer.on('hide-quit-confirm', () => cb()),
   onShowWindow: (cb) => ipcRenderer.on('show-window', () => cb()),
   removeAllListeners: (ch) => ipcRenderer.removeAllListeners(ch),
+
+  // ─── POPUP SONORE (fenêtre séparée) ──────────────────────────────────────
+  soundPopup: {
+    show: (payload) => ipcRenderer.invoke('sound-popup:show', payload),
+    hide: () => ipcRenderer.invoke('sound-popup:hide'),
+    setEnabled: (enabled) => ipcRenderer.invoke('sound-popup:set-enabled', enabled),
+    setPosition: (position) => ipcRenderer.invoke('sound-popup:set-position', position),
+    setSize: (size) => ipcRenderer.invoke('sound-popup:set-size', size),
+    preview: (payload) => ipcRenderer.invoke('sound-popup:preview', payload),
+    onAction: (cb) => {
+      const listener = (_e, action) => cb(action)
+      ipcRenderer.on('sound-popup:action', listener)
+      return () => ipcRenderer.removeListener('sound-popup:action', listener)
+    },
+  },
 
   // ─── TRAY ────────────────────────────────────────────────────────────────
   updateTrayLanguage: (lang) => ipcRenderer.invoke('update-tray-language', lang),

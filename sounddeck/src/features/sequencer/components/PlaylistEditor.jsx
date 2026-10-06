@@ -13,6 +13,7 @@ export default function PlaylistEditor({
   sounds,
   audioDevice,
   volume,
+  cardSize = 'medium',
   onSaveItems,
   addToast,
 }) {
@@ -39,6 +40,7 @@ export default function PlaylistEditor({
     audioDevice,
     volume,
     loopPlaylist,
+    cardSize,
   })
 
   const saveItemsOnly = async (updatedItems) => {

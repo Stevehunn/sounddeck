@@ -73,4 +73,18 @@ export default {
   playlists: 'Listas de reproducción',
   deletePlaylist: 'Eliminar lista de reproducción',
   deletePlaylistConfirm: '¿Realmente quieres eliminar esta lista de reproducción?',
+
+  // ─── POPUP DE SONIDO ────────────────────────────────────────────────
+  soundPopupEnabled: 'Popup de sonido',
+  soundPopupEnabledDesc: 'Mostrar una ventana cuando empieza un sonido',
+  soundPopupPosition: 'Posición del popup',
+  soundPopupPositionDesc: 'Elige dónde aparece el popup en la pantalla. Haz clic en una de las 8 posiciones alrededor de la pantalla.',
+  soundPopupPreview: 'Vista previa',
+  soundPopupConfigure: 'Configurar popup',
+  soundPopupPositionSaved: 'Posición del popup actualizada',
+  soundPopupEnabledToast: 'Popup de sonido activado',
+  soundPopupDisabledToast: 'Popup de sonido desactivado',
+  soundPopupUsesCardSize: 'El popup usa el tamaño de tarjeta:',
+  enable: 'Activar',
+  disable: 'Desactivar',
 }

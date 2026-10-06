@@ -10,6 +10,7 @@ import {
   registerExternalPlayback,
   unregisterExternalPlayback,
 } from '@core/services/AudioService'
+import { showSoundPopup, onSoundPopupAction } from '@core/services/SoundPopupService'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 
 export function useSequencePlayer({
@@ -19,30 +20,35 @@ export function useSequencePlayer({
   audioDevice,
   volume,
   loopPlaylist,
+  cardSize = 'medium',
 }) {
   const [playing, setPlaying] = useState(false)
   const [currentIdx, setCurrentIdx] = useState(-1)
   const [currentProgress, setCurrentProgress] = useState(null)
+  const [paused, setPaused] = useState(false)
 
   const sequenceRef = useRef(null)
   const howlRef = useRef(null)
   const playingRef = useRef(false)
   const currentIdxRef = useRef(-1)
+  const pausedRef = useRef(false)
 
   const loopPlaylistRef = useRef(loopPlaylist)
   useEffect(() => {
     loopPlaylistRef.current = loopPlaylist
   }, [loopPlaylist])
 
+  // Taille des cartes (pour la popup)
+  const cardSizeRef = useRef(cardSize)
+  useEffect(() => {
+    cardSizeRef.current = cardSize || 'medium'
+  }, [cardSize])
+
   const lastRegisteredSoundIdRef = useRef(null)
 
-  useEffect(() => {
-    playingRef.current = playing
-  }, [playing])
-
-  useEffect(() => {
-    currentIdxRef.current = currentIdx
-  }, [currentIdx])
+  useEffect(() => { playingRef.current = playing }, [playing])
+  useEffect(() => { currentIdxRef.current = currentIdx }, [currentIdx])
+  useEffect(() => { pausedRef.current = paused }, [paused])
 
   const cleanupExternalPlayback = useCallback(() => {
     if (lastRegisteredSoundIdRef.current) {
@@ -61,23 +67,26 @@ export function useSequencePlayer({
     if (!item) return
 
     const interval = setInterval(() => {
-      if (howlRef.current && howlRef.current.playing()) {
-        const seek = howlRef.current.seek()
-        const duration = howlRef.current.duration()
-        if (
-          typeof seek === 'number' &&
-          typeof duration === 'number' &&
-          duration > 0
-        ) {
-          setCurrentProgress({
-            current: seek,
-            duration,
-            ratio: Math.min(1, seek / duration),
-          })
-          setCurrentPlayingProgress(item.soundId, seek, duration)
-        }
-      } else {
+      const howl = howlRef.current
+      if (!howl) return
+      const isPlaying = howl.playing()
+      if (!isPlaying && !pausedRef.current) {
         setCurrentProgress(null)
+        return
+      }
+      const seek = howl.seek()
+      const duration = howl.duration()
+      if (
+        typeof seek === 'number' &&
+        typeof duration === 'number' &&
+        duration > 0
+      ) {
+        setCurrentProgress({
+          current: seek,
+          duration,
+          ratio: Math.min(1, seek / duration),
+        })
+        setCurrentPlayingProgress(item.soundId, seek, duration)
       }
     }, 100)
 
@@ -88,6 +97,7 @@ export function useSequencePlayer({
   const playFrom = useCallback(
     async (idx) => {
       cleanupExternalPlayback()
+      setPaused(false)
 
       if (idx >= items.length) {
         if (loopPlaylistRef.current) {
@@ -128,6 +138,18 @@ export function useSequencePlayer({
         src: [fileUrl],
         volume: volumeRatio,
         html5: false,
+        onload: () => {
+          const dur = howlRef.current?.duration?.() ?? 0
+          showSoundPopup({
+            name: sound.name,
+            emoji: sound.emoji,
+            image: sound.image,
+            duration: dur,
+            index: idx,
+            total: itemsRef.current.length,
+            cardSize: cardSizeRef.current,
+          })
+        },
         onend: () => {
           const delay = item.delay || 0
           sequenceRef.current = setTimeout(() => {
@@ -135,16 +157,17 @@ export function useSequencePlayer({
           }, delay * 1000)
         },
       })
+
       const soundId = item.soundId
       registerExternalPlayback(soundId, {
         isPaused: () => {
           if (!howlRef.current) return false
-
           return !howlRef.current.playing()
         },
         pause: () => {
           if (howlRef.current && howlRef.current.playing()) {
             howlRef.current.pause()
+            setPaused(true)
             return true
           }
           return false
@@ -152,6 +175,7 @@ export function useSequencePlayer({
         resume: () => {
           if (howlRef.current) {
             howlRef.current.play()
+            setPaused(false)
             return true
           }
           return false
@@ -176,6 +200,7 @@ export function useSequencePlayer({
 
     setPlaying(false)
     setCurrentIdx(-1)
+    setPaused(false)
     playingRef.current = false
     if (sequenceRef.current) {
       clearTimeout(sequenceRef.current)
@@ -188,6 +213,25 @@ export function useSequencePlayer({
     }
     setCurrentPlayingSound(null)
   }, [cleanupExternalPlayback])
+
+  const pause = useCallback(() => {
+    if (howlRef.current && howlRef.current.playing()) {
+      howlRef.current.pause()
+      setPaused(true)
+    }
+  }, [])
+
+  const resume = useCallback(() => {
+    if (howlRef.current && pausedRef.current) {
+      howlRef.current.play()
+      setPaused(false)
+    }
+  }, [])
+
+  const togglePause = useCallback(() => {
+    if (pausedRef.current) resume()
+    else pause()
+  }, [pause, resume])
 
   const goNext = useCallback(() => {
     if (sequenceRef.current) {
@@ -235,9 +279,30 @@ export function useSequencePlayer({
         e.preventDefault()
         goPrev()
       }
+      if (e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault()
+        if (pausedRef.current) resume()
+        else pause()
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
+  }, [goNext, goPrev, pause, resume])
+
+  // ─── ACTIONS POPUP (prev / next / pause) ─────────────────────────────
+  const togglePauseRef = useRef(null)
+  useEffect(() => {
+    togglePauseRef.current = togglePause
+  }, [togglePause])
+
+  useEffect(() => {
+    const off = onSoundPopupAction((action) => {
+      if (!playingRef.current) return
+      if (action === 'prev') goPrev()
+      else if (action === 'next') goNext()
+      else if (action === 'pause') togglePauseRef.current?.()
+    })
+    return () => { if (typeof off === 'function') off() }
   }, [goNext, goPrev])
 
   // ─── REGISTER STOP CALLBACK ──────────────────────────────────────────
@@ -251,10 +316,14 @@ export function useSequencePlayer({
 
   return {
     playing,
+    paused,
     currentIdx,
     currentProgress,
     start,
     stop,
+    pause,
+    resume,
+    togglePause,
     goNext,
     goPrev,
   }

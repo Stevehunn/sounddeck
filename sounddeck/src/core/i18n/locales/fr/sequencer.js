@@ -8,7 +8,7 @@ export default {
   sequencerPlay: 'Jouer la séquence',
   sequencerStop: 'Arrêter',
   sequencerClear: 'Vider la séquence',
-  
+
   // ─── ITEMS ───────────────────────────────────────────────────────────
   sequencerItemDelay: 'Délai (s)',
   sequencerItemRemove: 'Retirer de la séquence',
@@ -16,7 +16,7 @@ export default {
   sequencerItemMoveDown: 'Descendre',
   sequencerItemVolume: 'Volume',
   sequencerItemPlaying: 'Lecture en cours...',
-  
+
   // ─── CONTROLES ──────────────────────────────────────────────────────
   sequencerLoop: 'Répéter la séquence',
   sequencerShuffle: 'Lecture aléatoire',
@@ -24,19 +24,19 @@ export default {
   sequencerProgress: 'Progression',
   sequencerTimeRemaining: 'Temps restant',
   sequencerTotalDuration: 'Durée totale',
-  
+
   // ─── LISTE ──────────────────────────────────────────────────────────
   sequencerEmpty: 'La séquence est vide',
   sequencerEmptyHint: 'Ajoutez des sons depuis la bibliothèque',
   sequencerItemCount: '{count} son(s) dans la séquence',
   sequencerTotalItems: '{count} éléments',
-  
+
   // ─── LECTURE ──────────────────────────────────────────────────────────
   sequencerPlayingItem: 'Lecture du son {index}/{total}',
   sequencerNextIn: 'Prochain son dans {time}s',
   sequencerComplete: 'Séquence terminée',
   sequencerCompleteLoop: 'Nouveau cycle de lecture',
-  
+
   // ─── IMPORTER/EXPORTER ──────────────────────────────────────────────
   sequencerImport: 'Importer une séquence',
   sequencerExport: 'Exporter la séquence',
@@ -45,14 +45,14 @@ export default {
   sequencerImportError: 'Erreur lors de l\'import de la séquence',
   sequencerExportError: 'Erreur lors de l\'export de la séquence',
   unknownSound: 'Son inconnu',
-  
+
   // ─── STATUT ──────────────────────────────────────────────────────────
   sequencerStatusReady: 'Prêt',
   sequencerStatusPlaying: 'Lecture en cours',
   sequencerStatusPaused: 'En pause',
   sequencerStatusStopped: 'Arrêté',
   sequencerStatusError: 'Erreur',
-  
+
   // ─── PLAYLISTS ──────────────────────────────────────────────────────
   noPlaylist: 'Aucune playlist',
   newPlaylist: 'Nouvelle playlist',
@@ -73,4 +73,18 @@ export default {
   playlists: 'Playlists',
   deletePlaylist: 'Supprimer la playlist',
   deletePlaylistConfirm: 'Voulez-vous vraiment supprimer cette playlist ?',
+
+  // ─── POPUP SONORE ───────────────────────────────────────────────────
+  soundPopupEnabled: 'Popup sonore',
+  soundPopupEnabledDesc: 'Afficher une popup quand un son se lance',
+  soundPopupPosition: 'Position de la popup',
+  soundPopupPositionDesc: 'Choisissez où la popup apparaît à l\'écran. Cliquez sur l\'un des 8 emplacements autour de l\'écran.',
+  soundPopupPreview: 'Aperçu',
+  soundPopupConfigure: 'Configurer la popup',
+  soundPopupPositionSaved: 'Position de la popup mise à jour',
+  soundPopupEnabledToast: 'Popup sonore activée',
+  soundPopupDisabledToast: 'Popup sonore désactivée',
+  soundPopupUsesCardSize: 'La popup utilise la taille de carte :',
+  enable: 'Activer',
+  disable: 'Désactiver',
 }

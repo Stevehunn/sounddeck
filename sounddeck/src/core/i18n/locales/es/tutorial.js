@@ -126,6 +126,10 @@ export default {
   tutorialSequencerStep7Desc: 'Durante la reproducción, usa las teclas de flecha ← y → para ir al sonido anterior o siguiente. Práctico para controlar la secuencia sin ratón.',
   tutorialSequencerStep7Hint: '💡 Consejo: Pulsa Espacio para pausar/reanudar la secuencia.',
 
+  tutorialSequencerStep8Title: 'Configurar el popup de sonido',
+  tutorialSequencerStep8Desc: 'Activa o desactiva el popup, y elige su posición en pantalla. El popup muestra la imagen del sonido, su nombre, duración y botones de control (anterior, pausa, siguiente).',
+  tutorialSequencerStep8Hint: '💡 Consejo: Haz clic en una de las 8 posiciones alrededor de la pantalla para definir la ubicación. Validar la posición reactiva el popup.',
+
   // ─── DISCOVER ────────────────────────────────────────────────────────
   tutorialDiscoverStep1Title: 'Explorar categorías',
   tutorialDiscoverStep1Desc: 'La barra de categorías te permite navegar por miles de sonidos organizados por tema.',
