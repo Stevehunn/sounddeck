@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">14.28% </span>
+                <span class="strong">85.71% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>1/7</span>
+                <span class='fraction'>6/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">52.77% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/36</span>
+                <span class='fraction'>19/36</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/3</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">20% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>1/5</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -152,19 +152,19 @@
 <a name='L87'></a><a href='#L87'>87</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -237,30 +237,30 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// src/features/emoji/tutorialSteps.js
 &nbsp;
-function <span class="fstat-no" title="function not covered" >findFirstCustomEmoji() {</span>
-  const el = <span class="cstat-no" title="statement not covered" >document.querySelector('[data-testid^="emoji-page-item-"]')</span>
-<span class="cstat-no" title="statement not covered" >  if (el &amp;&amp; el.offsetParent !== null) <span class="cstat-no" title="statement not covered" >return el</span></span>
-<span class="cstat-no" title="statement not covered" >  return null</span>
+function findFirstCustomEmoji() {
+  const el = document.querySelector('[data-testid^="emoji-page-item-"]')
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (el &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >el.offsetParent !== null) <span class="cstat-no" title="statement not covered" >r</span>eturn el</span>
+  return null
 }
 &nbsp;
-function <span class="fstat-no" title="function not covered" >findCustomSection() {</span>
-<span class="cstat-no" title="statement not covered" >  return (</span>
+function findCustomSection() {
+  return (
     document.querySelector('[data-testid="emoji-page-custom-section"]') ||
     document.querySelector('[data-testid="emoji-page-empty-state"]')
   )
 }
 &nbsp;
-export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS = (t</span>) =&gt; <span class="cstat-no" title="statement not covered" >[</span>
+export const TUTORIAL_STEPS = (t) =&gt; [
   {
     id: 'emoji-page-1',
     icon: '😀',
-    title: t('tutorialEmojiPageStep1Title') || 'Votre bibliothèque d\'emojis',
+    title: t('tutorialEmojiPageStep1Title') || <span class="branch-1 cbranch-no" title="branch not covered" >'Votre bibliothèque d\'emojis',</span>
     description:
       t('tutorialEmojiPageStep1Desc') ||
-      'Cette page regroupe tous vos emojis : ceux par défaut, ceux que vous avez ajoutés manuellement, et ceux téléchargés depuis la page Découvrir.',
+<span class="branch-1 cbranch-no" title="branch not covered" >      'Cette page regroupe tous vos emojis : ceux par défaut, ceux que vous avez ajoutés manuellement, et ceux téléchargés depuis la page Découvrir.',</span>
     hint:
       t('tutorialEmojiPageStep1Hint') ||
-      '💡 Astuce : Les emojis par défaut sont toujours disponibles dans le picker.',
+<span class="branch-1 cbranch-no" title="branch not covered" >      '💡 Astuce : Les emojis par défaut sont toujours disponibles dans le picker.',</span>
     target: '[data-testid="emoji-page-container"]',
     fallbackTarget: '.main-content',
     position: 'bottom',
@@ -268,13 +268,13 @@ export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS
   {
     id: 'emoji-page-2',
     icon: '⭐',
-    title: t('tutorialEmojiPageStep2Title') || 'Vos emojis ajoutés',
+    title: t('tutorialEmojiPageStep2Title') || <span class="branch-1 cbranch-no" title="branch not covered" >'Vos emojis ajoutés',</span>
     description:
       t('tutorialEmojiPageStep2Desc') ||
-      'Cette section affiche uniquement les emojis que vous avez ajoutés. Ils sont groupés par catégorie d\'origine.',
+<span class="branch-1 cbranch-no" title="branch not covered" >      'Cette section affiche uniquement les emojis que vous avez ajoutés. Ils sont groupés par catégorie d\'origine.',</span>
     hint:
       t('tutorialEmojiPageStep2Hint') ||
-      '💡 Astuce : Les emojis sans catégorie apparaissent dans "Sans catégorie".',
+<span class="branch-1 cbranch-no" title="branch not covered" >      '💡 Astuce : Les emojis sans catégorie apparaissent dans "Sans catégorie".',</span>
     target: findCustomSection,
     fallbackTarget: '[data-testid="emoji-page-custom-section"]',
     position: 'bottom',
@@ -282,13 +282,13 @@ export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS
   {
     id: 'emoji-page-3',
     icon: '🗑️',
-    title: t('tutorialEmojiPageStep3Title') || 'Retirer un emoji',
+    title: t('tutorialEmojiPageStep3Title') || <span class="branch-1 cbranch-no" title="branch not covered" >'Retirer un emoji',</span>
     description:
       t('tutorialEmojiPageStep3Desc') ||
-      'Survolez un emoji ajouté pour voir le bouton ×. Cliquez dessus pour le retirer de votre collection. Les emojis par défaut ne peuvent pas être retirés.',
+<span class="branch-1 cbranch-no" title="branch not covered" >      'Survolez un emoji ajouté pour voir le bouton ×. Cliquez dessus pour le retirer de votre collection. Les emojis par défaut ne peuvent pas être retirés.',</span>
     hint:
       t('tutorialEmojiPageStep3Hint') ||
-      '💡 Astuce : Utilisez le bouton "Retirer la catégorie" pour en supprimer plusieurs d\'un coup.',
+<span class="branch-1 cbranch-no" title="branch not covered" >      '💡 Astuce : Utilisez le bouton "Retirer la catégorie" pour en supprimer plusieurs d\'un coup.',</span>
     target: findFirstCustomEmoji,
     fallbackTarget: '[data-testid="emoji-page-custom-section"]',
     position: 'bottom',
@@ -296,13 +296,13 @@ export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS
   {
     id: 'emoji-page-4',
     icon: '🔍',
-    title: t('tutorialEmojiPageStep4Title') || 'Rechercher',
+    title: t('tutorialEmojiPageStep4Title') || <span class="branch-1 cbranch-no" title="branch not covered" >'Rechercher',</span>
     description:
       t('tutorialEmojiPageStep4Desc') ||
-      'Utilisez la barre de recherche pour filtrer vos emojis ajoutés.',
+<span class="branch-1 cbranch-no" title="branch not covered" >      'Utilisez la barre de recherche pour filtrer vos emojis ajoutés.',</span>
     hint:
       t('tutorialEmojiPageStep4Hint') ||
-      '💡 Astuce : La recherche porte sur le caractère emoji lui-même.',
+<span class="branch-1 cbranch-no" title="branch not covered" >      '💡 Astuce : La recherche porte sur le caractère emoji lui-même.',</span>
     target: '[data-testid="emoji-page-search"]',
     fallbackTarget: 'input[type="text"]',
     position: 'bottom',
@@ -310,13 +310,13 @@ export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS
   {
     id: 'emoji-page-5',
     icon: '🧭',
-    title: t('tutorialEmojiPageStep5Title') || 'Découvrir plus d\'emojis',
+    title: t('tutorialEmojiPageStep5Title') || <span class="branch-1 cbranch-no" title="branch not covered" >'Découvrir plus d\'emojis',</span>
     description:
       t('tutorialEmojiPageStep5Desc') ||
-      'Cliquez sur "Ajouter plus d\'emojis" pour ouvrir la page Découvrir et enrichir votre collection par catégorie entière.',
+<span class="branch-1 cbranch-no" title="branch not covered" >      'Cliquez sur "Ajouter plus d\'emojis" pour ouvrir la page Découvrir et enrichir votre collection par catégorie entière.',</span>
     hint:
       t('tutorialEmojiPageStep5Hint') ||
-      '💡 Astuce : Vous pouvez ajouter 30 emojis d\'un seul clic depuis la page Découvrir.',
+<span class="branch-1 cbranch-no" title="branch not covered" >      '💡 Astuce : Vous pouvez ajouter 30 emojis d\'un seul clic depuis la page Découvrir.',</span>
     target: '[data-testid="emoji-page-open-discover-button"]',
     fallbackTarget: '.btn-primary',
     position: 'bottom',
@@ -328,7 +328,7 @@ export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-05T23:21:17.500Z
+                at 2026-10-06T10:42:41.767Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

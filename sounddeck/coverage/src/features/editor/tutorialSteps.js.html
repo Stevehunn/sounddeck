@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">2.17% </span>
+                <span class="strong">6.52% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>1/46</span>
+                <span class='fraction'>3/46</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">36.26% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/91</span>
+                <span class='fraction'>33/91</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">6.66% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/15</span>
+                <span class='fraction'>1/15</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">2.7% </span>
+                <span class="strong">8.1% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>1/37</span>
+                <span class='fraction'>3/37</span>
             </div>
         
             
@@ -299,8 +299,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -486,7 +486,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// src/features/editor/tutorialSteps.js
 &nbsp;
 /**
@@ -511,41 +511,41 @@ function <span class="fstat-no" title="function not covered" >refreshTarget(d</s
   }, delay)
 }
 &nbsp;
-export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS = (t</span>) =&gt; {
-  const steps = <span class="cstat-no" title="statement not covered" >[</span>
+export const TUTORIAL_STEPS = (t) =&gt; {
+  const steps = [
     // ─── ÉTAPE 1 : Toolbar ─────────────────────────────────────────────────
     {
       id: 'editor-1',
-      title: t('tutorialEditorStep1Title') || 'La barre d\'outils',
-      description: t('tutorialEditorStep1Desc') || 'En haut se trouve la barre d\'outils. C\'est là que vous gérez vos projets, ajoutez des pistes, importez des fichiers et contrôlez la lecture.',
+      title: t('tutorialEditorStep1Title') || <span class="branch-1 cbranch-no" title="branch not covered" >'La barre d\'outils',</span>
+      description: t('tutorialEditorStep1Desc') || <span class="branch-1 cbranch-no" title="branch not covered" >'En haut se trouve la barre d\'outils. C\'est là que vous gérez vos projets, ajoutez des pistes, importez des fichiers et contrôlez la lecture.',</span>
       icon: '📂',
       target: '[data-testid="editor-toolbar"]',
       fallbackTarget: '[data-testid="editor-container"]',
-      hint: t('tutorialEditorStep1Hint') || '💡 Astuce : Le métronome (🎵) vous aide à garder le tempo.',
+      hint: t('tutorialEditorStep1Hint') || <span class="branch-1 cbranch-no" title="branch not covered" >'💡 Astuce : Le métronome (🎵) vous aide à garder le tempo.',</span>
       position: 'bottom',
     },
 &nbsp;
     // ─── ÉTAPE 2 : Ajouter un son ──────────────────────────────────────────
     {
       id: 'editor-2',
-      title: t('tutorialEditorStep2Title') || 'Ajouter un son à votre projet',
-      description: t('tutorialEditorStep2Desc') || 'Cliquez sur "Ajouter un clip" dans la barre d\'outils pour importer un son depuis votre bibliothèque SoundDeck vers la timeline.',
+      title: t('tutorialEditorStep2Title') || <span class="branch-1 cbranch-no" title="branch not covered" >'Ajouter un son à votre projet',</span>
+      description: t('tutorialEditorStep2Desc') || <span class="branch-1 cbranch-no" title="branch not covered" >'Cliquez sur "Ajouter un clip" dans la barre d\'outils pour importer un son depuis votre bibliothèque SoundDeck vers la timeline.',</span>
       icon: '📥',
       target: '[data-testid="editor-add-clip-button"]',
       fallbackTarget: '[data-testid="editor-toolbar"]',
-      hint: t('tutorialEditorStep2Hint') || '💡 Astuce : Vous pouvez aussi importer un fichier audio externe avec "Importer un fichier".',
+      hint: t('tutorialEditorStep2Hint') || <span class="branch-1 cbranch-no" title="branch not covered" >'💡 Astuce : Vous pouvez aussi importer un fichier audio externe avec "Importer un fichier".',</span>
       position: 'bottom',
     },
 &nbsp;
     // ─── ÉTAPE 3 : Timeline ────────────────────────────────────────────────
     {
       id: 'editor-3',
-      title: t('tutorialEditorStep3Title') || 'La timeline et les pistes',
-      description: t('tutorialEditorStep3Desc') || 'Au centre se trouve la timeline avec vos pistes. Chaque piste contient des clips (sons) que vous pouvez déplacer en les glissant, ou ajuster leur durée en tirant sur les bords.',
+      title: t('tutorialEditorStep3Title') || <span class="branch-1 cbranch-no" title="branch not covered" >'La timeline et les pistes',</span>
+      description: t('tutorialEditorStep3Desc') || <span class="branch-1 cbranch-no" title="branch not covered" >'Au centre se trouve la timeline avec vos pistes. Chaque piste contient des clips (sons) que vous pouvez déplacer en les glissant, ou ajuster leur durée en tirant sur les bords.',</span>
       icon: '📊',
       target: '[data-testid="editor-timeline"]',
       fallbackTarget: '[data-testid="editor-container"]',
-      hint: t('tutorialEditorStep3Hint') || '💡 Astuce : Les pistes vous permettent d\'organiser vos sons par catégorie (batterie, voix, effets...).',
+      hint: t('tutorialEditorStep3Hint') || <span class="branch-1 cbranch-no" title="branch not covered" >'💡 Astuce : Les pistes vous permettent d\'organiser vos sons par catégorie (batterie, voix, effets...).',</span>
       position: 'bottom',
 <span class="fstat-no" title="function not covered" >      onShow: () =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >        if (!hasClips()) {</span>
@@ -557,12 +557,12 @@ export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS
     // ─── ÉTAPE 4 : Menu contextuel ─────────────────────────────────────────
     {
       id: 'editor-4',
-      title: t('tutorialEditorStep4Title') || 'Le menu contextuel du clip',
-      description: t('tutorialEditorStep4Desc') || 'Faites un clic droit sur un clip pour ouvrir un menu contextuel. Vous y trouverez toutes les actions : couper, dupliquer, ajouter des effets, activer la boucle, et bien plus.',
+      title: t('tutorialEditorStep4Title') || <span class="branch-1 cbranch-no" title="branch not covered" >'Le menu contextuel du clip',</span>
+      description: t('tutorialEditorStep4Desc') || <span class="branch-1 cbranch-no" title="branch not covered" >'Faites un clic droit sur un clip pour ouvrir un menu contextuel. Vous y trouverez toutes les actions : couper, dupliquer, ajouter des effets, activer la boucle, et bien plus.',</span>
       icon: '🖱️',
       target: '.clip-actions-menu',
       fallbackTarget: '[data-testid="context-menu"]',
-      hint: t('tutorialEditorStep4Hint') || '💡 Astuce : Le menu contextuel est l\'outil principal pour gérer vos clips.',
+      hint: t('tutorialEditorStep4Hint') || <span class="branch-1 cbranch-no" title="branch not covered" >'💡 Astuce : Le menu contextuel est l\'outil principal pour gérer vos clips.',</span>
       position: 'right',
 <span class="fstat-no" title="function not covered" >      onShow: () =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >        if (!hasClips()) <span class="cstat-no" title="statement not covered" >return</span></span>
@@ -582,12 +582,12 @@ export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS
     // ─── ÉTAPE 5 : Panneau effets ──────────────────────────────────────────
     {
       id: 'editor-5',
-      title: t('tutorialEditorStep5Title') || 'Le panneau des effets',
-      description: t('tutorialEditorStep5Desc') || 'Sous la timeline se trouve le panneau des effets. Il affiche tous les effets appliqués au clip actuellement sélectionné.',
+      title: t('tutorialEditorStep5Title') || <span class="branch-1 cbranch-no" title="branch not covered" >'Le panneau des effets',</span>
+      description: t('tutorialEditorStep5Desc') || <span class="branch-1 cbranch-no" title="branch not covered" >'Sous la timeline se trouve le panneau des effets. Il affiche tous les effets appliqués au clip actuellement sélectionné.',</span>
       icon: '🎛️',
       target: '[data-testid="editor-effects-panel"]',
       fallbackTarget: '[data-testid="editor-toolbar"]',
-      hint: t('tutorialEditorStep5Hint') || '💡 Astuce : Sélectionnez un clip dans la timeline pour voir ses effets.',
+      hint: t('tutorialEditorStep5Hint') || <span class="branch-1 cbranch-no" title="branch not covered" >'💡 Astuce : Sélectionnez un clip dans la timeline pour voir ses effets.',</span>
       position: 'top',
 <span class="fstat-no" title="function not covered" >      onShow: () =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >        if (!hasClips()) <span class="cstat-no" title="statement not covered" >return</span></span>
@@ -601,12 +601,12 @@ export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS
     // ─── ÉTAPE 6 : Ajouter un effet ────────────────────────────────────────
     {
       id: 'editor-6',
-      title: t('tutorialEditorStep6Title') || 'Ajouter et régler un effet',
-      description: t('tutorialEditorStep6Desc') || 'Cliquez sur "Ajouter un effet" pour choisir parmi les effets disponibles (Volume, Fade In/Out, Écho, Réverbération...). Ensuite, réglez les paramètres avec les curseurs.',
+      title: t('tutorialEditorStep6Title') || <span class="branch-1 cbranch-no" title="branch not covered" >'Ajouter et régler un effet',</span>
+      description: t('tutorialEditorStep6Desc') || <span class="branch-1 cbranch-no" title="branch not covered" >'Cliquez sur "Ajouter un effet" pour choisir parmi les effets disponibles (Volume, Fade In/Out, Écho, Réverbération...). Ensuite, réglez les paramètres avec les curseurs.',</span>
       icon: '🔊',
       target: '[data-testid="editor-add-effect-button"]',
       fallbackTarget: '[data-testid="editor-effects-panel"]',
-      hint: t('tutorialEditorStep6Hint') || '💡 Astuce : L\'auto-preview rejoue le clip avec les effets 1 seconde après chaque modification.',
+      hint: t('tutorialEditorStep6Hint') || <span class="branch-1 cbranch-no" title="branch not covered" >'💡 Astuce : L\'auto-preview rejoue le clip avec les effets 1 seconde après chaque modification.',</span>
       position: 'top',
 <span class="fstat-no" title="function not covered" >      onShow: () =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >        if (!hasClips()) <span class="cstat-no" title="statement not covered" >return</span></span>
@@ -620,12 +620,12 @@ export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS
     // ─── ÉTAPE 7 : Panneau des marqueurs ───────────────────────────────────
     {
       id: 'editor-7',
-      title: t('tutorialEditorStep7Title') || 'Le panneau des marqueurs',
-      description: t('tutorialEditorStep7Desc') || 'Le panneau des marqueurs s\'ouvre à droite de la timeline. Il regroupe tous les points de repère de votre projet : intro, refrain, drop, etc. Chaque marqueur peut avoir un nom, une position et une couleur.',
+      title: t('tutorialEditorStep7Title') || <span class="branch-1 cbranch-no" title="branch not covered" >'Le panneau des marqueurs',</span>
+      description: t('tutorialEditorStep7Desc') || <span class="branch-1 cbranch-no" title="branch not covered" >'Le panneau des marqueurs s\'ouvre à droite de la timeline. Il regroupe tous les points de repère de votre projet : intro, refrain, drop, etc. Chaque marqueur peut avoir un nom, une position et une couleur.',</span>
       icon: '🚩',
       target: '[data-testid="editor-markers-panel"]',
       fallbackTarget: '[data-testid="editor-timeline"]',
-      hint: t('tutorialEditorStep7Hint') || '💡 Astuce : Appuyez sur Ctrl+M pour ajouter un marqueur directement à la position du playhead.',
+      hint: t('tutorialEditorStep7Hint') || <span class="branch-1 cbranch-no" title="branch not covered" >'💡 Astuce : Appuyez sur Ctrl+M pour ajouter un marqueur directement à la position du playhead.',</span>
       position: 'left',
 <span class="fstat-no" title="function not covered" >      onShow: () =&gt; {</span>
         // Ouvre automatiquement le panneau si fermé
@@ -643,12 +643,12 @@ export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS
     // ─── ÉTAPE 8 : Ajouter un marqueur ─────────────────────────────────────
     {
       id: 'editor-8',
-      title: t('tutorialEditorStep8Title') || 'Ajouter un marqueur',
-      description: t('tutorialEditorStep8Desc') || 'Cliquez sur "+ Ajouter" en haut du panneau pour créer un nouveau marqueur. Vous pourrez ensuite lui donner un nom, choisir sa position et sélectionner une couleur.',
+      title: t('tutorialEditorStep8Title') || <span class="branch-1 cbranch-no" title="branch not covered" >'Ajouter un marqueur',</span>
+      description: t('tutorialEditorStep8Desc') || <span class="branch-1 cbranch-no" title="branch not covered" >'Cliquez sur "+ Ajouter" en haut du panneau pour créer un nouveau marqueur. Vous pourrez ensuite lui donner un nom, choisir sa position et sélectionner une couleur.',</span>
       icon: '➕',
       target: '[data-testid="editor-markers-add-button"]',
       fallbackTarget: '[data-testid="editor-markers-panel"]',
-      hint: t('tutorialEditorStep8Hint') || '💡 Astuce : Cliquez sur un marqueur pour déplacer le playhead à sa position.',
+      hint: t('tutorialEditorStep8Hint') || <span class="branch-1 cbranch-no" title="branch not covered" >'💡 Astuce : Cliquez sur un marqueur pour déplacer le playhead à sa position.',</span>
       position: 'left',
 <span class="fstat-no" title="function not covered" >      onShow: () =&gt; {</span>
         // S'assurer que le panneau est bien ouvert
@@ -664,41 +664,41 @@ export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS
     // ─── ÉTAPE 9 : Zoom ────────────────────────────────────────────────────
     {
       id: 'editor-9',
-      title: t('tutorialEditorStep9Title') || 'Le zoom de la timeline',
-      description: t('tutorialEditorStep9Desc') || 'Utilisez les contrôles de zoom en bas de l\'écran pour agrandir ou réduire la timeline. Cela vous permet de travailler sur des détails précis ou de voir l\'ensemble de votre projet.',
+      title: t('tutorialEditorStep9Title') || <span class="branch-1 cbranch-no" title="branch not covered" >'Le zoom de la timeline',</span>
+      description: t('tutorialEditorStep9Desc') || <span class="branch-1 cbranch-no" title="branch not covered" >'Utilisez les contrôles de zoom en bas de l\'écran pour agrandir ou réduire la timeline. Cela vous permet de travailler sur des détails précis ou de voir l\'ensemble de votre projet.',</span>
       icon: '🔍',
       target: '[data-testid="editor-zoom-controls"]',
       fallbackTarget: '[data-testid="editor-container"]',
-      hint: t('tutorialEditorStep9Hint') || '💡 Astuce : Utilisez Ctrl+Molette pour zoomer rapidement.',
+      hint: t('tutorialEditorStep9Hint') || <span class="branch-1 cbranch-no" title="branch not covered" >'💡 Astuce : Utilisez Ctrl+Molette pour zoomer rapidement.',</span>
       position: 'top',
     },
 &nbsp;
     // ─── ÉTAPE 10 : Volume maître ──────────────────────────────────────────
     {
       id: 'editor-10',
-      title: t('tutorialEditorStep10Title') || 'Le volume maître',
-      description: t('tutorialEditorStep10Desc') || 'À droite du zoom, vous trouverez le contrôle du volume maître. Il ajuste le niveau sonore global de votre projet. Vous pouvez également le couper avec le bouton à gauche.',
+      title: t('tutorialEditorStep10Title') || <span class="branch-1 cbranch-no" title="branch not covered" >'Le volume maître',</span>
+      description: t('tutorialEditorStep10Desc') || <span class="branch-1 cbranch-no" title="branch not covered" >'À droite du zoom, vous trouverez le contrôle du volume maître. Il ajuste le niveau sonore global de votre projet. Vous pouvez également le couper avec le bouton à gauche.',</span>
       icon: '🔊',
       target: '[data-testid="editor-master-volume"]',
       fallbackTarget: '[data-testid="editor-container"]',
-      hint: t('tutorialEditorStep10Hint') || '💡 Astuce : Le bouton 🔄 réinitialise tous les volumes (maître + pistes) à 100%.',
+      hint: t('tutorialEditorStep10Hint') || <span class="branch-1 cbranch-no" title="branch not covered" >'💡 Astuce : Le bouton 🔄 réinitialise tous les volumes (maître + pistes) à 100%.',</span>
       position: 'top',
     },
 &nbsp;
     // ─── ÉTAPE 11 : Export ─────────────────────────────────────────────────
     {
       id: 'editor-11',
-      title: t('tutorialEditorStep11Title') || 'Exporter votre projet',
-      description: t('tutorialEditorStep11Desc') || 'Une fois votre projet terminé, cliquez sur "Exporter" dans la barre d\'outils pour sauvegarder votre création en MP3, WAV ou l\'ajouter directement à votre bibliothèque.',
+      title: t('tutorialEditorStep11Title') || <span class="branch-1 cbranch-no" title="branch not covered" >'Exporter votre projet',</span>
+      description: t('tutorialEditorStep11Desc') || <span class="branch-1 cbranch-no" title="branch not covered" >'Une fois votre projet terminé, cliquez sur "Exporter" dans la barre d\'outils pour sauvegarder votre création en MP3, WAV ou l\'ajouter directement à votre bibliothèque.',</span>
       icon: '💾',
       target: '[data-testid="editor-export-button"]',
       fallbackTarget: '[data-testid="editor-toolbar"]',
-      hint: t('tutorialEditorStep11Hint') || '💡 Astuce : MP3 pour une taille réduite, WAV pour une qualité sans perte.',
+      hint: t('tutorialEditorStep11Hint') || <span class="branch-1 cbranch-no" title="branch not covered" >'💡 Astuce : MP3 pour une taille réduite, WAV pour une qualité sans perte.',</span>
       position: 'bottom',
     },
   ]
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  return steps</span>
+  return steps
 }</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -706,7 +706,7 @@ export const <span class="fstat-no" title="function not covered" >TUTORIAL_STEPS
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-05T23:21:17.500Z
+                at 2026-10-06T10:42:41.767Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>
