@@ -1,6 +1,4 @@
 // electron/__test-mocks__/electron.cjs
-// Mock CJS de 'electron'. Utilise globalThis.__vitest_vi__ (défini par setup-electron.js).
-
 const vi = globalThis.__vitest_vi__
 
 if (!vi) {
@@ -41,6 +39,21 @@ const app = {
   getLoginItemSettings: vi.fn(() => ({ openAtLogin: false })),
 }
 
+// ─── SCREEN ✅ NOUVEAU ─────────────────────────────────────────────────
+const mockDisplay = {
+  workArea: { x: 0, y: 0, width: 1920, height: 1080 },
+  bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+  id: 1,
+}
+
+const screen = {
+  getPrimaryDisplay: vi.fn(() => mockDisplay),
+  getAllDisplays: vi.fn(() => [mockDisplay]),
+  getDisplayMatching: vi.fn(() => mockDisplay),
+  getDisplayNearestPoint: vi.fn(() => mockDisplay),
+  _mockDisplay: mockDisplay,
+}
+
 // ─── IPC MAIN ──────────────────────────────────────────────────────────
 const ipcMain = {
   handle: vi.fn((channel, handler) => {
@@ -78,6 +91,7 @@ const webContents = {
   once: vi.fn(),
   openDevTools: vi.fn(),
   getURL: vi.fn(() => 'http://localhost:5173'),
+  isLoading: vi.fn(() => false),
   session: { on: vi.fn() },
 }
 
@@ -87,18 +101,26 @@ const mockWindow = {
   on: vi.fn(),
   once: vi.fn(),
   show: vi.fn(),
+  showInactive: vi.fn(),
   hide: vi.fn(),
   focus: vi.fn(),
   minimize: vi.fn(),
   maximize: vi.fn(),
   restore: vi.fn(),
+  destroy: vi.fn(),
+  isDestroyed: vi.fn(() => false),
   isVisible: vi.fn(() => true),
   isMinimized: vi.fn(() => false),
   setContextMenu: vi.fn(),
+  setAlwaysOnTop: vi.fn(),
+  setVisibleOnAllWorkspaces: vi.fn(),
+  setBounds: vi.fn(),
+  setPosition: vi.fn(),
+  setSize: vi.fn(),
+  getBounds: vi.fn(() => ({ x: 0, y: 0, width: 400, height: 100 })),
   webContents,
 }
 
-// ✅ function (pas arrow) → utilisable avec `new BrowserWindow(...)`
 const BrowserWindow = vi.fn(function () {
   return mockWindow
 })
@@ -113,7 +135,6 @@ const mockTray = {
   isDestroyed: vi.fn(() => false),
 }
 
-// ✅ function (pas arrow) → utilisable avec `new Tray(...)`
 const Tray = vi.fn(function () {
   return mockTray
 })
@@ -172,6 +193,7 @@ const ipcRenderer = {
 // ─── EXPORTS CJS ───────────────────────────────────────────────────────
 module.exports = {
   app,
+  screen,                     // ✅ NOUVEAU
   ipcMain,
   globalShortcut,
   BrowserWindow,
@@ -187,8 +209,8 @@ module.exports = {
   _mockWindow: mockWindow,
   _mockWebContents: webContents,
   _mockTray: mockTray,
+  _mockDisplay: mockDisplay,
 }
 
-// Interop ESM
 module.exports.default = module.exports
 module.exports.__esModule = true

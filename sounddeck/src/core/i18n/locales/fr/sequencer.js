@@ -75,7 +75,7 @@ export default {
   deletePlaylistConfirm: 'Voulez-vous vraiment supprimer cette playlist ?',
 
   // ─── POPUP SONORE ───────────────────────────────────────────────────
-  soundPopupEnabled: 'Popup sonore',
+  soundPopupEnabled: 'Notifications',
   soundPopupEnabledDesc: 'Afficher une popup quand un son se lance',
   soundPopupPosition: 'Position de la popup',
   soundPopupPositionDesc: 'Choisissez où la popup apparaît à l\'écran. Cliquez sur l\'un des 8 emplacements autour de l\'écran.',

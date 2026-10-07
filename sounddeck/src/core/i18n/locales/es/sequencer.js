@@ -75,7 +75,7 @@ export default {
   deletePlaylistConfirm: '¿Realmente quieres eliminar esta lista de reproducción?',
 
   // ─── POPUP DE SONIDO ────────────────────────────────────────────────
-  soundPopupEnabled: 'Popup de sonido',
+  soundPopupEnabled: 'Notificaciones',
   soundPopupEnabledDesc: 'Mostrar una ventana cuando empieza un sonido',
   soundPopupPosition: 'Posición del popup',
   soundPopupPositionDesc: 'Elige dónde aparece el popup en la pantalla. Haz clic en una de las 8 posiciones alrededor de la pantalla.',

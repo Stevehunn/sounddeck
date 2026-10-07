@@ -126,6 +126,11 @@ export default {
   tutorialSequencerStep7Desc: 'During playback, use the arrow keys ← and → to go to the previous or next sound. Handy for controlling the sequence without a mouse.',
   tutorialSequencerStep7Hint: '💡 Tip: Press Space to pause/resume the sequence.',
 
+  // ─── SEQUENCER — SOUND POPUP ────────────────────────────────────────
+  tutorialSequencerStep8Title: 'Configure the sound popup',
+  tutorialSequencerStep8Desc: 'Enable or disable the popup, and choose where it appears on screen. The popup shows the sound image, its name, its duration and control buttons (previous, pause, next).',
+  tutorialSequencerStep8Hint: '💡 Tip: Click one of the 8 slots around the screen to set the position. Validating the position re-enables the popup.',
+
   // ─── DISCOVER ────────────────────────────────────────────────────────
   tutorialDiscoverStep1Title: 'Explore categories',
   tutorialDiscoverStep1Desc: 'The category bar lets you browse thousands of sounds organized by theme.',

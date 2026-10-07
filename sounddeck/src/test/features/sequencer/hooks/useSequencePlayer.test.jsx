@@ -17,17 +17,26 @@ vi.mock('@core/services/AudioService', () => ({
   unregisterExternalPlayback: vi.fn(),
 }))
 
+vi.mock('@core/services/SoundPopupService', () => ({
+  showSoundPopup: vi.fn(),
+  onSoundPopupAction: vi.fn(() => vi.fn()), // retourne un unsubscribe
+}))
+
 vi.mock('@shared/utils/fileUrl', () => ({
   buildFileUrl: vi.fn((p) => (p ? `file://${p}` : null)),
 }))
 
 import { Howl } from 'howler'
 import * as AudioService from '@core/services/AudioService'
+import * as SoundPopupService from '@core/services/SoundPopupService'
 import { useSequencePlayer } from '@features/sequencer/hooks/useSequencePlayer'
 
 // ─── HELPERS ───────────────────────────────────────────────────────────
-const buildHowlInstance = () => ({
-  play: vi.fn(),
+const buildHowlInstance = (options = {}) => ({
+  play: vi.fn(() => {
+    // ✅ Déclenche onload (utilisé par le hook pour la popup)
+    options.onload?.()
+  }),
   stop: vi.fn(),
   unload: vi.fn(),
   pause: vi.fn(),
@@ -39,9 +48,8 @@ const buildHowlInstance = () => ({
 
 const setupHowlMock = () => {
   const instances = []
-  // ✅ `function` (pas arrow) → utilisable avec `new Howl()`
-  Howl.mockImplementation(function () {
-    const instance = buildHowlInstance()
+  Howl.mockImplementation(function (options) {
+    const instance = buildHowlInstance(options)
     instances.push(instance)
     return instance
   })
@@ -66,6 +74,7 @@ const defaultProps = (overrides = {}) => {
     audioDevice: 'default',
     volume: 80,
     loopPlaylist: false,
+    cardSize: 'medium',       // ✅ NOUVEAU
     ...overrides,
   }
 }
@@ -74,8 +83,6 @@ const defaultProps = (overrides = {}) => {
 // SETUP / TEARDOWN
 // ═══════════════════════════════════════════════════════════════════════
 beforeEach(() => {
-  // ✅ fake timers avec auto-advance : les intervals du hook (100ms)
-  //    n'explosent plus les warnings "outside act"
   vi.useFakeTimers({ shouldAdvanceTime: true })
 
   Howl.mockReset()
@@ -86,10 +93,12 @@ beforeEach(() => {
   AudioService.analyzeGain.mockReset().mockResolvedValue(0)
   AudioService.registerExternalPlayback.mockReset()
   AudioService.unregisterExternalPlayback.mockReset()
+
+  SoundPopupService.showSoundPopup.mockReset()
+  SoundPopupService.onSoundPopupAction.mockReset().mockReturnValue(vi.fn())
 })
 
 afterEach(() => {
-  // ✅ unmount tous les hooks → nettoie les intervals en cours
   cleanup()
   vi.clearAllTimers()
   vi.useRealTimers()
@@ -125,6 +134,13 @@ describe('useSequencePlayer > Init', () => {
     const { unmount } = renderHook(() => useSequencePlayer(defaultProps()))
     unmount()
     expect(AudioService.registerStopSequencerCallback).toHaveBeenCalledWith(null)
+  })
+
+  it('souscrit aux actions popup au mount', () => {
+    renderHook(() => useSequencePlayer(defaultProps()))
+    expect(SoundPopupService.onSoundPopupAction).toHaveBeenCalledWith(
+      expect.any(Function)
+    )
   })
 })
 
@@ -229,6 +245,50 @@ describe('useSequencePlayer > start', () => {
           pause: expect.any(Function),
           resume: expect.any(Function),
         })
+      )
+    )
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════
+// ✅ NOUVEAU : POPUP
+// ═══════════════════════════════════════════════════════════════════════
+describe('useSequencePlayer > Popup', () => {
+  it('appelle showSoundPopup au onload', async () => {
+    setupHowlMock()
+    const { result } = renderHook(() => useSequencePlayer(defaultProps()))
+
+    act(() => {
+      result.current.start()
+    })
+
+    await waitFor(() =>
+      expect(SoundPopupService.showSoundPopup).toHaveBeenCalled()
+    )
+
+    expect(SoundPopupService.showSoundPopup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'A',
+        index: 0,
+        total: 3,
+        cardSize: 'medium',
+      })
+    )
+  })
+
+  it('transmet la cardSize courante', async () => {
+    setupHowlMock()
+    const { result } = renderHook(() =>
+      useSequencePlayer(defaultProps({ cardSize: 'large' }))
+    )
+
+    act(() => {
+      result.current.start()
+    })
+
+    await waitFor(() =>
+      expect(SoundPopupService.showSoundPopup).toHaveBeenCalledWith(
+        expect.objectContaining({ cardSize: 'large' })
       )
     )
   })
@@ -422,19 +482,18 @@ describe('useSequencePlayer > goPrev', () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════
-// SOUND INTROUVABLE
+// Sound introuvable
 // ═══════════════════════════════════════════════════════════════════════
 describe('useSequencePlayer > Sound introuvable', () => {
-    it('skip le son introuvable et joue le suivant', async () => {
+  it('skip le son introuvable et joue le suivant', async () => {
     const instances = setupHowlMock()
     const sounds = [
       { id: 's1', path: '/sounds/a.mp3' },
-      // s2 manquant
       { id: 's3', path: '/sounds/c.mp3' },
     ]
     const items = [
       { id: 'i1', soundId: 's1', delay: 0 },
-      { id: 'i2', soundId: 's2', delay: 0 },  // ← introuvable
+      { id: 'i2', soundId: 's2', delay: 0 },
       { id: 'i3', soundId: 's3', delay: 0 },
     ]
     const props = defaultProps({ sounds, items, itemsRef: { current: items } })
@@ -446,21 +505,17 @@ describe('useSequencePlayer > Sound introuvable', () => {
     })
     await waitFor(() => expect(instances).toHaveLength(1))
 
-    // ✅ On déclenche le passage au son suivant (qui est introuvable)
-    //    → le hook doit skipper automatiquement vers s3
     act(() => {
       result.current.goNext()
     })
 
     await waitFor(() => expect(instances.length).toBeGreaterThanOrEqual(2))
-
-    // ✅ Vérifie que c'est bien s3 qui a été joué (pas s2)
     expect(AudioService.setCurrentPlayingSound).toHaveBeenLastCalledWith('s3')
   })
 })
 
 // ═══════════════════════════════════════════════════════════════════════
-// RACCOURCIS CLAVIER
+// Raccourcis clavier
 // ═══════════════════════════════════════════════════════════════════════
 describe('useSequencePlayer > Raccourcis clavier', () => {
   it('ArrowRight déclenche goNext quand playing', async () => {
@@ -543,7 +598,7 @@ describe('useSequencePlayer > Raccourcis clavier', () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════
-// CLEANUP AU DÉMONTAGE
+// Cleanup au démontage
 // ═══════════════════════════════════════════════════════════════════════
 describe('useSequencePlayer > Cleanup', () => {
   it('stop() est appelé au unmount', async () => {
