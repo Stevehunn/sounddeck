@@ -79,4 +79,19 @@ export default {
   tierFree: 'Gratis',
   tierPro: 'Pro',
   tierDev: 'Desarrollador',
+
+  // ─── ONGLET GITHUB SPONSOR ────────────────────────────────────────
+  authTabGithub: 'He patrocinado',
+  authGithubTitle: 'He patrocinado en GitHub',
+  authGithubSubtitle: 'Si patrocinaste SoundDeck en GitHub, activa tu cuenta aquí con tu nombre de usuario de GitHub.',
+  authGithubLoginLabel: 'Tu usuario de GitHub',
+  authGithubLoginPlaceholder: 'tu-usuario-github',
+  authGithubActivate: 'Activar mi cuenta',
+  authGithubActivating: 'Activando...',
+  authGithubSuccess: '¡Cuenta Pro activada!',
+  authGithubError: 'No se pudo activar tu cuenta.',
+  authGithubErrorMissingLogin: 'Introduce tu usuario de GitHub.',
+  authGithubErrorNotFound: 'No se encontró patrocinio para este usuario. Verifica la ortografía o espera unos minutos después de tu donación.',
+  authGithubErrorEmailExists: 'Ya existe una cuenta con este email. Inicia sesión.',
+  authGithubErrorInvalidLogin: 'Este usuario de GitHub no es válido.',
 }

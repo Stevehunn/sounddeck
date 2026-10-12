@@ -3,6 +3,8 @@ import { handleHealth } from './routes/health.js'
 import { handleLogin } from './routes/login.js'
 import { handleStripeWebhook } from './routes/stripe-webhook.js'
 import { handleRedeem } from './routes/redeem.js'
+import { handleGitHubSponsorWebhook } from './routes/github-webhook.js'
+import { handleClaimSponsorship } from './routes/claim.js'
 import {
   handleGenerateCode,
   handleListCodes,
@@ -18,7 +20,7 @@ export default {
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Hub-Signature-256, X-GitHub-Event',
     }
 
     if (method === 'OPTIONS') {
@@ -28,18 +30,22 @@ export default {
     try {
       let response
 
-      // ─── Routes publiques ────────────────────────────────────────
+      // ─── Public ──────────────────────────────────────────────────
       if (pathname === '/health' && method === 'GET') {
         response = handleHealth(env)
       } else if (pathname === '/login' && method === 'POST') {
         response = await handleLogin(request, env)
       } else if (pathname === '/redeem' && method === 'POST') {
         response = await handleRedeem(request, env)
+      } else if (pathname === '/claim-sponsorship' && method === 'POST') {
+        response = await handleClaimSponsorship(request, env)
       } else if (pathname === '/webhook/stripe' && method === 'POST') {
         response = await handleStripeWebhook(request, env)
+      } else if (pathname === '/webhook/github-sponsor' && method === 'POST') {
+        response = await handleGitHubSponsorWebhook(request, env)
       }
 
-      // ─── Routes admin (protégées) ────────────────────────────────
+      // ─── Admin ───────────────────────────────────────────────────
       else if (pathname === '/admin/generate-code' && method === 'POST') {
         response = await handleGenerateCode(request, env)
       } else if (pathname === '/admin/list-codes' && method === 'GET') {
@@ -62,18 +68,13 @@ export default {
     } catch (e) {
       console.error('❌ Unhandled error:', {
         message: e.message,
-        stack: e.stack?.split('\n').slice(0, 5).join('\n'),
         pathname,
         method,
         timestamp: new Date().toISOString(),
       })
-
       return new Response(
         JSON.stringify({ error: 'internal_error' }),
-        {
-          status: 500,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        }
+        { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       )
     }
   },

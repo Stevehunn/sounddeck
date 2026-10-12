@@ -79,4 +79,19 @@ export default {
   tierFree: 'Free',
   tierPro: 'Pro',
   tierDev: 'Developer',
+
+  // ─── ONGLET GITHUB SPONSOR ────────────────────────────────────────
+  authTabGithub: 'I sponsored',
+  authGithubTitle: 'I sponsored on GitHub',
+  authGithubSubtitle: 'If you sponsored SoundDeck on GitHub, activate your account here with your GitHub username.',
+  authGithubLoginLabel: 'Your GitHub username',
+  authGithubLoginPlaceholder: 'your-github-username',
+  authGithubActivate: 'Activate my account',
+  authGithubActivating: 'Activating...',
+  authGithubSuccess: 'Pro account activated!',
+  authGithubError: 'Unable to activate your account.',
+  authGithubErrorMissingLogin: 'Enter your GitHub username.',
+  authGithubErrorNotFound: 'No sponsorship found for this GitHub username. Check the spelling or wait a few minutes after your donation.',
+  authGithubErrorEmailExists: 'An account already exists with this email. Sign in instead.',
+  authGithubErrorInvalidLogin: 'This GitHub username is not valid.',
 }

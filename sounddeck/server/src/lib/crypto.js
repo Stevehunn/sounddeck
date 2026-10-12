@@ -265,6 +265,24 @@ export async function verifyStripeSignature(
   return false
 }
 
+/**
+ * Vérifie la signature GitHub sur un webhook.
+ * GitHub utilise X-Hub-Signature-256 = "sha256=<hmac_hex>"
+ *
+ * @param {string} payloadBody     Corps brut de la requête (string)
+ * @param {string} signatureHeader Header "X-Hub-Signature-256"
+ * @param {string} secret          Secret webhook GitHub
+ * @returns {Promise<boolean>}
+ */
+export async function verifyGitHubSignature(payloadBody, signatureHeader, secret) {
+  if (!signatureHeader || !secret) return false
+  if (!signatureHeader.startsWith('sha256=')) return false
+
+  const expected = signatureHeader.slice(7).toLowerCase()
+  const actual = await hmacSHA256Hex(secret, payloadBody)
+  return constantTimeEqual(expected, actual)
+}
+
 async function hmacSHA256Hex(secret, data) {
   const key = await crypto.subtle.importKey(
     'raw',

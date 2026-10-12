@@ -106,3 +106,93 @@ export function listRedeemCodes(db, { limit = 100, onlyUnused = false } = {}) {
     : `SELECT * FROM redeem_codes ORDER BY created_at DESC LIMIT ?`
   return db.prepare(query).bind(limit).all()
 }
+
+// ─── PENDING SPONSORSHIPS ──────────────────────────────────────────────
+
+export async function insertPendingSponsorship(db, {
+  id,
+  sponsorshipNodeId,
+  githubLogin,
+  githubUserId,
+  amountCents,
+  currency = 'USD',
+  tier = 'pro',
+  isOneTime = true,
+  privacyLevel = null,
+}) {
+  const now = Math.floor(Date.now() / 1000)
+  await db
+    .prepare(
+      `INSERT INTO pending_sponsorships
+         (id, sponsorship_node_id, github_login, github_user_id,
+          amount_cents, currency, tier, is_one_time, privacy_level, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      id,
+      sponsorshipNodeId,
+      githubLogin,
+      githubUserId,
+      amountCents,
+      currency,
+      tier,
+      isOneTime ? 1 : 0,
+      privacyLevel,
+      now
+    )
+    .run()
+}
+
+export function getPendingSponsorshipByNodeId(db, nodeId) {
+  return db
+    .prepare('SELECT * FROM pending_sponsorships WHERE sponsorship_node_id = ?')
+    .bind(nodeId)
+    .first()
+}
+
+export function findClaimableSponsorshipForLogin(db, githubLogin) {
+  return db
+    .prepare(
+      `SELECT * FROM pending_sponsorships
+       WHERE github_login = ? COLLATE NOCASE
+         AND claimed_at IS NULL
+         AND revoked = 0
+       ORDER BY created_at ASC
+       LIMIT 1`
+    )
+    .bind(githubLogin)
+    .first()
+}
+
+export async function markSponsorshipClaimed(db, sponsorshipId, userId) {
+  const now = Math.floor(Date.now() / 1000)
+  await db
+    .prepare(
+      `UPDATE pending_sponsorships
+       SET claimed_at = ?, claimed_by_user_id = ?
+       WHERE id = ? AND claimed_at IS NULL`
+    )
+    .bind(now, userId, sponsorshipId)
+    .run()
+}
+
+export function listPendingSponsorships(db, { limit = 100, onlyUnclaimed = false } = {}) {
+  const query = onlyUnclaimed
+    ? `SELECT * FROM pending_sponsorships
+       WHERE claimed_at IS NULL AND revoked = 0
+       ORDER BY created_at DESC LIMIT ?`
+    : `SELECT * FROM pending_sponsorships ORDER BY created_at DESC LIMIT ?`
+  return db.prepare(query).bind(limit).all()
+}
+
+export async function revokePendingSponsorship(db, id, reason = null) {
+  const now = Math.floor(Date.now() / 1000)
+  await db
+    .prepare(
+      `UPDATE pending_sponsorships
+       SET revoked = 1, revoked_at = ?, revoked_reason = ?
+       WHERE id = ? AND claimed_at IS NULL`
+    )
+    .bind(now, reason, id)
+    .run()
+}

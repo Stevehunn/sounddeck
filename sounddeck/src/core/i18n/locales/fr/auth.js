@@ -79,4 +79,19 @@ export default {
   tierFree: 'Gratuit',
   tierPro: 'Pro',
   tierDev: 'Développeur',
+
+  // ─── ONGLET GITHUB SPONSOR ────────────────────────────────────────
+  authTabGithub: 'J\'ai sponsorisé',
+  authGithubTitle: 'J\'ai sponsorisé sur GitHub',
+  authGithubSubtitle: 'Si tu as sponsorisé SoundDeck sur GitHub, active ton compte ici avec ton nom d\'utilisateur GitHub.',
+  authGithubLoginLabel: 'Ton pseudo GitHub',
+  authGithubLoginPlaceholder: 'ton-pseudo-github',
+  authGithubActivate: 'Activer mon compte',
+  authGithubActivating: 'Activation...',
+  authGithubSuccess: 'Compte Pro activé avec succès !',
+  authGithubError: 'Impossible d\'activer ton compte.',
+  authGithubErrorMissingLogin: 'Entre ton pseudo GitHub.',
+  authGithubErrorNotFound: 'Aucun sponsorship trouvé pour ce pseudo GitHub. Vérifie l\'orthographe ou attends quelques minutes après ton don.',
+  authGithubErrorEmailExists: 'Un compte existe déjà avec cet email. Connecte-toi à la place.',
+  authGithubErrorInvalidLogin: 'Ce pseudo GitHub n\'est pas valide.',
 }
