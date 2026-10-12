@@ -1,0 +1,22 @@
+name = "sounddeck-api"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ─── Base de données D1 ────────────────────────────────────────────────
+# ⚠️ L'id sera rempli à l'étape 3 (après `wrangler d1 create`)
+[[d1_databases]]
+binding = "DB"
+database_name = "sounddeck-db"
+database_id = "843190a9-ae07-4eef-a17d-7e7c05ec7f94"
+
+# ─── Variables publiques (visibles dans le code) ──────────────────────
+[vars]
+APP_VERSION = "1.4.0"
+DONATION_MIN_EUR = "5"
+
+# ─── Secrets (à définir via `wrangler secret put`) ────────────────────
+# PRIVATE_KEY_HEX        → clé privée Ed25519 (NE PAS COMMITER)
+# STRIPE_WEBHOOK_SECRET  → secret webhook Stripe
+# RESEND_API_KEY         → clé API Resend
+# ADMIN_TOKEN            → token pour les endpoints admin

@@ -1,0 +1,22 @@
+{
+  "name": "sounddeck-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 execute sounddeck-db --local --file=./migrations/0001_init.sql",
+    "db:migrate:remote": "wrangler d1 execute sounddeck-db --remote --file=./migrations/0001_init.sql",
+    "tail": "wrangler tail",
+    "db:seed:local":  "node scripts/seed.mjs && wrangler d1 execute sounddeck-db --local  --file=scripts/.tmp-seed.sql",
+    "db:seed:remote": "node scripts/seed.mjs && wrangler d1 execute sounddeck-db --remote --file=scripts/.tmp-seed.sql"
+  },
+  "dependencies": {
+    "@noble/ed25519": "^2.1.0",
+    "@noble/hashes": "^1.5.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.15.2"
+  }
+}

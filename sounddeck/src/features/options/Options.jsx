@@ -1,35 +1,34 @@
 // src/features/options/Options.jsx
-import { useCallback } from 'react'
-import { useLanguage } from '@core/i18n/LanguageContext'
-import {
-  stopMixer,
-  isMixerActive,
-} from '@core/services/AudioMixerService'
-import useConfirm from '@shared/hooks/useConfirm'
-import { clearAllErrorLogs } from '@shared/utils/errorHandler'
-import { logWarn } from '@shared/utils/logger'
-import { useEffect } from 'react'
+import { useCallback } from "react";
+import { useLanguage } from "@core/i18n/LanguageContext";
+import { stopMixer, isMixerActive } from "@core/services/AudioMixerService";
+import useConfirm from "@shared/hooks/useConfirm";
+import { clearAllErrorLogs } from "@shared/utils/errorHandler";
+import { logWarn } from "@shared/utils/logger";
+import { useEffect } from "react";
 
-import { SECTIONS } from './constants'
-import { useSectionObserver } from './hooks/useSectionObserver'
-import { useAudioDevices } from './hooks/useAudioDevices'
-import { usePluginsManagement } from './hooks/usePluginsManagement'
+import { SECTIONS } from "./constants";
+import { useSectionObserver } from "./hooks/useSectionObserver";
+import { useAudioDevices } from "./hooks/useAudioDevices";
+import { usePluginsManagement } from "./hooks/usePluginsManagement";
 
-import AppearanceSection from './sections/AppearanceSection'
-import AudioSection from './sections/AudioSection'
-import ShortcutsSection from './sections/ShortcutsSection'
-import SoundManagementSection from './sections/SoundManagementSection'
-import PluginsSection from './sections/PluginsSection'
-import IntegrationsSection from './sections/IntegrationsSection'
-import AdvancedSection from './sections/AdvancedSection'
-import BackupSection from './sections/BackupSection'
-import ProfilesSection from './sections/ProfilesSection'
+import AppearanceSection from "./sections/AppearanceSection";
+import AudioSection from "./sections/AudioSection";
+import ShortcutsSection from "./sections/ShortcutsSection";
+import SoundManagementSection from "./sections/SoundManagementSection";
+import PluginsSection from "./sections/PluginsSection";
+import IntegrationsSection from "./sections/IntegrationsSection";
+import AdvancedSection from "./sections/AdvancedSection";
+import BackupSection from "./sections/BackupSection";
+import ProfilesSection from "./sections/ProfilesSection";
+import SupportSection from "./sections/SupportSection";
+import AboutSection from "./sections/AboutSection";
 
 export default function Options({ store, addToast }) {
-  const { t, currentLang } = useLanguage()
-  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
+  const { t, currentLang } = useLanguage();
+  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang });
 
-  const { activeSection, sectionRefs, scrollToSection } = useSectionObserver()
+  const { activeSection, sectionRefs, scrollToSection } = useSectionObserver();
 
   const {
     audioDevices,
@@ -40,7 +39,7 @@ export default function Options({ store, addToast }) {
     handleInstallDriver,
     handleDetectDevices,
     testMicrophone,
-  } = useAudioDevices({ store, addToast })
+  } = useAudioDevices({ store, addToast });
 
   const {
     plugins,
@@ -48,115 +47,133 @@ export default function Options({ store, addToast }) {
     loadPlugins,
     handlePluginUninstall,
     handlePluginEnable,
-  } = usePluginsManagement({ addToast })
+  } = usePluginsManagement({ addToast });
 
   useEffect(() => {
     const syncMixer = async () => {
       try {
-        const isActive = isMixerActive()
+        const isActive = isMixerActive();
         if (!store.mixerEnabled && isActive) {
-          await stopMixer()
-          addToast(t('mixerResynced'), 'info')
+          await stopMixer();
+          addToast(t("mixerResynced"), "info");
         }
       } catch (e) {
-        logWarn('Options', 'Erreur sync mixer', e)
+        logWarn("Options", "Erreur sync mixer", e);
       }
-    }
-    syncMixer()
-  }, [store.mixerEnabled, t, addToast])
+    };
+    syncMixer();
+  }, [store.mixerEnabled, t, addToast]);
 
   const handleResetSidebar = useCallback(async () => {
     const confirmed = await confirm({
-      title: t('sidebarEditorReset'),
-      message: t('sidebarEditorResetConfirm'),
-      type: 'warning',
-    })
-    if (!confirmed) return
+      title: t("sidebarEditorReset"),
+      message: t("sidebarEditorResetConfirm"),
+      type: "warning",
+    });
+    if (!confirmed) return;
 
-    await store.resetSidebarConfig()
-    addToast(t('sidebarEditorResetSuccess'), 'success')
-  }, [store, t, addToast, confirm])
+    await store.resetSidebarConfig();
+    addToast(t("sidebarEditorResetSuccess"), "success");
+  }, [store, t, addToast, confirm]);
 
   const handleClearLogs = useCallback(async () => {
     try {
-      await clearAllErrorLogs()
-      addToast(t('logsCleared'), 'info')
+      await clearAllErrorLogs();
+      addToast(t("logsCleared"), "info");
     } catch (e) {
-      addToast('❌ ' + e.message, 'error')
+      addToast("❌ " + e.message, "error");
     }
-  }, [t, addToast])
+  }, [t, addToast]);
 
   const handleExportLogs = useCallback(async () => {
     try {
-      const raw = await window.electronAPI.storeGet('errorLogs')
-      const logs = Array.isArray(raw) ? raw : []
+      const raw = await window.electronAPI.storeGet("errorLogs");
+      const logs = Array.isArray(raw) ? raw : [];
 
       if (logs.length === 0) {
-        addToast(t('noErrorLogs'), 'info')
-        return
+        addToast(t("noErrorLogs"), "info");
+        return;
       }
 
-      const json = JSON.stringify(logs, null, 2)
+      const json = JSON.stringify(logs, null, 2);
       const r = await window.electronAPI.exportJsonFile(
         json,
         `sounddeck-error-logs-${new Date().toISOString().slice(0, 10)}.json`,
-        t('errorLogs') || 'Exporter les logs d\'erreur'
-      )
+        t("errorLogs") || "Exporter les logs d'erreur",
+      );
 
       if (r?.success) {
-        addToast(t('logsExported') || 'Logs exportés ✓', 'success')
+        addToast(t("logsExported") || "Logs exportés ✓", "success");
       } else if (!r?.canceled) {
-        addToast('❌ ' + (r?.error || t('error')), 'error')
+        addToast("❌ " + (r?.error || t("error")), "error");
       }
     } catch (e) {
-      addToast('❌ ' + e.message, 'error')
+      addToast("❌ " + e.message, "error");
     }
-  }, [t, addToast])
+  }, [t, addToast]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        overflow: "hidden",
+      }}
+    >
       {/* Header avec tabs */}
-      <div style={{
-        padding: '12px 20px',
-        borderBottom: '1px solid var(--border)',
-        flexShrink: 0,
-        background: 'var(--bg-secondary)',
-        zIndex: 10,
-      }}>
+      <div
+        style={{
+          padding: "12px 20px",
+          borderBottom: "1px solid var(--border)",
+          flexShrink: 0,
+          background: "var(--bg-secondary)",
+          zIndex: 10,
+        }}
+      >
         <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 8 }}>
-          <i className="ti ti-settings" style={{ color: 'var(--accent)', marginRight: 6 }} />
-          {t('optionsTitle')}
+          <i
+            className="ti ti-settings"
+            style={{ color: "var(--accent)", marginRight: 6 }}
+          />
+          {t("optionsTitle")}
         </div>
 
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
           {SECTIONS.map((section) => (
             <button
               key={section.id}
               onClick={() => scrollToSection(section.id)}
               style={{
-                padding: '5px 12px',
-                borderRadius: 'var(--radius-sm)',
+                padding: "5px 12px",
+                borderRadius: "var(--radius-sm)",
                 fontSize: 12,
-                cursor: 'pointer',
-                border: `1px solid ${activeSection === section.id ? 'var(--accent)' : 'var(--border)'}`,
-                background: activeSection === section.id ? 'var(--accent-light)' : 'transparent',
-                color: activeSection === section.id ? 'var(--accent)' : 'var(--text-secondary)',
+                cursor: "pointer",
+                border: `1px solid ${activeSection === section.id ? "var(--accent)" : "var(--border)"}`,
+                background:
+                  activeSection === section.id
+                    ? "var(--accent-light)"
+                    : "transparent",
+                color:
+                  activeSection === section.id
+                    ? "var(--accent)"
+                    : "var(--text-secondary)",
                 fontWeight: activeSection === section.id ? 500 : 400,
-                transition: 'all 0.15s',
-                display: 'flex',
-                alignItems: 'center',
+                transition: "all 0.15s",
+                display: "flex",
+                alignItems: "center",
                 gap: 4,
               }}
               onMouseEnter={(e) => {
                 if (activeSection !== section.id) {
-                  e.currentTarget.style.borderColor = 'var(--accent)'
-                  e.currentTarget.style.color = 'var(--text-primary)'
+                  e.currentTarget.style.borderColor = "var(--accent)";
+                  e.currentTarget.style.color = "var(--text-primary)";
                 }
               }}
               onMouseLeave={(e) => {
                 if (activeSection !== section.id) {
-                  e.currentTarget.style.borderColor = 'var(--border)'
-                  e.currentTarget.style.color = 'var(--text-secondary)'
+                  e.currentTarget.style.borderColor = "var(--border)";
+                  e.currentTarget.style.color = "var(--text-secondary)";
                 }
               }}
             >
@@ -168,16 +185,16 @@ export default function Options({ store, addToast }) {
       </div>
 
       {/* Contenu scrollable */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
         <AppearanceSection
-          sectionRef={(el) => (sectionRefs.current['appearance'] = el)}
+          sectionRef={(el) => (sectionRefs.current["appearance"] = el)}
           store={store}
           addToast={addToast}
           onResetSidebar={handleResetSidebar}
         />
 
         <AudioSection
-          sectionRef={(el) => (sectionRefs.current['audio'] = el)}
+          sectionRef={(el) => (sectionRefs.current["audio"] = el)}
           store={store}
           addToast={addToast}
           audioDevices={audioDevices}
@@ -191,19 +208,19 @@ export default function Options({ store, addToast }) {
         />
 
         <ShortcutsSection
-          sectionRef={(el) => (sectionRefs.current['shortcuts'] = el)}
+          sectionRef={(el) => (sectionRefs.current["shortcuts"] = el)}
           store={store}
           addToast={addToast}
         />
 
         <SoundManagementSection
-          sectionRef={(el) => (sectionRefs.current['soundManagement'] = el)}
+          sectionRef={(el) => (sectionRefs.current["soundManagement"] = el)}
           store={store}
           addToast={addToast}
         />
 
         <PluginsSection
-          sectionRef={(el) => (sectionRefs.current['plugins'] = el)}
+          sectionRef={(el) => (sectionRefs.current["plugins"] = el)}
           plugins={plugins}
           disabledPlugins={disabledPlugins}
           loadPlugins={loadPlugins}
@@ -213,11 +230,11 @@ export default function Options({ store, addToast }) {
         />
 
         <IntegrationsSection
-          sectionRef={(el) => (sectionRefs.current['integrations'] = el)}
+          sectionRef={(el) => (sectionRefs.current["integrations"] = el)}
         />
 
         <AdvancedSection
-          sectionRef={(el) => (sectionRefs.current['advanced'] = el)}
+          sectionRef={(el) => (sectionRefs.current["advanced"] = el)}
           store={store}
           addToast={addToast}
           onClearLogs={handleClearLogs}
@@ -225,19 +242,28 @@ export default function Options({ store, addToast }) {
         />
 
         <BackupSection
-          sectionRef={(el) => (sectionRefs.current['backup'] = el)}
+          sectionRef={(el) => (sectionRefs.current["backup"] = el)}
           store={store}
           addToast={addToast}
         />
 
         <ProfilesSection
-          sectionRef={(el) => (sectionRefs.current['profiles'] = el)}
+          sectionRef={(el) => (sectionRefs.current["profiles"] = el)}
           store={store}
           addToast={addToast}
+        />
+
+        <SupportSection
+          sectionRef={(el) => (sectionRefs.current["support"] = el)}
+          addToast={addToast}
+        />
+
+        <AboutSection
+          sectionRef={(el) => (sectionRefs.current["about"] = el)}
         />
       </div>
 
       <ConfirmWrapper />
     </div>
-  )
+  );
 }

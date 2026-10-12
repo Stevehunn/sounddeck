@@ -1,0 +1,7 @@
+# Copie ce fichier en .dev.vars pour le dev local (`wrangler dev`)
+# ⚠️ .dev.vars ne doit JAMAIS être commité
+
+PRIVATE_KEY_HEX=ta_cle_privee_hex_ici
+STRIPE_WEBHOOK_SECRET=whsec_test_xxx
+RESEND_API_KEY=re_xxx
+ADMIN_TOKEN=change_me_random_string

@@ -420,4 +420,10 @@ export default {
 
   logsCleared: 'Logs effacés',
   logsExported: 'Logs exportés ✓',
+
+  // ─── GITHUB SPONSORS ───────────────────────────────────────────────
+  supportGithubSponsor: 'Sponsoriser sur GitHub',
+  supportGithubSponsorDesc: 'Débloque tous les plugins Pro à vie',
+  supportGithubSponsorHint: 'À partir de 5 € — une fois suffit',
+  supportGithubSponsorNote: 'Après ton don, tu recevras ton code d\'activation par email.',
 };

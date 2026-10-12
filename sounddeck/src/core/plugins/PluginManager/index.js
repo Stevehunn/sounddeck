@@ -37,6 +37,10 @@ export class PluginManager {
     this._pagesCacheKey = null
     this._pagesVersion = 0
 
+    // ✅ Tier courant de la licence (sync depuis LicenseService via PluginContext)
+    // Valeurs possibles : 'free' | 'pro' | 'dev'
+    this._licenseTier = 'free'
+
     // Délégation à un sous-manager
     this._disabled = new DisabledPluginsManager()
   }
@@ -50,6 +54,25 @@ export class PluginManager {
     return this._disabled.list()
   }
 
+  // ─── LICENCE ──────────────────────────────────────────────────────────
+
+  /**
+   * Retourne le tier de licence courant.
+   * @returns {'free'|'pro'|'dev'}
+   */
+  getLicenseTier() {
+    return this._licenseTier || 'free'
+  }
+
+  /**
+   * Définit le tier de licence courant (appelé par PluginContext au boot).
+   * @param {'free'|'pro'|'dev'} tier
+   */
+  setLicenseTier(tier) {
+    const valid = ['free', 'pro', 'dev']
+    this._licenseTier = valid.includes(tier) ? tier : 'free'
+  }
+
   // ─── INIT (idempotent, safe pour React StrictMode) ────────────────────
   async initialize(store) {
     if (this._initialized) return
@@ -61,6 +84,15 @@ export class PluginManager {
 
       try {
         await this._disabled.ensureLoaded()
+
+        // Sync du tier AVANT de charger les plugins
+        try {
+          const { getStatus } = await import('@core/services/LicenseService')
+          const status = await getStatus()
+          this._licenseTier = status?.tier || 'free'
+        } catch (e) {
+          this._licenseTier = 'free'
+        }
 
         // 1. Plugins intégrés — skip si désactivés
         for (const [pluginId, loader] of INTEGRATED_PLUGINS) {
@@ -116,8 +148,14 @@ export class PluginManager {
     this._loadingPlugins.add(pluginInfo.id)
 
     try {
-      const pluginModule = await importPluginModule(pluginInfo)
-      const plugin = validatePluginModule(pluginInfo, pluginModule)
+      // ✅ Injecte le tier courant dans pluginInfo pour la validation licence
+      const enrichedInfo = {
+        ...pluginInfo,
+        _licenseTier: this._licenseTier,
+      }
+
+      const pluginModule = await importPluginModule(enrichedInfo)
+      const plugin = validatePluginModule(enrichedInfo, pluginModule)
 
       if (!plugin) {
         this._loadingPlugins.delete(pluginInfo.id)

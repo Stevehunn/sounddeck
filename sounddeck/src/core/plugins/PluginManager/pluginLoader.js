@@ -53,7 +53,7 @@ export async function importPluginModule(pluginInfo) {
 }
 
 /**
- * Valide la compatibilité + le module.
+ * Valide la compatibilité + le module + la licence.
  */
 export function validatePluginModule(pluginInfo, pluginModule) {
   if (!checkCompatibility(pluginInfo)) {
@@ -66,6 +66,32 @@ export function validatePluginModule(pluginInfo, pluginModule) {
   if (!plugin?.id) {
     logError('PluginManager', 'Plugin invalide: id manquant')
     return null
+  }
+
+  // ✅ Licence Pro requise ?
+  const manifest = { ...plugin, ...pluginInfo }
+  if (manifest.licenseRequired === true) {
+    if (!pluginInfo._licenseTier) {
+      logWarn(
+        'PluginManager',
+        `Plugin ${plugin.id} requiert une licence Pro (non fournie)`
+      )
+      return null
+    }
+
+    const requiredTier = manifest.minTier || 'pro'
+    // Ranking : free=0, pro=10, dev=99
+    const ranks = { free: 0, pro: 10, dev: 99 }
+    const userRank = ranks[pluginInfo._licenseTier] ?? 0
+    const requiredRank = ranks[requiredTier] ?? 10
+
+    if (userRank < requiredRank) {
+      logWarn(
+        'PluginManager',
+        `Plugin ${plugin.id} requiert tier "${requiredTier}", utilisateur a "${pluginInfo._licenseTier}"`
+      )
+      return null
+    }
   }
 
   return plugin

@@ -9,4 +9,6 @@ export const SECTIONS = [
   { id: 'advanced', icon: 'ti-gauge', labelKey: 'advancedOptions' },
   { id: 'backup', icon: 'ti-cloud', labelKey: 'optionsBackup' },
   { id: 'profiles', icon: 'ti-users', labelKey: 'optionsProfiles' },
+  { id: 'support', icon: 'ti-heart', labelKey: 'supportSectionTitle' },
+  { id: 'about', icon: 'ti-info-circle', labelKey: 'aboutSectionTitle' },
 ]

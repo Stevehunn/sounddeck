@@ -1,1 +1,3 @@
 /sounddeck/dist-electron
+/sounddeck/server/.dev.vars
+/sounddeck/server/node_modules

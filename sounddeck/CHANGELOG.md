@@ -1,45 +1,53 @@
 # Changelog
 
-All notable changes to SoundDeck are documented in this file.
+All notable changes to **SoundDeck** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [0.1.0] — 2026-10-09
 
 ### Added
 
-- Pro plugin infrastructure — license verification via Ed25519 signature (offline, no server)
-- Support section in Options — one-time donation unlocks all Pro plugins forever
-- License activation UI — paste a license key or import a `.sdlicense` file
-- `.sdlicense` receipt format for portable licenses
+- **Pro plugin infrastructure** — Ed25519-signed licenses, verified offline
+- **GitHub Sponsors integration** — one-time sponsorship unlocks all Pro plugins forever
+- **Redeem codes** — 14-char codes (SDCK-XXXX-XXXX-XXXX) with configurable expiry
+- **Support section** in Options — donate link + code activation
+- **About section** in Options — version, license, source code
+- **Login/Account UI** — sign-in modal, account panel with tier badge
+- **Cloudflare Worker backend** — login, redeem, admin endpoints
+- **D1 database** — users, payments, redeem_codes, audit_log
+- **Resend integration** — automatic welcome emails
+- **Admin CLI** — `code.mjs generate|list|revoke` for managing redeem codes
+- **i18n**: Spanish fully supported for all new features
 
 ### Changed
 
 - Sound popup: `hideDelay` increased from 4000ms → 6000ms for previews
 - Sound popup: renderer-side auto-hide delay now 4500ms (was 2500ms)
-- Sidebar: now shows a live list of currently playing sounds (multi-sound support)
-- AudioService: `soundCache` supports array of Howls (virtual device + local monitoring)
-- AudioService: `pauseSound` / `resumeSound` handle 3 modes (mixer / howler-virtual / howler-default)
-- AudioService: Range requests supported in `protocolHandler` for accurate `seek()`
+- Sidebar: live list of currently playing sounds (multi-sound support)
+- AudioService: `soundCache` supports arrays of Howls
+- AudioService: `pauseSound` / `resumeSound` handle 3 modes
+- AudioService: Range requests supported for accurate `seek()`
+- `PluginManager`: license check before loading plugins with `licenseRequired: true`
 
 ### Fixed
 
 - AudioService: memory leak when stopping multiple sounds simultaneously
 - AudioService: `setSinkId` errors no longer crash playback
-- Sequencer: `useSequencePlayer` correctly unregisters external playback on stop
-- Emoji picker: ZWJ sequences, keycaps, regional flags now validated correctly
+- Sequencer: `useSequencePlayer` correctly unregisters external playback
+- Emoji picker: ZWJ sequences, keycaps, regional flags validated correctly
 - Sidebar: prevent unnecessary re-renders with signature-based memoization
 - Tray: language updates propagate without restart
 
-### Testing
+### Security
 
-- 5,519 tests across 244 files
-- Coverage: 77.4% statements / 69.0% branches / 78.0% functions / 79.0% lines
-- New tests: SoundPopupService, SoundPopupConfigModal, SoundPopupWindow, VolumePanel, ContextMenuPortal, AudioMixerService, EmojiService, MyInstants plugins, YouTube plugins, Emoji plugins
-- Cross-language test ensures FR / EN / ES have identical key sets
+- All license tokens signed with Ed25519 (private key never leaves the operator's machine)
+- Passwords hashed with PBKDF2-SHA256 (100k iterations — Cloudflare Workers limit)
+- Stripe webhook signature verification (HMAC-SHA256, constant-time comparison)
+- Admin endpoints protected by bearer token with constant-time comparison
 
 ---
 
@@ -47,32 +55,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Advanced audio editor with multi-track timeline, clips, fades, and markers
+- Advanced audio editor with multi-track timeline
 - Sequencer with playlist support, delays, and loop mode
-- Trimmer with interactive waveform and selection handles
-- MyInstants discovery — search and import from thousands of sounds
-- YouTube import via yt-dlp (audio download + trim)
+- Trimmer with interactive waveform
+- MyInstants discovery
+- YouTube import via yt-dlp
 - Spotify / SoundCloud partial support
 - Emoji picker with categories
-- Emoji Discovery plugin — browse and add emojis by category
+- Emoji Discovery plugin
 - Plugin system with `.sdplugin` format
-- Custom themes editor with live preview (Midnight Blue, Forest, Ember, Pastel Light)
-- Editable sidebar — reorder, hide, pin items
-- Interactive tutorials for each page
+- Custom themes editor
+- Editable sidebar
+- Interactive tutorials
 - Usage statistics page
-- OBS WebSocket integration for record/stream control
-- Twitch alerts (follows, donations, subs)
+- OBS WebSocket integration
+- Twitch alerts
 - Multi-language: FR / EN / ES
-
-### Changed
-
-- Migrated from Context API to hooks-based store
-- Consolidated audio services into AudioService + AudioMixerService
-
-### Fixed
-
-- Various bugs in the editor timeline
-- Discord setup documentation clarified
 
 ---
 
@@ -106,24 +104,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release
 - Local soundboard for Discord
-- Drag & drop import
-- Basic playback
 
 ---
 
-## Legend
-
-- Added — new features
-- Changed — changes in existing functionality
-- Deprecated — soon-to-be removed features
-- Removed — now removed features
-- Fixed — bug fixes
-- Security — vulnerabilities
-
----
-
-[Unreleased]: https://github.com/SteveHun/sounddeck/compare/v1.3.0...HEAD
+[1.4.0]: https://github.com/SteveHun/sounddeck/releases/tag/v1.4.0
 [1.3.0]: https://github.com/SteveHun/sounddeck/releases/tag/v1.3.0
-[1.2.0]: https://github.com/SteveHun/sounddeck/releases/tag/v1.2.0
-[1.1.0]: https://github.com/SteveHun/sounddeck/releases/tag/v1.1.0
-[1.0.0]: https://github.com/SteveHun/sounddeck/releases/tag/v1.0.0

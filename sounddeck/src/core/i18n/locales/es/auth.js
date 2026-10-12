@@ -1,0 +1,82 @@
+// src/core/i18n/locales/es/auth.js
+export default {
+  // ─── INICIAR SESIÓN ───────────────────────────────────────────────────
+  authTitle: 'Iniciar sesión en mi cuenta',
+  authSubtitle: 'Inicia sesión para desbloquear los plugins Pro',
+  authEmail: 'Email',
+  authEmailPlaceholder: 'tu@ejemplo.com',
+  authPassword: 'Contraseña',
+  authPasswordPlaceholder: '••••••••',
+  authLogin: 'Iniciar sesión',
+  authLoggingIn: 'Iniciando sesión...',
+  authLogout: 'Cerrar sesión',
+  authLoggingOut: 'Cerrando sesión...',
+  authCancel: 'Cancelar',
+
+  // ─── PESTAÑAS ─────────────────────────────────────────────────────────
+  authTabLogin: 'Iniciar sesión',
+  authTabCode: 'Tengo un código',
+  authTabKey: 'Tengo una clave',
+
+  // ─── ERRORES ──────────────────────────────────────────────────────────
+  authErrorInvalidCredentials: 'Email o contraseña incorrectos.',
+  authErrorNetwork: 'No se puede contactar con el servidor. Verifica tu conexión.',
+  authErrorEmailRequired: 'Por favor introduce tu email.',
+  authErrorPasswordRequired: 'Por favor introduce tu contraseña.',
+  authErrorGeneric: 'Error al iniciar sesión. Inténtalo más tarde.',
+  authErrorServerDown: 'El servidor no está disponible. Inténtalo más tarde.',
+
+  // ─── PESTAÑA "TENGO UN CÓDIGO" ─────────────────────────────────────────
+  authCodeTitle: 'Activar con un código',
+  authCodeSubtitle: 'Si recibiste un código de activación, ingrésalo abajo para crear tu cuenta Pro.',
+  authCodeLabel: 'Código de activación',
+  authCodePlaceholder: 'SDCK-XXXX-XXXX-XXXX',
+  authCodeActivate: 'Activar mi código',
+  authCodeActivating: 'Activando...',
+  authCodeSuccess: '¡Cuenta Pro activada!',
+  authCodeError: 'Código inválido o ya utilizado.',
+  authCodeErrorExpired: 'Este código ha caducado.',
+  authCodeErrorRevoked: 'Este código ha sido revocado.',
+  authCodeErrorAlreadyUsed: 'Este código ya ha sido utilizado.',
+  authCodeErrorEmailMismatch: 'Este código está reservado para otro email.',
+  authCodeErrorEmailExists: 'Ya existe una cuenta con este email. Inicia sesión.',
+  authCodeErrorNotFound: 'Código no encontrado. Verifica la entrada.',
+
+  // ─── PESTAÑA "TENGO UNA CLAVE" ────────────────────────────────────────
+  authKeyTitle: 'Activar una clave manualmente',
+  authKeySubtitle: 'Si recibiste una clave por email, pégala abajo.',
+  authManualTitle: 'Activar una clave manualmente',
+  authManualSubtitle: 'Si recibiste una clave por email, pégala abajo.',
+  authManualPlaceholder: 'SDCK1.xxxxxxxxx.yyyyyyyyy',
+  authManualActivate: 'Activar clave',
+  authManualActivating: 'Activando...',
+  authManualInvalid: 'Clave inválida. Verifica que esté completa y no revocada.',
+  authManualSuccess: '¡Licencia activada con éxito!',
+  authManualShowManual: 'Tengo una clave para pegar manualmente',
+
+  // ─── MI CUENTA ────────────────────────────────────────────────────────
+  accountTitle: 'Mi cuenta Pro',
+  accountEmail: 'Email',
+  accountDonorName: 'Nombre',
+  accountTier: 'Nivel',
+  accountIssuedAt: 'Activado el',
+  accountTokenLabel: 'Mi clave de licencia',
+  accountTokenCopy: 'Copiar clave',
+  accountTokenCopied: '¡Clave copiada!',
+  accountTokenHide: 'Ocultar',
+  accountTokenShow: 'Mostrar',
+  accountTokenWarning: '⚠️ Guarda esta clave. La necesitarás para reactivar tu cuenta en otro PC.',
+  accountLogoutNote: 'Cerrar sesión elimina tu email pero conserva tu clave Pro en este ordenador.',
+  accountNoEmail: 'Sin email registrado',
+  accountNotConnected: 'No conectado a una cuenta',
+  accountNotConnectedNote: 'Tu licencia Pro está activa en este ordenador. Inicia sesión para sincronizar tu email.',
+  accountChange: 'Cambiar de cuenta',
+  accountConnect: 'Iniciar sesión',
+  accountLogoutConfirm: '¿Confirmar cierre de sesión?',
+  accountLogoutDone: 'Sesión cerrada (licencia Pro conservada)',
+
+  // ─── TIERS ───────────────────────────────────────────────────────────
+  tierFree: 'Gratis',
+  tierPro: 'Pro',
+  tierDev: 'Desarrollador',
+}

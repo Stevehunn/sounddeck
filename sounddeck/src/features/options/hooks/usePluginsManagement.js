@@ -2,11 +2,13 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { usePlugins } from '@core/plugins/PluginContext'
+import { useLicense } from '@core/store/hooks/useLicense'
 import { logWarn, logError } from '@shared/utils/logger'
 
 export function usePluginsManagement({ addToast }) {
   const { t } = useLanguage()
   const { pluginManager, refresh: refreshPlugins } = usePlugins()
+  const { tier: licenseTier, isPro } = useLicense()
   const [plugins, setPlugins] = useState([])
   const [disabledPlugins, setDisabledPlugins] = useState([])
 
@@ -87,5 +89,8 @@ export function usePluginsManagement({ addToast }) {
     loadPlugins,
     handlePluginUninstall,
     handlePluginEnable,
+    // ✅ NOUVEAU : expose le tier pour les consommateurs (Options, etc.)
+    licenseTier,
+    isPro,
   }
 }

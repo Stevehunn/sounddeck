@@ -3,6 +3,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+// vite.config.js
 const CSP_DEV = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' sounddeck-local: blob:",
@@ -10,7 +11,7 @@ const CSP_DEV = [
   "img-src 'self' data: blob: sounddeck-local: file: https:",
   "media-src 'self' data: blob: sounddeck-local: file: https:",
   "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com",
-  "connect-src 'self' sounddeck-local: ws: wss: http://localhost:* https: file: blob:",
+  "connect-src 'self' sounddeck-local: ws: wss: http://localhost:* http://127.0.0.1:* https: file: blob:",
   "worker-src 'self' blob: sounddeck-local:",
   "object-src 'none'",
   "base-uri 'self'",

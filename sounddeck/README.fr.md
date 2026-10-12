@@ -10,6 +10,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)](https://www.electronjs.org/)
 [![React](https://img.shields.io/badge/React-18-61dafb.svg)](https://react.dev/)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?logo=github-sponsors&logoColor=white)](https://github.com/sponsors/SteveHun)
 
 *Un soundboard puissant, multiplateforme et extensible.*
 
@@ -81,6 +82,16 @@
 - Synchronisation avec **OBS WebSocket**
 - Alertes **Twitch** (follows, dons, subs)
 
+### 💎 Plugins Pro
+
+Certains plugins nécessitent une **licence Pro**. Débloque-les tous **à vie** avec un **sponsorship GitHub unique** (à partir de 5 €).
+
+- Pas d'abonnement
+- Fonctionne hors-ligne
+- Valable à vie sur un nombre illimité de PC
+
+[**Sponsoriser sur GitHub →**](https://github.com/sponsors/SteveHun)
+
 ---
 
 ## 🚀 Installation
@@ -90,6 +101,8 @@
 1. Télécharger la dernière version depuis [Releases](../../releases)
 2. Lancer l'installateur (`.exe` sur Windows)
 3. Suivre le tutoriel interactif au premier lancement
+4. (Optionel) Sponsoriser sur [GitHub Sponsors](https://github.com/sponsors/SteveHun) pour débloquer les plugins
+
 
 ### Pour les développeurs
 
