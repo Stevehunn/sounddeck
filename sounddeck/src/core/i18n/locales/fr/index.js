@@ -14,6 +14,7 @@ import presentation from './presentation.js'
 import welcome from './welcome.js'
 import tutorial from './tutorial.js'
 import emoji from './emoji.js'
+import auth from './auth.js'
 
 export default {
   ...common,
@@ -31,4 +32,5 @@ export default {
   ...welcome,
   ...tutorial,
   ...emoji,
+  ...auth,
 }

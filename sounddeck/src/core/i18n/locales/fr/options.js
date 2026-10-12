@@ -10,7 +10,7 @@ export default {
   optionsBackup: 'Sauvegarde',
   optionsAbout: 'À propos',
   optionsProfiles: 'Profils',
-  
+
   // ─── GÉNÉRAL ─────────────────────────────────────────────────────────
   optionsLanguage: 'Langue',
   optionsLanguageDesc: 'Changer la langue de l\'application',
@@ -34,7 +34,7 @@ export default {
   deactivateShortcuts: 'Désactiver les raccourcis',
   quitApp: 'Quitter SoundDeck',
   openSoundDeck: 'Ouvrir SoundDeck',
-  
+
   // ─── APPARENCE ──────────────────────────────────────────────────────
   appearance: 'Apparence',
   language: 'Langue',
@@ -60,7 +60,7 @@ export default {
   focusModeOn: 'Focus ON',
   focusModeOff: 'Focus OFF',
   focusModeShortcut: 'Ctrl+Shift+F pour basculer',
-  
+
   // ─── AUDIO ───────────────────────────────────────────────────────────
   audio: 'Audio',
   audioMode: 'Mode audio',
@@ -78,7 +78,7 @@ export default {
   localOutputDeviceDesc: 'Périphérique utilisé pour l\'écoute locale (casque)',
   localOutputDeviceDefault: 'Par défaut',
   localOutputDeviceChanged: 'Périphérique local changé : {device}',
-  
+
   // ─── PILOTE VIRTUEL ──────────────────────────────────────────────────
   virtualDriver: 'Pilote audio virtuel',
   virtualDriverSub: 'Nécessaire pour Discord',
@@ -101,7 +101,7 @@ export default {
   uninstallGuideStep1: 'Va dans Panneau de configuration → Programmes → Désinstaller un programme',
   uninstallGuideStep2: 'Cherche "VB-CABLE" et désinstalle-le.',
   uninstallGuideRestart: '⚠️ Un redémarrage du PC peut être nécessaire après la désinstallation.',
-  
+
   // ─── MIXEUR ──────────────────────────────────────────────────────────
   mixerEnable: 'Mixeur micro + sons',
   mixerEnableDesc: 'Mélange ton micro avec les sons',
@@ -123,7 +123,8 @@ export default {
   mixerRepairError: '❌ Erreur : {error}',
   mixerNotInitialized: 'Mixeur non initialisé',
   mixerSoundVolume: 'Volume des sons',
-  
+  mixerResynced: 'Mixeur resynchronisé',
+
   // ─── MICROPHONE ──────────────────────────────────────────────────────
   microphone: 'Micro',
   microphoneSelect: 'Sélectionne ton micro',
@@ -140,20 +141,20 @@ export default {
   micTestInProgress: 'Test micro en cours (3 secondes)...',
   micTestFinished: 'Test micro terminé',
   micTesting: 'Test en cours...',
-  
+
   // ─── MONITORING ──────────────────────────────────────────────────────
   monitoring: "S'entendre",
   monitoringDesc: 'Écouter son micro dans les haut-parleurs (volume réduit)',
   monitoringEnabled: '🎤 Monitoring activé (vous vous entendez)',
   monitoringDisabled: '🔇 Monitoring désactivé',
   monitoringWarning: 'Monitoring actif : vous entendez votre micro dans les haut-parleurs',
-  
+
   // ─── BASSE LATENCE ────────────────────────────────────────────────────
   lowLatencyMode: 'Mode basse latence',
   lowLatencyModeDesc: 'Désactive les filtres audio pour réduire la latence (recommandé pour le jeu)',
   lowLatencyActivated: '⚡ Mode basse latence activé',
   lowLatencyDeactivated: '🔊 Mode basse latence désactivé',
-  
+
   // ─── RÉDUCTION DE BRUIT ──────────────────────────────────────────────
   noiseSuppression: 'Réduction de bruit micro',
   noiseSuppressionDesc: 'Filtre les bruits de fond (ventilateur, clavier, etc.)',
@@ -166,13 +167,13 @@ export default {
   noiseSuppressionActivated: '🔇 Réduction de bruit activée',
   noiseSuppressionDeactivated: '🔊 Réduction de bruit désactivée',
   noiseSuppressionModeChanged: 'Mode réduction de bruit : {mode}',
-  
+
   // ─── RECONNECT ──────────────────────────────────────────────────────
   reconnectFlow: 'Reconnecter le flux',
   reconnectFlowDesc: 'Force la reconnexion du flux au périphérique de sortie',
   reconnect: 'Reconnecter',
   flowReconnected: 'Flux reconnecté',
-  
+
   // ─── MODE AVANCÉ ──────────────────────────────────────────────────
   advancedMode: 'Mode avancé',
   advancedModeDesc: 'Utilise VB-Cable + VoiceMeeter Banana pour un mixage professionnel.',
@@ -181,11 +182,11 @@ export default {
   advancedModeTip: 'Consulte le guide Discord pour la configuration.',
   vbaudioInfo: 'Pour que Discord entende vos sons, installe VB-Audio Virtual Cable (gratuit) et sélectionne-le ici, puis dans Discord : Paramètres → Voix → Périphérique d\'entrée → CABLE Output.',
   vbaudioDownload: 'Télécharger VB-Audio →',
-  
+
   // ─── OPTIONS AVANCÉES ──────────────────────────────────────────────
   advancedOptions: 'Options avancées',
   advancedAudioOptions: 'Options audio avancées',
-  
+
   // ─── SAUVEGARDE ─────────────────────────────────────────────────────
   backup: 'Sauvegarde & restauration',
   exportLabel: 'Exporter',
@@ -223,7 +224,7 @@ export default {
   lazyLoadingDesc: 'Charge les sons uniquement quand ils sont visibles',
   lazyLoadingEnabled: 'Chargement à la demande activé',
   lazyLoadingDisabled: 'Chargement à la demande désactivé',
-  
+
   // ─── RACCOURCIS ──────────────────────────────────────────────────────
   shortcuts: 'Raccourcis',
   shortcutsPerSoundNote: 'Les raccourcis par son se configurent directement sur chaque carte de son (page Mes sons).',
@@ -244,7 +245,7 @@ export default {
   keyboardLayout: 'Disposition du clavier',
   keyboardLayoutDesc: 'Sélectionnez votre type de clavier',
   keyboardLayoutChanged: 'Disposition changée',
-  
+
   // ─── VISUALISATION DU CLAVIER ─────────────────────────────────────────
   keyboardVisualizerTitle: 'Raccourcis clavier',
   keyboardVisualizerUsed: 'raccourci utilisé',
@@ -270,7 +271,7 @@ export default {
   keyInactive: 'Touche inactive',
   keysWithoutModifier: 'Touches sans modificateur',
   keyboardVisualizerModifierUsed: 'Modificateur utilisé',
-  
+
   // ─── PROFILS ──────────────────────────────────────────────────────
   profileManagement: 'Gestion des profils',
   exportProfile: 'Exporter',
@@ -280,7 +281,7 @@ export default {
   profileImported: 'Profil importé',
   deleteProfile: 'Profil supprimé',
   deleteProfileConfirm: 'Voulez-vous vraiment supprimer le profil "{name}" ?',
-  
+
   // ─── GESTIONNAIRE DE PROFIL ────────────────────────────────────────────────
   profileManagerTitle: 'Gérer le profil',
   profileManagerSelectAll: 'Tout sélectionner',
@@ -306,7 +307,8 @@ export default {
   profileManagerRemoveError: 'Erreur lors du retrait des sons',
   profileManagerDeleteSuccess: 'Profil supprimé avec succès',
   profileManagerDeleteError: 'Erreur lors de la suppression du profil',
-  
+  profileMoved: 'Profil déplacé',
+
   // ─── THÈME PERSONNALISÉ ──────────────────────────────────────────────────
   themeEditorTitle: 'Éditeur de thème personnalisé',
   themeEditorReset: 'Réinitialiser',
@@ -341,16 +343,17 @@ export default {
   themePresetForest: 'Forêt',
   themePresetEmber: 'Braise',
   themePresetPastelLight: 'Clair Pastel',
-  
+
   // ─── ERREURS ──────────────────────────────────────────────────────────
   errorLogs: 'Logs d\'erreur',
   errorLogsDesc: 'Gestion des erreurs et logs',
   exportLogs: 'Exporter les logs',
   clearLogs: 'Effacer les logs',
   logsCleared: 'Logs effacés',
+  logsExported: 'Logs exportés ✓',
   clearLogsConfirm: 'Voulez-vous vraiment effacer tous les logs d\'erreur ?',
   noErrorLogs: 'Aucun log d\'erreur',
-  
+
   // ─── INTÉGRATIONS ──────────────────────────────────────────────────
   integrations: 'Intégrations',
 
@@ -397,6 +400,8 @@ export default {
   pluginsCommunityTip: 'Consultez la communauté SoundDeck pour découvrir des plugins créés par d\'autres utilisateurs.',
   pluginsDisabledTitle: 'Désactivés',
   pluginsEnableBtn: 'Réactiver',
+  pluginsEnableSuccess: 'Plugin "{name}" réactivé',
+  pluginsEnableError: 'Erreur lors de la réactivation',
   pluginsDisabledStatus: 'Désactivé',
 
   // ─── FEEDBACK ──────────────────────────────────────────────────────
@@ -418,12 +423,38 @@ export default {
   autoBackupEnabled: 'Sauvegarde automatique activée',
   autoBackupDisabled: 'Sauvegarde automatique désactivée',
 
-  logsCleared: 'Logs effacés',
-  logsExported: 'Logs exportés ✓',
+  // ═══════════════════════════════════════════════════════════════════
+  // ─── SUPPORT (GitHub Sponsors + Codes) ─────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════
+  supportSectionTitle: 'Soutenir SoundDeck',
+  supportSectionDesc: 'SoundDeck est gratuit et open-source. Si vous souhaitez soutenir le développement, un don unique débloque tous les plugins Pro à vie.',
 
   // ─── GITHUB SPONSORS ───────────────────────────────────────────────
   supportGithubSponsor: 'Sponsoriser sur GitHub',
   supportGithubSponsorDesc: 'Débloque tous les plugins Pro à vie',
   supportGithubSponsorHint: 'À partir de 5 € — une fois suffit',
   supportGithubSponsorNote: 'Après ton don, tu recevras ton code d\'activation par email.',
-};
+
+  // ─── AUTRES OPTIONS ────────────────────────────────────────────────
+  supportDonateBtn: 'Faire un don',
+  supportDonateHint: 'À partir de 5 € — merci !',
+  supportAlreadyDonor: 'Déjà fait un don ?',
+  supportActivateKey: 'J\'ai une clé',
+  supportSignIn: 'Se connecter',
+  supportProActive: 'Licence Pro active',
+  supportProActiveDesc: 'Merci pour votre soutien ! Vous avez accès à tous les plugins Pro.',
+  supportDevMode: 'Mode développeur actif',
+  supportDevModeDesc: 'Cette version a été compilée avec une licence développeur.',
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ─── À PROPOS ──────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════
+  aboutSectionTitle: 'À propos',
+  aboutVersion: 'Version',
+  aboutLicense: 'Licence',
+  aboutLicenseValue: 'MIT',
+  aboutSourceCode: 'Code source',
+  aboutSourceCodeValue: 'github.com/SteveHun/sounddeck',
+  aboutMadeWith: 'Fait avec ❤️ pour la communauté Discord',
+  aboutOpenSource: 'SoundDeck est un logiciel libre sous licence MIT.',
+}

@@ -18,6 +18,7 @@ import trimmer from '@core/i18n/locales/es/trimmer'
 import tutorial from '@core/i18n/locales/es/tutorial'
 import welcome from '@core/i18n/locales/es/welcome'
 import index from '@core/i18n/locales/es/index'
+import auth from '@core/i18n/locales/es/auth'
 
 const FILES = {
   common,
@@ -35,6 +36,7 @@ const FILES = {
   trimmer,
   tutorial,
   welcome,
+  auth,
 }
 
 testLocaleStructure('es', FILES, index, {

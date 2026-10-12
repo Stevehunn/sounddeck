@@ -9,7 +9,7 @@ export default function AboutSection({ sectionRef }) {
   const { t } = useLanguage();
 
   const handleOpenSource = () => {
-    window.electronAPI?.openExternal?.("https://github.com/SteveHun/sounddeck");
+    window.electronAPI?.openExternal?.("https://github.com/Stevehunn/Soundboard");
   };
 
   return (
@@ -19,42 +19,6 @@ export default function AboutSection({ sectionRef }) {
       title={t("aboutSectionTitle")}
       icon="ti-info-circle"
     >
-      {import.meta.env.DEV && (
-        <div
-          style={{
-            padding: "10px 14px",
-            background: "rgba(239,159,39,0.1)",
-            border: "1px dashed var(--warning)",
-            borderRadius: "var(--radius-md)",
-            marginBottom: 12,
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
-          <i
-            className="ti ti-bug"
-            style={{ color: "var(--warning)", fontSize: 16 }}
-          />
-          <div
-            style={{ flex: 1, fontSize: 11, color: "var(--text-secondary)" }}
-          >
-            <strong>Mode dev</strong> — Bouton de test pour reset la licence
-            locale
-          </div>
-          <button
-            className="btn-secondary btn-sm"
-            onClick={async () => {
-              await window.electronAPI.storeSet("licenseToken", null);
-              await window.electronAPI.storeSet("licenseEmail", null);
-              window.location.reload();
-            }}
-            style={{ fontSize: 11 }}
-          >
-            Reset licence locale
-          </button>
-        </div>
-      )}
       <OptionRow label={t("aboutVersion")}>
         <span
           style={{

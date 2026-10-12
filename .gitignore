@@ -1,3 +1,12 @@
-/sounddeck/dist-electron
-/sounddeck/server/.dev.vars
-/sounddeck/server/node_modules
+node_modules/
+dist/
+dist-electron/
+dist-plugins/
+.vite/
+.wrangler/
+server/.dev.vars
+server/.wrangler/
+server/node_modules/
+server/scripts/.tmp-*.sql
+*.log
+.DS_Store
