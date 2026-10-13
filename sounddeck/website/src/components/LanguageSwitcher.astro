@@ -1,0 +1,52 @@
+---
+import { languages, getLocalizedUrl, type Lang } from '../i18n'
+
+interface Props { currentLang: Lang }
+const { currentLang } = Astro.props
+
+const flags: Record<Lang, string> = {
+  fr: '🇫🇷',
+  en: '🇬🇧',
+  es: '🇪🇸',
+}
+
+const entries = Object.entries(languages) as [Lang, string][]
+---
+
+<div class="relative group">
+  <button
+    type="button"
+    class="flex items-center gap-1.5 px-3 h-9 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:bg-[var(--color-bg-hover)] text-sm transition-colors"
+    aria-label="Changer de langue"
+  >
+    <span>{flags[currentLang]}</span>
+    <span class="hidden sm:inline text-[var(--color-text-secondary)] uppercase text-xs font-medium tracking-wide">
+      {currentLang}
+    </span>
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-[var(--color-text-tertiary)]">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  </button>
+
+  <div class="absolute right-0 top-full mt-1.5 min-w-[140px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-secondary)] shadow-xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50">
+    {entries.map(([code, label]) => (
+      <a
+        href={getLocalizedUrl(Astro.url, code)}
+        class:list={[
+          'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors',
+          code === currentLang
+            ? 'bg-[var(--color-accent-light)] text-[var(--color-accent-hover)]'
+            : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]',
+        ]}
+      >
+        <span>{flags[code]}</span>
+        <span>{label}</span>
+        {code === currentLang && (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="ml-auto">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        )}
+      </a>
+    ))}
+  </div>
+</div>

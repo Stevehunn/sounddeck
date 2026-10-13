@@ -1,0 +1,217 @@
+{
+  "meta": {
+    "title": "SoundDeck — The ultimate soundboard for Discord",
+    "description": "Local soundboard for Discord with multi-track audio editor, playlist sequencer, YouTube import, and built-in mic mixer. Free and open source."
+  },
+  "nav": {
+    "features": "Features",
+    "pro": "Pro",
+    "faq": "FAQ",
+    "github": "GitHub",
+    "download": "Download"
+  },
+  "hero": {
+    "badge": "v0.1.0 · Open source · MIT",
+    "title_line1": "The ultimate",
+    "title_line2": "soundboard for Discord",
+    "subtitle": "Multi-track audio editor, playlist sequencer, YouTube import, mic + sounds mixer. Everything you need to spice up your voice sessions.",
+    "cta_primary": "Download for free",
+    "cta_secondary": "Sponsor ♥",
+    "meta_windows": "Windows",
+    "meta_macos": "macOS",
+    "meta_linux": "Linux",
+    "meta_free": "100% free",
+    "meta_open_source": "Open source"
+  },
+  "features": {
+    "title": "Powerful tools, simple interface",
+    "subtitle": "Every feature is built for speed. No hidden menus, no unnecessary setup.",
+    "items": {
+      "editor": {
+        "title": "Multi-track audio editor",
+        "desc": "Timeline with clips, fades, markers and audio effects (echo, reverb, speed). Undo/Redo, snap, automatic crossfade."
+      },
+      "sequencer": {
+        "title": "Playlist sequencer",
+        "desc": "Chain your sounds with custom delays, loop or shuffle. Perfect for intros and transitions."
+      },
+      "import": {
+        "title": "YouTube / MyInstants import",
+        "desc": "Download and import sounds in one click from YouTube, YouTube Music, MyInstants and more."
+      },
+      "mixer": {
+        "title": "Mic + sounds mixer",
+        "desc": "One virtual cable (VB-Cable), zero complex configuration. No VoiceMeeter needed for most setups."
+      },
+      "integrations": {
+        "title": "Works with Discord / OBS / Twitch",
+        "desc": "Native integration with OBS WebSocket and Twitch alerts (follows, donations, subs)."
+      },
+      "i18n": {
+        "title": "Multi-language",
+        "desc": "Interface available in French, English and Spanish. Complete translations, no hardcoded strings."
+      }
+    }
+  },
+  "showcase": {
+    "title": "Explore every corner of SoundDeck",
+    "subtitle": "8 pages built for speed. Every screen has a purpose, no feature is hidden.",
+    "pages": {
+      "home": {
+        "title": "My sounds",
+        "desc": "Your personal library, organized by profiles, favorites and tags. Instant search, drag & drop reordering.",
+        "bullets": [
+          "Multiple profiles (Gaming, Music, Memes…)",
+          "Favorites and tags to find a sound in a second",
+          "Global or per-sound keyboard shortcuts"
+        ]
+      },
+      "discover": {
+        "title": "Discover",
+        "desc": "Thousands of ready-to-use sounds, sorted by category. One-click import, straight into your library.",
+        "bullets": [
+          "Trending, Memes, Reactions, Gaming categories",
+          "Native MyInstants integration",
+          "Preview before importing"
+        ]
+      },
+      "editor": {
+        "title": "Audio editor",
+        "desc": "A full multi-track timeline with clips, effects and loops. Build complex mixes without leaving the app.",
+        "bullets": [
+          "Effects: volume, fade, speed, echo, reverb",
+          "Undo/Redo, snap, automatic crossfade",
+          "Export to MP3 or WAV"
+        ]
+      },
+      "sequencer": {
+        "title": "Sequencer",
+        "desc": "Chain your sounds with precise delays. Perfect for stream intros, transitions or retros.",
+        "bullets": [
+          "Configurable delays between sounds",
+          "Loop and shuffle playback",
+          "Drag & drop reordering"
+        ]
+      },
+      "trimmer": {
+        "title": "Trimmer",
+        "desc": "Interactive waveform with selection handles. Cut a sound to the second, preview the result before saving.",
+        "bullets": [
+          "Zoomable and navigable waveform",
+          "Selection preview",
+          "Formats: MP3, WAV, OGG, FLAC, M4A, AAC"
+        ]
+      },
+      "youtube": {
+        "title": "YouTube import",
+        "desc": "Paste a YouTube (or YouTube Music) URL, pick the portion to extract, and it's in your library.",
+        "bullets": [
+          "YouTube, YouTube Music, SoundCloud (partial) support",
+          "Precise start and end trimming",
+          "Auto-selection of the best audio format"
+        ]
+      },
+      "stats": {
+        "title": "Statistics",
+        "desc": "Track your usage: most played sounds, listening time, active profiles. Filter by week, month or all time.",
+        "bullets": [
+          "Top 10 most played sounds",
+          "History by week / month / all time",
+          "Profile and tag counters"
+        ]
+      },
+      "emoji": {
+        "title": "My emojis",
+        "desc": "212 emojis sorted by category (audio, reactions, animals, games…). Assign one emoji per sound to recognize it at a glance.",
+        "bullets": [
+          "Categories: audio, reactions, animals, games",
+          "Quick assignment from the library",
+          "Custom emojis supported"
+        ]
+      }
+    }
+  },
+  "how": {
+    "title": "How it works",
+    "subtitle": "A single virtual cable, zero complex configuration. SoundDeck merges your mic and your sounds into one stream that any app can read.",
+    "step1": {
+      "title": "Your inputs",
+      "desc": "Your microphone and the sounds from your SoundDeck library."
+    },
+    "step2": {
+      "title": "SoundDeck mixes",
+      "desc": "Both streams are merged in real time, with independent volume control."
+    },
+    "step3": {
+      "title": "Virtual cable",
+      "desc": "VB-Cable receives the mix and exposes it as a standard microphone device."
+    },
+    "step4": {
+      "title": "Discord & co.",
+      "desc": "Discord, OBS, Twitch, games… select VB-Cable as their mic. Your friends hear you with the sounds."
+    },
+    "compatTitle": "Works with anything that has voice chat",
+    "compatDesc": "Not just Discord — SoundDeck works with any game or software that accepts an audio input device. You keep your headphones for monitoring, and your friends receive the mix."
+  },
+  "pro": {
+    "badge": "Pro plugins",
+    "title": "Unlock all Pro plugins",
+    "subtitle": "A one-time donation of $5 or more on GitHub Sponsors unlocks lifetime access to all Pro plugins. No subscription, no account, works offline.",
+    "cta": "Sponsor on GitHub",
+    "features": {
+      "lifetime": "Lifetime access",
+      "offline": "Works offline",
+      "unlimited": "Unlimited PCs",
+      "no_sub": "No subscription"
+    }
+  },
+  "faq": {
+    "title": "Frequently asked questions",
+    "items": {
+      "free": {
+        "q": "Is SoundDeck really free?",
+        "a": "Yes. SoundDeck's core is 100% free and open source under the MIT license. Only some Pro plugins require a license, obtained through a one-time donation."
+      },
+      "license": {
+        "q": "How does the Pro license work?",
+        "a": "A one-time donation of $5 or more on GitHub Sponsors unlocks all Pro plugins forever, on an unlimited number of PCs. No subscription, no account to create."
+      },
+      "voicemeeter": {
+        "q": "Do I need VoiceMeeter?",
+        "a": "No. SoundDeck includes a built-in mic + sounds mixer. VB-Cable is enough for most setups. VoiceMeeter is still supported for advanced configurations."
+      },
+      "os": {
+        "q": "Which operating systems are supported?",
+        "a": "Windows, macOS and Linux. The Windows version is the most tested and most used by the community."
+      },
+      "privacy": {
+        "q": "Is my data sent anywhere?",
+        "a": "No. All your sounds, profiles and settings are stored locally. Only optional license verification requires an internet connection."
+      },
+      "contribute": {
+        "q": "Can I contribute?",
+        "a": "Of course! The project is open source on GitHub. See CONTRIBUTING.md for code conventions, testing rules and the Git workflow."
+      }
+    }
+  },
+  "footer": {
+    "tagline": "Made with ❤️ for the Discord community",
+    "product": "Product",
+    "resources": "Resources",
+    "community": "Community",
+    "links": {
+      "download": "Download",
+      "features": "Features",
+      "pro": "Pro plugins",
+      "faq": "FAQ",
+      "github": "GitHub",
+      "releases": "Releases",
+      "changelog": "Changelog",
+      "contributing": "Contributing",
+      "license": "MIT License",
+      "sponsors": "Sponsors",
+      "issues": "Report a bug"
+    },
+    "copyright": "© 2026 Stevehunn · SoundDeck is released under the MIT License"
+  }
+}

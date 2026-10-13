@@ -1,0 +1,99 @@
+---
+import { SITE } from '../i18n/utils'
+import { useTranslations, type Lang } from '../i18n'
+
+interface Props { lang: Lang }
+const { lang } = Astro.props
+const t = useTranslations(lang)
+
+const home = lang === 'fr' ? '/' : `/${lang}/`
+
+const columns = [
+  {
+    title: t.footer.product,
+    links: [
+      { label: t.footer.links.download,   href: SITE.githubReleases, external: true },
+      { label: t.footer.links.features,   href: '#features',          external: false },
+      { label: t.footer.links.pro,        href: '#pro',               external: false },
+      { label: t.footer.links.faq,        href: '#faq',               external: false },
+    ],
+  },
+  {
+    title: t.footer.resources,
+    links: [
+      { label: t.footer.links.github,     href: SITE.github,         external: true },
+      { label: t.footer.links.releases,   href: `${SITE.github}/releases`, external: true },
+      { label: t.footer.links.changelog,  href: SITE.changelog,      external: true },
+      { label: t.footer.links.contributing, href: SITE.contributing, external: true },
+    ],
+  },
+  {
+    title: t.footer.community,
+    links: [
+      { label: t.footer.links.sponsors,   href: SITE.githubSponsors, external: true },
+      { label: t.footer.links.issues,     href: SITE.githubIssues,   external: true },
+      { label: t.footer.links.license,    href: SITE.license,        external: true },
+    ],
+  },
+]
+---
+
+<footer class="border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)]/40">
+  <div class="max-w-6xl mx-auto px-6 py-14">
+
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-10">
+
+      <!-- Brand -->
+      <div class="col-span-2">
+        <a href={home} class="flex items-center gap-2.5 mb-4">
+          <img src="/logo-icon.png" alt="SoundDeck" width="28" height="28" class="rounded-md" />
+          <span class="font-bold text-[15px] tracking-tight">SoundDeck</span>
+        </a>
+        <p class="text-sm text-[var(--color-text-tertiary)] leading-relaxed max-w-xs">
+          {t.footer.tagline}
+        </p>
+      </div>
+
+      <!-- Link columns -->
+      {columns.map((col) => (
+        <div>
+          <h3 class="text-xs font-semibold text-[var(--color-text-primary)] uppercase tracking-wider mb-4">
+            {col.title}
+          </h3>
+          <ul class="space-y-2.5">
+            {col.links.map((link) => (
+              <li>
+                <a
+                  href={link.href}
+                  target={link.external ? '_blank' : undefined}
+                  rel={link.external ? 'noopener' : undefined}
+                  class="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+                >
+                  {link.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+
+    </div>
+
+    <div class="mt-12 pt-6 border-t border-[var(--color-border)] flex flex-col sm:flex-row items-center justify-between gap-3">
+      <p class="text-xs text-[var(--color-text-tertiary)]">
+        {t.footer.copyright}
+      </p>
+      <div class="flex items-center gap-4 text-xs text-[var(--color-text-tertiary)]">
+        <a href={SITE.github} target="_blank" rel="noopener" class="hover:text-[var(--color-text-primary)] transition-colors flex items-center gap-1.5">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.38.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.6-4.04-1.6-.55-1.4-1.34-1.77-1.34-1.77-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.17 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.65.24 2.87.12 3.17.77.84 1.24 1.91 1.24 3.22 0 4.62-2.8 5.64-5.48 5.94.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58C20.56 22.3 24 17.8 24 12.5 24 5.87 18.63.5 12 .5z"/></svg>
+          GitHub
+        </a>
+        <a href={SITE.githubSponsors} target="_blank" rel="noopener" class="hover:text-[#ea4aaa] transition-colors flex items-center gap-1.5">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          Sponsor
+        </a>
+      </div>
+    </div>
+
+  </div>
+</footer>

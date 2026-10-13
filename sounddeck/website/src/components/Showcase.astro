@@ -1,0 +1,100 @@
+---
+import { useTranslations, type Lang } from '../i18n'
+
+interface Props { lang: Lang }
+const { lang } = Astro.props
+const t = useTranslations(lang)
+
+const pages = [
+  { key: 'home',      icon: 'ti-home',          accent: '#7c6ff7', img: '/screenshots/home.png' },
+  { key: 'discover',  icon: 'ti-compass',       accent: '#1d9e75', img: '/screenshots/discovery.png' },
+  { key: 'editor',    icon: 'ti-wand',          accent: '#7c6ff7', img: '/screenshots/editor.png' },
+  { key: 'sequencer', icon: 'ti-playlist',      accent: '#ef9f27', img: '/screenshots/sequencer.png' },
+  { key: 'trimmer',   icon: 'ti-cut',           accent: '#e05252', img: '/screenshots/trimmer.png' },
+  { key: 'youtube',   icon: 'ti-brand-youtube', accent: '#e05252', img: '/screenshots/youtube.png' },
+  { key: 'stats',     icon: 'ti-chart-bar',     accent: '#1d9e75', img: '/screenshots/stats.png' },
+  { key: 'emoji',     icon: 'ti-mood-smile',    accent: '#ef9f27', img: '/screenshots/emoji.png' },
+] as const
+---
+
+<section id="showcase" class="relative py-24 md:py-32 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)]/30">
+  <div class="max-w-6xl mx-auto px-6">
+
+    <div data-reveal="up" class="text-center max-w-2xl mx-auto mb-20">
+      <h2 class="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+        {t.showcase.title}
+      </h2>
+      <p class="text-[var(--color-text-secondary)] text-base md:text-lg leading-relaxed">
+        {t.showcase.subtitle}
+      </p>
+    </div>
+
+    <div class="space-y-24 md:space-y-32">
+      {pages.map((p, i) => {
+        const page = t.showcase.pages[p.key]
+        const reversed = i % 2 === 1
+        return (
+          <div class="grid md:grid-cols-2 gap-8 md:gap-14 items-center">
+
+            <!-- Texte -->
+            <div
+              data-reveal={reversed ? 'right' : 'left'}
+              class:list={[reversed && 'md:order-2']}
+            >
+              <div
+                class="w-12 h-12 rounded-[var(--radius-md)] flex items-center justify-center mb-5 border"
+                style={`background: ${p.accent}15; border-color: ${p.accent}30; color: ${p.accent};`}
+              >
+                <i class={`ti ${p.icon}`} style="font-size: 24px"></i>
+              </div>
+
+              <h3 class="text-2xl md:text-3xl font-bold tracking-tight mb-3 text-[var(--color-text-primary)]">
+                {page.title}
+              </h3>
+
+              <p class="text-[var(--color-text-secondary)] text-base leading-relaxed mb-6">
+                {page.desc}
+              </p>
+
+              <ul class="space-y-3">
+                {page.bullets.map((b) => (
+                  <li class="flex items-start gap-3 text-sm text-[var(--color-text-secondary)]">
+                    <span
+                      class="shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full"
+                      style={`background: ${p.accent};`}
+                    />
+                    <span class="leading-relaxed">{b}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <!-- Image -->
+            <div
+              data-reveal={reversed ? 'left' : 'right'}
+              data-reveal-delay="120"
+              class:list={['relative group', reversed && 'md:order-1']}
+            >
+              <div
+                class="absolute -inset-3 rounded-[20px] blur-2xl opacity-40 pointer-events-none"
+                style={`background: ${p.accent}30;`}
+              />
+              <div class="relative rounded-[var(--radius-lg)] border border-[var(--color-border)] overflow-hidden shadow-xl shadow-black/40 bg-[var(--color-bg-secondary)] transition-transform duration-300 group-hover:scale-[1.015]">
+                <img
+                  src={p.img}
+                  alt={page.title}
+                  width="1920"
+                  height="1080"
+                  class="w-full h-auto block"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+
+          </div>
+        )
+      })}
+    </div>
+
+  </div>
+</section>

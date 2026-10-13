@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://sounddeck.stream/sitemap-index.xml

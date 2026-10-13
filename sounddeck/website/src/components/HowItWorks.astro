@@ -1,0 +1,122 @@
+---
+import { useTranslations, type Lang } from '../i18n'
+
+interface Props { lang: Lang }
+const { lang } = Astro.props
+const t = useTranslations(lang)
+
+const steps = [
+  { key: 'step1', icon: 'ti-microphone',     accent: '#ef9f27' },
+  { key: 'step2', icon: 'ti-adjustments',    accent: '#7c6ff7' },
+  { key: 'step3', icon: 'ti-plug-connected', accent: '#1d9e75' },
+  { key: 'step4', icon: 'ti-device-desktop', accent: '#e05252' },
+] as const
+
+const apps = [
+  { name: 'Discord',  icon: 'ti-brand-discord' },
+  { name: 'OBS',      icon: 'ti-video' },
+  { name: 'Twitch',   icon: 'ti-brand-twitch' },
+  { name: 'Steam',    icon: 'ti-brand-steam' },
+  { name: 'Zoom',     icon: 'ti-video-plus' },
+  { name: 'Teams',    icon: 'ti-users' },
+] as const
+---
+
+<section id="how" class="relative py-24 md:py-32 border-t border-[var(--color-border)]">
+  <div class="max-w-6xl mx-auto px-6">
+
+    <div data-reveal="up" class="text-center max-w-2xl mx-auto mb-16">
+      <h2 class="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+        {t.how.title}
+      </h2>
+      <p class="text-[var(--color-text-secondary)] text-base md:text-lg leading-relaxed">
+        {t.how.subtitle}
+      </p>
+    </div>
+
+    <div class="relative mb-14">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 md:gap-4 items-stretch relative">
+
+        {steps.map((s, i) => {
+          const item = t.how[s.key]
+          const delay = i * 130
+          return (
+            <>
+              <div
+                data-reveal="up"
+                data-reveal-delay={delay}
+                class="relative flex flex-col items-center text-center"
+              >
+                <div class="relative mb-5">
+                  <div
+                    class="w-16 h-16 rounded-[var(--radius-lg)] flex items-center justify-center border-2"
+                    style={`background: ${s.accent}15; border-color: ${s.accent}50; color: ${s.accent};`}
+                  >
+                    <i class={`ti ${s.icon}`} style="font-size: 28px"></i>
+                  </div>
+                  <span
+                    class="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white shadow-lg"
+                    style={`background: ${s.accent};`}
+                  >
+                    {i + 1}
+                  </span>
+                </div>
+
+                <h3 class="text-base font-semibold mb-2 text-[var(--color-text-primary)]">
+                  {item.title}
+                </h3>
+                <p class="text-sm text-[var(--color-text-secondary)] leading-relaxed max-w-xs">
+                  {item.desc}
+                </p>
+              </div>
+
+              {i < steps.length - 1 && (
+                <div
+                  class="hidden md:flex absolute top-[32px] -translate-y-1/2 items-center justify-center pointer-events-none"
+                  style={`left: calc(${((i + 1) * 25)}% - 20px); width: 40px;`}
+                >
+                  <svg
+                    width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="text-[var(--color-text-tertiary)]"
+                  >
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                    <polyline points="12 5 19 12 12 19"/>
+                  </svg>
+                </div>
+              )}
+            </>
+          )
+        })}
+
+      </div>
+    </div>
+
+    <div
+      data-reveal="up"
+      data-reveal-delay="200"
+      class="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-6 md:p-8"
+    >
+      <div class="flex flex-col md:flex-row md:items-center gap-6">
+        <div class="flex-1">
+          <h3 class="text-base font-semibold mb-2 text-[var(--color-text-primary)]">
+            {t.how.compatTitle}
+          </h3>
+          <p class="text-sm text-[var(--color-text-secondary)] leading-relaxed">
+            {t.how.compatDesc}
+          </p>
+        </div>
+
+        <div class="flex flex-wrap gap-2.5">
+          {apps.map((a) => (
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] text-xs font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-accent)]/40 hover:text-[var(--color-text-primary)] transition-colors">
+              <i class={`ti ${a.icon}`} style="font-size: 14px"></i>
+              {a.name}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>

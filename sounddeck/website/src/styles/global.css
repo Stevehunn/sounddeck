@@ -1,0 +1,186 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+@import url("https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css");
+
+@import "tailwindcss";
+
+@theme {
+  /* ─── Palette SoundDeck (alignée avec l'app) ─────────────────── */
+  --color-bg-primary: #111113;
+  --color-bg-secondary: #1a1a1e;
+  --color-bg-tertiary: #222228;
+  --color-bg-hover: #2a2a32;
+  --color-border: #2e2e36;
+  --color-border-hover: #3a3a44;
+
+  --color-text-primary: #f0f0f2;
+  --color-text-secondary: #a0a0b0;
+  --color-text-tertiary: #606070;
+
+  --color-accent: #7c6ff7;
+  --color-accent-hover: #9b96ff;
+  --color-accent-light: #2d2855;
+
+  --color-success: #1d9e75;
+  --color-warning: #ef9f27;
+  --color-danger: #e05252;
+
+  /* ─── Typo ────────────────────────────────────────────────────── */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
+  /* ─── Radius (cohérents avec l'app) ──────────────────────────── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: var(--color-bg-primary);
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background: var(--color-accent);
+    color: white;
+  }
+
+  /* Scrollbar alignée avec l'app */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-tertiary);
+  }
+}
+
+@layer utilities {
+  /* Gradient text accent */
+  .text-gradient {
+    background: linear-gradient(135deg, #7c6ff7 0%, #9b96ff 50%, #b8a8ff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Glow accent pour les CTA */
+  .glow-accent {
+    box-shadow: 0 0 40px rgba(124, 111, 247, 0.35);
+  }
+
+  /* Subtle grid background */
+  .bg-grid {
+    background-image:
+      linear-gradient(rgba(124, 111, 247, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124, 111, 247, 0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  /* Radial fade pour le hero */
+  .hero-glow {
+    background: radial-gradient(
+      ellipse 80% 60% at 50% 0%,
+      rgba(124, 111, 247, 0.18) 0%,
+      transparent 70%
+    );
+  }
+
+  /* Animations */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-fade-in-up {
+    animation: fadeInUp 0.6s ease forwards;
+  }
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SCROLL REVEAL ANIMATIONS
+   ═══════════════════════════════════════════════════════════ */
+
+/* Fallback no-JS : tout est visible */
+[data-reveal] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Avec JS : on masque avant déclenchement */
+html.js [data-reveal] {
+  opacity: 0;
+  filter: blur(3px);
+  transition:
+    opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.75s ease;
+  will-change: opacity, transform, filter;
+}
+
+html.js [data-reveal="up"] {
+  transform: translateY(28px);
+}
+html.js [data-reveal="down"] {
+  transform: translateY(-28px);
+}
+html.js [data-reveal="left"] {
+  transform: translateX(-36px);
+}
+html.js [data-reveal="right"] {
+  transform: translateX(36px);
+}
+html.js [data-reveal="zoom"] {
+  transform: scale(0.94);
+}
+html.js [data-reveal="fade"] {
+  transform: none;
+}
+
+html.js [data-reveal].is-visible {
+  opacity: 1;
+  transform: none;
+  filter: blur(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.js [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    transition: none !important;
+  }
+}

@@ -1,0 +1,67 @@
+---
+import { SITE } from '../i18n/utils'
+import { useTranslations, type Lang } from '../i18n'
+
+interface Props { lang: Lang }
+const { lang } = Astro.props
+const t = useTranslations(lang)
+
+const perks = [
+  { key: 'lifetime',  icon: 'ti-infinity' },
+  { key: 'offline',   icon: 'ti-cloud-off' },
+  { key: 'unlimited', icon: 'ti-devices' },
+  { key: 'no_sub',    icon: 'ti-credit-card-off' },
+] as const
+---
+
+<section id="pro" class="relative py-24 md:py-32 border-t border-[var(--color-border)]">
+  <div class="max-w-6xl mx-auto px-6">
+
+    <div
+  data-reveal="zoom"
+  class="relative rounded-[var(--radius-xl)] border border-[var(--color-accent)]/30 bg-gradient-to-br from-[var(--color-accent-light)]/40 via-[var(--color-bg-secondary)] to-[var(--color-bg-secondary)] p-10 md:p-14 overflow-hidden"
+>
+
+      <!-- Décor glow -->
+      <div class="absolute -top-32 -right-32 w-64 h-64 rounded-full bg-[var(--color-accent)]/20 blur-3xl pointer-events-none"></div>
+
+      <div class="relative max-w-2xl">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10 text-xs font-medium text-[var(--color-accent-hover)] mb-5">
+          <i class="ti ti-sparkles" style="font-size: 12px"></i>
+          {t.pro.badge}
+        </span>
+
+        <h2 class="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+          {t.pro.title}
+        </h2>
+
+        <p class="text-[var(--color-text-secondary)] text-base md:text-lg leading-relaxed mb-8">
+          {t.pro.subtitle}
+        </p>
+
+        <ul class="grid grid-cols-2 gap-3 mb-9 max-w-md">
+          {perks.map((p) => (
+            <li class="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+              <i class={`ti ${p.icon} text-[var(--color-accent)]`} style="font-size: 16px"></i>
+              {t.pro.features[p.key]}
+            </li>
+          ))}
+        </ul>
+
+        <a
+          href={SITE.githubSponsors}
+          target="_blank"
+          rel="noopener"
+          class="inline-flex items-center justify-center gap-2 px-6 h-12 rounded-[var(--radius-md)] bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-semibold transition-all hover:-translate-y-0.5 glow-accent"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+          {t.pro.cta}
+        </a>
+      </div>
+
+    </div>
+
+  </div>
+</section>
