@@ -2,7 +2,7 @@
   "name": "sounddeck",
   "version": "0.1.0",
   "description": "Soundboard local for Discord or other applications with voice chat",
-  "author": "SteveHun <stevehun09@gmail.com>",
+  "author": "Stevehunn <stevehun09@gmail.com>",
   "license": "MIT",
   "main": "electron/main.js",
   "scripts": {
@@ -86,9 +86,11 @@
     }
   },
   "dependencies": {
+    "@astrojs/sitemap": "^3.7.4",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@noble/ed25519": "^2.1.0",
     "@noble/hashes": "^1.5.0",
+    "@tailwindcss/vite": "^4.3.3",
     "adm-zip": "^0.6.0",
     "archiver": "^8.0.0",
     "electron-store": "^8.1.0",
@@ -97,6 +99,7 @@
     "obs-websocket-js": "^5.0.8",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "tailwindcss": "^4.3.3",
     "tmi.js": "^1.8.5",
     "tone": "^14.7.77",
     "unzipper": "^0.10.14",

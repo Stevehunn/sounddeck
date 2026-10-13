@@ -4,15 +4,15 @@
 
 **Soundboard local para Discord y otras aplicaciones de chat de voz**
 
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](#)
 [![Tests](https://img.shields.io/badge/tests-5384%20%E2%9C%85-success.svg)](#tests)
 [![Coverage](https://img.shields.io/badge/coverage-77.5%25-yellowgreen.svg)](#tests)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)](https://www.electronjs.org/)
 [![React](https://img.shields.io/badge/React-18-61dafb.svg)](https://react.dev/)
-[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?logo=github-sponsors&logoColor=white)](https://github.com/sponsors/SteveHun)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?logo=github-sponsors&logoColor=white)](https://github.com/sponsors/Stevehunn)
 
-*Un soundboard potente, multiplataforma y extensible.*
+_Un soundboard potente, multiplataforma y extensible._
 
 **🌍 Idiomas:** [English](README.md) · [Français](README.fr.md) · **Español**
 
@@ -23,6 +23,7 @@
 ## ✨ Características
 
 ### 🎵 Biblioteca de sonidos
+
 - Importación por **arrastrar y soltar**, diálogo de archivo o URL
 - Organización por **perfiles** (Gaming, Música, Memes…)
 - **Favoritos**, **etiquetas**, búsqueda instantánea
@@ -30,6 +31,7 @@
 - Compresión automática al importar (opcional, vía ffmpeg)
 
 ### 🎛️ Editor de audio
+
 - Línea de tiempo multipista con **clips**, **fades**, **marcadores**
 - **Efectos de audio**: Volumen, Fade In/Out, Velocidad, Eco, Reverb
 - **Bucles** por clip o globales (con número de ciclos personalizable)
@@ -38,23 +40,28 @@
 - **Exportación** de la mezcla final a MP3/WAV
 
 ### 🎹 Secuenciador
+
 - Crea **playlists** de sonidos con retardos configurables
 - **Bucle** y reproducción aleatoria
 - Reordenación por drag & drop
 - Navegación por teclado ← →
 
 ### ✂️ Recortador
+
 - Waveform interactiva con manejadores de selección
 - Vista previa de la selección antes de crear
 - Formatos soportados: MP3, WAV, OGG, FLAC, M4A, AAC
 
 ### 🌐 Descubrimiento e Importación
+
 - **MyInstants**: búsqueda e importación directa desde miles de sonidos
 - **YouTube**: descarga de audio (vía yt-dlp)
 - **Spotify / SoundCloud**: soporte parcial
 - **Emoji picker** con colecciones personalizables
 
 ### 🔊 Audio y Discord
+
+- **Asistente de configuración rápida** — configuración de Discord en un clic (detección automática de CABLE Input, auriculares, micro)
 - **Mezclador micrófono + sonidos** integrado (no necesitas VoiceMeeter en casos simples)
 - Compatible con **VB-Cable** y **VoiceMeeter Banana**
 - **Monitoring** (escucharte en los auriculares)
@@ -63,12 +70,14 @@
 - Selección fina de dispositivos de entrada/salida
 
 ### 🧩 Extensiones
+
 - **Sistema de plugins** completo con instalación desde URL o archivo `.sdplugin`
 - Plugins integrados: **YouTube**, **MyInstants**, **Emoji Discovery**
 - Hooks (beforePageRender, onSoundPlay, onAppStart…)
 - Versionado semántico con compatibilidad
 
 ### 🎨 Interfaz
+
 - 3 temas: **Oscuro**, **Claro**, **Personalizado** (con editor)
 - **Sidebar editable** (orden, visibilidad, fijación)
 - **Tutoriales interactivos** para cada página
@@ -77,6 +86,7 @@
 - Atajos de teclado globales + por sonido
 
 ### 💾 Copia de seguridad
+
 - **Auto-backup** configurable (intervalo, número máximo)
 - Exportar/Importar: config JSON, archivo completo, o solo sonidos
 - Sincronización con **OBS WebSocket**
@@ -90,7 +100,7 @@ Algunos plugins requieren una **licencia Pro**. Desbloquéalos todos **para siem
 - Funciona sin conexión
 - Válido para siempre en PCs ilimitados
 
-[**Patrocinar en GitHub →**](https://github.com/sponsors/SteveHun)
+[**Patrocinar en GitHub →**](https://github.com/sponsors/Stevehunn)
 
 ---
 
@@ -101,11 +111,12 @@ Algunos plugins requieren una **licencia Pro**. Desbloquéalos todos **para siem
 1. Descargar la última versión desde [Releases](../../releases)
 2. Ejecutar el instalador (`.exe` en Windows)
 3. Seguir el tutorial interactivo en el primer inicio
-4. (Opcional) Patrocina en [GitHub Sponsors](https://github.com/sponsors/SteveHun) para desbloquear los plugins Pro
+4. (Opcional) Patrocina en [GitHub Sponsors](https://github.com/sponsors/Stevehunn) para desbloquear los plugins Pro
 
 ### Para desarrolladores
 
 **Requisitos**:
+
 - **Node.js** ≥ 20.19
 - **npm** ≥ 10
 - **ffmpeg** (opcional, para recorte y compresión)
@@ -130,18 +141,18 @@ npm run build
 
 ## 📜 Scripts npm
 
-| Script | Descripción |
-|---|---|
-| `npm run dev` | Ejecuta Electron + Vite en modo dev con HMR |
-| `npm run build` | Build de producción (Vite + electron-builder) |
-| `npm run preview` | Previsualiza el build de Vite |
-| `npm test` | Ejecuta los tests en modo watch |
-| `npm run test:watch` | Modo watch explícito |
-| `npm run test:ui` | Interfaz gráfica de Vitest |
-| `npm run test:coverage` | Tests + reporte de coverage |
-| `npm run test:ci` | Tests + coverage (modo CI, exit on fail) |
-| `npm run build:plugin` | Compila un plugin (script utilitario) |
-| `npm run audit:i18n` | Auditoría de traducciones faltantes |
+| Script                  | Descripción                                   |
+| ----------------------- | --------------------------------------------- |
+| `npm run dev`           | Ejecuta Electron + Vite en modo dev con HMR   |
+| `npm run build`         | Build de producción (Vite + electron-builder) |
+| `npm run preview`       | Previsualiza el build de Vite                 |
+| `npm test`              | Ejecuta los tests en modo watch               |
+| `npm run test:watch`    | Modo watch explícito                          |
+| `npm run test:ui`       | Interfaz gráfica de Vitest                    |
+| `npm run test:coverage` | Tests + reporte de coverage                   |
+| `npm run test:ci`       | Tests + coverage (modo CI, exit on fail)      |
+| `npm run build:plugin`  | Compila un plugin (script utilitario)         |
+| `npm run audit:i18n`    | Auditoría de traducciones faltantes           |
 
 ---
 
@@ -151,14 +162,14 @@ El proyecto usa **[Vitest](https://vitest.dev/)** para tests unitarios y de inte
 
 ### Estado actual
 
-| Métrica | Valor |
-|---|---|
-| **Tests totales** | **5 384** ✅ |
-| **Archivos de test** | 240 |
-| **Coverage statements** | 77.5 % |
-| **Coverage branches** | 68.95 % |
-| **Coverage funciones** | 78.46 % |
-| **Coverage líneas** | 79.09 % |
+| Métrica                 | Valor        |
+| ----------------------- | ------------ |
+| **Tests totales**       | **5 384** ✅ |
+| **Archivos de test**    | 240          |
+| **Coverage statements** | 77.5 %       |
+| **Coverage branches**   | 68.95 %      |
+| **Coverage funciones**  | 78.46 %      |
+| **Coverage líneas**     | 79.09 %      |
 
 ### Ejecutar los tests
 
@@ -353,7 +364,21 @@ export default {
 
 ## 🎧 Configuración de Discord
 
-### Modo simple (solo VB-Cable) — Recomendado
+### 🪄 Asistente de configuración rápida (recomendado)
+
+Desde la v0.1.0, SoundDeck incluye una **configuración de Discord en un clic**:
+
+1. Instalar VB-Cable y reiniciar el PC
+2. Abrir **Options → Audio → Configuración rápida**
+3. Hacer clic en **« Configuración auto Discord »**
+4. SoundDeck selecciona automáticamente:
+   - Salida → `CABLE Input`
+   - Salida local → tus auriculares (dispositivo real, no alias de Windows)
+   - Micrófono → tu micrófono real
+   - Activa el mezclador, playLocally y la supresión de ruido
+5. Hacer clic en **« Hecho »** en el banner de recordatorio de Discord después de configurar Discord manualmente (Entrada = `CABLE Output`)
+
+### Modo simple (solo VB-Cable) — Manual
 
 1. Instalar **VB-Cable** desde [vb-audio.com](https://vb-audio.com/Cable/)
 2. Reiniciar el PC
@@ -369,9 +394,7 @@ export default {
 
 ### Modo avanzado (VoiceMeeter Banana)
 
-Consulta la **Guía de Discord** integrada (página Guide en la app).
-
----
+## Consulta la **Guía de Discord** integrada (página Guide en la app).
 
 ## 🌍 Internacionalización
 
@@ -388,11 +411,11 @@ El proyecto soporta **3 idiomas**: FR, EN, ES.
 ```javascript
 // src/core/i18n/locales/fr/common.js
 export default {
-  add: 'Ajouter',
-  cancel: 'Annuler',
+  add: "Ajouter",
+  cancel: "Annuler",
   profileManagerConfirmMessage: 'Retirer {count} son(s) du profil "{name}" ?',
   // ...
-}
+};
 ```
 
 Placeholders soportados: `{name}` (nombrados), `{0}` (posicionales).
@@ -409,6 +432,7 @@ Placeholders soportados: `{name}` (nombrados), `{0}` (posicionales).
 - El proceso de PR
 
 **Antes de enviar una PR**:
+
 ```bash
 npm test              # Todos los tests en verde
 npm run test:coverage # Sin regresión de coverage
@@ -418,7 +442,7 @@ npm run test:coverage # Sin regresión de coverage
 
 ## 📄 Licencia
 
-MIT © 2026 SteveHun
+MIT © 2026 Stevehunn
 
 Ver [LICENSE](LICENSE) para el texto completo.
 

@@ -79,6 +79,20 @@ export default {
   localOutputDeviceDefault: 'Por defecto',
   localOutputDeviceChanged: 'Dispositivo local cambiado: {device}',
 
+  // ─── CONFIGURACIÓN RÁPIDA ───────────────────────────────────────────
+  quickSetupTitle: 'Configuración rápida',
+  quickSetup: 'Asistente de configuración',
+  quickSetupDesc: 'Configura SoundDeck automáticamente para Discord (CABLE Input, mezclador, micro…).',
+  quickSetupApply: 'Configuración auto Discord',
+  quickSetupApplying: 'Aplicando configuración…',
+  quickSetupApplied: '✅ ¡SoundDeck está listo para Discord!',
+  quickSetupNoCable: '❌ CABLE Input no encontrado. Instala VB-Cable primero.',
+  quickSetupRememberDiscord: 'No olvides configurar Discord: Entrada = CABLE Output',
+  quickSetupBannerTitle: 'Recuerda configurar Discord',
+  quickSetupBannerDesc: 'Entrada = CABLE Output · Salida = auriculares · Desactiva la supresión de ruido y la cancelación de eco.',
+  quickSetupBannerDoneBtn: 'Hecho',
+  quickSetupDiscordDoneToast: '¡Perfecto! Puedes volver atrás si lo necesitas.',
+
   // ─── CONTROLADOR VIRTUAL ──────────────────────────────────────────────────
   virtualDriver: 'Controlador de audio virtual',
   virtualDriverSub: 'Necesario para Discord',
@@ -454,7 +468,7 @@ export default {
   aboutLicense: 'Licencia',
   aboutLicenseValue: 'MIT',
   aboutSourceCode: 'Código fuente',
-  aboutSourceCodeValue: 'github.com/SteveHun/sounddeck',
+  aboutSourceCodeValue: 'github.com/Stevehunn/sounddeck',
   aboutMadeWith: 'Hecho con ❤️ para la comunidad de Discord',
   aboutOpenSource: 'SoundDeck es software libre bajo licencia MIT.',
 }

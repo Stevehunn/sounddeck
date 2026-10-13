@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Marketing website** at [sounddeck.stream](https://sounddeck.stream) — Astro + Tailwind, deployed on Cloudflare Pages
+  - 3 languages: FR (default), EN, ES
+  - Scroll reveal animations with blur + stagger + directional slide
+  - Sections: Hero (3D floating screenshot), Features, Showcase, HowItWorks, ProPlugins, FAQ
+  - Design aligned with the app (#7C6FF7 accent, Inter, dark theme)
+  - SEO: Open Graph meta tags, sitemap, robots.txt, security headers
+
+---
+
 ## [0.1.0] — 2026-10-09
 
 ### Added
@@ -21,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **D1 database** — users, payments, redeem_codes, audit_log
 - **Resend integration** — automatic welcome emails
 - **Admin CLI** — `code.mjs generate|list|revoke` for managing redeem codes
+- **Quick audio setup** — one-click Discord configuration in Options → Audio - Auto-detects CABLE Input, real headphones, real microphone (ignores Windows aliases) 
+- Configures output device, local output, microphone, mixer, playLocally, and noise suppression in a single action 
+- Discord setup reminder banner with persistent "Done" button (localStorage) 
+- Skipped if CABLE Input is missing (explicit error toast)
 - **i18n**: Spanish fully supported for all new features
 
 ### Changed
@@ -107,5 +124,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[1.4.0]: https://github.com/SteveHun/sounddeck/releases/tag/v1.4.0
-[1.3.0]: https://github.com/SteveHun/sounddeck/releases/tag/v1.3.0
+[0.1.0]: https://github.com/Stevehunn/Soundboard/releases/tag/v1.4.0
+[1.3.0]: https://github.com/Stevehunn/Soundboard/releases/tag/v1.3.0

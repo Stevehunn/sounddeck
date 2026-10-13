@@ -4,15 +4,15 @@
 
 **Local soundboard for Discord and other voice chat apps**
 
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](#)
 [![Tests](https://img.shields.io/badge/tests-5384%20%E2%9C%85-success.svg)](#tests)
 [![Coverage](https://img.shields.io/badge/coverage-77.5%25-yellowgreen.svg)](#tests)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)](https://www.electronjs.org/)
 [![React](https://img.shields.io/badge/React-18-61dafb.svg)](https://react.dev/)
-[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?logo=github-sponsors&logoColor=white)](https://github.com/sponsors/SteveHun)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?logo=github-sponsors&logoColor=white)](https://github.com/sponsors/Stevehunn)
 
-*A powerful, cross-platform, extensible soundboard.*
+_A powerful, cross-platform, extensible soundboard._
 
 **🌍 Languages:** **English** · [Français](README.fr.md) · [Español](README.es.md)
 
@@ -23,6 +23,7 @@
 ## ✨ Features
 
 ### 🎵 Sound library
+
 - Import via **drag & drop**, file dialog, or URL
 - Organize with **profiles** (Gaming, Music, Memes…)
 - **Favorites**, **tags**, instant search
@@ -30,6 +31,7 @@
 - Automatic compression on import (optional, via ffmpeg)
 
 ### 🎛️ Audio editor
+
 - Multi-track timeline with **clips**, **fades**, **markers**
 - **Audio effects**: Volume, Fade In/Out, Speed, Echo, Reverb
 - **Loops** per clip or global (with custom cycle count)
@@ -38,23 +40,28 @@
 - **Export** final mix to MP3/WAV
 
 ### 🎹 Sequencer
+
 - Build **playlists** of sounds with configurable delays
 - **Loop** and shuffle playback
 - Drag & drop reordering
 - Keyboard navigation ← →
 
 ### ✂️ Trimmer
+
 - Interactive waveform with selection handles
 - Preview the selection before creating
 - Supported formats: MP3, WAV, OGG, FLAC, M4A, AAC
 
 ### 🌐 Discovery & Import
+
 - **MyInstants**: search and import directly from thousands of sounds
 - **YouTube**: audio download (via yt-dlp)
 - **Spotify / SoundCloud**: partial support
 - **Emoji picker** with customizable collections
 
 ### 🔊 Audio & Discord
+
+- **Quick setup wizard** — one-click Discord configuration (auto-detects CABLE Input, headphones, mic)
 - Built-in **mic + sounds mixer** (no VoiceMeeter needed for simple setups)
 - Compatible with **VB-Cable** and **VoiceMeeter Banana**
 - **Monitoring** (hear yourself in headphones)
@@ -63,12 +70,14 @@
 - Fine input/output device selection
 
 ### 🧩 Extensions
+
 - Full **plugin system** with installation from URL or `.sdplugin` file
 - Built-in plugins: **YouTube**, **MyInstants**, **Emoji Discovery**
 - Hooks (beforePageRender, onSoundPlay, onAppStart…)
 - Semantic versioning with compatibility checks
 
 ### 🎨 Interface
+
 - 3 themes: **Dark**, **Light**, **Custom** (with editor)
 - **Editable sidebar** (order, visibility, pinning)
 - **Interactive tutorials** for each page
@@ -77,6 +86,7 @@
 - Global + per-sound keyboard shortcuts
 
 ### 💾 Backup
+
 - Configurable **auto-backup** (interval, max count)
 - Export/Import: JSON config, full archive, or sounds only
 - **OBS WebSocket** synchronization
@@ -86,11 +96,11 @@
 
 Some plugins require a **Pro license**. Unlock all of them forever with a **one-time GitHub Sponsorship** (from $5).
 
--  No subscription
--  Works offline
--  Valid forever on unlimited PCs
+- No subscription
+- Works offline
+- Valid forever on unlimited PCs
 
-[**Sponsor on GitHub →**](https://github.com/sponsors/SteveHun)
+[**Sponsor on GitHub →**](https://github.com/sponsors/Stevehunn)
 
 ---
 
@@ -101,11 +111,12 @@ Some plugins require a **Pro license**. Unlock all of them forever with a **one-
 1. Download the latest version from [Releases](../../releases)
 2. Run the installer (`.exe` on Windows)
 3. Follow the interactive tutorial on first launch
-4. (Optional) Sponsor on [GitHub Sponsors](https://github.com/sponsors/SteveHun) to unlock Pro plugins
+4. (Optional) Sponsor on [GitHub Sponsors](https://github.com/sponsors/Stevehunn) to unlock Pro plugins
 
 ### For developers
 
 **Requirements**:
+
 - **Node.js** ≥ 20.19
 - **npm** ≥ 10
 - **ffmpeg** (optional, for trimming and compression)
@@ -130,18 +141,18 @@ npm run build
 
 ## 📜 npm scripts
 
-| Script | Description |
-|---|---|
-| `npm run dev` | Runs Electron + Vite in dev mode with HMR |
-| `npm run build` | Production build (Vite + electron-builder) |
-| `npm run preview` | Previews the Vite build |
-| `npm test` | Runs tests in watch mode |
-| `npm run test:watch` | Explicit watch mode |
-| `npm run test:ui` | Vitest graphical UI |
-| `npm run test:coverage` | Tests + coverage report |
-| `npm run test:ci` | Tests + coverage (CI mode, exit on fail) |
-| `npm run build:plugin` | Build a plugin (utility script) |
-| `npm run audit:i18n` | Audit missing translations |
+| Script                  | Description                                |
+| ----------------------- | ------------------------------------------ |
+| `npm run dev`           | Runs Electron + Vite in dev mode with HMR  |
+| `npm run build`         | Production build (Vite + electron-builder) |
+| `npm run preview`       | Previews the Vite build                    |
+| `npm test`              | Runs tests in watch mode                   |
+| `npm run test:watch`    | Explicit watch mode                        |
+| `npm run test:ui`       | Vitest graphical UI                        |
+| `npm run test:coverage` | Tests + coverage report                    |
+| `npm run test:ci`       | Tests + coverage (CI mode, exit on fail)   |
+| `npm run build:plugin`  | Build a plugin (utility script)            |
+| `npm run audit:i18n`    | Audit missing translations                 |
 
 ---
 
@@ -151,14 +162,14 @@ The project uses **[Vitest](https://vitest.dev/)** for unit and integration test
 
 ### Current state
 
-| Metric | Value |
-|---|---|
-| **Total tests** | **5,384** ✅ |
-| **Test files** | 240 |
-| **Statements coverage** | 77.5 % |
-| **Branches coverage** | 68.95 % |
-| **Functions coverage** | 78.46 % |
-| **Lines coverage** | 79.09 % |
+| Metric                  | Value        |
+| ----------------------- | ------------ |
+| **Total tests**         | **5,384** ✅ |
+| **Test files**          | 240          |
+| **Statements coverage** | 77.5 %       |
+| **Branches coverage**   | 68.95 %      |
+| **Functions coverage**  | 78.46 %      |
+| **Lines coverage**      | 79.09 %      |
 
 ### Running tests
 
@@ -353,7 +364,21 @@ export default {
 
 ## 🎧 Discord setup
 
-### Simple mode (VB-Cable only) — Recommended
+### 🪄 Quick setup wizard (recommended)
+
+Starting with v0.1.0, SoundDeck ships with a **one-click Discord setup**:
+
+1. Install VB-Cable and restart your PC
+2. Open **Options → Audio → Quick setup**
+3. Click **"Auto-setup for Discord"**
+4. SoundDeck auto-selects:
+   - Output → `CABLE Input`
+   - Local output → your headphones (real device, not Windows alias)
+   - Microphone → your real mic
+   - Enables the mixer, playLocally, and noise suppression
+5. Click **"Done"** on the Discord reminder banner after configuring Discord manually (Input = `CABLE Output`)
+
+### Simple mode (VB-Cable only) — Manual
 
 1. Install **VB-Cable** from [vb-audio.com](https://vb-audio.com/Cable/)
 2. Restart your PC
@@ -371,8 +396,6 @@ export default {
 
 See the built-in **Discord Guide** (Guide page in the app).
 
----
-
 ## 🌍 Internationalization
 
 The project supports **3 languages**: FR, EN, ES.
@@ -388,11 +411,11 @@ The project supports **3 languages**: FR, EN, ES.
 ```javascript
 // src/core/i18n/locales/fr/common.js
 export default {
-  add: 'Ajouter',
-  cancel: 'Annuler',
+  add: "Ajouter",
+  cancel: "Annuler",
   profileManagerConfirmMessage: 'Retirer {count} son(s) du profil "{name}" ?',
   // ...
-}
+};
 ```
 
 Supported placeholders: `{name}` (named), `{0}` (positional).
@@ -409,6 +432,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - PR process
 
 **Before submitting a PR**:
+
 ```bash
 npm test              # All tests green
 npm run test:coverage # No coverage regression
@@ -418,7 +442,7 @@ npm run test:coverage # No coverage regression
 
 ## 📄 License
 
-MIT © 2026 SteveHun
+MIT © 2026 Stevehunn
 
 See [LICENSE](LICENSE) for the full text.
 

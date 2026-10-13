@@ -1,4 +1,4 @@
-# Logs
+# ─── Logs ───────────────────────────────────────────────────────────
 logs
 *.log
 npm-debug.log*
@@ -7,13 +7,17 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# ─── Dependencies & builds ──────────────────────────────────────────
 node_modules
 dist
 dist-ssr
 dist-plugins
 *.local
 
-# Editor directories and files
+# ─── Coverage ───────────────────────────────────────────────────────
+coverage/
+
+# ─── Editor directories and files ───────────────────────────────────
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -24,5 +28,16 @@ dist-plugins
 *.sln
 *.sw?
 
-# Feedback webhooks (contient des secrets)
-electron/feedback-config.jscoverage/
+# ─── Secrets locaux (JAMAIS commités) ───────────────────────────────
+electron/feedback-config.js
+server/.dev.vars
+
+# ─── Cloudflare Wrangler ────────────────────────────────────────────
+.wrangler/
+server/.wrangler/
+server/scripts/.tmp-*.sql
+
+# ─── Website ────────────────────────────────────────────────────────
+website/node_modules/
+website/dist/
+website/.astro/

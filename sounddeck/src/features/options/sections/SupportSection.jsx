@@ -7,7 +7,7 @@ import LoginModal from '@features/auth/LoginModal'
 import AccountPanel from '@features/auth/AccountPanel'
 
 // ⚠️ À remplacer par ton vrai lien GitHub Sponsors
-const GITHUB_SPONSORS_URL = 'https://github.com/sponsors/SteveHun'
+const GITHUB_SPONSORS_URL = 'https://github.com/sponsors/Stevehunn'
 
 export default function SupportSection({ sectionRef, addToast }) {
   const { t } = useLanguage()

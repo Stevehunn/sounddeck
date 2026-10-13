@@ -55,7 +55,7 @@ En participant à ce projet, vous vous engagez à être respectueux et construct
 ### Installation initiale
 
 ```bash
-git clone https://github.com/SteveHun/sounddeck.git
+git clone https://github.com/Stevehunn/sounddeck.git
 cd sounddeck
 npm install
 npm run dev

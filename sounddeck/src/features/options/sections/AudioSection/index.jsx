@@ -4,6 +4,7 @@ import { setLowLatencyMode } from '@core/services/AudioMixerService'
 import Section from '../../Section'
 import OptionRow from '../../OptionRow'
 import Toggle from '../../Toggle'
+import QuickSetupSection from './QuickSetupSection'
 import OutputDevicesSection from './OutputDevicesSection'
 import VirtualDriverSection from './VirtualDriverSection'
 import MixerSection from './MixerSection'
@@ -31,6 +32,9 @@ export default function AudioSection({
       title={t('optionsAudio')}
       icon="ti-volume"
     >
+      {/* Configuration rapide (auto Discord) */}
+      <QuickSetupSection store={store} addToast={addToast} />
+
       <OutputDevicesSection
         store={store}
         addToast={addToast}
@@ -57,7 +61,6 @@ export default function AudioSection({
         onTestMicrophone={onTestMicrophone}
       />
 
-      {/* Low latency : actif même sans mixer, on le garde dans l'orchestrateur */}
       <OptionRow label={t('lowLatencyMode')} sub={t('lowLatencyModeDesc')}>
         <Toggle
           value={store.lowLatencyMode || false}
