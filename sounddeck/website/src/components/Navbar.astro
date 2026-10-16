@@ -50,9 +50,8 @@ const t = useTranslations(lang)
     <div class="flex items-center gap-3">
       <LanguageSwitcher currentLang={lang} />
       <a
-        href={SITE.githubReleases}
-        target="_blank"
-        rel="noopener"
+        href={SITE.downloadWindows}
+        data-download-btn
         class="hidden sm:inline-flex items-center gap-1.5 px-4 h-9 rounded-[var(--radius-md)] bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-medium transition-all hover:-translate-y-px hover:shadow-lg hover:shadow-[var(--color-accent)]/30"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
