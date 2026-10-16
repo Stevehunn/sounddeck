@@ -128,8 +128,8 @@ export async function handleListCodes(request, env) {
     500,
   );
 
-  const codes = await listRedeemCodes(env.DB, { limit, onlyUnused });
-  return json({ codes });
+  const result = await listRedeemCodes(env.DB, { limit, onlyUnused });
+  return json({ codes: result.results || [] });
 }
 
 /**
