@@ -1,0 +1,1144 @@
+---
+// Admin page - self-contained, no BaseLayout (pas de Navbar/Footer)
+---
+
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>Admin — SoundDeck</title>
+  <style is:global>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #111113;
+      --surface: #1a1a1e;
+      --surface-2: #222228;
+      --surface-3: #2a2a32;
+      --border: #2e2e36;
+      --text: #f0f0f2;
+      --text-dim: #a0a0b0;
+      --text-faint: #606070;
+      --accent: #7c6ff7;
+      --accent-hover: #9b96ff;
+      --success: #1d9e75;
+      --warning: #ef9f27;
+      --danger: #e05252;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body { padding: 24px; }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ─── LOGIN ──────────────────────────────────────── */
+    .login-wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 40px;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .login-card h1 {
+      font-size: 22px;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .login-card p {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.6;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .login-card input[type="password"] {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-family: monospace;
+      font-size: 13px;
+      outline: none;
+      margin-bottom: 12px;
+    }
+    .login-card input[type="password"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(124,111,247,0.15);
+    }
+    .login-card .hint {
+      font-size: 11px;
+      color: var(--text-faint);
+      margin-top: 16px;
+      margin-bottom: 0;
+    }
+
+    /* ─── DASHBOARD ──────────────────────────────────── */
+    .dashboard {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+    .dash-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .dash-header .logo {
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .dash-header .logo .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* ─── STATS ──────────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-faint);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .stat-value.accent { color: var(--accent); }
+    .stat-value.success { color: var(--success); }
+    .stat-value.warning { color: var(--warning); }
+
+    /* ─── SECTIONS ───────────────────────────────────── */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .section-header h2 {
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-body {
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    /* ─── TABLES ─────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      text-align: left;
+      padding: 12px 16px;
+      background: var(--surface-2);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-faint);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-dim);
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(124,111,247,0.03); }
+    td.mono { font-family: monospace; color: var(--text); font-size: 12px; }
+    td.mono-lg {
+      font-family: monospace;
+      color: var(--text);
+      font-size: 13px;
+      letter-spacing: 1px;
+    }
+
+    /* ─── BADGES ─────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge.pro {
+      background: rgba(29,158,117,0.15);
+      color: var(--success);
+      border: 1px solid var(--success);
+    }
+    .badge.free {
+      background: rgba(160,160,176,0.1);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+    .badge.dev {
+      background: rgba(124,111,247,0.15);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+    .badge.verified {
+      background: rgba(29,158,117,0.15);
+      color: var(--success);
+    }
+    .badge.unverified {
+      background: rgba(239,159,39,0.15);
+      color: var(--warning);
+    }
+    .badge.used {
+      background: rgba(160,160,176,0.1);
+      color: var(--text-faint);
+    }
+
+    /* ─── BUTTONS ────────────────────────────────────── */
+    button {
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      border-radius: 8px;
+      padding: 8px 16px;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+    .btn-secondary {
+      background: var(--surface-2);
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .btn-secondary:hover:not(:disabled) {
+      background: var(--surface-3);
+      border-color: var(--text-faint);
+    }
+
+    .btn-danger {
+      background: transparent;
+      color: var(--danger);
+      border-color: var(--danger);
+    }
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(224,82,82,0.1);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-dim);
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+    .btn-ghost:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
+
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+    .btn-icon {
+      padding: 6px;
+      min-width: 32px;
+      justify-content: center;
+    }
+
+    /* ─── MODAL ──────────────────────────────────────── */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px;
+      max-width: 480px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    }
+    .modal h3 {
+      font-size: 18px;
+      margin-bottom: 6px;
+    }
+    .modal .subtitle {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-bottom: 20px;
+    }
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+    }
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(124,111,247,0.15);
+    }
+    .field input.mono {
+      font-family: monospace;
+      letter-spacing: 1px;
+    }
+    .field.checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .field.checkbox input {
+      width: auto;
+      accent-color: var(--accent);
+    }
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .error-box {
+      padding: 10px 14px;
+      background: rgba(224,82,82,0.1);
+      border: 1px solid var(--danger);
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--danger);
+      margin-bottom: 12px;
+    }
+
+    /* ─── TOASTS ─────────────────────────────────────── */
+    #toast-root {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      min-width: 260px;
+      max-width: 400px;
+      animation: slideIn 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .toast.success { border-left: 3px solid var(--success); }
+    .toast.error { border-left: 3px solid var(--danger); }
+    .toast.info { border-left: 3px solid var(--accent); }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    /* ─── EMPTY / LOADING ────────────────────────────── */
+    .empty {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-faint);
+      font-size: 13px;
+    }
+    .empty .icon { font-size: 32px; display: block; margin-bottom: 8px; opacity: 0.5; }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       LOGIN SCREEN
+       ═══════════════════════════════════════════════════════════ -->
+  <div id="login-screen" class="login-wrap">
+    <div class="login-card">
+      <h1>🔐 SoundDeck Admin</h1>
+      <p>Entre ton <code>ADMIN_TOKEN</code> pour accéder au panneau d'administration.</p>
+
+      <input
+        type="password"
+        id="token-input"
+        placeholder="ADMIN_TOKEN"
+        autocomplete="off"
+        spellcheck="false"
+      />
+
+      <div id="login-error" class="error-box" hidden></div>
+
+      <button id="login-btn" class="btn-primary" style="width:100%;justify-content:center;padding:12px;">
+        Se connecter
+      </button>
+
+      <p class="hint">
+        ⚠️ Le token est stocké dans ta session uniquement (vidé à la fermeture du navigateur).
+      </p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       DASHBOARD
+       ═══════════════════════════════════════════════════════════ -->
+  <div id="dashboard-screen" class="dashboard" hidden>
+
+    <header class="dash-header">
+      <div class="logo">
+        <span class="dot"></span>
+        🎧 SoundDeck Admin
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button id="refresh-btn" class="btn-secondary btn-sm">
+          <span>↻</span> Rafraîchir
+        </button>
+        <button id="logout-btn" class="btn-danger btn-sm">
+          Déconnexion
+        </button>
+      </div>
+    </header>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Utilisateurs</div>
+        <div class="stat-value" id="stat-users">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Comptes Pro</div>
+        <div class="stat-value success" id="stat-pro">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Comptes Free</div>
+        <div class="stat-value" id="stat-free">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Codes actifs</div>
+        <div class="stat-value warning" id="stat-codes">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Codes utilisés</div>
+        <div class="stat-value" id="stat-codes-used">—</div>
+      </div>
+    </div>
+
+    <!-- Users -->
+    <section class="section">
+      <div class="section-header">
+        <h2>👥 Utilisateurs <span id="users-count" style="color:var(--text-faint);font-weight:400;font-size:13px;"></span></h2>
+        <button id="new-user-btn" class="btn-primary btn-sm">
+          <span>+</span> Créer un utilisateur
+        </button>
+      </div>
+      <div class="section-body">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Tier</th>
+              <th>Vérifié</th>
+              <th>Créé</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Codes -->
+    <section class="section">
+      <div class="section-header">
+        <h2>🎁 Codes de rédemption <span id="codes-count" style="color:var(--text-faint);font-weight:400;font-size:13px;"></span></h2>
+        <button id="new-code-btn" class="btn-primary btn-sm">
+          <span>+</span> Générer un code
+        </button>
+      </div>
+      <div class="section-body">
+        <table>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Email attendu</th>
+              <th>Tier</th>
+              <th>Expire</th>
+              <th>Statut</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="codes-tbody">
+            <tr><td colspan="6" class="empty"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Modal root -->
+  <div id="modal-root"></div>
+
+  <!-- Toast root -->
+  <div id="toast-root"></div>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════
+    // CONFIG
+    // ═══════════════════════════════════════════════════════════
+    const API_BASE = 'https://api.sounddeck.stream'
+
+    const state = {
+      token: sessionStorage.getItem('sd_admin_token') || null,
+      users: [],
+      codes: [],
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // HELPERS
+    // ═══════════════════════════════════════════════════════════
+    const $ = (id) => document.getElementById(id)
+    const $$ = (sel) => document.querySelectorAll(sel)
+
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+    }
+
+    function fmtDate(unix) {
+      if (!unix) return '—'
+      return new Date(unix * 1000).toLocaleString('fr-FR', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit',
+      })
+    }
+
+    function fmtDateShort(unix) {
+      if (!unix) return '—'
+      return new Date(unix * 1000).toLocaleDateString('fr-FR')
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // TOASTS
+    // ═══════════════════════════════════════════════════════════
+    function toast(message, type = 'info') {
+      const el = document.createElement('div')
+      el.className = `toast ${type}`
+      const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'
+      el.innerHTML = `<span style="font-weight:600;">${icon}</span> ${escapeHtml(message)}`
+      $('toast-root').appendChild(el)
+      setTimeout(() => {
+        el.style.transition = 'opacity 0.3s, transform 0.3s'
+        el.style.opacity = '0'
+        el.style.transform = 'translateX(20px)'
+        setTimeout(() => el.remove(), 300)
+      }, 3500)
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // API
+    // ═══════════════════════════════════════════════════════════
+    async function apiCall(method, path, body) {
+      const headers = { Authorization: `Bearer ${state.token}` }
+      if (body) headers['Content-Type'] = 'application/json'
+
+      const res = await fetch(`${API_BASE}${path}`, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+      })
+
+      const text = await res.text()
+      let data
+      try { data = JSON.parse(text) } catch { data = { raw: text } }
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          logout()
+          throw new Error('Session expirée. Reconnecte-toi.')
+        }
+        const err = new Error(data.error || data.message || `HTTP ${res.status}`)
+        err.status = res.status
+        err.data = data
+        throw err
+      }
+
+      return data
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // AUTH
+    // ═══════════════════════════════════════════════════════════
+    async function login() {
+      const token = $('token-input').value.trim()
+      if (!token) {
+        showLoginError('Entre un token.')
+        return
+      }
+
+      const btn = $('login-btn')
+      btn.disabled = true
+      btn.textContent = 'Connexion...'
+      $('login-error').hidden = true
+
+      state.token = token
+
+      try {
+        // Test avec la route list-users
+        const result = await apiCall('GET', '/admin/list-users?limit=1')
+        sessionStorage.setItem('sd_admin_token', token)
+        toast('Connecté', 'success')
+        showDashboard()
+        await refreshAll()
+      } catch (e) {
+        state.token = null
+        sessionStorage.removeItem('sd_admin_token')
+        showLoginError('Token invalide ou erreur réseau.')
+      } finally {
+        btn.disabled = false
+        btn.textContent = 'Se connecter'
+      }
+    }
+
+    function logout() {
+      state.token = null
+      state.users = []
+      state.codes = []
+      sessionStorage.removeItem('sd_admin_token')
+      $('login-screen').hidden = false
+      $('dashboard-screen').hidden = true
+      $('token-input').value = ''
+    }
+
+    function showLoginError(msg) {
+      const el = $('login-error')
+      el.textContent = msg
+      el.hidden = false
+    }
+
+    function showDashboard() {
+      $('login-screen').hidden = true
+      $('dashboard-screen').hidden = false
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // DATA LOADING
+    // ═══════════════════════════════════════════════════════════
+    async function loadUsers() {
+      const { users } = await apiCall('GET', '/admin/list-users?limit=200')
+      state.users = users || []
+      renderUsers()
+    }
+
+    async function loadCodes() {
+      const { codes } = await apiCall('GET', '/admin/list-codes?limit=200')
+      state.codes = codes || []
+      renderCodes()
+    }
+
+    async function refreshAll() {
+      try {
+        await Promise.all([loadUsers(), loadCodes()])
+        updateStats()
+      } catch (e) {
+        toast(e.message, 'error')
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // RENDER
+    // ═══════════════════════════════════════════════════════════
+    function updateStats() {
+      const users = state.users
+      const codes = state.codes
+
+      const now = Math.floor(Date.now() / 1000)
+
+      $('stat-users').textContent = users.length
+      $('stat-pro').textContent = users.filter(u => u.tier === 'pro' || u.tier === 'dev').length
+      $('stat-free').textContent = users.filter(u => u.tier === 'free').length
+
+      const activeCodes = codes.filter(c =>
+        !c.used_at && !c.revoked && (!c.expires_at || c.expires_at > now)
+      ).length
+      const usedCodes = codes.filter(c => c.used_at).length
+
+      $('stat-codes').textContent = activeCodes
+      $('stat-codes-used').textContent = usedCodes
+
+      $('users-count').textContent = `(${users.length})`
+      $('codes-count').textContent = `(${codes.length})`
+    }
+
+    function renderUsers() {
+      const tbody = $('users-tbody')
+      if (state.users.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty"><span class="icon">👤</span>Aucun utilisateur</td></tr>`
+        return
+      }
+
+      tbody.innerHTML = state.users.map(u => {
+        const tierClass = u.tier === 'pro' ? 'pro' : u.tier === 'dev' ? 'dev' : 'free'
+        return `
+          <tr>
+            <td class="mono">${escapeHtml(u.email)}</td>
+            <td><span class="badge ${tierClass}">${escapeHtml(u.tier || 'pro')}</span></td>
+            <td>${u.email_verified
+              ? '<span class="badge verified">✓ Vérifié</span>'
+              : '<span class="badge unverified">Non vérifié</span>'
+            }</td>
+            <td>${fmtDate(u.created_at)}</td>
+            <td style="text-align:right;">
+              <button
+                class="btn-secondary btn-sm"
+                data-action="reset-pwd"
+                data-email="${escapeHtml(u.email)}"
+              >
+                Reset password
+              </button>
+            </td>
+          </tr>
+        `
+      }).join('')
+    }
+
+    function renderCodes() {
+      const tbody = $('codes-tbody')
+      if (state.codes.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty"><span class="icon">🎁</span>Aucun code</td></tr>`
+        return
+      }
+
+      const now = Math.floor(Date.now() / 1000)
+
+      tbody.innerHTML = state.codes.map(c => {
+        let statusBadge
+        if (c.revoked) statusBadge = '<span class="badge used">Révoqué</span>'
+        else if (c.used_at) statusBadge = '<span class="badge used">Utilisé</span>'
+        else if (c.expires_at && c.expires_at < now) statusBadge = '<span class="badge unverified">Expiré</span>'
+        else statusBadge = '<span class="badge verified">Actif</span>'
+
+        const canRevoke = !c.revoked && !c.used_at
+
+        return `
+          <tr>
+            <td class="mono-lg">${escapeHtml(c.code)}</td>
+            <td>${c.email_hint ? `<span class="mono" style="font-size:12px;">${escapeHtml(c.email_hint)}</span>` : '<span style="color:var(--text-faint);">—</span>'}</td>
+            <td><span class="badge ${c.tier === 'pro' ? 'pro' : 'free'}">${escapeHtml(c.tier)}</span></td>
+            <td>${c.expires_at ? fmtDateShort(c.expires_at) : '<span style="color:var(--text-faint);">Jamais</span>'}</td>
+            <td>${statusBadge}</td>
+            <td style="text-align:right;">
+              <button class="btn-ghost btn-icon" data-action="copy-code" data-code="${escapeHtml(c.code)}" title="Copier">📋</button>
+              ${canRevoke ? `<button class="btn-ghost btn-icon" data-action="revoke-code" data-code="${escapeHtml(c.code)}" title="Révoquer" style="color:var(--danger);">🗑</button>` : ''}
+            </td>
+          </tr>
+        `
+      }).join('')
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // MODALS
+    // ═══════════════════════════════════════════════════════════
+    function openModal(html) {
+      const root = $('modal-root')
+      root.innerHTML = `
+        <div class="modal-backdrop" id="modal-backdrop">
+          <div class="modal" onclick="event.stopPropagation()">
+            ${html}
+          </div>
+        </div>
+      `
+      $('modal-backdrop').addEventListener('click', closeModal)
+    }
+
+    function closeModal() {
+      $('modal-root').innerHTML = ''
+    }
+
+    // ─── Modal : créer un utilisateur ─────────────────────
+    function showCreateUserModal() {
+      openModal(`
+        <h3>Créer un utilisateur</h3>
+        <div class="subtitle">Le compte sera directement vérifié (pas besoin de mail).</div>
+
+        <div class="field">
+          <label>Email *</label>
+          <input type="email" id="cu-email" placeholder="user@example.com" />
+        </div>
+
+        <div class="field">
+          <label>Mot de passe * (min 6 caractères)</label>
+          <input type="text" id="cu-password" placeholder="Password123" class="mono" />
+        </div>
+
+        <div class="field">
+          <label>Tier</label>
+          <select id="cu-tier">
+            <option value="pro" selected>Pro</option>
+            <option value="free">Free</option>
+            <option value="dev">Dev</option>
+          </select>
+        </div>
+
+        <div id="cu-error" class="error-box" hidden></div>
+
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick="window.__closeModal()">Annuler</button>
+          <button class="btn-primary" id="cu-submit">Créer</button>
+        </div>
+      `)
+
+      $('cu-submit').addEventListener('click', async () => {
+        const email = $('cu-email').value.trim()
+        const password = $('cu-password').value
+        const tier = $('cu-tier').value
+
+        if (!email || !password) {
+          $('cu-error').textContent = 'Email et mot de passe requis'
+          $('cu-error').hidden = false
+          return
+        }
+        if (password.length < 6) {
+          $('cu-error').textContent = 'Mot de passe trop court (min 6)'
+          $('cu-error').hidden = false
+          return
+        }
+
+        const btn = $('cu-submit')
+        btn.disabled = true
+        btn.textContent = 'Création...'
+
+        try {
+          await apiCall('POST', '/admin/create-user', { email, password, tier })
+          toast(`Utilisateur créé : ${email}`, 'success')
+          closeModal()
+          await loadUsers()
+          updateStats()
+        } catch (e) {
+          $('cu-error').textContent = e.data?.error === 'email_already_exists'
+            ? 'Cet email existe déjà'
+            : (e.message || 'Erreur')
+          $('cu-error').hidden = false
+          btn.disabled = false
+          btn.textContent = 'Créer'
+        }
+      })
+    }
+
+    // ─── Modal : reset password ───────────────────────────
+    function showResetPasswordModal(email) {
+      openModal(`
+        <h3>Reset password</h3>
+        <div class="subtitle">Pour <span class="mono">${escapeHtml(email)}</span></div>
+
+        <div class="field">
+          <label>Nouveau mot de passe * (min 6 caractères)</label>
+          <input type="text" id="rp-password" placeholder="NewPassword123" class="mono" />
+        </div>
+
+        <div id="rp-error" class="error-box" hidden></div>
+
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick="window.__closeModal()">Annuler</button>
+          <button class="btn-primary" id="rp-submit">Valider</button>
+        </div>
+      `)
+
+      $('rp-submit').addEventListener('click', async () => {
+        const newPassword = $('rp-password').value
+        if (!newPassword || newPassword.length < 6) {
+          $('rp-error').textContent = 'Mot de passe trop court (min 6)'
+          $('rp-error').hidden = false
+          return
+        }
+
+        const btn = $('rp-submit')
+        btn.disabled = true
+        btn.textContent = 'Mise à jour...'
+
+        try {
+          await apiCall('POST', '/admin/reset-password', { email, newPassword })
+          toast(`Mot de passe mis à jour pour ${email}`, 'success')
+          closeModal()
+        } catch (e) {
+          $('rp-error').textContent = e.message || 'Erreur'
+          $('rp-error').hidden = false
+          btn.disabled = false
+          btn.textContent = 'Valider'
+        }
+      })
+    }
+
+    // ─── Modal : générer un code ──────────────────────────
+    function showGenerateCodeModal() {
+      openModal(`
+        <h3>Générer un code de rédemption</h3>
+        <div class="subtitle">Le code donne accès au tier sélectionné. Envoyé par mail si un email est renseigné.</div>
+
+        <div class="field">
+          <label>Email (optionnel — limite l'usage à cet email)</label>
+          <input type="email" id="gc-email" placeholder="user@example.com" />
+        </div>
+
+        <div class="field">
+          <label>Expire dans</label>
+          <select id="gc-expires">
+            <option value="7d">7 jours</option>
+            <option value="30d" selected>30 jours</option>
+            <option value="90d">90 jours</option>
+            <option value="365d">1 an</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Tier</label>
+          <select id="gc-tier">
+            <option value="pro" selected>Pro</option>
+            <option value="free">Free</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Note (optionnel)</label>
+          <input type="text" id="gc-note" placeholder="Ex: Sponsor GitHub @john" />
+        </div>
+
+        <div class="field checkbox">
+          <input type="checkbox" id="gc-send" checked />
+          <label for="gc-send" style="margin:0;">Envoyer par mail (si email fourni)</label>
+        </div>
+
+        <div id="gc-error" class="error-box" hidden></div>
+
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick="window.__closeModal()">Annuler</button>
+          <button class="btn-primary" id="gc-submit">Générer</button>
+        </div>
+      `)
+
+      $('gc-submit').addEventListener('click', async () => {
+        const email = $('gc-email').value.trim() || undefined
+        const expiresIn = $('gc-expires').value
+        const tier = $('gc-tier').value
+        const note = $('gc-note').value.trim() || undefined
+        const sendEmail = $('gc-send').checked
+
+        const btn = $('gc-submit')
+        btn.disabled = true
+        btn.textContent = 'Génération...'
+
+        try {
+          const result = await apiCall('POST', '/admin/generate-code', {
+            email, expiresIn, tier, note, sendEmail,
+          })
+          toast(`Code généré : ${result.code}`, 'success')
+          closeModal()
+          await loadCodes()
+          updateStats()
+        } catch (e) {
+          $('gc-error').textContent = e.message || 'Erreur'
+          $('gc-error').hidden = false
+          btn.disabled = false
+          btn.textContent = 'Générer'
+        }
+      })
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // EVENT LISTENERS
+    // ═══════════════════════════════════════════════════════════
+    window.__closeModal = closeModal
+
+    // Login
+    $('login-btn').addEventListener('click', login)
+    $('token-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') login()
+    })
+
+    // Logout
+    $('logout-btn').addEventListener('click', logout)
+
+    // Refresh
+    $('refresh-btn').addEventListener('click', async () => {
+      $('refresh-btn').disabled = true
+      await refreshAll()
+      $('refresh-btn').disabled = false
+      toast('Données actualisées', 'info')
+    })
+
+    // New user
+    $('new-user-btn').addEventListener('click', showCreateUserModal)
+
+    // New code
+    $('new-code-btn').addEventListener('click', showGenerateCodeModal)
+
+    // Delegated events for table actions
+    document.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-action]')
+      if (!btn) return
+
+      const action = btn.dataset.action
+
+      if (action === 'reset-pwd') {
+        showResetPasswordModal(btn.dataset.email)
+      }
+
+      if (action === 'copy-code') {
+        try {
+          await navigator.clipboard.writeText(btn.dataset.code)
+          toast('Code copié', 'success')
+        } catch {
+          toast('Impossible de copier', 'error')
+        }
+      }
+
+      if (action === 'revoke-code') {
+        const code = btn.dataset.code
+        if (!confirm(`Révoquer le code ${code} ? Cette action est irréversible.`)) return
+        try {
+          await apiCall('POST', '/admin/revoke-code', { code })
+          toast('Code révoqué', 'success')
+          await loadCodes()
+          updateStats()
+        } catch (e) {
+          toast(e.message || 'Erreur', 'error')
+        }
+      }
+    })
+
+    // ═══════════════════════════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════════════════════════
+    async function init() {
+      if (state.token) {
+        try {
+          await refreshAll()
+          showDashboard()
+        } catch {
+          logout()
+        }
+      } else {
+        $('login-screen').hidden = false
+      }
+    }
+
+    init()
+  </script>
+
+</body>
+</html>

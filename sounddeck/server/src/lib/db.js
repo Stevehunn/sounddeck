@@ -1,97 +1,5 @@
 // server/src/lib/db.js
 
-// ─── AUTH / HASH ───────────────────────────────────────────────────────
-
-const PBKDF2_ITERATIONS = 100_000;
-const PBKDF2_KEYLEN = 32; // 256 bits
-const PBKDF2_DIGEST = "SHA-256";
-const SALT_BYTES = 16;
-
-function bytesToHex(bytes) {
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function hexToBytes(hex) {
-  const out = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < out.length; i++) {
-    out[i] = parseInt(hex.substr(i * 2, 2), 16);
-  }
-  return out;
-}
-
-/**
- * Hash un password avec PBKDF2-SHA256 (100k itérations).
- * @returns {Promise<{ hash: string, salt: string }>} hash et salt en hex
- */
-export async function hashPassword(password) {
-  const enc = new TextEncoder();
-  const saltBytes = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
-
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(password),
-    { name: "PBKDF2" },
-    false,
-    ["deriveBits"],
-  );
-
-  const hashBuffer = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      salt: saltBytes,
-      iterations: PBKDF2_ITERATIONS,
-      hash: PBKDF2_DIGEST,
-    },
-    keyMaterial,
-    PBKDF2_KEYLEN * 8,
-  );
-
-  return {
-    hash: bytesToHex(new Uint8Array(hashBuffer)),
-    salt: bytesToHex(saltBytes),
-  };
-}
-
-/**
- * Vérifie un password contre un hash+salt existant.
- * @returns {Promise<boolean>}
- */
-export async function verifyPassword(password, hashHex, saltHex) {
-  const enc = new TextEncoder();
-  const saltBytes = hexToBytes(saltHex);
-
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(password),
-    { name: "PBKDF2" },
-    false,
-    ["deriveBits"],
-  );
-
-  const hashBuffer = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      salt: saltBytes,
-      iterations: PBKDF2_ITERATIONS,
-      hash: PBKDF2_DIGEST,
-    },
-    keyMaterial,
-    PBKDF2_KEYLEN * 8,
-  );
-
-  const computed = bytesToHex(new Uint8Array(hashBuffer));
-
-  // Comparaison constant-time
-  if (computed.length !== hashHex.length) return false;
-  let diff = 0;
-  for (let i = 0; i < computed.length; i++) {
-    diff |= computed.charCodeAt(i) ^ hashHex.charCodeAt(i);
-  }
-  return diff === 0;
-}
-
 // ─── USERS ─────────────────────────────────────────────────────────────
 
 export function getUserByEmail(db, email) {
@@ -148,13 +56,128 @@ export async function updateUserPassword(
 export function listUsers(db, { limit = 100 } = {}) {
   return db
     .prepare(
-      `SELECT id, email, tier, donor_id, donor_name, created_at, updated_at
+      `SELECT id, email, tier, donor_id, donor_name, email_verified, created_at, updated_at
        FROM users
        ORDER BY created_at DESC
        LIMIT ?`,
     )
     .bind(limit)
     .all();
+}
+
+// ─── EMAIL VERIFICATION (nouveau) ──────────────────────────────────────
+
+export function getUserByVerifyToken(db, token) {
+  return db
+    .prepare("SELECT * FROM users WHERE verify_token = ?")
+    .bind(token)
+    .first();
+}
+
+export async function setUserVerifyToken(db, userId, token, expiresAt) {
+  const now = Math.floor(Date.now() / 1000);
+  await db
+    .prepare(
+      `UPDATE users
+       SET verify_token = ?, verify_token_expires = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+    .bind(token, expiresAt, now, userId)
+    .run();
+}
+
+export async function markEmailVerified(db, userId) {
+  const now = Math.floor(Date.now() / 1000);
+  await db
+    .prepare(
+      `UPDATE users
+       SET email_verified = 1, verify_token = NULL, verify_token_expires = NULL, updated_at = ?
+       WHERE id = ?`,
+    )
+    .bind(now, userId)
+    .run();
+}
+
+/**
+ * Crée un user avec un token de vérification (signup public).
+ * email_verified = 0 par défaut.
+ */
+export async function createUserUnverified(
+  db,
+  {
+    id,
+    email,
+    passwordHash,
+    passwordSalt,
+    donorId,
+    donorName = null,
+    tier = "free",
+    verifyToken,
+    verifyTokenExpires,
+  },
+) {
+  const now = Math.floor(Date.now() / 1000);
+  await db
+    .prepare(
+      `INSERT INTO users
+       (id, email, password_hash, password_salt, donor_id, donor_name, tier,
+        email_verified, verify_token, verify_token_expires, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+    )
+    .bind(
+      id,
+      email,
+      passwordHash,
+      passwordSalt,
+      donorId,
+      donorName,
+      tier,
+      verifyToken,
+      verifyTokenExpires,
+      now,
+      now,
+    )
+    .run();
+  return { id, email, donorId, tier };
+}
+
+// ─── PASSWORD RESETS (nouveau) ─────────────────────────────────────────
+
+export async function createPasswordReset(
+  db,
+  { token, userId, email, expiresAt, ip = null, userAgent = null },
+) {
+  const now = Math.floor(Date.now() / 1000);
+  await db
+    .prepare(
+      `INSERT INTO password_resets (token, user_id, email, created_at, expires_at, ip, user_agent)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(token, userId, email, now, expiresAt, ip, userAgent)
+    .run();
+}
+
+export function getPasswordReset(db, token) {
+  return db
+    .prepare("SELECT * FROM password_resets WHERE token = ?")
+    .bind(token)
+    .first();
+}
+
+export async function markPasswordResetUsed(db, token) {
+  const now = Math.floor(Date.now() / 1000);
+  await db
+    .prepare("UPDATE password_resets SET used_at = ? WHERE token = ?")
+    .bind(now, token)
+    .run();
+}
+
+export async function deleteExpiredPasswordResets(db) {
+  const now = Math.floor(Date.now() / 1000);
+  await db
+    .prepare("DELETE FROM password_resets WHERE expires_at < ?")
+    .bind(now)
+    .run();
 }
 
 // ─── PAYMENTS ──────────────────────────────────────────────────────────

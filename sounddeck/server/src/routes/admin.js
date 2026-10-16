@@ -9,9 +9,8 @@ import {
   updateUserPassword,
   getUserByEmail,
   listUsers,
-  hashPassword,
 } from "../lib/db.js";
-import { sendRedeemCodeEmail } from "../lib/email.js";
+import { hashPassword } from "../lib/crypto.js";
 
 /**
  * Vérifie le token admin dans l'Authorization header (constant-time).
