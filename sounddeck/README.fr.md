@@ -4,19 +4,57 @@
 
 **Soundboard local pour Discord et autres applications de chat vocal**
 
-[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-1.4.12-blue.svg)](https://github.com/Stevehunn/sounddeck/releases)
 [![Tests](https://img.shields.io/badge/tests-5384%20%E2%9C%85-success.svg)](#tests)
 [![Coverage](https://img.shields.io/badge/coverage-77.5%25-yellowgreen.svg)](#tests)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)](https://www.electronjs.org/)
 [![React](https://img.shields.io/badge/React-18-61dafb.svg)](https://react.dev/)
+[![Website](https://img.shields.io/badge/website-sounddeck.stream-7c6ff7.svg)](https://sounddeck.stream)
 [![GitHub Sponsors](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?logo=github-sponsors&logoColor=white)](https://github.com/sponsors/Stevehunn)
 
-_Un soundboard puissant, multiplateforme et extensible._
+*Un soundboard puissant, multiplateforme et extensible.*
 
 **🌍 Langues :** [English](README.md) · **Français** · [Español](README.es.md)
 
 </div>
+
+---
+
+## 🎯 C'est quoi SoundDeck ?
+
+SoundDeck est un **soundboard local pour Discord** (et toute autre app de chat vocal) avec :
+
+- 🎛️ Un **éditeur audio multi-piste** (timeline, effets, undo/redo)
+- 🎹 Un **séquenceur de playlists** (délais personnalisés, boucle, shuffle)
+- 🌐 Import **YouTube / MyInstants**
+- 🔊 Un **mixeur micro + sons** intégré (Discord-ready, pas besoin de VoiceMeeter)
+- 🧩 Un **système de plugins** (installation depuis URL ou `.sdplugin`)
+- 🌍 **3 langues** : anglais, français, espagnol
+
+**Gratuit et open source (MIT).** Les plugins Pro se débloquent à vie avec un don unique.
+
+[**Télécharger →**](https://github.com/Stevehunn/sounddeck/releases/latest) · [**Site web →**](https://sounddeck.stream) · [**Sponsoriser →**](https://github.com/sponsors/Stevehunn)
+
+---
+
+## 📦 Structure du repo
+
+Ce repo contient **3 sous-projets** :
+
+```
+sounddeck/
+├── (racine)        ← App desktop (Electron + React + Vite)
+├── server/         ← API Cloudflare Worker + base D1
+├── website/        ← Site marketing (Astro + Tailwind)
+└── scripts/        ← Scripts utilitaires (release, licences, plugins)
+```
+
+| Sous-projet | Tech | Déploiement |
+|---|---|---|
+| **App desktop** | Electron 42 + React 18 + Vite 8 | GitHub Releases |
+| **API** | Cloudflare Workers + D1 | `api.sounddeck.stream` |
+| **Site web** | Astro 5 + Tailwind 4 | Cloudflare Pages (`sounddeck.stream`) |
 
 ---
 
@@ -27,22 +65,21 @@ _Un soundboard puissant, multiplateforme et extensible._
 - Import par **glisser-déposer**, dialog fichier ou URL
 - Organisation par **profils** (Gaming, Musique, Memes…)
 - **Favoris**, **tags**, recherche instantanée
-- **Drag & drop** pour réordonner
 - Compression automatique à l'import (optionnelle, via ffmpeg)
 
 ### 🎛️ Éditeur audio
 
-- Timeline multi-pistes avec **clips**, **fades**, **marqueurs**
-- **Effets audio** : Volume, Fade In/Out, Vitesse, Écho, Réverbération
-- **Boucles** par clip ou globales (avec nombre de cycles personnalisable)
-- **Normalisation** automatique du volume (Peak ou RMS)
-- **Undo/Redo**, snap, crossfade automatique
-- **Export** mixage final en MP3/WAV
+- Timeline multi-pistes avec clips, fades, marqueurs
+- Effets : Volume, Fade In/Out, Vitesse, Écho, Réverbération
+- Boucles par clip ou globales (nombre de cycles personnalisable)
+- Normalisation automatique du volume (Peak ou RMS)
+- Undo/Redo, snap, crossfade automatique
+- Export mixage final en MP3/WAV
 
 ### 🎹 Séquenceur
 
-- Créez des **playlists** de sons avec délais configurables
-- **Boucle** et lecture aléatoire
+- Playlists de sons avec délais configurables
+- Boucle et lecture aléatoire
 - Réorganisation par drag & drop
 - Navigation clavier ← →
 
@@ -50,7 +87,7 @@ _Un soundboard puissant, multiplateforme et extensible._
 
 - Waveform interactive avec poignées de sélection
 - Écoute de la sélection avant création
-- Formats supportés : MP3, WAV, OGG, FLAC, M4A, AAC
+- Formats : MP3, WAV, OGG, FLAC, M4A, AAC
 
 ### 🌐 Découverte & Import
 
@@ -61,44 +98,49 @@ _Un soundboard puissant, multiplateforme et extensible._
 
 ### 🔊 Audio & Discord
 
-- **Assistant de configuration rapide** — config Discord en un clic (détection auto CABLE Input, casque, micro)
+- 🪄 **Assistant de configuration rapide** — config Discord en un clic (détection auto CABLE Input, casque, micro)
 - **Mixeur micro + sons** intégré (pas besoin de VoiceMeeter dans les cas simples)
 - Compatible **VB-Cable** et **VoiceMeeter Banana**
-- **Monitoring** (s'entendre dans le casque)
-- **Réduction de bruit** micro (AudioWorklet ou filtre)
-- Mode **basse latence** pour le gaming
-- Sélection fine des périphériques d'entrée/sortie
+- Monitoring (s'entendre dans le casque)
+- Réduction de bruit micro (AudioWorklet ou filtre)
+- Mode basse latence pour le gaming
 
 ### 🧩 Extensions
 
-- **Système de plugins** complet avec installation depuis URL ou fichier `.sdplugin`
+- **Système de plugins** complet avec `.sdplugin`
 - Plugins intégrés : **YouTube**, **MyInstants**, **Emoji Discovery**
-- Hooks (beforePageRender, onSoundPlay, onAppStart…)
+- Hooks (`beforePageRender`, `onSoundPlay`, `onAppStart`, `onProfileSwitch`)
 - Versionning sémantique avec compatibilité
 
 ### 🎨 Interface
 
-- 3 thèmes : **Sombre**, **Clair**, **Personnalisé** (avec éditeur)
-- **Sidebar éditable** (ordre, visibilité, épinglage)
-- **Tutoriels interactifs** pour chaque page
-- **Statistiques** d'utilisation
+- 3 thèmes : Sombre, Clair, Personnalisé
+- Sidebar éditable (ordre, visibilité, épinglage)
+- Tutoriels interactifs pour chaque page
+- Statistiques d'utilisation
 - **Multilingue** : 🇫🇷 Français · 🇬🇧 English · 🇪🇸 Español
-- Raccourcis clavier globaux + par son
 
 ### 💾 Sauvegarde
 
-- **Auto-backup** configurable (intervalle, nombre max)
+- Auto-backup configurable (intervalle, nombre max)
 - Export/Import : config JSON, archive complète, ou sons uniquement
 - Synchronisation avec **OBS WebSocket**
 - Alertes **Twitch** (follows, dons, subs)
 
+### 🔄 Mise à jour automatique
+
+- Auto-updater intégré (`electron-updater`)
+- Banner de mise à jour dans la sidebar
+- Téléchargement + installation en un clic
+- Fonctionne hors-ligne jusqu'au clic de l'utilisateur
+
 ### 💎 Plugins Pro
 
-Certains plugins nécessitent une **licence Pro**. Débloque-les tous **à vie** avec un **sponsorship GitHub unique** (à partir de 5 €).
+Certains plugins nécessitent une **licence Pro**. Débloque-les tous **à vie** avec un **don unique de 5 € ou plus sur GitHub Sponsors**.
 
-- Pas d'abonnement
-- Fonctionne hors-ligne
-- Valable à vie sur un nombre illimité de PC
+- ✅ Pas d'abonnement
+- ✅ Fonctionne hors-ligne
+- ✅ Valable à vie sur un nombre illimité de PC
 
 [**Sponsoriser sur GitHub →**](https://github.com/sponsors/Stevehunn)
 
@@ -108,101 +150,51 @@ Certains plugins nécessitent une **licence Pro**. Débloque-les tous **à vie**
 
 ### Pour les utilisateurs
 
-1. Télécharger la dernière version depuis [Releases](../../releases)
+1. Télécharger la dernière version depuis [**Releases**](https://github.com/Stevehunn/sounddeck/releases/latest)
 2. Lancer l'installateur (`.exe` sur Windows)
 3. Suivre le tutoriel interactif au premier lancement
-4. (Optionel) Sponsoriser sur [GitHub Sponsors](https://github.com/sponsors/Stevehunn) pour débloquer les plugins
+4. (Optionnel) [Sponsoriser sur GitHub](https://github.com/sponsors/Stevehunn) pour débloquer les plugins Pro
 
 ### Pour les développeurs
 
-**Prérequis** :
+**Prérequis :**
 
 - **Node.js** ≥ 20.19
 - **npm** ≥ 10
-- **ffmpeg** (optionnel, pour le rognage et la compression)
+- **ffmpeg** (optionnel, pour le rognage + compression)
 - **yt-dlp** (optionnel, pour l'import YouTube)
 
 ```bash
-# 1. Cloner le repo
-git clone https://github.com/<user>/sounddeck.git
+# Cloner
+git clone https://github.com/Stevehunn/sounddeck.git
 cd sounddeck
 
-# 2. Installer les dépendances
+# Installer + lancer
 npm install
-
-# 3. Lancer en dev (Electron + Vite HMR)
 npm run dev
-
-# 4. Build production
-npm run build
 ```
 
----
-
-## 📜 Scripts npm
-
-| Script                  | Description                                |
-| ----------------------- | ------------------------------------------ |
-| `npm run dev`           | Lance Electron + Vite en mode dev avec HMR |
-| `npm run build`         | Build production (Vite + electron-builder) |
-| `npm run preview`       | Prévisualise le build Vite                 |
-| `npm test`              | Lance les tests en mode watch              |
-| `npm run test:watch`    | Tests en mode watch explicite              |
-| `npm run test:ui`       | Interface graphique Vitest                 |
-| `npm run test:coverage` | Tests + rapport de coverage                |
-| `npm run test:ci`       | Tests + coverage (mode CI, exit on fail)   |
-| `npm run build:plugin`  | Build un plugin (script utilitaire)        |
-| `npm run audit:i18n`    | Audit des traductions manquantes           |
+> 📖 **Documentation développeur complète :** voir [DOCS.md](DOCS.md).
 
 ---
 
 ## 🧪 Tests
 
-Le projet utilise **[Vitest](https://vitest.dev/)** pour les tests unitaires et d'intégration.
+Le projet utilise **Vitest** pour les tests unitaires + d'intégration.
 
-### État actuel
-
-| Métrique                | Valeur       |
-| ----------------------- | ------------ |
-| **Tests totaux**        | **5 384** ✅ |
-| **Fichiers de test**    | 240          |
-| **Coverage statements** | 77.5 %       |
-| **Coverage branches**   | 68.95 %      |
-| **Coverage fonctions**  | 78.46 %      |
-| **Coverage lignes**     | 79.09 %      |
-
-### Lancer les tests
+| Métrique | Valeur |
+|---|---|
+| **Tests totaux** | **5 384** ✅ |
+| **Fichiers de test** | 240 |
+| **Coverage statements** | 77.5 % |
+| **Coverage branches** | 68.95 % |
+| **Coverage fonctions** | 78.46 % |
+| **Coverage lignes** | 79.09 % |
 
 ```bash
-# Tous les tests (frontend + electron)
-npm test
-
-# Avec coverage
-npm run test:coverage
-
-# Un fichier spécifique
-npx vitest src/test/core/services/AudioService.test.jsx
-
-# Un dossier
-npx vitest src/test/features/editor
-```
-
-### Structure des tests
-
-```
-src/test/                  # Tests frontend (React)
-├── components/            # Composants partagés
-├── core/
-│   ├── i18n/              # Traductions (fr/en/es)
-│   ├── plugins/           # Système de plugins
-│   ├── services/          # AudioService, AudioMixer, EmojiService
-│   └── store/             # State global (hooks)
-├── features/              # Tests par feature (editor, home, options…)
-├── hooks/                 # Hooks partagés
-├── plugins/               # Tests des plugins
-└── utils/                 # Utilitaires (format, logger, etc.)
-
-electron/modules/__tests__/ # Tests process principal Electron (Node)
+npm test                # Mode watch
+npm run test:coverage   # Avec couverture
+npm run test:ci         # Mode CI
 ```
 
 ---
@@ -212,98 +204,67 @@ electron/modules/__tests__/ # Tests process principal Electron (Node)
 ```
 sounddeck/
 ├── electron/                  # Processus principal Electron
-│   ├── main.js                # Point d'entrée, IPC, cycle de vie
-│   ├── preload.js             # Bridge sécurisé contexte isolé
-│   ├── store.js               # Wrapper electron-store
-│   ├── i18n.js                # Traductions du process principal
-│   └── modules/               # Modules IPC
-│       ├── fileHandlers.js    # Dialogs, import/export fichiers
-│       ├── storeHandlers.js   # Persistance
-│       ├── projectHandlers.js # Projets éditeur
-│       ├── windowManager.js   # Fenêtre principale
-│       ├── trayManager.js     # System tray
-│       ├── shortcutManager.js # Raccourcis globaux
-│       ├── protocolHandler.js # Protocole sounddeck-local://
-│       ├── diagnostic.js      # Logs et diagnostics
-│       └── ipcHandlers.js     # Handlers divers
+│   ├── main.js
+│   ├── preload.js
+│   └── modules/
+│       ├── autoUpdater.js     # electron-updater
+│       ├── fileHandlers.js
+│       ├── shortcutManager.js
+│       └── ...
 │
-├── src/                       # Application React
-│   ├── App.jsx                # Composant racine
-│   ├── main.jsx               # Point d'entrée React
-│   │
-│   ├── core/                  # Cœur applicatif
-│   │   ├── i18n/              # Internationalisation
-│   │   │   ├── locales/       # fr, en, es (15 fichiers chacun)
-│   │   │   ├── LanguageContext.jsx
-│   │   │   └── constants.js
-│   │   ├── plugins/           # Système de plugins
-│   │   │   ├── PluginManager/ # Gestionnaire + loader + cache
-│   │   │   ├── PluginContext.jsx
-│   │   │   └── hooks/
-│   │   ├── services/          # Services métier
-│   │   │   ├── AudioService.js        # Lecture des sons (Howler)
-│   │   │   ├── AudioMixerService.js   # Mixeur micro + sons (Web Audio)
-│   │   │   └── EmojiService.js        # Gestion des emojis
-│   │   └── store/             # State global (React hooks)
-│   │       ├── index.js       # useStore() principal
-│   │       ├── hooks/         # useSounds, useProfiles, useMixer…
-│   │       └── utils/         # normalizePath, volumeUtils, constants
-│   │
-│   ├── features/              # Modules métier
-│   │   ├── editor/            # Éditeur audio (timeline, effets…)
-│   │   ├── home/              # Page principale (bibliothèque)
-│   │   ├── options/           # Paramètres
-│   │   ├── presentation/      # Mode présentation
-│   │   ├── sequencer/         # Séquenceur de playlists
-│   │   ├── stats/             # Statistiques
-│   │   ├── trimmer/           # Rogneur
-│   │   ├── welcome/           # Écran de bienvenue
-│   │   └── emoji/             # Page Mes emojis
-│   │
-│   ├── plugins/               # Plugins intégrés
-│   │   ├── youtube/           # Import YouTube
-│   │   ├── myinstants/        # Découverte MyInstants
-│   │   └── emoji/             # Découverte d'emojis
-│   │
-│   ├── shared/                # Code partagé
-│   │   ├── components/        # Composants réutilisables
-│   │   │   ├── audio/         # Waveform, SoundCard, AudioTrimmer
-│   │   │   ├── modals/        # ConfirmModal, FeedbackModal…
-│   │   │   ├── navigation/    # Sidebar, SidebarEditor
-│   │   │   ├── settings/      # BackupSettings, OBSControl, etc.
-│   │   │   └── ui/            # Toast, ThemeToggle, Tutorial…
-│   │   ├── constants/         # Constantes (pages, emojis, navigation)
-│   │   ├── contexts/          # NetworkContext
-│   │   ├── hooks/             # useConfirm, useEmojis, etc.
-│   │   └── utils/             # Utilitaires purs (format, logger, audio)
-│   │
-│   └── test/                  # Configuration et utilitaires de test
-│       ├── setup.js           # Setup Vitest (jsdom, mocks)
-│       ├── setup-electron.js  # Setup Vitest pour Electron
-│       └── utils/             # Helpers (fixtures, mockElectronAPI…)
+├── src/                       # Renderer React
+│   ├── core/
+│   │   ├── i18n/              # fr, en, es
+│   │   ├── plugins/           # Moteur de plugins
+│   │   ├── services/          # AudioService, AudioMixerService
+│   │   └── store/             # State global
+│   ├── features/              # Editor, Sequencer, Trimmer, etc.
+│   └── shared/                # Composants, hooks, utils
 │
-├── public/                    # Assets statiques
-├── package.json
-├── vite.config.js
-└── eslint.config.js
+├── server/                    # Cloudflare Worker + D1
+│   ├── src/routes/            # login, signup, admin, etc.
+│   ├── migrations/            # Migrations SQL D1
+│   └── scripts/               # code.mjs, admin.mjs
+│
+├── website/                   # Site marketing Astro
+│   ├── src/pages/             # index, /en, /es, /admin
+│   └── src/components/        # Hero, Features, FAQ, etc.
+│
+└── scripts/                   # Scripts utilitaires
+    ├── release.mjs
+    ├── sign-license.mjs
+    └── ...
 ```
 
-### Principes d'architecture
+**Principes d'architecture :**
 
-- **Séparation stricte** : `electron/` (Node) vs `src/` (React/DOM)
-- **Context Bridge** : communication IPC sécurisée via `preload.js`
-- **Pas d'accès `nodeIntegration`** dans le renderer
-- **Services centralisés** : toute la logique audio dans `core/services/`
-- **Hooks métier** : chaque feature expose ses hooks réutilisables
-- **Alias Vite** : `@core`, `@shared`, `@features`, `@plugins`
+- Séparation stricte : `electron/` (Node) vs `src/` (React/DOM)
+- Context bridge : IPC sécurisé via `preload.js`
+- Pas de `nodeIntegration` dans le renderer
+- Services centralisés : toute la logique audio dans `core/services/`
+- Alias Vite : `@core`, `@shared`, `@features`, `@plugins`
+
+---
+
+## 📜 Scripts npm
+
+| Script | Description |
+|---|---|
+| `npm run dev` | Lance Electron + Vite en dev (HMR) |
+| `npm run build` | Build production (Vite + electron-builder) |
+| `npm run release` | Build + publication GitHub Releases |
+| `npm test` | Tests en mode watch |
+| `npm run test:coverage` | Tests + rapport de couverture |
+| `npm run test:ci` | Tests + couverture (mode CI) |
+| `npm run test:ui` | Interface graphique Vitest |
+| `npm run build:plugin` | Build un plugin `.sdplugin` |
+| `npm run audit:i18n` | Audit des traductions manquantes |
 
 ---
 
 ## 🔌 Système de plugins
 
-### Format `.sdplugin`
-
-Un plugin est une archive ZIP contenant :
+Un plugin est une archive ZIP (`.sdplugin`) contenant :
 
 ```
 my-plugin.sdplugin
@@ -313,14 +274,14 @@ my-plugin.sdplugin
     └── Discover.jsx # Composants React optionnels
 ```
 
-### Manifest `plugin.json`
+**Manifest (`plugin.json`) :**
 
 ```json
 {
   "id": "my-plugin",
   "name": "My Plugin",
   "version": "1.0.0",
-  "author": "You",
+  "author": "Vous",
   "requires": ">=1.3.0",
   "pages": [
     {
@@ -332,110 +293,91 @@ my-plugin.sdplugin
 }
 ```
 
-### API plugin
+**Point d'entrée (`index.js`) :**
 
 ```javascript
 export default {
   id: 'my-plugin',
   name: 'My Plugin',
   version: '1.0.0',
-  pages: [...],
+  pages: [],
 
   async init(store, pluginManager) {
-    // Setup à l'activation
     pluginManager.addHook('onSoundPlay', (sound) => {
       console.log('Playing:', sound.name)
     })
   },
 
-  async destroy() {
-    // Cleanup
-  }
+  async destroy() {}
 }
 ```
 
-### Installation
-
-1. **Options → Plugins → Installer un plugin**
-2. Coller une URL ou choisir un fichier `.sdplugin`
-3. Redémarrer l'app pour appliquer
+**Installation :** Options → Plugins → Installer un plugin.
 
 ---
 
 ## 🎧 Configuration Discord
 
-### 🪄 Assistant de configuration rapide (recommandé)
+### 🪄 Assistant rapide (recommandé)
 
-Depuis la v0.1.0, SoundDeck propose une **configuration Discord en un clic** :
+Depuis la v1.4.12, SoundDeck propose une **configuration Discord en un clic** :
 
-1. Installer VB-Cable et redémarrer le PC
+1. Installer **VB-Cable** et redémarrer le PC
 2. Ouvrir **Options → Audio → Configuration rapide**
 3. Cliquer sur **« Configuration auto Discord »**
 4. SoundDeck sélectionne automatiquement :
    - Sortie → `CABLE Input`
-   - Sortie locale → ton casque (vrai périphérique, pas un alias Windows)
+   - Sortie locale → ton casque (vrai périphérique)
    - Micro → ton vrai micro
    - Active le mixeur, playLocally et la réduction de bruit
 5. Cliquer sur **« Fait »** sur le bandeau de rappel Discord après avoir configuré Discord manuellement (Entrée = `CABLE Output`)
 
-### Mode simple (VB-Cable uniquement) — Manuel
+### Mode manuel (VB-Cable uniquement)
 
 1. Installer **VB-Cable** depuis [vb-audio.com](https://vb-audio.com/Cable/)
 2. Redémarrer le PC
 3. **Options → Audio** :
-   - Activez **Mixeur micro + sons**
-   - Sélectionnez votre micro
+   - Activer **Mixeur micro + sons**
+   - Sélectionner votre micro
    - Sortie : `CABLE Input (VB-Audio Virtual Cable)`
-   - Activez **Jouer en local aussi** → sélectionnez votre casque
+   - Activer **Jouer en local aussi** → sélectionner votre casque
 4. **Discord → Voix & Vidéo** :
    - Périphérique d'entrée : `CABLE Output (VB-Audio Virtual Cable)`
    - Périphérique de sortie : votre casque
-   - Désactivez : Suppression de bruit, Annulation d'écho, Contrôle automatique de gain
+   - Désactiver : Suppression de bruit, Annulation d'écho, Contrôle automatique de gain
 
 ### Mode avancé (VoiceMeeter Banana)
 
-## Consultez le **Guide Discord** intégré (page Guide dans l'app).
+Consulter le **Guide Discord** intégré (page Guide dans l'app).
+
+---
 
 ## 🌍 Internationalisation
 
-Le projet supporte **3 langues** : FR, EN, ES.
+Le projet supporte **3 langues** : EN, FR, ES.
 
-### Ajouter une langue
+**Ajouter une clé de traduction :**
 
-1. Créer `src/core/i18n/locales/<code>/` avec les 15 fichiers (`common.js`, `editor.js`, etc.)
-2. Ajouter la langue dans `src/core/i18n/constants.js`
-3. Lancer `npm run audit:i18n` pour vérifier la cohérence
-
-### Structure d'un fichier de traductions
-
-```javascript
-// src/core/i18n/locales/fr/common.js
-export default {
-  add: "Ajouter",
-  cancel: "Annuler",
-  profileManagerConfirmMessage: 'Retirer {count} son(s) du profil "{name}" ?',
-  // ...
-};
-```
-
-Placeholders supportés : `{name}` (nommés), `{0}` (positionnels).
+1. Ajouter la clé dans les **3 fichiers** `src/core/i18n/locales/<lang>/<section>.js`
+2. Lancer `npm run audit:i18n` pour vérifier
 
 ---
 
 ## 🤝 Contribuer
 
-Les contributions sont bienvenues ! Voir [CONTRIBUTING.md](CONTRIBUTING.md) pour :
+Les contributions sont bienvenues ! Voir [CONTRIBUTING.fr.md](CONTRIBUTING.fr.md) pour :
 
 - Le workflow Git
 - Les conventions de code
-- Les règles de tests (coverage minimal 75 %)
+- Les règles de tests (coverage min 75 %)
 - Le processus de PR
 
-**Avant de soumettre une PR** :
+**Avant de soumettre une PR :**
 
 ```bash
 npm test              # Tous les tests verts
-npm run test:coverage # Pas de régression de coverage
+npm run test:coverage # Pas de régression
+npx eslint src electron --fix
 ```
 
 ---
@@ -453,9 +395,12 @@ Voir [LICENSE](LICENSE) pour le texte complet.
 - **[Electron](https://www.electronjs.org/)** — Framework desktop
 - **[React](https://react.dev/)** — UI
 - **[Vite](https://vitejs.dev/)** — Build tool
-- **[Vitest](https://vitest.dev/)** — Framework de test
+- **[Vitest](https://vitest.dev/)** — Tests
 - **[Howler.js](https://howlerjs.com/)** — Lecture audio
 - **[Tone.js](https://tonejs.github.io/)** — Web Audio
+- **[Astro](https://astro.build/)** — Site web
+- **[Cloudflare Workers](https://workers.cloudflare.com/)** — API + D1
+- **[Resend](https://resend.com/)** — Emails transactionnels
 - **[Tabler Icons](https://tabler.io/icons)** — Icônes
 - **[yt-dlp](https://github.com/yt-dlp/yt-dlp)** — Extraction YouTube
 - **[ffmpeg](https://ffmpeg.org/)** — Traitement audio
@@ -467,6 +412,6 @@ Voir [LICENSE](LICENSE) pour le texte complet.
 
 **Fait avec ❤️ pour la communauté Discord**
 
-[Signaler un bug](../../issues) · [Proposer une idée](../../issues) · [Voir les releases](../../releases)
+[Site web](https://sounddeck.stream) · [Signaler un bug](https://github.com/Stevehunn/sounddeck/issues) · [Releases](https://github.com/Stevehunn/sounddeck/releases)
 
 </div>
