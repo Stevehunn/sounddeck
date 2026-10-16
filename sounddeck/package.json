@@ -1,6 +1,6 @@
 {
   "name": "sounddeck",
-  "version": "1.4.1",
+  "version": "1.4.11",
   "description": "Soundboard local for Discord or other applications with voice chat",
   "author": "Stevehunn <stevehun09@gmail.com>",
   "license": "MIT",
@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "concurrently \"cross-env BROWSER=none vite\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build && electron-builder",
-    "release": "vite build && electron-builder --publish never",
+    "release": "node scripts/release.mjs",
     "preview": "vite preview",
     "test": "vitest",
     "test:watch": "vitest --watch",
