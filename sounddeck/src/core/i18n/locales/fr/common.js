@@ -388,4 +388,11 @@ export default {
   a11ySounds: 'sons.',
   a11ySoundOf: 'Son',
   a11yOf: 'sur',
+
+  // ─── Auto-update ────────────────────────────────────────────────
+  updateAvailable: 'Mise à jour disponible',
+  updateDownload: 'Télécharger la mise à jour',
+  updateDownloading: 'Téléchargement...',
+  updateRestart: 'Installer et redémarrer',
+  updateRetryGithub: 'Ouvrir GitHub',
 };

@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.1.0] — 2026-10-09
+## [1.4.0] — 2026-10-09
 
 ### Added
 
@@ -124,5 +124,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[0.1.0]: https://github.com/Stevehunn/Soundboard/releases/tag/v1.4.0
+[1.4.0]: https://github.com/Stevehunn/Soundboard/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Stevehunn/Soundboard/releases/tag/v1.3.0

@@ -8,5 +8,5 @@ export const SITE = {
   license: 'https://github.com/Stevehunn/sounddeck/blob/main/LICENSE',
   changelog: 'https://github.com/Stevehunn/sounddeck/blob/main/CHANGELOG.md',
   contributing: 'https://github.com/Stevehunn/sounddeck/blob/main/CONTRIBUTING.md',
-  version: '0.1.0',
+  version: '1.4.0',
 } as const

@@ -3,7 +3,7 @@ import { useLanguage } from "@core/i18n/LanguageContext";
 import Section from "../Section";
 import OptionRow from "../OptionRow";
 
-const APP_VERSION = "0.1.0";
+const APP_VERSION = "1.4.0";
 
 export default function AboutSection({ sectionRef }) {
   const { t } = useLanguage();

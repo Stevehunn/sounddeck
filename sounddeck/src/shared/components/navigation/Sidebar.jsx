@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useRef, memo } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { useCurrentPlaying } from '@shared/hooks/useCurrentPlaying'
+import { useAutoUpdater } from '@shared/hooks/useAutoUpdater'
 import { formatTime } from '@shared/utils/format'
 import { togglePauseSound } from '@core/services/AudioService'
 import {
@@ -56,6 +57,118 @@ function buildVisibleItemsSignature(visibleItems) {
   return parts.join('§')
 }
 
+// ─── COMPOSANT : BANNIÈRE DE MISE À JOUR ─────────────────────────────────────
+
+const UpdateBanner = memo(function UpdateBanner({
+  status,
+  version,
+  progress,
+  onDownload,
+  onInstall,
+  onOpenGithub,
+  t,
+}) {
+  if (status === 'idle' || status === 'checking') return null
+
+  const isDownloading = status === 'downloading'
+  const isReady = status === 'downloaded'
+  const hasError = status === 'error'
+
+  const percent = progress?.percent ? Math.floor(progress.percent) : 0
+
+  const handleClick = () => {
+    if (isDownloading) return
+    if (isReady) onInstall()
+    else if (hasError) onOpenGithub()
+    else onDownload()
+  }
+
+  const label = hasError
+    ? t('updateRetryGithub')
+    : isReady
+      ? t('updateRestart')
+      : isDownloading
+        ? `${t('updateDownloading')} ${percent}%`
+        : t('updateDownload')
+
+  const icon = hasError
+    ? 'ti-external-link'
+    : isReady
+      ? 'ti-refresh'
+      : isDownloading
+        ? 'ti-loader'
+        : 'ti-download'
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={isDownloading}
+      title={`${t('updateAvailable')} — v${version}`}
+      style={{
+        width: 'calc(100% - 16px)',
+        margin: '6px 8px 4px',
+        padding: '8px 10px',
+        borderRadius: 8,
+        background: isReady ? 'var(--success)' : 'var(--accent-light)',
+        border: `1px solid ${isReady ? 'var(--success)' : 'var(--accent)'}`,
+        color: isReady ? 'white' : 'var(--accent)',
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: isDownloading ? 'wait' : 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 7,
+        transition: 'all 0.15s ease',
+        fontFamily: 'inherit',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {isDownloading && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            height: '100%',
+            width: `${percent}%`,
+            background: 'var(--accent)',
+            opacity: 0.25,
+            transition: 'width 0.3s ease',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      <i
+        className={`ti ${icon}`}
+        style={{
+          fontSize: 14,
+          animation: isDownloading ? 'spin 1s linear infinite' : 'none',
+          position: 'relative',
+          zIndex: 1,
+        }}
+      />
+      <span style={{ flex: 1, textAlign: 'left', position: 'relative', zIndex: 1 }}>
+        {label}
+      </span>
+      <span
+        style={{
+          fontSize: 9,
+          padding: '1px 6px',
+          borderRadius: 10,
+          background: isReady ? 'rgba(255,255,255,0.25)' : 'var(--accent)',
+          color: 'white',
+          fontWeight: 700,
+          position: 'relative',
+          zIndex: 1,
+        }}
+      >
+        v{version}
+      </span>
+    </button>
+  )
+})
+
 // ─── COMPOSANT : LISTE DES SONS EN LECTURE (FEATURE multi-sons) ─────────────
 
 const NowPlayingList = memo(function NowPlayingList({
@@ -70,7 +183,6 @@ const NowPlayingList = memo(function NowPlayingList({
 
   return (
     <div style={{ width: '100%', minWidth: 0 }}>
-      {/* Header */}
       <div
         style={{
           display: 'flex',
@@ -112,7 +224,6 @@ const NowPlayingList = memo(function NowPlayingList({
         </span>
       </div>
 
-      {/* Liste scrollable */}
       <div
         style={{
           display: 'flex',
@@ -164,7 +275,6 @@ const NowPlayingItem = memo(function NowPlayingItem({
         opacity: isPaused ? 0.75 : 1,
       }}
     >
-      {/* Ligne principale */}
       <div
         style={{
           display: 'flex',
@@ -173,7 +283,6 @@ const NowPlayingItem = memo(function NowPlayingItem({
           minWidth: 0,
         }}
       >
-        {/* Image / Emoji */}
         {sound.image ? (
           <img
             src={buildFileUrl(sound.image)}
@@ -205,7 +314,6 @@ const NowPlayingItem = memo(function NowPlayingItem({
           </span>
         )}
 
-        {/* Nom */}
         <span
           style={{
             fontSize: 11,
@@ -222,7 +330,6 @@ const NowPlayingItem = memo(function NowPlayingItem({
           {sound.name}
         </span>
 
-        {/* Bouton pause/resume */}
         <button
           onClick={(e) => {
             e.stopPropagation()
@@ -255,7 +362,6 @@ const NowPlayingItem = memo(function NowPlayingItem({
           />
         </button>
 
-        {/* Bouton stop */}
         <button
           onClick={(e) => {
             e.stopPropagation()
@@ -292,7 +398,6 @@ const NowPlayingItem = memo(function NowPlayingItem({
         </button>
       </div>
 
-      {/* Barre de progression */}
       {progress ? (
         <div
           style={{
@@ -384,7 +489,8 @@ const Sidebar = memo(
     const [draggedProfileId, setDraggedProfileId] = useState(null)
     const [dragOverProfileId, setDragOverProfileId] = useState(null)
 
-    // FEATURE multi-sons : liste des sons en lecture
+    const updater = useAutoUpdater()
+
     const {
       playingSounds,
       togglePause: togglePauseSoundById,
@@ -1089,7 +1195,9 @@ const Sidebar = memo(
 
     const renderFooter = () => {
       const footerItems = visibleItems.groups.footer || []
-      if (footerItems.length === 0) return null
+      const showUpdate = updater.status !== 'idle' && updater.status !== 'checking'
+
+      if (footerItems.length === 0 && !showUpdate) return null
 
       return (
         <div
@@ -1100,6 +1208,17 @@ const Sidebar = memo(
             background: 'var(--bg-secondary)',
           }}
         >
+          {showUpdate && (
+            <UpdateBanner
+              status={updater.status}
+              version={updater.version}
+              progress={updater.progress}
+              onDownload={updater.download}
+              onInstall={updater.install}
+              onOpenGithub={updater.openGithub}
+              t={t}
+            />
+          )}
           {footerItems.map((item) => renderNavItem(item))}
         </div>
       )
@@ -1144,7 +1263,6 @@ const Sidebar = memo(
           height: '100vh',
         }}
       >
-        {/* FEATURE multi-sons : header compact + liste */}
         <div
           style={{
             padding: showNowPlaying ? '8px 10px 10px' : '14px 14px 12px',

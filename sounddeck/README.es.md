@@ -4,7 +4,7 @@
 
 **Soundboard local para Discord y otras aplicaciones de chat de voz**
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](#)
 [![Tests](https://img.shields.io/badge/tests-5384%20%E2%9C%85-success.svg)](#tests)
 [![Coverage](https://img.shields.io/badge/coverage-77.5%25-yellowgreen.svg)](#tests)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)

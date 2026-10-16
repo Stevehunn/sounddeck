@@ -14,7 +14,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath),
   writeDroppedFile: (fileName, arrayBuffer) => ipcRenderer.invoke('write-dropped-file', fileName, arrayBuffer),
 
-  // Export JSON générique (logs d'erreur, backups, etc.)
   exportJsonFile: (json, defaultName, title) =>
     ipcRenderer.invoke('export-json-file', json, defaultName, title),
 
@@ -136,11 +135,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportEditorProject: (project, filePath) => ipcRenderer.invoke('export-editor-project', { project, filePath }),
   importEditorProject: (filePath) => ipcRenderer.invoke('import-editor-project', filePath),
 
+  // ─── AUTO-UPDATE ─────────────────────────────────────────────────────────
+  updateCheck: () => ipcRenderer.invoke('update:check'),
+  updateDownload: () => ipcRenderer.invoke('update:download'),
+  updateInstall: () => ipcRenderer.invoke('update:install'),
+  updateOpenGithub: () => ipcRenderer.invoke('update:open-github'),
+  onUpdateChecking: (cb) => ipcRenderer.on('update:checking', () => cb()),
+  onUpdateAvailable: (cb) => ipcRenderer.on('update:available', (e, info) => cb(info)),
+  onUpdateNotAvailable: (cb) => ipcRenderer.on('update:not-available', (e, info) => cb(info)),
+  onUpdateProgress: (cb) => ipcRenderer.on('update:progress', (e, p) => cb(p)),
+  onUpdateDownloaded: (cb) => ipcRenderer.on('update:downloaded', (e, info) => cb(info)),
+  onUpdateError: (cb) => ipcRenderer.on('update:error', (e, err) => cb(err)),
+
   // ─── DIVERS ──────────────────────────────────────────────────────────────
   isElectron: true,
 })
 
-// Exposer également via window pour accès direct dans les event handlers
 window.addEventListener('DOMContentLoaded', () => {
   const originalFileDescriptor = Object.getOwnPropertyDescriptor(File.prototype, 'path')
   if (!originalFileDescriptor) {

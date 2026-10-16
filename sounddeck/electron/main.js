@@ -16,6 +16,7 @@ const {
 } = require('./modules')
 
 const { registerSoundPopupHandlers } = require('./modules/soundPopupManager')
+const { initAutoUpdater } = require('./modules/autoUpdater')
 
 const store = require('./store')
 
@@ -159,6 +160,9 @@ function createMainWindow() {
 
   registerAllHandlers()
 
+  // ✅ Auto-updater
+  initAutoUpdater(() => mainWindow)
+
   mainWindow.once('ready-to-show', () => {
     const lang = store.get('lang', 'fr')
 
@@ -254,6 +258,13 @@ function updateTrayMenu() {
 
 app.whenReady().then(async () => {
   protocolHandler.registerLocalFileProtocol()
+
+  // ✅ Stocker la version de l'app pour le check de mise à jour
+  try {
+    store.set('appVersion', app.getVersion())
+  } catch (e) {
+    console.warn('⚠️ Impossible de stocker appVersion:', e.message)
+  }
 
   // injecte les webhooks feedback (avant de créer la fenêtre)
   initFeedbackWebhooks()
