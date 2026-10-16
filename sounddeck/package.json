@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "concurrently \"cross-env BROWSER=none vite\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build && electron-builder",
-    "release": "vite build && electron-builder --publish always",
+    "release": "vite build && electron-builder --publish never",
     "preview": "vite preview",
     "test": "vitest",
     "test:watch": "vitest --watch",
