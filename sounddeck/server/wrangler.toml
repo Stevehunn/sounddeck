@@ -3,8 +3,12 @@ main = "src/index.js"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+# ─── Domaine custom ────────────────────────────────────────────────────
+routes = [
+  { pattern = "api.sounddeck.stream", custom_domain = true }
+]
+
 # ─── Base de données D1 ────────────────────────────────────────────────
-# ⚠️ L'id sera rempli à l'étape 3 (après `wrangler d1 create`)
 [[d1_databases]]
 binding = "DB"
 database_name = "sounddeck-db"
@@ -12,7 +16,7 @@ database_id = "843190a9-ae07-4eef-a17d-7e7c05ec7f94"
 
 # ─── Variables publiques (visibles dans le code) ──────────────────────
 [vars]
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.4.1"
 DONATION_MIN_EUR = "5"
 
 # ─── Secrets (à définir via `wrangler secret put`) ────────────────────

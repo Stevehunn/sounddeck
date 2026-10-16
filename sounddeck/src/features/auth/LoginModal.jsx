@@ -4,9 +4,7 @@ import { createPortal } from 'react-dom'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { logError } from '@shared/utils/logger'
 
-const API_BASE = import.meta.env.DEV
-  ? 'http://127.0.0.1:8787'
-  : 'https://sounddeck-api.sounddeck.workers.dev'
+const API_BASE = 'https://api.sounddeck.stream'
 
 export default function LoginModal({ onClose, onActivated, addToast }) {
   const { t } = useLanguage()

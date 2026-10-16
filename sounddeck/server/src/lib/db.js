@@ -1,100 +1,264 @@
 // server/src/lib/db.js
 
+// ─── AUTH / HASH ───────────────────────────────────────────────────────
+
+const PBKDF2_ITERATIONS = 100_000;
+const PBKDF2_KEYLEN = 32; // 256 bits
+const PBKDF2_DIGEST = "SHA-256";
+const SALT_BYTES = 16;
+
+function bytesToHex(bytes) {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function hexToBytes(hex) {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  }
+  return out;
+}
+
+/**
+ * Hash un password avec PBKDF2-SHA256 (100k itérations).
+ * @returns {Promise<{ hash: string, salt: string }>} hash et salt en hex
+ */
+export async function hashPassword(password) {
+  const enc = new TextEncoder();
+  const saltBytes = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
+
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(password),
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits"],
+  );
+
+  const hashBuffer = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: saltBytes,
+      iterations: PBKDF2_ITERATIONS,
+      hash: PBKDF2_DIGEST,
+    },
+    keyMaterial,
+    PBKDF2_KEYLEN * 8,
+  );
+
+  return {
+    hash: bytesToHex(new Uint8Array(hashBuffer)),
+    salt: bytesToHex(saltBytes),
+  };
+}
+
+/**
+ * Vérifie un password contre un hash+salt existant.
+ * @returns {Promise<boolean>}
+ */
+export async function verifyPassword(password, hashHex, saltHex) {
+  const enc = new TextEncoder();
+  const saltBytes = hexToBytes(saltHex);
+
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(password),
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits"],
+  );
+
+  const hashBuffer = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: saltBytes,
+      iterations: PBKDF2_ITERATIONS,
+      hash: PBKDF2_DIGEST,
+    },
+    keyMaterial,
+    PBKDF2_KEYLEN * 8,
+  );
+
+  const computed = bytesToHex(new Uint8Array(hashBuffer));
+
+  // Comparaison constant-time
+  if (computed.length !== hashHex.length) return false;
+  let diff = 0;
+  for (let i = 0; i < computed.length; i++) {
+    diff |= computed.charCodeAt(i) ^ hashHex.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+// ─── USERS ─────────────────────────────────────────────────────────────
+
 export function getUserByEmail(db, email) {
-  return db.prepare('SELECT * FROM users WHERE email = ?').bind(email).first()
+  return db.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
 }
 
 export function getUserByDonorId(db, donorId) {
-  return db.prepare('SELECT * FROM users WHERE donor_id = ?').bind(donorId).first()
+  return db
+    .prepare("SELECT * FROM users WHERE donor_id = ?")
+    .bind(donorId)
+    .first();
 }
 
-export async function createUser(db, { id, email, passwordHash, passwordSalt, donorId, donorName, tier = 'pro' }) {
-  const now = Math.floor(Date.now() / 1000)
+export async function createUser(
+  db,
+  { id, email, passwordHash, passwordSalt, donorId, donorName, tier = "pro" },
+) {
+  const now = Math.floor(Date.now() / 1000);
   await db
     .prepare(
       `INSERT INTO users (id, email, password_hash, password_salt, donor_id, donor_name, tier, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(id, email, passwordHash, passwordSalt, donorId, donorName, tier, now, now)
-    .run()
-  return { id, email, donorId, donorName, tier }
+    .bind(
+      id,
+      email,
+      passwordHash,
+      passwordSalt,
+      donorId,
+      donorName,
+      tier,
+      now,
+      now,
+    )
+    .run();
+  return { id, email, donorId, donorName, tier };
 }
 
-export async function updateUserPassword(db, userId, passwordHash, passwordSalt) {
-  const now = Math.floor(Date.now() / 1000)
+export async function updateUserPassword(
+  db,
+  userId,
+  passwordHash,
+  passwordSalt,
+) {
+  const now = Math.floor(Date.now() / 1000);
   await db
     .prepare(
-      'UPDATE users SET password_hash = ?, password_salt = ?, updated_at = ? WHERE id = ?'
+      "UPDATE users SET password_hash = ?, password_salt = ?, updated_at = ? WHERE id = ?",
     )
     .bind(passwordHash, passwordSalt, now, userId)
-    .run()
+    .run();
 }
 
-export async function recordPayment(db, { id, stripeSessionId, stripePaymentId, email, amount, currency, donorId }) {
-  const now = Math.floor(Date.now() / 1000)
+export function listUsers(db, { limit = 100 } = {}) {
+  return db
+    .prepare(
+      `SELECT id, email, tier, donor_id, donor_name, created_at, updated_at
+       FROM users
+       ORDER BY created_at DESC
+       LIMIT ?`,
+    )
+    .bind(limit)
+    .all();
+}
+
+// ─── PAYMENTS ──────────────────────────────────────────────────────────
+
+export async function recordPayment(
+  db,
+  { id, stripeSessionId, stripePaymentId, email, amount, currency, donorId },
+) {
+  const now = Math.floor(Date.now() / 1000);
   await db
     .prepare(
       `INSERT INTO payments (id, stripe_session_id, stripe_payment_id, email, amount, currency, donor_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(id, stripeSessionId, stripePaymentId, email, amount, currency, donorId, now)
-    .run()
+    .bind(
+      id,
+      stripeSessionId,
+      stripePaymentId,
+      email,
+      amount,
+      currency,
+      donorId,
+      now,
+    )
+    .run();
 }
 
-export async function logAudit(db, { event, email = null, donorId = null, ip = null, userAgent = null, detail = null }) {
-  const now = Math.floor(Date.now() / 1000)
+// ─── AUDIT ─────────────────────────────────────────────────────────────
+
+export async function logAudit(
+  db,
+  {
+    event,
+    email = null,
+    donorId = null,
+    ip = null,
+    userAgent = null,
+    detail = null,
+  },
+) {
+  const now = Math.floor(Date.now() / 1000);
   await db
     .prepare(
       `INSERT INTO audit_log (event, email, donor_id, ip, user_agent, detail, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(event, email, donorId, ip, userAgent, detail, now)
-    .run()
+    .run();
 }
 
 // ─── REDEEM CODES ──────────────────────────────────────────────────────
 
-export async function insertRedeemCode(db, {
-  code, tier = 'pro', note = null, emailHint = null, expiresAt = null, maxUses = 1,
-}) {
-  const now = Math.floor(Date.now() / 1000)
+export async function insertRedeemCode(
+  db,
+  {
+    code,
+    tier = "pro",
+    note = null,
+    emailHint = null,
+    expiresAt = null,
+    maxUses = 1,
+  },
+) {
+  const now = Math.floor(Date.now() / 1000);
   await db
     .prepare(
       `INSERT INTO redeem_codes (code, tier, note, email_hint, created_at, expires_at, max_uses)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(code, tier, note, emailHint, now, expiresAt, maxUses)
-    .run()
-  return { code, tier, note, emailHint, expiresAt, maxUses }
+    .run();
+  return { code, tier, note, emailHint, expiresAt, maxUses };
 }
 
 export function getRedeemCode(db, code) {
-  return db.prepare('SELECT * FROM redeem_codes WHERE code = ?').bind(code).first()
+  return db
+    .prepare("SELECT * FROM redeem_codes WHERE code = ?")
+    .bind(code)
+    .first();
 }
 
 export async function markRedeemCodeUsed(db, code, userId, email) {
-  const now = Math.floor(Date.now() / 1000)
+  const now = Math.floor(Date.now() / 1000);
   await db
     .prepare(
       `UPDATE redeem_codes
        SET used_at = ?, used_by_email = ?, used_by_user_id = ?,
            current_uses = current_uses + 1
-       WHERE code = ?`
+       WHERE code = ?`,
     )
     .bind(now, email, userId, code)
-    .run()
+    .run();
 }
 
 export async function revokeRedeemCode(db, code, reason = null) {
-  const now = Math.floor(Date.now() / 1000)
+  const now = Math.floor(Date.now() / 1000);
   await db
     .prepare(
       `UPDATE redeem_codes
        SET revoked = 1, revoked_at = ?, revoked_reason = ?
-       WHERE code = ? AND used_at IS NULL`
+       WHERE code = ? AND used_at IS NULL`,
     )
     .bind(now, reason, code)
-    .run()
+    .run();
 }
 
 export function listRedeemCodes(db, { limit = 100, onlyUnused = false } = {}) {
@@ -103,30 +267,33 @@ export function listRedeemCodes(db, { limit = 100, onlyUnused = false } = {}) {
        WHERE used_at IS NULL AND revoked = 0
          AND (expires_at IS NULL OR expires_at > strftime('%s','now'))
        ORDER BY created_at DESC LIMIT ?`
-    : `SELECT * FROM redeem_codes ORDER BY created_at DESC LIMIT ?`
-  return db.prepare(query).bind(limit).all()
+    : `SELECT * FROM redeem_codes ORDER BY created_at DESC LIMIT ?`;
+  return db.prepare(query).bind(limit).all();
 }
 
 // ─── PENDING SPONSORSHIPS ──────────────────────────────────────────────
 
-export async function insertPendingSponsorship(db, {
-  id,
-  sponsorshipNodeId,
-  githubLogin,
-  githubUserId,
-  amountCents,
-  currency = 'USD',
-  tier = 'pro',
-  isOneTime = true,
-  privacyLevel = null,
-}) {
-  const now = Math.floor(Date.now() / 1000)
+export async function insertPendingSponsorship(
+  db,
+  {
+    id,
+    sponsorshipNodeId,
+    githubLogin,
+    githubUserId,
+    amountCents,
+    currency = "USD",
+    tier = "pro",
+    isOneTime = true,
+    privacyLevel = null,
+  },
+) {
+  const now = Math.floor(Date.now() / 1000);
   await db
     .prepare(
       `INSERT INTO pending_sponsorships
          (id, sponsorship_node_id, github_login, github_user_id,
           amount_cents, currency, tier, is_one_time, privacy_level, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -138,16 +305,16 @@ export async function insertPendingSponsorship(db, {
       tier,
       isOneTime ? 1 : 0,
       privacyLevel,
-      now
+      now,
     )
-    .run()
+    .run();
 }
 
 export function getPendingSponsorshipByNodeId(db, nodeId) {
   return db
-    .prepare('SELECT * FROM pending_sponsorships WHERE sponsorship_node_id = ?')
+    .prepare("SELECT * FROM pending_sponsorships WHERE sponsorship_node_id = ?")
     .bind(nodeId)
-    .first()
+    .first();
 }
 
 export function findClaimableSponsorshipForLogin(db, githubLogin) {
@@ -158,41 +325,44 @@ export function findClaimableSponsorshipForLogin(db, githubLogin) {
          AND claimed_at IS NULL
          AND revoked = 0
        ORDER BY created_at ASC
-       LIMIT 1`
+       LIMIT 1`,
     )
     .bind(githubLogin)
-    .first()
+    .first();
 }
 
 export async function markSponsorshipClaimed(db, sponsorshipId, userId) {
-  const now = Math.floor(Date.now() / 1000)
+  const now = Math.floor(Date.now() / 1000);
   await db
     .prepare(
       `UPDATE pending_sponsorships
        SET claimed_at = ?, claimed_by_user_id = ?
-       WHERE id = ? AND claimed_at IS NULL`
+       WHERE id = ? AND claimed_at IS NULL`,
     )
     .bind(now, userId, sponsorshipId)
-    .run()
+    .run();
 }
 
-export function listPendingSponsorships(db, { limit = 100, onlyUnclaimed = false } = {}) {
+export function listPendingSponsorships(
+  db,
+  { limit = 100, onlyUnclaimed = false } = {},
+) {
   const query = onlyUnclaimed
     ? `SELECT * FROM pending_sponsorships
        WHERE claimed_at IS NULL AND revoked = 0
        ORDER BY created_at DESC LIMIT ?`
-    : `SELECT * FROM pending_sponsorships ORDER BY created_at DESC LIMIT ?`
-  return db.prepare(query).bind(limit).all()
+    : `SELECT * FROM pending_sponsorships ORDER BY created_at DESC LIMIT ?`;
+  return db.prepare(query).bind(limit).all();
 }
 
 export async function revokePendingSponsorship(db, id, reason = null) {
-  const now = Math.floor(Date.now() / 1000)
+  const now = Math.floor(Date.now() / 1000);
   await db
     .prepare(
       `UPDATE pending_sponsorships
        SET revoked = 1, revoked_at = ?, revoked_reason = ?
-       WHERE id = ? AND claimed_at IS NULL`
+       WHERE id = ? AND claimed_at IS NULL`,
     )
     .bind(now, reason, id)
-    .run()
+    .run();
 }
