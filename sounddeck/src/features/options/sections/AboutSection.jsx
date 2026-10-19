@@ -1,13 +1,60 @@
 // src/features/options/sections/AboutSection.jsx
+/**
+ * @file About section of the Options page.
+ *
+ * Shows the current app version (read from `appVersion` in the store,
+ * which is written once at boot in `electron/main.js`), plus the
+ * license, a link to the GitHub source, and a small footer.
+ *
+ * The version is loaded asynchronously from the store (via IPC) so the
+ * displayed value always matches the actual installed build — no need
+ * to bump a hardcoded constant on every release.
+ */
+
+import { useState, useEffect } from "react";
 import { useLanguage } from "@core/i18n/LanguageContext";
 import Section from "../Section";
 import OptionRow from "../OptionRow";
 
-const APP_VERSION = "1.4.0";
+/**
+ * Placeholder shown while the app version is being loaded (or if the
+ * store doesn't have it, e.g. in dev). Never displayed in a normal
+ * packaged build for more than a few ms.
+ */
+const VERSION_PLACEHOLDER = "…";
 
+/**
+ * @param {Object} props
+ * @param {React.RefObject<HTMLElement>} [props.sectionRef]
+ * @returns {JSX.Element}
+ */
 export default function AboutSection({ sectionRef }) {
   const { t } = useLanguage();
+  const [appVersion, setAppVersion] = useState(
+    /** @type {string|null} */ (null),
+  );
 
+  // Load the app version from the store (populated by electron/main.js
+  // on every boot — see `store.set("appVersion", app.getVersion())`).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const version = await window.electronAPI?.storeGet?.("appVersion");
+        if (!cancelled) setAppVersion(version || "?");
+      } catch {
+        if (!cancelled) setAppVersion("?");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /**
+   * Opens the GitHub repo in the user's default browser.
+   * @returns {void}
+   */
   const handleOpenSource = () => {
     window.electronAPI?.openExternal?.("https://github.com/Stevehunn/Soundboard");
   };
@@ -31,7 +78,7 @@ export default function AboutSection({ sectionRef }) {
             borderRadius: 6,
           }}
         >
-          v{APP_VERSION}
+          v{appVersion ?? VERSION_PLACEHOLDER}
         </span>
       </OptionRow>
 

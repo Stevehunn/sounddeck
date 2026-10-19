@@ -184,7 +184,7 @@ export default function FeedbackModal({
       }
 
       if (typeof window.electronAPI?.readFileBase64 !== "function") {
-        throw new Error("readFileBase64 not available (restart the app)");
+        throw new Error("readFileBase64 non disponible (redémarrez l'app)");
       }
 
       const readResult = await window.electronAPI.readFileBase64(filePath);
@@ -662,7 +662,7 @@ export default function FeedbackModal({
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="email@example.com"
+              placeholder="email@exemple.com"
               className="input-lg"
               style={{ borderRadius: "var(--radius-md)" }}
               type="email"

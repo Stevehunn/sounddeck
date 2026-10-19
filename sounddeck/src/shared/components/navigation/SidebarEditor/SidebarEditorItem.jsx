@@ -195,14 +195,14 @@ function EditableItem({
       <div style={{ display: "flex", gap: 4 }}>
         <IconBtn
           active={item.pinned}
-          title={item.pinned ? "Unpin" : "Pin"}
+          title={item.pinned ? "Désépingler" : "Épingler"}
           icon={item.pinned ? "ti-pinned" : "ti-pin"}
           onClick={onTogglePinned}
         />
         {canHide && (
           <IconBtn
             danger={!isVisible}
-            title={isVisible ? "Hide" : "Show"}
+            title={isVisible ? "Masquer" : "Afficher"}
             icon={isVisible ? "ti-eye" : "ti-eye-off"}
             onClick={onToggleVisibility}
           />
@@ -245,7 +245,7 @@ function DefaultProfileItem({ item, onTogglePinned }) {
 
       <IconBtn
         active={item.pinned}
-        title={item.pinned ? "Unpin" : "Pin"}
+        title={item.pinned ? "Désépingler" : "Épingler"}
         icon={item.pinned ? "ti-pinned" : "ti-pin"}
         onClick={onTogglePinned}
       />
