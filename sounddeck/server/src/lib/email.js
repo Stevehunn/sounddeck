@@ -336,12 +336,15 @@ export async function sendVerifyEmail(resendApiKey, { email, verifyUrl }) {
 /**
  * Builds the HTML body for the verification email.
  *
+ * Note: `email` isn't displayed in the body — it's the recipient's address,
+ * already known by their email client. Kept out of the signature to avoid
+ * an unused-arg warning.
+ *
  * @param {Object} params
- * @param {string} params.email
  * @param {string} params.verifyUrl
  * @returns {string}
  */
-function buildVerifyEmailHtml({ email, verifyUrl }) {
+function buildVerifyEmailHtml({ verifyUrl }) {
   return `
 <!DOCTYPE html>
 <html>
@@ -438,12 +441,14 @@ export async function sendPasswordResetEmail(
 /**
  * Builds the HTML body for the password reset email.
  *
+ * Note: `email` isn't displayed in the body (see `buildVerifyEmailHtml`
+ * for the rationale).
+ *
  * @param {Object} params
- * @param {string} params.email
  * @param {string} params.resetUrl
  * @returns {string}
  */
-function buildPasswordResetHtml({ email, resetUrl }) {
+function buildPasswordResetHtml({ resetUrl }) {
   return `
 <!DOCTYPE html>
 <html>

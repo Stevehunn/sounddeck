@@ -131,6 +131,18 @@ vi.mock('@features/options/sections/ProfilesSection', () => ({
   default: () => <div data-testid="profiles-section" />,
 }))
 
+// ✅ Fix : SupportSection + AboutSection étaient rendues pour de vrai
+// et appellent `storeGet(...)` en montant. Comme `storeGet` est mocké
+// avec `mockResolvedValue([{ id: '1' }])` dans les tests d'export, ces
+// composants essayaient de rendre un tableau d'objets → crash
+// "Objects are not valid as a React child".
+vi.mock('@features/options/sections/SupportSection', () => ({
+  default: () => <div data-testid="support-section" />,
+}))
+vi.mock('@features/options/sections/AboutSection', () => ({
+  default: () => <div data-testid="about-section" />,
+}))
+
 import Options from '@features/options/Options'
 
 describe('Options', () => {
@@ -148,8 +160,17 @@ describe('Options', () => {
     }
     addToast = vi.fn()
 
+    // ✅ Fix : `storeGet` key-aware. Retourne la valeur attendue pour chaque
+    // clé connue, et `undefined` par défaut (les composants qui n'ont pas
+    // de valeur à rendre resteront muets). Évite qu'un composant qui fait
+    // `storeGet("appVersion")` reçoive `[{ id: '1' }]` par accident.
     window.electronAPI = {
-      storeGet: vi.fn().mockResolvedValue([]),
+      storeGet: vi.fn().mockImplementation((key) => {
+        if (key === 'errorLogs') return Promise.resolve([])
+        // Toutes les autres clés : pas de valeur → les composants
+        // doivent tolérer `undefined`.
+        return Promise.resolve(undefined)
+      }),
       exportJsonFile: vi.fn().mockResolvedValue({ success: true }),
     }
   })
@@ -306,7 +327,9 @@ describe('Options', () => {
 
   describe('handleExportLogs', () => {
     it('devrait afficher un info si aucun log', async () => {
-      window.electronAPI.storeGet.mockResolvedValue([])
+      window.electronAPI.storeGet.mockImplementation((key) =>
+        key === 'errorLogs' ? Promise.resolve([]) : Promise.resolve(undefined)
+      )
       renderOptions()
       fireEvent.click(screen.getByTestId('export-logs-btn'))
 
@@ -316,7 +339,11 @@ describe('Options', () => {
     })
 
     it('devrait exporter les logs si présents', async () => {
-      window.electronAPI.storeGet.mockResolvedValue([{ id: '1', msg: 'err' }])
+      window.electronAPI.storeGet.mockImplementation((key) =>
+        key === 'errorLogs'
+          ? Promise.resolve([{ id: '1', msg: 'err' }])
+          : Promise.resolve(undefined)
+      )
       renderOptions()
       fireEvent.click(screen.getByTestId('export-logs-btn'))
 
@@ -326,7 +353,11 @@ describe('Options', () => {
     })
 
     it('devrait afficher un toast succès après export', async () => {
-      window.electronAPI.storeGet.mockResolvedValue([{ id: '1' }])
+      window.electronAPI.storeGet.mockImplementation((key) =>
+        key === 'errorLogs'
+          ? Promise.resolve([{ id: '1' }])
+          : Promise.resolve(undefined)
+      )
       window.electronAPI.exportJsonFile.mockResolvedValue({ success: true })
       renderOptions()
       fireEvent.click(screen.getByTestId('export-logs-btn'))
@@ -340,7 +371,11 @@ describe('Options', () => {
     })
 
     it('ne devrait PAS afficher error si annulé', async () => {
-      window.electronAPI.storeGet.mockResolvedValue([{ id: '1' }])
+      window.electronAPI.storeGet.mockImplementation((key) =>
+        key === 'errorLogs'
+          ? Promise.resolve([{ id: '1' }])
+          : Promise.resolve(undefined)
+      )
       window.electronAPI.exportJsonFile.mockResolvedValue({ canceled: true })
       renderOptions()
       fireEvent.click(screen.getByTestId('export-logs-btn'))
@@ -351,7 +386,11 @@ describe('Options', () => {
     })
 
     it('devrait afficher un toast erreur si export échoue', async () => {
-      window.electronAPI.storeGet.mockResolvedValue([{ id: '1' }])
+      window.electronAPI.storeGet.mockImplementation((key) =>
+        key === 'errorLogs'
+          ? Promise.resolve([{ id: '1' }])
+          : Promise.resolve(undefined)
+      )
       window.electronAPI.exportJsonFile.mockResolvedValue({
         success: false,
         error: 'disk full',

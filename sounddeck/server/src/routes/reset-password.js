@@ -1,18 +1,31 @@
 /**
  * @file Reset-password route (GET + POST).
  *
- * Flow:
- * 1. GET  /reset-password?token=X → renders an HTML form where the user
- *    enters a new password.
- * 2. POST /reset-password         → validates the token, updates the
- *    password hash, marks the token as used, returns 200 OK.
+ * Serves the password reset flow to a browser, entirely from the worker
+ * (no React, no build step, no external assets). This ensures the flow
+ * works even when the SoundDeck desktop app isn't installed.
  *
- * The page is served entirely by the worker (no React), so it works even
- * without the app being installed.
+ * Two endpoints:
  *
- * Token validity:
- * - Single-use: `used_at` is set after a successful reset.
- * - Expires after 1 hour (checked against `expires_at`).
+ * 1. **GET  /reset-password?token=X** — renders the HTML form.
+ *    Three error states, each with a dedicated page:
+ *    - Missing token → 400 "Invalid link"
+ *    - Token doesn't exist / already used → 400 "Invalid / used link"
+ *    - Token exists but `expires_at < now` → 400 "Link expired"
+ *
+ * 2. **POST /reset-password** — validates the token, hashes the new
+ *    password, updates `users.password_hash` + `password_salt`, and marks
+ *    the token as used (single-use). Returns JSON for the inline `<script>`
+ *    that submitted the form.
+ *
+ * All shared CSS lives in `SHARED_STYLE` (single string), so both the form
+ * page and the error page stay visually consistent without duplicating the
+ * <style> block.
+ *
+ * @see ../lib/crypto.js — `hashPassword` (PBKDF2-SHA256, 100k iters)
+ * @see ../lib/db.js — `getPasswordReset`, `markPasswordResetUsed`,
+ *      `updateUserPassword`
+ * @see ./forgot-password.js — the sibling route that generates the token
  */
 
 import { hashPassword } from "../lib/crypto.js";
@@ -61,9 +74,11 @@ function htmlResponse(html, status = 200) {
  *
  * Request body: `{ token: string, newPassword: string }`
  *
- * Validation:
- * - `newPassword` length must be between 6 and 100 chars.
- * - Token must exist, not be already used, and not be expired.
+ * Validation order:
+ * 1. Both fields present.
+ * 2. `newPassword` length ∈ [6, 100].
+ * 3. Token exists, not already used, not expired.
+ * 4. The user tied to the token still exists.
  *
  * On success:
  * - Password hash + salt are updated.
@@ -72,8 +87,8 @@ function htmlResponse(html, status = 200) {
  *
  * @param {Request} request
  * @param {Object} env
- * @param {string} env.DB
- * @returns {Promise<Response>}
+ * @param {string} env.DB - D1 database binding.
+ * @returns {Promise<Response>} JSON `{ok: true, message}` on success.
  */
 export async function handleResetPasswordSubmit(request, env) {
   let body;
@@ -86,6 +101,7 @@ export async function handleResetPasswordSubmit(request, env) {
   const token = String(body.token || "").trim();
   const newPassword = String(body.newPassword || "");
 
+  // ─── Input validation ────────────────────────────────────────────
   if (!token || !newPassword) {
     return jsonResponse({ error: "missing_fields" }, 400);
   }
@@ -99,6 +115,7 @@ export async function handleResetPasswordSubmit(request, env) {
     return jsonResponse({ error: "password_too_long" }, 400);
   }
 
+  // ─── Token validation ────────────────────────────────────────────
   const reset = await getPasswordReset(env.DB, token);
   if (!reset) {
     return jsonResponse({ error: "invalid_token" }, 400);
@@ -117,11 +134,11 @@ export async function handleResetPasswordSubmit(request, env) {
     return jsonResponse({ error: "user_not_found" }, 404);
   }
 
-  // Hash and persist the new password
+  // ─── Update password + burn the token ────────────────────────────
   const { hash, salt } = await hashPassword(newPassword);
   await updateUserPassword(env.DB, user.id, hash, salt);
 
-  // Burn the token (single-use)
+  // Single-use token
   await markPasswordResetUsed(env.DB, token);
 
   await logAudit(env.DB, {
@@ -145,13 +162,22 @@ export async function handleResetPasswordSubmit(request, env) {
 /**
  * Handles `GET /reset-password?token=X` — renders the HTML reset form.
  *
- * Invalid tokens, already-used tokens, and expired tokens all render a
- * dedicated error page.
+ * Three error states, each returns a dedicated HTML page with 400:
+ * - No `token` query param → "Invalid link" / "No token was provided."
+ * - Token unknown to DB → "Invalid link" / "This link does not exist or
+ *   has already been used."
+ * - Token already used → "Link already used" / "This link has already
+ *   reset a password. Request a new one."
+ * - Token expired → "Link expired" / "This link is valid for 1 hour.
+ *   Request a new one from the app."
+ *
+ * On success returns the form page with the token embedded in the inline
+ * `<script>` so it can be POSTed back.
  *
  * @param {Request} request
  * @param {Object} env
- * @param {string} env.DB
- * @returns {Promise<Response>}
+ * @param {string} env.DB - D1 database binding.
+ * @returns {Promise<Response>} HTML response (form or error page).
  */
 export async function handleResetPasswordPage(request, env) {
   const url = new URL(request.url);
@@ -203,8 +229,13 @@ export async function handleResetPasswordPage(request, env) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Shared CSS for the reset-password pages (form + error). Kept inline so the
- * page works with zero external requests (fast, no CORS, no fonts).
+ * Shared CSS for the reset-password pages (form + error).
+ *
+ * Kept inline so the page works with zero external requests: fast, no
+ * CORS, no font loading, no FOUC. The colors mirror the app's dark theme
+ * (`index.css`).
+ *
+ * @type {string}
  */
 const SHARED_STYLE = `
   body { font-family: system-ui, -apple-system, sans-serif; background: #111113; color: #f0f0f2; margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -232,13 +263,22 @@ const SHARED_STYLE = `
 /**
  * Builds the HTML reset form page.
  *
- * Includes an inline script that POSTs to `/reset-password` and swaps the
- * page for a success card on 200. Errors are shown in a message box below
- * the form (no page reload).
+ * Includes an inline `<script>` that:
+ * - Prevents the default form submit
+ * - Client-side validates (min length, password match)
+ * - POSTs `{ token, newPassword }` to `/reset-password`
+ * - Swaps the page for a success card on 200
+ * - Shows an error message inline on failure (no page reload)
  *
- * @param {string} token - The reset token (already validated).
+ * The `token` is injected via `JSON.stringify(token)` to guarantee valid
+ * JS string escaping (prevents injection if the token ever contained a
+ * quote).
+ *
+ * All user-facing strings are in **French** to match the app's locale.
+ *
+ * @param {string} token - The reset token (already validated by the caller).
  * @param {string} email - User's email (displayed for context).
- * @returns {string} HTML string.
+ * @returns {string} HTML document as a string.
  */
 function buildResetFormPage(token, email) {
   return `<!DOCTYPE html>
@@ -361,9 +401,9 @@ function buildResetFormPage(token, email) {
 /**
  * Builds the HTML error page for invalid / expired / already-used tokens.
  *
- * @param {string} title - Short error title.
- * @param {string} message - Error description.
- * @returns {string} HTML string.
+ * @param {string} title - Short error title (displayed as `<h1>`).
+ * @param {string} message - Error description (1-2 sentences).
+ * @returns {string} HTML document as a string.
  */
 function buildErrorPage(title, message) {
   return `<!DOCTYPE html>

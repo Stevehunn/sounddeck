@@ -1,4 +1,45 @@
-// server/src/index.js
+/**
+ * @file Cloudflare Worker entry point — request router.
+ *
+ * This is the single `export default` consumed by the Workers runtime.
+ * Every incoming HTTP request lands in `fetch()`, which:
+ *
+ * 1. Handles CORS preflight (`OPTIONS`) requests.
+ * 2. Routes to the matching handler based on `pathname` + `method`:
+ *
+ *    **Public routes**
+ *    - `GET  /health`                       → health check
+ *    - `GET  /download/:platform`           → GitHub Releases redirect
+ *    - `POST /signup`                       → create unverified account
+ *    - `GET  /verify-email?token=…`         → verify email (HTML)
+ *    - `POST /forgot-password`              → send reset link by email
+ *    - `GET  /reset-password?token=…`       → reset form (HTML)
+ *    - `POST /reset-password`               → submit new password
+ *    - `POST /login`                        → email + password login
+ *    - `POST /redeem`                       → redeem activation code
+ *    - `POST /claim-sponsorship`            → claim a GitHub Sponsorship
+ *    - `POST /webhook/stripe`               → Stripe webhook (dormant)
+ *    - `POST /webhook/github-sponsor`       → GitHub Sponsors webhook
+ *
+ *    **Admin routes** (require `Authorization: Bearer <ADMIN_TOKEN>`)
+ *    - `POST /admin/generate-code`
+ *    - `GET  /admin/list-codes`
+ *    - `POST /admin/revoke-code`
+ *    - `POST /admin/create-user`
+ *    - `POST /admin/reset-password`
+ *    - `GET  /admin/list-users`
+ *
+ * 3. Injects CORS headers on every response (including error responses).
+ *    HTML responses get a relaxed CORS (no `Access-Control-Allow-Headers`
+ *    because they're served to a browser, not an XHR).
+ * 4. Catches any unhandled error → logs it and returns `500 internal_error`.
+ *
+ * Unknown routes → `404 Not Found` (plain text).
+ *
+ * @see ./routes/*.js — the actual route handlers
+ * @see ./lib/*.js    — DB, crypto, email, license helpers
+ */
+
 import { handleHealth } from "./routes/health.js";
 import { handleLogin } from "./routes/login.js";
 import { handleStripeWebhook } from "./routes/stripe-webhook.js";
@@ -22,11 +63,22 @@ import {
 import { handleDownload } from "./routes/download.js";
 
 export default {
-  async fetch(request, env, ctx) {
+  /**
+   * Main request handler.
+   *
+   * The method is `fetch` because that's the Cloudflare Workers
+   * convention (the runtime invokes `worker.fetch(request, env, ctx)`).
+   *
+   * @param {Request} request - Incoming HTTP request.
+   * @param {Object} env - Worker environment bindings (D1, secrets, vars).
+   * @returns {Promise<Response>} The HTTP response, with CORS headers set.
+   */
+  async fetch(request, env) {
     const url = new URL(request.url);
     const { pathname } = url;
     const method = request.method;
 
+    // ─── CORS headers applied to every response ────────────────────
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
@@ -34,6 +86,7 @@ export default {
         "Content-Type, Authorization, X-Hub-Signature-256, X-GitHub-Event",
     };
 
+    // ─── CORS preflight ────────────────────────────────────────────
     if (method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
@@ -41,10 +94,13 @@ export default {
     try {
       let response;
 
-      // ─── Public ──────────────────────────────────────────────────
+      // ─── Public routes ───────────────────────────────────────────
       if (pathname === "/health" && method === "GET") {
         response = handleHealth(env);
-      } else if (pathname.startsWith("/download/") && (method === "GET" || method === "HEAD")) {
+      } else if (
+        pathname.startsWith("/download/") &&
+        (method === "GET" || method === "HEAD")
+      ) {
         const platform = pathname.split("/")[2];
         response = await handleDownload(request, env, platform);
       } else if (pathname === "/signup" && method === "POST") {
@@ -69,7 +125,7 @@ export default {
         response = await handleGitHubSponsorWebhook(request, env);
       }
 
-      // ─── Admin ───────────────────────────────────────────────────
+      // ─── Admin routes (Bearer auth inside each handler) ──────────
       else if (pathname === "/admin/generate-code" && method === "POST") {
         response = await handleGenerateCode(request, env);
       } else if (pathname === "/admin/list-codes" && method === "GET") {
@@ -83,9 +139,11 @@ export default {
       } else if (pathname === "/admin/list-users" && method === "GET") {
         response = await handleListUsers(request, env);
       } else {
+        // ─── Catch-all 404 ────────────────────────────────────────
         response = new Response("Not Found", { status: 404 });
       }
 
+      // ─── Inject CORS headers (skip Allow-Headers for HTML) ────────
       const newHeaders = new Headers(response.headers);
       const isHtml = response.headers
         .get("Content-Type")

@@ -9,6 +9,11 @@
  * The version is loaded asynchronously from the store (via IPC) so the
  * displayed value always matches the actual installed build — no need
  * to bump a hardcoded constant on every release.
+ *
+ * **Defensive**: the store value is coerced to a string. If the value is
+ * missing, not a string, or the IPC fails, the UI shows `…` (loading) or
+ * `?` (invalid) instead of trying to render a non-primitive (which would
+ * crash React with "Objects are not valid as a React child").
  */
 
 import { useState, useEffect } from "react";
@@ -22,6 +27,22 @@ import OptionRow from "../OptionRow";
  * packaged build for more than a few ms.
  */
 const VERSION_PLACEHOLDER = "…";
+
+/**
+ * Coerces the raw `appVersion` store value to a printable string.
+ *
+ * Guards against unexpected types (`undefined`, `null`, arrays, objects)
+ * that could be present if the store got corrupted or if a future
+ * migration writes a non-string.
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normalizeVersion(value) {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number") return String(value);
+  return "?";
+}
 
 /**
  * @param {Object} props
@@ -41,7 +62,7 @@ export default function AboutSection({ sectionRef }) {
     (async () => {
       try {
         const version = await window.electronAPI?.storeGet?.("appVersion");
-        if (!cancelled) setAppVersion(version || "?");
+        if (!cancelled) setAppVersion(normalizeVersion(version));
       } catch {
         if (!cancelled) setAppVersion("?");
       }
@@ -56,7 +77,9 @@ export default function AboutSection({ sectionRef }) {
    * @returns {void}
    */
   const handleOpenSource = () => {
-    window.electronAPI?.openExternal?.("https://github.com/Stevehunn/Soundboard");
+    window.electronAPI?.openExternal?.(
+      "https://github.com/Stevehunn/Soundboard",
+    );
   };
 
   return (
