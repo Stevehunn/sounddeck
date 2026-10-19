@@ -1,4 +1,3 @@
-// eslint.config.mjs
 import js from "@eslint/js";
 import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
@@ -30,6 +29,69 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // ── React 19 strict rules downgraded to warn ────────────────
+      // These rules didn't exist when the codebase was written. They're
+      // legitimate in principle but enforcing them as errors would force
+      // a massive refactor of components that are otherwise fine.
+      // Existing/new code should still avoid them; fix incrementally.
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/set-state-in-render": "warn",
+      "react-hooks/refs": "warn",
+      "react-hooks/immutability": "warn",
+      "react-hooks/purity": "warn",
+    },
+  },
+
+  // ─── Vitest tests (src/) ─────────────────────────────────────────
+  {
+    files: [
+      "src/**/*.test.{js,jsx}",
+      "src/**/*.spec.{js,jsx}",
+      "src/test/**/*.{js,jsx}",
+    ],
+    languageOptions: {
+      globals: {
+        ...globals.node, // ← ADD THIS: `global`, `process`, `__dirname`, `require`, `Buffer`
+        ...globals.browser,
+        // Vitest globals
+        describe: "readonly",
+        it: "readonly",
+        test: "readonly",
+        expect: "readonly",
+        vi: "readonly",
+        beforeAll: "readonly",
+        afterAll: "readonly",
+        beforeEach: "readonly",
+        afterEach: "readonly",
+      },
+    },
+    rules: {
+      "react-refresh/only-export-components": "off",
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/immutability": "off",
+      "react-hooks/purity": "off",
+      // Tests: unused imports / args are noise. They never cause bugs
+      // in prod (the code isn't shipped), and enforcing them means
+      // patching 20+ files just to prefix mock args with `_`.
+      "no-unused-vars": "off",
+    },
+  },
+
+  // ─── Node-side test setup (setup-electron.js) ────────────────────
+  // Runs in Node ESM, but touches `window` and `File` for mocks.
+  {
+    files: ["src/test/setup-electron.js"],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+        vi: "readonly",
+        beforeEach: "readonly",
+        afterEach: "readonly",
+      },
+    },
   },
 
   // ─── Electron main process (Node.js, CommonJS) ────────────────────
@@ -41,12 +103,23 @@ export default defineConfig([
     },
   },
 
+  // ─── Electron preload (Node + browser context bridge) ─────────────
+  // preload.js / preload-popup.js run in a browser-like context but
+  // still `require('electron')`.
+  {
+    files: ["electron/preload*.js"],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+    },
+  },
+
   // ─── Electron tests (Node.js + Vitest) ────────────────────────────
   {
     files: ["electron/**/*.test.js", "electron/**/__tests__/**/*.js"],
     languageOptions: {
       globals: {
         ...globals.node,
+        ...globals.browser,
         describe: "readonly",
         it: "readonly",
         test: "readonly",
@@ -82,7 +155,6 @@ export default defineConfig([
         clearTimeout: "readonly",
         setInterval: "readonly",
         clearInterval: "readonly",
-        // Web base64 (available in Workers runtime)
         btoa: "readonly",
         atob: "readonly",
       },

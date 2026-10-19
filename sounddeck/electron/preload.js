@@ -34,7 +34,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
   writeDroppedFile: (fileName, arrayBuffer) =>
     ipcRenderer.invoke("write-dropped-file", fileName, arrayBuffer),
 
-  /** Export any JSON-serializable object to a file chosen via native dialog. */
+  /**
+   * Exports an arbitrary JSON-serializable value to a file chosen via the
+   * native save dialog.
+   *
+   * @param {string | Object} json - Content to write (string is written
+   *   as-is, any other value is pretty-printed with 2 spaces).
+   * @param {string} defaultName - Suggested filename shown in the dialog.
+   * @param {string} [title] - Optional dialog title.
+   * @returns {Promise<{success: boolean, path?: string, canceled?: boolean, error?: string}>}
+   */
   exportJsonFile: (json, defaultName, title) =>
     ipcRenderer.invoke("export-json-file", json, defaultName, title),
 
@@ -48,7 +57,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
   fetchMyinstants: (query, mode, lang) =>
     ipcRenderer.invoke("fetch-myinstants", query, mode, lang),
 
-  /** Fetches emojis for a category (getemoji.com). */
+  /**
+   * Fetches the emoji list for a category from getemoji.com (cached 1h).
+   *
+   * @param {string} categoryId - One of: smileys, people, animals, food,
+   *   travel, activities, objects, symbols, flags.
+   * @returns {Promise<{success: boolean, emojis: string[], fromCache?: boolean, error?: string, isNetworkError?: boolean}>}
+   */
   fetchEmojis: (categoryId) => ipcRenderer.invoke("fetch-emojis", categoryId),
 
   // ─── SHORTCUTS ──────────────────────────────────────────────────────────

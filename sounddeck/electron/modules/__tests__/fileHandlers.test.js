@@ -4,7 +4,6 @@
 // ═══════════════════════════════════════════════════════════════════════
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { EventEmitter } from 'events'
-import path from 'path'
 
 import { registerFileHandlers } from '../fileHandlers'
 
@@ -148,7 +147,9 @@ function mockHttpResponseOnce({
 }
 
 function mockHttpErrorOnce(error) {
-  const impl = (url, optionsOrCb, maybeCb) => {
+  // `https.get(url, optionsOrCb, maybeCb)` — args kept positionally for
+  // signature compatibility with the real `https.get`, but unused here.
+  const impl = (_url, _optionsOrCb, _maybeCb) => {
     const req = new EventEmitter()
     req.setTimeout = vi.fn()
     req.destroy = vi.fn()

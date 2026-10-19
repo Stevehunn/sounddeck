@@ -174,7 +174,6 @@ const storeMock = vi.hoisted(() => {
     updateCustomTheme: vi.fn(),
     toggleGlobalShortcuts: vi.fn(),
     setSoundOrder: vi.fn(),
-    tags: {},
     updatePlayLocally: vi.fn(),
     updateSoundVolume: vi.fn(),
     incrementPlayCount: vi.fn(),

@@ -61,9 +61,8 @@ function initFeedbackWebhooks() {
   try {
     let fileConfig = {};
     try {
-      // eslint-disable-next-line global-require
       fileConfig = require("./feedback-config");
-    } catch (e) {
+    } catch {
       // No config file — that's fine
     }
 
