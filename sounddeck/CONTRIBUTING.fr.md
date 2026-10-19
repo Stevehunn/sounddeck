@@ -16,6 +16,7 @@ Ce document explique comment contribuer à SoundDeck : signaler des bugs, propos
 - [Scripts disponibles](#-scripts-disponibles)
 - [Structure du projet](#-structure-du-projet)
 - [Conventions de code](#-conventions-de-code)
+- [Commentaires & JSDoc](#-commentaires--jsdoc)
 - [Règles de test](#-règles-de-test)
 - [Workflow Git](#-workflow-git)
 - [Développement de plugins](#-développement-de-plugins)
@@ -69,6 +70,7 @@ npm run dev
 |---|---|
 | `npm run dev` | Lance Electron + Vite en dev avec HMR |
 | `npm run build` | Build de production (Vite + electron-builder) |
+| `npm run release` | Build + publication sur GitHub Releases (requiert `GH_TOKEN`) |
 | `npm run preview` | Prévisualise le build Vite |
 | `npm test` | Lance les tests en watch mode |
 | `npm run test:coverage` | Tests + rapport de couverture (HTML) |
@@ -90,6 +92,10 @@ sounddeck/
 │   ├── plugins/           # Plugins intégrés
 │   ├── shared/            # Composants, hooks, utils
 │   └── test/              # Config de test + helpers
+│
+├── server/                # API Cloudflare Worker + base D1
+├── website/               # Site marketing Astro
+├── scripts/               # Scripts utilitaires (release, licences, plugins)
 └── public/                # Assets statiques
 ```
 
@@ -101,9 +107,9 @@ sounddeck/
 
 ### Général
 
-- Commentaires et identifiants en anglais ; chaînes visibles via `t('...')`.
-- Indentation 2 espaces, sans point-virgule.
-- Linting : `npx eslint src electron --fix` avant chaque commit.
+- **Langue** : commentaires et identifiants en **anglais** ; chaînes visibles via `t('...')` (jamais en dur).
+- **Formatage** : indentation 2 espaces, sans point-virgule (voir `eslint.config.js`).
+- **Linting** : lancer `npx eslint src electron server website --fix` avant chaque commit.
 
 ### React
 
@@ -123,6 +129,97 @@ Format : `{domaine}-{element}` en kebab-case. Jamais de texte visible ni de clas
 2. Core (`@core/...`)
 3. Shared (`@shared/...`)
 4. Local (`./...`)
+
+---
+
+## 📝 Commentaires & JSDoc
+
+### Langue
+
+- **Tous les commentaires et identifiants sont en anglais.**
+- Les chaînes visibles passent par `t('...')` (i18n) — jamais en dur.
+- CHANGELOG, README, docs : garder leur langue (EN/FR/ES).
+
+### JSDoc pour les fonctions exportées
+
+Chaque **fonction exportée** (et toute fonction interne non triviale) doit avoir un bloc JSDoc. Ça active l'autocomplete VS Code sans TypeScript, et les règles `eslint-plugin-jsdoc` vérifient la cohérence.
+
+```js
+/**
+ * Description courte de ce que fait la fonction.
+ *
+ * Description plus longue optionnelle avec les cas limites,
+ * effets de bord, ou le comportement.
+ *
+ * @param {string} email - Email utilisateur (sera lowercased + trimmed).
+ * @param {string} password - Mot de passe en clair (min 6 chars).
+ * @param {Object} [options] - Options optionnelles.
+ * @param {boolean} [options.sendEmail=true] - Envoie l'email de vérification.
+ * @returns {Promise<{ok: boolean, userId: string}>}
+ *   `ok: true` en cas de succès, `userId` est l'UUID du nouvel utilisateur.
+ * @throws {Error} Si l'insertion DB échoue.
+ *
+ * @example
+ * const { ok, userId } = await createUser('a@b.c', 'secret')
+ */
+export async function createUser(email, password, options = {}) {
+  // ...
+}
+```
+
+### JSDoc pour les composants React
+
+```jsx
+/**
+ * Panneau de compte affichant le tier et les actions de l'utilisateur.
+ *
+ * @param {Object} props
+ * @param {{email: string, tier: 'free'|'pro'|'dev'}} props.status
+ * @param {() => void} props.onLogout - Appelé quand l'utilisateur confirme la déconnexion.
+ * @param {() => void} props.onLoginClick - Ouvre la modale de connexion.
+ * @param {(msg: string, type?: string) => void} props.addToast
+ * @returns {JSX.Element}
+ */
+export default function AccountPanel({ status, onLogout, onLoginClick, addToast }) {
+  // ...
+}
+```
+
+### En-tête de fichier (optionnel, pour les modules complexes)
+
+```js
+/**
+ * @file Module auto-updater (electron-updater).
+ *
+ * Responsabilités :
+ * - Vérifie les mises à jour au démarrage (prod uniquement)
+ * - Télécharge + installe depuis GitHub Releases
+ * - Forward les events de progression au renderer via IPC
+ *
+ * @see https://www.electron.build/auto-update
+ */
+```
+
+### Commentaires inline
+
+- `// Note inline courte` pour les évidences
+- `// TODO(nom): chose à faire` pour les TODO
+- `// FIXME: description du bug` pour les bugs connus
+- ❌ Éviter les commentaires évidents type `// incrémente i` ou `// retourne result`
+
+### Vérifié par ESLint
+
+Le repo embarque `eslint-plugin-jsdoc`. Règles actives sur `electron/**/*.js` et `server/src/**/*.js` :
+
+| Règle | Niveau |
+|---|---|
+| `jsdoc/require-jsdoc` (publicOnly) | warn |
+| `jsdoc/require-param` | warn |
+| `jsdoc/require-returns` | warn |
+| `jsdoc/check-param-names` | error |
+| `jsdoc/check-tag-names` | error |
+
+Si un warning apparaît, le corriger avant de merger. Les erreurs bloquent la CI.
 
 ---
 
@@ -224,12 +321,12 @@ Conservez votre fichier `.sdlicense` (email, gestionnaire de mots de passe, clou
 
 1. Fork + branche depuis `main`
 2. Code + tests
-3. `npm test` + `npm run test:coverage` + `npx eslint . --fix`
-4. Mettre à jour `CHANGELOG.md`
+3. `npm test` + `npm run test:coverage` + `npx eslint src electron server website --fix`
+4. Mettre à jour `CHANGELOG.md` sous `[Unreleased]`
 5. Push + ouvrir une PR contre `main`
 6. Attendre la review
 
-Ce que les reviewers regardent : tests passent, pas de chaîne en dur, `data-testid` sur les nouveaux éléments interactifs, pas de `console.log`.
+Ce que les reviewers regardent : tests passent, pas de chaîne en dur, **JSDoc sur les nouvelles fonctions exportées** (voir [Commentaires & JSDoc](#-commentaires--jsdoc)), `data-testid` sur les nouveaux éléments interactifs, pas de `console.log`.
 
 Critères de rejet : breaking change sans discussion, nouvelle dépendance injustifiée, refacto hors sujet, pas de tests, régression de couverture.
 

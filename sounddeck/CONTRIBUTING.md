@@ -16,6 +16,7 @@ This document explains how to contribute to SoundDeck: reporting bugs, proposing
 - [Available scripts](#-available-scripts)
 - [Project structure](#-project-structure)
 - [Coding conventions](#-coding-conventions)
+- [Code comments & JSDoc](#-code-comments--jsdoc)
 - [Testing rules](#-testing-rules)
 - [Git workflow](#-git-workflow)
 - [Plugin development](#-plugin-development)
@@ -69,6 +70,7 @@ npm run dev
 |---|---|
 | `npm run dev` | Run Electron + Vite in dev mode with HMR |
 | `npm run build` | Production build (Vite + electron-builder) |
+| `npm run release` | Build + publish to GitHub Releases (requires `GH_TOKEN`) |
 | `npm run preview` | Preview the Vite build |
 | `npm test` | Run tests in watch mode |
 | `npm run test:coverage` | Tests + coverage report (HTML) |
@@ -95,6 +97,9 @@ sounddeck/
 │   ├── shared/            # Components, hooks, utils
 │   └── test/              # Test setup + helpers
 │
+├── server/                # Cloudflare Worker API + D1 database
+├── website/               # Astro marketing site
+├── scripts/               # Utility scripts (release, licenses, plugins)
 └── public/                # Static assets
 ```
 
@@ -114,9 +119,9 @@ sounddeck/
 
 ### General
 
-- **Language**: code comments and identifiers in English; user-facing strings via `t('...')` (never hardcoded).
+- **Language**: code comments and identifiers in **English**; user-facing strings via `t('...')` (never hardcoded).
 - **Formatting**: 2-space indentation, semicolons omitted (see `eslint.config.js`).
-- **Linting**: run `npx eslint src electron --fix` before committing.
+- **Linting**: run `npx eslint src electron server website --fix` before committing.
 
 ### React
 
@@ -151,6 +156,97 @@ import Toast from '@shared/components/ui/Toast'
 // 4. Local (same folder / feature)
 import SoundCard from './SoundCard'
 ```
+
+---
+
+## 📝 Code comments & JSDoc
+
+### Language
+
+- **All code comments and identifiers are in English.**
+- User-facing strings go through `t('...')` (i18n) — never hardcoded.
+- CHANGELOG, README, docs: keep their language (EN/FR/ES).
+
+### JSDoc for exported functions
+
+Every **exported** function (and any non-trivial internal function) must have a JSDoc block. This enables autocomplete in VS Code without TypeScript, and the `eslint-plugin-jsdoc` rules enforce consistency.
+
+```js
+/**
+ * Short description of what the function does.
+ *
+ * Optional longer description with details about
+ * edge cases, side effects, or behavior.
+ *
+ * @param {string} email - User email (will be lowercased and trimmed).
+ * @param {string} password - Plaintext password (min 6 chars).
+ * @param {Object} [options] - Optional settings.
+ * @param {boolean} [options.sendEmail=true] - Send verification email.
+ * @returns {Promise<{ok: boolean, userId: string}>}
+ *   `ok: true` on success, `userId` is the new user's UUID.
+ * @throws {Error} If the DB insert fails.
+ *
+ * @example
+ * const { ok, userId } = await createUser('a@b.c', 'secret')
+ */
+export async function createUser(email, password, options = {}) {
+  // ...
+}
+```
+
+### JSDoc for React components
+
+```jsx
+/**
+ * Account panel showing the current user's tier and actions.
+ *
+ * @param {Object} props
+ * @param {{email: string, tier: 'free'|'pro'|'dev'}} props.status
+ * @param {() => void} props.onLogout - Called when the user confirms logout.
+ * @param {() => void} props.onLoginClick - Opens the login modal.
+ * @param {(msg: string, type?: string) => void} props.addToast
+ * @returns {JSX.Element}
+ */
+export default function AccountPanel({ status, onLogout, onLoginClick, addToast }) {
+  // ...
+}
+```
+
+### File header (optional, for complex modules)
+
+```js
+/**
+ * @file Auto-updater module (electron-updater).
+ *
+ * Responsibilities:
+ * - Check for updates on app boot (production only)
+ * - Download + install updates from GitHub Releases
+ * - Forward progress events to the renderer via IPC
+ *
+ * @see https://www.electron.build/auto-update
+ */
+```
+
+### Inline comments
+
+- `// Short inline note` for obvious stuff
+- `// TODO(name): thing to do` for TODOs
+- `// FIXME: bug description` for known issues
+- ❌ Avoid obvious comments like `// increment i` or `// return result`
+
+### Enforced by ESLint
+
+The repo ships with `eslint-plugin-jsdoc`. Rules active on `electron/**/*.js` and `server/src/**/*.js`:
+
+| Rule | Level |
+|---|---|
+| `jsdoc/require-jsdoc` (publicOnly) | warn |
+| `jsdoc/require-param` | warn |
+| `jsdoc/require-returns` | warn |
+| `jsdoc/check-param-names` | error |
+| `jsdoc/check-tag-names` | error |
+
+If a warning appears, fix it before merging. Errors block the CI.
 
 ---
 
@@ -370,7 +466,7 @@ SoundDeck is free and open-source (MIT). If you'd like to support development:
    ```bash
    npm test
    npm run test:coverage
-   npx eslint . --fix
+   npx eslint src electron server website --fix
    ```
 4. Update `CHANGELOG.md` under `[Unreleased]`
 5. Push and open a PR against `main`
@@ -381,6 +477,7 @@ SoundDeck is free and open-source (MIT). If you'd like to support development:
 
 - Tests pass + new code is covered
 - No hardcoded strings (use `t()`)
+- **JSDoc on new exported functions** (see [Code comments & JSDoc](#-code-comments--jsdoc))
 - `data-testid` on new interactive elements
 - No `console.log` left in production code (use `logger`)
 - Small, focused PRs (one feature per PR)

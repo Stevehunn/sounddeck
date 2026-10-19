@@ -23,7 +23,7 @@ describe('AboutSection', () => {
 
   it('affiche la version', () => {
     renderSection()
-    expect(screen.getByText(/v0\.1\.0/)).toBeInTheDocument()
+    expect(screen.getByText(/v1\.4\.11/)).toBeInTheDocument()
   })
 
   it('affiche la licence MIT', () => {
