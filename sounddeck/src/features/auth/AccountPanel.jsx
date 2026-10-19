@@ -1,7 +1,39 @@
-// src/features/auth/AccountPanel.jsx
+/**
+ * @file Account panel shown in Options → Support when a user is connected.
+ *
+ * Displays:
+ * - The current tier (free / pro / dev) with a color-coded badge
+ * - The user's email and issue date (if connected)
+ * - Actions: reveal/copy license token, change account, logout
+ *
+ * Tier-specific behavior:
+ * - **Pro / Dev**: shows the license token controls (the token is meant
+ *   to be saved by the user in case they change PC)
+ * - **Free**: no token controls (there's no meaningful license to save);
+ *   an "Upgrade to Pro" CTA is shown by the parent (`SupportSection`)
+ */
+
 import { useState } from "react";
 import { useLanguage } from "@core/i18n/LanguageContext";
 
+/**
+ * @typedef {'free' | 'pro' | 'dev'} LicenseTier
+ * @typedef {Object} LicenseStatus
+ * @property {string|null} email - User email, null if not connected
+ * @property {LicenseTier} [tier] - 'free' | 'pro' | 'dev'
+ * @property {number} [issuedAt] - Unix timestamp (seconds)
+ */
+
+/**
+ * Account panel with tier badge, user info, and actions.
+ *
+ * @param {Object} props
+ * @param {LicenseStatus} props.status - Current license status.
+ * @param {() => Promise<void>|void} props.onLogout - Called after confirm.
+ * @param {() => void} props.onLoginClick - Opens the login modal.
+ * @param {(msg: string, type?: string) => void} [props.addToast]
+ * @returns {JSX.Element}
+ */
 export default function AccountPanel({
   status,
   onLogout,
@@ -19,6 +51,7 @@ export default function AccountPanel({
   const isDev = tier === "dev";
   const isFree = tier === "free";
 
+  // ─── Load / copy token ──────────────────────────────────────────────
   const loadToken = async () => {
     const tk = await window.electronAPI?.storeGet?.("licenseToken");
     setTokenValue(tk || "");
@@ -35,6 +68,7 @@ export default function AccountPanel({
     }
   };
 
+  // ─── Logout (2-click confirm, auto-cancel after 3s) ─────────────────
   const handleLogoutClick = () => {
     if (!confirmingLogout) {
       setConfirmingLogout(true);
@@ -44,7 +78,7 @@ export default function AccountPanel({
     onLogout?.();
   };
 
-  // ─── Couleurs / labels selon tier ────────────────────────────────
+  // ─── Tier-specific display config ───────────────────────────────────
   const tierConfig = isDev
     ? {
         label: t("tierDev"),
@@ -85,7 +119,7 @@ export default function AccountPanel({
         gap: 10,
       }}
     >
-      {/* ─── HEADER : badge tier ──────────────────────────────────── */}
+      {/* ─── Header: tier badge ──────────────────────────────────── */}
       <div
         style={{
           display: "flex",
@@ -138,7 +172,7 @@ export default function AccountPanel({
         </span>
       </div>
 
-      {/* ─── DESCRIPTION ──────────────────────────────────────────── */}
+      {/* ─── Description ─────────────────────────────────────────── */}
       <div
         style={{
           fontSize: 11,
@@ -149,7 +183,7 @@ export default function AccountPanel({
         {tierConfig.desc}
       </div>
 
-      {/* ─── BADGE "NON CONNECTÉ" si pas d'email ─────────────────── */}
+      {/* ─── "Not connected" badge ───────────────────────────────── */}
       {!isConnected && (
         <div
           style={{
@@ -169,7 +203,7 @@ export default function AccountPanel({
         </div>
       )}
 
-      {/* ─── INFOS : email + date ─────────────────────────────────── */}
+      {/* ─── Email + date ────────────────────────────────────────── */}
       {isConnected && (
         <div
           style={{
@@ -207,7 +241,7 @@ export default function AccountPanel({
         </div>
       )}
 
-      {/* ─── TOKEN AFFICHÉ ────────────────────────────────────────── */}
+      {/* ─── Token display ───────────────────────────────────────── */}
       {showToken && tokenValue && (
         <div
           style={{
@@ -226,7 +260,7 @@ export default function AccountPanel({
         </div>
       )}
 
-      {/* ─── WARNING : garde ta clé (uniquement si Pro) ───────────── */}
+      {/* ─── Token warning (Pro / Dev only) ──────────────────────── */}
       {isPro && (
         <div
           style={{
@@ -240,7 +274,7 @@ export default function AccountPanel({
         </div>
       )}
 
-      {/* ─── ACTIONS ──────────────────────────────────────────────── */}
+      {/* ─── Actions ─────────────────────────────────────────────── */}
       <div
         style={{
           display: "flex",
@@ -250,7 +284,7 @@ export default function AccountPanel({
           alignItems: "center",
         }}
       >
-        {/* Afficher/Copier token — uniquement pour Pro / Dev */}
+        {/* Token reveal/copy — Pro / Dev only */}
         {isPro && (
           <>
             {!showToken ? (
@@ -290,7 +324,7 @@ export default function AccountPanel({
 
         <div style={{ flex: 1 }} />
 
-        {/* Boutons connecté */}
+        {/* Connected actions */}
         {isConnected && (
           <>
             <button
@@ -321,7 +355,7 @@ export default function AccountPanel({
           </>
         )}
 
-        {/* Bouton non connecté */}
+        {/* Not connected */}
         {!isConnected && (
           <button
             type="button"
@@ -335,7 +369,7 @@ export default function AccountPanel({
         )}
       </div>
 
-      {/* ─── NOTE de bas de panneau ───────────────────────────────── */}
+      {/* ─── Footer note ─────────────────────────────────────────── */}
       <div
         style={{
           fontSize: 10,

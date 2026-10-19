@@ -1,296 +1,407 @@
-// src/features/auth/LoginModal.jsx
-import { useState } from 'react'
-import { createPortal } from 'react-dom'
-import { useLanguage } from '@core/i18n/LanguageContext'
-import { logError } from '@shared/utils/logger'
+/**
+ * @file Login / signup / password reset modal.
+ *
+ * This modal is the single entry point for every authentication action:
+ *
+ * - **Login** (email + password)
+ * - **Signup** (email + password + confirm, creates a `free` account,
+ *   requires email verification before first login)
+ * - **Forgot password** (sends a reset link by email)
+ * - **Redeem code** (`SDCK-XXXX-XXXX-XXXX`)
+ * - **Claim sponsorship** (GitHub login + email + password)
+ * - **Manual license key** (offline Ed25519 token)
+ *
+ * The modal uses a "tab + sub-mode" pattern:
+ * - 4 tabs (login / github / code / key) — the historical navigation
+ * - Within the "login" tab, a sub-mode state (`normal` / `forgot` /
+ *   `forgot-sent` / `signup` / `signup-sent`) that swaps the body
+ *   without leaving the tab. This keeps the historical 4-tab layout
+ *   intact while adding the signup/forgot flows.
+ *
+ * All API calls target `https://api.sounddeck.stream` (the Cloudflare
+ * Worker). On success, `onActivated(token, email)` is called with the
+ * signed license token so the parent can persist it.
+ *
+ * @see @core/services/LicenseService.js (activate)
+ * @see @core/store/hooks/useLicense.js (status, activate, logout)
+ * @see server/src/routes/login.js, signup.js, forgot-password.js, …
+ */
 
-const API_BASE = 'https://api.sounddeck.stream'
+import { useState } from "react";
+import { createPortal } from "react-dom";
+import { useLanguage } from "@core/i18n/LanguageContext";
+import { logError } from "@shared/utils/logger";
 
+const API_BASE = "https://api.sounddeck.stream";
+
+/**
+ * @typedef {'login' | 'github' | 'code' | 'key'} LoginTab
+ * @typedef {'normal' | 'forgot' | 'forgot-sent' | 'signup' | 'signup-sent'} LoginSubMode
+ */
+
+/**
+ * Main login modal component.
+ *
+ * @param {Object} props
+ * @param {() => void} props.onClose - Called when the modal should close.
+ * @param {(token: string, email: string|null) => Promise<{success: boolean}|void>}
+ *   props.onActivated - Called with the signed license token + email when
+ *   authentication succeeds (login, redeem, claim, manual key).
+ * @param {(msg: string, type?: string) => void} [props.addToast] - Optional
+ *   toast callback for non-blocking feedback.
+ * @returns {JSX.Element} React portal rendering the modal.
+ */
 export default function LoginModal({ onClose, onActivated, addToast }) {
-  const { t } = useLanguage()
-  const [tab, setTab] = useState('login')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [code, setCode] = useState('')
-  const [githubLogin, setGithubLogin] = useState('')
-  const [manualKey, setManualKey] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const { t } = useLanguage();
 
-  // Sous-mode du tab "login" :
-  // 'normal' | 'forgot' | 'forgot-sent' | 'signup' | 'signup-sent'
-  const [loginSubMode, setLoginSubMode] = useState('normal')
+  // Navigation
+  const [tab, setTab] = useState(/** @type {LoginTab} */ ("login"));
+  const [loginSubMode, setLoginSubMode] = useState(
+    /** @type {LoginSubMode} */ ("normal"),
+  );
 
-  // Champs partagés forgot / signup
-  const [subEmail, setSubEmail] = useState('')
-  const [signupPassword, setSignupPassword] = useState('')
-  const [signupConfirm, setSignupConfirm] = useState('')
+  // Form state (shared across tabs)
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [githubLogin, setGithubLogin] = useState("");
+  const [manualKey, setManualKey] = useState("");
 
-  // ─── LOGIN ────────────────────────────────────────────────────────
+  // Sub-mode state (forgot + signup)
+  const [subEmail, setSubEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupConfirm, setSignupConfirm] = useState("");
+
+  // Async / error state
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // HANDLERS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Login with email + password.
+   *
+   * @param {React.FormEvent<HTMLFormElement>} e
+   * @returns {Promise<void>}
+   */
   const handleLogin = async (e) => {
-    e.preventDefault()
-    setError(null)
-    if (!email.trim()) return setError(t('authErrorEmailRequired'))
-    if (!password) return setError(t('authErrorPasswordRequired'))
+    e.preventDefault();
+    setError(null);
+    if (!email.trim()) return setError(t("authErrorEmailRequired"));
+    if (!password) return setError(t("authErrorPasswordRequired"));
 
-    setLoading(true)
+    setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), password }),
-      })
+      });
       if (!res.ok) {
-        if (res.status === 401) setError(t('authErrorInvalidCredentials'))
+        if (res.status === 401) setError(t("authErrorInvalidCredentials"));
         else if (res.status === 403) {
-          const data = await res.json().catch(() => ({}))
-          if (data.error === 'email_not_verified') {
-            setError(t('authErrorEmailNotVerified'))
+          const data = await res.json().catch(() => ({}));
+          if (data.error === "email_not_verified") {
+            setError(t("authErrorEmailNotVerified"));
           } else {
-            setError(t('authErrorGeneric'))
+            setError(t("authErrorGeneric"));
           }
         } else {
-          setError(t('authErrorGeneric'))
+          setError(t("authErrorGeneric"));
         }
-        return
+        return;
       }
-      const data = await res.json()
-      if (!data?.token) return setError(t('authErrorGeneric'))
-      await onActivated(data.token, data.email || email.trim())
+      const data = await res.json();
+      if (!data?.token) return setError(t("authErrorGeneric"));
+      await onActivated(data.token, data.email || email.trim());
     } catch (err) {
-      logError('LoginModal', 'Erreur login', err)
-      setError(t('authErrorNetwork'))
+      logError("LoginModal", "Login error", err);
+      setError(t("authErrorNetwork"));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  // ─── FORGOT PASSWORD ──────────────────────────────────────────────
+  /**
+   * Request a password reset link by email.
+   *
+   * The API always returns 200 OK (anti-enumeration), so the UI always
+   * shows the success state regardless of whether the email exists.
+   *
+   * @param {React.FormEvent<HTMLFormElement>} e
+   * @returns {Promise<void>}
+   */
   const handleForgotPassword = async (e) => {
-    e.preventDefault()
-    setError(null)
+    e.preventDefault();
+    setError(null);
 
-    const trimmed = subEmail.trim().toLowerCase()
-    if (!trimmed) return setError(t('authErrorEmailRequired'))
+    const trimmed = subEmail.trim().toLowerCase();
+    if (!trimmed) return setError(t("authErrorEmailRequired"));
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      return setError(t('authErrorEmailInvalid'))
+      return setError(t("authErrorEmailInvalid"));
     }
 
-    setLoading(true)
+    setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: trimmed }),
-      })
+      });
 
       if (!res.ok && res.status !== 200) {
-        const data = await res.json().catch(() => ({}))
-        if (data.error === 'missing_email') {
-          return setError(t('authErrorEmailRequired'))
+        const data = await res.json().catch(() => ({}));
+        if (data.error === "missing_email") {
+          return setError(t("authErrorEmailRequired"));
         }
-        setError(t('authErrorNetwork'))
-        return
+        setError(t("authErrorNetwork"));
+        return;
       }
 
-      setLoginSubMode('forgot-sent')
+      setLoginSubMode("forgot-sent");
     } catch (err) {
-      logError('LoginModal', 'Erreur forgot password', err)
-      setError(t('authErrorNetwork'))
+      logError("LoginModal", "Forgot password error", err);
+      setError(t("authErrorNetwork"));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  // ─── SIGNUP ───────────────────────────────────────────────────────
+  /**
+   * Create a free account and trigger the verification email.
+   *
+   * On success, the user is NOT logged in — they must click the link in
+   * the verification email first. The UI transitions to `signup-sent`.
+   *
+   * @param {React.FormEvent<HTMLFormElement>} e
+   * @returns {Promise<void>}
+   */
   const handleSignup = async (e) => {
-    e.preventDefault()
-    setError(null)
+    e.preventDefault();
+    setError(null);
 
-    const trimmed = subEmail.trim().toLowerCase()
-    if (!trimmed) return setError(t('authErrorEmailRequired'))
+    const trimmed = subEmail.trim().toLowerCase();
+    if (!trimmed) return setError(t("authErrorEmailRequired"));
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      return setError(t('authErrorEmailInvalid'))
+      return setError(t("authErrorEmailInvalid"));
     }
-    if (!signupPassword) return setError(t('authErrorPasswordRequired'))
+    if (!signupPassword) return setError(t("authErrorPasswordRequired"));
     if (signupPassword.length < 6) {
-      return setError(t('authErrorPasswordTooShort'))
+      return setError(t("authErrorPasswordTooShort"));
     }
     if (signupPassword !== signupConfirm) {
-      return setError(t('authErrorPasswordMismatch'))
+      return setError(t("authErrorPasswordMismatch"));
     }
 
-    setLoading(true)
+    setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/signup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: trimmed,
           password: signupPassword,
         }),
-      })
+      });
 
-      const data = await res.json().catch(() => ({}))
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         const map = {
-          email_already_exists: t('authSignupErrorEmailExists'),
-          invalid_email: t('authErrorEmailInvalid'),
-          password_too_short: t('authErrorPasswordTooShort'),
-          password_too_long: t('authErrorPasswordTooLong'),
-          email_send_failed: t('authSignupErrorEmailFailed'),
-        }
-        setError(map[data.error] || t('authErrorGeneric'))
-        return
+          email_already_exists: t("authSignupErrorEmailExists"),
+          invalid_email: t("authErrorEmailInvalid"),
+          password_too_short: t("authErrorPasswordTooShort"),
+          password_too_long: t("authErrorPasswordTooLong"),
+          email_send_failed: t("authSignupErrorEmailFailed"),
+        };
+        setError(map[data.error] || t("authErrorGeneric"));
+        return;
       }
 
-      setLoginSubMode('signup-sent')
+      setLoginSubMode("signup-sent");
     } catch (err) {
-      logError('LoginModal', 'Erreur signup', err)
-      setError(t('authErrorNetwork'))
+      logError("LoginModal", "Signup error", err);
+      setError(t("authErrorNetwork"));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  // ─── REDEEM CODE ──────────────────────────────────────────────────
+  /**
+   * Redeem a Pro activation code (`SDCK-XXXX-XXXX-XXXX`).
+   *
+   * @param {React.FormEvent<HTMLFormElement>} e
+   * @returns {Promise<void>}
+   */
   const handleRedeemCode = async (e) => {
-    e.preventDefault()
-    setError(null)
-    if (!email.trim()) return setError(t('authErrorEmailRequired'))
-    if (!password) return setError(t('authErrorPasswordRequired'))
-    if (!code.trim()) return setError(t('authCodeErrorNotFound'))
+    e.preventDefault();
+    setError(null);
+    if (!email.trim()) return setError(t("authErrorEmailRequired"));
+    if (!password) return setError(t("authErrorPasswordRequired"));
+    if (!code.trim()) return setError(t("authCodeErrorNotFound"));
 
-    setLoading(true)
+    setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/redeem`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: email.trim(),
           password,
           code: code.trim().toUpperCase(),
         }),
-      })
-      const data = await res.json().catch(() => ({}))
+      });
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         const map = {
-          code_not_found: t('authCodeErrorNotFound'),
-          code_revoked: t('authCodeErrorRevoked'),
-          code_already_used: t('authCodeErrorAlreadyUsed'),
-          code_expired: t('authCodeErrorExpired'),
-          email_mismatch: t('authCodeErrorEmailMismatch'),
-          email_already_exists: t('authCodeErrorEmailExists'),
-          invalid_code_format: t('authCodeError'),
-        }
-        setError(map[data.error] || t('authCodeError'))
-        return
+          code_not_found: t("authCodeErrorNotFound"),
+          code_revoked: t("authCodeErrorRevoked"),
+          code_already_used: t("authCodeErrorAlreadyUsed"),
+          code_expired: t("authCodeErrorExpired"),
+          email_mismatch: t("authCodeErrorEmailMismatch"),
+          email_already_exists: t("authCodeErrorEmailExists"),
+          invalid_code_format: t("authCodeError"),
+        };
+        setError(map[data.error] || t("authCodeError"));
+        return;
       }
 
-      if (!data?.token) return setError(t('authCodeError'))
+      if (!data?.token) return setError(t("authCodeError"));
 
-      addToast?.(t('authCodeSuccess'), 'success')
-      await onActivated(data.token, data.email || email.trim())
+      addToast?.(t("authCodeSuccess"), "success");
+      await onActivated(data.token, data.email || email.trim());
     } catch (err) {
-      logError('LoginModal', 'Erreur redeem', err)
-      setError(t('authErrorNetwork'))
+      logError("LoginModal", "Redeem error", err);
+      setError(t("authErrorNetwork"));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  // ─── CLAIM GITHUB SPONSORSHIP ────────────────────────────────────
+  /**
+   * Claim a pending GitHub Sponsorship (for sponsors whose GitHub email
+   * was private at the time of donation).
+   *
+   * @param {React.FormEvent<HTMLFormElement>} e
+   * @returns {Promise<void>}
+   */
   const handleClaimSponsorship = async (e) => {
-    e.preventDefault()
-    setError(null)
-    if (!githubLogin.trim()) return setError(t('authGithubErrorMissingLogin'))
-    if (!email.trim()) return setError(t('authErrorEmailRequired'))
-    if (!password) return setError(t('authErrorPasswordRequired'))
+    e.preventDefault();
+    setError(null);
+    if (!githubLogin.trim()) return setError(t("authGithubErrorMissingLogin"));
+    if (!email.trim()) return setError(t("authErrorEmailRequired"));
+    if (!password) return setError(t("authErrorPasswordRequired"));
 
-    setLoading(true)
+    setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/claim-sponsorship`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           githubLogin: githubLogin.trim(),
           email: email.trim(),
           password,
         }),
-      })
-      const data = await res.json().catch(() => ({}))
+      });
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         const map = {
-          sponsorship_not_found: t('authGithubErrorNotFound'),
-          email_already_exists: t('authGithubErrorEmailExists'),
-          invalid_github_login: t('authGithubErrorInvalidLogin'),
-          missing_fields: t('authErrorGeneric'),
-        }
-        setError(map[data.error] || t('authGithubError'))
-        return
+          sponsorship_not_found: t("authGithubErrorNotFound"),
+          email_already_exists: t("authGithubErrorEmailExists"),
+          invalid_github_login: t("authGithubErrorInvalidLogin"),
+          missing_fields: t("authErrorGeneric"),
+        };
+        setError(map[data.error] || t("authGithubError"));
+        return;
       }
 
-      if (!data?.token) return setError(t('authGithubError'))
+      if (!data?.token) return setError(t("authGithubError"));
 
-      addToast?.(t('authGithubSuccess'), 'success')
-      await onActivated(data.token, data.email || email.trim())
+      addToast?.(t("authGithubSuccess"), "success");
+      await onActivated(data.token, data.email || email.trim());
     } catch (err) {
-      logError('LoginModal', 'Erreur claim sponsorship', err)
-      setError(t('authErrorNetwork'))
+      logError("LoginModal", "Claim sponsorship error", err);
+      setError(t("authErrorNetwork"));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  // ─── MANUAL KEY ───────────────────────────────────────────────────
+  /**
+   * Activate a license with a manually pasted Ed25519 token.
+   *
+   * @param {React.FormEvent<HTMLFormElement>} e
+   * @returns {Promise<void>}
+   */
   const handleManualActivate = async (e) => {
-    e.preventDefault()
-    setError(null)
-    if (!manualKey.trim()) return setError(t('authManualInvalid'))
+    e.preventDefault();
+    setError(null);
+    if (!manualKey.trim()) return setError(t("authManualInvalid"));
 
-    setLoading(true)
+    setLoading(true);
     try {
-      const result = await onActivated(manualKey.trim(), null)
-      if (result?.success) addToast?.(t('authManualSuccess'), 'success')
-      else setError(t('authManualInvalid'))
+      const result = await onActivated(manualKey.trim(), null);
+      if (result?.success) addToast?.(t("authManualSuccess"), "success");
+      else setError(t("authManualInvalid"));
     } catch (err) {
-      logError('LoginModal', 'Erreur activation manuelle', err)
-      setError(t('authErrorGeneric'))
+      logError("LoginModal", "Manual activation error", err);
+      setError(t("authErrorGeneric"));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  // ─── RESET SOUS-MODE QUAND ON CHANGE DE TAB ───────────────────────
+  /**
+   * Switches to another tab. Resets the sub-mode when leaving the "login"
+   * tab so re-entering "login" always starts in normal mode.
+   *
+   * @param {LoginTab} newTab
+   * @returns {void}
+   */
   const handleTabChange = (newTab) => {
-    setTab(newTab)
-    setError(null)
-    if (newTab !== 'login') {
-      setLoginSubMode('normal')
-      setSubEmail('')
-      setSignupPassword('')
-      setSignupConfirm('')
+    setTab(newTab);
+    setError(null);
+    if (newTab !== "login") {
+      setLoginSubMode("normal");
+      setSubEmail("");
+      setSignupPassword("");
+      setSignupConfirm("");
     }
-  }
+  };
 
+  /**
+   * Enters a sub-mode within the "login" tab (forgot / signup / …).
+   * @param {LoginSubMode} mode
+   * @returns {void}
+   */
   const goToSubMode = (mode) => {
-    setError(null)
-    setLoginSubMode(mode)
-  }
+    setError(null);
+    setLoginSubMode(mode);
+  };
 
+  /**
+   * Close the modal if the user clicks the backdrop (not the modal itself).
+   * @param {React.MouseEvent<HTMLDivElement>} e
+   * @returns {void}
+   */
   const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget && !loading) onClose?.()
-  }
+    if (e.target === e.currentTarget && !loading) onClose?.();
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════════════════════════
 
   const tabs = [
-    { id: 'login', icon: 'ti-user', label: t('authTabLogin') },
-    { id: 'github', icon: 'ti-brand-github', label: t('authTabGithub') },
-    { id: 'code', icon: 'ti-gift', label: t('authTabCode') },
-    { id: 'key', icon: 'ti-key', label: t('authTabKey') },
-  ]
+    { id: "login", icon: "ti-user", label: t("authTabLogin") },
+    { id: "github", icon: "ti-brand-github", label: t("authTabGithub") },
+    { id: "code", icon: "ti-gift", label: t("authTabCode") },
+    { id: "key", icon: "ti-key", label: t("authTabKey") },
+  ];
 
   return createPortal(
     <div className="modal-overlay" onClick={handleOverlayClick}>
@@ -300,27 +411,27 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-title">
-          <i className="ti ti-lock" style={{ color: 'var(--accent)' }} />
-          {t('authTitle')}
+          <i className="ti ti-lock" style={{ color: "var(--accent)" }} />
+          {t("authTitle")}
         </div>
 
         <div
           style={{
             fontSize: 12,
-            color: 'var(--text-secondary)',
+            color: "var(--text-secondary)",
             marginBottom: 16,
           }}
         >
-          {t('authSubtitle')}
+          {t("authSubtitle")}
         </div>
 
         {/* ─── TABS ──────────────────────────────────────────────── */}
         <div
           style={{
-            display: 'flex',
+            display: "flex",
             gap: 4,
             marginBottom: 16,
-            background: 'var(--bg-tertiary)',
+            background: "var(--bg-tertiary)",
             borderRadius: 8,
             padding: 4,
           }}
@@ -332,26 +443,23 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
               onClick={() => handleTabChange(id)}
               style={{
                 flex: 1,
-                padding: '6px 6px',
+                padding: "6px 6px",
                 borderRadius: 6,
-                border: 'none',
-                background:
-                  tab === id ? 'var(--bg-secondary)' : 'transparent',
+                border: "none",
+                background: tab === id ? "var(--bg-secondary)" : "transparent",
                 color:
-                  tab === id
-                    ? 'var(--text-primary)'
-                    : 'var(--text-tertiary)',
+                  tab === id ? "var(--text-primary)" : "var(--text-tertiary)",
                 fontSize: 10,
                 fontWeight: tab === id ? 500 : 400,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 gap: 3,
                 minWidth: 0,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
               }}
               title={label}
             >
@@ -359,9 +467,7 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
                 className={`ti ${icon}`}
                 style={{ fontSize: 12, flexShrink: 0 }}
               />
-              <span
-                style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}
-              >
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
                 {label}
               </span>
             </button>
@@ -369,10 +475,10 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
         </div>
 
         {/* ═══ TAB LOGIN — NORMAL ══════════════════════════════════ */}
-        {tab === 'login' && loginSubMode === 'normal' && (
+        {tab === "login" && loginSubMode === "normal" && (
           <form
             onSubmit={handleLogin}
-            style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            style={{ display: "flex", flexDirection: "column", gap: 12 }}
           >
             <EmailField
               value={email}
@@ -386,39 +492,38 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
               disabled={loading}
             />
 
-            {/* Liens : Mot de passe oublié + Créer un compte */}
             <div
               style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
                 marginTop: -6,
-                flexWrap: 'wrap',
+                flexWrap: "wrap",
                 gap: 8,
               }}
             >
               <button
                 type="button"
-                onClick={() => goToSubMode('signup')}
+                onClick={() => goToSubMode("signup")}
                 style={linkStyle}
                 data-testid="login-modal-signup-link"
               >
-                {t('authNoAccountYet')}{' '}
-                <strong style={{ color: 'var(--accent)' }}>
-                  {t('authCreateAccount')}
+                {t("authNoAccountYet")}{" "}
+                <strong style={{ color: "var(--accent)" }}>
+                  {t("authCreateAccount")}
                 </strong>
               </button>
 
               <button
                 type="button"
                 onClick={() => {
-                  setSubEmail(email)
-                  goToSubMode('forgot')
+                  setSubEmail(email);
+                  goToSubMode("forgot");
                 }}
                 style={linkStyle}
                 data-testid="login-modal-forgot-link"
               >
-                {t('authForgotPassword')}
+                {t("authForgotPassword")}
               </button>
             </div>
 
@@ -426,28 +531,28 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
             <Actions
               onCancel={onClose}
               loading={loading}
-              submitLabel={t('authLogin')}
-              loadingLabel={t('authLoggingIn')}
+              submitLabel={t("authLogin")}
+              loadingLabel={t("authLoggingIn")}
               icon="ti-login"
             />
           </form>
         )}
 
         {/* ═══ TAB LOGIN — FORGOT ══════════════════════════════════ */}
-        {tab === 'login' && loginSubMode === 'forgot' && (
+        {tab === "login" && loginSubMode === "forgot" && (
           <form
             onSubmit={handleForgotPassword}
-            style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            style={{ display: "flex", flexDirection: "column", gap: 12 }}
           >
-            <div style={infoStyle}>{t('authForgotPasswordSubtitle')}</div>
+            <div style={infoStyle}>{t("authForgotPasswordSubtitle")}</div>
 
             <div>
-              <label style={labelStyle}>{t('authEmail')}</label>
+              <label style={labelStyle}>{t("authEmail")}</label>
               <input
                 type="email"
                 value={subEmail}
                 onChange={(e) => setSubEmail(e.target.value)}
-                placeholder={t('authEmailPlaceholder')}
+                placeholder={t("authEmailPlaceholder")}
                 className="input-lg"
                 disabled={loading}
                 autoFocus
@@ -460,12 +565,12 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
             <div style={subActionsStyle}>
               <button
                 type="button"
-                onClick={() => goToSubMode('normal')}
+                onClick={() => goToSubMode("normal")}
                 className="btn-ghost btn-sm"
                 disabled={loading}
                 style={{ fontSize: 12 }}
               >
-                <i className="ti ti-arrow-left" /> {t('authBack')}
+                <i className="ti ti-arrow-left" /> {t("authBack")}
               </button>
 
               <button
@@ -477,14 +582,14 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
                   <>
                     <i
                       className="ti ti-loader"
-                      style={{ animation: 'spin 1s linear infinite' }}
+                      style={{ animation: "spin 1s linear infinite" }}
                     />
-                    {t('authForgotPasswordSending')}
+                    {t("authForgotPasswordSending")}
                   </>
                 ) : (
                   <>
                     <i className="ti ti-send" />
-                    {t('authForgotPasswordSend')}
+                    {t("authForgotPasswordSend")}
                   </>
                 )}
               </button>
@@ -493,41 +598,41 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
         )}
 
         {/* ═══ TAB LOGIN — FORGOT-SENT ═════════════════════════════ */}
-        {tab === 'login' && loginSubMode === 'forgot-sent' && (
+        {tab === "login" && loginSubMode === "forgot-sent" && (
           <SuccessPanel
             icon="ti-mail-check"
-            title={t('authForgotPasswordSent')}
+            title={t("authForgotPasswordSent")}
             message={
               <>
-                {t('authForgotPasswordSentDesc')}{' '}
+                {t("authForgotPasswordSentDesc")}{" "}
                 <span style={emailHighlightStyle}>{subEmail}</span>
               </>
             }
-            hint={t('authForgotPasswordCheckSpam')}
-            primaryLabel={t('authForgotPasswordResend')}
+            hint={t("authForgotPasswordCheckSpam")}
+            primaryLabel={t("authForgotPasswordResend")}
             primaryIcon="ti-refresh"
-            onPrimary={() => goToSubMode('forgot')}
-            secondaryLabel={t('authBack')}
+            onPrimary={() => goToSubMode("forgot")}
+            secondaryLabel={t("authBack")}
             secondaryIcon="ti-arrow-left"
-            onSecondary={() => goToSubMode('normal')}
+            onSecondary={() => goToSubMode("normal")}
           />
         )}
 
         {/* ═══ TAB LOGIN — SIGNUP ══════════════════════════════════ */}
-        {tab === 'login' && loginSubMode === 'signup' && (
+        {tab === "login" && loginSubMode === "signup" && (
           <form
             onSubmit={handleSignup}
-            style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            style={{ display: "flex", flexDirection: "column", gap: 12 }}
           >
-            <div style={infoStyle}>{t('authSignupSubtitle')}</div>
+            <div style={infoStyle}>{t("authSignupSubtitle")}</div>
 
             <div>
-              <label style={labelStyle}>{t('authEmail')}</label>
+              <label style={labelStyle}>{t("authEmail")}</label>
               <input
                 type="email"
                 value={subEmail}
                 onChange={(e) => setSubEmail(e.target.value)}
-                placeholder={t('authEmailPlaceholder')}
+                placeholder={t("authEmailPlaceholder")}
                 className="input-lg"
                 disabled={loading}
                 autoFocus
@@ -536,12 +641,12 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
             </div>
 
             <div>
-              <label style={labelStyle}>{t('authPassword')}</label>
+              <label style={labelStyle}>{t("authPassword")}</label>
               <input
                 type="password"
                 value={signupPassword}
                 onChange={(e) => setSignupPassword(e.target.value)}
-                placeholder={t('authSignupPasswordPlaceholder')}
+                placeholder={t("authSignupPasswordPlaceholder")}
                 className="input-lg"
                 disabled={loading}
                 minLength={6}
@@ -550,12 +655,12 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
             </div>
 
             <div>
-              <label style={labelStyle}>{t('authSignupConfirmLabel')}</label>
+              <label style={labelStyle}>{t("authSignupConfirmLabel")}</label>
               <input
                 type="password"
                 value={signupConfirm}
                 onChange={(e) => setSignupConfirm(e.target.value)}
-                placeholder={t('authSignupConfirmPlaceholder')}
+                placeholder={t("authSignupConfirmPlaceholder")}
                 className="input-lg"
                 disabled={loading}
                 minLength={6}
@@ -568,12 +673,12 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
             <div style={subActionsStyle}>
               <button
                 type="button"
-                onClick={() => goToSubMode('normal')}
+                onClick={() => goToSubMode("normal")}
                 className="btn-ghost btn-sm"
                 disabled={loading}
                 style={{ fontSize: 12 }}
               >
-                <i className="ti ti-arrow-left" /> {t('authBack')}
+                <i className="ti ti-arrow-left" /> {t("authBack")}
               </button>
 
               <button
@@ -591,14 +696,14 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
                   <>
                     <i
                       className="ti ti-loader"
-                      style={{ animation: 'spin 1s linear infinite' }}
+                      style={{ animation: "spin 1s linear infinite" }}
                     />
-                    {t('authSignupCreating')}
+                    {t("authSignupCreating")}
                   </>
                 ) : (
                   <>
                     <i className="ti ti-user-plus" />
-                    {t('authSignupCreate')}
+                    {t("authSignupCreate")}
                   </>
                 )}
               </button>
@@ -607,46 +712,46 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
         )}
 
         {/* ═══ TAB LOGIN — SIGNUP-SENT ═════════════════════════════ */}
-        {tab === 'login' && loginSubMode === 'signup-sent' && (
+        {tab === "login" && loginSubMode === "signup-sent" && (
           <SuccessPanel
             icon="ti-mail-check"
-            title={t('authSignupSent')}
+            title={t("authSignupSent")}
             message={
               <>
-                {t('authSignupSentDesc')}{' '}
+                {t("authSignupSentDesc")}{" "}
                 <span style={emailHighlightStyle}>{subEmail}</span>
               </>
             }
-            hint={t('authSignupSentHint')}
-            primaryLabel={t('authBack')}
+            hint={t("authSignupSentHint")}
+            primaryLabel={t("authBack")}
             primaryIcon="ti-arrow-left"
             onPrimary={() => {
-              setEmail(subEmail)
-              setPassword('')
-              goToSubMode('normal')
+              setEmail(subEmail);
+              setPassword("");
+              goToSubMode("normal");
             }}
           />
         )}
 
         {/* ═══ TAB GITHUB ═════════════════════════════════════════ */}
-        {tab === 'github' && (
+        {tab === "github" && (
           <form
             onSubmit={handleClaimSponsorship}
-            style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            style={{ display: "flex", flexDirection: "column", gap: 12 }}
           >
-            <div style={infoStyle}>{t('authGithubSubtitle')}</div>
+            <div style={infoStyle}>{t("authGithubSubtitle")}</div>
             <div>
-              <label style={labelStyle}>{t('authGithubLoginLabel')}</label>
+              <label style={labelStyle}>{t("authGithubLoginLabel")}</label>
               <input
                 type="text"
                 value={githubLogin}
                 onChange={(e) =>
-                  setGithubLogin(e.target.value.replace(/^@/, ''))
+                  setGithubLogin(e.target.value.replace(/^@/, ""))
                 }
-                placeholder={t('authGithubLoginPlaceholder')}
+                placeholder={t("authGithubLoginPlaceholder")}
                 className="input-lg"
                 disabled={loading}
-                style={{ fontFamily: 'monospace' }}
+                style={{ fontFamily: "monospace" }}
                 data-testid="login-modal-github-input"
                 autoFocus
               />
@@ -661,8 +766,8 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
             <Actions
               onCancel={onClose}
               loading={loading}
-              submitLabel={t('authGithubActivate')}
-              loadingLabel={t('authGithubActivating')}
+              submitLabel={t("authGithubActivate")}
+              loadingLabel={t("authGithubActivating")}
               icon="ti-brand-github"
               disabled={!githubLogin.trim()}
             />
@@ -670,12 +775,12 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
         )}
 
         {/* ═══ TAB CODE ═══════════════════════════════════════════ */}
-        {tab === 'code' && (
+        {tab === "code" && (
           <form
             onSubmit={handleRedeemCode}
-            style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            style={{ display: "flex", flexDirection: "column", gap: 12 }}
           >
-            <div style={infoStyle}>{t('authCodeSubtitle')}</div>
+            <div style={infoStyle}>{t("authCodeSubtitle")}</div>
             <EmailField
               value={email}
               onChange={setEmail}
@@ -688,19 +793,19 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
               disabled={loading}
             />
             <div>
-              <label style={labelStyle}>{t('authCodeLabel')}</label>
+              <label style={labelStyle}>{t("authCodeLabel")}</label>
               <input
                 type="text"
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
-                placeholder={t('authCodePlaceholder')}
+                placeholder={t("authCodePlaceholder")}
                 className="input-lg"
                 disabled={loading}
                 style={{
-                  fontFamily: 'monospace',
+                  fontFamily: "monospace",
                   letterSpacing: 1.5,
                   fontSize: 14,
-                  textAlign: 'center',
+                  textAlign: "center",
                 }}
                 maxLength={19}
                 data-testid="login-modal-code-input"
@@ -710,8 +815,8 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
             <Actions
               onCancel={onClose}
               loading={loading}
-              submitLabel={t('authCodeActivate')}
-              loadingLabel={t('authCodeActivating')}
+              submitLabel={t("authCodeActivate")}
+              loadingLabel={t("authCodeActivating")}
               icon="ti-gift"
               disabled={!code.trim()}
             />
@@ -719,26 +824,26 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
         )}
 
         {/* ═══ TAB KEY ════════════════════════════════════════════ */}
-        {tab === 'key' && (
+        {tab === "key" && (
           <form
             onSubmit={handleManualActivate}
-            style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            style={{ display: "flex", flexDirection: "column", gap: 12 }}
           >
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-              {t('authKeySubtitle')}
+            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+              {t("authKeySubtitle")}
             </div>
             <textarea
               value={manualKey}
               onChange={(e) => setManualKey(e.target.value)}
-              placeholder={t('authManualPlaceholder')}
+              placeholder={t("authManualPlaceholder")}
               disabled={loading}
               rows={3}
               style={{
-                fontFamily: 'monospace',
+                fontFamily: "monospace",
                 fontSize: 11,
-                resize: 'vertical',
+                resize: "vertical",
                 minHeight: 80,
-                wordBreak: 'break-all',
+                wordBreak: "break-all",
               }}
               autoFocus
             />
@@ -746,8 +851,8 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
             <Actions
               onCancel={onClose}
               loading={loading}
-              submitLabel={t('authManualActivate')}
-              loadingLabel={t('authManualActivating')}
+              submitLabel={t("authManualActivate")}
+              loadingLabel={t("authManualActivating")}
               icon="ti-key"
               disabled={!manualKey.trim()}
             />
@@ -755,103 +860,146 @@ export default function LoginModal({ onClose, onActivated, addToast }) {
         )}
       </div>
     </div>,
-    document.body
-  )
+    document.body,
+  );
 }
 
-// ─── Styles partagés ───────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// SHARED STYLES
+// ═══════════════════════════════════════════════════════════════════════════
+
 const labelStyle = {
   fontSize: 12,
-  color: 'var(--text-secondary)',
-  display: 'block',
+  color: "var(--text-secondary)",
+  display: "block",
   marginBottom: 6,
-}
+};
 
 const infoStyle = {
   fontSize: 12,
-  color: 'var(--text-secondary)',
+  color: "var(--text-secondary)",
   lineHeight: 1.6,
   marginBottom: 4,
-}
+};
 
 const linkStyle = {
-  background: 'transparent',
-  border: 'none',
-  color: 'var(--text-secondary)',
+  background: "transparent",
+  border: "none",
+  color: "var(--text-secondary)",
   fontSize: 11,
-  cursor: 'pointer',
-  padding: '4px 0',
-  fontFamily: 'inherit',
-  textDecoration: 'none',
-}
+  cursor: "pointer",
+  padding: "4px 0",
+  fontFamily: "inherit",
+  textDecoration: "none",
+};
 
 const emailHighlightStyle = {
-  fontFamily: 'monospace',
-  color: 'var(--accent)',
-}
+  fontFamily: "monospace",
+  color: "var(--accent)",
+};
 
 const subActionsStyle = {
-  display: 'flex',
+  display: "flex",
   gap: 8,
-  justifyContent: 'space-between',
-  alignItems: 'center',
+  justifyContent: "space-between",
+  alignItems: "center",
   marginTop: 8,
-}
+};
 
-// ─── Sub-components ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// SUB-COMPONENTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Standard email input with label + placeholder.
+ *
+ * @param {Object} props
+ * @param {string} props.value
+ * @param {(value: string) => void} props.onChange
+ * @param {boolean} [props.disabled]
+ * @param {boolean} [props.autoFocus]
+ * @returns {JSX.Element}
+ */
 function EmailField({ value, onChange, disabled, autoFocus }) {
-  const { t } = useLanguage()
+  const { t } = useLanguage();
   return (
     <div>
-      <label style={labelStyle}>{t('authEmail')}</label>
+      <label style={labelStyle}>{t("authEmail")}</label>
       <input
         type="email"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={t('authEmailPlaceholder')}
+        placeholder={t("authEmailPlaceholder")}
         className="input-lg"
         disabled={disabled}
         autoFocus={autoFocus}
       />
     </div>
-  )
+  );
 }
 
+/**
+ * Standard password input with label + placeholder.
+ *
+ * @param {Object} props
+ * @param {string} props.value
+ * @param {(value: string) => void} props.onChange
+ * @param {boolean} [props.disabled]
+ * @returns {JSX.Element}
+ */
 function PasswordField({ value, onChange, disabled }) {
-  const { t } = useLanguage()
+  const { t } = useLanguage();
   return (
     <div>
-      <label style={labelStyle}>{t('authPassword')}</label>
+      <label style={labelStyle}>{t("authPassword")}</label>
       <input
         type="password"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={t('authPasswordPlaceholder')}
+        placeholder={t("authPasswordPlaceholder")}
         className="input-lg"
         disabled={disabled}
       />
     </div>
-  )
+  );
 }
 
+/**
+ * Red error banner.
+ *
+ * @param {{children: React.ReactNode}} props
+ * @returns {JSX.Element}
+ */
 function ErrorBox({ children }) {
   return (
     <div
       style={{
-        padding: '8px 12px',
-        background: 'rgba(224,82,82,0.1)',
-        border: '1px solid var(--danger)',
-        borderRadius: 'var(--radius-md)',
+        padding: "8px 12px",
+        background: "rgba(224,82,82,0.1)",
+        border: "1px solid var(--danger)",
+        borderRadius: "var(--radius-md)",
         fontSize: 12,
-        color: 'var(--danger)',
+        color: "var(--danger)",
       }}
     >
       <i className="ti ti-alert-triangle" style={{ marginRight: 4 }} />
       {children}
     </div>
-  )
+  );
 }
 
+/**
+ * Footer action bar (Cancel + Submit).
+ *
+ * @param {Object} props
+ * @param {() => void} props.onCancel
+ * @param {boolean} props.loading
+ * @param {string} props.submitLabel
+ * @param {string} props.loadingLabel
+ * @param {string} props.icon - Tabler icon class (without `ti-` prefix).
+ * @param {boolean} [props.disabled]
+ * @returns {JSX.Element}
+ */
 function Actions({
   onCancel,
   loading,
@@ -860,13 +1008,13 @@ function Actions({
   icon,
   disabled,
 }) {
-  const { t } = useLanguage()
+  const { t } = useLanguage();
   return (
     <div
       style={{
-        display: 'flex',
+        display: "flex",
         gap: 8,
-        justifyContent: 'flex-end',
+        justifyContent: "flex-end",
         marginTop: 8,
       }}
     >
@@ -876,7 +1024,7 @@ function Actions({
         onClick={onCancel}
         disabled={loading}
       >
-        {t('authCancel')}
+        {t("authCancel")}
       </button>
       <button
         type="submit"
@@ -887,7 +1035,7 @@ function Actions({
           <>
             <i
               className="ti ti-loader"
-              style={{ animation: 'spin 1s linear infinite' }}
+              style={{ animation: "spin 1s linear infinite" }}
             />
             {loadingLabel}
           </>
@@ -899,10 +1047,25 @@ function Actions({
         )}
       </button>
     </div>
-  )
+  );
 }
 
-// ─── SuccessPanel (utilisé pour forgot-sent et signup-sent) ────────────
+/**
+ * Shared success panel used for both `forgot-sent` and `signup-sent`.
+ *
+ * @param {Object} props
+ * @param {string} props.icon - Tabler icon class (e.g. `ti-mail-check`).
+ * @param {string} props.title - Bold title.
+ * @param {React.ReactNode} props.message - Body text (can contain JSX).
+ * @param {string} [props.hint] - Small gray hint below the message.
+ * @param {string} props.primaryLabel - Primary button label.
+ * @param {string} [props.primaryIcon]
+ * @param {() => void} props.onPrimary
+ * @param {string} [props.secondaryLabel]
+ * @param {string} [props.secondaryIcon]
+ * @param {() => void} [props.onSecondary]
+ * @returns {JSX.Element}
+ */
 function SuccessPanel({
   icon,
   title,
@@ -918,25 +1081,25 @@ function SuccessPanel({
   return (
     <div
       style={{
-        display: 'flex',
-        flexDirection: 'column',
+        display: "flex",
+        flexDirection: "column",
         gap: 16,
-        alignItems: 'center',
-        padding: '12px 0 8px',
-        textAlign: 'center',
+        alignItems: "center",
+        padding: "12px 0 8px",
+        textAlign: "center",
       }}
     >
       <div
         style={{
           width: 64,
           height: 64,
-          borderRadius: '50%',
-          background: 'rgba(29,158,117,0.15)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          borderRadius: "50%",
+          background: "rgba(29,158,117,0.15)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
           fontSize: 32,
-          color: 'var(--success)',
+          color: "var(--success)",
         }}
       >
         <i className={`ti ${icon}`} />
@@ -947,7 +1110,7 @@ function SuccessPanel({
       <div
         style={{
           fontSize: 12,
-          color: 'var(--text-secondary)',
+          color: "var(--text-secondary)",
           lineHeight: 1.6,
           maxWidth: 400,
         }}
@@ -959,7 +1122,7 @@ function SuccessPanel({
         <div
           style={{
             fontSize: 11,
-            color: 'var(--text-tertiary)',
+            color: "var(--text-tertiary)",
             lineHeight: 1.5,
             maxWidth: 400,
             marginTop: 4,
@@ -971,11 +1134,11 @@ function SuccessPanel({
 
       <div
         style={{
-          display: 'flex',
+          display: "flex",
           gap: 8,
           marginTop: 12,
-          width: '100%',
-          justifyContent: 'center',
+          width: "100%",
+          justifyContent: "center",
         }}
       >
         {secondaryLabel && (
@@ -985,7 +1148,7 @@ function SuccessPanel({
             onClick={onSecondary}
             style={{ minWidth: 140 }}
           >
-            {secondaryIcon && <i className={`ti ${secondaryIcon}`} />}{' '}
+            {secondaryIcon && <i className={`ti ${secondaryIcon}`} />}{" "}
             {secondaryLabel}
           </button>
         )}
@@ -999,5 +1162,5 @@ function SuccessPanel({
         </button>
       </div>
     </div>
-  )
+  );
 }
