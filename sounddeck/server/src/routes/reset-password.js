@@ -1,141 +1,211 @@
-// server/src/routes/reset-password.js
-import { hashPassword } from '../lib/crypto.js'
+/**
+ * @file Reset-password route (GET + POST).
+ *
+ * Flow:
+ * 1. GET  /reset-password?token=X → renders an HTML form where the user
+ *    enters a new password.
+ * 2. POST /reset-password         → validates the token, updates the
+ *    password hash, marks the token as used, returns 200 OK.
+ *
+ * The page is served entirely by the worker (no React), so it works even
+ * without the app being installed.
+ *
+ * Token validity:
+ * - Single-use: `used_at` is set after a successful reset.
+ * - Expires after 1 hour (checked against `expires_at`).
+ */
+
+import { hashPassword } from "../lib/crypto.js";
 import {
   getPasswordReset,
   markPasswordResetUsed,
   getUserByEmail,
   updateUserPassword,
   logAudit,
-} from '../lib/db.js'
+} from "../lib/db.js";
 
+/**
+ * Returns a JSON `Response` with the given payload and status code.
+ *
+ * @param {unknown} data
+ * @param {number} [status=200]
+ * @returns {Response}
+ */
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json' },
-  })
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
+/**
+ * Returns an HTML `Response` with the given body and status code.
+ *
+ * @param {string} html
+ * @param {number} [status=200]
+ * @returns {Response}
+ */
 function htmlResponse(html, status = 200) {
   return new Response(html, {
     status,
-    headers: { 'Content-Type': 'text/html; charset=utf-8' },
-  })
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
 }
 
-// ─── POST /reset-password ──────────────────────────────────────────────
-// Body : { token, newPassword }
+// ═══════════════════════════════════════════════════════════════════════════
+// POST /reset-password
+// ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Handles `POST /reset-password` (submit new password).
+ *
+ * Request body: `{ token: string, newPassword: string }`
+ *
+ * Validation:
+ * - `newPassword` length must be between 6 and 100 chars.
+ * - Token must exist, not be already used, and not be expired.
+ *
+ * On success:
+ * - Password hash + salt are updated.
+ * - The token is marked as used (single-use).
+ * - An audit log entry `password_reset_success` is recorded.
+ *
+ * @param {Request} request
+ * @param {Object} env
+ * @param {string} env.DB
+ * @returns {Promise<Response>}
+ */
 export async function handleResetPasswordSubmit(request, env) {
-  let body
+  let body;
   try {
-    body = await request.json()
+    body = await request.json();
   } catch {
-    return jsonResponse({ error: 'invalid_json' }, 400)
+    return jsonResponse({ error: "invalid_json" }, 400);
   }
 
-  const token = String(body.token || '').trim()
-  const newPassword = String(body.newPassword || '')
+  const token = String(body.token || "").trim();
+  const newPassword = String(body.newPassword || "");
 
   if (!token || !newPassword) {
-    return jsonResponse({ error: 'missing_fields' }, 400)
+    return jsonResponse({ error: "missing_fields" }, 400);
   }
   if (newPassword.length < 6) {
     return jsonResponse(
-      { error: 'password_too_short', message: 'Min 6 caractères' },
-      400
-    )
+      { error: "password_too_short", message: "Min 6 characters" },
+      400,
+    );
   }
   if (newPassword.length > 100) {
-    return jsonResponse({ error: 'password_too_long' }, 400)
+    return jsonResponse({ error: "password_too_long" }, 400);
   }
 
-  const reset = await getPasswordReset(env.DB, token)
+  const reset = await getPasswordReset(env.DB, token);
   if (!reset) {
-    return jsonResponse({ error: 'invalid_token' }, 400)
+    return jsonResponse({ error: "invalid_token" }, 400);
   }
   if (reset.used_at) {
-    return jsonResponse({ error: 'token_already_used' }, 400)
+    return jsonResponse({ error: "token_already_used" }, 400);
   }
 
-  const now = Math.floor(Date.now() / 1000)
+  const now = Math.floor(Date.now() / 1000);
   if (reset.expires_at < now) {
-    return jsonResponse({ error: 'token_expired' }, 400)
+    return jsonResponse({ error: "token_expired" }, 400);
   }
 
-  // Récupère le user
-  const user = await getUserByEmail(env.DB, reset.email)
+  const user = await getUserByEmail(env.DB, reset.email);
   if (!user) {
-    return jsonResponse({ error: 'user_not_found' }, 404)
+    return jsonResponse({ error: "user_not_found" }, 404);
   }
 
-  // Hash + update
-  const { hash, salt } = await hashPassword(newPassword)
-  await updateUserPassword(env.DB, user.id, hash, salt)
+  // Hash and persist the new password
+  const { hash, salt } = await hashPassword(newPassword);
+  await updateUserPassword(env.DB, user.id, hash, salt);
 
-  // Marque le token utilisé (usage unique)
-  await markPasswordResetUsed(env.DB, token)
+  // Burn the token (single-use)
+  await markPasswordResetUsed(env.DB, token);
 
   await logAudit(env.DB, {
-    event: 'password_reset_success',
+    event: "password_reset_success",
     email: user.email,
     donorId: user.donor_id,
-    ip: request.headers.get('CF-Connecting-IP'),
-    userAgent: request.headers.get('User-Agent'),
-  })
+    ip: request.headers.get("CF-Connecting-IP"),
+    userAgent: request.headers.get("User-Agent"),
+  });
 
   return jsonResponse({
     ok: true,
-    message: 'Mot de passe réinitialisé. Tu peux te connecter.',
-  })
+    message: "Password reset. You can now log in.",
+  });
 }
 
-// ─── GET /reset-password?token=xxx ─────────────────────────────────────
-// Renvoie la page HTML avec le formulaire
+// ═══════════════════════════════════════════════════════════════════════════
+// GET /reset-password?token=X
+// ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Handles `GET /reset-password?token=X` — renders the HTML reset form.
+ *
+ * Invalid tokens, already-used tokens, and expired tokens all render a
+ * dedicated error page.
+ *
+ * @param {Request} request
+ * @param {Object} env
+ * @param {string} env.DB
+ * @returns {Promise<Response>}
+ */
 export async function handleResetPasswordPage(request, env) {
-  const url = new URL(request.url)
-  const token = url.searchParams.get('token')
+  const url = new URL(request.url);
+  const token = url.searchParams.get("token");
 
   if (!token) {
-    return htmlResponse(buildErrorPage('Lien invalide', 'Aucun token fourni.'), 400)
+    return htmlResponse(
+      buildErrorPage("Invalid link", "No token was provided."),
+      400,
+    );
   }
 
-  const reset = await getPasswordReset(env.DB, token)
+  const reset = await getPasswordReset(env.DB, token);
   if (!reset) {
     return htmlResponse(
       buildErrorPage(
-        'Lien invalide',
-        "Ce lien n'existe pas ou a déjà été utilisé."
+        "Invalid link",
+        "This link does not exist or has already been used.",
       ),
-      400
-    )
+      400,
+    );
   }
   if (reset.used_at) {
     return htmlResponse(
       buildErrorPage(
-        'Lien déjà utilisé',
-        'Ce lien a déjà servi à réinitialiser un mot de passe. Fais une nouvelle demande.'
+        "Link already used",
+        "This link has already reset a password. Request a new one.",
       ),
-      400
-    )
+      400,
+    );
   }
 
-  const now = Math.floor(Date.now() / 1000)
+  const now = Math.floor(Date.now() / 1000);
   if (reset.expires_at < now) {
     return htmlResponse(
       buildErrorPage(
-        'Lien expiré',
-        'Ce lien est valable 1 heure. Fais une nouvelle demande depuis l\'app.'
+        "Link expired",
+        "This link is valid for 1 hour. Request a new one from the app.",
       ),
-      400
-    )
+      400,
+    );
   }
 
-  return htmlResponse(buildResetFormPage(token, reset.email))
+  return htmlResponse(buildResetFormPage(token, reset.email));
 }
 
-// ─── Templates HTML ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// HTML templates
+// ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Shared CSS for the reset-password pages (form + error). Kept inline so the
+ * page works with zero external requests (fast, no CORS, no fonts).
+ */
 const SHARED_STYLE = `
   body { font-family: system-ui, -apple-system, sans-serif; background: #111113; color: #f0f0f2; margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
   .card { background: #1a1a1e; border: 1px solid #2e2e36; border-radius: 14px; padding: 40px; max-width: 460px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
@@ -157,8 +227,19 @@ const SHARED_STYLE = `
   .msg.error { background: rgba(224,82,82,0.1); border: 1px solid #e05252; color: #e05252; }
   .msg.success { background: rgba(29,158,117,0.1); border: 1px solid #1d9e75; color: #1d9e75; }
   .hint { font-size: 12px; color: #606070; margin-top: 8px; text-align: center; }
-`
+`;
 
+/**
+ * Builds the HTML reset form page.
+ *
+ * Includes an inline script that POSTs to `/reset-password` and swaps the
+ * page for a success card on 200. Errors are shown in a message box below
+ * the form (no page reload).
+ *
+ * @param {string} token - The reset token (already validated).
+ * @param {string} email - User's email (displayed for context).
+ * @returns {string} HTML string.
+ */
 function buildResetFormPage(token, email) {
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -256,7 +337,7 @@ function buildResetFormPage(token, email) {
           return showMsg(map[data.error] || 'Une erreur est survenue.', 'error')
         }
 
-        // Succès → on remplace la page
+        // Success → replace the page
         document.body.innerHTML = \`
           <div class="card">
             <div class="icon ok">✅</div>
@@ -274,9 +355,16 @@ function buildResetFormPage(token, email) {
     })
   </script>
 </body>
-</html>`
+</html>`;
 }
 
+/**
+ * Builds the HTML error page for invalid / expired / already-used tokens.
+ *
+ * @param {string} title - Short error title.
+ * @param {string} message - Error description.
+ * @returns {string} HTML string.
+ */
 function buildErrorPage(title, message) {
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -293,5 +381,5 @@ function buildErrorPage(title, message) {
     <p>${message}</p>
   </div>
 </body>
-</html>`
+</html>`;
 }
