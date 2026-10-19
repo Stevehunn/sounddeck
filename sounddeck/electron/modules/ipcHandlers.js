@@ -1,18 +1,71 @@
-// electron/modules/ipcHandlers.js
+/**
+ * @file System-level IPC handlers for the Electron main process.
+ *
+ * Two separate domains live in this module:
+ *
+ * 1. **Emoji scraping** (`fetch-emojis`) — fetches getemoji.com, parses
+ *    the HTML, and returns the emoji list for a given category. Emojis
+ *    are cached in-memory for 1 hour to avoid hammering the site.
+ *
+ * 2. **System + confirm + tray handlers**:
+ *    - Open external URLs / quit / hide / show window
+ *    - System language + keyboard layout detection (azerty vs qwerty)
+ *    - `fetch-myinstants`: scrape myinstants.com for sounds
+ *    - `confirm-quit`: user answered the close-to-tray dialog
+ *    - Tray language updates (via a global callback registered by `main.js`)
+ *
+ * All network handlers route errors through `normalizeNetworkError()` so
+ * the renderer always gets a stable code (`NETWORK_ERROR` /
+ * `NETWORK_TIMEOUT`) instead of a cryptic Node errno string.
+ *
+ * @see ./networkUtils.js — `normalizeNetworkError` used by every network
+ *      path in this file.
+ * @see ../preload.js — exposes these channels to the renderer as
+ *      `electronAPI.fetchMyinstants`, `.fetchEmojis`, `.openExternal`, …
+ * @see ./trayManager.js — consumer of the `update-tray-language` channel
+ *      (via the `registerTrayUpdateHandler` callback).
+ */
+
 const { ipcMain, shell } = require("electron");
 const https = require("https");
 const store = require("../store");
 
 const { normalizeNetworkError } = require("./networkUtils");
 
-// ─── EMOJI SCRAPING (getemoji.com) ──────────────────────────────────────────
+// ─── EMOJI SCRAPING (getemoji.com) ──────────────────────────────────────
 
+/**
+ * URL of the emoji catalog used for scraping.
+ * @type {string}
+ */
 const EMOJI_SOURCE_URL = "https://getemoji.com/";
+
+/**
+ * How long a category's emoji list stays cached, in milliseconds.
+ * @type {number}
+ */
 const EMOJI_CACHE_TTL = 60 * 60 * 1000; // 1h
+
+/**
+ * In-memory cache: `categoryId -> { emojis: string[], fetchedAt: number }`.
+ * Cleared by `__resetEmojiCache()` (used by tests).
+ * @type {Map<string, { emojis: string[], fetchedAt: number }>}
+ */
 const emojiCache = new Map();
 
-// Mapping categoryId → titres de section sur getemoji.com
-// Basé sur la structure réelle du site (vérifié 2024)
+/**
+ * Maps our internal category IDs to the section titles used on
+ * getemoji.com. Matched case-insensitively by substring against the
+ * `<h2>` text of each `<section>` on the page.
+ *
+ * ⚠️ These strings are **functional values** (they must match the
+ * actual site HTML) — do **not** translate them.
+ *
+ * `people` intentionally spans 3 sections because getemoji.com splits
+ * humans across them.
+ *
+ * @type {Record<string, string[]>}
+ */
 const EMOJI_SECTION_MATCHERS = {
   smileys: ["Smileys"],
   people: [
@@ -29,6 +82,30 @@ const EMOJI_SECTION_MATCHERS = {
   flags: ["Flags"],
 };
 
+/**
+ * Fetches a URL and returns its HTML body.
+ *
+ * Follows up to 5 redirects, uses a desktop `User-Agent` (getemoji.com
+ * throttles bare clients), and aborts after 15 s of no response.
+ *
+ * On any failure (timeout, network error, non-200 status, too many
+ * redirects), the promise **resolves** (never rejects) with
+ * `{ ok: false, error, isNetworkError, html: "" }` — this makes the
+ * call site cleaner and lets it forward a structured error to the
+ * renderer.
+ *
+ * @param {string} url - The URL to fetch.
+ * @param {number} [redirectCount=0] - Loop guard (internal).
+ * @returns {Promise<{
+ *   ok: true,
+ *   html: string
+ * } | {
+ *   ok: false,
+ *   error: string,
+ *   isNetworkError: boolean,
+ *   html: ""
+ * }>} Success object with HTML, or failure object with error code.
+ */
 function fetchHtml(url, redirectCount = 0) {
   return new Promise((resolve) => {
     if (redirectCount > 5) {
@@ -102,11 +179,22 @@ function fetchHtml(url, redirectCount = 0) {
 }
 
 /**
- * Parse le HTML de getemoji.com pour extraire les emojis d'une section.
- * ✅ V2 : cumule TOUTES les sections qui matchent (ex: "people" = 3 sections)
- * ✅ V2 : pas de limite hardcodée à 200
- * @param html
- * @param categoryId
+ * Parses emoji characters out of getemoji.com's HTML for a given
+ * category ID.
+ *
+ * The page is a flat list of `<section>` blocks, each with a `<h2>`
+ * title followed by `<div class="emoji emoji-button">😀</div>` items.
+ * We match the section title against `EMOJI_SECTION_MATCHERS[categoryId]`
+ * (case-insensitive substring) and collect every emoji div inside it.
+ *
+ * Emoji are deduplicated **across** all matched sections (e.g. `people`
+ * matches 3 sections) via a single `Set`. No artificial limit — the
+ * whole category is returned.
+ *
+ * @param {string} html - Full HTML of getemoji.com.
+ * @param {string} categoryId - One of the keys of `EMOJI_SECTION_MATCHERS`.
+ * @returns {string[]} Array of emoji characters (may be empty if the
+ *   category ID is unknown or the site HTML changed).
  */
 function parseEmojisFromHtml(html, categoryId) {
   if (!html || !categoryId) return [];
@@ -114,7 +202,8 @@ function parseEmojisFromHtml(html, categoryId) {
   const matchers = EMOJI_SECTION_MATCHERS[categoryId] || [];
   if (matchers.length === 0) return [];
 
-  // ✅ Set global : dédupliqué ET cumulé sur toutes les sections matchées
+  // Single global Set: deduplicated AND accumulated across all matched
+  // sections (e.g. `people` spans 3 sections on getemoji.com).
   const globalSeen = new Set();
   const allEmojis = [];
 
@@ -124,7 +213,7 @@ function parseEmojisFromHtml(html, categoryId) {
   while ((sectionMatch = sectionRegex.exec(html)) !== null) {
     const sectionHtml = sectionMatch[1];
 
-    // Cherche le titre dans le h2
+    // Extract the title from the h2
     let title = null;
     const titleWithLink = sectionHtml.match(
       /<h2[^>]*>[\s\S]*?<a[^>]*>([^<]+)<\/a>[\s\S]*?<\/h2>/,
@@ -137,7 +226,7 @@ function parseEmojisFromHtml(html, categoryId) {
     }
     if (!title) continue;
 
-    // Décode les entités HTML
+    // Decode HTML entities
     title = title
       .replace(/&amp;/g, "&")
       .replace(/&#039;/g, "'")
@@ -152,7 +241,7 @@ function parseEmojisFromHtml(html, categoryId) {
     });
     if (!isTarget) continue;
 
-    // Extrait les emojis de cette section et cumule
+    // Extract the emojis from this section and accumulate
     const emojiRegex = /<div class="emoji emoji-button">([^<]+)<\/div>/g;
     let emojiMatch;
 
@@ -163,37 +252,62 @@ function parseEmojisFromHtml(html, categoryId) {
         allEmojis.push(emoji);
       }
     }
-    // ✅ PAS de return ici — on continue pour cumuler les autres sections
+    // No early return — keep scanning other sections to accumulate them.
   }
 
-  // ✅ Pas de slice(0, 200) — on laisse tout passer
   return allEmojis;
 }
 
-// ─── HANDLERS SYSTÈME ────────────────────────────────────────────────────────
+// ─── SYSTEM HANDLERS ────────────────────────────────────────────────────
 
 /**
+ * Registers every system-level IPC handler.
  *
+ * Must be called once, during app startup (see `electron/main.js`).
+ *
+ * Channels registered:
+ *
+ * **External / window**
+ * - `open-external`              `(url) -> void`
+ * - `quit-app`                   `() -> true`
+ * - `hide-window`                `() -> true`
+ * - `show-window`                `() -> true`
+ *
+ * **System info**
+ * - `update-tray-language`       `(lang) -> true`
+ * - `get-system-language`        `() -> 'fr' | 'en' | 'es'` (fallback `'fr'`)
+ * - `get-system-keyboard-layout` `() -> 'azerty' | 'qwerty'`
+ *
+ * **Network scraping**
+ * - `fetch-myinstants`           `(query, mode, lang) -> { success, sounds?, error?, isNetworkError? }`
+ * - `fetch-emojis`               `(categoryId) -> { success, emojis, error?, isNetworkError?, fromCache? }`
+ *
+ * All handlers are idempotent w.r.t. their registration (`fetch-*` are
+ * guarded by `ipcMain.eventNames().includes(...)` so re-running this
+ * function in tests / dev doesn't throw `"Attempted to register a
+ * second handler"`).
+ *
+ * @returns {void}
  */
 function registerSystemHandlers() {
   if (!ipcMain) {
-    console.error("❌ [ipcHandlers] ipcMain est undefined !");
+    console.error("❌ [ipcHandlers] ipcMain is undefined!");
     return;
   }
 
-  // Open external URL
+  // Open an external URL in the user's default browser.
   ipcMain.handle("open-external", (event, url) => {
     shell.openExternal(url);
   });
 
-  // Quit app
+  // Quit the app immediately (bypasses the close-to-tray flow).
   ipcMain.handle("quit-app", () => {
     const { app } = require("electron");
     app.quit();
     return true;
   });
 
-  // Hide window
+  // Hide the main window (used by the tray "close to tray" flow).
   ipcMain.handle("hide-window", () => {
     const { getMainWindow } = require("./windowManager");
     const mainWindow = getMainWindow();
@@ -203,14 +317,14 @@ function registerSystemHandlers() {
     return true;
   });
 
-  // Show window
+  // Show and focus the main window.
   ipcMain.handle("show-window", () => {
     const { showMainWindow } = require("./windowManager");
     showMainWindow();
     return true;
   });
 
-  // Update tray language
+  // Forward a language change to the tray menu (callback set by main.js).
   ipcMain.handle("update-tray-language", (event, lang) => {
     if (global.__updateTrayCallback) {
       global.__updateTrayCallback(lang);
@@ -218,7 +332,7 @@ function registerSystemHandlers() {
     return true;
   });
 
-  // Get system language
+  // Detect the OS locale and map it to a supported app language.
   ipcMain.handle("get-system-language", () => {
     try {
       const { app } = require("electron");
@@ -232,7 +346,8 @@ function registerSystemHandlers() {
     }
   });
 
-  // Get system keyboard layout
+  // Detect whether the system keyboard is AZERTY (fr / be / ch) or QWERTY.
+  // Windows: registry check first, then locale fallback.
   ipcMain.handle("get-system-keyboard-layout", () => {
     if (process.platform === "win32") {
       try {
@@ -245,7 +360,9 @@ function registerSystemHandlers() {
           if (result.includes("0000040c")) {
             return "azerty";
           }
-        } catch (e) {}
+        } catch {
+          // Registry lookup failed — fall through to locale check
+        }
 
         try {
           const locale = require("electron").app.getLocale();
@@ -253,7 +370,9 @@ function registerSystemHandlers() {
           if (azertyLocales.some((l) => locale.startsWith(l))) {
             return "azerty";
           }
-        } catch (e) {}
+        } catch {
+          // Locale detection failed — fall through to qwerty
+        }
 
         return "qwerty";
       } catch (e) {
@@ -264,7 +383,8 @@ function registerSystemHandlers() {
     return "qwerty";
   });
 
-  // ─── HANDLER MYINSTANTS ──────────────────────────────────────────────────
+  // ─── MYINSTANTS HANDLER ─────────────────────────────────────────────
+  // Idempotency guard: skip if already registered (safe to re-run).
   if (!ipcMain.eventNames().includes("fetch-myinstants")) {
     ipcMain.handle(
       "fetch-myinstants",
@@ -281,6 +401,14 @@ function registerSystemHandlers() {
             es: "https://www.myinstants.com/fr/index/es/",
           };
 
+          /**
+           * Fetches a page and returns `{ ok, html }` (or an error
+           * object with `isNetworkError`). 15 s timeout, follows 3xx
+           * redirects.
+           *
+           * @param {string} url
+           * @returns {Promise<{ok: true, html: string, status: number} | {ok: false, error: string, isNetworkError: boolean, html: ""}>}
+           */
           const fetchPage = (url) => {
             return new Promise((resolve) => {
               const timeout = setTimeout(() => {
@@ -332,6 +460,16 @@ function registerSystemHandlers() {
             });
           };
 
+          /**
+           * Extracts the list of sounds from a myinstants HTML page.
+           * Returns at most 40 items, each with `{ id, name, slug, url, emoji }`.
+           * The `url` is picked from the inline `play('media/sounds/...')`
+           * calls when present (best-effort — some entries stay `null`
+           * and are resolved lazily by the caller).
+           *
+           * @param {string} html
+           * @returns {Array<{id: string, name: string, slug: string, url: string|null, emoji: string}>}
+           */
           const parseSoundList = (html) => {
             const sounds = [];
             const seen = new Set();
@@ -391,6 +529,11 @@ function registerSystemHandlers() {
               (m) => `https://www.myinstants.com/${m[1]}`,
             );
 
+            /**
+             * Picks an emoji based on keywords in the sound name.
+             * @param {string} name
+             * @returns {string}
+             */
             const getEmojiForName = (name) => {
               const n = name.toLowerCase();
               if (n.includes("boom") || n.includes("explo")) return "💥";
@@ -514,6 +657,8 @@ function registerSystemHandlers() {
             return { success: false, error: "Aucun son trouvé", sounds: [] };
           }
 
+          // Resolve direct audio URLs for sounds that don't have one yet
+          // (by fetching each instant page). Batched by 3 for politeness.
           const needsResolve = sounds.filter((s) => !s.url && s.slug);
           if (needsResolve.length > 0) {
             const toResolve = needsResolve.slice(0, 20);
@@ -563,7 +708,8 @@ function registerSystemHandlers() {
     );
   }
 
-  // ─── HANDLER EMOJIS ──────────────────────────────────────────────────────
+  // ─── EMOJIS HANDLER ─────────────────────────────────────────────────
+  // Idempotency guard: skip if already registered (safe to re-run).
   if (!ipcMain.eventNames().includes("fetch-emojis")) {
     ipcMain.handle("fetch-emojis", async (event, categoryId) => {
       try {
@@ -571,7 +717,7 @@ function registerSystemHandlers() {
           return { success: false, error: "Catégorie manquante", emojis: [] };
         }
 
-        // Cache
+        // Cache hit → serve from memory
         const cached = emojiCache.get(categoryId);
         if (cached && Date.now() - cached.fetchedAt < EMOJI_CACHE_TTL) {
           return { success: true, emojis: cached.emojis, fromCache: true };
@@ -580,7 +726,7 @@ function registerSystemHandlers() {
         const { ok, html, error, isNetworkError } =
           await fetchHtml(EMOJI_SOURCE_URL);
         if (!ok) {
-          console.error("❌ [fetch-emojis] Erreur fetch:", error);
+          console.error("❌ [fetch-emojis] Fetch error:", error);
           return {
             success: false,
             error,
@@ -593,7 +739,7 @@ function registerSystemHandlers() {
 
         if (emojis.length === 0) {
           console.warn(
-            `⚠️ [fetch-emojis] Aucun emoji trouvé pour "${categoryId}". Le HTML du site a peut-être changé.`,
+            `⚠️ [fetch-emojis] No emoji found for "${categoryId}". Site HTML may have changed.`,
           );
           return {
             success: false,
@@ -618,15 +764,34 @@ function registerSystemHandlers() {
   }
 }
 
-// ─── HANDLERS CONFIRMATION ──────────────────────────────────────────────────
+// ─── CONFIRM HANDLERS ───────────────────────────────────────────────────
 
 /**
+ * Registers the quit-confirmation handler.
  *
- * @param windowManager
+ * Called once, during app startup, with the shared `windowManager` module
+ * so we can toggle its quitting / pendingQuit flags.
+ *
+ * Channel registered:
+ * - `confirm-quit` `(action, remember) -> 'quit' | 'minimize' | 'cancel'`
+ *
+ * Behavior:
+ * - `action: 'quit'` → mark `isQuitting` + `pendingQuit`, then `app.quit()`
+ * - `action: 'minimize'` → hide the window, notify the renderer to close
+ *   the confirm dialog, then optionally persist `closeToTray: true`
+ * - anything else → `'cancel'` (no state change)
+ *
+ * @param {{
+ *   setQuitting: (v: boolean) => void,
+ *   setPendingQuit: (v: boolean) => void,
+ *   getMainWindow: () => import('electron').BrowserWindow | null
+ * }} windowManager - The `./windowManager` module (injected so tests can
+ *   pass a mock).
+ * @returns {void}
  */
 function registerConfirmHandlers(windowManager) {
   if (!ipcMain) {
-    console.error("❌ [ipcHandlers] ipcMain est undefined !");
+    console.error("❌ [ipcHandlers] ipcMain is undefined!");
     return;
   }
 
@@ -658,11 +823,22 @@ function registerConfirmHandlers(windowManager) {
   });
 }
 
-// ─── REGISTRE POUR LE CALLBACK DE MISE À JOUR DU TRAY ─────────────────────
+// ─── TRAY UPDATE CALLBACK ───────────────────────────────────────────────
 
 /**
+ * Stores the callback used by the `update-tray-language` IPC channel.
  *
- * @param callback
+ * The `update-tray-language` handler itself is registered in
+ * `registerSystemHandlers()`, but it needs a reference to the tray
+ * menu rebuilder (`updateTrayMenu` in `main.js`) to actually do its job.
+ * `main.js` calls this once at startup to wire them together.
+ *
+ * Kept on `global.__updateTrayCallback` (not a module-level variable)
+ * so that tests can reset it via `delete globalThis.__updateTrayCallback`.
+ *
+ * @param {(lang: string) => void} callback - Receives the new language
+ *   code (`'fr' | 'en' | 'es'`) and rebuilds the tray menu.
+ * @returns {void}
  */
 function registerTrayUpdateHandler(callback) {
   global.__updateTrayCallback = callback;
