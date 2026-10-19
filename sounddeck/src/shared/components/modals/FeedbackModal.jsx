@@ -140,10 +140,10 @@ function formatBytes(bytes) {
  */
 export default function FeedbackModal({
   onClose,
-  lang = "fr",
+  _lang = "fr",
   onSubmit,
   store,
-  addToast,
+  _addToast,
 }) {
   const { t } = useLanguage();
 

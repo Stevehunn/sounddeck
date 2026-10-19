@@ -82,7 +82,7 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
   type = "danger",
-  lang = "fr",
+  _lang = "fr",
 }) {
   const { t } = useLanguage();
   const [isHoveringConfirm, setIsHoveringConfirm] = useState(false);
