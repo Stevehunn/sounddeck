@@ -1,311 +1,416 @@
-// server/src/lib/crypto.js
-import * as ed from '@noble/ed25519'
-import { sha512 } from '@noble/hashes/sha512'
+/**
+ * @file Crypto primitives for the SoundDeck worker.
+ *
+ * Provides three independent groups of helpers:
+ *
+ * 1. Ed25519 signatures — used to sign Pro license tokens offline. The
+ *    private key NEVER leaves the operator's machine; only the public key
+ *    is embedded in the app (`licenseKeys.js`). See `signLicense`.
+ *
+ * 2. Password hashing — PBKDF2-HMAC-SHA256, 100 000 iterations (Cloudflare
+ *    Workers cap for `crypto.subtle`). All passwords are stored as a
+ *    `{hash, salt}` pair of hex strings. See `hashPassword` / `verifyPassword`.
+ *
+ * 3. HMAC-SHA256 — used to verify webhook signatures from Stripe and
+ *    GitHub Sponsors. Comparisons are constant-time. See `verifyStripeSignature`
+ *    and `verifyGitHubSignature`.
+ *
+ * @see https://developers.cloudflare.com/workers/runtime-apis/web-crypto/
+ * @see https://www.npmjs.com/package/@noble/ed25519
+ */
 
-// @noble/ed25519 v2 requiert un hash injecté
-ed.etc.sha512Sync = (...m) => sha512(ed.etc.concatBytes(...m))
+import * as ed from "@noble/ed25519";
+import { sha512 } from "@noble/hashes/sha512";
 
-// ═══════════════════════════════════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════════════════════════════════
+// @noble/ed25519 v2 requires an injected SHA-512 implementation
+ed.etc.sha512Sync = (...m) => sha512(ed.etc.concatBytes(...m));
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HEX / BASE64 HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Convertit une string hex en Uint8Array avec validation stricte.
+ * Converts a hex string to a `Uint8Array` with strict validation.
+ *
  * @param {string} hex
- * @param {number} [expectedBytes]  Taille attendue en octets (validation)
+ * @param {number} [expectedBytes] - If provided, throws if the decoded length
+ *   doesn't match (defensive against malformed keys).
  * @returns {Uint8Array}
+ * @throws {Error} If the input is not a valid hex string, has an odd length,
+ *   or doesn't match `expectedBytes`.
  */
 function hexToBytes(hex, expectedBytes) {
-  if (typeof hex !== 'string') {
-    throw new Error(
-      `hexToBytes: attendu une string, reçu ${typeof hex}`
-    )
+  if (typeof hex !== "string") {
+    throw new Error(`hexToBytes: expected a string, got ${typeof hex}`);
   }
 
-  const clean = hex.trim()
+  const clean = hex.trim();
 
   if (clean.length === 0) {
-    throw new Error('hexToBytes: chaîne vide')
+    throw new Error("hexToBytes: empty string");
   }
 
   if (!/^[0-9a-f]+$/i.test(clean)) {
     throw new Error(
-      `hexToBytes: caractère non-hex détecté (longueur=${clean.length}, début="${clean.slice(0, 16)}…")`
-    )
+      `hexToBytes: non-hex character detected (length=${clean.length}, start="${clean.slice(0, 16)}…")`,
+    );
   }
 
   if (clean.length % 2 !== 0) {
     throw new Error(
-      `hexToBytes: longueur impaire (${clean.length}), attendu un multiple de 2`
-    )
+      `hexToBytes: odd length (${clean.length}), expected a multiple of 2`,
+    );
   }
 
-  const bytes = new Uint8Array(clean.length / 2)
+  const bytes = new Uint8Array(clean.length / 2);
   for (let i = 0; i < clean.length; i += 2) {
-    bytes[i / 2] = parseInt(clean.slice(i, i + 2), 16)
+    bytes[i / 2] = parseInt(clean.slice(i, i + 2), 16);
   }
 
   if (expectedBytes !== undefined && bytes.length !== expectedBytes) {
     throw new Error(
-      `hexToBytes: taille invalide. Attendu ${expectedBytes} octets (${expectedBytes * 2} chars), reçu ${bytes.length} octets (${clean.length} chars)`
-    )
+      `hexToBytes: invalid size. Expected ${expectedBytes} bytes (${expectedBytes * 2} chars), got ${bytes.length} bytes (${clean.length} chars)`,
+    );
   }
 
-  return bytes
+  return bytes;
 }
 
 /**
- * Encode un Uint8Array en base64url (compatible Workers + Node).
+ * Encodes a `Uint8Array` to base64url (URL-safe base64, no padding).
+ * Compatible with both Cloudflare Workers and Node.js.
+ *
+ * @param {Uint8Array} bytes
+ * @returns {string}
  */
 function b64url(bytes) {
-  const bin = String.fromCharCode(...bytes)
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  const bin = String.fromCharCode(...bytes);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 /**
- * Convertit un Uint8Array en hex string.
+ * Converts a `Uint8Array` to a lowercase hex string.
+ *
+ * @param {Uint8Array} bytes
+ * @returns {string}
  */
 function bytesToHex(bytes) {
   return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// ED25519 : SIGNATURE DE LICENCE
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// ED25519 — LICENSE TOKEN SIGNING
+// ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Signe un payload de licence avec la clé privée Ed25519.
+ * Signs a license payload with the operator's Ed25519 private key.
  *
- * @param {object} payload  { v, tier, donorId, donorName, issuedAt, neverExpires }
- * @param {string} privateKeyHex  Clé privée (32 octets = 64 chars hex)
- * @returns {Promise<string>}  Token au format "SDCK1.<payload_b64url>.<sig_b64url>"
+ * The resulting token has the format:
+ *
+ *   `SDCK1.<payload_b64url>.<signature_b64url>`
+ *
+ * The payload is a plain JSON object (not encrypted — just signed). Anyone
+ * can read it; only the operator can produce a valid signature.
+ *
+ * @param {Object} payload - License payload.
+ * @param {number} payload.v - Format version (currently 1).
+ * @param {'pro'|'dev'} payload.tier - License tier.
+ * @param {string} payload.donorId - Unique donor identifier.
+ * @param {string|null} payload.donorName - Display name (may be null).
+ * @param {number} payload.issuedAt - Unix timestamp (seconds).
+ * @param {boolean} payload.neverExpires - Currently always true.
+ * @param {string} privateKeyHex - Ed25519 private key, 32 bytes hex (64 chars).
+ * @returns {Promise<string>} The signed license token.
+ * @throws {Error} If `privateKeyHex` is missing or invalid.
+ *
+ * @example
+ * const token = await signLicense(
+ *   { v: 1, tier: 'pro', donorId: 'abc', donorName: 'Steve', issuedAt: 1700000000, neverExpires: true },
+ *   process.env.PRIVATE_KEY_HEX
+ * )
+ * // → "SDCK1.eyJ2IjoxLCJ0aWVyIjoicHJvIi...<sig>"
  */
 export async function signLicense(payload, privateKeyHex) {
   if (!privateKeyHex) {
     throw new Error(
-      'signLicense: PRIVATE_KEY_HEX manquant. ' +
-        'Vérifie ton .dev.vars (dev) ou tes wrangler secrets (prod).'
-    )
+      "signLicense: PRIVATE_KEY_HEX missing. " +
+        "Check your .dev.vars (dev) or your wrangler secrets (prod).",
+    );
   }
 
-  // ✅ Validation stricte : 32 octets = 64 chars hex
-  const privateKey = hexToBytes(privateKeyHex, 32)
+  // Strict validation: 32 bytes = 64 chars hex
+  const privateKey = hexToBytes(privateKeyHex, 32);
 
-  const payloadJson = JSON.stringify(payload)
-  const payloadBytes = new TextEncoder().encode(payloadJson)
-  const signature = await ed.signAsync(payloadBytes, privateKey)
+  const payloadJson = JSON.stringify(payload);
+  const payloadBytes = new TextEncoder().encode(payloadJson);
+  const signature = await ed.signAsync(payloadBytes, privateKey);
 
-  return `SDCK1.${b64url(payloadBytes)}.${b64url(signature)}`
+  return `SDCK1.${b64url(payloadBytes)}.${b64url(signature)}`;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// PASSWORD HASHING (PBKDF2-HMAC-SHA256, 600k itérations)
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// PASSWORD HASHING — PBKDF2-HMAC-SHA256
+// ═══════════════════════════════════════════════════════════════════════════
 
-// ⚠️ Cloudflare Workers limite PBKDF2 à 100 000 itérations max
-// (limite du runtime `crypto.subtle`). On adapte en conséquence.
-const PBKDF2_ITERATIONS = 100_000
-const PBKDF2_KEY_LEN = 32 // 32 octets = 256 bits
-const PBKDF2_SALT_LEN = 16 // 16 octets
+// ⚠️ Cloudflare Workers caps PBKDF2 at 100 000 iterations
+// (runtime `crypto.subtle` limitation). We tune accordingly.
+const PBKDF2_ITERATIONS = 100_000;
+const PBKDF2_KEY_LEN = 32; // 32 bytes = 256 bits
+const PBKDF2_SALT_LEN = 16; // 16 bytes
 
 /**
- * Hash un password avec PBKDF2 + salt aléatoire.
- * @param {string} password
- * @returns {Promise<{hash: string, salt: string}>}  Hex strings
+ * Hashes a password with PBKDF2-HMAC-SHA256 and a random 16-byte salt.
+ *
+ * Returns both values as hex strings — store them together in the `users`
+ * table (`password_hash` + `password_salt` columns).
+ *
+ * @param {string} password - Plaintext password (non-empty).
+ * @returns {Promise<{hash: string, salt: string}>} Hex-encoded hash and salt.
+ * @throws {Error} If `password` is empty or invalid.
  */
 export async function hashPassword(password) {
-  if (typeof password !== 'string' || password.length === 0) {
-    throw new Error('hashPassword: password vide ou invalide')
+  if (typeof password !== "string" || password.length === 0) {
+    throw new Error("hashPassword: password is empty or invalid");
   }
 
-  const salt = crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_LEN))
+  const salt = crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_LEN));
 
   const keyMaterial = await crypto.subtle.importKey(
-    'raw',
+    "raw",
     new TextEncoder().encode(password),
-    'PBKDF2',
+    "PBKDF2",
     false,
-    ['deriveBits']
-  )
+    ["deriveBits"],
+  );
 
   const bits = await crypto.subtle.deriveBits(
     {
-      name: 'PBKDF2',
+      name: "PBKDF2",
       salt,
       iterations: PBKDF2_ITERATIONS,
-      hash: 'SHA-256',
+      hash: "SHA-256",
     },
     keyMaterial,
-    PBKDF2_KEY_LEN * 8
-  )
+    PBKDF2_KEY_LEN * 8,
+  );
 
   return {
     hash: bytesToHex(new Uint8Array(bits)),
     salt: bytesToHex(salt),
-  }
+  };
 }
 
 /**
- * Vérifie un password contre un hash + salt.
- * @param {string} password
- * @param {string} hashHex  Hash attendu (64 chars)
- * @param {string} saltHex  Salt (32 chars)
- * @returns {Promise<boolean>}
+ * Verifies a plaintext password against a stored hash + salt.
+ *
+ * The comparison is constant-time (no early return on partial match) to
+ * prevent timing attacks.
+ *
+ * @param {string} password - Plaintext password from the login form.
+ * @param {string} hashHex - Hex-encoded hash from the DB.
+ * @param {string} saltHex - Hex-encoded salt from the DB.
+ * @returns {Promise<boolean>} `true` if the password matches.
  */
 export async function verifyPassword(password, hashHex, saltHex) {
-  if (typeof password !== 'string' || password.length === 0) return false
-  if (typeof hashHex !== 'string' || typeof saltHex !== 'string') return false
+  if (typeof password !== "string" || password.length === 0) return false;
+  if (typeof hashHex !== "string" || typeof saltHex !== "string") return false;
 
-  // ✅ Validation stricte : salt = 16 octets
-  let salt
+  // Strict validation: salt must be 16 bytes
+  let salt;
   try {
-    salt = hexToBytes(saltHex, PBKDF2_SALT_LEN)
+    salt = hexToBytes(saltHex, PBKDF2_SALT_LEN);
   } catch (e) {
-    console.error('verifyPassword: salt invalide —', e.message)
-    return false
+    console.error("verifyPassword: invalid salt —", e.message);
+    return false;
   }
 
   const keyMaterial = await crypto.subtle.importKey(
-    'raw',
+    "raw",
     new TextEncoder().encode(password),
-    'PBKDF2',
+    "PBKDF2",
     false,
-    ['deriveBits']
-  )
+    ["deriveBits"],
+  );
 
   const bits = await crypto.subtle.deriveBits(
     {
-      name: 'PBKDF2',
+      name: "PBKDF2",
       salt,
       iterations: PBKDF2_ITERATIONS,
-      hash: 'SHA-256',
+      hash: "SHA-256",
     },
     keyMaterial,
-    PBKDF2_KEY_LEN * 8
-  )
+    PBKDF2_KEY_LEN * 8,
+  );
 
-  const computed = bytesToHex(new Uint8Array(bits))
+  const computed = bytesToHex(new Uint8Array(bits));
 
-  // Comparaison à temps constant (évite les timing attacks)
-  if (computed.length !== hashHex.length) return false
-  let diff = 0
+  // Constant-time comparison (avoids timing attacks)
+  if (computed.length !== hashHex.length) return false;
+  let diff = 0;
   for (let i = 0; i < computed.length; i++) {
-    diff |= computed.charCodeAt(i) ^ hashHex.charCodeAt(i)
+    diff |= computed.charCodeAt(i) ^ hashHex.charCodeAt(i);
   }
-  return diff === 0
+  return diff === 0;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 // UTILS
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Génère un mot de passe aléatoire lisible (16 chars, alphanumérique sans ambigus).
+ * Generates a random 16-character password.
+ *
+ * Uses a restricted alphabet (no `0/O/1/l/I`) for readability when the
+ * user has to type or copy the password manually.
+ *
+ * @returns {string}
  */
 export function generateTempPassword() {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
-  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
   return Array.from(bytes)
     .map((b) => chars[b % chars.length])
-    .join('')
+    .join("");
 }
 
 /**
- * Génère un UUID v4.
+ * Returns a v4 UUID.
+ *
+ * Wrapper around `crypto.randomUUID()` so callers don't need to know the
+ * runtime specifics.
+ *
+ * @returns {string}
  */
 export function uuid() {
-  return crypto.randomUUID()
+  return crypto.randomUUID();
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// STRIPE WEBHOOK SIGNATURE
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// WEBHOOK SIGNATURES
+// ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Vérifie la signature Stripe sur un webhook.
- * @param {string} payloadBody   Corps brut de la requête (string)
- * @param {string} signatureHeader  Header "stripe-signature"
- * @param {string} secret           Secret webhook (whsec_...)
- * @param {number} toleranceSec     Tolérance (5 min par défaut)
- * @returns {Promise<boolean>}
+ * Verifies a Stripe webhook signature (`Stripe-Signature` header).
+ *
+ * Stripe's format: `t=timestamp,v1=sig1,v1=sig2,...`. We reconstruct the
+ * signed payload as `${timestamp}.${body}`, recompute HMAC-SHA256 with the
+ * webhook secret, and compare in constant-time against each `v1` signature.
+ *
+ * Also enforces a tolerance window (default 5 minutes) to prevent replay
+ * attacks.
+ *
+ * @param {string} payloadBody - Raw request body (string, NOT parsed JSON).
+ * @param {string} signatureHeader - Value of the `Stripe-Signature` header.
+ * @param {string} secret - Webhook signing secret (`whsec_...`).
+ * @param {number} [toleranceSec=300] - Max accepted clock skew, in seconds.
+ * @returns {Promise<boolean>} `true` if at least one `v1` signature matches.
+ *
+ * @see https://stripe.com/docs/webhooks/signatures
  */
 export async function verifyStripeSignature(
   payloadBody,
   signatureHeader,
   secret,
-  toleranceSec = 300
+  toleranceSec = 300,
 ) {
-  if (!signatureHeader || !secret) return false
+  if (!signatureHeader || !secret) return false;
 
-  // Format : "t=timestamp,v1=sig1,v1=sig2,..."
-  const parts = signatureHeader.split(',').reduce((acc, part) => {
-    const [key, value] = part.split('=')
-    if (!acc[key]) acc[key] = []
-    acc[key].push(value)
-    return acc
-  }, {})
+  // Format: "t=timestamp,v1=sig1,v1=sig2,..."
+  const parts = signatureHeader.split(",").reduce((acc, part) => {
+    const [key, value] = part.split("=");
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(value);
+    return acc;
+  }, {});
 
-  const timestamp = parts.t?.[0]
-  if (!timestamp) return false
+  const timestamp = parts.t?.[0];
+  if (!timestamp) return false;
 
-  // Vérifie la fenêtre temporelle (protection contre le replay)
-  const now = Math.floor(Date.now() / 1000)
-  if (Math.abs(now - parseInt(timestamp, 10)) > toleranceSec) return false
+  // Enforce the time window (replay protection)
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - parseInt(timestamp, 10)) > toleranceSec) return false;
 
-  const signedPayload = `${timestamp}.${payloadBody}`
-  const expected = await hmacSHA256Hex(secret, signedPayload)
+  const signedPayload = `${timestamp}.${payloadBody}`;
+  const expected = await hmacSHA256Hex(secret, signedPayload);
 
-  // Comparaison à temps constant avec toutes les signatures v1
-  const signatures = parts.v1 || []
+  // Constant-time compare against every v1 signature
+  const signatures = parts.v1 || [];
   for (const sig of signatures) {
-    if (constantTimeEqual(sig, expected)) return true
+    if (constantTimeEqual(sig, expected)) return true;
   }
-  return false
+  return false;
 }
 
 /**
- * Vérifie la signature GitHub sur un webhook.
- * GitHub utilise X-Hub-Signature-256 = "sha256=<hmac_hex>"
+ * Verifies a GitHub webhook signature (`X-Hub-Signature-256` header).
  *
- * @param {string} payloadBody     Corps brut de la requête (string)
- * @param {string} signatureHeader Header "X-Hub-Signature-256"
- * @param {string} secret          Secret webhook GitHub
+ * GitHub's format: `sha256=<hex>`. We compute HMAC-SHA256 of the raw body
+ * with the webhook secret and compare in constant-time.
+ *
+ * @param {string} payloadBody - Raw request body (string, NOT parsed JSON).
+ * @param {string} signatureHeader - Value of the `X-Hub-Signature-256` header.
+ * @param {string} secret - Webhook secret configured on GitHub.
  * @returns {Promise<boolean>}
+ *
+ * @see https://docs.github.com/en/developers/webhooks-and-events/webhooks/securing-your-webhooks
  */
-export async function verifyGitHubSignature(payloadBody, signatureHeader, secret) {
-  if (!signatureHeader || !secret) return false
-  if (!signatureHeader.startsWith('sha256=')) return false
+export async function verifyGitHubSignature(
+  payloadBody,
+  signatureHeader,
+  secret,
+) {
+  if (!signatureHeader || !secret) return false;
+  if (!signatureHeader.startsWith("sha256=")) return false;
 
-  const expected = signatureHeader.slice(7).toLowerCase()
-  const actual = await hmacSHA256Hex(secret, payloadBody)
-  return constantTimeEqual(expected, actual)
+  const expected = signatureHeader.slice(7).toLowerCase();
+  const actual = await hmacSHA256Hex(secret, payloadBody);
+  return constantTimeEqual(expected, actual);
 }
 
+/**
+ * Computes the HMAC-SHA256 of `data` with `secret`, returns hex.
+ *
+ * @param {string} secret
+ * @param {string} data
+ * @returns {Promise<string>} Hex-encoded digest.
+ */
 async function hmacSHA256Hex(secret, data) {
   const key = await crypto.subtle.importKey(
-    'raw',
+    "raw",
     new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
+    { name: "HMAC", hash: "SHA-256" },
     false,
-    ['sign']
-  )
+    ["sign"],
+  );
   const sig = await crypto.subtle.sign(
-    'HMAC',
+    "HMAC",
     key,
-    new TextEncoder().encode(data)
-  )
-  return bytesToHex(new Uint8Array(sig))
+    new TextEncoder().encode(data),
+  );
+  return bytesToHex(new Uint8Array(sig));
 }
 
+/**
+ * Constant-time string comparison. Returns `true` only if `a === b`.
+ *
+ * @param {string} a
+ * @param {string} b
+ * @returns {boolean}
+ */
 function constantTimeEqual(a, b) {
-  if (a.length !== b.length) return false
-  let diff = 0
+  if (a.length !== b.length) return false;
+  let diff = 0;
   for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   }
-  return diff === 0
+  return diff === 0;
 }
 
-export const PBKDF2_ITERATIONS_FOR_DISPLAY = PBKDF2_ITERATIONS
+/**
+ * Exported for informational purposes (display in admin UI, diagnostics).
+ * Do NOT change this value without bumping existing password hashes.
+ */
+export const PBKDF2_ITERATIONS_FOR_DISPLAY = PBKDF2_ITERATIONS;

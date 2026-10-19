@@ -42,6 +42,9 @@ const TRAY_LABELS = {
 
 // ─── FONCTIONS ──────────────────────────────────────────────────────────────
 
+/**
+ *
+ */
 function getCurrentTrayLanguage() {
   return store.get('lang', 'fr')
 }
@@ -85,6 +88,11 @@ function buildTrayMenu(lang, callbacks) {
   ])
 }
 
+/**
+ *
+ * @param lang
+ * @param callbacks
+ */
 function createTray(lang = 'fr', callbacks = {}) {
   if (trayInstance) {
     console.log('ℹ️ Une icône du tray existe déjà')
@@ -123,6 +131,11 @@ function createTray(lang = 'fr', callbacks = {}) {
   })
 }
 
+/**
+ *
+ * @param lang
+ * @param callbacks
+ */
 function updateTrayMenu(lang, callbacks) {
   if (tray) {
     const contextMenu = buildTrayMenu(lang, callbacks)
@@ -130,6 +143,9 @@ function updateTrayMenu(lang, callbacks) {
   }
 }
 
+/**
+ *
+ */
 function destroyTray() {
   if (trayInstance) {
     try {
@@ -143,6 +159,9 @@ function destroyTray() {
   }
 }
 
+/**
+ *
+ */
 function getTray() {
   return tray
 }

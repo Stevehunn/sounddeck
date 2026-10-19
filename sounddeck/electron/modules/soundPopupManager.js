@@ -179,6 +179,10 @@ function resetHideTimer(delay = DEFAULT_HIDE_DELAY) {
   }, delay);
 }
 
+/**
+ *
+ * @param payload
+ */
 function showSoundPopup(payload = {}) {
   if (!popupEnabled) return;
 
@@ -191,6 +195,10 @@ function showSoundPopup(payload = {}) {
   resetHideTimer(payload.hideDelay || DEFAULT_HIDE_DELAY);
 }
 
+/**
+ *
+ * @param payload
+ */
 function previewSoundPopup(payload = {}) {
   if (payload.cardSize) {
     popupSize = resolveSize(payload.cardSize);
@@ -206,6 +214,9 @@ function previewSoundPopup(payload = {}) {
   resetHideTimer(6000);
 }
 
+/**
+ *
+ */
 function hidePopupWindow() {
   if (hideTimer) {
     clearTimeout(hideTimer);
@@ -216,6 +227,9 @@ function hidePopupWindow() {
   }
 }
 
+/**
+ *
+ */
 function destroyPopupWindow() {
   hidePopupWindow();
   if (popupWindow && !popupWindow.isDestroyed()) {
@@ -224,11 +238,19 @@ function destroyPopupWindow() {
   popupWindow = null;
 }
 
+/**
+ *
+ * @param enabled
+ */
 function setEnabled(enabled) {
   popupEnabled = !!enabled;
   if (!popupEnabled) hidePopupWindow();
 }
 
+/**
+ *
+ * @param position
+ */
 function setPosition(position) {
   if (!VALID_POSITIONS.includes(position)) return;
   popupPosition = position;
@@ -237,6 +259,10 @@ function setPosition(position) {
   }
 }
 
+/**
+ *
+ * @param size
+ */
 function setSize(size) {
   popupSize = resolveSize(size);
   if (popupWindow && !popupWindow.isDestroyed()) {
@@ -244,6 +270,12 @@ function setSize(size) {
   }
 }
 
+/**
+ *
+ * @param ipcMain
+ * @param root0
+ * @param root0.getMainWindow
+ */
 function registerSoundPopupHandlers(ipcMain, { getMainWindow } = {}) {
   mainWindowGetter = getMainWindow || (() => null);
 

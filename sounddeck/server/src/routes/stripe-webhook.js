@@ -9,6 +9,11 @@ import { getUserByEmail, createUser, recordPayment, logAudit } from '../lib/db.j
 import { generateLicenseToken } from '../lib/license.js'
 import { sendWelcomeEmail } from '../lib/email.js'
 
+/**
+ *
+ * @param request
+ * @param env
+ */
 export async function handleStripeWebhook(request, env) {
   const signature = request.headers.get('stripe-signature')
   if (!signature) {

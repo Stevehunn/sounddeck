@@ -1,5 +1,9 @@
 // server/src/routes/health.js
 
+/**
+ *
+ * @param env
+ */
 export function handleHealth(env) {
   return new Response(
     JSON.stringify({

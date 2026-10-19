@@ -272,6 +272,11 @@ async function downloadYtDlp() {
 
 // ─── HANDLERS FICHIERS ──────────────────────────────────────────────────────
 
+/**
+ *
+ * @param mainWindow
+ * @param soundsDir
+ */
 function registerFileHandlers(mainWindow, soundsDir) {
   ipcMain.handle('open-file-dialog', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {

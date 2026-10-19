@@ -44,6 +44,9 @@ function nodeStreamToWeb(nodeStream) {
 
 // ─── SCHEME PRIVILÉGIÉ (à appeler AVANT app.whenReady()) ────────────────
 
+/**
+ *
+ */
 function registerLocalSchemes() {
   protocol.registerSchemesAsPrivileged([
     {
@@ -98,6 +101,9 @@ function isPathAllowed(filePath) {
 
 // ─── HANDLER (à appeler APRÈS app.whenReady()) ──────────────────────────
 
+/**
+ *
+ */
 function registerLocalFileProtocol() {
   protocol.handle('sounddeck-local', async (request) => {
     try {

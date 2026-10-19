@@ -18,6 +18,9 @@ function safeRegister(accelerator, callback) {
   }
 }
 
+/**
+ *
+ */
 function unregisterAllShortcuts() {
   registeredShortcuts.forEach(acc => {
     try {
@@ -28,6 +31,10 @@ function unregisterAllShortcuts() {
   console.log('🔇 Tous les raccourcis désenregistrés')
 }
 
+/**
+ *
+ * @param mainWindow
+ */
 function registerShortcuts(mainWindow) {
   if (!globalShortcutsEnabled) {
     console.log('🔇 Raccourcis globaux désactivés')
@@ -73,6 +80,10 @@ function registerShortcuts(mainWindow) {
   console.log('✅ Raccourcis globaux activés')
 }
 
+/**
+ *
+ * @param mainWindow
+ */
 function reregisterShortcuts(mainWindow) {
   unregisterAllShortcuts()
   if (globalShortcutsEnabled) {
@@ -83,6 +94,10 @@ function reregisterShortcuts(mainWindow) {
   }
 }
 
+/**
+ *
+ * @param mainWindow
+ */
 function toggleGlobalShortcuts(mainWindow) {
   globalShortcutsEnabled = !globalShortcutsEnabled
   store.set('globalShortcutsEnabled', globalShortcutsEnabled)
@@ -100,6 +115,10 @@ function toggleGlobalShortcuts(mainWindow) {
   return globalShortcutsEnabled
 }
 
+/**
+ *
+ * @param mainWindow
+ */
 function registerToggleShortcut(mainWindow) {
   const toggleAccelerator = store.get('toggleShortcutsAccelerator', 'CommandOrControl+Shift+K')
   if (!toggleAccelerator) return
@@ -132,6 +151,11 @@ function registerToggleShortcut(mainWindow) {
   }
 }
 
+/**
+ *
+ * @param mainWindow
+ * @param shortcut
+ */
 function registerToggleWindowShortcut(mainWindow, shortcut) {
   if (!shortcut) {
     shortcut = currentToggleWindowShortcut
@@ -169,19 +193,31 @@ function registerToggleWindowShortcut(mainWindow, shortcut) {
   }
 }
 
+/**
+ *
+ */
 function getShortcutsEnabled() {
   return globalShortcutsEnabled
 }
 
+/**
+ *
+ */
 function getRegisteredShortcuts() {
   return registeredShortcuts
 }
 
+/**
+ *
+ */
 function cleanupShortcuts() {
   unregisterAllShortcuts()
   globalShortcut.unregisterAll()
 }
 
+/**
+ *
+ */
 function registerShortcutHandlers() {
   console.log('🔧 [shortcutManager] Enregistrement des handlers IPC...')
   const getMain = () => require('./windowManager').getMainWindow()

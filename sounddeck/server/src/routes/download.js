@@ -83,7 +83,7 @@ export async function handleDownload(request, env, platform) {
     method: "GET",
   });
 
-  let releaseData = null;
+  let releaseData;
   const cached = await cache.match(cacheKey);
   if (cached) {
     releaseData = await cached.json();

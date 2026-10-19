@@ -5,6 +5,9 @@ const fs = require('fs')
 
 const store = require('../store')
 
+/**
+ *
+ */
 function registerStoreHandlers() {
   ipcMain.handle('store-get', (event, key) => {
     return store.get(key)

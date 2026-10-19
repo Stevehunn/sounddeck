@@ -159,6 +159,9 @@ function checkExpectedHandlers() {
 
 // ─── DIAGNOSTIC DES PLUGINS ──────────────────────────────────────────────────
 
+/**
+ *
+ */
 function diagnosePlugins() {
   console.log('\n' + '═'.repeat(60))
   console.log('🔌 DIAGNOSTIC DES PLUGINS')
@@ -208,6 +211,9 @@ function diagnosePlugins() {
 
 // ─── DIAGNOSTIC DU STORE ──────────────────────────────────────────────────────
 
+/**
+ *
+ */
 function diagnoseStore() {
   console.log('\n' + '═'.repeat(60))
   console.log('💾 DIAGNOSTIC DU STORE')
@@ -240,6 +246,9 @@ function diagnoseStore() {
 
 // ─── DIAGNOSTIC DU SYSTÈME ────────────────────────────────────────────────────
 
+/**
+ *
+ */
 function diagnoseSystem() {
   console.log('\n' + '═'.repeat(60))
   console.log('🖥️ DIAGNOSTIC DU SYSTÈME')
@@ -269,6 +278,9 @@ function diagnoseSystem() {
 
 // ─── DIAGNOSTIC AUDIO ──────────────────────────────────────────────────────
 
+/**
+ *
+ */
 function diagnoseAudio() {
   console.log('\n' + '═'.repeat(60))
   console.log('🔊 DIAGNOSTIC AUDIO')
@@ -312,6 +324,9 @@ function diagnoseAudio() {
 
 // ─── DIAGNOSTIC DES SONS ─────────────────────────────────────────────────
 
+/**
+ *
+ */
 function diagnoseSounds() {
   console.log('\n' + '═'.repeat(60))
   console.log('🎵 DIAGNOSTIC DES SONS')
@@ -379,6 +394,9 @@ function diagnoseSounds() {
 
 // ─── DIAGNOSTIC DES RACCOURCIS ───────────────────────────────────────────
 
+/**
+ *
+ */
 function diagnoseShortcuts() {
   console.log('\n' + '═'.repeat(60))
   console.log('⌨️ DIAGNOSTIC DES RACCOURCIS')
@@ -424,6 +442,9 @@ function diagnoseShortcuts() {
 
 // ─── DIAGNOSTIC PERFORMANCE ─────────────────────────────────────────────
 
+/**
+ *
+ */
 function diagnosePerformance() {
   console.log('\n' + '═'.repeat(60))
   console.log('⚡ DIAGNOSTIC PERFORMANCE')
@@ -457,6 +478,9 @@ function diagnosePerformance() {
 
 // ─── DIAGNOSTIC DE LA SIDEBAR ──────────────────────────────────────────────
 
+/**
+ *
+ */
 function diagnoseSidebar() {
   console.log('\n' + '═'.repeat(60))
   console.log('📑 DIAGNOSTIC DE LA SIDEBAR')
@@ -492,6 +516,9 @@ function diagnoseSidebar() {
 
 // ─── DIAGNOSTIC DE L'ÉDITEUR ──────────────────────────────────────────────
 
+/**
+ *
+ */
 function diagnoseEditor() {
   console.log('\n' + '═'.repeat(60))
   console.log('✏️ DIAGNOSTIC DE L\'ÉDITEUR')
@@ -526,6 +553,9 @@ function diagnoseEditor() {
 
 // ─── EXPORT DU DIAGNOSTIC VERS UN FICHIER ────────────────────────────────
 
+/**
+ *
+ */
 function exportDiagnosticToFile() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
   const filename = `sounddeck-diagnostic-${timestamp}.json`
@@ -619,6 +649,9 @@ function exportDiagnosticToFile() {
 
 // ─── DIAGNOSTIC COMPLET ──────────────────────────────────────────────────
 
+/**
+ *
+ */
 function runFullDiagnostic() {
   console.log('═'.repeat(60))
   console.log('  🔍 SOUNDDECK - DIAGNOSTIC COMPLET')
@@ -647,6 +680,9 @@ function runFullDiagnostic() {
 
 // ─── HANDLERS IPC POUR LE DIAGNOSTIC ─────────────────────────────────────
 
+/**
+ *
+ */
 function registerDiagnosticHandlers() {
   console.log('🔧 Enregistrement des handlers de diagnostic...')
   

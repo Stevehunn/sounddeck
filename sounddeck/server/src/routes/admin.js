@@ -1,4 +1,23 @@
-// server/src/routes/admin.js
+/**
+ * @file Admin routes — protected by `ADMIN_TOKEN` (Bearer).
+ *
+ * All endpoints require `Authorization: Bearer <ADMIN_TOKEN>`. The token is
+ * compared in constant-time. If `ADMIN_TOKEN` is unset or empty, ALL admin
+ * endpoints return `401 unauthorized` (fail-safe default).
+ *
+ * Endpoints:
+ * - POST /admin/generate-code    → create a redeem code
+ * - GET  /admin/list-codes       → list codes
+ * - POST /admin/revoke-code      → revoke an unused code
+ * - POST /admin/create-user      → create a verified user (bypass signup)
+ * - POST /admin/reset-password   → reset a user's password by email
+ * - GET  /admin/list-users       → list users
+ *
+ * @see ../lib/db.js for the D1 helpers.
+ * @see ../lib/codeGen.js for code generation / parsing.
+ * @see ../lib/email.js for the redeem-code email.
+ */
+
 import { generateCode, parseExpiry, normalizeCode } from "../lib/codeGen.js";
 import {
   insertRedeemCode,
@@ -11,9 +30,17 @@ import {
   listUsers,
 } from "../lib/db.js";
 import { hashPassword } from "../lib/crypto.js";
+import { sendRedeemCodeEmail } from "../lib/email.js";
 
 /**
- * Vérifie le token admin dans l'Authorization header (constant-time).
+ * Checks the `Authorization: Bearer <token>` header against `ADMIN_TOKEN`.
+ *
+ * Uses constant-time comparison to prevent timing leaks.
+ *
+ * @param {Request} request
+ * @param {Object} env
+ * @param {string} [env.ADMIN_TOKEN]
+ * @returns {boolean}
  */
 function checkAuth(request, env) {
   const auth = request.headers.get("Authorization") || "";
@@ -30,6 +57,13 @@ function checkAuth(request, env) {
   return diff === 0;
 }
 
+/**
+ * Returns a JSON `Response` with the given payload and status code.
+ *
+ * @param {unknown} data
+ * @param {number} [status=200]
+ * @returns {Response}
+ */
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -37,11 +71,26 @@ function json(data, status = 200) {
   });
 }
 
-// ─── CODES DE RÉDEMPTION ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// REDEEM CODES
+// ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * POST /admin/generate-code
- * Body : { email, expiresIn, note, tier, sendEmail }
+ * Handles `POST /admin/generate-code`.
+ *
+ * Request body:
+ * - `email` (optional)   — if set, only this email can redeem the code
+ * - `expiresIn` (string) — e.g. "30d", "1y". Default: "30d".
+ * - `note` (optional)    — free-form note for the admin
+ * - `tier` (optional)    — "pro" (default) or "free"
+ * - `sendEmail` (bool)   — default: true. Sends the code by email if `email` set.
+ *
+ * @param {Request} request
+ * @param {Object} env
+ * @param {string} env.DB - D1 binding.
+ * @param {string} env.RESEND_API_KEY - Resend key.
+ * @param {string} [env.ADMIN_TOKEN] - Bearer token for auth.
+ * @returns {Promise<Response>}
  */
 export async function handleGenerateCode(request, env) {
   if (!checkAuth(request, env)) {
@@ -59,7 +108,7 @@ export async function handleGenerateCode(request, env) {
   const note = body.note || null;
   const tier = body.tier || "pro";
   const expiresIn = body.expiresIn || "30d";
-  const sendEmail = body.sendEmail !== false;
+  const sendEmail = body.sendEmail !== false; // send by default
 
   let expiresAt;
   try {
@@ -83,6 +132,7 @@ export async function handleGenerateCode(request, env) {
     return json({ error: "db_error", message: e.message }, 500);
   }
 
+  // Email sending is best-effort: it doesn't break code generation
   let emailSent = false;
   let emailError = null;
 
@@ -114,7 +164,15 @@ export async function handleGenerateCode(request, env) {
 }
 
 /**
- * GET /admin/list-codes
+ * Handles `GET /admin/list-codes`.
+ *
+ * Query params:
+ * - `onlyUnused=1` — filter to unused, non-revoked, non-expired codes
+ * - `limit` (number) — max results, capped at 500
+ *
+ * @param {Request} request
+ * @param {Object} env
+ * @returns {Promise<Response>}
  */
 export async function handleListCodes(request, env) {
   if (!checkAuth(request, env)) {
@@ -128,13 +186,21 @@ export async function handleListCodes(request, env) {
     500,
   );
 
+  // ⚠️ `.all()` returns `{results, meta, success}` — not an array.
   const result = await listRedeemCodes(env.DB, { limit, onlyUnused });
   return json({ codes: result.results || [] });
 }
 
 /**
- * POST /admin/revoke-code
- * Body : { code, reason }
+ * Handles `POST /admin/revoke-code`.
+ *
+ * Request body: `{ code: string, reason?: string }`
+ *
+ * Refuses if the code doesn't exist, is already used, or is already revoked.
+ *
+ * @param {Request} request
+ * @param {Object} env
+ * @returns {Promise<Response>}
  */
 export async function handleRevokeCode(request, env) {
   if (!checkAuth(request, env)) {
@@ -160,11 +226,25 @@ export async function handleRevokeCode(request, env) {
   return json({ success: true, code });
 }
 
-// ─── USERS ────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// USERS
+// ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * POST /admin/create-user
- * Body : { email, password, tier? }
+ * Handles `POST /admin/create-user`.
+ *
+ * Creates a user **already verified** (`email_verified = 1`), bypassing the
+ * signup flow. Useful to seed accounts / grant Pro access directly.
+ *
+ * Request body:
+ * - `email` (string, required)
+ * - `password` (string, required, min 6)
+ * - `tier` (optional, `pro` | `free` | `dev`, default `pro`)
+ * - `donorName` (optional)
+ *
+ * @param {Request} request
+ * @param {Object} env
+ * @returns {Promise<Response>}
  */
 export async function handleCreateUser(request, env) {
   if (!checkAuth(request, env)) {
@@ -188,7 +268,7 @@ export async function handleCreateUser(request, env) {
   }
   if (password.length < 6) {
     return json(
-      { error: "password_too_short", message: "Min 6 caractères" },
+      { error: "password_too_short", message: "Min 6 characters" },
       400,
     );
   }
@@ -223,8 +303,15 @@ export async function handleCreateUser(request, env) {
 }
 
 /**
- * POST /admin/reset-password
- * Body : { email, newPassword }
+ * Handles `POST /admin/reset-password`.
+ *
+ * Request body:
+ * - `email` (string)
+ * - `newPassword` (string, min 6)
+ *
+ * @param {Request} request
+ * @param {Object} env
+ * @returns {Promise<Response>}
  */
 export async function handleResetPassword(request, env) {
   if (!checkAuth(request, env)) {
@@ -246,7 +333,7 @@ export async function handleResetPassword(request, env) {
   }
   if (newPassword.length < 6) {
     return json(
-      { error: "password_too_short", message: "Min 6 caractères" },
+      { error: "password_too_short", message: "Min 6 characters" },
       400,
     );
   }
@@ -268,7 +355,14 @@ export async function handleResetPassword(request, env) {
 }
 
 /**
- * GET /admin/list-users
+ * Handles `GET /admin/list-users`.
+ *
+ * Query params:
+ * - `limit` (number) — max results, capped at 500. Default: 100.
+ *
+ * @param {Request} request
+ * @param {Object} env
+ * @returns {Promise<Response>}
  */
 export async function handleListUsers(request, env) {
   if (!checkAuth(request, env)) {

@@ -9,6 +9,11 @@ import {
 } from '../lib/db.js'
 import { generateLicenseToken } from '../lib/license.js'
 
+/**
+ *
+ * @param request
+ * @param env
+ */
 export async function handleClaimSponsorship(request, env) {
   let body
   try {

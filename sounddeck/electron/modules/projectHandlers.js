@@ -8,6 +8,7 @@ const { randomUUID } = require('crypto')
  * régénère TOUS les IDs (project, tracks, clips, effets, markers)
  * + remap loopState.tracks/clips pour préserver les boucles.
  * Évite les collisions d'ID quand on duplique/importe un projet.
+ * @param project
  */
 function regenerateProjectIds(project) {
   const trackIdMap = new Map()
@@ -67,6 +68,10 @@ function regenerateProjectIds(project) {
   }
 }
 
+/**
+ *
+ * @param store
+ */
 function registerProjectHandlers(store) {
   console.log('🔧 [projectHandlers] Enregistrement des handlers...')
 

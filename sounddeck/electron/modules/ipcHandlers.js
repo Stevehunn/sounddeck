@@ -105,6 +105,8 @@ function fetchHtml(url, redirectCount = 0) {
  * Parse le HTML de getemoji.com pour extraire les emojis d'une section.
  * ✅ V2 : cumule TOUTES les sections qui matchent (ex: "people" = 3 sections)
  * ✅ V2 : pas de limite hardcodée à 200
+ * @param html
+ * @param categoryId
  */
 function parseEmojisFromHtml(html, categoryId) {
   if (!html || !categoryId) return [];
@@ -170,6 +172,9 @@ function parseEmojisFromHtml(html, categoryId) {
 
 // ─── HANDLERS SYSTÈME ────────────────────────────────────────────────────────
 
+/**
+ *
+ */
 function registerSystemHandlers() {
   if (!ipcMain) {
     console.error("❌ [ipcHandlers] ipcMain est undefined !");
@@ -615,6 +620,10 @@ function registerSystemHandlers() {
 
 // ─── HANDLERS CONFIRMATION ──────────────────────────────────────────────────
 
+/**
+ *
+ * @param windowManager
+ */
 function registerConfirmHandlers(windowManager) {
   if (!ipcMain) {
     console.error("❌ [ipcHandlers] ipcMain est undefined !");
@@ -651,6 +660,10 @@ function registerConfirmHandlers(windowManager) {
 
 // ─── REGISTRE POUR LE CALLBACK DE MISE À JOUR DU TRAY ─────────────────────
 
+/**
+ *
+ * @param callback
+ */
 function registerTrayUpdateHandler(callback) {
   global.__updateTrayCallback = callback;
 }

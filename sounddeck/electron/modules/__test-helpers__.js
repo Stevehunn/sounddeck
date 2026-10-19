@@ -11,6 +11,10 @@ function getIpcMain() {
   return globalThis.__electronMock.ipcMain
 }
 
+/**
+ *
+ * @param channel
+ */
 export function getIpcHandler(channel) {
   const ipcMain = getIpcMain()
   const handler = ipcMain._handlers.get(channel)
@@ -24,14 +28,24 @@ export function getIpcHandler(channel) {
   return handler
 }
 
+/**
+ *
+ * @param channel
+ */
 export function hasIpcHandler(channel) {
   return getIpcMain()._handlers.has(channel)
 }
 
+/**
+ *
+ */
 export function getRegisteredChannels() {
   return Array.from(getIpcMain()._handlers.keys())
 }
 
+/**
+ *
+ */
 export function clearIpcHandlers() {
   const ipcMain = getIpcMain()
   ipcMain._handlers.clear()

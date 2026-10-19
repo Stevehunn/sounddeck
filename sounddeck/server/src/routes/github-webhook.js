@@ -12,6 +12,11 @@ import { sendWelcomeEmail } from '../lib/email.js'
 
 const SUPPORTED_ACTIONS = new Set(['created'])
 
+/**
+ *
+ * @param request
+ * @param env
+ */
 export async function handleGitHubSponsorWebhook(request, env) {
   const signature = request.headers.get('x-hub-signature-256')
   const event = request.headers.get('x-github-event')

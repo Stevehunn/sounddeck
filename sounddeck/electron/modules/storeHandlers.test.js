@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { registerStoreHandlers } from "./storeHandlers";
 import { getIpcHandler, getRegisteredChannels } from "./__test-helpers__";
+const path = require('path')
 
 let fs;
 

@@ -49,6 +49,7 @@ function normalizeNetworkError(err) {
 
 /**
  * Renvoie true si l'erreur est une erreur réseau.
+ * @param err
  */
 function isNetworkError(err) {
   return normalizeNetworkError(err) !== null

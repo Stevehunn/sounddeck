@@ -104,6 +104,10 @@ function callHandler(channel, ...args) {
 
 /**
  * Simule une réponse HTTP complète. Émet data + end + finish sur le dest.
+ * @param root0
+ * @param root0.statusCode
+ * @param root0.headers
+ * @param root0.body
  */
 function mockHttpResponseOnce({
   statusCode = 200,

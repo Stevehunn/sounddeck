@@ -11,6 +11,11 @@ import {
 import { generateLicenseToken } from '../lib/license.js'
 import { uuid } from '../lib/crypto.js'
 
+/**
+ *
+ * @param request
+ * @param env
+ */
 export async function handleRedeem(request, env) {
   let body
   try {

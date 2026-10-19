@@ -12,6 +12,10 @@ const isDev = !require('electron').app.isPackaged
 
 // ─── CRÉATION DE LA FENÊTRE ──────────────────────────────────────────────
 
+/**
+ *
+ * @param shouldStartMinimized
+ */
 function createWindow(shouldStartMinimized = false) {
   const iconPath = path.join(__dirname, '../../public/icon.ico')
 
@@ -105,10 +109,16 @@ function createWindow(shouldStartMinimized = false) {
 
 // ─── GESTION DE LA FENÊTRE ───────────────────────────────────────────────
 
+/**
+ *
+ */
 function getMainWindow() {
   return mainWindow
 }
 
+/**
+ *
+ */
 function showMainWindow() {
   if (mainWindow) {
     const wasHidden = !mainWindow.isVisible()
@@ -120,16 +130,25 @@ function showMainWindow() {
   }
 }
 
+/**
+ *
+ */
 function hideMainWindow() {
   if (mainWindow) {
     mainWindow.hide()
   }
 }
 
+/**
+ *
+ */
 function isWindowVisible() {
   return mainWindow ? mainWindow.isVisible() : false
 }
 
+/**
+ *
+ */
 function focusMainWindow() {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore()
@@ -140,15 +159,39 @@ function focusMainWindow() {
 
 // ─── GESTION DE LA FERMETURE ─────────────────────────────────────────────
 
+/**
+ *
+ * @param value
+ */
 function setQuitting(value) { isQuitting = value }
+/**
+ *
+ * @param value
+ */
 function setPendingQuit(value) { pendingQuit = value }
+/**
+ *
+ * @param value
+ */
 function setCloseToTray(value) { closeToTray = value }
+/**
+ *
+ */
 function getCloseToTray() { return closeToTray }
+/**
+ *
+ */
 function getIsQuitting() { return isQuitting }
+/**
+ *
+ */
 function getPendingQuit() { return pendingQuit }
 
 // ─── NETTOYAGE ───────────────────────────────────────────────────────────
 
+/**
+ *
+ */
 function cleanupWindow() {
   if (mainWindow) {
     mainWindow = null

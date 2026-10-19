@@ -3,6 +3,11 @@ import { verifyPassword } from '../lib/crypto.js'
 import { getUserByEmail, logAudit } from '../lib/db.js'
 import { generateLicenseToken } from '../lib/license.js'
 
+/**
+ *
+ * @param request
+ * @param env
+ */
 export async function handleLogin(request, env) {
   let body
   try {
