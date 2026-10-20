@@ -1,4 +1,3 @@
-// src/plugins/youtube/i18n.test.js
 import { describe, it, expect } from 'vitest'
 import translations from './i18n'
 

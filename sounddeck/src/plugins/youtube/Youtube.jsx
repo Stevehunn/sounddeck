@@ -1,4 +1,38 @@
-// src/plugins/youtube/YouTube.jsx
+/**
+ * @file YouTube Import plugin page.
+ *
+ * Three-step flow:
+ * 1. **URL** (`UrlStep`) → user pastes a YouTube / Spotify / SoundCloud URL
+ * 2. **Trim** (`TrimStep`) → user picks a portion of the audio
+ * 3. **Save** (`SaveStep`) → user configures name, image, emoji, profiles
+ *
+ * The component uses a **module-scope state object** (`youtubeModuleState`)
+ * to persist the current step / video info / downloaded path across
+ * mounts. This means navigating away and back preserves the user's place
+ * in the flow (and avoids re-downloading when the user changes something
+ * in another tab).
+ *
+ * **Tutorial mode**: when `isYoutubeTutorialActive()` is true, every
+ * network and file operation is replaced by a mock (see
+ * `./tutorialSteps.js`). The page then runs entirely on fake data to
+ * demo the flow to new users. The tutorial start/finish is controlled
+ * from the global `Tutorial.jsx`.
+ *
+ * **Auto-update of the yt-dlp status**: if the user installs yt-dlp from
+ * another tab, `youtubeModuleState.checkDone` + `forceUpdateListeners`
+ * let this component refresh its status without a reload.
+ *
+ * **Detect platform**: `detectPlatform()` from `platformImport.js` picks
+ * the right fetcher (`youtubeInfo` / `getSpotifyTrack` /
+ * `getSoundCloudTrack`), so the flow works for all three platforms.
+ *
+ * @see ./tutorialSteps.js — mock helpers for tutorial mode
+ * @see ./components/UrlStep.jsx, ./components/TrimStep.jsx, ./components/SaveStep.jsx
+ * @see ./components/StatusViews.jsx — CheckingView, MissingYtdlpView
+ * @see ./components/DownloadProgressModal.jsx — progress modal
+ * @see @shared/utils/platformImport.js — detectPlatform + fetchers
+ */
+
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { useNetwork } from '@shared/contexts'
@@ -29,6 +63,23 @@ import SaveStep from './components/SaveStep'
 import { CheckingView, MissingYtdlpView } from './components/StatusViews'
 import DownloadProgressModal from './components/DownloadProgressModal'
 
+/**
+ * Module-scope state — persists across mounts so the user's place in
+ * the flow isn't lost when they navigate away and back.
+ *
+ * @type {{
+ *   ytdlpStatus: 'available' | 'missing' | null,
+ *   checkDone: boolean,
+ *   checkPromise: Promise<string> | null,
+ *   checkStarted: boolean,
+ *   videoInfo: Object | null,
+ *   step: 'url' | 'trim' | 'save',
+ *   soundName: string,
+ *   end: number,
+ *   downloadedPath: string | null,
+ *   platform: 'youtube' | 'spotify' | 'soundcloud' | null,
+ * }}
+ */
 const youtubeModuleState = {
   ytdlpStatus: null,
   checkDone: false,
@@ -42,29 +93,93 @@ const youtubeModuleState = {
   platform: null,
 }
 
+/** How long the 100% state of the progress modal is shown, in ms. */
+const PROGRESS_CLOSE_DELAY = 500
+
+/**
+ * YouTube Import page.
+ *
+ * @param {Object} props
+ * @param {{
+ *   sounds: Array,
+ *   profiles: Array<{ id: string, name: string, isDefault?: boolean }>,
+ *   currentProfileId: string,
+ *   addSound: (data: Object) => Promise<void>
+ * }} props.store - App store.
+ * @param {(msg: string, type?: string) => void} [props.addToast]
+ * @returns {JSX.Element|null}
+ */
 export default function YouTube({ store, addToast }) {
   const { t, currentLang } = useLanguage()
   const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
-  const { showNoConnection, ensureOnline } = useNetwork()
+  const { ensureOnline } = useNetwork()
 
-  const [ytdlpStatus, setYtdlpStatus] = useState(() =>
-    youtubeModuleState.checkDone ? youtubeModuleState.ytdlpStatus ?? 'missing' : 'checking'
-  )
-  const [forceRender, setForceRender] = useState(0)
+  // ─── INITIAL STATE ─────────────────────────────────────────────────
+  // Computed once via `useState` initializers so no `setState` runs
+  // synchronously in a mount effect (React 19 rule).
+  const [ytdlpStatus, setYtdlpStatus] = useState(() => {
+    if (isYoutubeTutorialActive()) return 'available'
+    return youtubeModuleState.checkDone
+      ? youtubeModuleState.ytdlpStatus ?? 'missing'
+      : 'checking'
+  })
+  // Ignore the value, only keep the setter (used to force re-renders)
+  const [, setForceRender] = useState(0)
   const [resetKey, setResetKey] = useState(0)
   const [downloading, setDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
   const [downloadStatus, setDownloadStatus] = useState('')
   const [url, setUrl] = useState('')
-  const [videoInfo, setVideoInfo] = useState(youtubeModuleState.videoInfo)
+
+  const [videoInfo, setVideoInfo] = useState(() => {
+    if (isYoutubeTutorialActive()) return getMockVideoInfo()
+    return youtubeModuleState.videoInfo
+  })
   const [loadingInfo, setLoadingInfo] = useState(false)
   const [start, setStart] = useState(0)
-  const [end, setEnd] = useState(youtubeModuleState.end)
-  const [soundName, setSoundName] = useState(youtubeModuleState.soundName)
-  const [targetProfiles, setTargetProfiles] = useState([])
+  const [end, setEnd] = useState(() => {
+    if (isYoutubeTutorialActive()) {
+      return getMockVideoInfo().duration || 0
+    }
+    return youtubeModuleState.end
+  })
+  const [soundName, setSoundName] = useState(() => {
+    if (isYoutubeTutorialActive()) {
+      return getMockVideoInfo().title || ''
+    }
+    return youtubeModuleState.soundName
+  })
+  const [targetProfiles, setTargetProfiles] = useState(() => {
+    // Only auto-init if we're already on the 'save' step (e.g. remount)
+    const isTutorial = isYoutubeTutorialActive()
+    const initialStep = isTutorial
+      ? getTutorialState().step
+      : youtubeModuleState.step
+    if (initialStep !== 'save') return []
+
+    const userProfiles = store.profiles.filter((p) => p.id !== 'all')
+    if (userProfiles.length === 0) return ['all']
+    if (isTutorial) return userProfiles.map((p) => p.id)
+    const currentId = store.currentProfileId
+    if (
+      currentId &&
+      currentId !== 'all' &&
+      userProfiles.some((p) => p.id === currentId)
+    ) {
+      return [currentId]
+    }
+    return [userProfiles[0].id]
+  })
   const [emoji, setEmoji] = useState('🎵')
-  const [step, setStep] = useState(youtubeModuleState.step)
-  const [downloadedPath, setDownloadedPath] = useState(youtubeModuleState.downloadedPath)
+  const [step, setStep] = useState(() => {
+    if (isYoutubeTutorialActive()) {
+      return getTutorialState().step || 'url'
+    }
+    return youtubeModuleState.step
+  })
+  const [downloadedPath, setDownloadedPath] = useState(
+    youtubeModuleState.downloadedPath,
+  )
   const [importing, setImporting] = useState(false)
   const [platform, setPlatform] = useState(youtubeModuleState.platform)
   const [customImage, setCustomImage] = useState(null)
@@ -72,10 +187,11 @@ export default function YouTube({ store, addToast }) {
   const [previewHowl, setPreviewHowl] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [showProgress, setShowProgress] = useState(false)
-  const [toastShown, setToastShown] = useState(false)
   const [useThumbnail, setUseThumbnail] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
 
+  // ─── REFS ──────────────────────────────────────────────────────────
   const isMounted = useRef(true)
   const fetchingRef = useRef(false)
   const initDone = useRef(false)
@@ -87,58 +203,91 @@ export default function YouTube({ store, addToast }) {
   const forceUpdateListenersRef = useRef([])
 
   const tRef = useRef(t)
-  useEffect(() => { tRef.current = t }, [t])
+  useEffect(() => {
+    tRef.current = t
+  }, [t])
 
+  // ─── HELPERS ───────────────────────────────────────────────────────
+  /**
+   * Returns whether tutorial mode is currently active.
+   *
+   * @returns {boolean}
+   */
   const isTutorialMode = useCallback(() => isYoutubeTutorialActive(), [])
 
-  const effectiveStatus = youtubeModuleState.checkDone
-    ? youtubeModuleState.ytdlpStatus ?? 'missing'
-    : ytdlpStatus
-
+  /**
+   * Resolves the final image for the sound being saved:
+   * - YouTube thumbnail if `useThumbnail` is on
+   * - Custom image otherwise
+   *
+   * @returns {string|null}
+   */
   const getFinalImage = useCallback(() => {
     if (useThumbnail && videoInfo?.thumbnail) return videoInfo.thumbnail
     return customImage || null
   }, [useThumbnail, videoInfo, customImage])
 
-  useEffect(() => {
-    if (step === 'save' && showProgress && !toastShown) {
-      setShowProgress(false)
-      setIsProcessing(false)
-      setToastShown(true)
-      addToast(tRef.current('ytAudioReady'), 'success')
+  /**
+   * Initializes `targetProfiles` from the current store state when the
+   * user transitions to the 'save' step (or when remounting on that
+   * step).
+   *
+   * Priority:
+   * 1. All user profiles in tutorial mode
+   * 2. Current profile if it's a user profile
+   * 3. First user profile
+   * 4. Fallback: `['all']` if no user profiles exist
+   *
+   * No-op if `targetProfiles` is already populated.
+   *
+   * @returns {void}
+   */
+  const initializeTargetProfiles = useCallback(() => {
+    if (targetProfiles.length > 0) return
+    const userProfiles = store.profiles.filter((p) => p.id !== 'all')
+    if (userProfiles.length === 0) {
+      setTargetProfiles(['all'])
+      return
     }
-  }, [step, showProgress, toastShown, addToast])
+    if (isTutorialMode()) {
+      setTargetProfiles(userProfiles.map((p) => p.id))
+      return
+    }
+    const currentId = store.currentProfileId
+    if (
+      currentId &&
+      currentId !== 'all' &&
+      userProfiles.some((p) => p.id === currentId)
+    ) {
+      setTargetProfiles([currentId])
+    } else {
+      setTargetProfiles([userProfiles[0].id])
+    }
+  }, [
+    store.profiles,
+    store.currentProfileId,
+    isTutorialMode,
+    targetProfiles,
+  ])
 
+  // ─── MOUNT EFFECTS ─────────────────────────────────────────────────
   useEffect(() => {
     isMounted.current = true
-    return () => { isMounted.current = false }
+    return () => {
+      isMounted.current = false
+    }
   }, [])
 
   useEffect(() => {
     if (step !== 'save') return
     if (targetProfiles.length > 0) return
+    // Defer via setTimeout so the setState inside `initializeTargetProfiles`
+    // doesn't run synchronously in the effect body.
+    const timer = setTimeout(initializeTargetProfiles, 0)
+    return () => clearTimeout(timer)
+  }, [step, targetProfiles.length, initializeTargetProfiles])
 
-    const userProfiles = store.profiles.filter((p) => p.id !== 'all')
-
-    if (userProfiles.length === 0) {
-      setTargetProfiles(['all'])
-      return
-    }
-
-    if (isTutorialMode()) {
-      setTargetProfiles(userProfiles.map((p) => p.id))
-      return
-    }
-
-    const currentId = store.currentProfileId
-    if (currentId && currentId !== 'all' && userProfiles.some((p) => p.id === currentId)) {
-      setTargetProfiles([currentId])
-    } else {
-      setTargetProfiles([userProfiles[0].id])
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, store.profiles.length, store.currentProfileId])
-
+  // ─── RESET EVENT ───────────────────────────────────────────────────
   useEffect(() => {
     const handleForceReset = () => {
       if (resetTimerRef.current) {
@@ -162,7 +311,6 @@ export default function YouTube({ store, addToast }) {
       setImporting(false)
       setDownloadProgress(0)
       setDownloadStatus('')
-      setToastShown(false)
       setLoadingInfo(false)
       setResetKey((prev) => prev + 1)
 
@@ -177,12 +325,26 @@ export default function YouTube({ store, addToast }) {
       savingRef.current = false
       isProcessingRef.current = false
       fetchingRef.current = false
+      setIsSaving(false)
     }
 
     window.addEventListener('youtube-force-reset', handleForceReset)
-    return () => window.removeEventListener('youtube-force-reset', handleForceReset)
+    return () =>
+      window.removeEventListener('youtube-force-reset', handleForceReset)
   }, [])
 
+  // ─── YT-DLP STATUS ─────────────────────────────────────────────────
+  /**
+   * Checks whether yt-dlp is installed and returns its status.
+   *
+   * Deduplicated: multiple concurrent calls share the same in-flight
+   * promise (`youtubeModuleState.checkPromise`). Once a check succeeds
+   * (`checkDone = true`), subsequent calls return the cached result.
+   *
+   * In tutorial mode, always returns `'available'` (no real check).
+   *
+   * @returns {Promise<'available' | 'missing'>}
+   */
   const checkYtdlp = useCallback(async () => {
     if (isTutorialMode()) {
       youtubeModuleState.ytdlpStatus = 'available'
@@ -206,7 +368,7 @@ export default function YouTube({ store, addToast }) {
         }
         return youtubeModuleState.ytdlpStatus
       } catch (error) {
-        logError('YouTube', 'Erreur dans la promesse existante', error)
+        logError('YouTube', 'Error in existing promise', error)
         setYtdlpStatus('missing')
         return 'missing'
       }
@@ -215,15 +377,21 @@ export default function YouTube({ store, addToast }) {
     youtubeModuleState.checkPromise = (async () => {
       try {
         const result = await window.electronAPI.checkYtdlp()
-        youtubeModuleState.ytdlpStatus = result?.available ? 'available' : 'missing'
+        youtubeModuleState.ytdlpStatus = result?.available
+          ? 'available'
+          : 'missing'
         youtubeModuleState.checkDone = true
         setYtdlpStatus(youtubeModuleState.ytdlpStatus)
         forceUpdateListenersRef.current.forEach((listener) => {
-          try { listener() } catch (e) {}
+          try {
+            listener()
+          } catch {
+            /* noop — listener errors are non-fatal */
+          }
         })
         return youtubeModuleState.ytdlpStatus
       } catch (error) {
-        logError('YouTube', 'Erreur checkYtdlp', error)
+        logError('YouTube', 'Error in checkYtdlp', error)
         youtubeModuleState.ytdlpStatus = 'missing'
         youtubeModuleState.checkDone = true
         setYtdlpStatus('missing')
@@ -236,15 +404,20 @@ export default function YouTube({ store, addToast }) {
     try {
       await youtubeModuleState.checkPromise
       return youtubeModuleState.ytdlpStatus
-    } catch (error) {
+    } catch {
       return 'missing'
     }
   }, [ytdlpStatus, isTutorialMode])
 
+  // ─── INIT EFFECT (run once) ────────────────────────────────────────
   useEffect(() => {
     if (initDone.current) return
     initDone.current = true
     hasCompletedSave.current = false
+
+    // Capture the ref's value in a local variable so cleanup doesn't
+    // read `forceUpdateListenersRef.current` (which may have changed).
+    const listenersRef = forceUpdateListenersRef.current
 
     const listener = () => {
       setForceRender((prev) => prev + 1)
@@ -252,50 +425,29 @@ export default function YouTube({ store, addToast }) {
         setYtdlpStatus(youtubeModuleState.ytdlpStatus ?? 'missing')
       }
     }
-    forceUpdateListenersRef.current.push(listener)
+    listenersRef.push(listener)
 
-    if (isTutorialMode()) {
-      const mockInfo = getMockVideoInfo()
-      const tutorialState = getTutorialState()
-
-      if (mockInfo) {
-        setVideoInfo(mockInfo)
-        setSoundName(mockInfo.title || '')
-        setEnd(mockInfo.duration || 0)
-        setStep(tutorialState.step || 'url')
+    // Defer all sync setState / init calls via setTimeout(0) so they
+    // don't run synchronously inside the effect body.
+    const initTimer = setTimeout(() => {
+      if (isTutorialMode()) {
+        youtubeModuleState.ytdlpStatus = 'available'
+        youtubeModuleState.checkDone = true
+        setYtdlpStatus('available')
+        // Trigger re-render in case tutorial mock info needs to be shown
+        setForceRender((prev) => prev + 1)
+      } else if (youtubeModuleState.checkDone) {
+        setYtdlpStatus(youtubeModuleState.ytdlpStatus ?? 'missing')
+      } else if (!youtubeModuleState.checkStarted) {
+        youtubeModuleState.checkStarted = true
+        checkYtdlp()
       }
-
-      setTimeout(() => setForceRender((prev) => prev + 1), 100)
-    }
-
-    if (youtubeModuleState.videoInfo && !isTutorialMode()) {
-      setVideoInfo(youtubeModuleState.videoInfo)
-      setSoundName(youtubeModuleState.soundName)
-      setEnd(youtubeModuleState.end)
-      setStep(youtubeModuleState.step)
-      setPlatform(youtubeModuleState.platform)
-    }
-    if (youtubeModuleState.downloadedPath && !isTutorialMode()) {
-      setDownloadedPath(youtubeModuleState.downloadedPath)
-      setStep(youtubeModuleState.step)
-    }
-
-    if (youtubeModuleState.checkDone) {
-      setYtdlpStatus(youtubeModuleState.ytdlpStatus ?? 'missing')
-    } else if (!youtubeModuleState.checkStarted && !isTutorialMode()) {
-      youtubeModuleState.checkStarted = true
-      checkYtdlp()
-    } else if (isTutorialMode()) {
-      youtubeModuleState.ytdlpStatus = 'available'
-      youtubeModuleState.checkDone = true
-      setYtdlpStatus('available')
-    }
+    }, 0)
 
     return () => {
-      const list = forceUpdateListenersRef.current
-      const index = list.indexOf(listener)
-      if (index > -1) list.splice(index, 1)
-
+      clearTimeout(initTimer)
+      const idx = listenersRef.indexOf(listener)
+      if (idx > -1) listenersRef.splice(idx, 1)
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current)
         progressIntervalRef.current = null
@@ -307,6 +459,7 @@ export default function YouTube({ store, addToast }) {
     }
   }, [checkYtdlp, isTutorialMode])
 
+  // ─── PREVIEW CLEANUP ───────────────────────────────────────────────
   useEffect(() => {
     return () => {
       if (previewHowl) {
@@ -316,6 +469,19 @@ export default function YouTube({ store, addToast }) {
     }
   }, [previewHowl])
 
+  // ─── PROGRESS SIMULATION ───────────────────────────────────────────
+  /**
+   * Starts the simulated progress bar (0 → 95%) for the download step.
+   *
+   * The real progress is unknown (yt-dlp doesn't report granular
+   * progress), so we simulate it with a decelerating curve and jump to
+   * 100% when the actual download finishes.
+   *
+   * The status label changes as the simulation progresses
+   * (downloading → extracting → converting → finalizing).
+   *
+   * @returns {void}
+   */
   const startProgressSimulation = useCallback(() => {
     setShowProgress(true)
     setDownloadProgress(0)
@@ -341,6 +507,11 @@ export default function YouTube({ store, addToast }) {
     }, 300)
   }, [t])
 
+  /**
+   * Stops the simulated progress interval (idempotent).
+   *
+   * @returns {void}
+   */
   const stopProgressSimulation = useCallback(() => {
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current)
@@ -348,6 +519,15 @@ export default function YouTube({ store, addToast }) {
     }
   }, [])
 
+  // ─── HANDLERS ──────────────────────────────────────────────────────
+  /**
+   * Installs yt-dlp via `electronAPI.downloadYtdlp()`.
+   *
+   * Shows toasts on success / failure. On network error, falls back to
+   * `ensureOnline()` to display the network banner.
+   *
+   * @returns {Promise<void>}
+   */
   const handleInstallYtdlp = async () => {
     setDownloading(true)
     addToast(t('ytdlpDownloading'), 'info')
@@ -366,8 +546,10 @@ export default function YouTube({ store, addToast }) {
           if (!online) return
         }
         addToast(
-          t('ytdlpInstallError', { detail: result?.error || t('unknownError') }),
-          'error'
+          t('ytdlpInstallError', {
+            detail: result?.error || t('unknownError'),
+          }),
+          'error',
         )
       }
     } catch (error) {
@@ -380,6 +562,16 @@ export default function YouTube({ store, addToast }) {
     }
   }
 
+  /**
+   * Fetches video info for the current URL.
+   *
+   * Detects the platform (YouTube / Spotify / SoundCloud), calls the
+   * matching IPC method, and advances to the 'trim' step on success.
+   *
+   * In tutorial mode, uses `mockFetchVideoInfo()`.
+   *
+   * @returns {Promise<void>}
+   */
   const handleFetchInfo = useCallback(async () => {
     if (fetchingRef.current) return
 
@@ -421,7 +613,10 @@ export default function YouTube({ store, addToast }) {
         fetchingRef.current = false
         setIsProcessing(false)
         if (!online) return
-        addToast(t('ytFetchError', { detail: result?.error || t('unknownError') }), 'error')
+        addToast(
+          t('ytFetchError', { detail: result?.error || t('unknownError') }),
+          'error',
+        )
         return
       }
 
@@ -432,7 +627,9 @@ export default function YouTube({ store, addToast }) {
           duration: data.duration || 0,
           thumbnail: data.thumbnail || data.cover || null,
           uploader: data.uploader || data.artist || t('unknownArtist'),
-          url: isTutorialMode() ? 'https://www.youtube.com/watch?v=a5uQMwRMHcs' : url.trim(),
+          url: isTutorialMode()
+            ? 'https://www.youtube.com/watch?v=a5uQMwRMHcs'
+            : url.trim(),
           platform: data.platform || 'youtube',
           id: data.id || Date.now().toString(),
         }
@@ -455,14 +652,19 @@ export default function YouTube({ store, addToast }) {
         }
 
         addToast(
-          t('platformDetected', { platform: info.platform || t('platformYoutube') }),
-          'success'
+          t('platformDetected', {
+            platform: info.platform || t('platformYoutube'),
+          }),
+          'success',
         )
       } else {
-        addToast(t('ytFetchError', { detail: result?.error || t('unknownError') }), 'error')
+        addToast(
+          t('ytFetchError', { detail: result?.error || t('unknownError') }),
+          'error',
+        )
       }
     } catch (error) {
-      logError('YouTube', 'Erreur handleFetchInfo', error)
+      logError('YouTube', 'Error in handleFetchInfo', error)
       if (error?.isNetworkError) {
         const online = await ensureOnline()
         setLoadingInfo(false)
@@ -478,42 +680,64 @@ export default function YouTube({ store, addToast }) {
     setIsProcessing(false)
   }, [url, addToast, t, isTutorialMode, ensureOnline])
 
-  const togglePreview = useCallback((filePath) => {
-    if (!filePath) return
+  /**
+   * Toggles audio preview for the downloaded file.
+   *
+   * A single `<Howl>` instance is reused; toggling again stops it.
+   *
+   * @param {string} filePath - Path to the local MP3.
+   * @returns {void}
+   */
+  const togglePreview = useCallback(
+    (filePath) => {
+      if (!filePath) return
 
-    if (previewHowl && isPreviewPlaying) {
-      previewHowl.stop()
-      previewHowl.unload()
-      setPreviewHowl(null)
-      setIsPreviewPlaying(false)
-      return
-    }
+      if (previewHowl && isPreviewPlaying) {
+        previewHowl.stop()
+        previewHowl.unload()
+        setPreviewHowl(null)
+        setIsPreviewPlaying(false)
+        return
+      }
 
-    try {
-      const howl = new Howl({
-        src: [filePath],
-        html5: true,
-        volume: 0.5,
-        onend: () => {
-          setIsPreviewPlaying(false)
-          setPreviewHowl(null)
-        },
-        onloaderror: () => {
-          addToast(t('ytPreviewError'), 'error')
-          setIsPreviewPlaying(false)
-          setPreviewHowl(null)
-        },
-      })
+      try {
+        const howl = new Howl({
+          src: [filePath],
+          html5: true,
+          volume: 0.5,
+          onend: () => {
+            setIsPreviewPlaying(false)
+            setPreviewHowl(null)
+          },
+          onloaderror: () => {
+            addToast(t('ytPreviewError'), 'error')
+            setIsPreviewPlaying(false)
+            setPreviewHowl(null)
+          },
+        })
 
-      setPreviewHowl(howl)
-      setIsPreviewPlaying(true)
-      howl.play()
-    } catch (error) {
-      logError('YouTube', 'Erreur togglePreview', error)
-      addToast(t('ytPreviewError'), 'error')
-    }
-  }, [previewHowl, isPreviewPlaying, addToast, t])
+        setPreviewHowl(howl)
+        setIsPreviewPlaying(true)
+        howl.play()
+      } catch (error) {
+        logError('YouTube', 'Error in togglePreview', error)
+        addToast(t('ytPreviewError'), 'error')
+      }
+    },
+    [previewHowl, isPreviewPlaying, addToast, t],
+  )
 
+  /**
+   * Downloads the audio for the current video (or the selected portion).
+   *
+   * On success: advances to the 'save' step, initializes target profiles,
+   * then (after a short delay) closes the progress modal and shows the
+   * "audio ready" toast.
+   *
+   * In tutorial mode, uses `mockDownloadAudio()`.
+   *
+   * @returns {Promise<void>}
+   */
   const handleDownloadAudio = useCallback(async () => {
     const currentVideoInfo = videoInfo || youtubeModuleState.videoInfo
     const currentPlatform = platform || youtubeModuleState.platform
@@ -525,7 +749,6 @@ export default function YouTube({ store, addToast }) {
 
     if (isProcessingRef.current) return
 
-    setToastShown(false)
     isProcessingRef.current = true
     setImporting(true)
     setIsProcessing(true)
@@ -539,7 +762,7 @@ export default function YouTube({ store, addToast }) {
           currentVideoInfo.url,
           start,
           end > 0 ? end : currentVideoInfo.duration || 0,
-          soundName || currentVideoInfo.title
+          soundName || currentVideoInfo.title,
         )
         setTutorialStep('save')
         setTimeout(() => setForceRender((prev) => prev + 1), 100)
@@ -575,7 +798,7 @@ export default function YouTube({ store, addToast }) {
             currentVideoInfo.url,
             start,
             end > 0 ? end : currentVideoInfo.duration || 0,
-            currentVideoInfo.title
+            currentVideoInfo.title,
           )
         }
       }
@@ -595,6 +818,14 @@ export default function YouTube({ store, addToast }) {
 
         setDownloadedPath(result.path)
         setStep('save')
+        initializeTargetProfiles()
+
+        // Show 100% for a moment, then close the progress modal + toast.
+        setTimeout(() => {
+          setShowProgress(false)
+          setIsProcessing(false)
+          addToast(tRef.current('ytAudioReady'), 'success')
+        }, PROGRESS_CLOSE_DELAY)
 
         if (isTutorialMode()) {
           setTutorialStep('save')
@@ -607,10 +838,15 @@ export default function YouTube({ store, addToast }) {
           const online = await ensureOnline()
           if (!online) return
         }
-        addToast(t('ytDownloadError', { detail: result?.error || t('unknownError') }), 'error')
+        addToast(
+          t('ytDownloadError', {
+            detail: result?.error || t('unknownError'),
+          }),
+          'error',
+        )
       }
     } catch (error) {
-      logError('YouTube', 'Erreur téléchargement', error)
+      logError('YouTube', 'Error downloading audio', error)
       stopProgressSimulation()
       setShowProgress(false)
       isProcessingRef.current = false
@@ -623,16 +859,40 @@ export default function YouTube({ store, addToast }) {
       addToast(t('ytDownloadError', { detail: error.message }), 'error')
     }
   }, [
-    videoInfo, platform, soundName, start, end,
-    addToast, t, startProgressSimulation, stopProgressSimulation,
-    isTutorialMode, ensureOnline,
+    videoInfo,
+    platform,
+    soundName,
+    start,
+    end,
+    addToast,
+    t,
+    startProgressSimulation,
+    stopProgressSimulation,
+    isTutorialMode,
+    ensureOnline,
+    initializeTargetProfiles,
   ])
 
+  /**
+   * Saves the sound to the library.
+   *
+   * Sequence:
+   * 1. Validate name / path / profiles.
+   * 2. If a sound with the same name exists, ask for confirmation.
+   * 3. Download the thumbnail if `useThumbnail` is on.
+   * 4. Call `store.addSound()`.
+   * 5. Show progress + success toast, reset state.
+   *
+   * `savingRef` + `hasCompletedSave` act as double-click guards.
+   *
+   * @returns {Promise<void>}
+   */
   const handleSave = useCallback(async () => {
     if (savingRef.current || hasCompletedSave.current) return
 
     const currentSoundName = soundName || youtubeModuleState.soundName
-    const currentDownloadedPath = downloadedPath || youtubeModuleState.downloadedPath
+    const currentDownloadedPath =
+      downloadedPath || youtubeModuleState.downloadedPath
     const finalImage = getFinalImage()
 
     if (!currentSoundName.trim()) {
@@ -644,17 +904,24 @@ export default function YouTube({ store, addToast }) {
       return
     }
     if (targetProfiles.length === 0) {
-      addToast(t('editorProfileRequired') || 'Sélectionnez au moins un profil', 'error')
+      addToast(
+        t('editorProfileRequired') || 'Select at least one profile',
+        'error',
+      )
       return
     }
 
     const existingSound = store.sounds.find(
-      (s) => s.name.toLowerCase() === currentSoundName.trim().toLowerCase()
+      (s) =>
+        s.name.toLowerCase() === currentSoundName.trim().toLowerCase(),
     )
     if (existingSound && !isTutorialMode()) {
       const confirmed = await confirm({
         title: t('soundExists'),
-        message: t('soundExistsConfirm').replace('{name}', currentSoundName.trim()),
+        message: t('soundExistsConfirm').replace(
+          '{name}',
+          currentSoundName.trim(),
+        ),
         type: 'warning',
       })
       if (!confirmed) return
@@ -662,6 +929,7 @@ export default function YouTube({ store, addToast }) {
 
     savingRef.current = true
     hasCompletedSave.current = true
+    setIsSaving(true)
     setIsProcessing(true)
     setShowProgress(true)
     setDownloadProgress(0)
@@ -676,6 +944,7 @@ export default function YouTube({ store, addToast }) {
       }
     }, 200)
 
+    // Snapshot the module state so we can roll back on error
     const savedGlobals = {
       step: youtubeModuleState.step,
       videoInfo: youtubeModuleState.videoInfo,
@@ -685,6 +954,7 @@ export default function YouTube({ store, addToast }) {
       platform: youtubeModuleState.platform,
     }
 
+    // Reset module state optimistically (so a nav-away is safe)
     youtubeModuleState.step = 'url'
     youtubeModuleState.videoInfo = null
     youtubeModuleState.soundName = ''
@@ -703,14 +973,16 @@ export default function YouTube({ store, addToast }) {
             if (window.electronAPI.downloadThumbnail) {
               const result = await window.electronAPI.downloadThumbnail(
                 videoInfo.thumbnail,
-                currentSoundName
+                currentSoundName,
               )
-              imageToSave = result?.success ? result.path : videoInfo.thumbnail
+              imageToSave = result?.success
+                ? result.path
+                : videoInfo.thumbnail
             } else {
               imageToSave = videoInfo.thumbnail
             }
           } catch (e) {
-            logWarn('YouTube', 'Erreur téléchargement miniature', e)
+            logWarn('YouTube', 'Error downloading thumbnail', e)
             imageToSave = videoInfo.thumbnail
           }
         }
@@ -726,8 +998,12 @@ export default function YouTube({ store, addToast }) {
 
       clearInterval(saveInterval)
 
-      addToast(t('ytSoundAdded', { name: currentSoundName.trim() }), 'success')
+      addToast(
+        t('ytSoundAdded', { name: currentSoundName.trim() }),
+        'success',
+      )
 
+      // Reset local state back to the URL step
       setUrl('')
       setVideoInfo(null)
       setDownloadedPath(null)
@@ -739,7 +1015,6 @@ export default function YouTube({ store, addToast }) {
       setPlatform(null)
       setCustomImage(null)
       setUseThumbnail(false)
-      setToastShown(false)
       setShowProgress(false)
       setIsProcessing(false)
       setDownloadProgress(0)
@@ -757,11 +1032,13 @@ export default function YouTube({ store, addToast }) {
         resetTimerRef.current = null
         savingRef.current = false
         hasCompletedSave.current = false
+        setIsSaving(false)
       }, 500)
     } catch (error) {
-      logError('YouTube', 'Erreur sauvegarde', error)
+      logError('YouTube', 'Error saving', error)
       clearInterval(saveInterval)
 
+      // Roll back module state so the user can retry
       youtubeModuleState.step = savedGlobals.step
       youtubeModuleState.videoInfo = savedGlobals.videoInfo
       youtubeModuleState.soundName = savedGlobals.soundName
@@ -771,6 +1048,7 @@ export default function YouTube({ store, addToast }) {
 
       savingRef.current = false
       hasCompletedSave.current = false
+      setIsSaving(false)
       setIsProcessing(false)
       setShowProgress(false)
       setDownloadProgress(0)
@@ -778,10 +1056,27 @@ export default function YouTube({ store, addToast }) {
       addToast(t('ytSaveError', { detail: error.message }), 'error')
     }
   }, [
-    soundName, downloadedPath, getFinalImage, useThumbnail, videoInfo,
-    targetProfiles, store, addToast, t, confirm, previewHowl, emoji, isTutorialMode,
+    soundName,
+    downloadedPath,
+    getFinalImage,
+    useThumbnail,
+    videoInfo,
+    targetProfiles,
+    store,
+    addToast,
+    t,
+    confirm,
+    previewHowl,
+    emoji,
+    isTutorialMode,
   ])
 
+  /**
+   * Opens the native image picker, imports the selected image into the
+   * app's images directory, and sets it as the custom image.
+   *
+   * @returns {Promise<void>}
+   */
   const handlePickImage = useCallback(async () => {
     const imgPath = await window.electronAPI.openImageDialog()
     if (imgPath) {
@@ -794,12 +1089,36 @@ export default function YouTube({ store, addToast }) {
     }
   }, [addToast, t])
 
+  // ─── RENDER ────────────────────────────────────────────────────────
   const currentStep = step || youtubeModuleState.step
   const currentVideoInfo = videoInfo || youtubeModuleState.videoInfo
-  const currentDownloadedPath = downloadedPath || youtubeModuleState.downloadedPath
+  const currentDownloadedPath =
+    downloadedPath || youtubeModuleState.downloadedPath
   const finalImage = getFinalImage()
 
-  if (effectiveStatus === 'checking') {
+  // ─── GUARD: reset module state if steps have no data ──────────────
+  // Handles edge cases where the user reaches 'trim' or 'save' without
+  // the required data (e.g. after a hard reset from another tab).
+  // Moving this out of the render body satisfies `react-hooks/immutability`.
+  useEffect(() => {
+    const hasVideo =
+      videoInfo || youtubeModuleState.videoInfo
+    const hasDownloaded =
+      downloadedPath || youtubeModuleState.downloadedPath
+
+    if (step === 'trim' && !hasVideo) {
+      youtubeModuleState.step = 'url'
+      // Defer setState out of the effect body (React 19 rule)
+      setTimeout(() => setStep('url'), 0)
+    } else if (step === 'save' && (!hasVideo || !hasDownloaded)) {
+      if (!savingRef.current) {
+        youtubeModuleState.step = 'url'
+        setTimeout(() => setStep('url'), 0)
+      }
+    }
+  }, [step, videoInfo, downloadedPath])
+
+  if (ytdlpStatus === 'checking') {
     return (
       <>
         <CheckingView />
@@ -808,10 +1127,13 @@ export default function YouTube({ store, addToast }) {
     )
   }
 
-  if (effectiveStatus === 'missing' && !isTutorialMode()) {
+  if (ytdlpStatus === 'missing' && !isTutorialMode()) {
     return (
       <>
-        <MissingYtdlpView onInstall={handleInstallYtdlp} downloading={downloading} />
+        <MissingYtdlpView
+          onInstall={handleInstallYtdlp}
+          downloading={downloading}
+        />
         <ConfirmWrapper />
         <LoadingOverlay
           visible={isProcessing || downloading}
@@ -842,12 +1164,8 @@ export default function YouTube({ store, addToast }) {
 
   if (currentStep === 'trim') {
     const info = currentVideoInfo
-    if (!info) {
-      youtubeModuleState.step = 'url'
-      setStep('url')
-      return null
-    }
-
+    // The effect above already handles the "no data" case
+    if (!info) return null
     return (
       <>
         <TrimStep
@@ -883,14 +1201,8 @@ export default function YouTube({ store, addToast }) {
     const info = currentVideoInfo
     const currentPath = currentDownloadedPath
 
-    if (!info || !currentPath) {
-      if (!savingRef.current) {
-        youtubeModuleState.step = 'url'
-        setStep('url')
-      }
-      return null
-    }
-
+    // The effect above already handles the "no data" case
+    if (!info || !currentPath) return null
     const availableProfiles = store.profiles || []
     const noProfilesSelected = targetProfiles.length === 0
     const noUserProfiles = availableProfiles.length === 0
@@ -921,9 +1233,9 @@ export default function YouTube({ store, addToast }) {
           showEmojiPicker={showEmojiPicker}
           setShowEmojiPicker={setShowEmojiPicker}
           isProcessing={isProcessing}
-          savingRef={savingRef.current}
+          savingRef={isSaving}
           onBack={() => {
-            if (!savingRef.current) {
+            if (!isSaving) {
               setTutorialStep(isTutorialMode() ? 'trim' : undefined)
               youtubeModuleState.step = 'trim'
               setStep('trim')
@@ -939,7 +1251,10 @@ export default function YouTube({ store, addToast }) {
           status={downloadStatus}
           t={t}
         />
-        <LoadingOverlay visible={isProcessing && !showProgress} message={t('saving')} />
+        <LoadingOverlay
+          visible={isProcessing && !showProgress}
+          message={t('saving')}
+        />
         <ConfirmWrapper />
       </>
     )

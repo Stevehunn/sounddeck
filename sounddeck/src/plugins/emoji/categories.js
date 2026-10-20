@@ -1,4 +1,3 @@
-// src/plugins/emoji/categories.js
 /**
  * Catégories scrapables depuis getemoji.com.
  * L'id correspond à la section HTML sur la page source.

@@ -1,41 +1,84 @@
-// src/plugins/emoji/EmojiDiscover.jsx
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+/**
+ * @file Emoji Discovery plugin page.
+ *
+ * Fetches emojis from getemoji.com (via IPC `fetch-emojis`), groups them
+ * by category, and lets the user add them one at a time or an entire
+ * category at once to their personal collection (`useEmojis`).
+ *
+ * Responsibilities:
+ * - **Category browsing** — sidebar with 9 categories (smileys, people,
+ *   animals, …). Clicking a category shows its emoji grid.
+ * - **Caching** — per-category emoji lists are cached in memory via
+ *   `useEmojiCache` (TTL 24h, scoped to component lifetime). Cache hits
+ *   are instant; misses trigger a fetch.
+ * - **Preloading** — after 500ms, the page preloads all categories in the
+ *   background (2 at a time, current category first) so switching feels
+ *   instant. A thin progress bar at the top shows the progress.
+ * - **Adding** — clicking an emoji calls `addEmoji(emoji, categoryId)`.
+ *   A bulk "Add category" button adds all emojis of the current category
+ *   at once.
+ *
+ * The component detects ownership (`hasEmoji`) and disables the add
+ * button on already-owned emojis.
+ *
+ * @see ./categories.js — the list of EMOJI_DISCOVER_CATEGORIES
+ * @see ./useEmojiCache.js — the per-instance cache hook
+ * @see @shared/hooks/useEmojis.js — `addEmoji`, `addCategory`, `hasEmoji`
+ * @see @shared/contexts — `useNetwork` (offline detection)
+ */
+
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { useEmojis } from '@shared/hooks/useEmojis'
 import { useNetwork } from '@shared/contexts'
 import { EMOJI_DISCOVER_CATEGORIES } from './categories'
-import { useEmojiCache } from './useEmojiCache'   // ✅ NOUVEAU
+import { useEmojiCache } from './useEmojiCache'
 
-export default function EmojiDiscover({ store, addToast }) {
-  const { t, currentLang } = useLanguage()
+/** Number of categories fetched concurrently during preload. */
+const PRELOAD_BATCH_SIZE = 2
+
+/** Delay before starting the background preload, in milliseconds. */
+const PRELOAD_START_DELAY = 500
+
+/**
+ * Emoji Discovery page.
+ *
+ * @param {Object} props
+ * @param {Object} props.store - App store (unused here, kept for the
+ *   plugin page contract — every plugin page receives `{ store, addToast }`).
+ * @param {(msg: string, type?: string) => void} [props.addToast]
+ * @returns {JSX.Element}
+ */
+export default function EmojiDiscover({ store: _store, addToast }) {
+  const { t } = useLanguage()
   const { showNoConnection, ensureOnline } = useNetwork()
-  const {
-    addEmoji,
-    addCategory,
-    hasEmoji,
-    customEmojis,
-  } = useEmojis()
+  const { addEmoji, addCategory, hasEmoji } = useEmojis()
 
-  // ✅ Cache isolé, TTL 24h, pas de fuite entre les mounts
+  // Per-mount isolated cache (TTL 24h). No leak between mounts.
   const emojiCache = useEmojiCache()
 
   const [activeCategory, setActiveCategory] = useState('smileys')
-  const [emojis, setEmojis] = useState([])
+
+  // Initial emojis and cache info are read from the cache synchronously
+  // via the useState initializer (avoids a setState-in-effect warning).
+  const [emojis, setEmojis] = useState(() => emojiCache.get('smileys') || [])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [addedFlash, setAddedFlash] = useState(null)
+  const [cacheInfo, setCacheInfo] = useState(() => emojiCache.getInfo())
 
   const [isPreloading, setIsPreloading] = useState(false)
   const [preloadProgress, setPreloadProgress] = useState(0)
   const [preloadStatus, setPreloadStatus] = useState('')
   const [isPreloadComplete, setIsPreloadComplete] = useState(false)
 
-  const [cacheInfo, setCacheInfo] = useState({})
-
+  // Lifecycle guards
   const isMountedRef = useRef(true)
   const preloadAbortRef = useRef(false)
   const currentCategoryRef = useRef('smileys')
 
+  // Track mount status so async callbacks can bail out if the component
+  // was unmounted (avoid state updates on unmounted components).
   useEffect(() => {
     isMountedRef.current = true
     return () => {
@@ -44,14 +87,27 @@ export default function EmojiDiscover({ store, addToast }) {
     }
   }, [])
 
+  // Keep a ref of the current category so async callbacks always know
+  // whether their result is still relevant.
   useEffect(() => {
     currentCategoryRef.current = activeCategory
   }, [activeCategory])
 
-  // ─── CHARGEMENT D'UNE CATÉGORIE ─────────────────────────────────────
+  // ─── LOAD ONE CATEGORY ──────────────────────────────────────────────
+  /**
+   * Loads the emoji list for a category.
+   *
+   * Behavior:
+   * - If the cache has the category and `forceRefresh` is false → use cache.
+   * - Otherwise fetch via IPC `fetchEmojis`. On network error, calls
+   *   `showNoConnection()` (silent UI). On other errors, shows the error.
+   *
+   * @param {string} categoryId
+   * @param {boolean} [forceRefresh=false] - Bypass cache (used by refresh button).
+   * @returns {Promise<void>}
+   */
   const loadCategory = useCallback(
     async (categoryId, forceRefresh = false) => {
-      // ✅ Cache lookup via le hook
       if (!forceRefresh) {
         const cached = emojiCache.get(categoryId)
         if (cached) {
@@ -79,25 +135,19 @@ export default function EmojiDiscover({ store, addToast }) {
           if (list.length === 0 && currentCategoryRef.current === categoryId) {
             setError(t('emojiDiscoverEmpty'))
           }
-        } else {
-          if (result?.isNetworkError) {
-            if (currentCategoryRef.current === categoryId) setError('')
-            showNoConnection()
-          } else {
-            if (currentCategoryRef.current === categoryId) {
-              setError(result?.error || t('emojiDiscoverError'))
-            }
-          }
+        } else if (result?.isNetworkError) {
+          if (currentCategoryRef.current === categoryId) setError('')
+          showNoConnection()
+        } else if (currentCategoryRef.current === categoryId) {
+          setError(result?.error || t('emojiDiscoverError'))
         }
       } catch (e) {
         if (!isMountedRef.current) return
         if (e?.isNetworkError) {
           if (currentCategoryRef.current === categoryId) setError('')
           showNoConnection()
-        } else {
-          if (currentCategoryRef.current === categoryId) {
-            setError(e.message || t('emojiDiscoverError'))
-          }
+        } else if (currentCategoryRef.current === categoryId) {
+          setError(e.message || t('emojiDiscoverError'))
         }
       } finally {
         if (isMountedRef.current) {
@@ -109,7 +159,16 @@ export default function EmojiDiscover({ store, addToast }) {
     [t, emojiCache, showNoConnection]
   )
 
-  // ─── PRÉCHARGEMENT ──────────────────────────────────────────────────
+  // ─── PRELOAD ALL CATEGORIES ────────────────────────────────────────
+  /**
+   * Preloads every category in the background (2 at a time), current
+   * category first.
+   *
+   * Aborts cleanly on unmount or on a network error. Progress is
+   * mirrored into the top progress bar.
+   *
+   * @returns {Promise<void>}
+   */
   const preloadAllCategories = useCallback(async () => {
     if (isPreloading || isPreloadComplete) return
 
@@ -121,7 +180,7 @@ export default function EmojiDiscover({ store, addToast }) {
 
     const categoryIds = EMOJI_DISCOVER_CATEGORIES.map((c) => c.id)
 
-    // Déjà tout en cache ?
+    // Already fully cached? Nothing to do.
     const allCached = categoryIds.every((id) => {
       const cached = emojiCache.get(id)
       return cached && cached.length > 0
@@ -139,12 +198,20 @@ export default function EmojiDiscover({ store, addToast }) {
     const total = categoryIds.length
     let loaded = 0
 
+    // Prioritize the currently visible category
     const priority = [currentCategoryRef.current]
     const others = categoryIds.filter((id) => !priority.includes(id))
     const sortedIds = [...priority, ...others]
 
     setPreloadStatus(t('emojiDiscoverPreloading') || 'Préchargement...')
 
+    /**
+     * Loads a single category for the preloader. Returns `true` if the
+     * category ended up cached (either already there or fetched now).
+     *
+     * @param {string} id
+     * @returns {Promise<boolean>}
+     */
     const loadOne = async (id) => {
       if (preloadAbortRef.current) return false
 
@@ -167,7 +234,10 @@ export default function EmojiDiscover({ store, addToast }) {
         }
         return false
       } catch (e) {
-        console.warn(`⚠️ [EmojiDiscover] Échec préchargement de ${id}:`, e.message)
+        console.warn(
+          `⚠️ [EmojiDiscover] Failed to preload ${id}:`,
+          e.message
+        )
         if (e?.isNetworkError) {
           preloadAbortRef.current = true
           if (isMountedRef.current) showNoConnection()
@@ -176,18 +246,18 @@ export default function EmojiDiscover({ store, addToast }) {
       }
     }
 
-    const batchSize = 2
-    for (let i = 0; i < sortedIds.length; i += batchSize) {
+    // Run in small batches so we don't hammer the network
+    for (let i = 0; i < sortedIds.length; i += PRELOAD_BATCH_SIZE) {
       if (preloadAbortRef.current) break
 
-      const batch = sortedIds.slice(i, i + batchSize)
+      const batch = sortedIds.slice(i, i + PRELOAD_BATCH_SIZE)
       const results = await Promise.all(batch.map((id) => loadOne(id)))
 
       loaded += results.filter(Boolean).length
       const progress = Math.round((loaded / total) * 100)
       setPreloadProgress(progress)
       setPreloadStatus(
-        `${t('emojiDiscoverCategoriesLoaded') || 'Catégories chargées'} : ${loaded}/${total}`
+        `${t('emojiDiscoverCategoriesLoaded') || 'Categories loaded'}: ${loaded}/${total}`
       )
       setCacheInfo(emojiCache.getInfo())
     }
@@ -201,25 +271,39 @@ export default function EmojiDiscover({ store, addToast }) {
     setCacheInfo(emojiCache.getInfo())
   }, [isPreloading, isPreloadComplete, emojiCache, t, showNoConnection, ensureOnline])
 
-  // ─── EFFET INITIAL ──────────────────────────────────────────────────
+  // ─── INITIAL EFFECT ─────────────────────────────────────────────────
+  // The initial emojis + cache info are already read from the cache via
+  // `useState` initializers above. This effect only triggers a fetch
+  // when the cache was empty, and schedules the background preload.
+  //
+  // Both calls are deferred via `setTimeout` so that the `setState` calls
+  // inside `loadCategory()` don't run synchronously within the effect body
+  // (would trip React 19's `set-state-in-effect` rule).
   useEffect(() => {
-    const cached = emojiCache.get(activeCategory)
-    if (cached) {
-      setEmojis(cached)
-      setCacheInfo(emojiCache.getInfo())
-    } else {
-      loadCategory(activeCategory)
-    }
+    const initTimer = setTimeout(() => {
+      if (emojis.length === 0) {
+        loadCategory(activeCategory)
+      }
+    }, 0)
 
-    const timer = setTimeout(() => {
+    const preloadTimer = setTimeout(() => {
       preloadAllCategories()
-    }, 500)
+    }, PRELOAD_START_DELAY)
 
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(initTimer)
+      clearTimeout(preloadTimer)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ─── SÉLECTION DE CATÉGORIE ─────────────────────────────────────────
+  // ─── CATEGORY SELECTION ────────────────────────────────────────────
+  /**
+   * Handles a click on a category in the sidebar.
+   *
+   * @param {string} categoryId
+   * @returns {void}
+   */
   const handleSelectCategory = useCallback(
     (categoryId) => {
       if (categoryId === activeCategory) return
@@ -238,10 +322,17 @@ export default function EmojiDiscover({ store, addToast }) {
   )
 
   // ─── ACTIONS ────────────────────────────────────────────────────────
+  /**
+   * Adds a single emoji to the user's collection.
+   *
+   * @param {string} emoji
+   * @returns {Promise<void>}
+   */
   const handleAddEmoji = useCallback(
     async (emoji) => {
       const result = await addEmoji(emoji, activeCategory)
       if (result.success) {
+        // Brief flash on the card to confirm
         setAddedFlash(emoji)
         setTimeout(() => setAddedFlash(null), 800)
       } else {
@@ -251,6 +342,11 @@ export default function EmojiDiscover({ store, addToast }) {
     [addEmoji, activeCategory, addToast, t]
   )
 
+  /**
+   * Adds every emoji of the current category at once.
+   *
+   * @returns {Promise<void>}
+   */
   const handleAddCategory = useCallback(async () => {
     const result = await addCategory(activeCategory, emojis)
     if (result.success) {
@@ -270,9 +366,14 @@ export default function EmojiDiscover({ store, addToast }) {
   return (
     <div
       data-testid="emoji-discover-container"
-      style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflow: 'hidden',
+      }}
     >
-      {/* Barre de progression préchargement */}
+      {/* Preload progress bar */}
       {isPreloading && (
         <div
           data-testid="emoji-discover-preload-bar"
@@ -289,9 +390,15 @@ export default function EmojiDiscover({ store, addToast }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
             <i
               className="ti ti-loader"
-              style={{ animation: 'spin 1s linear infinite', fontSize: 14, color: 'var(--accent)' }}
+              style={{
+                animation: 'spin 1s linear infinite',
+                fontSize: 14,
+                color: 'var(--accent)',
+              }}
             />
-            <span style={{ fontSize: 11, color: 'var(--accent)' }}>{preloadStatus}</span>
+            <span style={{ fontSize: 11, color: 'var(--accent)' }}>
+              {preloadStatus}
+            </span>
           </div>
           <div
             style={{
@@ -320,7 +427,7 @@ export default function EmojiDiscover({ store, addToast }) {
       )}
 
       <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-        {/* Sidebar catégories */}
+        {/* Categories sidebar */}
         <div
           data-testid="emoji-discover-categories"
           style={{
@@ -332,14 +439,40 @@ export default function EmojiDiscover({ store, addToast }) {
             overflow: 'hidden',
           }}
         >
-          <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <i className="ti ti-mood-smile-beam" style={{ color: 'var(--accent)' }} />
+          <div
+            style={{
+              padding: '12px 12px 8px',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 600,
+                fontSize: 14,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <i
+                className="ti ti-mood-smile-beam"
+                style={{ color: 'var(--accent)' }}
+              />
               {t('emojiDiscoverTitle')}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+            <div
+              style={{
+                fontSize: 11,
+                color: 'var(--text-tertiary)',
+                marginTop: 2,
+              }}
+            >
               {t('emojiDiscoverSub')}
-              {isPreloadComplete && <span style={{ marginLeft: 6, color: 'var(--success)' }}>· ✅</span>}
+              {isPreloadComplete && (
+                <span style={{ marginLeft: 6, color: 'var(--success)' }}>
+                  · ✅
+                </span>
+              )}
             </div>
           </div>
 
@@ -355,7 +488,9 @@ export default function EmojiDiscover({ store, addToast }) {
                   onClick={() => handleSelectCategory(cat.id)}
                   className={`sidebar-item ${isActive ? 'active' : ''}`}
                   style={{
-                    borderLeft: `2px solid ${isActive ? 'var(--accent)' : 'transparent'}`,
+                    borderLeft: `2px solid ${
+                      isActive ? 'var(--accent)' : 'transparent'
+                    }`,
                   }}
                 >
                   <span style={{ fontSize: 18 }}>{cat.emoji}</span>
@@ -363,7 +498,14 @@ export default function EmojiDiscover({ store, addToast }) {
                     {t(cat.labelKey) || cat.id}
                   </span>
                   {isCached && !isActive && (
-                    <span style={{ fontSize: 9, marginLeft: 'auto', opacity: 0.5 }} title="En cache">
+                    <span
+                      style={{
+                        fontSize: 9,
+                        marginLeft: 'auto',
+                        opacity: 0.5,
+                      }}
+                      title="Cached"
+                    >
                       💾
                     </span>
                   )}
@@ -373,8 +515,15 @@ export default function EmojiDiscover({ store, addToast }) {
           </div>
         </div>
 
-        {/* Contenu principal */}
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {/* Main content */}
+        <div
+          style={{
+            flex: 1,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
           <div
             style={{
               padding: '12px 20px',
@@ -386,12 +535,24 @@ export default function EmojiDiscover({ store, addToast }) {
             }}
           >
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, fontSize: 15 }}>{t('emojiDiscoverTitle')}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>
+                {t('emojiDiscoverTitle')}
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: 'var(--text-tertiary)',
+                }}
+              >
                 {emojis.length > 0 &&
-                  t('emojiDiscoverCategoryEmojiCount').replace('{count}', emojis.length)}
+                  t('emojiDiscoverCategoryEmojiCount').replace(
+                    '{count}',
+                    emojis.length
+                  )}
                 {emojis.length > 0 &&
-                  ` · ${ownedCount}/${emojis.length} ${t('emojiDiscoverAdded').toLowerCase()}`}
+                  ` · ${ownedCount}/${emojis.length} ${t(
+                    'emojiDiscoverAdded'
+                  ).toLowerCase()}`}
               </div>
             </div>
 
@@ -416,7 +577,9 @@ export default function EmojiDiscover({ store, addToast }) {
             >
               <i
                 className={`ti ${loading ? 'ti-loader' : 'ti-refresh'}`}
-                style={loading ? { animation: 'spin 1s linear infinite' } : {}}
+                style={
+                  loading ? { animation: 'spin 1s linear infinite' } : {}
+                }
               />
             </button>
           </div>
@@ -426,7 +589,13 @@ export default function EmojiDiscover({ store, addToast }) {
             style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}
           >
             {loading && (
-              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)' }}>
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: 40,
+                  color: 'var(--text-tertiary)',
+                }}
+              >
                 <i
                   className="ti ti-loader"
                   style={{
@@ -441,7 +610,13 @@ export default function EmojiDiscover({ store, addToast }) {
             )}
 
             {error && !loading && (
-              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)' }}>
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: 40,
+                  color: 'var(--text-tertiary)',
+                }}
+              >
                 <i
                   className="ti ti-alert-triangle"
                   style={{ fontSize: 32, color: 'var(--warning)' }}
@@ -477,9 +652,15 @@ export default function EmojiDiscover({ store, addToast }) {
                       style={{
                         position: 'relative',
                         aspectRatio: '1',
-                        background: isOwned ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
+                        background: isOwned
+                          ? 'var(--bg-tertiary)'
+                          : 'var(--bg-secondary)',
                         border: `1px solid ${
-                          isFlashing ? 'var(--success)' : isOwned ? 'var(--success)' : 'var(--border)'
+                          isFlashing
+                            ? 'var(--success)'
+                            : isOwned
+                              ? 'var(--success)'
+                              : 'var(--border)'
                         }`,
                         borderRadius: 'var(--radius-sm)',
                         fontSize: 26,
@@ -502,7 +683,11 @@ export default function EmojiDiscover({ store, addToast }) {
                           e.currentTarget.style.transform = 'scale(1)'
                         }
                       }}
-                      title={isOwned ? t('emojiDiscoverAdded') : t('emojiDiscoverAddEmoji')}
+                      title={
+                        isOwned
+                          ? t('emojiDiscoverAdded')
+                          : t('emojiDiscoverAddEmoji')
+                      }
                     >
                       {emoji}
                       {isOwned && (

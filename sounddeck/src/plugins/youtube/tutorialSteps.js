@@ -1,218 +1,253 @@
 // src/plugins/youtube/tutorialSteps.js
 
 const MOCK_VIDEO_INFO = {
-  id: 'a5uQMwRMHcs',
-  title: 'SoundDeck - Tutoriel complet',
+  id: "a5uQMwRMHcs",
+  title: "SoundDeck - Tutoriel complet",
   duration: 300,
-  thumbnail: 'https://i.ytimg.com/vi/a5uQMwRMHcs/maxresdefault.jpg',
-  uploader: 'SoundDeck Official',
-  platform: 'youtube',
-  url: 'https://www.youtube.com/watch?v=a5uQMwRMHcs'
-}
+  thumbnail: "https://i.ytimg.com/vi/a5uQMwRMHcs/maxresdefault.jpg",
+  uploader: "SoundDeck Official",
+  platform: "youtube",
+  url: "https://www.youtube.com/watch?v=a5uQMwRMHcs",
+};
 
 export const startYoutubeTutorial = () => {
-  window.dispatchEvent(new CustomEvent('youtube-force-reset', {
-    detail: { timestamp: Date.now() }
-  }))
+  window.dispatchEvent(
+    new CustomEvent("youtube-force-reset", {
+      detail: { timestamp: Date.now() },
+    }),
+  );
 
-  window.__youtubeTutorialActive = true
-  window.__youtubeTutorialStartedAt = Date.now()
+  window.__youtubeTutorialActive = true;
+  window.__youtubeTutorialStartedAt = Date.now();
   window.__youtubeTutorialState = {
     videoInfo: { ...MOCK_VIDEO_INFO },
     downloadedPath: null,
     soundName: MOCK_VIDEO_INFO.title,
     start: 0,
     end: MOCK_VIDEO_INFO.duration,
-    step: 'url',
+    step: "url",
     useThumbnail: false,
     customImage: null,
-    emoji: '🎵',
-    targetProfiles: ['all']
-  }
-  window.__isTutorialMode = true
-  window.__tutorialPageId = 'youtube'
-}
+    emoji: "🎵",
+    targetProfiles: ["all"],
+  };
+  window.__isTutorialMode = true;
+  window.__tutorialPageId = "youtube";
+};
 
 export const deactivateYoutubeTutorialMode = () => {
-  window.__youtubeTutorialActive = false
-  window.__youtubeTutorialStartedAt = null
-  window.__youtubeTutorialState = null
-  window.__isTutorialMode = false
-  window.__tutorialPageId = null
-}
+  window.__youtubeTutorialActive = false;
+  window.__youtubeTutorialStartedAt = null;
+  window.__youtubeTutorialState = null;
+  window.__isTutorialMode = false;
+  window.__tutorialPageId = null;
+};
 
 export const finishYoutubeTutorial = () => {
-  deactivateYoutubeTutorialMode()
-  window.dispatchEvent(new CustomEvent('youtube-force-reset', {
-    detail: { timestamp: Date.now() }
-  }))
-}
+  deactivateYoutubeTutorialMode();
+  window.dispatchEvent(
+    new CustomEvent("youtube-force-reset", {
+      detail: { timestamp: Date.now() },
+    }),
+  );
+};
 
 export const forceResetYoutubeComponent = () => {
-  deactivateYoutubeTutorialMode()
-  window.dispatchEvent(new CustomEvent('youtube-force-reset', {
-    detail: { timestamp: Date.now() }
-  }))
-}
+  deactivateYoutubeTutorialMode();
+  window.dispatchEvent(
+    new CustomEvent("youtube-force-reset", {
+      detail: { timestamp: Date.now() },
+    }),
+  );
+};
 
 export const cleanupYoutubeTutorial = () => {
-  const startedAt = window.__youtubeTutorialStartedAt || 0
-  const elapsed = Date.now() - startedAt
+  const startedAt = window.__youtubeTutorialStartedAt || 0;
+  const elapsed = Date.now() - startedAt;
 
   if (elapsed < 500 && window.__youtubeTutorialActive) {
-    return
+    return;
   }
 
-  finishYoutubeTutorial()
-}
+  finishYoutubeTutorial();
+};
 
-export const isYoutubeTutorialActive = () => window.__youtubeTutorialActive === true
+export const isYoutubeTutorialActive = () =>
+  window.__youtubeTutorialActive === true;
 
-export const getTutorialState = () => window.__youtubeTutorialState || {
-  videoInfo: { ...MOCK_VIDEO_INFO },
-  downloadedPath: null,
-  soundName: MOCK_VIDEO_INFO.title,
-  start: 0,
-  end: MOCK_VIDEO_INFO.duration,
-  step: 'url',
-  useThumbnail: false,
-  customImage: null,
-  emoji: '🎵',
-  targetProfiles: ['all']
-}
+export const getTutorialState = () =>
+  window.__youtubeTutorialState || {
+    videoInfo: { ...MOCK_VIDEO_INFO },
+    downloadedPath: null,
+    soundName: MOCK_VIDEO_INFO.title,
+    start: 0,
+    end: MOCK_VIDEO_INFO.duration,
+    step: "url",
+    useThumbnail: false,
+    customImage: null,
+    emoji: "🎵",
+    targetProfiles: ["all"],
+  };
 
-export const getMockVideoInfo = () => ({ ...MOCK_VIDEO_INFO })
-export const getTutorialStep = () => window.__youtubeTutorialState?.step || 'url'
+export const getMockVideoInfo = () => ({ ...MOCK_VIDEO_INFO });
+export const getTutorialStep = () =>
+  window.__youtubeTutorialState?.step || "url";
 
 export const setTutorialStep = (step) => {
   if (window.__youtubeTutorialState) {
-    window.__youtubeTutorialState.step = step
+    window.__youtubeTutorialState.step = step;
   }
-}
+};
 
-export const mockFetchVideoInfo = () => new Promise((resolve) => {
-  setTimeout(() => resolve({ success: true, data: { ...MOCK_VIDEO_INFO } }), 300)
-})
+export const mockFetchVideoInfo = () =>
+  new Promise((resolve) => {
+    setTimeout(
+      () => resolve({ success: true, data: { ...MOCK_VIDEO_INFO } }),
+      300,
+    );
+  });
 
-export const mockDownloadAudio = (url, start, end, title) => new Promise((resolve) => {
-  setTimeout(() => resolve({
-    success: true,
-    path: `C:/Users/.../SoundDeck/sounds/${title.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.mp3`,
-    name: title
-  }), 500)
-})
+export const mockDownloadAudio = (url, start, end, title) =>
+  new Promise((resolve) => {
+    setTimeout(
+      () =>
+        resolve({
+          success: true,
+          path: `C:/Users/.../SoundDeck/sounds/${title.replace(/[^a-zA-Z0-9]/g, "_")}_${Date.now()}.mp3`,
+          name: title,
+        }),
+      500,
+    );
+  });
 
-export const mockSaveSound = () => new Promise((resolve) => {
-  setTimeout(() => resolve({ success: true, message: 'Son sauvegardé avec succès' }), 400)
-})
+export const mockSaveSound = () =>
+  new Promise((resolve) => {
+    setTimeout(
+      () => resolve({ success: true, message: "Son sauvegardé avec succès" }),
+      400,
+    );
+  });
 
 function clickWithRetry(selector, maxAttempts = 10, delayMs = 250) {
   return new Promise((resolve) => {
-    let attempts = 0
+    let attempts = 0;
     const tryClick = () => {
-      const btn = document.querySelector(selector)
+      const btn = document.querySelector(selector);
       // offsetParent !== null : garantit que l'élément est visible
       if (btn && btn.offsetParent !== null) {
         try {
-          btn.click()
-          resolve(true)
-          return
-        } catch (e) {
-          // continue
+          btn.click();
+          resolve(true);
+          return;
+        } catch {
+          // Silently retry
         }
       }
-      attempts++
+      attempts++;
       if (attempts >= maxAttempts) {
-        console.warn(`⚠️ [YouTube tutorial] Élément introuvable: ${selector}`)
-        resolve(false)
-        return
+        console.warn(`⚠️ [YouTube tutorial] Élément introuvable: ${selector}`);
+        resolve(false);
+        return;
       }
-      setTimeout(tryClick, delayMs)
-    }
-    tryClick()
-  })
+      setTimeout(tryClick, delayMs);
+    };
+    tryClick();
+  });
 }
 
 export const clickLoadButton = () => {
-  return clickWithRetry('[data-testid="youtube-load-button"], .youtube-load-button', 8, 250)
-}
+  return clickWithRetry(
+    '[data-testid="youtube-load-button"], .youtube-load-button',
+    8,
+    250,
+  );
+};
 
 export const clickDownloadButton = () => {
-  return clickWithRetry('[data-testid="youtube-download-button"], .youtube-download-button', 10, 250)
-}
+  return clickWithRetry(
+    '[data-testid="youtube-download-button"], .youtube-download-button',
+    10,
+    250,
+  );
+};
 
 export const clickSaveButton = () => {
-  return clickWithRetry('[data-testid="youtube-save-button"], .youtube-save-button', 10, 250)
-}
+  return clickWithRetry(
+    '[data-testid="youtube-save-button"], .youtube-save-button',
+    10,
+    250,
+  );
+};
 
 export const TUTORIAL_STEPS = (t) => {
   const steps = [
     {
-      id: 'youtube-1',
-      title: t('tutorialYoutubeStep1Title'),
-      description: t('tutorialYoutubeStep1Desc'),
-      icon: '📋',
+      id: "youtube-1",
+      title: t("tutorialYoutubeStep1Title"),
+      description: t("tutorialYoutubeStep1Desc"),
+      icon: "📋",
       target: '[data-testid="youtube-url-input"], .youtube-url-input',
       fallbackTarget: '.youtube-container input[type="text"]',
-      hint: t('tutorialYoutubeStep1Hint'),
-      position: 'bottom',
+      hint: t("tutorialYoutubeStep1Hint"),
+      position: "bottom",
     },
     {
-      id: 'youtube-2',
-      title: t('tutorialYoutubeStep2Title'),
-      description: t('tutorialYoutubeStep2Desc'),
-      icon: '🔄',
+      id: "youtube-2",
+      title: t("tutorialYoutubeStep2Title"),
+      description: t("tutorialYoutubeStep2Desc"),
+      icon: "🔄",
       target: '[data-testid="youtube-load-button"], .youtube-load-button',
-      fallbackTarget: '.youtube-container button:has(.ti-search)',
-      hint: t('tutorialYoutubeStep2Hint'),
-      position: 'bottom',
+      fallbackTarget: ".youtube-container button:has(.ti-search)",
+      hint: t("tutorialYoutubeStep2Hint"),
+      position: "bottom",
       afterNextStep: () => clickLoadButton(),
       afterNextStepDelay: 2200,
     },
     {
-      id: 'youtube-3',
-      title: t('tutorialYoutubeStep3Title'),
-      description: t('tutorialYoutubeStep3Desc'),
-      icon: '✂️',
+      id: "youtube-3",
+      title: t("tutorialYoutubeStep3Title"),
+      description: t("tutorialYoutubeStep3Desc"),
+      icon: "✂️",
       target: '[data-testid="youtube-trim-controls"], .youtube-trim-controls',
       fallbackTarget: '.youtube-container input[type="range"]',
-      hint: t('tutorialYoutubeStep3Hint'),
-      position: 'bottom',
+      hint: t("tutorialYoutubeStep3Hint"),
+      position: "bottom",
     },
     {
-      id: 'youtube-4',
-      title: t('tutorialYoutubeStep4Title'),
-      description: t('tutorialYoutubeStep4Desc'),
-      icon: '⬇️',
-      target: '[data-testid="youtube-download-button"], .youtube-download-button',
-      fallbackTarget: '.youtube-container button:has(.ti-download)',
-      hint: t('tutorialYoutubeStep4Hint'),
-      position: 'bottom',
+      id: "youtube-4",
+      title: t("tutorialYoutubeStep4Title"),
+      description: t("tutorialYoutubeStep4Desc"),
+      icon: "⬇️",
+      target:
+        '[data-testid="youtube-download-button"], .youtube-download-button',
+      fallbackTarget: ".youtube-container button:has(.ti-download)",
+      hint: t("tutorialYoutubeStep4Hint"),
+      position: "bottom",
       afterNextStep: () => clickDownloadButton(),
       afterNextStepDelay: 2800,
     },
     {
-      id: 'youtube-5',
-      title: t('tutorialYoutubeStep5Title'),
-      description: t('tutorialYoutubeStep5Desc'),
-      icon: '⚙️',
+      id: "youtube-5",
+      title: t("tutorialYoutubeStep5Title"),
+      description: t("tutorialYoutubeStep5Desc"),
+      icon: "⚙️",
       target: '[data-testid="youtube-save-controls"], .youtube-save-controls',
-      fallbackTarget: '.youtube-container .option-row',
-      hint: t('tutorialYoutubeStep5Hint'),
-      position: 'bottom',
+      fallbackTarget: ".youtube-container .option-row",
+      hint: t("tutorialYoutubeStep5Hint"),
+      position: "bottom",
     },
     {
-      id: 'youtube-6',
-      title: t('tutorialYoutubeStep6Title'),
-      description: t('tutorialYoutubeStep6Desc'),
-      icon: '📚',
+      id: "youtube-6",
+      title: t("tutorialYoutubeStep6Title"),
+      description: t("tutorialYoutubeStep6Desc"),
+      icon: "📚",
       target: '[data-testid="youtube-save-button"], .youtube-save-button',
-      fallbackTarget: '.youtube-container button:has(.ti-check)',
-      hint: t('tutorialYoutubeStep6Hint'),
-      position: 'bottom',
+      fallbackTarget: ".youtube-container button:has(.ti-check)",
+      hint: t("tutorialYoutubeStep6Hint"),
+      position: "bottom",
       afterNextStep: () => clickSaveButton(),
       afterNextStepDelay: 1200,
     },
-  ]
-  return steps
-}
+  ];
+  return steps;
+};

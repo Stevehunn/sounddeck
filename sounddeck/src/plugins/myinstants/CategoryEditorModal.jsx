@@ -1,5 +1,4 @@
 // src/plugins/myinstants/CategoryEditorModal.jsx
-import React from 'react'
 import { CATEGORIES_LIST } from './categories'
 
 export default function CategoryEditorModal({

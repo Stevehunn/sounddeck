@@ -1,4 +1,23 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+/**
+ * @file Tests for the YouTube plugin tutorial steps + tutorial-mode helpers.
+ *
+ * Covers:
+ * - **Lifecycle flags**: `startYoutubeTutorial` / `deactivateYoutubeTutorialMode`
+ *   / `finishYoutubeTutorial` / `forceResetYoutubeComponent` / `cleanupYoutubeTutorial`
+ * - **Query helpers**: `isYoutubeTutorialActive`, `getTutorialState`,
+ *   `getMockVideoInfo`, `getTutorialStep`, `setTutorialStep`
+ * - **Mocks**: `mockFetchVideoInfo`, `mockDownloadAudio`, `mockSaveSound`
+ * - **Click retry helpers**: `clickLoadButton`, `clickDownloadButton`,
+ *   `clickSaveButton` (via `clickWithRetry`)
+ * - **Steps**: `TUTORIAL_STEPS` (count, shape, unique IDs, action wiring)
+ *
+ * All timeouts are simulated via `vi.useFakeTimers()` / `vi.advanceTimersByTime`.
+ *
+ * @see ./tutorialSteps.js — the module under test
+ * @see ./YouTube.jsx — main consumer
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   startYoutubeTutorial,
   deactivateYoutubeTutorialMode,
@@ -19,11 +38,13 @@ import {
   TUTORIAL_STEPS,
 } from "./tutorialSteps";
 
+/** Identity i18n function for tests. */
 const t = (k) => k;
 
 describe("youtube/tutorialSteps", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    // Reset every global the module touches
     delete window.__youtubeTutorialActive;
     delete window.__youtubeTutorialStartedAt;
     delete window.__youtubeTutorialState;
@@ -35,31 +56,35 @@ describe("youtube/tutorialSteps", () => {
     vi.useRealTimers();
   });
 
+  // ════════════════════════════════════════════════════════════════════
+  // startYoutubeTutorial
+  // ════════════════════════════════════════════════════════════════════
+
   describe("startYoutubeTutorial", () => {
-    it("devrait activer le flag", () => {
+    it("should set the active flag", () => {
       startYoutubeTutorial();
       expect(window.__youtubeTutorialActive).toBe(true);
     });
 
-    it("devrait définir startedAt", () => {
+    it("should set startedAt to a positive timestamp", () => {
       startYoutubeTutorial();
       expect(window.__youtubeTutorialStartedAt).toBeGreaterThan(0);
     });
 
-    it("devrait initialiser le state", () => {
+    it("should initialize the state object", () => {
       startYoutubeTutorial();
       expect(window.__youtubeTutorialState).toBeDefined();
       expect(window.__youtubeTutorialState.step).toBe("url");
       expect(window.__youtubeTutorialState.emoji).toBe("🎵");
     });
 
-    it("devrait définir isTutorialMode", () => {
+    it("should set isTutorialMode + tutorialPageId", () => {
       startYoutubeTutorial();
       expect(window.__isTutorialMode).toBe(true);
       expect(window.__tutorialPageId).toBe("youtube");
     });
 
-    it("devrait dispatcher youtube-force-reset", () => {
+    it("should dispatch youtube-force-reset", () => {
       const spy = vi.fn();
       window.addEventListener("youtube-force-reset", spy);
       startYoutubeTutorial();
@@ -68,8 +93,12 @@ describe("youtube/tutorialSteps", () => {
     });
   });
 
+  // ════════════════════════════════════════════════════════════════════
+  // deactivateYoutubeTutorialMode
+  // ════════════════════════════════════════════════════════════════════
+
   describe("deactivateYoutubeTutorialMode", () => {
-    it("devrait remettre tous les flags à off", () => {
+    it("should reset every global flag", () => {
       startYoutubeTutorial();
       deactivateYoutubeTutorialMode();
       expect(window.__youtubeTutorialActive).toBe(false);
@@ -80,23 +109,31 @@ describe("youtube/tutorialSteps", () => {
     });
   });
 
+  // ════════════════════════════════════════════════════════════════════
+  // isYoutubeTutorialActive
+  // ════════════════════════════════════════════════════════════════════
+
   describe("isYoutubeTutorialActive", () => {
-    it("devrait retourner true/false", () => {
+    it("should return true/false depending on state", () => {
       expect(isYoutubeTutorialActive()).toBe(false);
       startYoutubeTutorial();
       expect(isYoutubeTutorialActive()).toBe(true);
     });
   });
 
+  // ════════════════════════════════════════════════════════════════════
+  // getMockVideoInfo
+  // ════════════════════════════════════════════════════════════════════
+
   describe("getMockVideoInfo", () => {
-    it("devrait retourner une copie du mock", () => {
+    it("should return a fresh copy (not the shared constant)", () => {
       const a = getMockVideoInfo();
       const b = getMockVideoInfo();
       expect(a).toEqual(b);
       expect(a).not.toBe(b);
     });
 
-    it("devrait contenir les champs essentiels", () => {
+    it("should contain the essential fields", () => {
       const info = getMockVideoInfo();
       expect(info.id).toBeTruthy();
       expect(info.title).toBeTruthy();
@@ -106,38 +143,50 @@ describe("youtube/tutorialSteps", () => {
     });
   });
 
+  // ════════════════════════════════════════════════════════════════════
+  // getTutorialState
+  // ════════════════════════════════════════════════════════════════════
+
   describe("getTutorialState", () => {
-    it("devrait retourner le state par défaut si aucun", () => {
+    it("should return the default state when none exists", () => {
       const state = getTutorialState();
       expect(state.step).toBe("url");
       expect(state.soundName).toBeTruthy();
     });
 
-    it("devrait retourner le state courant si présent", () => {
+    it("should return the current state if present", () => {
       startYoutubeTutorial();
       setTutorialStep("trim");
       expect(getTutorialState().step).toBe("trim");
     });
   });
 
+  // ════════════════════════════════════════════════════════════════════
+  // getTutorialStep / setTutorialStep
+  // ════════════════════════════════════════════════════════════════════
+
   describe("getTutorialStep / setTutorialStep", () => {
-    it('devrait retourner "url" par défaut', () => {
+    it('should default to "url"', () => {
       expect(getTutorialStep()).toBe("url");
     });
 
-    it("setTutorialStep devrait modifier le step", () => {
+    it("setTutorialStep should update the step", () => {
       startYoutubeTutorial();
       setTutorialStep("save");
       expect(getTutorialStep()).toBe("save");
     });
 
-    it("setTutorialStep sans state actif → pas de crash", () => {
+    it("setTutorialStep without active state should not throw", () => {
       expect(() => setTutorialStep("trim")).not.toThrow();
     });
   });
 
+  // ════════════════════════════════════════════════════════════════════
+  // finishYoutubeTutorial / forceResetYoutubeComponent
+  // ════════════════════════════════════════════════════════════════════
+
   describe("finishYoutubeTutorial / forceResetYoutubeComponent", () => {
-    it("devrait désactiver et dispatcher", () => {
+    it("finishYoutubeTutorial should deactivate + dispatch reset", () => {
       startYoutubeTutorial();
       const spy = vi.fn();
       window.addEventListener("youtube-force-reset", spy);
@@ -150,22 +199,26 @@ describe("youtube/tutorialSteps", () => {
       window.removeEventListener("youtube-force-reset", spy);
     });
 
-    it("forceReset devrait désactiver aussi", () => {
+    it("forceResetYoutubeComponent should also deactivate", () => {
       startYoutubeTutorial();
       forceResetYoutubeComponent();
       expect(window.__youtubeTutorialActive).toBe(false);
     });
   });
 
+  // ════════════════════════════════════════════════════════════════════
+  // cleanupYoutubeTutorial
+  // ════════════════════════════════════════════════════════════════════
+
   describe("cleanupYoutubeTutorial", () => {
-    it("devrait ignorer si moins de 500ms depuis le début", () => {
+    it("should skip if < 500ms have elapsed (StrictMode guard)", () => {
       startYoutubeTutorial();
       cleanupYoutubeTutorial();
-      // Toujours actif (délai < 500ms)
+      // Still active (elapsed < 500ms)
       expect(window.__youtubeTutorialActive).toBe(true);
     });
 
-    it("devrait finish si > 500ms", () => {
+    it("should finish if > 500ms have elapsed", () => {
       startYoutubeTutorial();
       window.__youtubeTutorialStartedAt = Date.now() - 1000;
       cleanupYoutubeTutorial();
@@ -173,8 +226,12 @@ describe("youtube/tutorialSteps", () => {
     });
   });
 
+  // ════════════════════════════════════════════════════════════════════
+  // mock* helpers
+  // ════════════════════════════════════════════════════════════════════
+
   describe("mockFetchVideoInfo", () => {
-    it("devrait résoudre après 300ms", async () => {
+    it("should resolve after 300ms", async () => {
       const promise = mockFetchVideoInfo();
       vi.advanceTimersByTime(300);
       const result = await promise;
@@ -184,7 +241,7 @@ describe("youtube/tutorialSteps", () => {
   });
 
   describe("mockDownloadAudio", () => {
-    it("devrait résoudre avec un path", async () => {
+    it("should resolve with a fake path", async () => {
       const promise = mockDownloadAudio("url", 0, 10, "My Test");
       vi.advanceTimersByTime(500);
       const result = await promise;
@@ -195,7 +252,7 @@ describe("youtube/tutorialSteps", () => {
   });
 
   describe("mockSaveSound", () => {
-    it("devrait résoudre success", async () => {
+    it("should resolve with success", async () => {
       const promise = mockSaveSound();
       vi.advanceTimersByTime(400);
       const result = await promise;
@@ -203,13 +260,17 @@ describe("youtube/tutorialSteps", () => {
     });
   });
 
+  // ════════════════════════════════════════════════════════════════════
+  // TUTORIAL_STEPS
+  // ════════════════════════════════════════════════════════════════════
+
   describe("TUTORIAL_STEPS", () => {
-    it("devrait retourner 6 étapes", () => {
+    it("should return 6 steps", () => {
       const steps = TUTORIAL_STEPS(t);
       expect(steps).toHaveLength(6);
     });
 
-    it("chaque étape devrait avoir id, title, description, target", () => {
+    it("each step should have id, title, description, target, icon", () => {
       for (const step of TUTORIAL_STEPS(t)) {
         expect(step.id).toBeTruthy();
         expect(step.title).toBeTruthy();
@@ -219,40 +280,53 @@ describe("youtube/tutorialSteps", () => {
       }
     });
 
-    it("les ids devraient être uniques", () => {
+    it("step IDs should be unique", () => {
       const ids = TUTORIAL_STEPS(t).map((s) => s.id);
       expect(new Set(ids).size).toBe(ids.length);
     });
+
+    it("steps 2, 4, 6 should have afterNextStep + afterNextStepDelay", () => {
+      const steps = TUTORIAL_STEPS(t);
+      for (const id of ["youtube-2", "youtube-4", "youtube-6"]) {
+        const step = steps.find((s) => s.id === id);
+        expect(typeof step.afterNextStep).toBe("function");
+        expect(step.afterNextStepDelay).toBeGreaterThan(0);
+      }
+    });
   });
 
+  // ════════════════════════════════════════════════════════════════════
+  // clickWithRetry helpers
+  // ════════════════════════════════════════════════════════════════════
+
   describe("clickWithRetry helpers", () => {
-    it("clickLoadButton devrait résoudre false si pas de bouton", async () => {
+    it("clickLoadButton should resolve false if the button isn't found", async () => {
       const promise = clickLoadButton();
       vi.advanceTimersByTime(3000);
       const result = await promise;
       expect(result).toBe(false);
     });
 
-    it("clickDownloadButton devrait résoudre false si pas de bouton", async () => {
+    it("clickDownloadButton should resolve false if the button isn't found", async () => {
       const promise = clickDownloadButton();
       vi.advanceTimersByTime(4000);
       const result = await promise;
       expect(result).toBe(false);
     });
 
-    it("clickSaveButton devrait résoudre false si pas de bouton", async () => {
+    it("clickSaveButton should resolve false if the button isn't found", async () => {
       const promise = clickSaveButton();
       vi.advanceTimersByTime(4000);
       const result = await promise;
       expect(result).toBe(false);
     });
 
-    it("clickLoadButton devrait cliquer si le bouton existe", async () => {
+    it("clickLoadButton should click if the button exists", async () => {
       const btn = document.createElement("button");
       btn.setAttribute("data-testid", "youtube-load-button");
       btn.click = vi.fn();
 
-      // ⚠️ jsdom ne calcule pas offsetParent → on le force pour simuler un élément visible
+      // jsdom doesn't compute offsetParent → force it to simulate visibility
       Object.defineProperty(btn, "offsetParent", {
         get: () => document.body,
         configurable: true,

@@ -1,4 +1,3 @@
-// src/plugins/youtube/utils.test.js
 import { describe, it, expect } from 'vitest'
 import { formatDuration } from './utils'
 

@@ -1,8 +1,40 @@
-// src/plugins/youtube/components/UrlStep.jsx
-import React from 'react'
+/**
+ * @file Step 1 of the YouTube import flow — URL input.
+ *
+ * Renders a URL input + a "Load" button. On click, calls `onFetchInfo`
+ * (defined in the parent), which detects the platform (YouTube / Spotify
+ * / SoundCloud), fetches the video metadata, and advances to `TrimStep`.
+ *
+ * Tutorial mode: the URL is replaced by a hardcoded demo URL, the input
+ * is disabled, and the Load button is always enabled (so the tutorial
+ * can simulate the full flow).
+ *
+ * The `resetKey` prop is used as a React `key` to remount the component
+ * when a "reset" is triggered externally (`youtube-force-reset` event) —
+ * this clears the input's internal focus/selection state.
+ *
+ * @see ../YouTube.jsx — parent (defines `onFetchInfo`)
+ * @see ./TrimStep.jsx — next step
+ */
+
 import { useLanguage } from '@core/i18n/LanguageContext'
 import PageHeader from './PageHeader'
 
+/** Demo URL used when the tutorial is active. */
+const TUTORIAL_URL = 'https://www.youtube.com/watch?v=a5uQMwRMHcs'
+
+/**
+ * URL input step.
+ *
+ * @param {Object} props
+ * @param {number} props.resetKey - Remount key (bumped by parent on reset).
+ * @param {boolean} props.isTutorialMode - Whether the tutorial is active.
+ * @param {string} props.url - Controlled URL value.
+ * @param {(url: string) => void} props.setUrl - URL setter.
+ * @param {boolean} props.loadingInfo - Whether a fetch is in progress.
+ * @param {() => void} props.onFetchInfo - Called on Load click / Enter.
+ * @returns {JSX.Element}
+ */
 export default function UrlStep({
   resetKey,
   isTutorialMode,
@@ -41,7 +73,7 @@ export default function UrlStep({
             <input
               data-testid="youtube-url-input"
               className="youtube-url-input"
-              value={isTutorialMode ? 'https://www.youtube.com/watch?v=a5uQMwRMHcs' : url}
+              value={isTutorialMode ? TUTORIAL_URL : url}
               onChange={(e) => !isTutorialMode && setUrl(e.target.value)}
               placeholder={t('ytUrlPlaceholder')}
               style={{ flex: 1, fontSize: 13, borderRadius: 'var(--radius-md)' }}

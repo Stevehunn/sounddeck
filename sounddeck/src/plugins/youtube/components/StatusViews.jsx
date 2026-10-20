@@ -1,10 +1,28 @@
-// src/plugins/youtube/components/StatusViews.jsx
-import React from 'react'
+/**
+ * @file Two placeholder views shown before the URL input becomes available:
+ *
+ * 1. **`CheckingView`** — a blank page with just the header. Shown while
+ *    `yt-dlp` is being detected (the parent also renders a
+ *    `<LoadingOverlay>` on top of it).
+ * 2. **`MissingYtdlpView`** — a "yt-dlp required" screen with an
+ *    "Install automatically" button. Shown when yt-dlp isn't found and
+ *    the user hasn't installed it yet.
+ *
+ * Both views share the same header (`PageHeader`) as the rest of the
+ * flow so the UI feels continuous.
+ *
+ * @see ../YouTube.jsx — parent (renders these based on `effectiveStatus`)
+ * @see ./PageHeader.jsx — the shared header component
+ */
+
 import { useLanguage } from '@core/i18n/LanguageContext'
 import PageHeader from './PageHeader'
 
 /**
- * Vue "Vérification de yt-dlp en cours"
+ * Placeholder view shown while the app checks whether yt-dlp is
+ * installed. The parent overlays a `<LoadingOverlay>` on top of it.
+ *
+ * @returns {JSX.Element}
  */
 export function CheckingView() {
   const { t } = useLanguage()
@@ -16,7 +34,15 @@ export function CheckingView() {
 }
 
 /**
- * Vue "yt-dlp manquant → installer"
+ * View shown when yt-dlp isn't installed. Offers a one-click install
+ * (the parent calls `electronAPI.downloadYtdlp()`) and a fallback hint
+ * about manual install.
+ *
+ * @param {Object} props
+ * @param {() => void} props.onInstall - Called when the user clicks "Install".
+ * @param {boolean} props.downloading - Whether a download is in progress
+ *   (disables the button and swaps its label to "Installing…").
+ * @returns {JSX.Element}
  */
 export function MissingYtdlpView({ onInstall, downloading }) {
   const { t } = useLanguage()

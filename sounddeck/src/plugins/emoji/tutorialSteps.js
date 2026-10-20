@@ -1,4 +1,3 @@
-// src/plugins/emoji/tutorialSteps.js
 export const TUTORIAL_STEPS = (t) => [
   {
     id: 'emoji-discover-1',

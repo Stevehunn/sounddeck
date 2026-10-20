@@ -1,4 +1,3 @@
-// src/plugins/emoji/useEmojiCache.test.jsx
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useEmojiCache } from './useEmojiCache'

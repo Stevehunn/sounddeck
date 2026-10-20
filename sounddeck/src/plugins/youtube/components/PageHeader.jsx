@@ -1,6 +1,25 @@
-// src/plugins/youtube/components/PageHeader.jsx
-import React from 'react'
+/**
+ * @file Small header bar used by every step of the YouTube import flow
+ * (URL → Trim → Save).
+ *
+ * Renders an optional back button, a title, and an optional subtitle.
+ * The back button (arrow-left icon) is only rendered when `onBack` is
+ * passed — used to navigate between steps.
+ *
+ * @see ./UrlStep.jsx — step 1
+ * @see ./TrimStep.jsx — step 2
+ * @see ./SaveStep.jsx — step 3
+ */
 
+/**
+ * Page header with optional back button.
+ *
+ * @param {Object} props
+ * @param {string} props.title - Main title (translated).
+ * @param {string} [props.sub] - Subtitle below the title (translated).
+ * @param {() => void} [props.onBack] - If provided, renders a back button.
+ * @returns {JSX.Element}
+ */
 export default function PageHeader({ title, sub, onBack }) {
   return (
     <div style={{

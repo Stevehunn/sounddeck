@@ -1,9 +1,42 @@
-// src/plugins/youtube/components/TrimStep.jsx
-import React from 'react'
+/**
+ * @file Step 2 of the YouTube import flow — portion selection.
+ *
+ * Shows the video's thumbnail, title, uploader and total duration, then
+ * lets the user pick a portion via:
+ * - **Two range sliders** (start / end), each clamped so `start < end`
+ * - **Two number inputs** for precise values (also clamped)
+ * - **A "Select all" button** to reset to `[0, duration]`
+ *
+ * The "Download audio" button triggers `onDownload` (parent), which calls
+ * `electronAPI.youtubeDownload()`.
+ *
+ * @see ../YouTube.jsx — parent
+ * @see ../utils.js — `formatDuration`
+ * @see ./UrlStep.jsx — previous step
+ * @see ./SaveStep.jsx — next step
+ */
+
 import { useLanguage } from '@core/i18n/LanguageContext'
 import PageHeader from './PageHeader'
 import { formatDuration } from '../utils'
 
+/**
+ * Trim / portion step.
+ *
+ * @param {Object} props
+ * @param {{ title: string, duration: number, thumbnail?: string, uploader?: string }} props.info
+ *   Video metadata.
+ * @param {boolean} props.isTutorialMode - Whether the tutorial is active.
+ * @param {number} props.start - Selection start (seconds).
+ * @param {number} props.end - Selection end (seconds).
+ * @param {(v: number) => void} props.setStart - Start setter.
+ * @param {(v: number) => void} props.setEnd - End setter.
+ * @param {boolean} props.importing - Whether a download is in progress
+ *   (disables the download button and swaps its label).
+ * @param {() => void} props.onBack - Back to URL step.
+ * @param {() => void} props.onDownload - Triggers the audio download.
+ * @returns {JSX.Element}
+ */
 export default function TrimStep({
   info,
   isTutorialMode,

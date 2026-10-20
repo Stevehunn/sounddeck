@@ -1,5 +1,40 @@
-// src/plugins/myinstants/Discover.jsx
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+/**
+ * @file MyInstants Discovery page.
+ *
+ * The user-facing page that lets the user browse, search, and import
+ * sounds from myinstants.com. This is the largest plugin page (700+
+ * lines) because it combines many concerns:
+ *
+ * 1. **Search** — text input → `fetchMyinstants(query, 'search')`.
+ * 2. **Categories** — 40+ predefined categories (trending, memes, gaming,
+ *    anime, …) defined in `./categories.js`. Each has a `mode` that maps
+ *    to a fetch strategy (`local`, `multi`, `search`, `trending`).
+ *    Users can pick which categories are visible via the category editor.
+ * 3. **Persistent cache** — via `./useMyInstantsCache` (electron-store,
+ *    24h TTL). Cache hits bypass the network entirely.
+ * 4. **Background preload** — after 500ms, preloads all categories in the
+ *    background (3 at a time). Progress shown in a thin bar at the top.
+ * 5. **Preview** — inline `<Howl>` instance (html5 mode) with play/stop.
+ * 6. **Import** — `AddToProfileModal` → downloads the sound via
+ *    `store.addSound` and shows a toast.
+ *
+ * Persistence keys:
+ * - `myinstantsSelectedCategories` — array of visible category IDs
+ * - `myinstantsCategoryCache` — map of `{ [categoryId]: { sounds, fetchedAt } }`
+ *
+ * Legacy migration: old versions used `localStorage` under
+ * `myinstants_selected_categories` — we auto-migrate to the store on
+ * first load.
+ *
+ * @see ./categories.js — CATEGORIES, DEFAULT_CATEGORIES
+ * @see ./useMyInstantsCache.js — `ensureCacheLoaded`, `getCachedCategory`, …
+ * @see ./CategoryBar.jsx — the horizontal category selector
+ * @see ./CategoryEditorModal.jsx — the modal to pick which categories to show
+ * @see ./AddToProfileModal.jsx — the modal to select which profiles to save to
+ * @see ./tutorialSteps.js — the tutorial steps
+ */
+
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Howl } from 'howler'
 import { CATEGORIES, DEFAULT_CATEGORIES } from './categories'
 import { useLanguage } from '@core/i18n/LanguageContext'
@@ -16,10 +51,43 @@ import CategoryBar from './CategoryBar'
 import CategoryEditorModal from './CategoryEditorModal'
 import AddToProfileModal from './AddToProfileModal'
 
+/** electron-store key for the visible category IDs. */
+const STORE_KEY_CATEGORIES = 'myinstantsSelectedCategories'
+
+/** Legacy localStorage key (pre-store migration). */
+const LEGACY_LS_KEY = 'myinstants_selected_categories'
+
+/** Timeout for a single `fetchMyinstants` call, in milliseconds. */
+const FETCH_TIMEOUT_MS = 20000
+
+/** Delay before starting the background preload, in milliseconds. */
+const PRELOAD_START_DELAY = 500
+
+/** Number of categories fetched concurrently during preload. */
+const PRELOAD_BATCH_SIZE = 3
+
+/** Max number of comma-separated terms processed in `mode: 'multi'`. */
+const MAX_MULTI_TERMS = 3
+
+/** Max number of terms processed per preload batch entry. */
+const MAX_PRELOAD_TERMS = 2
+
+/** Minimum result count before the "Load more" button appears. */
+const SHOW_MORE_THRESHOLD = 20
+
+/**
+ * MyInstants Discovery page.
+ *
+ * @param {Object} props
+ * @param {{ sounds: Array, profiles: Array, currentProfileId: string, addSound: Function }} props.store
+ * @param {(msg: string, type?: string) => void} [props.addToast]
+ * @returns {JSX.Element}
+ */
 export default function MyInstantsDiscover({ store, addToast }) {
   const { t, currentLang } = useLanguage()
   const { showNoConnection, ensureOnline } = useNetwork()
 
+  // ─── UI STATE ──────────────────────────────────────────────────────
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState([])
@@ -40,38 +108,53 @@ export default function MyInstantsDiscover({ store, addToast }) {
   const [showProfileModal, setShowProfileModal] = useState(null)
   const [selectedProfile, setSelectedProfile] = useState('all')
 
+  // ─── REFS ──────────────────────────────────────────────────────────
   const previewHowlRef = useRef(null)
   const preloadAbortRef = useRef(false)
   const resultsRef = useRef([])
 
-  const STORE_KEY_CATEGORIES = 'myinstantsSelectedCategories'
-  const LEGACY_LS_KEY = 'myinstants_selected_categories'
-
+  // ─── API AVAILABILITY ──────────────────────────────────────────────
+  /**
+   * Verifies that `window.electronAPI.fetchMyinstants` is available
+   * (i.e. the app is running inside Electron, not a plain browser).
+   *
+   * @returns {boolean} `true` if the API is available.
+   */
   const checkApi = useCallback(() => {
     if (!window.electronAPI?.fetchMyinstants) {
-      logError('Discover', 'window.electronAPI.fetchMyinstants non disponible')
-      setError(t('myinstantsError') || 'API MyInstants non disponible')
+      logError('Discover', 'window.electronAPI.fetchMyinstants not available')
+      setError(t('myinstantsError') || 'MyInstants API not available')
       return false
     }
     return true
   }, [t])
 
+  // ─── CATEGORY PREFERENCES ──────────────────────────────────────────
+  /**
+   * Loads the user's visible-category preferences from the store.
+   *
+   * Handles legacy migration from `localStorage`. Falls back to
+   * `DEFAULT_CATEGORIES` if nothing is stored or all stored IDs are
+   * unknown (e.g. a category was removed).
+   *
+   * @returns {Promise<string[]>} The visible category IDs.
+   */
   const loadCategoryPreferences = useCallback(async () => {
     try {
-      let saved = await getItem(STORE_KEY_CATEGORIES)
+      const saved = await getItem(STORE_KEY_CATEGORIES)
 
       if (saved) {
         try {
           const parsed = typeof saved === 'string' ? JSON.parse(saved) : saved
           if (Array.isArray(parsed)) {
-            const validCategories = parsed.filter(id => CATEGORIES[id])
+            const validCategories = parsed.filter((id) => CATEGORIES[id])
             if (validCategories.length > 0) {
               setSelectedCategories(validCategories)
               return validCategories
             }
           }
-        } catch (e) {
-          // silencieux
+        } catch {
+          // Silent — corrupted store value, fall back to defaults
         }
       }
 
@@ -82,208 +165,143 @@ export default function MyInstantsDiscover({ store, addToast }) {
           if (Array.isArray(parsed)) {
             await setItem(STORE_KEY_CATEGORIES, JSON.stringify(parsed))
             localStorage.removeItem(LEGACY_LS_KEY)
-            const validCategories = parsed.filter(id => CATEGORIES[id])
+            const validCategories = parsed.filter((id) => CATEGORIES[id])
             if (validCategories.length > 0) {
               setSelectedCategories(validCategories)
               return validCategories
             }
           }
-        } catch (e) {
-          // silencieux
+        } catch {
+          // Silent — corrupted legacy value
         }
       }
     } catch (e) {
-      logWarn('Discover', 'Erreur chargement préférences catégories', e)
+      logWarn('Discover', 'Error loading category preferences', e)
     }
 
-    const defaults = DEFAULT_CATEGORIES.map(cat => cat.id)
+    const defaults = DEFAULT_CATEGORIES.map((cat) => cat.id)
     setSelectedCategories(defaults)
     return defaults
   }, [])
 
+  /**
+   * Persists the visible-category preferences to the store.
+   *
+   * @param {string[]} categoryIds
+   * @returns {Promise<void>}
+   */
   const saveCategoryPreferences = useCallback(async (categoryIds) => {
     try {
       await setItem(STORE_KEY_CATEGORIES, JSON.stringify(categoryIds))
       setSelectedCategories(categoryIds)
     } catch (e) {
-      logWarn('Discover', 'Erreur sauvegarde préférences catégories', e)
+      logWarn('Discover', 'Error saving category preferences', e)
     }
   }, [])
 
+  /**
+   * Returns the list of category objects the user has chosen to see
+   * (or the defaults if none were chosen).
+   *
+   * @returns {Array<Object>}
+   */
   const getVisibleCategories = useCallback(() => {
     if (selectedCategories.length === 0) {
       return DEFAULT_CATEGORIES
     }
-    return selectedCategories
-      .map(id => CATEGORIES[id])
-      .filter(Boolean)
+    return selectedCategories.map((id) => CATEGORIES[id]).filter(Boolean)
   }, [selectedCategories])
 
-  useEffect(() => { resultsRef.current = results }, [results])
+  useEffect(() => {
+    resultsRef.current = results
+  }, [results])
 
-  const loadCategory = useCallback(async (categoryId, forceRefresh = false) => {
-    const category = CATEGORIES[categoryId]
-    if (!category) return
+  // ─── CATEGORY LOADING ──────────────────────────────────────────────
+  /**
+   * Loads the sounds for a category (with cache and `mode` dispatch).
+   *
+   * Modes:
+   * - `local` / `trending` → fetch trending page
+   * - `multi` → fetch up to `MAX_MULTI_TERMS` search terms, merge results
+   * - `search` → single search query
+   *
+   * @param {string} categoryId
+   * @param {boolean} [forceRefresh=false] - Bypass cache.
+   * @returns {Promise<void>}
+   */
+  const loadCategory = useCallback(
+    async (categoryId, forceRefresh = false) => {
+      const category = CATEGORIES[categoryId]
+      if (!category) return
 
-    if (!checkApi()) return
+      if (!checkApi()) return
 
-    if (!forceRefresh && activeCategory === categoryId && resultsRef.current.length > 0) {
-      return
-    }
-
-    if (!forceRefresh) {
-      const cached = getCachedCategory(categoryId)
-      if (cached && cached.length > 0) {
-        setResults(cached)
-        setError('')
-        setActiveCategory(categoryId)
-        setCacheInfo(getCacheInfo())
+      // Skip if the same category is already loaded (and no refresh asked)
+      if (
+        !forceRefresh &&
+        activeCategory === categoryId &&
+        resultsRef.current.length > 0
+      ) {
         return
       }
-    }
 
-    setLoading(true)
-    setError('')
-    setResults([])
-    setActiveCategory(categoryId)
+      if (!forceRefresh) {
+        const cached = getCachedCategory(categoryId)
+        if (cached && cached.length > 0) {
+          setResults(cached)
+          setError('')
+          setActiveCategory(categoryId)
+          setCacheInfo(getCacheInfo())
+          return
+        }
+      }
 
-    try {
-      let mode = category.mode
-      let query = category.query
+      setLoading(true)
+      setError('')
+      setResults([])
+      setActiveCategory(categoryId)
 
-      const fetchWithTimeout = (promise, timeout = 20000) => {
+      /**
+       * Wraps a promise with a timeout.
+       *
+       * @param {Promise} promise
+       * @param {number} [timeout=FETCH_TIMEOUT_MS]
+       * @returns {Promise}
+       */
+      const fetchWithTimeout = (promise, timeout = FETCH_TIMEOUT_MS) => {
         return Promise.race([
           promise,
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeout)),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), timeout)
+          ),
         ])
       }
 
-      let result
-
-      if (mode === 'local' || mode === 'trending') {
-        result = await fetchWithTimeout(
-          window.electronAPI.fetchMyinstants('', mode === 'local' ? 'local' : 'trending', currentLang)
-        )
-      } else if (mode === 'multi') {
-        const terms = query.split(',').map(t => t.trim()).filter(Boolean)
-        const allResults = []
-        const seen = new Set()
-        const limitedTerms = terms.slice(0, 3)
-        for (const term of limitedTerms) {
-          const r = await fetchWithTimeout(window.electronAPI.fetchMyinstants(term, 'search', currentLang))
-          if (r.success) {
-            for (const sound of r.sounds) {
-              if (!seen.has(sound.slug)) {
-                seen.add(sound.slug)
-                allResults.push(sound)
-              }
-            }
-          }
-        }
-        result = { success: true, sounds: allResults }
-      } else {
-        result = await fetchWithTimeout(window.electronAPI.fetchMyinstants(query, 'search', currentLang))
-      }
-
-      if (result.success) {
-        setResults(result.sounds || [])
-        if (result.sounds.length > 0) {
-          setCachedCategory(categoryId, result.sounds)
-        }
-        if (result.sounds.length === 0) {
-          setError(t('myinstantsNoResults'))
-        }
-      } else {
-        if (result.isNetworkError) {
-          setError('')
-          showNoConnection()
-        } else {
-          setError(result.error || t('myinstantsError'))
-        }
-      }
-    } catch (e) {
-      logError('Discover', 'Erreur chargement catégorie', e)
-      const online = await ensureOnline()
-      if (!online) {
-        setError('')
-      } else {
-        setError(e.message || t('myinstantsError'))
-      }
-    }
-
-    setLoading(false)
-    setCacheInfo(getCacheInfo())
-  }, [currentLang, t, activeCategory, checkApi, showNoConnection, ensureOnline])
-
-  const preloadAllCategories = useCallback(async (priorityIds = null) => {
-    if (isPreloading || isPreloadComplete) return
-
-    const online = await ensureOnline()
-    if (!online) {
-      setIsPreloadComplete(true)
-      return
-    }
-
-    const categoryIds = Object.keys(CATEGORIES)
-
-    const allCached = categoryIds.every(id => {
-      const cached = getCachedCategory(id)
-      return cached && cached.length > 0
-    })
-
-    if (allCached) {
-      setIsPreloadComplete(true)
-      setCacheInfo(getCacheInfo())
-      return
-    }
-
-    if (!checkApi()) return
-
-    setIsPreloading(true)
-    preloadAbortRef.current = false
-
-    const total = categoryIds.length
-    let loaded = 0
-
-    setPreloadStatus(t('myinstantsPreloading'))
-
-    let priorityList = priorityIds
-    if (!priorityList || priorityList.length === 0) {
-      priorityList = getVisibleCategories().map(cat => cat.id)
-    }
-
-    const otherIds = categoryIds.filter(id => !priorityList.includes(id))
-    const sortedIds = [...priorityList, ...otherIds]
-
-    const loadOneCategory = async (id) => {
-      if (preloadAbortRef.current) return false
-
-      const cached = getCachedCategory(id)
-      if (cached && cached.length > 0) return true
-
-      const config = CATEGORIES[id]
-      if (!config) return false
-
       try {
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout')), 20000)
-        )
-
+        const mode = category.mode
+        const query = category.query
         let result
-        if (config.mode === 'local' || config.mode === 'trending') {
-          result = await Promise.race([
-            window.electronAPI.fetchMyinstants('', config.mode === 'local' ? 'local' : 'trending', currentLang),
-            timeoutPromise,
-          ])
-        } else if (config.mode === 'multi') {
-          const terms = config.query.split(',').map(t => t.trim()).filter(Boolean).slice(0, 2)
+
+        if (mode === 'local' || mode === 'trending') {
+          result = await fetchWithTimeout(
+            window.electronAPI.fetchMyinstants(
+              '',
+              mode === 'local' ? 'local' : 'trending',
+              currentLang
+            )
+          )
+        } else if (mode === 'multi') {
+          const terms = query
+            .split(',')
+            .map((term) => term.trim())
+            .filter(Boolean)
+            .slice(0, MAX_MULTI_TERMS)
           const allResults = []
           const seen = new Set()
           for (const term of terms) {
-            const r = await Promise.race([
-              window.electronAPI.fetchMyinstants(term, 'search', currentLang),
-              timeoutPromise,
-            ])
+            const r = await fetchWithTimeout(
+              window.electronAPI.fetchMyinstants(term, 'search', currentLang)
+            )
             if (r.success) {
               for (const sound of r.sounds) {
                 if (!seen.has(sound.slug)) {
@@ -295,53 +313,221 @@ export default function MyInstantsDiscover({ store, addToast }) {
           }
           result = { success: true, sounds: allResults }
         } else {
-          result = await Promise.race([
-            window.electronAPI.fetchMyinstants(config.query, 'search', currentLang),
-            timeoutPromise,
-          ])
+          result = await fetchWithTimeout(
+            window.electronAPI.fetchMyinstants(query, 'search', currentLang)
+          )
         }
 
-        if (result.success && result.sounds.length > 0) {
-          setCachedCategory(id, result.sounds)
-          return true
+        if (result.success) {
+          setResults(result.sounds || [])
+          if (result.sounds.length > 0) {
+            setCachedCategory(categoryId, result.sounds)
+          }
+          if (result.sounds.length === 0) {
+            setError(t('myinstantsNoResults'))
+          }
+        } else if (result.isNetworkError) {
+          setError('')
+          showNoConnection()
+        } else {
+          setError(result.error || t('myinstantsError'))
         }
-        return false
       } catch (e) {
-        logWarn('Discover', `Échec préchargement de ${id}`, e)
-        return false
+        logError('Discover', 'Error loading category', e)
+        const online = await ensureOnline()
+        if (!online) {
+          setError('')
+        } else {
+          setError(e.message || t('myinstantsError'))
+        }
       }
-    }
 
-    const batchSize = 3
-    for (let i = 0; i < sortedIds.length; i += batchSize) {
-      if (preloadAbortRef.current) break
+      setLoading(false)
+      setCacheInfo(getCacheInfo())
+    },
+    [currentLang, t, activeCategory, checkApi, showNoConnection, ensureOnline]
+  )
 
-      const batch = sortedIds.slice(i, i + batchSize)
-      const results = await Promise.all(batch.map(id => loadOneCategory(id)))
+  // ─── PRELOAD ────────────────────────────────────────────────────────
+  /**
+   * Preloads all categories in the background (3 at a time), prioritized
+   * list first.
+   *
+   * @param {string[] | null} [priorityIds=null] - Categories to fetch first
+   *   (defaults to the currently visible ones).
+   * @returns {Promise<void>}
+   */
+  const preloadAllCategories = useCallback(
+    async (priorityIds = null) => {
+      if (isPreloading || isPreloadComplete) return
 
-      loaded += results.filter(Boolean).length
-      setPreloadProgress(Math.round((loaded / total) * 100))
-      setPreloadStatus(`${t('myinstantsCategoriesLoaded')}: ${loaded}/${total}`)
-    }
-
-    setIsPreloading(false)
-    setPreloadProgress(100)
-    setIsPreloadComplete(true)
-    setPreloadStatus(`✅ ${t('myinstantsAllCategoriesLoaded')}`)
-    setCacheInfo(getCacheInfo())
-
-    if (!preloadAbortRef.current && priorityList.length > 0) {
-      const firstCategory = priorityList[0]
-      const cached = getCachedCategory(firstCategory)
-      if (cached && cached.length > 0) {
-        setResults(cached)
-        setActiveCategory(firstCategory)
-      } else {
-        loadCategory(firstCategory)
+      const online = await ensureOnline()
+      if (!online) {
+        setIsPreloadComplete(true)
+        return
       }
-    }
-  }, [currentLang, isPreloading, isPreloadComplete, t, loadCategory, getVisibleCategories, checkApi, ensureOnline])
 
+      const categoryIds = Object.keys(CATEGORIES)
+
+      const allCached = categoryIds.every((id) => {
+        const cached = getCachedCategory(id)
+        return cached && cached.length > 0
+      })
+
+      if (allCached) {
+        setIsPreloadComplete(true)
+        setCacheInfo(getCacheInfo())
+        return
+      }
+
+      if (!checkApi()) return
+
+      setIsPreloading(true)
+      preloadAbortRef.current = false
+
+      const total = categoryIds.length
+      let loaded = 0
+
+      setPreloadStatus(t('myinstantsPreloading'))
+
+      let priorityList = priorityIds
+      if (!priorityList || priorityList.length === 0) {
+        priorityList = getVisibleCategories().map((cat) => cat.id)
+      }
+
+      const otherIds = categoryIds.filter((id) => !priorityList.includes(id))
+      const sortedIds = [...priorityList, ...otherIds]
+
+      /**
+       * Loads one category for the preloader.
+       *
+       * @param {string} id
+       * @returns {Promise<boolean>}
+       */
+      const loadOneCategory = async (id) => {
+        if (preloadAbortRef.current) return false
+
+        const cached = getCachedCategory(id)
+        if (cached && cached.length > 0) return true
+
+        const config = CATEGORIES[id]
+        if (!config) return false
+
+        try {
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), FETCH_TIMEOUT_MS)
+          )
+
+          let result
+          if (config.mode === 'local' || config.mode === 'trending') {
+            result = await Promise.race([
+              window.electronAPI.fetchMyinstants(
+                '',
+                config.mode === 'local' ? 'local' : 'trending',
+                currentLang
+              ),
+              timeoutPromise,
+            ])
+          } else if (config.mode === 'multi') {
+            const terms = config.query
+              .split(',')
+              .map((term) => term.trim())
+              .filter(Boolean)
+              .slice(0, MAX_PRELOAD_TERMS)
+            const allResults = []
+            const seen = new Set()
+            for (const term of terms) {
+              const r = await Promise.race([
+                window.electronAPI.fetchMyinstants(
+                  term,
+                  'search',
+                  currentLang
+                ),
+                timeoutPromise,
+              ])
+              if (r.success) {
+                for (const sound of r.sounds) {
+                  if (!seen.has(sound.slug)) {
+                    seen.add(sound.slug)
+                    allResults.push(sound)
+                  }
+                }
+              }
+            }
+            result = { success: true, sounds: allResults }
+          } else {
+            result = await Promise.race([
+              window.electronAPI.fetchMyinstants(
+                config.query,
+                'search',
+                currentLang
+              ),
+              timeoutPromise,
+            ])
+          }
+
+          if (result.success && result.sounds.length > 0) {
+            setCachedCategory(id, result.sounds)
+            return true
+          }
+          return false
+        } catch (e) {
+          logWarn('Discover', `Failed to preload ${id}`, e)
+          return false
+        }
+      }
+
+      for (let i = 0; i < sortedIds.length; i += PRELOAD_BATCH_SIZE) {
+        if (preloadAbortRef.current) break
+
+        const batch = sortedIds.slice(i, i + PRELOAD_BATCH_SIZE)
+        const batchResults = await Promise.all(
+          batch.map((id) => loadOneCategory(id))
+        )
+
+        loaded += batchResults.filter(Boolean).length
+        setPreloadProgress(Math.round((loaded / total) * 100))
+        setPreloadStatus(
+          `${t('myinstantsCategoriesLoaded')}: ${loaded}/${total}`
+        )
+      }
+
+      setIsPreloading(false)
+      setPreloadProgress(100)
+      setIsPreloadComplete(true)
+      setPreloadStatus(`✅ ${t('myinstantsAllCategoriesLoaded')}`)
+      setCacheInfo(getCacheInfo())
+
+      // After preload, make sure the first priority category is shown
+      if (!preloadAbortRef.current && priorityList.length > 0) {
+        const firstCategory = priorityList[0]
+        const cached = getCachedCategory(firstCategory)
+        if (cached && cached.length > 0) {
+          setResults(cached)
+          setActiveCategory(firstCategory)
+        } else {
+          loadCategory(firstCategory)
+        }
+      }
+    },
+    [
+      currentLang,
+      isPreloading,
+      isPreloadComplete,
+      t,
+      loadCategory,
+      getVisibleCategories,
+      checkApi,
+      ensureOnline,
+    ]
+  )
+
+  // ─── SEARCH ────────────────────────────────────────────────────────
+  /**
+   * Handles the "Search" button and Enter key.
+   *
+   * @returns {Promise<void>}
+   */
   const handleSearch = useCallback(async () => {
     if (!checkApi()) return
 
@@ -355,22 +541,24 @@ export default function MyInstantsDiscover({ store, addToast }) {
     setResults([])
 
     try {
-      const result = await window.electronAPI.fetchMyinstants(search.trim(), 'search', currentLang)
+      const result = await window.electronAPI.fetchMyinstants(
+        search.trim(),
+        'search',
+        currentLang
+      )
       if (result.success) {
         setResults(result.sounds || [])
         if (result.sounds.length === 0) {
           setError(t('myinstantsNoResults'))
         }
+      } else if (result.isNetworkError) {
+        setError('')
+        showNoConnection()
       } else {
-        if (result.isNetworkError) {
-          setError('')
-          showNoConnection()
-        } else {
-          setError(result.error || t('myinstantsError'))
-        }
+        setError(result.error || t('myinstantsError'))
       }
     } catch (e) {
-      logError('Discover', 'Erreur recherche', e)
+      logError('Discover', 'Error during search', e)
       const online = await ensureOnline()
       if (!online) {
         setError('')
@@ -379,48 +567,91 @@ export default function MyInstantsDiscover({ store, addToast }) {
       }
     }
     setLoading(false)
-  }, [search, currentLang, t, activeCategory, loadCategory, checkApi, showNoConnection, ensureOnline])
+  }, [
+    search,
+    currentLang,
+    t,
+    activeCategory,
+    loadCategory,
+    checkApi,
+    showNoConnection,
+    ensureOnline,
+  ])
 
-  const isSoundOwned = useCallback((soundName) => {
-    return store.sounds.some(s => s.name.toLowerCase() === soundName.toLowerCase())
-  }, [store.sounds])
+  // ─── ADD SOUND ─────────────────────────────────────────────────────
+  /**
+   * Checks whether a sound with this name already exists in the library.
+   *
+   * @param {string} soundName
+   * @returns {boolean}
+   */
+  const isSoundOwned = useCallback(
+    (soundName) => {
+      return store.sounds.some(
+        (s) => s.name.toLowerCase() === soundName.toLowerCase()
+      )
+    },
+    [store.sounds]
+  )
 
+  /**
+   * Opens the "Add to profile" modal for a given sound.
+   *
+   * @param {Object} sound
+   * @returns {void}
+   */
   const openProfileModal = (sound) => {
     setShowProfileModal(sound)
     setSelectedProfile('all')
   }
 
+  /**
+   * Confirms the add from the modal: calls `store.addSound` with the
+   * selected profiles.
+   *
+   * @returns {Promise<void>}
+   */
   const confirmAddSound = useCallback(async () => {
     if (!showProfileModal) return
 
     const online = await ensureOnline()
     if (!online) return
 
-    setDownloading(prev => ({ ...prev, [showProfileModal.id]: true }))
+    setDownloading((prev) => ({ ...prev, [showProfileModal.id]: true }))
 
     try {
       const sound = showProfileModal
-      const profiles = selectedProfile === 'all'
-        ? ['all']
-        : [selectedProfile, ...(selectedProfile !== 'all' ? ['all'] : [])]
+      const profiles =
+        selectedProfile === 'all'
+          ? ['all']
+          : [
+              selectedProfile,
+              ...(selectedProfile !== 'all' ? ['all'] : []),
+            ]
 
       await store.addSound({
         name: sound.name,
         path: sound.url || null,
         emoji: sound.emoji || '🔊',
-        profiles: profiles,
+        profiles,
       })
 
       addToast(t('myinstantsAdded'), 'success')
       setShowProfileModal(null)
     } catch (e) {
-      logError('Discover', 'Erreur ajout', e)
+      logError('Discover', 'Error adding sound', e)
       addToast(t('myinstantsErrorWithDetail', { detail: e.message }), 'error')
     } finally {
-      setDownloading(prev => ({ ...prev, [showProfileModal.id]: false }))
+      setDownloading((prev) => ({ ...prev, [showProfileModal.id]: false }))
     }
   }, [showProfileModal, selectedProfile, store, addToast, t, ensureOnline])
 
+  /**
+   * Toggles audio preview for a given sound (single instance at a time).
+   *
+   * @param {Object} sound
+   * @returns {Promise<void>}
+   */
   const togglePreview = async (sound) => {
     if (previewing === sound.id) {
       if (previewHowlRef.current) {
@@ -468,30 +699,43 @@ export default function MyInstantsDiscover({ store, addToast }) {
       setPreviewing(sound.id)
       howl.play()
     } catch (e) {
-      logError('Discover', 'Erreur preview', e)
+      logError('Discover', 'Error previewing sound', e)
       addToast(t('myinstantsPreviewError'), 'error')
     }
   }
 
+  // ─── CATEGORY EDITOR ───────────────────────────────────────────────
+  /** Opens the category editor with the current selection as draft. */
   const openCategoryEditor = () => {
     setTempSelectedCategories([...selectedCategories])
     setShowCategoryEditor(true)
   }
 
+  /** Closes the category editor without saving. */
   const closeCategoryEditor = () => {
     setShowCategoryEditor(false)
   }
 
+  /**
+   * Toggles a category in the editor's draft selection.
+   *
+   * @param {string} categoryId
+   * @returns {void}
+   */
   const toggleCategoryInEditor = (categoryId) => {
-    setTempSelectedCategories(prev => {
+    setTempSelectedCategories((prev) => {
       if (prev.includes(categoryId)) {
-        return prev.filter(id => id !== categoryId)
-      } else {
-        return [...prev, categoryId]
+        return prev.filter((id) => id !== categoryId)
       }
+      return [...prev, categoryId]
     })
   }
 
+  /**
+   * Saves the category editor's selection and loads the first category.
+   *
+   * @returns {Promise<void>}
+   */
   const saveCategoryEditor = async () => {
     if (tempSelectedCategories.length === 0) {
       addToast(t('myinstantsSelectAtLeastOneCategory'), 'error')
@@ -504,33 +748,39 @@ export default function MyInstantsDiscover({ store, addToast }) {
     setShowAllCategories(false)
     setCacheInfo(getCacheInfo())
 
-    if (tempSelectedCategories.length > 0) {
-      const firstCategory = tempSelectedCategories[0]
-      const cached = getCachedCategory(firstCategory)
-      if (cached && cached.length > 0) {
-        setResults(cached)
-        setActiveCategory(firstCategory)
-        setError('')
-      } else {
-        loadCategory(firstCategory, true)
-      }
+    const firstCategory = tempSelectedCategories[0]
+    const cached = getCachedCategory(firstCategory)
+    if (cached && cached.length > 0) {
+      setResults(cached)
+      setActiveCategory(firstCategory)
+      setError('')
+    } else {
+      loadCategory(firstCategory, true)
     }
   }
 
+  /** Resets the editor's draft to `DEFAULT_CATEGORIES`. */
   const resetCategoryEditor = () => {
-    const defaults = DEFAULT_CATEGORIES.map(cat => cat.id)
+    const defaults = DEFAULT_CATEGORIES.map((cat) => cat.id)
     setTempSelectedCategories(defaults)
   }
 
+  /** Selects all categories in the editor. */
   const selectAllCategories = () => {
-    const allIds = Object.keys(CATEGORIES)
-    setTempSelectedCategories(allIds)
+    setTempSelectedCategories(Object.keys(CATEGORIES))
   }
 
+  /** Deselects all categories in the editor. */
   const deselectAllCategories = () => {
     setTempSelectedCategories([])
   }
 
+  /**
+   * Handles a click on a category chip in the CategoryBar.
+   *
+   * @param {string} catId
+   * @returns {void}
+   */
   const handleSelectCategoryFromBar = (catId) => {
     setSearch('')
     const cached = getCachedCategory(catId)
@@ -543,6 +793,16 @@ export default function MyInstantsDiscover({ store, addToast }) {
     }
   }
 
+  // ─── INITIAL EFFECT (run once on mount) ────────────────────────────
+  // The three callbacks below depend on state, so listing them as deps
+  // would re-trigger this effect on every state change. That's not what
+  // we want: this effect is a one-time initialization that:
+  //   1. Loads the persistent cache from electron-store
+  //   2. Loads the user's category preferences
+  //   3. Fetches the first visible category
+  //   4. Schedules a background preload after 500ms
+  // Intentionally runs once per mount — `exhaustive-deps` is disabled.
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     const init = async () => {
       await ensureCacheLoaded()
@@ -561,7 +821,7 @@ export default function MyInstantsDiscover({ store, addToast }) {
 
       setTimeout(() => {
         preloadAllCategories(selected)
-      }, 500)
+      }, PRELOAD_START_DELAY)
     }
 
     init()
@@ -575,18 +835,25 @@ export default function MyInstantsDiscover({ store, addToast }) {
       }
     }
   }, [])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
+  // ─── RENDER ────────────────────────────────────────────────────────
   if (isInitialLoad && results.length === 0 && !loading) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100%',
-        color: 'var(--text-tertiary)',
-        gap: 12,
-      }}>
-        <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite', fontSize: 24 }} />
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          color: 'var(--text-tertiary)',
+          gap: 12,
+        }}
+      >
+        <i
+          className="ti ti-loader"
+          style={{ animation: 'spin 1s linear infinite', fontSize: 24 }}
+        />
         <span>{t('myinstantsLoading')}</span>
       </div>
     )
@@ -595,31 +862,40 @@ export default function MyInstantsDiscover({ store, addToast }) {
   const visibleCategories = getVisibleCategories()
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      overflow: 'hidden',
-    }}>
-      {/* En-tête */}
-      <div style={{
-        padding: '12px 20px',
-        borderBottom: '1px solid var(--border)',
-        flexShrink: 0,
-      }}>
-        <div style={{
-          fontWeight: 600,
-          fontSize: 15,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          padding: '12px 20px',
+          borderBottom: '1px solid var(--border)',
+          flexShrink: 0,
+        }}
+      >
+        <div
+          style={{
+            fontWeight: 600,
+            fontSize: 15,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
           <i className="ti ti-compass" style={{ color: 'var(--accent)' }} />
           {t('myinstantsTitle')}
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-          {results.length > 0 && `${results.length} ${t('myinstantsSoundsAvailable')}`}
-          {activeCategory && CATEGORIES[activeCategory] && ` · ${t(CATEGORIES[activeCategory].labelKey)}`}
+          {results.length > 0 &&
+            `${results.length} ${t('myinstantsSoundsAvailable')}`}
+          {activeCategory &&
+            CATEGORIES[activeCategory] &&
+            ` · ${t(CATEGORIES[activeCategory].labelKey)}`}
           {search && ` · ${t('myinstantsResultsFor')} "${search}"`}
           {isPreloadComplete && (
             <span style={{ marginLeft: 8, color: 'var(--success)' }}>
@@ -629,38 +905,53 @@ export default function MyInstantsDiscover({ store, addToast }) {
         </div>
       </div>
 
-      {/* Barre de progression du préchargement */}
+      {/* Preload progress bar */}
       {isPreloading && (
-        <div style={{
-          padding: '4px 20px',
-          background: 'var(--accent-light)',
-          borderBottom: '1px solid var(--accent)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          flexShrink: 0,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-            <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite', fontSize: 14, color: 'var(--accent)' }} />
+        <div
+          style={{
+            padding: '4px 20px',
+            background: 'var(--accent-light)',
+            borderBottom: '1px solid var(--accent)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}
+          >
+            <i
+              className="ti ti-loader"
+              style={{
+                animation: 'spin 1s linear infinite',
+                fontSize: 14,
+                color: 'var(--accent)',
+              }}
+            />
             <span style={{ fontSize: 11, color: 'var(--accent)' }}>
               {preloadStatus}
             </span>
           </div>
-          <div style={{
-            flex: 1,
-            minWidth: 80,
-            height: 4,
-            background: 'var(--bg-tertiary)',
-            borderRadius: 2,
-            overflow: 'hidden',
-          }}>
-            <div style={{
-              width: `${preloadProgress}%`,
-              height: '100%',
-              background: 'var(--accent)',
+          <div
+            style={{
+              flex: 1,
+              minWidth: 80,
+              height: 4,
+              background: 'var(--bg-tertiary)',
               borderRadius: 2,
-              transition: 'width 0.3s ease',
-            }} />
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${preloadProgress}%`,
+                height: '100%',
+                background: 'var(--accent)',
+                borderRadius: 2,
+                transition: 'width 0.3s ease',
+              }}
+            />
           </div>
           <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
             {preloadProgress}%
@@ -668,23 +959,25 @@ export default function MyInstantsDiscover({ store, addToast }) {
         </div>
       )}
 
-      {/* Barre de recherche */}
-      <div style={{
-        padding: '12px 20px',
-        borderBottom: '1px solid var(--border)',
-        flexShrink: 0,
-        display: 'flex',
-        gap: 8,
-        flexWrap: 'wrap',
-      }}>
+      {/* Search bar */}
+      <div
+        style={{
+          padding: '12px 20px',
+          borderBottom: '1px solid var(--border)',
+          flexShrink: 0,
+          display: 'flex',
+          gap: 8,
+          flexWrap: 'wrap',
+        }}
+      >
         <div style={{ flex: 1, minWidth: 200, display: 'flex', gap: 8 }}>
           <input
             data-testid="discover-search"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder={t('myinstantsSearchPlaceholder')}
             style={{ flex: 1 }}
-            onKeyDown={e => e.key === 'Enter' && handleSearch()}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           />
           <button
             className="btn-primary"
@@ -693,9 +986,14 @@ export default function MyInstantsDiscover({ store, addToast }) {
             style={{ minWidth: 80 }}
           >
             {loading ? (
-              <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
+              <i
+                className="ti ti-loader"
+                style={{ animation: 'spin 1s linear infinite' }}
+              />
             ) : (
-              <><i className="ti ti-search" /> {t('myinstantsSearch')}</>
+              <>
+                <i className="ti ti-search" /> {t('myinstantsSearch')}
+              </>
             )}
           </button>
 
@@ -721,12 +1019,12 @@ export default function MyInstantsDiscover({ store, addToast }) {
                 cursor: 'pointer',
                 transition: 'all var(--transition-base) ease',
               }}
-              onMouseEnter={e => {
+              onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'rgba(224, 82, 82, 0.15)'
                 e.currentTarget.style.color = 'var(--danger)'
                 e.currentTarget.style.borderColor = 'var(--danger)'
               }}
-              onMouseLeave={e => {
+              onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'var(--bg-tertiary)'
                 e.currentTarget.style.color = 'var(--text-tertiary)'
                 e.currentTarget.style.borderColor = 'var(--border)'
@@ -743,19 +1041,25 @@ export default function MyInstantsDiscover({ store, addToast }) {
           disabled={loading}
           style={{ fontSize: 11 }}
         >
-          <i className={`ti ${loading ? 'ti-loader' : 'ti-refresh'}`}
-            style={loading ? { animation: 'spin 1s linear infinite' } : {}} />
+          <i
+            className={`ti ${loading ? 'ti-loader' : 'ti-refresh'}`}
+            style={
+              loading ? { animation: 'spin 1s linear infinite' } : {}
+            }
+          />
           {t('myinstantsRefresh')}
         </button>
       </div>
 
-      {/* Catégories */}
-      <div style={{
-        padding: '8px 20px',
-        borderBottom: '1px solid var(--border)',
-        flexShrink: 0,
-        background: 'var(--bg-secondary)',
-      }}>
+      {/* Categories bar */}
+      <div
+        style={{
+          padding: '8px 20px',
+          borderBottom: '1px solid var(--border)',
+          flexShrink: 0,
+          background: 'var(--bg-secondary)',
+        }}
+      >
         <CategoryBar
           categories={visibleCategories}
           activeCategory={activeCategory}
@@ -768,36 +1072,46 @@ export default function MyInstantsDiscover({ store, addToast }) {
         />
       </div>
 
-      {/* Contenu */}
+      {/* Content */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
         {loading && (
-          <div style={{
-            textAlign: 'center',
-            padding: '40px',
-            color: 'var(--text-tertiary)',
-          }}>
-            <i className="ti ti-loader" style={{
-              animation: 'spin 1s linear infinite',
-              fontSize: 32,
-              display: 'block',
-              marginBottom: 12,
-            }} />
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '40px',
+              color: 'var(--text-tertiary)',
+            }}
+          >
+            <i
+              className="ti ti-loader"
+              style={{
+                animation: 'spin 1s linear infinite',
+                fontSize: 32,
+                display: 'block',
+                marginBottom: 12,
+              }}
+            />
             {t('myinstantsLoading')}
           </div>
         )}
 
         {error && !loading && (
-          <div style={{
-            textAlign: 'center',
-            padding: '40px',
-            color: 'var(--text-tertiary)',
-          }}>
-            <i className="ti ti-alert-triangle" style={{
-              fontSize: 32,
-              display: 'block',
-              marginBottom: 12,
-              color: 'var(--warning)',
-            }} />
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '40px',
+              color: 'var(--text-tertiary)',
+            }}
+          >
+            <i
+              className="ti ti-alert-triangle"
+              style={{
+                fontSize: 32,
+                display: 'block',
+                marginBottom: 12,
+                color: 'var(--warning)',
+              }}
+            />
             {error}
             <br />
             <button
@@ -811,32 +1125,44 @@ export default function MyInstantsDiscover({ store, addToast }) {
         )}
 
         {!loading && !error && results.length === 0 && (
-          <div style={{
-            textAlign: 'center',
-            padding: '60px 20px',
-            color: 'var(--text-tertiary)',
-          }}>
-            <i className="ti ti-music-off" style={{
-              fontSize: 48,
-              display: 'block',
-              marginBottom: 16,
-              color: 'var(--border)',
-            }} />
-            <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 8 }}>
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '60px 20px',
+              color: 'var(--text-tertiary)',
+            }}
+          >
+            <i
+              className="ti ti-music-off"
+              style={{
+                fontSize: 48,
+                display: 'block',
+                marginBottom: 16,
+                color: 'var(--border)',
+              }}
+            />
+            <div
+              style={{ fontSize: 16, fontWeight: 500, marginBottom: 8 }}
+            >
               {t('myinstantsNoResults')}
             </div>
             <div style={{ fontSize: 13 }}>
-              {search ? t('myinstantsTryDifferentSearch') : t('myinstantsSelectCategory')}
+              {search
+                ? t('myinstantsTryDifferentSearch')
+                : t('myinstantsSelectCategory')}
             </div>
           </div>
         )}
 
         {!loading && results.length > 0 && (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-            gap: 12,
-          }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns:
+                'repeat(auto-fill, minmax(180px, 1fr))',
+              gap: 12,
+            }}
+          >
             {results.map((sound, index) => {
               const owned = isSoundOwned(sound.name)
               const isDownloading = downloading[sound.id]
@@ -845,78 +1171,122 @@ export default function MyInstantsDiscover({ store, addToast }) {
               return (
                 <div
                   key={sound.id}
-                  data-testid={index === 0 ? 'discover-sound-card' : undefined}
+                  data-testid={
+                    index === 0 ? 'discover-sound-card' : undefined
+                  }
                   style={{
                     background: 'var(--bg-secondary)',
-                    border: `1px solid ${owned ? 'var(--success)' : isPreviewing ? 'var(--accent)' : 'var(--border)'}`,
+                    border: `1px solid ${
+                      owned
+                        ? 'var(--success)'
+                        : isPreviewing
+                          ? 'var(--accent)'
+                          : 'var(--border)'
+                    }`,
                     borderRadius: 'var(--radius-md)',
                     padding: 12,
                     textAlign: 'center',
                     transition: 'border-color 0.2s',
                     opacity: owned ? 0.8 : 1,
-                    boxShadow: isPreviewing ? '0 0 20px rgba(124,111,247,0.2)' : 'none',
+                    boxShadow: isPreviewing
+                      ? '0 0 20px rgba(124,111,247,0.2)'
+                      : 'none',
                   }}
                 >
-                  <div style={{
-                    fontSize: 32,
-                    marginBottom: 8,
-                    opacity: owned ? 0.6 : 1,
-                  }}>
+                  <div
+                    style={{
+                      fontSize: 32,
+                      marginBottom: 8,
+                      opacity: owned ? 0.6 : 1,
+                    }}
+                  >
                     {sound.emoji || '🔊'}
                   </div>
-                  <div style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    marginBottom: 8,
-                    color: owned ? 'var(--text-tertiary)' : 'var(--text-primary)',
-                  }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      marginBottom: 8,
+                      color: owned
+                        ? 'var(--text-tertiary)'
+                        : 'var(--text-primary)',
+                    }}
+                  >
                     {sound.name}
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button
-                      data-testid={index === 0 ? 'discover-preview-button' : undefined}
+                      data-testid={
+                        index === 0 ? 'discover-preview-button' : undefined
+                      }
                       className={`btn-${isPreviewing ? 'danger' : 'secondary'} btn-sm`}
                       style={{ flex: 1 }}
                       onClick={() => togglePreview(sound)}
                       disabled={owned}
                     >
-                      <i className={`ti ${isPreviewing ? 'ti-player-stop-filled' : 'ti-player-play'}`} />
+                      <i
+                        className={`ti ${
+                          isPreviewing
+                            ? 'ti-player-stop-filled'
+                            : 'ti-player-play'
+                        }`}
+                      />
                     </button>
                     <button
-                      data-testid={index === 0 ? 'discover-add-button' : undefined}
+                      data-testid={
+                        index === 0 ? 'discover-add-button' : undefined
+                      }
                       className={`btn-${owned ? 'success' : 'primary'} btn-sm`}
                       style={{ flex: 1 }}
                       onClick={() => openProfileModal(sound)}
                       disabled={owned || isDownloading}
                     >
                       {owned ? (
-                        <><i className="ti ti-check" /> {t('myinstantsAlreadyAdded')}</>
+                        <>
+                          <i className="ti ti-check" />{' '}
+                          {t('myinstantsAlreadyAdded')}
+                        </>
                       ) : isDownloading ? (
-                        <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
+                        <i
+                          className="ti ti-loader"
+                          style={{ animation: 'spin 1s linear infinite' }}
+                        />
                       ) : (
-                        <><i className="ti ti-download" /> {t('myinstantsAdd')}</>
+                        <>
+                          <i className="ti ti-download" />{' '}
+                          {t('myinstantsAdd')}
+                        </>
                       )}
                     </button>
                   </div>
                   {owned && (
-                    <div style={{
-                      fontSize: 9,
-                      color: 'var(--success)',
-                      marginTop: 4,
-                    }}>
-                      <i className="ti ti-check" /> {t('myinstantsAlreadyAdded')}
+                    <div
+                      style={{
+                        fontSize: 9,
+                        color: 'var(--success)',
+                        marginTop: 4,
+                      }}
+                    >
+                      <i className="ti ti-check" />{' '}
+                      {t('myinstantsAlreadyAdded')}
                     </div>
                   )}
                   {isPreviewing && !owned && (
-                    <div style={{
-                      fontSize: 9,
-                      color: 'var(--accent)',
-                      marginTop: 4,
-                    }}>
-                      <i className="ti ti-volume" style={{ animation: 'pulse 1s ease infinite' }} /> {t('myinstantsPlaying')}
+                    <div
+                      style={{
+                        fontSize: 9,
+                        color: 'var(--accent)',
+                        marginTop: 4,
+                      }}
+                    >
+                      <i
+                        className="ti ti-volume"
+                        style={{ animation: 'pulse 1s ease infinite' }}
+                      />{' '}
+                      {t('myinstantsPlaying')}
                     </div>
                   )}
                 </div>
@@ -925,33 +1295,37 @@ export default function MyInstantsDiscover({ store, addToast }) {
           </div>
         )}
 
-        {!loading && results.length > 0 && results.length >= 20 && (
-          <div style={{
-            textAlign: 'center',
-            padding: '20px 0 10px 0',
-            borderTop: '1px solid var(--border)',
-            marginTop: 16,
-          }}>
-            <button
-              data-testid="discover-load-more"
-              className="btn-secondary"
-              onClick={() => {
-                addToast(t('myinstantsLoadingMore'), 'info')
-              }}
+        {!loading &&
+          results.length > 0 &&
+          results.length >= SHOW_MORE_THRESHOLD && (
+            <div
               style={{
-                fontSize: 12,
-                padding: '6px 20px',
-                borderRadius: 'var(--radius-md)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
+                textAlign: 'center',
+                padding: '20px 0 10px 0',
+                borderTop: '1px solid var(--border)',
+                marginTop: 16,
               }}
             >
-              <i className="ti ti-chevron-down" />
-              {t('myinstantsShowMore')}
-            </button>
-          </div>
-        )}
+              <button
+                data-testid="discover-load-more"
+                className="btn-secondary"
+                onClick={() => {
+                  addToast(t('myinstantsLoadingMore'), 'info')
+                }}
+                style={{
+                  fontSize: 12,
+                  padding: '6px 20px',
+                  borderRadius: 'var(--radius-md)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <i className="ti ti-chevron-down" />
+                {t('myinstantsShowMore')}
+              </button>
+            </div>
+          )}
       </div>
 
       <AddToProfileModal

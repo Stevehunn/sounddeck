@@ -1,4 +1,3 @@
-// src/plugins/youtube/i18n.js
 export default {
   fr: {
     // ─── PAGE PRINCIPALE ──────────────────────────────────────────────────────

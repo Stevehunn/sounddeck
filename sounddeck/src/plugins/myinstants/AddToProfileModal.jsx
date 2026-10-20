@@ -1,5 +1,4 @@
 // src/plugins/myinstants/AddToProfileModal.jsx
-import React from 'react'
 
 export default function AddToProfileModal({
   sound,

@@ -1,5 +1,4 @@
 // src/plugins/myinstants/CategoryBar.jsx
-import React from 'react'
 
 export default function CategoryBar({
   categories,

@@ -1,6 +1,3 @@
-// src/plugins/emoji/i18n.js
-// ✅ Fichier unique contenant toutes les traductions du plugin Emoji
-
 export default {
   fr: {
     // ─── PAGE PRINCIPALE ─────────────────────────────────────────────

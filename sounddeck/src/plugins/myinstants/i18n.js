@@ -1,10 +1,36 @@
 /**
- * Traductions du plugin MyInstants
- * Ces traductions sont fusionnées avec les traductions principales de l'application
+ * @file MyInstants plugin translations.
+ *
+ * This file provides the strings used by the MyInstants Discovery plugin
+ * (Discover.jsx, CategoryBar.jsx, CategoryEditorModal.jsx,
+ * AddToProfileModal.jsx, tutorialSteps.js).
+ *
+ * Structure:
+ * - 3 languages: `fr`, `en`, `es`
+ * - 2 main sections per language:
+ *   - **Main page** — title, search, empty states, errors, preload
+ *   - **Categories** — display labels for the 40+ MyInstants categories
+ *   - **Category editor** — labels for the category-selection modal
+ *   - **Actions** — buttons, dialogs, toasts
+ *   - **Discover tutorial** — 8 tutorial steps for the discovery page
+ *
+ * These translations are **merged at startup** with the app's core
+ * translations by `PluginManager` (each plugin ships its own `i18n.js`
+ * at the root of its folder — see the "Plugin translations" section in
+ * `CONTRIBUTING.md`).
+ *
+ * ⚠️ Every key **must be present in all 3 languages** — the test
+ * `i18n.test.js` verifies this. When adding a key, add it to `fr` (the
+ * reference language), then `en`, then `es`.
+ *
+ * @see ./Discover.jsx — main consumer
+ * @see ./tutorialSteps.js — consumes the `tutorialDiscover*` keys
+ * @see ../../../src/core/i18n/LanguageContext.jsx — `useLanguage()` hook
  */
+
 export default {
   fr: {
-    // ─── PAGE PRINCIPALE ──────────────────────────────────────────────────────
+    // ─── MAIN PAGE ────────────────────────────────────────────────────
     myinstantsTitle: 'Découverte',
     pluginNameMyInstants: 'Découverte MyInstants',
     myinstantsSub: 'Sons disponibles',
@@ -40,7 +66,7 @@ export default {
     myinstantsShowMore: 'Voir toutes les catégories',
     myinstantsShowLess: 'Voir moins',
 
-    // ─── CATÉGORIES ──────────────────────────────────────────────────────────
+    // ─── CATEGORIES ──────────────────────────────────────────────────
     category_trending: 'Tendances',
     category_best: 'Meilleurs',
     category_popular: 'Populaires',
@@ -83,7 +109,7 @@ export default {
     category_transitions: 'Transitions',
     category_new: 'Nouveautés',
 
-    // ─── ÉDITEUR DE CATÉGORIES ──────────────────────────────────────────────
+    // ─── CATEGORY EDITOR ─────────────────────────────────────────────
     myinstantsCategoryEditor: 'Personnaliser les catégories',
     myinstantsCategoryEditorDesc: 'Choisissez les catégories affichées par défaut',
     myinstantsCategoryEditorSave: 'Sauvegarder',
@@ -95,14 +121,13 @@ export default {
     myinstantsCategoryEditorCancel: 'Annuler',
     myinstantsNoCategories: 'Aucune catégorie sélectionnée',
 
-    // ─── ACTIONS ─────────────────────────────────────────────────────────────
+    // ─── ACTIONS ─────────────────────────────────────────────────────
     myinstantsCancel: 'Annuler',
-    myinstantsSearch: 'Rechercher',
     myinstantsLoadingMore: '📥 Chargement de plus de sons...',
     myinstantsSelectAtLeastOneCategory: 'Sélectionnez au moins une catégorie',
     myinstantsSelected: 'sélectionnées',
 
-    // ─── TUTORIEL DÉCOUVERTE ──────────────────────────────────────────────────
+    // ─── DISCOVER TUTORIAL ──────────────────────────────────────────
     tutorialDiscoverStep1Title: 'Bienvenue dans la découverte',
     tutorialDiscoverStep1Desc: 'Explorez une vaste bibliothèque de sons populaires depuis MyInstants.',
     tutorialDiscoverStep1Hint: '💡 Astuce : Utilisez la barre de recherche pour trouver des sons spécifiques.',
@@ -137,7 +162,7 @@ export default {
   },
 
   en: {
-    // ─── MAIN PAGE ──────────────────────────────────────────────────────────
+    // ─── MAIN PAGE ────────────────────────────────────────────────────
     myinstantsTitle: 'Discovery',
     pluginNameMyInstants: 'MyInstants Discovery',
     myinstantsSub: 'Sounds available',
@@ -173,7 +198,7 @@ export default {
     myinstantsShowMore: 'See all categories',
     myinstantsShowLess: 'Show less',
 
-    // ─── CATEGORIES ──────────────────────────────────────────────────────────
+    // ─── CATEGORIES ──────────────────────────────────────────────────
     category_trending: 'Trending',
     category_best: 'Best',
     category_popular: 'Popular',
@@ -216,7 +241,7 @@ export default {
     category_transitions: 'Transitions',
     category_new: 'New',
 
-    // ─── CATEGORY EDITOR ─────────────────────────────────────────────────────
+    // ─── CATEGORY EDITOR ─────────────────────────────────────────────
     myinstantsCategoryEditor: 'Customize categories',
     myinstantsCategoryEditorDesc: 'Choose which categories are shown by default',
     myinstantsCategoryEditorSave: 'Save',
@@ -228,14 +253,13 @@ export default {
     myinstantsCategoryEditorCancel: 'Cancel',
     myinstantsNoCategories: 'No categories selected',
 
-    // ─── ACTIONS ─────────────────────────────────────────────────────────────
+    // ─── ACTIONS ─────────────────────────────────────────────────────
     myinstantsCancel: 'Cancel',
-    myinstantsSearch: 'Search',
     myinstantsLoadingMore: '📥 Loading more sounds...',
     myinstantsSelectAtLeastOneCategory: 'Select at least one category',
     myinstantsSelected: 'selected',
 
-    // ─── DISCOVER TUTORIAL ──────────────────────────────────────────────────
+    // ─── DISCOVER TUTORIAL ──────────────────────────────────────────
     tutorialDiscoverStep1Title: 'Welcome to Discovery',
     tutorialDiscoverStep1Desc: 'Explore a vast library of popular sounds from MyInstants.',
     tutorialDiscoverStep1Hint: '💡 Tip: Use the search bar to find specific sounds.',
@@ -270,7 +294,7 @@ export default {
   },
 
   es: {
-    // ─── PÁGINA PRINCIPAL ──────────────────────────────────────────────────
+    // ─── MAIN PAGE ────────────────────────────────────────────────────
     myinstantsTitle: 'Descubrimiento',
     pluginNameMyInstants: 'Descubrir MyInstants',
     myinstantsSub: 'Sonidos disponibles',
@@ -306,7 +330,7 @@ export default {
     myinstantsShowMore: 'Ver todas las categorías',
     myinstantsShowLess: 'Ver menos',
 
-    // ─── CATEGORÍAS ──────────────────────────────────────────────────────────
+    // ─── CATEGORIES ──────────────────────────────────────────────────
     category_trending: 'Tendencias',
     category_best: 'Mejores',
     category_popular: 'Populares',
@@ -349,7 +373,7 @@ export default {
     category_transitions: 'Transiciones',
     category_new: 'Nuevo',
 
-    // ─── EDITOR DE CATEGORÍAS ──────────────────────────────────────────────
+    // ─── CATEGORY EDITOR ─────────────────────────────────────────────
     myinstantsCategoryEditor: 'Personalizar categorías',
     myinstantsCategoryEditorDesc: 'Elige las categorías que se muestran por defecto',
     myinstantsCategoryEditorSave: 'Guardar',
@@ -361,14 +385,13 @@ export default {
     myinstantsCategoryEditorCancel: 'Cancelar',
     myinstantsNoCategories: 'No hay categorías seleccionadas',
 
-    // ─── ACCIONES ────────────────────────────────────────────────────────────
+    // ─── ACTIONS ─────────────────────────────────────────────────────
     myinstantsCancel: 'Cancelar',
-    myinstantsSearch: 'Buscar',
     myinstantsLoadingMore: '📥 Cargando más sonidos...',
     myinstantsSelectAtLeastOneCategory: 'Selecciona al menos una categoría',
     myinstantsSelected: 'seleccionadas',
 
-    // ─── TUTORIAL DESCUBRIMIENTO ──────────────────────────────────────────
+    // ─── DISCOVER TUTORIAL ──────────────────────────────────────────
     tutorialDiscoverStep1Title: 'Bienvenido al descubrimiento',
     tutorialDiscoverStep1Desc: 'Explora una vasta biblioteca de sonidos populares de MyInstants.',
     tutorialDiscoverStep1Hint: '💡 Consejo: Usa la barra de búsqueda para encontrar sonidos específicos.',

@@ -1,4 +1,3 @@
-// src/plugins/emoji/categories.test.js
 import { describe, it, expect } from 'vitest'
 import { EMOJI_DISCOVER_CATEGORIES } from './categories'
 

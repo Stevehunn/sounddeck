@@ -1,11 +1,68 @@
-// src/plugins/youtube/components/SaveStep.jsx
-import React from 'react'
+/**
+ * @file Step 3 of the YouTube import flow — final configuration.
+ *
+ * Lets the user:
+ * - Preview the downloaded audio
+ * - Edit the sound name
+ * - Pick an image (custom file or YouTube thumbnail)
+ * - Pick an emoji (via `EmojiPicker`)
+ * - Choose which profiles to save the sound to
+ * - Save the sound (`onSave`)
+ *
+ * The **Save** button is disabled if:
+ * - Any operation is in progress (`isProcessing` / `savingRef`)
+ * - The name is empty
+ * - The audio file is missing (`!currentPath`)
+ * - No profiles are selected
+ * - There are no user profiles at all (only "All sounds")
+ *
+ * @see ../YouTube.jsx — parent (`handleSave`, `handlePickImage`)
+ * @see ./PageHeader.jsx — the shared header
+ * @see @shared/components/ui/DeleteButton.jsx — for clearing the image
+ * @see @shared/components/ui/EmojiPicker.jsx — for picking an emoji
+ */
+
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { DeleteButton } from '@shared/components/ui'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 import EmojiPicker from '@shared/components/ui/EmojiPicker'
 import PageHeader from './PageHeader'
 
+/**
+ * Save / configure step.
+ *
+ * @param {Object} props
+ * @param {{ title: string, duration: number, thumbnail?: string, uploader?: string }} props.info
+ *   Video metadata (source).
+ * @param {string} props.currentPath - Path to the downloaded MP3.
+ * @param {boolean} props.isTutorialMode - Whether the tutorial is active.
+ * @param {string} props.soundName - Controlled sound name.
+ * @param {(v: string) => void} props.setSoundName
+ * @param {string} props.emoji - Current emoji.
+ * @param {(v: string) => void} props.setEmoji
+ * @param {string|null} props.customImage - Path to a custom image (or null).
+ * @param {(v: string|null) => void} props.setCustomImage
+ * @param {boolean} props.useThumbnail - Whether to use the YouTube thumbnail.
+ * @param {(v: boolean) => void} props.setUseThumbnail
+ * @param {string|null} props.finalImage - Resolved image (`useThumbnail ? thumb : custom`).
+ * @param {{ thumbnail?: string } | null} props.videoInfo
+ * @param {string[]} props.targetProfiles - Selected profile IDs.
+ * @param {(updater: (prev: string[]) => string[]) => void} props.setTargetProfiles
+ * @param {Array<{ id: string, name: string, isDefault?: boolean }>} props.availableProfiles
+ * @param {boolean} props.noProfilesSelected - `targetProfiles.length === 0`.
+ * @param {boolean} props.noUserProfiles - Only the "All sounds" profile exists.
+ * @param {boolean} props.isPreviewPlaying - Whether audio preview is playing.
+ * @param {(path: string) => void} props.togglePreview
+ * @param {boolean} props.showEmojiPicker - Whether the emoji picker is open.
+ * @param {(v: boolean) => void} props.setShowEmojiPicker
+ * @param {boolean} props.isProcessing - Whether a save / download is in progress.
+ * @param {boolean} props.savingRef - Snapshot of `savingRef.current` from parent.
+ * @param {() => void} props.onBack - Back to Trim step.
+ * @param {() => void} props.onSave - Triggers the save.
+ * @param {() => void} props.onPickImage - Opens the native image dialog.
+ * @param {Function} [_addToast] - Unused here (kept for parent contract).
+ * @returns {JSX.Element}
+ */
 export default function SaveStep({
   info,
   currentPath,
@@ -34,7 +91,7 @@ export default function SaveStep({
   onBack,
   onSave,
   onPickImage,
-  addToast,
+  addToast: _addToast, // intentionally unused (see JSDoc)
 }) {
   const { t } = useLanguage()
 
@@ -51,6 +108,7 @@ export default function SaveStep({
       />
       <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
+          {/* Success banner */}
           <div
             className="option-row"
             style={{
@@ -72,6 +130,7 @@ export default function SaveStep({
             </div>
           </div>
 
+          {/* Audio preview */}
           {currentPath && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -110,6 +169,7 @@ export default function SaveStep({
             </div>
           )}
 
+          {/* Sound name */}
           <div style={{ marginBottom: 14 }}>
             <label style={{
               fontSize: 12,
@@ -133,6 +193,7 @@ export default function SaveStep({
             />
           </div>
 
+          {/* Image picker */}
           <div style={{ marginBottom: 14 }}>
             <label style={{
               fontSize: 12,
@@ -146,6 +207,7 @@ export default function SaveStep({
               {t('image')}
             </label>
 
+            {/* Preview */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -191,6 +253,7 @@ export default function SaveStep({
               </div>
             </div>
 
+            {/* Image actions */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {videoInfo?.thumbnail && (
                 <button
@@ -248,6 +311,7 @@ export default function SaveStep({
             </div>
           </div>
 
+          {/* Emoji picker */}
           <div style={{ marginBottom: 14 }}>
             <label style={{
               fontSize: 12,
@@ -287,6 +351,7 @@ export default function SaveStep({
             />
           </div>
 
+          {/* Profiles */}
           <div style={{ marginBottom: 24 }}>
             <label style={{
               fontSize: 12,
@@ -315,7 +380,7 @@ export default function SaveStep({
                 <i className="ti ti-alert-triangle" />
                 <span>
                   {t('ytNoUserProfile') ||
-                    'Créez un profil depuis la page "Mes sons" avant d\'ajouter un son.'}
+                    'Create a profile from the "My Sounds" page before adding a sound.'}
                 </span>
               </div>
             ) : (
@@ -369,13 +434,14 @@ export default function SaveStep({
                     padding: '4px 8px',
                   }}>
                     <i className="ti ti-alert-triangle" />
-                    {t('editorProfileRequired') || 'Sélectionnez au moins un profil'}
+                    {t('editorProfileRequired') || 'Select at least one profile'}
                   </div>
                 )}
               </div>
             )}
           </div>
 
+          {/* Actions */}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
             <button
               className="btn-secondary btn-lg"
