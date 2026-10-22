@@ -1,4 +1,20 @@
-// src/shared/components/settings/OBSControl.jsx
+/**
+ * @file OBS Studio control panel (collapsible card).
+ *
+ * Lets the user connect to a running OBS instance (via the OBS WebSocket
+ * plugin v5), then start/stop recording and streaming. Shows the current
+ * connection status and the last error message.
+ *
+ * The panel is collapsed by default (only the "Connect" button is
+ * visible). Once connected, it expands to show recording / streaming /
+ * disconnect buttons.
+ *
+ * Status polling runs every 5 seconds via `getOBSStatus()` — the interval
+ * keeps the "Connected" badge up to date even if the WebSocket drops.
+ *
+ * @see @shared/utils/obsIntegration.js
+ */
+
 import { useState, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import {
@@ -8,12 +24,20 @@ import {
   startOBSRecording,
   stopOBSRecording,
   startOBSStreaming,
-  stopOBSStreaming
+  stopOBSStreaming,
 } from '@shared/utils/obsIntegration'
 import { logWarn } from '@shared/utils/logger'
 
-export default function OBSControl({ lang = 'fr' }) {
-  const { t, currentLang } = useLanguage()
+/**
+ * OBS Studio control panel.
+ *
+ * @param {Object} props
+ * @param {'fr'|'en'|'es'} [_lang='fr'] - Kept for API compatibility; the
+ *   effective language comes from `useLanguage()`.
+ * @returns {JSX.Element}
+ */
+export default function OBSControl({ _lang = 'fr' }) {
+  const { t } = useLanguage()
   const [isConnected, setIsConnected] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
@@ -40,6 +64,10 @@ export default function OBSControl({ lang = 'fr' }) {
     return () => clearInterval(interval)
   }, [])
 
+  /**
+   * Connects to OBS with the configured host/port/password.
+   * @returns {Promise<void>}
+   */
   const handleConnect = async () => {
     setIsLoading(true)
     setStatus(t('connecting') || t('loading'))
@@ -59,6 +87,10 @@ export default function OBSControl({ lang = 'fr' }) {
     setIsLoading(false)
   }
 
+  /**
+   * Disconnects from OBS and resets the recording/streaming state.
+   * @returns {void}
+   */
   const handleDisconnect = () => {
     try {
       disconnectOBS()
@@ -71,6 +103,10 @@ export default function OBSControl({ lang = 'fr' }) {
     }
   }
 
+  /**
+   * Toggles recording on/off.
+   * @returns {Promise<void>}
+   */
   const handleToggleRecording = async () => {
     if (isRecording) {
       try {
@@ -91,6 +127,10 @@ export default function OBSControl({ lang = 'fr' }) {
     }
   }
 
+  /**
+   * Toggles streaming on/off.
+   * @returns {Promise<void>}
+   */
   const handleToggleStreaming = async () => {
     if (isStreaming) {
       try {
@@ -112,32 +152,41 @@ export default function OBSControl({ lang = 'fr' }) {
   }
 
   return (
-    <div style={{
-      padding: '12px',
-      background: 'var(--bg-secondary)',
-      borderRadius: 'var(--radius-md)',
-      border: `1px solid ${isConnected ? 'var(--success)' : 'var(--border)'}`
-    }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 10
-      }}>
+    <div
+      style={{
+        padding: '12px',
+        background: 'var(--bg-secondary)',
+        borderRadius: 'var(--radius-md)',
+        border: `1px solid ${isConnected ? 'var(--success)' : 'var(--border)'}`,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 10,
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <i className="ti ti-brand-obs" style={{
-            color: isConnected ? 'var(--success)' : 'var(--text-tertiary)'
-          }} />
-          <span style={{ fontWeight: 600, fontSize: 13 }}>
-            OBS Studio
-          </span>
-          <span style={{
-            fontSize: 10,
-            color: isConnected ? 'var(--success)' : 'var(--text-tertiary)',
-            background: isConnected ? 'rgba(29,158,117,0.1)' : 'var(--bg-tertiary)',
-            padding: '2px 8px',
-            borderRadius: 10
-          }}>
+          <i
+            className="ti ti-brand-obs"
+            style={{
+              color: isConnected ? 'var(--success)' : 'var(--text-tertiary)',
+            }}
+          />
+          <span style={{ fontWeight: 600, fontSize: 13 }}>OBS Studio</span>
+          <span
+            style={{
+              fontSize: 10,
+              color: isConnected ? 'var(--success)' : 'var(--text-tertiary)',
+              background: isConnected
+                ? 'rgba(29,158,117,0.1)'
+                : 'var(--bg-tertiary)',
+              padding: '2px 8px',
+              borderRadius: 10,
+            }}
+          >
             {isConnected ? t('connected') : t('disconnected')}
           </span>
         </div>
@@ -147,28 +196,32 @@ export default function OBSControl({ lang = 'fr' }) {
           onClick={() => setShowConfig(!showConfig)}
           style={{ fontSize: 12 }}
         >
-          <i className={`ti ${showConfig ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
+          <i
+            className={`ti ${showConfig ? 'ti-chevron-up' : 'ti-chevron-down'}`}
+          />
         </button>
       </div>
 
       {showConfig && (
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-          marginBottom: 10
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            marginBottom: 10,
+          }}
+        >
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               value={host}
-              onChange={e => setHost(e.target.value)}
+              onChange={(e) => setHost(e.target.value)}
               placeholder={t('obsHost')}
               className="input-sm"
               style={{ flex: 1 }}
             />
             <input
               value={port}
-              onChange={e => setPort(Number(e.target.value))}
+              onChange={(e) => setPort(Number(e.target.value))}
               placeholder={t('obsPort')}
               className="input-sm"
               style={{ width: 80 }}
@@ -176,7 +229,7 @@ export default function OBSControl({ lang = 'fr' }) {
           </div>
           <input
             value={password}
-            onChange={e => setPassword(e.target.value)}
+            onChange={(e) => setPassword(e.target.value)}
             placeholder={t('obsPassword')}
             type="password"
             className="input-sm"
@@ -192,9 +245,17 @@ export default function OBSControl({ lang = 'fr' }) {
           style={{ width: '100%', justifyContent: 'center' }}
         >
           {isLoading ? (
-            <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {t('loading')}</>
+            <>
+              <i
+                className="ti ti-loader"
+                style={{ animation: 'spin 1s linear infinite' }}
+              />{' '}
+              {t('loading')}
+            </>
           ) : (
-            <><i className="ti ti-plug" /> {t('obsConnect')}</>
+            <>
+              <i className="ti ti-plug" /> {t('obsConnect')}
+            </>
           )}
         </button>
       ) : (
@@ -206,11 +267,13 @@ export default function OBSControl({ lang = 'fr' }) {
               flex: 1,
               justifyContent: 'center',
               borderColor: isRecording ? 'var(--danger)' : undefined,
-              color: isRecording ? 'var(--danger)' : undefined
+              color: isRecording ? 'var(--danger)' : undefined,
             }}
           >
-            <i className={`ti ${isRecording ? 'ti-player-stop-filled' : 'ti-circle-filled'}`}
-               style={{ color: 'var(--danger)' }} />
+            <i
+              className={`ti ${isRecording ? 'ti-player-stop-filled' : 'ti-circle-filled'}`}
+              style={{ color: 'var(--danger)' }}
+            />
             {isRecording ? t('obsStopRecording') : t('obsStartRecording')}
           </button>
 
@@ -221,10 +284,12 @@ export default function OBSControl({ lang = 'fr' }) {
               flex: 1,
               justifyContent: 'center',
               borderColor: isStreaming ? 'var(--success)' : undefined,
-              color: isStreaming ? 'var(--success)' : undefined
+              color: isStreaming ? 'var(--success)' : undefined,
             }}
           >
-            <i className={`ti ${isStreaming ? 'ti-player-stop-filled' : 'ti-player-play-filled'}`} />
+            <i
+              className={`ti ${isStreaming ? 'ti-player-stop-filled' : 'ti-player-play-filled'}`}
+            />
             {isStreaming ? t('obsStopStreaming') : t('obsStartStreaming')}
           </button>
 
@@ -239,17 +304,17 @@ export default function OBSControl({ lang = 'fr' }) {
       )}
 
       {status && (
-        <div style={{
-          fontSize: 11,
-          color: 'var(--text-tertiary)',
-          marginTop: 8,
-          textAlign: 'center'
-        }}>
+        <div
+          style={{
+            fontSize: 11,
+            color: 'var(--text-tertiary)',
+            marginTop: 8,
+            textAlign: 'center',
+          }}
+        >
           {status}
         </div>
       )}
-
-      
     </div>
   )
 }

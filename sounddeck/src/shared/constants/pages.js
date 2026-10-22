@@ -1,20 +1,23 @@
-// src/shared/constants/pages.js
-// ─────────────────────────────────────────────────────────────────────────────
-// ✅ SOURCE DE VÉRITÉ UNIQUE pour toutes les pages core.
-// Utilisé par : PluginManager, Sidebar, SidebarEditor, store/utils/constants.
-// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * @file Single source of truth for core pages.
+ *
+ * Consumed by: `PluginManager`, `Sidebar`, `SidebarEditor`,
+ * `store/utils/constants`.
+ */
 
 /**
- * Définition canonique de chaque page core.
- *  - id       : identifiant unique (route)
- *  - labelKey : clé i18n (via t())
- *  - icon     : icône Tabler
- *  - group    : groupe sidebar (navigation/actions/footer)
- *  - pinned   : épinglé par défaut (dans la section "📌 Pinned")
- *  - canHide  : si false, ne peut pas être masqué (actions uniquement)
+ * Canonical definition of every core page.
+ *
+ * @type {Array<{
+ *   id: string,
+ *   labelKey: string,
+ *   icon: string,
+ *   group: 'navigation'|'actions'|'footer',
+ *   canHide?: boolean,
+ * }>}
  */
 export const CORE_PAGES = [
-  // ─── Navigation principale ──────────────────────────────────────────────
+  // ─── Main navigation ─────────────────────────────────────────────────
   { id: 'home',        labelKey: 'mySounds',       icon: 'ti-home',              group: 'navigation' },
   { id: 'discover',    labelKey: 'discover',       icon: 'ti-compass',           group: 'navigation' },
   { id: 'trimmer',     labelKey: 'trimmer',        icon: 'ti-cut',               group: 'navigation' },
@@ -24,21 +27,30 @@ export const CORE_PAGES = [
   { id: 'stats',       labelKey: 'stats',          icon: 'ti-chart-bar',         group: 'navigation' },
   { id: 'emoji',       labelKey: 'emojiPageTitle', icon: 'ti-mood-smile',        group: 'navigation' },
 
-  // ─── Actions (visibles dans la section "⚡ Actions") ───────────────────
+  // ─── Actions (rendered in the "⚡ Actions" section) ────────────────────
   { id: 'loop',         labelKey: 'loop',         icon: 'ti-repeat',            group: 'actions', canHide: false },
   { id: 'shortcuts',    labelKey: 'shortcuts',    icon: 'ti-keyboard',          group: 'actions', canHide: false },
   { id: 'presentation', labelKey: 'presentation', icon: 'ti-layout-grid',       group: 'actions', canHide: false },
 
-  // ─── Footer (toujours en bas) ─────────────────────────────────────────
+  // ─── Footer (always at the bottom) ─────────────────────────────────
   { id: 'guide',        labelKey: 'guide',        icon: 'ti-book',              group: 'footer' },
   { id: 'options',      labelKey: 'options',      icon: 'ti-settings',          group: 'footer' },
 ]
 
-/** Set d'IDs pour lookups O(1). */
+/**
+ * Set of IDs for O(1) lookups.
+ * @type {Set<string>}
+ */
 export const CORE_PAGE_IDS = new Set(CORE_PAGES.map((p) => p.id))
 
-/** Map id → définition complète. */
+/**
+ * Map `id → full definition`.
+ * @type {Map<string, Object>}
+ */
 export const CORE_PAGES_MAP = new Map(CORE_PAGES.map((p) => [p.id, p]))
 
-/** Ordre par défaut (utilisé par DEFAULT_SIDEBAR_CONFIG). */
+/**
+ * Default order of core pages (used by `DEFAULT_SIDEBAR_CONFIG`).
+ * @type {string[]}
+ */
 export const DEFAULT_ITEM_ORDER = CORE_PAGES.map((p) => p.id)

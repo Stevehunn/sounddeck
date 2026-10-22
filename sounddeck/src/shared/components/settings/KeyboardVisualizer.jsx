@@ -1,12 +1,36 @@
-// src/shared/components/settings/KeyboardVisualizer.jsx
+/**
+ * @file Keyboard layout visualizer.
+ *
+ * Renders a QWERTY/AZERTY keyboard where each key highlights if it's used
+ * by at least one shortcut. Users can filter by modifiers (Ctrl/Alt/Shift)
+ * to see only shortcuts that match a specific combination.
+ *
+ * Two sources of truth for key mappings:
+ * - **Physical → display** (`PHYSICAL_TO_AZERTY`) — a QWERTY key is mapped
+ *   to its AZERTY equivalent for display.
+ * - **AZERTY → physical** (`AZERTY_TO_PHYSICAL`) — the reverse, used to
+ *   normalize a shortcut key from any layout to physical QWERTY.
+ *
+ * Both live in `@shared/utils/keyboardLayouts.js` and are shared with
+ * `ShortcutRecorder`.
+ *
+ * Layout config:
+ * - 4 rows (numbers, top letters, home letters, bottom letters)
+ * - A numpad below (NumLock, operators, 0-9, `.`)
+ *
+ * @see @shared/utils/keyboardLayouts.js
+ * @see ./ShortcutRecorder.jsx (single-key editing)
+ */
+
 import { useState } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
-import {
-  PHYSICAL_TO_AZERTY,
-  AZERTY_TO_PHYSICAL,
-} from '@shared/utils/keyboardLayouts'
+import { AZERTY_TO_PHYSICAL } from '@shared/utils/keyboardLayouts'
 
-//table de symboles locale
+/**
+ * Base-key fallback for symbols typed with Shift (e.g. `!` → `1`).
+ * Used when a shortcut is bound to a shifted symbol but the visualizer
+ * wants to highlight the base key.
+ */
 const SYMBOL_TO_BASE_KEY = {
   '!': '1', '@': '2', '#': '3', '$': '4', '%': '5',
   '^': '6', '&': '7', '*': '8', '(': '9', ')': '0',
@@ -15,7 +39,10 @@ const SYMBOL_TO_BASE_KEY = {
   '~': '`',
 }
 
-// Layouts clavier (QWERTY + AZERTY)
+/**
+ * Static keyboard layouts for QWERTY and AZERTY.
+ * Each `rows` entry is a display row; `numpad` is the numpad sequence.
+ */
 const KEYBOARD_LAYOUTS = {
   qwerty: {
     rows: [
@@ -37,14 +64,13 @@ const KEYBOARD_LAYOUTS = {
   },
 }
 
-// Helpers locaux qui utilisent la table partagée
-function getDisplayKey(physicalKey, layout) {
-  if (layout === 'azerty') {
-    return PHYSICAL_TO_AZERTY[physicalKey] || physicalKey
-  }
-  return physicalKey
-}
-
+/**
+ * Converts a display key to the corresponding physical QWERTY key.
+ *
+ * @param {string} displayKey
+ * @param {'qwerty'|'azerty'} layout
+ * @returns {string}
+ */
 function getPhysicalKey(displayKey, layout) {
   if (layout === 'azerty') {
     return AZERTY_TO_PHYSICAL[displayKey] || displayKey
@@ -52,10 +78,20 @@ function getPhysicalKey(displayKey, layout) {
   return displayKey
 }
 
+/**
+ * Keyboard visualizer.
+ *
+ * @param {Object} props
+ * @param {Record<string, string>} props.shortcuts - Map of `soundId → accelerator`.
+ * @param {'qwerty'|'azerty'} [props.layout='qwerty']
+ * @param {'fr'|'en'|'es'} [_lang='fr'] - Kept for API compatibility; the
+ *   effective language comes from `useLanguage()`.
+ * @returns {JSX.Element}
+ */
 export default function KeyboardVisualizer({
   shortcuts,
   layout = 'qwerty',
-  lang = 'fr',
+  _lang = 'fr',
 }) {
   const { t } = useLanguage()
 
@@ -67,6 +103,10 @@ export default function KeyboardVisualizer({
 
   const hasActiveFilters = Object.values(filters).some((active) => active)
 
+  /**
+   * Returns the list of active modifier accelerator prefixes.
+   * @returns {string[]}
+   */
   const getActiveMods = () => {
     const mods = []
     if (filters.ctrl) mods.push('CommandOrControl')
@@ -75,12 +115,24 @@ export default function KeyboardVisualizer({
     return mods
   }
 
+  /**
+   * Returns `true` if the shortcut uses any modifier.
+   * @param {string} shortcut
+   * @returns {boolean}
+   */
   const hasModifiers = (shortcut) => {
     if (!shortcut) return false
     const mods = ['CommandOrControl', 'Alt', 'Shift', 'Control']
     return mods.some((mod) => shortcut.includes(mod))
   }
 
+  /**
+   * Returns `true` if the shortcut matches the current filter EXACTLY
+   * (all active modifiers present, no extra modifiers).
+   *
+   * @param {string} shortcut
+   * @returns {boolean}
+   */
   const matchesFiltersExact = (shortcut) => {
     if (!shortcut) return false
 
@@ -105,6 +157,11 @@ export default function KeyboardVisualizer({
     return hasNoExtra
   }
 
+  /**
+   * Extracts the last segment of an accelerator (the actual key).
+   * @param {string} shortcut
+   * @returns {string|null}
+   */
   const getKeyFromShortcut = (shortcut) => {
     if (!shortcut) return null
     const clean = shortcut.replace(/CommandOrControl/g, 'CommandOrControl')
@@ -112,6 +169,11 @@ export default function KeyboardVisualizer({
     return parts[parts.length - 1]
   }
 
+  /**
+   * Returns `true` if the given key is used by at least one matching shortcut.
+   * @param {string} displayKey
+   * @returns {boolean}
+   */
   const isKeyActive = (displayKey) => {
     const physicalKey = getPhysicalKey(displayKey, layout)
 
@@ -143,6 +205,11 @@ export default function KeyboardVisualizer({
     })
   }
 
+  /**
+   * Returns the number of shortcuts that use the given modifier.
+   * @param {'ctrl'|'alt'|'shift'} mod
+   * @returns {number}
+   */
   const getModifierCount = (mod) => {
     const searchTerms = {
       ctrl: ['CommandOrControl', 'Control'],
@@ -155,10 +222,20 @@ export default function KeyboardVisualizer({
     ).length
   }
 
+  /**
+   * Toggles a modifier filter on/off.
+   * @param {'ctrl'|'alt'|'shift'} mod
+   * @returns {void}
+   */
   const toggleFilter = (mod) => {
     setFilters((prev) => ({ ...prev, [mod]: !prev[mod] }))
   }
 
+  /**
+   * Returns `true` if the given filter is active.
+   * @param {'ctrl'|'alt'|'shift'} mod
+   * @returns {boolean}
+   */
   const isFilterActive = (mod) => filters[mod]
 
   const totalShortcuts = Object.values(shortcuts).filter((s) => s).length
@@ -173,6 +250,10 @@ export default function KeyboardVisualizer({
     shift: layout === 'azerty' ? 'Maj' : 'Shift',
   }
 
+  /**
+   * Returns a human-readable label for the current filter state.
+   * @returns {string}
+   */
   const getFilterStatus = () => {
     const active = Object.entries(filters)
       .filter(([, isActive]) => isActive)
@@ -216,7 +297,9 @@ export default function KeyboardVisualizer({
       >
         <i className="ti ti-keyboard" />
         {t('keyboardVisualizerTitle')}
-        <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 400 }}>
+        <span
+          style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 400 }}
+        >
           {hasActiveFilters
             ? `${activeShortcuts} / ${totalShortcuts} ${t('withFilter')} ${getFilterStatus()}`
             : `${soloShortcuts.length} ${t('soloKeys')} / ${totalShortcuts} ${t('shortcutsTotal')}`}
@@ -328,7 +411,9 @@ export default function KeyboardVisualizer({
 
         {hasActiveFilters && (
           <button
-            onClick={() => setFilters({ ctrl: false, alt: false, shift: false })}
+            onClick={() =>
+              setFilters({ ctrl: false, alt: false, shift: false })
+            }
             style={{
               padding: '6px 12px',
               borderRadius: 6,
@@ -346,7 +431,14 @@ export default function KeyboardVisualizer({
         )}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          alignItems: 'center',
+        }}
+      >
         {rows.map((row, rowIndex) => (
           <div key={rowIndex} style={{ display: 'flex', gap: 4 }}>
             <div style={{ width: rowIndex * 20 }} />
@@ -360,7 +452,9 @@ export default function KeyboardVisualizer({
                     height: 36,
                     borderRadius: 4,
                     border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                    background: active ? 'var(--accent-light)' : 'var(--bg-secondary)',
+                    background: active
+                      ? 'var(--accent-light)'
+                      : 'var(--bg-secondary)',
                     color: active ? 'var(--accent)' : 'var(--text-secondary)',
                     display: 'flex',
                     alignItems: 'center',
@@ -372,7 +466,11 @@ export default function KeyboardVisualizer({
                     cursor: 'default',
                     lineHeight: 1.1,
                   }}
-                  title={active ? `${t('shortcutUsedWith')} ${getFilterStatus()}` : ''}
+                  title={
+                    active
+                      ? `${t('shortcutUsedWith')} ${getFilterStatus()}`
+                      : ''
+                  }
                 >
                   <span>{key}</span>
                   {active && (
@@ -395,10 +493,16 @@ export default function KeyboardVisualizer({
           </div>
         ))}
 
-        {/* Pavé numérique */}
+        {/* Numpad */}
         <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
           <div style={{ width: 20 }} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 36px)', gap: 4 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 36px)',
+              gap: 4,
+            }}
+          >
             {numpadKeys.map((key) => {
               const active = isKeyActive(key)
               return (
@@ -409,7 +513,9 @@ export default function KeyboardVisualizer({
                     height: 36,
                     borderRadius: 4,
                     border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                    background: active ? 'var(--accent-light)' : 'var(--bg-secondary)',
+                    background: active
+                      ? 'var(--accent-light)'
+                      : 'var(--bg-secondary)',
                     color: active ? 'var(--accent)' : 'var(--text-secondary)',
                     display: 'flex',
                     alignItems: 'center',
@@ -479,18 +585,39 @@ export default function KeyboardVisualizer({
           {t('keyInactive')}
         </span>
         {hasActiveFilters && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--accent)' }}>
+          <span
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              color: 'var(--accent)',
+            }}
+          >
             <i className="ti ti-filter" style={{ fontSize: 12 }} />
             {getFilterStatus()}
           </span>
         )}
         {!hasActiveFilters && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-tertiary)' }}>
+          <span
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              color: 'var(--text-tertiary)',
+            }}
+          >
             <i className="ti ti-info-circle" style={{ fontSize: 12 }} />
             {t('keysWithoutModifier')}
           </span>
         )}
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-tertiary)' }}>
+        <span
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            color: 'var(--text-tertiary)',
+          }}
+        >
           <span style={{ fontSize: 10 }}>⌨️</span>
           {layoutLabel}
         </span>

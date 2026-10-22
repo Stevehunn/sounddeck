@@ -1,9 +1,18 @@
-// src/core/plugins/PluginManager/pagesCache.js
+/**
+ * @file Builds the complete pages list (core + plugins + profiles).
+ *
+ * @see ./PluginManager/index.js (`getAllPages`)
+ */
+
 import { CORE_PAGES } from './constants'
 import { DEFAULT_ICONS, DEFAULT_GROUPS } from '@shared/constants/navigation'
 
 /**
- * Construit la liste complète des pages (core + plugins + profils).
+ * Builds the complete pages list.
+ *
+ * @param {Object} pluginManager
+ * @param {(key: string) => string} [translateFn] - Optional i18n function.
+ * @returns {Array<Object>}
  */
 export function buildAllPages(pluginManager, translateFn) {
   const t = translateFn || ((key) => key)
@@ -28,6 +37,12 @@ export function buildAllPages(pluginManager, translateFn) {
   return [...corePages, ...pluginPages, ...storePages]
 }
 
+/**
+ * Builds "page" descriptors for the user's profiles.
+ *
+ * @param {Object|null} store
+ * @returns {Array<Object>}
+ */
 function buildStorePages(store) {
   if (!store) return []
 

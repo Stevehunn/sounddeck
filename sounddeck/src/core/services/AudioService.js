@@ -1,4 +1,27 @@
-// src/core/services/AudioService.js
+/**
+ * @file Main audio service — playback, gain analysis, progress, pause/resume.
+ *
+ * This module owns every sound that is playing. It supports two playback
+ * modes:
+ *
+ * - **Normal mode** — Howler.js `Howl` instances. Uses `html5: false`
+ *   (Web Audio) for the default device, and `html5: true` + `setSinkId`
+ *   for virtual devices (VB-Cable, VoiceMeeter, …).
+ * - **Mixer mode** — `AudioMixerService` (mic + sounds mixed into a single
+ *   `MediaStream`). Used when `store.mixerEnabled === true`.
+ *
+ * Both modes expose the same public API (`playSound`, `stopSound`,
+ * `pauseSound`, `resumeSound`, `getSoundProgress`, …) so consumers don't
+ * need to know which mode is active.
+ *
+ * A playback subscription (`subscribeToPlayback`) lets React components
+ * (e.g. `useCurrentPlaying`) react to play/stop events without polling.
+ *
+ * @see ./AudioMixerService.js
+ * @see @shared/hooks/useCurrentPlaying.js
+ * @see @shared/components/audio/SoundCard/index.jsx
+ */
+
 import { Howl } from 'howler'
 import * as AudioMixerService from './AudioMixerService'
 import { buildFileUrl } from '@shared/utils/fileUrl'
@@ -20,27 +43,35 @@ const pausedStates = new Map()
 const soundMetadata = new Map()
 const externalPlaybackHandlers = new Map()
 
-// DEBUG : logs actifs uniquement en dev
+// Debug logs are only active in dev builds.
 const DEBUG_AUDIO =
   typeof import.meta !== 'undefined' && import.meta.env?.DEV
 
 function dbg(tag, data) {
   if (!DEBUG_AUDIO) return
   try {
-    // eslint-disable-next-line no-console
     console.log(`[AudioService][${tag}]`, data)
-  } catch (e) {}
+  } catch {
+    // Silent — logging must never crash the caller.
+  }
 }
 
 export function setStoreRef(store) {
   storeRef = store
 }
 
-// ─── SYSTÈME D'ÉVÉNEMENTS DE LECTURE ────────────────────────────────────────
+// ─── PLAYBACK EVENT SYSTEM ─────────────────────────────────────────────
 
 const playbackListeners = new Set()
 let currentPlayingId = null
 
+/**
+ * Subscribes to playback events. The listener is called immediately with
+ * the current snapshot, then again on every play/stop.
+ *
+ * @param {(snapshot: {id: string|null, playingIds: string[]}) => void} callback
+ * @returns {() => void} Unsubscribe function.
+ */
 export function subscribeToPlayback(callback) {
   playbackListeners.add(callback)
   try {
@@ -49,7 +80,7 @@ export function subscribeToPlayback(callback) {
       playingIds: Array.from(playingIds),
     })
   } catch (e) {
-    logError('AudioService', 'Callback playback initial', e)
+    logError('AudioService', 'Initial playback callback', e)
   }
   return () => playbackListeners.delete(callback)
 }
@@ -64,7 +95,7 @@ function notifyPlaybackListeners(id = null) {
     try {
       cb(snapshot)
     } catch (e) {
-      logError('AudioService', 'Callback playback', e)
+      logError('AudioService', 'Playback callback', e)
     }
   })
 }
@@ -97,15 +128,26 @@ function handleHowlTerminated(soundId) {
   }
 }
 
+/**
+ * Returns the IDs of every currently playing sound.
+ * @returns {string[]}
+ */
 export function getPlayingIds() {
   return Array.from(playingIds)
 }
 
-// ─── OVERRIDE POUR LECTEURS EXTERNES ────────────────────────────────────────
+// ─── EXTERNAL PLAYER OVERRIDE ──────────────────────────────────────────
 
 let manualOverrideId = null
 let manualProgress = { id: null, current: 0, duration: 0, ratio: 0 }
 
+/**
+ * Forces the "current playing" tracker to point at the given sound ID.
+ * Used by external players (e.g. the sequencer) that aren't managed here.
+ *
+ * @param {string|null} soundId
+ * @returns {void}
+ */
 export function setCurrentPlayingSound(soundId) {
   manualOverrideId = soundId || null
   if (!soundId) {
@@ -117,6 +159,14 @@ export function setCurrentPlayingSound(soundId) {
   notifyPlaybackListeners(soundId || null)
 }
 
+/**
+ * Updates the progress shown for the currently overridden external sound.
+ *
+ * @param {string} soundId
+ * @param {number} current - Seconds played.
+ * @param {number} duration - Total duration (seconds).
+ * @returns {void}
+ */
 export function setCurrentPlayingProgress(soundId, current, duration) {
   if (manualOverrideId !== soundId) return
   manualProgress = {
@@ -127,22 +177,36 @@ export function setCurrentPlayingProgress(soundId, current, duration) {
   }
 }
 
-// ─── REGISTRE DES LECTEURS EXTERNES ────────────────────────────────────────
+// ─── EXTERNAL PLAYER REGISTRY ──────────────────────────────────────────
 
+/**
+ * Registers external playback handlers (pause/resume/isPaused) for a sound
+ * that isn't managed by this module.
+ *
+ * @param {string} soundId
+ * @param {{pause: () => any, resume: () => any, isPaused: () => boolean}} handlers
+ * @returns {void}
+ */
 export function registerExternalPlayback(soundId, handlers) {
   if (!soundId || !handlers) return
   externalPlaybackHandlers.set(soundId, handlers)
 }
 
+/**
+ * Removes the external handlers for the given sound.
+ * @param {string} soundId
+ * @returns {void}
+ */
 export function unregisterExternalPlayback(soundId) {
   if (!soundId) return
   externalPlaybackHandlers.delete(soundId)
 }
 
-// ─── HELPERS CACHE ─────────────────────────────────────────────────────────
+// ─── CACHE HELPERS ────────────────────────────────────────────────────
 
 function findTrackableHowl(cached) {
-  if (!cached || cached === 'loading' || cached === '__mixer_paused__') return null
+  if (!cached || cached === 'loading' || cached === '__mixer_paused__')
+    return null
 
   const isHowl = (h) =>
     h &&
@@ -158,7 +222,8 @@ function findTrackableHowl(cached) {
 }
 
 const isBufferSourceNode = (h) =>
-  typeof AudioBufferSourceNode !== 'undefined' && h instanceof AudioBufferSourceNode
+  typeof AudioBufferSourceNode !== 'undefined' &&
+  h instanceof AudioBufferSourceNode
 
 function captureHowlOffset(h) {
   if (!h) return { offset: null, duration: null }
@@ -176,29 +241,40 @@ function captureHowlOffset(h) {
         duration = node.duration
       }
     }
-  } catch (e) {}
+  } catch {
+    // Ignore — Howler internals aren't guaranteed.
+  }
 
   if (offset === null) {
     try {
       const s = h.seek()
       if (typeof s === 'number' && s > 0) offset = s
-    } catch (e) {}
+    } catch {
+      // Ignore.
+    }
   }
 
   if (duration === null) {
     try {
       const d = h.duration()
       if (typeof d === 'number' && d > 0) duration = d
-    } catch (e) {}
+    } catch {
+      // Ignore.
+    }
   }
 
   return { offset, duration }
 }
 
-// ─── DÉTECTION DES DEVICES VIRTUELS ────────────────────────────────────────
+// ─── VIRTUAL DEVICE DETECTION ─────────────────────────────────────────
 
 const VIRTUAL_DEVICE_KEYWORDS = [
-  'cable', 'vb-audio', 'vb audio', 'virtual', 'voicemeeter', 'scream',
+  'cable',
+  'vb-audio',
+  'vb audio',
+  'virtual',
+  'voicemeeter',
+  'scream',
 ]
 
 async function getDeviceLabel(deviceId) {
@@ -209,7 +285,7 @@ async function getDeviceLabel(deviceId) {
       (d) => d.deviceId === deviceId && d.kind === 'audiooutput'
     )
     return (device?.label || '').toLowerCase()
-  } catch (e) {
+  } catch {
     return ''
   }
 }
@@ -223,7 +299,7 @@ async function shouldCreateLocalHowl(audioDevice, localDeviceId, playLocally) {
   if (!playLocally) return false
 
   if (localDeviceId === audioDevice) {
-    logWarn('AudioService', `Skip local : même device (${audioDevice})`)
+    logWarn('AudioService', `Skip local: same device (${audioDevice})`)
     return false
   }
 
@@ -234,22 +310,30 @@ async function shouldCreateLocalHowl(audioDevice, localDeviceId, playLocally) {
   const localIsVirtual = isVirtualDeviceLabel(localLabel)
 
   if (localIsVirtual) {
-    logWarn('AudioService',
-      `Skip local : "${localLabel}" est un device virtuel.`)
+    logWarn('AudioService', `Skip local: "${localLabel}" is a virtual device.`)
     return false
   }
 
   if (localDeviceId === 'default' && audioIsVirtual) {
-    logWarn('AudioService',
-      `Skip local : localDeviceId='default' + audioDevice virtuel.`)
+    logWarn(
+      'AudioService',
+      `Skip local: localDeviceId='default' + virtual audioDevice.`
+    )
     return false
   }
 
   return true
 }
 
-// ─── ANALYSE GAIN ──────────────────────────────────────────────────────────
+// ─── GAIN ANALYSIS ────────────────────────────────────────────────────
 
+/**
+ * Analyzes a file to compute the RMS-based normalization gain (in dB).
+ *
+ * @param {string} filePath
+ * @param {number} [sampleCount=200] - Number of samples to average.
+ * @returns {Promise<number>} Gain in dB (0 on failure).
+ */
 export async function analyzeGain(filePath, sampleCount = 200) {
   if (gainCache[filePath]) return gainCache[filePath]
 
@@ -280,6 +364,11 @@ export async function analyzeGain(filePath, sampleCount = 200) {
   }
 }
 
+/**
+ * Sets the target RMS used for normalization (clamped to 0.02-1).
+ * @param {number} targetRMS
+ * @returns {void}
+ */
 export function setNormalizationTarget(targetRMS) {
   const clamped = Math.max(
     0.02,
@@ -289,6 +378,10 @@ export function setNormalizationTarget(targetRMS) {
   gainCache.targetRMS = clamped
 }
 
+/**
+ * Returns the current normalization target RMS.
+ * @returns {number}
+ */
 export function getNormalizationTarget() {
   return normalizationTargetRMS
 }
@@ -304,6 +397,14 @@ function calculateFinalVolume(globalVolume, soundVolumeDb, gainDb = 0) {
   return Math.max(0.0001, finalVolume)
 }
 
+/**
+ * Computes the final playback volume for a sound (0-1), including
+ * normalization and per-sound dB adjustments.
+ *
+ * @param {Object} sound
+ * @param {number} [globalVolume=80] - Master volume (0-100).
+ * @returns {number}
+ */
 export function getFinalVolumeForSound(sound, globalVolume = 80) {
   if (!sound) return 1
   const gainDb = gainCache[sound.path] || 0
@@ -311,7 +412,7 @@ export function getFinalVolumeForSound(sound, globalVolume = 80) {
   return calculateFinalVolume(globalVolume, soundVolumeDb, gainDb)
 }
 
-// ─── Mode Normal (sans mixeur) ─────────────────────────────────────────────
+// ─── NORMAL MODE (no mixer) ───────────────────────────────────────────
 
 function playSoundNormal(
   sound,
@@ -321,28 +422,56 @@ function playSoundNormal(
   playLocally = true
 ) {
   const gainDb = gainCache[sound.path] || 0
-  const volumeRatio = calculateFinalVolume(globalVolume, sound.volume ?? 0, gainDb)
+  const volumeRatio = calculateFinalVolume(
+    globalVolume,
+    sound.volume ?? 0,
+    gainDb
+  )
   const fileUrl = buildFileUrl(sound.path)
 
   const rawExt = sound.path
-    .split('.').pop()?.split('?')[0]?.split('#')[0]?.toLowerCase()
-  const validFormats = ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'opus', 'webm']
+    .split('.')
+    .pop()
+    ?.split('?')[0]
+    ?.split('#')[0]
+    ?.toLowerCase()
+  const validFormats = [
+    'mp3',
+    'wav',
+    'ogg',
+    'flac',
+    'm4a',
+    'aac',
+    'opus',
+    'webm',
+  ]
   const format = validFormats.includes(rawExt) ? rawExt : 'mp3'
 
+  // If already playing, stop it (toggle behavior).
   if (soundCache[sound.id]) {
     const cached = soundCache[sound.id]
     if (Array.isArray(cached)) {
       cached.forEach((h) => {
-        try { h.stop(); h.unload() } catch (e) {}
+        try {
+          h.stop()
+          h.unload()
+        } catch {
+          // Ignore.
+        }
       })
     } else {
-      try { cached.stop(); cached.unload() } catch (e) {}
+      try {
+        cached.stop()
+        cached.unload()
+      } catch {
+        // Ignore.
+      }
     }
     delete soundCache[sound.id]
     return
   }
 
-  // ─── Cas 1 : device par défaut → Howl html5:false ────────────────────
+  // ─── Case 1: default device → Howl html5:false ───────────────────────
   if (!audioDevice || audioDevice === 'default') {
     const howl = new Howl({
       src: [fileUrl],
@@ -380,7 +509,7 @@ function playSoundNormal(
     return
   }
 
-  // ─── Cas 2 : device virtuel → Howls html5:true ───────────────────────
+  // ─── Case 2: virtual device → Howls html5:true ───────────────────────
   const localDeviceId = storeRef?.localAudioDevice || 'default'
 
   try {
@@ -397,7 +526,7 @@ function playSoundNormal(
       },
       onstop: () => handleHowlTerminated(sound.id),
       onloaderror: (id, err) => {
-        logError('AudioService', 'device virtuel', err)
+        logError('AudioService', 'virtual device', err)
         handleHowlTerminated(sound.id)
       },
     })
@@ -406,7 +535,8 @@ function playSoundNormal(
       try {
         const audioNode = howlDiscord._sounds?.[0]?._node
         if (audioNode && audioNode.setSinkId) {
-          audioNode.setSinkId(audioDevice)
+          audioNode
+            .setSinkId(audioDevice)
             .catch((e) => logWarn('AudioService', 'setSinkId failed', e))
         }
       } catch (e) {
@@ -453,7 +583,7 @@ function playSoundNormal(
           loop,
           format: [format],
           onloaderror: (id, err) => {
-            logError('AudioService', 'lecture locale', err)
+            logError('AudioService', 'local playback', err)
           },
         })
 
@@ -463,7 +593,9 @@ function playSoundNormal(
             if (audioNode && audioNode.setSinkId) {
               audioNode.setSinkId(localDeviceId).catch(() => {})
             }
-          } catch (e) {}
+          } catch {
+            // Ignore.
+          }
         })
 
         if (Array.isArray(soundCache[sound.id])) {
@@ -501,9 +633,14 @@ function playSoundNormal(
   }
 }
 
-// ─── Mode Mixeur ───────────────────────────────────────────────────────────
+// ─── MIXER MODE ───────────────────────────────────────────────────────
 
-async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true) {
+async function playSoundWithMixer(
+  sound,
+  globalVolume,
+  loop,
+  playLocally = true
+) {
   const soundVolumeDb = sound.volumeDb ?? sound.volume ?? 0
   let soundRatio = Math.pow(10, soundVolumeDb / 20)
   soundRatio = Math.min(1, soundRatio)
@@ -524,12 +661,12 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
 
   soundCache[sound.id] = 'loading'
 
-  let audioBuffer = null
+  let audioBuffer
   try {
     audioBuffer = await AudioMixerService.loadAudioBuffer(fileUrl)
   } catch (e) {
     delete soundCache[sound.id]
-    logWarn('AudioService', 'Erreur chargement buffer', e)
+    logWarn('AudioService', 'Buffer load error', e)
     return
   }
 
@@ -537,7 +674,7 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
 
   if (!audioBuffer) {
     delete soundCache[sound.id]
-    logWarn('AudioService', `Impossible de charger: ${fileUrl}`)
+    logWarn('AudioService', `Cannot load: ${fileUrl}`)
     return
   }
 
@@ -595,7 +732,7 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
         format: ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'],
         onend: () => {},
         onloaderror: (id, err) => {
-          logWarn('AudioService', 'Erreur lecture locale (mixer)', err)
+          logWarn('AudioService', 'Local playback error (mixer)', err)
         },
       })
 
@@ -605,7 +742,9 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
           if (audioNode && audioNode.setSinkId) {
             audioNode.setSinkId(localDevice).catch(() => {})
           }
-        } catch (e) {}
+        } catch {
+          // Ignore.
+        }
       })
 
       localHowl.play()
@@ -617,14 +756,30 @@ async function playSoundWithMixer(sound, globalVolume, loop, playLocally = true)
         soundCache[sound.id].push(localHowl)
       }
     } catch (e) {
-      logWarn('AudioService', 'Erreur lecture locale (mixer, catch)', e)
+      logWarn('AudioService', 'Local playback error (mixer, catch)', e)
     }
   }
 }
 
-// ─── API PRINCIPALE ────────────────────────────────────────────────────────
+// ─── MAIN API ─────────────────────────────────────────────────────────
 
-export function playSound(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
+/**
+ * Plays a sound (fire-and-forget — no gain analysis if not cached).
+ *
+ * @param {Object} sound - Sound object (`id`, `path`, `volume`, `volumeDb`).
+ * @param {string} [audioDevice='default']
+ * @param {number} [globalVolume=80]
+ * @param {boolean} [loop=false]
+ * @param {boolean} [playLocally=true]
+ * @returns {void}
+ */
+export function playSound(
+  sound,
+  audioDevice = 'default',
+  globalVolume = 80,
+  loop = false,
+  playLocally = true
+) {
   if (!sound?.path) return
 
   markSoundPlaying(sound.id)
@@ -638,14 +793,34 @@ export function playSound(sound, audioDevice = 'default', globalVolume = 80, loo
   }
 }
 
-export async function playSoundAsync(sound, audioDevice = 'default', globalVolume = 80, loop = false, playLocally = true) {
+/**
+ * Like `playSound`, but also awaits gain analysis if it isn't cached yet.
+ * Slight latency penalty (decoding the file) — use for one-shot playback
+ * where you care about consistent volume.
+ *
+ * @param {Object} sound
+ * @param {string} [audioDevice='default']
+ * @param {number} [globalVolume=80]
+ * @param {boolean} [loop=false]
+ * @param {boolean} [playLocally=true]
+ * @returns {Promise<void>}
+ */
+export async function playSoundAsync(
+  sound,
+  audioDevice = 'default',
+  globalVolume = 80,
+  loop = false,
+  playLocally = true
+) {
   if (!sound?.path) return
 
   markSoundPlaying(sound.id)
   notifyPlaybackListeners(sound.id)
 
   if (sound.path && !gainCache[sound.path]) {
-    try { await analyzeGain(sound.path) } catch (e) {
+    try {
+      await analyzeGain(sound.path)
+    } catch (e) {
       logWarn('AudioService', 'Gain analysis fallback', e)
     }
   }
@@ -653,6 +828,14 @@ export async function playSoundAsync(sound, audioDevice = 'default', globalVolum
   playSound(sound, audioDevice, globalVolume, loop, playLocally)
 }
 
+/**
+ * Analyzes the gain of every sound that hasn't been analyzed yet.
+ * Useful before an important session so playback never stutters.
+ *
+ * @param {Array<Object>} sounds
+ * @param {((progress: number) => void)|null} [onProgress]
+ * @returns {Promise<Record<string, number>>}
+ */
 export async function analyzeAllGains(sounds, onProgress) {
   const total = sounds.length
   let done = 0
@@ -673,6 +856,11 @@ export async function analyzeAllGains(sounds, onProgress) {
   return gainCache
 }
 
+/**
+ * Stops a specific sound.
+ * @param {string} soundId
+ * @returns {void}
+ */
 export function stopSound(soundId) {
   const cached = soundCache[soundId]
 
@@ -698,10 +886,13 @@ export function stopSound(soundId) {
 
   const safeStop = (h) => {
     try {
-      if (isBufferSourceNode(h) || (h.stop && typeof h.stop === 'function')) h.stop()
+      if (isBufferSourceNode(h) || (h.stop && typeof h.stop === 'function'))
+        h.stop()
       if (h.disconnect && typeof h.disconnect === 'function') h.disconnect()
       if (h.unload && typeof h.unload === 'function') h.unload()
-    } catch (e) {}
+    } catch {
+      // Ignore — one failing stop shouldn't block the rest.
+    }
   }
 
   if (Array.isArray(cached)) cached.forEach(safeStop)
@@ -712,10 +903,21 @@ export function stopSound(soundId) {
 
 let stopSequencerCallback = null
 
+/**
+ * Registers a callback invoked whenever `stopAllSounds()` is called.
+ * Used by the sequencer to cancel its pending timers.
+ *
+ * @param {(() => void)|null} cb
+ * @returns {void}
+ */
 export function registerStopSequencerCallback(cb) {
   stopSequencerCallback = cb
 }
 
+/**
+ * Stops every playing sound.
+ * @returns {void}
+ */
 export function stopAllSounds() {
   const ids = Object.keys(soundCache)
 
@@ -734,10 +936,13 @@ export function stopAllSounds() {
 
     const safeStop = (h) => {
       try {
-        if (isBufferSourceNode(h) || (h.stop && typeof h.stop === 'function')) h.stop()
+        if (isBufferSourceNode(h) || (h.stop && typeof h.stop === 'function'))
+          h.stop()
         if (h.disconnect && typeof h.disconnect === 'function') h.disconnect()
         if (h.unload && typeof h.unload === 'function') h.unload()
-      } catch (e) {}
+      } catch {
+        // Ignore.
+      }
     }
 
     if (Array.isArray(cached)) cached.forEach(safeStop)
@@ -754,8 +959,14 @@ export function stopAllSounds() {
   if (stopSequencerCallback) stopSequencerCallback()
 }
 
-// ─── PAUSE / RESUME ────────────────────────────────────────────────────────
+// ─── PAUSE / RESUME ───────────────────────────────────────────────────
 
+/**
+ * Pauses a sound. Returns `false` if the sound isn't playing.
+ *
+ * @param {string} soundId
+ * @returns {boolean}
+ */
 export function pauseSound(soundId) {
   const cached = soundCache[soundId]
   if (!cached || cached === 'loading') return false
@@ -770,7 +981,7 @@ export function pauseSound(soundId) {
     let capturedOffset = null
     let capturedDuration = null
 
-    // ─── MODE 3 : MIXER ────────────────────────────────────────────────
+    // ─── Mode 3: MIXER ─────────────────────────────────────────────────
     if (mode === 'mixer') {
       const state = mixerSourceState.get(soundId)
 
@@ -800,21 +1011,37 @@ export function pauseSound(soundId) {
 
       for (const h of items) {
         if (isBufferSourceNode(h)) {
-          try { h.onended = null } catch (e) {}
-          try { h.stop() } catch (e) {}
-          try { h.disconnect() } catch (e) {}
+          try {
+            h.onended = null
+          } catch {
+            // Ignore.
+          }
+          try {
+            h.stop()
+          } catch {
+            // Ignore.
+          }
+          try {
+            h.disconnect()
+          } catch {
+            // Ignore.
+          }
         }
       }
       for (const h of items) {
         if (!isBufferSourceNode(h) && h?.unload) {
-          try { h.unload() } catch (e) {}
+          try {
+            h.unload()
+          } catch {
+            // Ignore.
+          }
         }
       }
 
       soundCache[soundId] = '__mixer_paused__'
     }
 
-    // ─── MODE 2 : HOWLER VIRTUEL (html5:true) ──────────────────────────
+    // ─── Mode 2: HOWLER VIRTUAL (html5:true) ───────────────────────────
     else if (mode === 'howler-virtual') {
       const firstHowl = items.find((h) => !isBufferSourceNode(h))
       if (firstHowl) {
@@ -834,14 +1061,18 @@ export function pauseSound(soundId) {
 
       for (const h of items) {
         if (!isBufferSourceNode(h) && h?.unload) {
-          try { h.unload() } catch (e) {}
+          try {
+            h.unload()
+          } catch {
+            // Ignore.
+          }
         }
       }
 
       soundCache[soundId] = '__mixer_paused__'
     }
 
-    // ─── MODE 1 : HOWLER DEFAULT (html5:false) ─────────────────────────
+    // ─── Mode 1: HOWLER DEFAULT (html5:false) ──────────────────────────
     else {
       const firstHowl = items.find((h) => !isBufferSourceNode(h))
       if (firstHowl) {
@@ -849,7 +1080,11 @@ export function pauseSound(soundId) {
         capturedOffset = captureBefore.offset
         capturedDuration = captureBefore.duration
 
-        try { firstHowl.pause() } catch (e) {}
+        try {
+          firstHowl.pause()
+        } catch {
+          // Ignore.
+        }
 
         const captureAfter = captureHowlOffset(firstHowl)
         if (captureAfter.offset !== null) capturedOffset = captureAfter.offset
@@ -867,18 +1102,23 @@ export function pauseSound(soundId) {
     return true
   } catch (e) {
     pausedSounds.delete(soundId)
-    logWarn('AudioService', 'Erreur pauseSound', e)
+    logWarn('AudioService', 'pauseSound error', e)
     return false
   }
 }
 
+/**
+ * Resumes a previously paused sound.
+ * @param {string} soundId
+ * @returns {boolean}
+ */
 export function resumeSound(soundId) {
   try {
     const state = pausedStates.get(soundId)
     const meta = soundMetadata.get(soundId) || {}
     const mode = state?.mode || meta.mode || 'howler-default'
 
-    // ─── MODE 3 : MIXER ────────────────────────────────────────────────
+    // ─── Mode 3: MIXER ─────────────────────────────────────────────────
     if (mode === 'mixer' && state) {
       const newSource = AudioMixerService.playSoundInMixer(
         state.buffer,
@@ -918,26 +1158,45 @@ export function resumeSound(soundId) {
             format: ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'],
             loop: state.loop || false,
             onloaderror: (id, err) => {
-              logWarn('AudioService', 'Erreur recréation lecture locale', err)
+              logWarn('AudioService', 'Local playback re-creation error', err)
             },
           })
 
           const applyOffsetAndPlay = () => {
             if (!playingIds.has(soundId) || pausedSounds.has(soundId)) {
-              try { newLocalHowl.unload() } catch (e) {}
+              try {
+                newLocalHowl.unload()
+              } catch {
+                // Ignore.
+              }
               return
             }
-            // ✅ Seek via Howler (support Range côté protocolHandler)
+            // Seek via Howler (the protocolHandler supports Range requests).
             if (savedOffset > 0) {
-              try { newLocalHowl.seek(savedOffset) } catch (e) {}
+              try {
+                newLocalHowl.seek(savedOffset)
+              } catch {
+                // Ignore.
+              }
             }
             try {
               const node = newLocalHowl._sounds?.[0]?._node
-              if (node && node.setSinkId && localDevice && localDevice !== 'default') {
+              if (
+                node &&
+                node.setSinkId &&
+                localDevice &&
+                localDevice !== 'default'
+              ) {
                 node.setSinkId(localDevice).catch(() => {})
               }
-            } catch (e) {}
-            try { newLocalHowl.play() } catch (e) {}
+            } catch {
+              // Ignore.
+            }
+            try {
+              newLocalHowl.play()
+            } catch {
+              // Ignore.
+            }
           }
 
           if (newLocalHowl.state() === 'loaded') {
@@ -953,9 +1212,7 @@ export function resumeSound(soundId) {
       }
     }
 
-    // ─── MODE 2 : HOWLER VIRTUEL (html5:true) ──────────────────────────
-    // ✅ SIMPLIFIÉ : plus besoin de setTimeout de correction.
-    //    Le protocolHandler gère les Range requests → howl.seek() fonctionne.
+    // ─── Mode 2: HOWLER VIRTUAL (html5:true) ───────────────────────────
     else if (mode === 'howler-virtual' && state) {
       const savedOffset = state.offset
       const configs = state.howlsConfig || []
@@ -969,29 +1226,47 @@ export function resumeSound(soundId) {
           format: [cfg.format || 'mp3'],
           loop: cfg.loop || false,
           onloaderror: (id, err) => {
-            logWarn('AudioService', `Erreur recréation howl ${index}`, err)
+            logWarn('AudioService', `Recreation error howl ${index}`, err)
           },
         })
 
         const applyAndPlay = () => {
           if (!playingIds.has(soundId) || pausedSounds.has(soundId)) {
-            try { howl.unload() } catch (e) {}
+            try {
+              howl.unload()
+            } catch {
+              // Ignore.
+            }
             return
           }
 
-          // ✅ Seek direct via Howler (le Range fonctionne maintenant)
           if (savedOffset > 0) {
-            try { howl.seek(savedOffset) } catch (e) {}
+            try {
+              howl.seek(savedOffset)
+            } catch {
+              // Ignore.
+            }
           }
 
           try {
             const node = howl._sounds?.[0]?._node
-            if (node && cfg.device && cfg.device !== 'default' && node.setSinkId) {
+            if (
+              node &&
+              cfg.device &&
+              cfg.device !== 'default' &&
+              node.setSinkId
+            ) {
               node.setSinkId(cfg.device).catch(() => {})
             }
-          } catch (e) {}
+          } catch {
+            // Ignore.
+          }
 
-          try { howl.play() } catch (e) {}
+          try {
+            howl.play()
+          } catch {
+            // Ignore.
+          }
         }
 
         if (howl.state() === 'loaded') {
@@ -1010,8 +1285,7 @@ export function resumeSound(soundId) {
       }
     }
 
-    // ─── MODE 1 : HOWLER DEFAULT (html5:false) ─────────────────────────
-    // html5:false → le buffer est déjà en RAM, seek trivial.
+    // ─── Mode 1: HOWLER DEFAULT (html5:false) ──────────────────────────
     else {
       const cached = soundCache[soundId]
       if (cached && cached !== 'loading' && cached !== '__mixer_paused__') {
@@ -1022,10 +1296,18 @@ export function resumeSound(soundId) {
           if (!h?.play || typeof h.play !== 'function') continue
 
           if (savedOffset > 0) {
-            try { h.seek(savedOffset) } catch (e) {}
+            try {
+              h.seek(savedOffset)
+            } catch {
+              // Ignore.
+            }
           }
 
-          try { h.play() } catch (e) {}
+          try {
+            h.play()
+          } catch {
+            // Ignore.
+          }
         }
       }
     }
@@ -1037,21 +1319,35 @@ export function resumeSound(soundId) {
     return true
   } catch (e) {
     pausedSounds.delete(soundId)
-    logWarn('AudioService', 'Erreur resumeSound', e)
+    logWarn('AudioService', 'resumeSound error', e)
     return false
   }
 }
 
+/**
+ * Returns `true` if the given sound is currently paused.
+ * @param {string} soundId
+ * @returns {boolean}
+ */
 export function isPausedSound(soundId) {
   const ext = externalPlaybackHandlers.get(soundId)
   if (ext?.isPaused) {
-    try { return ext.isPaused() } catch (e) {
-      logWarn('AudioService', 'Erreur ext.isPaused', e)
+    try {
+      return ext.isPaused()
+    } catch (e) {
+      logWarn('AudioService', 'ext.isPaused error', e)
     }
   }
   return pausedSounds.has(soundId)
 }
 
+/**
+ * Toggles pause/resume for a sound (delegates to external handlers if
+ * the sound is managed by another player, e.g. the sequencer).
+ *
+ * @param {string} soundId
+ * @returns {boolean}
+ */
 export function togglePauseSound(soundId) {
   const ext = externalPlaybackHandlers.get(soundId)
   if (ext) {
@@ -1059,7 +1355,7 @@ export function togglePauseSound(soundId) {
       const isPaused = ext.isPaused?.() ?? false
       return isPaused ? (ext.resume?.() ?? false) : (ext.pause?.() ?? false)
     } catch (e) {
-      logWarn('AudioService', 'Erreur togglePauseSound (ext)', e)
+      logWarn('AudioService', 'togglePauseSound (ext) error', e)
       return false
     }
   }
@@ -1068,14 +1364,20 @@ export function togglePauseSound(soundId) {
   return pauseSound(soundId)
 }
 
-// ─── API DE LECTURE ────────────────────────────────────────────────────────
+// ─── PLAYBACK API ─────────────────────────────────────────────────────
 
+/**
+ * Returns `true` if the given sound is currently playing.
+ * @param {string} soundId
+ * @returns {boolean}
+ */
 export function isPlaying(soundId) {
   if (manualOverrideId === soundId) return true
   if (pausedSounds.has(soundId)) return false
 
   const cached = soundCache[soundId]
-  if (!cached || cached === 'loading' || cached === '__mixer_paused__') return false
+  if (!cached || cached === 'loading' || cached === '__mixer_paused__')
+    return false
 
   const howl = findTrackableHowl(cached)
   if (howl) return howl.playing()
@@ -1089,6 +1391,12 @@ export function isPlaying(soundId) {
   return !!cached
 }
 
+/**
+ * Returns the current playback progress of a sound, or `null`.
+ *
+ * @param {string} soundId
+ * @returns {{current: number, duration: number, ratio: number}|null}
+ */
 export function getSoundProgress(soundId) {
   if (manualOverrideId === soundId && manualProgress.id === soundId) {
     if (manualProgress.duration <= 0) return null
@@ -1111,8 +1419,8 @@ export function getSoundProgress(soundId) {
     return null
   }
 
-  // Mode mixer : on calcule depuis startedAtMs (le BufferSourceNode
-  // n'expose pas sa position courante de façon fiable).
+  // Mixer mode: compute from `startedAtMs` (BufferSourceNode doesn't
+  // expose its current position reliably).
   const state = mixerSourceState.get(soundId)
   if (state?.buffer) {
     const now = performance.now()
@@ -1130,10 +1438,11 @@ export function getSoundProgress(soundId) {
     }
   }
 
-  // Mode howler : howl.seek() renvoie maintenant la bonne valeur
-  // (le protocolHandler supporte les Range requests).
+  // Howler mode: `howl.seek()` returns the right value (Range requests
+  // are supported by the protocolHandler).
   const cached = soundCache[soundId]
-  if (!cached || cached === 'loading' || cached === '__mixer_paused__') return null
+  if (!cached || cached === 'loading' || cached === '__mixer_paused__')
+    return null
 
   const howl = findTrackableHowl(cached)
   if (!howl) return null
@@ -1151,6 +1460,11 @@ export function getSoundProgress(soundId) {
   }
 }
 
+/**
+ * Returns the duration of a sound (seconds), or `null` if unknown.
+ * @param {string} soundId
+ * @returns {number|null}
+ */
 export function getSoundDuration(soundId) {
   const cached = soundCache[soundId]
   if (!cached || cached === '__mixer_paused__') return null
@@ -1158,6 +1472,13 @@ export function getSoundDuration(soundId) {
   return howl?.duration() || null
 }
 
+/**
+ * Clears the cache for a specific sound (or for all sounds if no ID is
+ * passed — same as `stopAllSounds()`).
+ *
+ * @param {string} [soundId]
+ * @returns {void}
+ */
 export function clearSoundCache(soundId) {
   if (soundId) stopSound(soundId)
   else stopAllSounds()

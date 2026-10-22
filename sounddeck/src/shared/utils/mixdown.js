@@ -1,9 +1,39 @@
-// src/shared/utils/mixdown.js
+/**
+ * @file Multi-track mixdown pipeline.
+ *
+ * Renders a project (tracks + clips + per-clip effects) into a single
+ * `AudioBuffer` using an `OfflineAudioContext`, then exports it to a file
+ * (`exportMixdown`) either as WAV (direct) or MP3/OGG (via ffmpeg, with a
+ * WAV fallback).
+ *
+ * The renderer is **solo-aware**: if any track has `solo === true`, only
+ * soloed tracks are included. Muted tracks are always excluded.
+ *
+ * Clip effects (volume/fadeIn/fadeOut/speed/echo/reverb) are applied by
+ * `applyEffectsToBuffer` from `realTimeEffects.js` — if that module fails
+ * to load, the mixdown continues without effects (logged).
+ *
+ * @see @shared/utils/realTimeEffects.js
+ * @see @shared/utils/wavEncoder.js
+ * @see @shared/utils/fileExport.js
+ */
+
 import { audioBufferToWav } from './wavEncoder'
 import { saveAudioBuffer } from './fileExport'
 import { buildFileUrl } from './fileUrl'
 import { logWarn, logError } from './logger'
 
+/**
+ * Renders a project to a single `AudioBuffer`.
+ *
+ * @param {Object} project - `{ tracks: Array<{clips: Array, volume, muted, solo}> }`.
+ * @param {Record<string, number>} clipDurations - Map of `clipId → duration (s)`.
+ * @param {number} [sampleRate=44100]
+ * @param {((progress: number) => void)|null} [onProgress] - Called with 0-1 progress.
+ * @param {number} [exportStart=0] - Start of the render window (seconds).
+ * @param {number|null} [exportEnd=null] - End of the render window (`null` = end of last clip).
+ * @returns {Promise<AudioBuffer>}
+ */
 export async function mixdownProject(
   project,
   clipDurations,
@@ -13,7 +43,7 @@ export async function mixdownProject(
   exportEnd = null
 ) {
   if (!project || !project.tracks || project.tracks.length === 0) {
-    throw new Error('Projet vide')
+    throw new Error('Empty project')
   }
 
   let totalDuration = 0
@@ -36,8 +66,8 @@ export async function mixdownProject(
       clipsWithInfo.push({
         ...clip,
         trackId: track.id,
-        duration: duration,
-        end: end,
+        duration,
+        end,
         trackVolume: track.volume || 1,
         trackMuted: track.muted || false,
         trackSolo: track.solo || false,
@@ -52,7 +82,7 @@ export async function mixdownProject(
   }
 
   if (clipsWithInfo.length === 0) {
-    throw new Error('Aucun clip à mixer dans la sélection')
+    throw new Error('No clips to mix in the selection')
   }
 
   const offlineContext = new OfflineAudioContext(
@@ -84,10 +114,10 @@ export async function mixdownProject(
   try {
     const effectsModule = await import('./realTimeEffects')
     applyEffectsToBufferFn = effectsModule.applyEffectsToBuffer
-  } catch (e) {
+  } catch {
     logWarn(
       'mixdown',
-      'realTimeEffects non disponible, les effets ne seront pas appliqués'
+      'realTimeEffects unavailable, effects will not be applied'
     )
   }
 
@@ -130,7 +160,7 @@ export async function mixdownProject(
         } catch (e) {
           logWarn(
             'mixdown',
-            `Erreur application effets sur "${clipInfo.name}"`,
+            `Error applying effects to "${clipInfo.name}"`,
             e
           )
         }
@@ -178,7 +208,7 @@ export async function mixdownProject(
 
       return source
     } catch (e) {
-      logWarn('mixdown', `Erreur mixage du clip "${clipInfo.name}"`, e)
+      logWarn('mixdown', `Error mixing clip "${clipInfo.name}"`, e)
       processed++
       if (onProgress) onProgress(processed / totalClips)
       return null
@@ -191,13 +221,34 @@ export async function mixdownProject(
   try {
     renderedBuffer = await offlineContext.startRendering()
   } catch (e) {
-    logError('mixdown', 'Erreur lors du rendu', e)
-    throw new Error('Erreur lors du rendu audio')
+    logError('mixdown', 'Render error', e)
+    throw new Error('Audio render error', { cause: e })
   }
 
   return renderedBuffer
 }
 
+/**
+ * Exports a rendered buffer to a file.
+ *
+ * - `format === 'wav'` — direct WAV save.
+ * - `format === 'mp3' | 'ogg'` — converts via ffmpeg; falls back to WAV on
+ *   failure (returned with `warning`).
+ *
+ * @param {AudioBuffer} buffer
+ * @param {'mp3'|'wav'|'ogg'} [format='mp3']
+ * @param {number} [bitrate=192]
+ * @param {string} outputPath
+ * @param {((progress: number) => void)|null} [onProgress]
+ * @returns {Promise<{
+ *   success: boolean,
+ *   path?: string,
+ *   format?: string,
+ *   size?: number,
+ *   warning?: string,
+ *   error?: string,
+ * }>}
+ */
 export async function exportMixdown(
   buffer,
   format = 'mp3',
@@ -207,8 +258,8 @@ export async function exportMixdown(
 ) {
   try {
     if (!outputPath) {
-      logError('mixdown', 'outputPath est undefined')
-      return { success: false, error: 'outputPath manquant' }
+      logError('mixdown', 'outputPath is undefined')
+      return { success: false, error: 'outputPath missing' }
     }
 
     if (onProgress) onProgress(0.1)
@@ -228,13 +279,13 @@ export async function exportMixdown(
 
       if (!saveResult.success) {
         const fallbackPath = outputPath.replace(/\.(mp3|ogg)$/, '.wav')
-        const result = await saveAudioBuffer(wavData, fallbackPath)
+        await saveAudioBuffer(wavData, fallbackPath)
         if (onProgress) onProgress(1)
         return {
           success: true,
           path: fallbackPath,
           format: 'wav',
-          warning: 'Conversion impossible, export en WAV',
+          warning: 'Conversion failed, exported as WAV',
         }
       }
 
@@ -251,14 +302,16 @@ export async function exportMixdown(
 
       try {
         await window.electronAPI.deleteSoundFile?.(tempPath)
-      } catch (e) {}
+      } catch {
+        // ignore
+      }
 
       if (result?.success) {
         if (onProgress) onProgress(1)
         return {
           success: true,
           path: outputPath,
-          format: format,
+          format,
           size: result.size || 0,
         }
       }
@@ -270,10 +323,10 @@ export async function exportMixdown(
         success: true,
         path: fallbackPath,
         format: 'wav',
-        warning: 'Conversion impossible, export en WAV',
+        warning: 'Conversion failed, exported as WAV',
       }
     } catch (e) {
-      logWarn('mixdown', 'Erreur conversion', e)
+      logWarn('mixdown', 'Conversion error', e)
 
       const fallbackPath = outputPath.replace(/\.(mp3|ogg)$/, '.wav')
       await saveAudioBuffer(wavData, fallbackPath)
@@ -282,11 +335,11 @@ export async function exportMixdown(
         success: true,
         path: fallbackPath,
         format: 'wav',
-        warning: 'Erreur conversion, export en WAV',
+        warning: 'Conversion error, exported as WAV',
       }
     }
   } catch (e) {
-    logError('mixdown', 'Erreur export', e)
+    logError('mixdown', 'Export error', e)
     return {
       success: false,
       error: e.message,

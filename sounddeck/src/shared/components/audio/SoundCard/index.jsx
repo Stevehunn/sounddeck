@@ -1,7 +1,41 @@
-// src/shared/components/audio/SoundCard/index.jsx
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+/**
+ * @file Sound card — play, rename, tag, volume, image/emoji, context menu.
+ *
+ * A card represents one sound in the library. It supports:
+ * - **Play / stop** with visual feedback (pulse, border color, progress bar)
+ * - **Favorite** toggle (star icon)
+ * - **Rename** (inline editing on double-click of the name)
+ * - **Tags** (add inline, remove on click)
+ * - **Volume** (via `VolumePanel`, per-sound dB adjustment)
+ * - **Image / emoji** (change via context menu or `EmojiPicker`)
+ * - **Context menu** (`ContextMenuPortal`) with all the above + delete
+ * - **Keyboard shortcut** (via `ShortcutRecorder`, compact mode)
+ *
+ * Drag & drop:
+ * - The card itself is `draggable` when `draggable === true` and the user
+ *   isn't interacting with the volume panel.
+ * - Dragging calls `onDragStart` / `onDragEnd` (managed by the parent grid).
+ *
+ * Note on state derivation:
+ * - `imgError` is tracked as `{url, hasError}` so an error on one image is
+ *   automatically "cleared" when the image URL changes — no need for a
+ *   `set-state-in-effect`.
+ * - `progress` is only meaningful when `playing === true`; the derived
+ *   `displayProgress` handles the "not playing" case without state.
+ *
+ * @see ./VolumePanel.jsx
+ * @see ./ContextMenuPortal.jsx
+ * @see ../Waveform.jsx (unused here, used by AudioTrimmer)
+ */
+
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { playSound, stopSound, isPlaying, getSoundProgress } from '@core/services/AudioService'
+import {
+  playSound,
+  stopSound,
+  isPlaying,
+  getSoundProgress,
+} from '@core/services/AudioService'
 import ShortcutRecorder from '@shared/components/settings/ShortcutRecorder'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import useConfirm from '@shared/hooks/useConfirm'
@@ -13,6 +47,51 @@ import { convertOldVolumeToDb } from '@core/store/utils/volumeUtils'
 import VolumePanel from './VolumePanel'
 import ContextMenuPortal from './ContextMenuPortal'
 
+/**
+ * Compute the canonical volume in dB from a sound.
+ *
+ * Prefers `sound.volumeDb` (new schema) and falls back to the legacy linear
+ * `sound.volume` (0-100 → dB).
+ *
+ * @param {Object} sound
+ * @returns {number} Volume in dB.
+ */
+function getSoundVolumeDb(sound) {
+  return sound.volumeDb !== undefined
+    ? sound.volumeDb
+    : convertOldVolumeToDb(sound.volume)
+}
+
+/**
+ * SoundCard component.
+ *
+ * @param {Object} props
+ * @param {Object} props.sound - Sound data (`id`, `name`, `path`, `image`, `emoji`, `volumeDb`, `favorites`, `playCount`).
+ * @param {string} [props.shortcut] - Keyboard accelerator bound to this sound.
+ * @param {string} props.audioDevice - Output device ID (for `playSound`).
+ * @param {number} props.volume - Master volume (0-100).
+ * @param {boolean} props.loopEnabled - Whether loop is currently ON.
+ * @param {boolean} props.playLocally - Whether to play on the local output too.
+ * @param {(id: string) => void} props.onToggleFavorite
+ * @param {(id: string, acc: string) => void} props.onSetShortcut
+ * @param {((id: string) => void)|null} props.onDelete
+ * @param {((id: string) => void)|null} props.onRemoveFromProfile
+ * @param {(id: string, name: string) => void} props.onRename
+ * @param {(id: string, volumeDb: number) => void} props.onVolumeChange
+ * @param {((id: string) => void)|null} [props.onPlay]
+ * @param {string} props.currentProfileId
+ * @param {((e: React.DragEvent) => void)|null} [props.onDragStart]
+ * @param {((e: React.DragEvent) => void)|null} [props.onDragEnd]
+ * @param {boolean} [props.draggable=true]
+ * @param {'qwerty'|'azerty'} [props.layout='qwerty']
+ * @param {((id: string, path: string) => void)|null} [props.onChangeImage]
+ * @param {((id: string, emoji: string) => void)|null} [props.onChangeEmoji]
+ * @param {string[]} [props.tags=[]]
+ * @param {((id: string, tag: string) => void)|null} [props.onAddTag]
+ * @param {((id: string, tag: string) => void)|null} [props.onRemoveTag]
+ * @param {'small'|'medium'|'large'} [props.size='medium']
+ * @returns {JSX.Element}
+ */
 export default function SoundCard({
   sound,
   shortcut,
@@ -42,7 +121,7 @@ export default function SoundCard({
   const { t, currentLang } = useLanguage()
   const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
 
-  // ─── ÉTATS ─────────────────────────────────────────────────────────────
+  // ─── STATE ─────────────────────────────────────────────────────────────
   const [playing, setPlaying] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showVolume, setShowVolume] = useState(false)
@@ -52,12 +131,15 @@ export default function SoundCard({
   const [showTagInput, setShowTagInput] = useState(false)
   const [newTagValue, setNewTagValue] = useState('')
 
-  const initialVolume =
-    sound.volumeDb !== undefined
-      ? sound.volumeDb
-      : convertOldVolumeToDb(sound.volume)
-  const [localVolume, setLocalVolume] = useState(initialVolume)
-  const [imgError, setImgError] = useState(false)
+  // Volume state (controlled, synced from sound.volumeDb via effect below)
+  const [localVolume, setLocalVolume] = useState(() =>
+    getSoundVolumeDb(sound)
+  )
+
+  // Image error: track which URL failed, so an error on one URL doesn't
+  // leak to the next one (derived state, no set-state-in-effect).
+  const [imgErrorUrl, setImgErrorUrl] = useState(null)
+
   const [fileError, setFileError] = useState(false)
   const [progress, setProgress] = useState(null)
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
@@ -78,26 +160,69 @@ export default function SoundCard({
 
   const isFavorite = sound.favorites?.includes(currentProfileId) || false
 
+  // Derived: a progress bar is only meaningful while playing.
+  const displayProgress = playing ? progress : null
+
+  // Derived: an image is shown unless the current `sound.image` URL errored.
+  const showImage = !!sound.image && imgErrorUrl !== sound.image
+
+  // ─── MENU POSITIONING ──────────────────────────────────────────────────
+  // Declared BEFORE the effect that uses it (avoids "accessed before declared").
+  const calculateMenuPosition = useCallback(() => {
+    if (!buttonRef.current) return
+
+    const rect = buttonRef.current.getBoundingClientRect()
+    const menuWidth = 220
+
+    let left = rect.left - 10
+    const spaceRight = window.innerWidth - left - menuWidth
+    if (spaceRight < 10) {
+      left = Math.max(10, window.innerWidth - menuWidth - 10)
+    }
+
+    const estimatedHeight = menuHeight > 0 ? menuHeight : 300
+    const spaceBottom = window.innerHeight - rect.bottom - 6
+
+    let top
+    if (spaceBottom >= estimatedHeight) {
+      top = rect.bottom + 6
+    } else {
+      const spaceTop = rect.top - 6
+      if (spaceTop >= estimatedHeight) {
+        top = rect.top - estimatedHeight - 6
+      } else {
+        top = Math.max(10, (window.innerHeight - estimatedHeight) / 2)
+      }
+    }
+
+    top = Math.max(10, Math.min(top, window.innerHeight - estimatedHeight - 10))
+    left = Math.max(10, Math.min(left, window.innerWidth - menuWidth - 10))
+
+    setMenuPosition({ top, left })
+  }, [menuHeight])
+
   // ─── EFFECTS ───────────────────────────────────────────────────────────
 
+  // Sync localVolume when the store updates `sound.volumeDb` externally
+  // (e.g. reset from context menu, profile switch). Deferred via
+  // `setTimeout(0)` to satisfy React 19's set-state-in-effect rule.
+  //
+  // Inline the volume computation (instead of `getSoundVolumeDb(sound)`)
+  // so ESLint sees only `sound.volume` / `sound.volumeDb` accesses in the
+  // closure — no missing `sound` dependency.
   useEffect(() => {
     const newVolume =
       sound.volumeDb !== undefined
         ? sound.volumeDb
         : convertOldVolumeToDb(sound.volume)
-    setLocalVolume(newVolume)
+    const timer = setTimeout(() => setLocalVolume(newVolume), 0)
+    return () => clearTimeout(timer)
   }, [sound.volume, sound.volumeDb])
 
+  // Poll progress while playing
   useEffect(() => {
-    setImgError(false)
-  }, [sound.image])
+    if (!playing) return
 
-  // Poll progression tant que playing
-  useEffect(() => {
-    if (!playing) {
-      setProgress(null)
-      return
-    }
     const interval = setInterval(() => {
       if (!isPlaying(sound.id)) {
         setPlaying(false)
@@ -111,13 +236,11 @@ export default function SoundCard({
     return () => clearInterval(interval)
   }, [playing, sound.id])
 
-  // Stop si loop désactivé pendant lecture
+  // Stop playback if loop is disabled while a sound is playing
   const prevLoopEnabledRef = useRef(loopEnabled)
-
   useEffect(() => {
     const loopJustDisabled =
       prevLoopEnabledRef.current === true && loopEnabled === false
-
     prevLoopEnabledRef.current = loopEnabled
 
     if (loopJustDisabled && playing) {
@@ -126,7 +249,7 @@ export default function SoundCard({
     }
   }, [loopEnabled, playing, sound.id])
 
-  // Click outside pour fermer le menu
+  // Close menu on click outside
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (showMenu && menuRef.current && !menuRef.current.contains(e.target)) {
@@ -141,12 +264,12 @@ export default function SoundCard({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showMenu])
 
-  // Recalcul position menu quand hauteur mesurée
+  // Re-clamp menu position once its real height is known
   useEffect(() => {
     if (showMenu && menuHeight > 0) {
       calculateMenuPosition()
     }
-  }, [showMenu, menuHeight]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [showMenu, menuHeight, calculateMenuPosition])
 
   // ─── HANDLERS ──────────────────────────────────────────────────────────
 
@@ -196,39 +319,6 @@ export default function SoundCard({
     if (cardRef.current)
       cardRef.current.style.cursor = draggable ? 'grab' : 'default'
   }, [draggable])
-
-  const calculateMenuPosition = useCallback(() => {
-    if (!buttonRef.current) return
-
-    const rect = buttonRef.current.getBoundingClientRect()
-    const menuWidth = 220
-
-    let left = rect.left - 10
-    const spaceRight = window.innerWidth - left - menuWidth
-    if (spaceRight < 10) {
-      left = Math.max(10, window.innerWidth - menuWidth - 10)
-    }
-
-    const estimatedHeight = menuHeight > 0 ? menuHeight : 300
-    const spaceBottom = window.innerHeight - rect.bottom - 6
-
-    let top
-    if (spaceBottom >= estimatedHeight) {
-      top = rect.bottom + 6
-    } else {
-      const spaceTop = rect.top - 6
-      if (spaceTop >= estimatedHeight) {
-        top = rect.top - estimatedHeight - 6
-      } else {
-        top = Math.max(10, (window.innerHeight - estimatedHeight) / 2)
-      }
-    }
-
-    top = Math.max(10, Math.min(top, window.innerHeight - estimatedHeight - 10))
-    left = Math.max(10, Math.min(left, window.innerWidth - menuWidth - 10))
-
-    setMenuPosition({ top, left })
-  }, [menuHeight])
 
   const handleMenuToggle = (e) => {
     e.stopPropagation()
@@ -316,11 +406,10 @@ export default function SoundCard({
     }
   }
 
-  // l'emoji soit bien visible (comportement symétrique à "changer l'image").
+  // Change emoji (also clears the image so the emoji is visible)
   const handleEmojiSelect = (emoji) => {
     if (onChangeEmoji) onChangeEmoji(sound.id, emoji)
 
-    // Si une image était définie, on l'efface pour laisser la place à l'emoji
     if (sound.image && onChangeImage) {
       onChangeImage(sound.id, null)
     }
@@ -328,10 +417,9 @@ export default function SoundCard({
     setShowEmojiPicker(false)
   }
 
-  // ─── RENDU ─────────────────────────────────────────────────────────────
+  // ─── RENDER ────────────────────────────────────────────────────────────
 
   const imageUrl = buildFileUrl(sound.image)
-  const showImage = !!sound.image && !imgError
 
   return (
     <>
@@ -357,14 +445,15 @@ export default function SoundCard({
           borderRadius: 'var(--radius-md)',
           padding: sizeConfig.padding,
           position: 'relative',
-          transition: 'border-color 0.15s, transform 0.15s ease, box-shadow 0.15s ease',
+          transition:
+            'border-color 0.15s, transform 0.15s ease, box-shadow 0.15s ease',
           cursor:
             draggable && !isDraggingVolume && !showVolume ? 'grab' : 'default',
           userSelect: isDraggingVolume || showVolume ? 'none' : 'auto',
           boxShadow: playing ? '0 0 20px rgba(124,111,247,0.15)' : 'none',
         }}
       >
-        {/* Header : favori + loop + menu */}
+        {/* Header : favorite + loop + menu */}
         <div
           style={{
             display: 'flex',
@@ -462,7 +551,7 @@ export default function SoundCard({
                 height: '100%',
                 objectFit: 'cover',
               }}
-              onError={() => setImgError(true)}
+              onError={() => setImgErrorUrl(sound.image)}
             />
           )}
           {!showImage && (
@@ -510,7 +599,7 @@ export default function SoundCard({
           </div>
         </div>
 
-        {/* Nom (éditable) */}
+        {/* Name (editable) */}
         {editingName ? (
           <input
             autoFocus
@@ -589,7 +678,7 @@ export default function SoundCard({
           </div>
         )}
 
-        {/* Ajout tag */}
+        {/* Add tag */}
         {onAddTag && (
           <div
             style={{
@@ -706,7 +795,7 @@ export default function SoundCard({
           </div>
         )}
 
-        {/* Enregistreur de raccourci */}
+        {/* Shortcut recorder */}
         <ShortcutRecorder
           value={shortcut || ''}
           onSave={(acc) => onSetShortcut(sound.id, acc)}
@@ -716,8 +805,8 @@ export default function SoundCard({
           layout={layout}
         />
 
-        {/* Barre de progression */}
-        {progress && (
+        {/* Progress bar (only while playing) */}
+        {displayProgress && (
           <div style={{ marginTop: 4 }}>
             <div
               style={{
@@ -733,7 +822,7 @@ export default function SoundCard({
                   height: '100%',
                   borderRadius: 2,
                   background: loopEnabled ? 'var(--success)' : 'var(--accent)',
-                  width: `${progress.ratio * 100}%`,
+                  width: `${displayProgress.ratio * 100}%`,
                   transition: 'width 0.1s linear',
                   boxShadow: `0 0 4px ${
                     loopEnabled ? 'var(--success)' : 'var(--accent)'
@@ -750,13 +839,13 @@ export default function SoundCard({
                 marginTop: 1,
               }}
             >
-              <span>{formatTime(progress.current)}</span>
-              <span>{formatTime(progress.duration)}</span>
+              <span>{formatTime(displayProgress.current)}</span>
+              <span>{formatTime(displayProgress.duration)}</span>
             </div>
           </div>
         )}
 
-        {/* Compteur de lectures */}
+        {/* Play count */}
         {sound.playCount > 0 && (
           <div
             style={{
@@ -776,7 +865,7 @@ export default function SoundCard({
         )}
       </div>
 
-      {/* Menu contextuel délégué */}
+      {/* Context menu (portal) */}
       {showMenu &&
         createPortal(
           <div ref={menuRef}>
@@ -814,7 +903,7 @@ export default function SoundCard({
           document.body
         )}
 
-      {/* VolumePanel délégué */}
+      {/* Volume panel (portal) */}
       {showVolume &&
         createPortal(
           <VolumePanel
@@ -833,7 +922,7 @@ export default function SoundCard({
           document.body
         )}
 
-      {/* EmojiPicker global */}
+      {/* Global EmojiPicker */}
       <EmojiPicker
         isOpen={showEmojiPicker}
         onClose={() => setShowEmojiPicker(false)}

@@ -1,2 +1,3 @@
-// src/shared/contexts/index.js
-export { NetworkProvider, useNetwork } from './NetworkContext'
+export { NetworkProvider } from './NetworkProvider'
+export { NetworkContext, useNetwork } from './NetworkContext'
+export { probeNetwork, resetProbeCache } from './probeNetwork'

@@ -1,4 +1,3 @@
-// src/core/index.js
 export * from './store'
 export * from './services'
 export { default as PluginManager, pluginManager } from './plugins/PluginManager'

@@ -1,8 +1,21 @@
-// src/core/services/LicenseService.js
-//
-// Service haut niveau pour la gestion de la licence Pro.
-// Contrairement à licenseManager qui ne fait QUE vérifier un token,
-// ce service gère le stockage, l'activation, le logout et le cache.
+/**
+ * @file High-level license management (Pro tier).
+ *
+ * While `licenseManager` only *verifies* a token, this service owns the
+ * full lifecycle:
+ * - **Storage** — the token and email are persisted in electron-store.
+ * - **Activation** — validates a token, saves it, refreshes the cached
+ *   status.
+ * - **Sign-out** — clears the email but keeps the token (so the user
+ *   stays Pro on this machine, only the display name disappears).
+ * - **Revocation** — clears both the token and email (destructive).
+ * - **Caching** — `getStatus()` caches the result; `getStatus(true)` or
+ *   `invalidateCache()` bypasses it.
+ *
+ * @see @core/plugins/PluginManager/licenseManager.js (verification)
+ * @see @core/plugins/PluginManager/licenseKeys.js (tier definitions)
+ * @see @core/store/hooks/useLicense.js (React wrapper)
+ */
 
 import { logWarn, logError, logInfo } from '@shared/utils/logger'
 import { verifyLicense } from '@core/plugins/PluginManager/licenseManager'
@@ -12,6 +25,12 @@ const STORE_KEY_EMAIL = 'licenseEmail'
 
 let cachedStatus = null
 
+/**
+ * Builds a "free tier" status object.
+ *
+ * @param {string|null} [error=null] - Verification error code, if any.
+ * @returns {Object}
+ */
 function buildFreeStatus(error = null) {
   return {
     valid: false,
@@ -25,6 +44,21 @@ function buildFreeStatus(error = null) {
   }
 }
 
+/**
+ * Returns the current license status (cached unless `force` is `true`).
+ *
+ * @param {boolean} [force=false] - Bypass the cache.
+ * @returns {Promise<{
+ *   valid: boolean,
+ *   tier: 'free'|'pro'|'dev',
+ *   rank: number,
+ *   donorId: string|null,
+ *   donorName: string|null,
+ *   email: string|null,
+ *   issuedAt: number|null,
+ *   error: string|null,
+ * }>}
+ */
 export async function getStatus(force = false) {
   if (cachedStatus && !force) return cachedStatus
 
@@ -56,12 +90,19 @@ export async function getStatus(force = false) {
     }
     return cachedStatus
   } catch (e) {
-    logError('LicenseService', 'Erreur getStatus', e)
+    logError('LicenseService', 'getStatus error', e)
     cachedStatus = buildFreeStatus('INTERNAL_ERROR')
     return cachedStatus
   }
 }
 
+/**
+ * Activates a license token.
+ *
+ * @param {string} token - Raw token (whitespace is stripped).
+ * @param {string|null} [email=null] - Optional email to associate.
+ * @returns {Promise<{success: boolean, error?: string, status?: Object}>}
+ */
 export async function activate(token, email = null) {
   if (!token || typeof token !== 'string') {
     return { success: false, error: 'MISSING_TOKEN' }
@@ -79,9 +120,9 @@ export async function activate(token, email = null) {
     if (email) {
       await window.electronAPI?.storeSet?.(STORE_KEY_EMAIL, email)
     }
-    logInfo('LicenseService', `Licence activée : tier=${result.tier}`)
+    logInfo('LicenseService', `License activated: tier=${result.tier}`)
   } catch (e) {
-    logError('LicenseService', 'Erreur persistance licence', e)
+    logError('LicenseService', 'License persistence error', e)
     return { success: false, error: 'STORE_ERROR' }
   }
 
@@ -90,29 +131,45 @@ export async function activate(token, email = null) {
   return { success: true, status }
 }
 
+/**
+ * Signs out (removes the email but keeps the token).
+ *
+ * @returns {Promise<Object>} The refreshed status.
+ */
 export async function logout() {
   try {
     await window.electronAPI?.storeSet?.(STORE_KEY_EMAIL, null)
-    logInfo('LicenseService', 'Logout : email retiré (token conservé)')
+    logInfo('LicenseService', 'Logout: email cleared (token kept)')
   } catch (e) {
-    logWarn('LicenseService', 'Erreur logout', e)
+    logWarn('LicenseService', 'Logout error', e)
   }
   cachedStatus = null
   return getStatus(true)
 }
 
+/**
+ * Revokes the license locally (clears both token and email).
+ *
+ * @returns {Promise<Object>} The refreshed status.
+ */
 export async function revokeLocal() {
   try {
     await window.electronAPI?.storeSet?.(STORE_KEY_TOKEN, null)
     await window.electronAPI?.storeSet?.(STORE_KEY_EMAIL, null)
-    logWarn('LicenseService', 'Licence révoquée localement')
+    logWarn('LicenseService', 'License revoked locally')
   } catch (e) {
-    logWarn('LicenseService', 'Erreur revokeLocal', e)
+    logWarn('LicenseService', 'revokeLocal error', e)
   }
   cachedStatus = null
   return getStatus(true)
 }
 
+/**
+ * Returns `true` if the current user meets the given tier.
+ *
+ * @param {string} requiredTier
+ * @returns {Promise<boolean>}
+ */
 export async function meetsTier(requiredTier) {
   const status = await getStatus()
   const { meetsTier: check } = await import(
@@ -121,6 +178,10 @@ export async function meetsTier(requiredTier) {
   return check(status.tier, requiredTier)
 }
 
+/**
+ * Invalidates the cached status (next `getStatus()` will re-fetch).
+ * @returns {void}
+ */
 export function invalidateCache() {
   cachedStatus = null
 }

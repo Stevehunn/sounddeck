@@ -1,12 +1,19 @@
-// src/shared/utils/uuid.js
-// ─────────────────────────────────────────────────────────────────────────────
-// ✅ Générateur UUID canonique pour toute l'app.
-// Préfère `crypto.randomUUID()` (natif, rapide), fallback UUIDv4-like.
-// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * @file UUID v4 generator.
+ *
+ * Prefers `crypto.randomUUID()` (native, fast). Falls back to a Math.random
+ * + timestamp implementation for older browsers / non-secure contexts.
+ *
+ * The optional `prefix` is prepended with a dash (`"clip"` → `"clip-<uuid>"`)
+ * — used by the editor to distinguish clip / effect / track IDs.
+ *
+ * @see @shared/utils/audioContext.js (uses UUID for sound IDs)
+ */
 
 /**
- * Génère un UUID v4.
- * @param {string} [prefix] - Préfixe optionnel (ex: 'clip', 'effect', 'track')
+ * Generates a UUID v4 (optionally prefixed).
+ *
+ * @param {string} [prefix='']
  * @returns {string}
  */
 export function uuid(prefix = '') {

@@ -1,10 +1,47 @@
-// src/shared/components/settings/PluginInstaller.jsx
+/**
+ * @file Plugin installer modal.
+ *
+ * Two install methods:
+ * 1. **From URL** — the URL is fetched via `fetch()`, converted to an
+ *    `ArrayBuffer`, and passed to `electronAPI.installPluginFromBuffer`.
+ * 2. **From file** — the user picks a `.sdplugin` / `.zip` file, which is
+ *    read via `FileReader.arrayBuffer()` and passed to the same IPC.
+ *
+ * **Pro-gated**: if the user isn't Pro (`useLicense().isPro === false`),
+ * the installer shows a lock screen that redirects to Options → Support.
+ * The main process also validates the plugin manifest's `licenseRequired`
+ * flag on install, so this is a UX convenience, not a security boundary.
+ *
+ * Progress: the UI shows a 0-100% bar during install (fake progress — the
+ * actual work is done by the main process).
+ *
+ * @see electron/modules/fileHandlers.js — `installPluginFromBuffer` handler
+ * @see @core/store/hooks/useLicense.js
+ */
+
 import { useState, useRef } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { useLicense } from '@core/store/hooks/useLicense'
 
-export default function PluginInstaller({ onClose, addToast, lang, onInstall }) {
-  const { t, currentLang } = useLanguage()
+/**
+ * Plugin installer modal.
+ *
+ * @param {Object} props
+ * @param {() => void} props.onClose - Called when the modal should close.
+ * @param {(msg: string, type?: string) => void} props.addToast
+ * @param {'fr'|'en'|'es'} [_lang] - Kept for API compatibility; the
+ *   effective language comes from `useLanguage()`.
+ * @param {(result: Object) => void} [props.onInstall] - Called after a
+ *   successful install (before the modal auto-closes).
+ * @returns {JSX.Element}
+ */
+export default function PluginInstaller({
+  onClose,
+  addToast,
+  _lang,
+  onInstall,
+}) {
+  const { t } = useLanguage()
   const { isPro, loading: licenseLoading } = useLicense()
   const [url, setUrl] = useState('')
   const [installing, setInstalling] = useState(false)
@@ -12,8 +49,7 @@ export default function PluginInstaller({ onClose, addToast, lang, onInstall }) 
   const [status, setStatus] = useState('')
   const fileInputRef = useRef(null)
 
-  // ⛔ Si pas Pro → on bloque l'UI et on propose la section Support
-  // (le main process validera de toute façon le manifest côté Electron)
+  // ─── Pro gate ─────────────────────────────────────────────────────
   if (!licenseLoading && !isPro) {
     return (
       <div className="modal-overlay" onClick={onClose}>
@@ -56,6 +92,10 @@ export default function PluginInstaller({ onClose, addToast, lang, onInstall }) 
     )
   }
 
+  /**
+   * Installs a plugin from a URL.
+   * @returns {Promise<void>}
+   */
   const handleInstallFromUrl = async () => {
     if (!url.trim()) {
       addToast(t('pluginInvalidUrl'), 'error')
@@ -105,10 +145,19 @@ export default function PluginInstaller({ onClose, addToast, lang, onInstall }) 
     }
   }
 
+  /**
+   * Opens the native file picker.
+   * @returns {void}
+   */
   const handleInstallFromFile = () => {
     fileInputRef.current?.click()
   }
 
+  /**
+   * Reads the selected file and installs it.
+   * @param {React.ChangeEvent<HTMLInputElement>} e
+   * @returns {Promise<void>}
+   */
   const handleFileSelected = async (e) => {
     const file = e.target.files[0]
     if (!file) return
@@ -168,7 +217,7 @@ export default function PluginInstaller({ onClose, addToast, lang, onInstall }) 
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Méthode 1: URL */}
+          {/* Method 1: URL */}
           <div>
             <div
               style={{
@@ -200,7 +249,7 @@ export default function PluginInstaller({ onClose, addToast, lang, onInstall }) 
             </div>
           </div>
 
-          {/* Séparateur */}
+          {/* Separator */}
           <div
             style={{
               display: 'flex',
@@ -215,7 +264,7 @@ export default function PluginInstaller({ onClose, addToast, lang, onInstall }) 
             <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
           </div>
 
-          {/* Méthode 2: Fichier */}
+          {/* Method 2: File */}
           <div>
             <div
               style={{
@@ -246,7 +295,7 @@ export default function PluginInstaller({ onClose, addToast, lang, onInstall }) 
             </div>
           </div>
 
-          {/* Barre de progression */}
+          {/* Progress bar */}
           {installing && (
             <div style={{ marginTop: 4 }}>
               <div
@@ -283,7 +332,7 @@ export default function PluginInstaller({ onClose, addToast, lang, onInstall }) 
             </div>
           )}
 
-          {/* Info format */}
+          {/* Format info */}
           <div
             style={{
               fontSize: 11,

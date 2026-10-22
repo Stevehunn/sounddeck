@@ -1,12 +1,55 @@
-// src/shared/utils/realTimeEffects.js
+/**
+ * @file Audio effects applied offline to an `AudioBuffer`.
+ *
+ * Each effect returns a **new** buffer (no in-place mutation) so they can
+ * be chained. Supported effects: `volume`, `fadeIn`, `fadeOut`, `speed`,
+ * `echo`, `reverb`.
+ *
+ * ## When to use this module
+ *
+ * These are **offline** (post-processing) effects, used by:
+ * - The mixdown pipeline (`mixdownProject`) to bake effects into a track.
+ * - The clip preview in the editor.
+ *
+ * For **real-time** playback effects (during `playSound`), see
+ * `@core/services/AudioService.js` which uses Web Audio nodes.
+ *
+ * ## A context is created per call
+ *
+ * `applyEffectsToBuffer` creates a **dedicated** `AudioContext` for each
+ * call and closes it in a `finally`. This is deliberate: the shared
+ * context (`audioContext.js`) may be `suspended`, and mixing effects would
+ * disturb any ongoing playback. Since effects are offline operations,
+ * the extra context is short-lived.
+ *
+ * ## Caching
+ *
+ * `getCachedEffectBuffer` / `setCachedEffectBuffer` provide a small LRU-ish
+ * cache keyed by `clipId_version`. Use it to avoid re-running effects on
+ * every preview render.
+ *
+ * @see @shared/utils/mixdown.js
+ * @see @shared/utils/audioContext.js
+ */
+
 import { logError } from './logger'
 
 const effectCache = new Map()
 
+/**
+ * Applies a list of effects to an `AudioBuffer`.
+ *
+ * @param {AudioBuffer} audioBuffer
+ * @param {Array<{type: string, enabled: boolean, params: Object}>} effects
+ * @param {number} [_sampleRate=44100] - Unused (kept for API compatibility;
+ *   each effect reads `buffer.sampleRate`).
+ * @param {boolean} [normalize=true] - Apply clipping protection at the end.
+ * @returns {AudioBuffer}
+ */
 export function applyEffectsToBuffer(
   audioBuffer,
   effects,
-  sampleRate = 44100,
+  _sampleRate = 44100,
   normalize = true
 ) {
   if (!audioBuffer) return audioBuffer
@@ -16,9 +59,7 @@ export function applyEffectsToBuffer(
   if (activeEffects.length === 0) return audioBuffer
 
   let result = audioBuffer
-  // ⚠️ NOTE : AudioContext dédié (non partagé) — chaque appel crée + ferme
-  // un contexte temporaire. C'est OK en pratique (fermé dans le `finally`),
-  // mais pourrait être optimisé plus tard (cf O(nettoyage) pour passer au shared).
+  // Dedicated context per call (see file docstring for rationale).
   const ctx = new (window.AudioContext || window.webkitAudioContext)()
 
   try {
@@ -31,7 +72,11 @@ export function applyEffectsToBuffer(
           result = applyFadeInEffect(result, effect.params.duration || 0.5, ctx)
           break
         case 'fadeOut':
-          result = applyFadeOutEffect(result, effect.params.duration || 0.5, ctx)
+          result = applyFadeOutEffect(
+            result,
+            effect.params.duration || 0.5,
+            ctx
+          )
           break
         case 'speed':
           result = applySpeedEffect(result, effect.params.value || 1, ctx)
@@ -69,7 +114,7 @@ export function applyEffectsToBuffer(
 
     return result
   } catch (e) {
-    logError('realTimeEffects', 'Erreur application effets', e)   // ✅ CHANGÉ
+    logError('realTimeEffects', 'Error applying effects', e)
     return audioBuffer
   } finally {
     if (ctx.state !== 'closed') {
@@ -78,6 +123,14 @@ export function applyEffectsToBuffer(
   }
 }
 
+/**
+ * Applies a static volume multiplier.
+ *
+ * @param {AudioBuffer} buffer
+ * @param {number} volume - Linear multiplier (clamped to 0-5).
+ * @param {AudioContext} ctx
+ * @returns {AudioBuffer}
+ */
 export function applyVolumeEffect(buffer, volume, ctx) {
   const clampedVolume = Math.max(0, Math.min(5, volume))
 
@@ -99,6 +152,14 @@ export function applyVolumeEffect(buffer, volume, ctx) {
   return newBuffer
 }
 
+/**
+ * Applies a fade-in over `duration` seconds (quadratic curve).
+ *
+ * @param {AudioBuffer} buffer
+ * @param {number} duration - Fade duration in seconds (≤0.05 → no-op).
+ * @param {AudioContext} ctx
+ * @returns {AudioBuffer}
+ */
 export function applyFadeInEffect(buffer, duration, ctx) {
   if (duration <= 0.05) return buffer
 
@@ -135,6 +196,14 @@ export function applyFadeInEffect(buffer, duration, ctx) {
   return newBuffer
 }
 
+/**
+ * Applies a fade-out over `duration` seconds (quadratic curve).
+ *
+ * @param {AudioBuffer} buffer
+ * @param {number} duration - Fade duration in seconds (≤0.05 → no-op).
+ * @param {AudioContext} ctx
+ * @returns {AudioBuffer}
+ */
 export function applyFadeOutEffect(buffer, duration, ctx) {
   if (duration <= 0.05) return buffer
 
@@ -172,6 +241,14 @@ export function applyFadeOutEffect(buffer, duration, ctx) {
   return newBuffer
 }
 
+/**
+ * Applies a speed change (linear interpolation, no pitch preservation).
+ *
+ * @param {AudioBuffer} buffer
+ * @param {number} speed - Multiplier (clamped to 0.1-4; 1 → no-op).
+ * @param {AudioContext} ctx
+ * @returns {AudioBuffer}
+ */
 export function applySpeedEffect(buffer, speed, ctx) {
   const clampedSpeed = Math.max(0.1, Math.min(4, speed))
 
@@ -199,6 +276,16 @@ export function applySpeedEffect(buffer, speed, ctx) {
   return newBuffer
 }
 
+/**
+ * Applies a simple echo (single delayed copy, mixed in).
+ *
+ * @param {AudioBuffer} buffer
+ * @param {number} delay - Delay in seconds (clamped to 0.05-3).
+ * @param {number} decay - Echo amplitude (0-1).
+ * @param {number} mix - Dry/wet mix (0 = dry only, 1 = echo only).
+ * @param {AudioContext} ctx
+ * @returns {AudioBuffer}
+ */
 export function applyEchoEffect(buffer, delay, decay, mix, ctx) {
   const clampedDelay = Math.max(0.05, Math.min(3, delay))
   const clampedDecay = Math.max(0, Math.min(1, decay))
@@ -230,6 +317,15 @@ export function applyEchoEffect(buffer, delay, decay, mix, ctx) {
   return newBuffer
 }
 
+/**
+ * Applies a cheap multi-tap reverb (comb-filter style, no FFT).
+ *
+ * @param {AudioBuffer} buffer
+ * @param {number} roomSize - 0-1 (larger = more/longer taps).
+ * @param {number} mix - Dry/wet mix (0 = dry only).
+ * @param {AudioContext} ctx
+ * @returns {AudioBuffer}
+ */
 export function applyReverbEffect(buffer, roomSize, mix, ctx) {
   const clampedRoomSize = Math.max(0.05, Math.min(1, roomSize))
   const clampedMix = Math.max(0, Math.min(1, mix))
@@ -277,6 +373,17 @@ export function applyReverbEffect(buffer, roomSize, mix, ctx) {
   return newBuffer
 }
 
+/**
+ * Normalizes an `AudioBuffer` to a safe peak (0.95).
+ *
+ * - Peak > 0.95 → scale down to 0.95.
+ * - Peak < 0.1  → scale up (capped at 5x gain).
+ * - 0.1 ≤ peak ≤ 0.95 → returned unchanged.
+ *
+ * @param {AudioBuffer} buffer
+ * @param {AudioContext} ctx
+ * @returns {AudioBuffer}
+ */
 export function normalizeBuffer(buffer, ctx) {
   const channels = buffer.numberOfChannels
   const length = buffer.length
@@ -322,11 +429,27 @@ export function normalizeBuffer(buffer, ctx) {
   return buffer
 }
 
+/**
+ * Returns a cached effect buffer for the given `clipId_version`, or `null`.
+ *
+ * @param {string} clipId
+ * @param {number} [version=0]
+ * @returns {AudioBuffer|null}
+ */
 export function getCachedEffectBuffer(clipId, version = 0) {
   const key = `${clipId}_${version}`
   return effectCache.get(key) || null
 }
 
+/**
+ * Stores an effect buffer in the cache (`clipId_version`).
+ * Evicts the oldest entries when the cache exceeds 100 items.
+ *
+ * @param {string} clipId
+ * @param {AudioBuffer} buffer
+ * @param {number} [version=0]
+ * @returns {void}
+ */
 export function setCachedEffectBuffer(clipId, buffer, version = 0) {
   const key = `${clipId}_${version}`
   effectCache.set(key, buffer)
@@ -338,6 +461,12 @@ export function setCachedEffectBuffer(clipId, buffer, version = 0) {
   }
 }
 
+/**
+ * Clears cached effect buffers (all, or a specific `clipId` prefix).
+ *
+ * @param {string} [clipId]
+ * @returns {void}
+ */
 export function clearEffectCache(clipId) {
   if (clipId) {
     const keys = Array.from(effectCache.keys()).filter((k) =>

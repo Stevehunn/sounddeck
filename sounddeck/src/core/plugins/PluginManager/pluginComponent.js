@@ -1,10 +1,27 @@
-// src/core/plugins/PluginManager/pluginComponent.js
+/**
+ * @file Lazy loader for plugin page components.
+ *
+ * Two modes:
+ * - **DEV** — tries several Vite-resolvable paths (`componentPath`,
+ *   `pages/<id>`, `<id>`, `components/<id>`). This is needed because
+ *   plugins can declare their component in different shapes.
+ * - **PROD** — uses `electronAPI.getPluginComponentPath()` to resolve
+ *   the absolute path of the component, then dynamic-imports it.
+ *
+ * Loaded components are cached in `pluginManager.components` so subsequent
+ * calls are instant.
+ *
+ * @see ./PluginManager/index.js (`getPluginComponent`)
+ */
+
 import { logWarn, logError } from '@shared/utils/logger'
 
 /**
- * Charge un composant de page de plugin.
- * En DEV : essaie plusieurs chemins Vite.
- * En PROD : utilise le chemin fourni par le main process.
+ * Loads the React component for the given plugin page.
+ *
+ * @param {Object} pluginManager - The plugin manager instance.
+ * @param {string} pageId
+ * @returns {Promise<React.ComponentType|null>}
  */
 export async function loadPluginComponent(pluginManager, pageId) {
   if (pluginManager.components.has(pageId)) {
@@ -34,11 +51,11 @@ export async function loadPluginComponent(pluginManager, pageId) {
             pluginManager.components.set(pageId, Component)
             return Component
           }
-        } catch (e) {
-          // Essayer le chemin suivant
+        } catch {
+          // Try the next path
         }
       }
-      logWarn('PluginManager', `Composant non trouvé pour la page ${pageId}`, {
+      logWarn('PluginManager', `Component not found for page ${pageId}`, {
         paths,
       })
       return null
@@ -57,7 +74,7 @@ export async function loadPluginComponent(pluginManager, pageId) {
       }
     }
   } catch (e) {
-    logError('PluginManager', `Chargement composant ${pageId}`, e)
+    logError('PluginManager', `Component load error for ${pageId}`, e)
   }
 
   return null

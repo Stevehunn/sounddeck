@@ -1,7 +1,47 @@
-// src/shared/components/audio/SoundCard/VolumePanel.jsx
-import { useState, useEffect } from 'react'
+/**
+ * @file Floating volume panel for a SoundCard.
+ *
+ * Opens as a portal next to the card when the user clicks "Volume" in the
+ * context menu. Shows:
+ * - The sound name (truncated)
+ * - The current volume in dB (−24 to +24, step 0.5)
+ * - A slider for live adjustment
+ * - A "Reset to 0 dB" button
+ * - A "Close" button
+ *
+ * **Controlled component**: it doesn't own any local state — the parent
+ * (`SoundCard/index.jsx`) owns `localVolume` and passes `volume` down. This
+ * keeps the display in sync with the parent's canonical state without a
+ * `setState-in-effect` sync (see React 19 rule).
+ *
+ * Commit vs live update:
+ * - `onChange(val)` is called on every slider move (updates the parent's
+ *   `localVolume` so the slider stays responsive).
+ * - `onCommit(val)` is called on `mouseup`/`touchend` (writes to the store).
+ *   This avoids spamming `store.updateSoundVolume()` 60 times per drag.
+ *
+ * Closes on outside click (mousedown anywhere except `#volume-panel`).
+ *
+ * @see ./index.jsx — parent (positioning + integration)
+ */
+
+import { useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
+/**
+ * Floating volume panel.
+ *
+ * @param {Object} props
+ * @param {number} props.volume - Current volume in dB (−24 to +24).
+ * @param {(v: number) => void} props.onChange - Called on every slider move.
+ * @param {(v: number) => void} props.onCommit - Called on slider release.
+ * @param {() => void} props.onClose - Close the panel.
+ * @param {() => void} [props.onDragStart] - Called when the user grabs the slider.
+ * @param {() => void} [props.onDragEnd] - Called when the user releases the slider.
+ * @param {string} [props.soundName] - Sound name (shown in the header).
+ * @param {{top: number, left: number}} [props.position] - Absolute position.
+ * @returns {JSX.Element}
+ */
 export default function VolumePanel({
   volume,
   onChange,
@@ -13,22 +53,19 @@ export default function VolumePanel({
   position,
 }) {
   const { t } = useLanguage()
-  const [localVolume, setLocalVolume] = useState(volume)
-
-  useEffect(() => {
-    setLocalVolume(volume)
-  }, [volume])
 
   const handleSliderChange = (e) => {
     const newVal = parseFloat(e.target.value)
     if (!isNaN(newVal)) {
-      setLocalVolume(newVal)
       onChange(newVal)
     }
   }
 
-  const handleSliderMouseUp = () => {
-    onCommit(localVolume)
+  const handleSliderMouseUp = (e) => {
+    // Read the current value from the slider (avoids stale `volume` if the
+    // parent's re-render was batched with the last `onChange`).
+    const val = parseFloat(e?.target?.value)
+    onCommit(isNaN(val) ? volume : val)
     if (onDragEnd) onDragEnd()
   }
 
@@ -37,11 +74,11 @@ export default function VolumePanel({
   }
 
   const resetToZero = () => {
-    setLocalVolume(0)
     onChange(0)
     onCommit(0)
   }
 
+  // Close on outside click (mousedown anywhere except the panel).
   useEffect(() => {
     const handleClickOutside = (e) => {
       const panel = document.getElementById('volume-panel')
@@ -153,7 +190,7 @@ export default function VolumePanel({
         </button>
       </div>
 
-      {/* Valeur dB */}
+      {/* dB value */}
       <div
         style={{
           textAlign: 'center',
@@ -169,17 +206,19 @@ export default function VolumePanel({
             fontSize: 32,
             fontWeight: 700,
             color:
-              localVolume === 0
+              volume === 0
                 ? 'var(--accent)'
-                : localVolume > 0
+                : volume > 0
                   ? 'var(--success)'
                   : 'var(--danger)',
           }}
         >
-          {localVolume > 0 ? '+' : ''}
-          {localVolume}
+          {volume > 0 ? '+' : ''}
+          {volume}
         </span>
-        <span style={{ fontSize: 16, color: 'var(--text-tertiary)', marginLeft: 4 }}>
+        <span
+          style={{ fontSize: 16, color: 'var(--text-tertiary)', marginLeft: 4 }}
+        >
           dB
         </span>
       </div>
@@ -191,7 +230,7 @@ export default function VolumePanel({
           min="-24"
           max="24"
           step="0.5"
-          value={localVolume}
+          value={volume}
           onChange={handleSliderChange}
           onMouseDown={handleSliderMouseDown}
           onMouseUp={handleSliderMouseUp}
@@ -209,7 +248,7 @@ export default function VolumePanel({
         />
       </div>
 
-      {/* Graduations */}
+      {/* Ticks */}
       <div
         style={{
           display: 'flex',
@@ -222,9 +261,10 @@ export default function VolumePanel({
         <span>-24 dB</span>
         <span
           style={{
-            color: localVolume === 0 ? 'var(--accent)' : 'var(--text-tertiary)',
-            fontWeight: localVolume === 0 ? 600 : 400,
-            background: localVolume === 0 ? 'var(--accent-light)' : 'transparent',
+            color: volume === 0 ? 'var(--accent)' : 'var(--text-tertiary)',
+            fontWeight: volume === 0 ? 600 : 400,
+            background:
+              volume === 0 ? 'var(--accent-light)' : 'transparent',
             padding: '1px 8px',
             borderRadius: 10,
             fontSize: 9,
@@ -235,7 +275,7 @@ export default function VolumePanel({
         <span>+24 dB</span>
       </div>
 
-      {/* Boutons */}
+      {/* Actions */}
       <div style={{ display: 'flex', gap: 8 }}>
         <button
           onClick={(e) => {
@@ -245,13 +285,12 @@ export default function VolumePanel({
           style={{
             flex: 1,
             background:
-              localVolume === 0 ? 'var(--accent-light)' : 'var(--bg-tertiary)',
+              volume === 0 ? 'var(--accent-light)' : 'var(--bg-tertiary)',
             border: `1px solid ${
-              localVolume === 0 ? 'var(--accent)' : 'var(--border)'
+              volume === 0 ? 'var(--accent)' : 'var(--border)'
             }`,
             borderRadius: 'var(--radius-md)',
-            color:
-              localVolume === 0 ? 'var(--accent)' : 'var(--text-secondary)',
+            color: volume === 0 ? 'var(--accent)' : 'var(--text-secondary)',
             cursor: 'pointer',
             padding: '8px 12px',
             fontSize: 12,
@@ -262,14 +301,14 @@ export default function VolumePanel({
             transition: 'all 0.15s',
           }}
           onMouseEnter={(e) => {
-            if (localVolume !== 0) {
+            if (volume !== 0) {
               e.currentTarget.style.borderColor = 'var(--accent)'
               e.currentTarget.style.color = 'var(--accent)'
               e.currentTarget.style.background = 'var(--accent-light)'
             }
           }}
           onMouseLeave={(e) => {
-            if (localVolume !== 0) {
+            if (volume !== 0) {
               e.currentTarget.style.borderColor = 'var(--border)'
               e.currentTarget.style.color = 'var(--text-secondary)'
               e.currentTarget.style.background = 'var(--bg-tertiary)'

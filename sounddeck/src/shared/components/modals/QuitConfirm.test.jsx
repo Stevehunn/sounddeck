@@ -1,4 +1,3 @@
-// src/shared/components/modals/QuitConfirm.test.jsx
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import QuitConfirm from './QuitConfirm'
@@ -11,14 +10,12 @@ describe('QuitConfirm', () => {
 
   it('devrait afficher le titre', () => {
     render(<QuitConfirm onClose={() => {}} />)
-    // Le titre est la clé traduite via useLanguage
     expect(document.body.textContent).toMatch(/quitConfirmTitle|Quitter|Quit/i)
   })
 
   it('devrait afficher 3 boutons (quit / minimize / cancel)', () => {
     render(<QuitConfirm onClose={() => {}} />)
     const buttons = screen.getAllByRole('button')
-    // 3 boutons + éventuellement 0 car la checkbox n'est pas un bouton
     expect(buttons.length).toBeGreaterThanOrEqual(3)
   })
 

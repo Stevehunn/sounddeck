@@ -1,4 +1,23 @@
-// src/core/store/index.js
+/**
+ * @file Global store — single source of truth for all app state.
+ *
+ * Aggregates every sub-hook (sounds, profiles, shortcuts, settings, mixer,
+ * editor) into one flat object returned by `useStore()`. Components read
+ * the flat properties directly (e.g. `store.sounds`, `store.volume`).
+ *
+ * On boot, `hydrateStore()` loads every persisted key from electron-store
+ * in parallel and feeds it to the sub-hooks. Sidebar configuration is
+ * reconciled with the current profiles (removes stale profile entries,
+ * re-adds missing core pages) to keep it consistent after updates.
+ *
+ * @see ./hooks/useSounds.js
+ * @see ./hooks/useProfiles.js
+ * @see ./hooks/useSettings.js
+ * @see ./hooks/useMixer.js
+ * @see ./hooks/useShortcuts.js
+ * @see ./hooks/useEditor.js
+ */
+
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSounds } from './hooks/useSounds'
 import { useProfiles } from './hooks/useProfiles'
@@ -7,7 +26,6 @@ import { useSettings } from './hooks/useSettings'
 import { useEditor } from './hooks/useEditor'
 import { useMixer } from './hooks/useMixer'
 import { DEFAULT_SIDEBAR_CONFIG } from './utils/constants'
-import { normalizePath } from './utils/normalizePath'
 import { migrateSoundVolume } from './utils/volumeUtils'
 import {
   DEFAULT_GROUPS,
@@ -22,26 +40,32 @@ const save = async (key, value) => {
   await window.electronAPI.storeSet(key, value)
 }
 
+/**
+ * Loads every persisted key in parallel, with per-key error fallback.
+ *
+ * @param {Record<string, any>} keysWithDefaults
+ * @param {Record<string, () => Promise<any>>} [ipcExtraGetters] - Optional
+ *   custom getters (e.g. `getStartMinimized`).
+ * @returns {Promise<Record<string, any>>}
+ */
 async function hydrateStore(keysWithDefaults, ipcExtraGetters = {}) {
   const keys = Object.keys(keysWithDefaults)
   const results = {}
 
   const promises = keys.map(async (key) => {
     try {
-      // Priorité aux getters IPC personnalisés (ex: getStartMinimized)
       const getter = ipcExtraGetters[key]
       const value = getter
         ? await getter()
         : await window.electronAPI.storeGet(key)
 
-      // Fallback sur le défaut si la valeur est null/undefined
       results[key] =
         value !== undefined && value !== null
           ? value
           : keysWithDefaults[key]
     } catch (e) {
       if (import.meta.env.DEV) {
-        console.warn(`⚠️ [store] storeGet(${key}) a échoué:`, e?.message || e)
+        console.warn(`⚠️ [store] storeGet(${key}) failed:`, e?.message || e)
       }
       results[key] = keysWithDefaults[key]
     }
@@ -68,16 +92,21 @@ export function useStore() {
   const mixerHook = useMixer(save, storeValuesRef)
   const editorHook = useEditor(save)
 
-  storeValuesRef.current = {
-    playLocally: settingsHook.playLocally,
-    audioDevice: settingsHook.audioDevice,
-    localAudioDevice: settingsHook.localAudioDevice,
-    mixerSoundVolume: mixerHook.mixerSoundVolume,
-    monitoringEnabled: mixerHook.monitoringEnabled,
-    mixerEnabled: mixerHook.mixerEnabled,
-  }
+  // Sync the store snapshot AFTER commit (React 19 disallows mutations
+  // during render). The sub-hooks read `storeValuesRef.current` only from
+  // async callbacks, so the 1-tick delay is safe.
+  useEffect(() => {
+    storeValuesRef.current = {
+      playLocally: settingsHook.playLocally,
+      audioDevice: settingsHook.audioDevice,
+      localAudioDevice: settingsHook.localAudioDevice,
+      mixerSoundVolume: mixerHook.mixerSoundVolume,
+      monitoringEnabled: mixerHook.monitoringEnabled,
+      mixerEnabled: mixerHook.mixerEnabled,
+    }
+  })
 
-  // ─── CHARGEMENT INITIAL ─────────────────────────────────────────────────
+  // ─── INITIAL LOAD ────────────────────────────────────────────────────
   useEffect(() => {
     async function loadData() {
       try {
@@ -131,7 +160,7 @@ export function useStore() {
           lowLatencyMode: null,
           monitoringEnabled: null,
 
-          // Start (avec getters IPC dédiés)
+          // Startup (with dedicated IPC getters)
           startMinimized: null,
           launchAtStartup: null,
         }
@@ -152,7 +181,9 @@ export function useStore() {
           nameKey: 'allSounds',
           isDefault: true,
         }
-        const userProfiles = (data.profiles || []).filter((p) => p.id !== 'all')
+        const userProfiles = (data.profiles || []).filter(
+          (p) => p.id !== 'all'
+        )
         const allProfiles = [allProfile, ...userProfiles]
 
         soundsHook.setSounds(savedSounds)
@@ -171,23 +202,33 @@ export function useStore() {
         settingsHook.updateCustomTheme(data.customTheme || null)
         settingsHook.updateLang(data.lang || 'fr')
         settingsHook.updateAudioDevice(data.audioDevice || 'default')
-        settingsHook.updateLocalAudioDevice(data.localAudioDevice || 'default')
+        settingsHook.updateLocalAudioDevice(
+          data.localAudioDevice || 'default'
+        )
         settingsHook.updateVolume(data.volume ?? 80)
         settingsHook.updatePlayLocally(data.playLocally ?? true)
         settingsHook.updatePreviewVolume(data.previewVolume ?? 70)
         settingsHook.updateKeyboardLayout(data.keyboardLayout || 'qwerty')
         settingsHook.updateCardSize(data.cardSize || 'medium')
-        settingsHook.updateNormalizationEnabled(data.normalizationEnabled ?? true)
-        settingsHook.updateNormalizationTarget(data.normalizationTarget ?? 0.2)
+        settingsHook.updateNormalizationEnabled(
+          data.normalizationEnabled ?? true
+        )
+        settingsHook.updateNormalizationTarget(
+          data.normalizationTarget ?? 0.2
+        )
         settingsHook.setStartMinimized(data.startMinimized ?? false)
         settingsHook.setLaunchAtStartup(data.launchAtStartup ?? false)
         settingsHook.updateVirtualDriverInstalled(
           data.virtualDriverInstalled || false
         )
-        settingsHook.updateVirtualDeviceActive(data.virtualDeviceActive ?? false)
+        settingsHook.updateVirtualDeviceActive(
+          data.virtualDeviceActive ?? false
+        )
         settingsHook.updateAutoBackupEnabled(data.autoBackupEnabled ?? true)
         settingsHook.updateBackupInterval(data.backupInterval ?? 5)
-        settingsHook.updateLazyLoadingEnabled(data.lazyLoadingEnabled ?? true)
+        settingsHook.updateLazyLoadingEnabled(
+          data.lazyLoadingEnabled ?? true
+        )
         settingsHook.updateCompressOnImport(data.compressOnImport ?? false)
         settingsHook.updateCompressionBitrate(data.compressionBitrate ?? 128)
         settingsHook.updateShortcutsEnabled(data.shortcutsEnabled ?? true)
@@ -199,7 +240,9 @@ export function useStore() {
         )
         settingsHook.updateLoopShortcut(data.loopShortcut || '')
         settingsHook.updateStopAllShortcut(data.stopAllShortcut || '')
-        settingsHook.updatePresentationShortcut(data.presentationShortcut || '')
+        settingsHook.updatePresentationShortcut(
+          data.presentationShortcut || ''
+        )
 
         mixerHook.setMixerEnabled(data.mixerEnabled ?? false)
         mixerHook.setMicrophoneDevice(data.microphoneDevice || 'default')
@@ -210,19 +253,21 @@ export function useStore() {
         mixerHook.setLowLatencyMode(data.lowLatencyMode ?? false)
         mixerHook.setMonitoringEnabled(data.monitoringEnabled ?? false)
 
-        // Projets éditeur (parallélisables entre eux)
+        // Editor projects (parallel)
         await Promise.all([
           editorHook.loadRecentEditorProjects?.(),
           editorHook.loadAllEditorProjects?.(),
         ])
 
-        // Sidebar
+        // Sidebar reconciliation
         if (data.sidebarConfig) {
           let items = [...(data.sidebarConfig.items || [])]
 
           allProfiles.forEach((profile) => {
             const profileId = `profile-${profile.id}`
-            const existingIndex = items.findIndex((item) => item.id === profileId)
+            const existingIndex = items.findIndex(
+              (item) => item.id === profileId
+            )
 
             if (existingIndex === -1) {
               items.push({
@@ -243,8 +288,19 @@ export function useStore() {
           })
 
           const KNOWN_CORE_IDS = [
-            'home', 'discover', 'trimmer', 'editor', 'sequencer', 'youtube',
-            'stats', 'emoji', 'loop', 'shortcuts', 'presentation', 'guide', 'options',
+            'home',
+            'discover',
+            'trimmer',
+            'editor',
+            'sequencer',
+            'youtube',
+            'stats',
+            'emoji',
+            'loop',
+            'shortcuts',
+            'presentation',
+            'guide',
+            'options',
           ]
 
           const currentProfileIds = new Set(
@@ -295,7 +351,13 @@ export function useStore() {
           const defaultConfig = {
             mode: 'default',
             items: defaultItems,
-            sectionOrder: ['pinned', 'profiles', 'navigation', 'actions', 'footer'],
+            sectionOrder: [
+              'pinned',
+              'profiles',
+              'navigation',
+              'actions',
+              'footer',
+            ],
           }
           setSidebarConfig(defaultConfig)
           await save('sidebarConfig', defaultConfig)
@@ -303,15 +365,26 @@ export function useStore() {
 
         setSidebarVersion((prev) => prev + 1)
       } catch (e) {
-        console.error('Erreur chargement store:', e)
+        console.error('Store load error:', e)
       } finally {
         isHydrating = false
         setLoading(false)
       }
     }
     loadData()
+    // The loadData effect intentionally runs once on mount: `hydrateStore`
+    // hydrates every stateful hook from the store, so re-running on every
+    // hook change would reset local edits and thrash disk I/O.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /**
+   * Syncs the sidebar config with the given profiles list (keeps entries
+   * in sync when profiles are added/removed/renamed elsewhere).
+   *
+   * @param {Array<Object>} profileList
+   * @returns {Promise<Object>} The updated config.
+   */
   const syncProfilesToSidebar = useCallback(
     async (profileList) => {
       const currentConfig = sidebarConfig || DEFAULT_SIDEBAR_CONFIG
@@ -329,7 +402,9 @@ export function useStore() {
 
       allProfiles.forEach((profile) => {
         const profileId = `profile-${profile.id}`
-        const existingIndex = newItems.findIndex((item) => item.id === profileId)
+        const existingIndex = newItems.findIndex(
+          (item) => item.id === profileId
+        )
 
         if (existingIndex === -1) {
           newItems.push({
@@ -368,6 +443,10 @@ export function useStore() {
     [sidebarConfig]
   )
 
+  /**
+   * Resets the sidebar config to its default state.
+   * @returns {Promise<void>}
+   */
   const resetSidebarConfig = useCallback(async () => {
     const allProfiles = profilesHook.getAllProfiles()
     const defaultItems = [...DEFAULT_SIDEBAR_CONFIG.items]
@@ -398,6 +477,11 @@ export function useStore() {
     await save('sidebarConfig', defaultConfig)
   }, [profilesHook])
 
+  /**
+   * Replaces the sidebar config with a new one (persisted).
+   * @param {Object} newConfig
+   * @returns {Promise<void>}
+   */
   const updateSidebarConfig = useCallback(async (newConfig) => {
     setSidebarConfig(newConfig)
     setSidebarVersion((prev) => prev + 1)
@@ -412,17 +496,21 @@ export function useStore() {
     setLoopEnabled((prev) => !prev)
   }, [])
 
-  const currentSounds = useMemo(() => {
-    return soundsHook.getOrderedSounds(profilesHook.currentProfileId)
-  }, [soundsHook.sounds, soundsHook.soundOrder, profilesHook.currentProfileId])
+  // Extract the stable functions + values so the memo deps are simple.
+  // `getOrderedSounds` / `getFavoriteSounds` are useCallback-wrapped in
+  // `useSounds` and only change when `sounds` or `soundOrder` change.
+  const { getOrderedSounds, getFavoriteSounds } = soundsHook
+  const { currentProfileId } = profilesHook
 
-  const favoriteSounds = useMemo(() => {
-    return soundsHook.getFavoriteSounds(profilesHook.currentProfileId)
-  }, [
-    soundsHook.sounds,
-    soundsHook.soundOrder,
-    profilesHook.currentProfileId,
-  ])
+  const currentSounds = useMemo(
+    () => getOrderedSounds(currentProfileId),
+    [getOrderedSounds, currentProfileId]
+  )
+
+  const favoriteSounds = useMemo(
+    () => getFavoriteSounds(currentProfileId),
+    [getFavoriteSounds, currentProfileId]
+  )
 
   return {
     loading,
@@ -551,7 +639,7 @@ export function useStore() {
     initMixerOnStartup: mixerHook.initMixerOnStartup,
     toggleMonitoring: mixerHook.toggleMonitoring,
 
-    // Gestion multi-projets de l'éditeur
+    // Editor multi-project
     editorProjects: editorHook.editorProjects,
     recentEditorProjects: editorHook.recentEditorProjects,
     loadAllEditorProjects: editorHook.loadAllEditorProjects,

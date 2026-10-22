@@ -1,14 +1,31 @@
-// src/shared/utils/format.js
+/**
+ * @file Time formatting helpers.
+ *
+ * `formatTime(seconds, options)` is the single place where durations are
+ * turned into strings. It supports several output shapes:
+ *
+ * - **default**: `"1:23"` if ≥ 60 s, `"45.3s"` if < 60 s.
+ * - **`alwaysMMSS`**: `"0:45"` even for < 60 s.
+ * - **`decimals: 1|2`**: `"1:23.4"` or `"1:23.45"`.
+ * - **`short: true`**: `"12.3s"`.
+ * - **`noDecimals: true`**: `"1:23"` (floor).
+ *
+ * `formatMMSS(seconds)` is a convenience wrapper for the `alwaysMMSS` mode.
+ *
+ * @see @shared/components/audio/Waveform.jsx (formats handle labels)
+ * @see @shared/components/audio/AudioTrimmer.jsx
+ */
 
 /**
- * Formate un temps (en secondes) en chaîne lisible.
+ * Formats a duration (in seconds) as a human-readable string.
  *
- * Modes :
- *   - défaut          : "1:23" ou "45.3s" (auto)
- *   - alwaysMMSS      : "0:45" même si < 60s
- *   - decimals: 1|2   : "1:23.4" ou "1:23.45"
- *   - short           : "12.3s"
- *   - noDecimals      : "1:23" (floor)
+ * @param {number} seconds
+ * @param {Object} [options]
+ * @param {boolean} [options.alwaysMMSS=false] - Use `M:SS` even for < 60 s.
+ * @param {number} [options.decimals=0] - Number of decimal places (0-2).
+ * @param {boolean} [options.short=false] - Return only seconds (e.g. `"12.3s"`).
+ * @param {boolean} [options.noDecimals=false] - Floor the seconds (no decimal).
+ * @returns {string} Formatted duration (`"0:00"` for invalid input).
  */
 export function formatTime(seconds, options = {}) {
   if (!seconds && seconds !== 0) return '0:00'
@@ -48,7 +65,10 @@ export function formatTime(seconds, options = {}) {
 }
 
 /**
- * Format "1:23" (MM:SS) — utilitaire raccourci
+ * Shortcut for `formatTime(seconds, { alwaysMMSS: true })`.
+ *
+ * @param {number} seconds
+ * @returns {string} Formatted duration (`"M:SS"`).
  */
 export function formatMMSS(seconds) {
   return formatTime(seconds, { alwaysMMSS: true })

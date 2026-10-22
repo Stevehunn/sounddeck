@@ -1,24 +1,38 @@
-// src/core/plugins/PluginManager/pluginLoader.js
+/**
+ * @file Plugin module loading + validation.
+ *
+ * - **`importPluginModule`** — imports an integrated or external plugin
+ *   module (with multi-path fallback for Vite dev).
+ * - **`validatePluginModule`** — checks compatibility, id presence, and
+ *   Pro licensing.
+ * - **`registerPluginPages`** — registers the plugin's pages in the manager.
+ *
+ * @see ./PluginManager/index.js
+ * @see ./semver.js
+ */
+
 import { logError, logWarn } from '@shared/utils/logger'
 import { checkCompatibility } from './semver'
 import { INTEGRATED_PLUGIN_IDS } from './constants'
 
 /**
- * Charge un module de plugin (intégré ou externe).
- * Retourne le module OU null en cas d'échec.
+ * Imports the plugin module.
+ *
+ * @param {Object} pluginInfo
+ * @returns {Promise<Object|null>} The module, or `null` on failure.
  */
 export async function importPluginModule(pluginInfo) {
-  // Cas 1 : plugin intégré avec loader fourni
+  // Case 1: integrated plugin with a loader provided by Vite's glob
   if (pluginInfo._loader) {
     try {
       return await pluginInfo._loader()
     } catch (e) {
-      logError('PluginManager', `Chargement intégré ${pluginInfo.id}`, e)
+      logError('PluginManager', `Integrated load ${pluginInfo.id}`, e)
       return null
     }
   }
 
-  // Cas 2 : plugin externe — essaie plusieurs chemins
+  // Case 2: external plugin — try several Vite paths
   const paths = [
     `../../plugins/${pluginInfo.id}/index.js`,
     `../../plugins/${pluginInfo.id}/index.jsx`,
@@ -38,7 +52,7 @@ export async function importPluginModule(pluginInfo) {
     }
   }
 
-  // Cas 3 : plugin externe sur disque
+  // Case 3: external plugin on disk (resolved by the main process)
   try {
     const fullPath = await window.electronAPI?.getPluginPath?.(pluginInfo.id)
     if (fullPath) {
@@ -48,12 +62,16 @@ export async function importPluginModule(pluginInfo) {
     lastError = e
   }
 
-  logError('PluginManager', `Plugin ${pluginInfo.id} introuvable`, lastError)
+  logError('PluginManager', `Plugin ${pluginInfo.id} not found`, lastError)
   return null
 }
 
 /**
- * Valide la compatibilité + le module + la licence.
+ * Validates compatibility, module shape, and Pro licensing.
+ *
+ * @param {Object} pluginInfo
+ * @param {Object} pluginModule
+ * @returns {Object|null} The plugin object, or `null` if invalid.
  */
 export function validatePluginModule(pluginInfo, pluginModule) {
   if (!checkCompatibility(pluginInfo)) {
@@ -64,23 +82,23 @@ export function validatePluginModule(pluginInfo, pluginModule) {
   const plugin = pluginModule?.default || pluginModule
 
   if (!plugin?.id) {
-    logError('PluginManager', 'Plugin invalide: id manquant')
+    logError('PluginManager', 'Invalid plugin: missing id')
     return null
   }
 
-  // ✅ Licence Pro requise ?
+  // Pro license required?
   const manifest = { ...plugin, ...pluginInfo }
   if (manifest.licenseRequired === true) {
     if (!pluginInfo._licenseTier) {
       logWarn(
         'PluginManager',
-        `Plugin ${plugin.id} requiert une licence Pro (non fournie)`
+        `Plugin ${plugin.id} requires a Pro license (none provided)`
       )
       return null
     }
 
     const requiredTier = manifest.minTier || 'pro'
-    // Ranking : free=0, pro=10, dev=99
+    // Ranking: free=0, pro=10, dev=99
     const ranks = { free: 0, pro: 10, dev: 99 }
     const userRank = ranks[pluginInfo._licenseTier] ?? 0
     const requiredRank = ranks[requiredTier] ?? 10
@@ -88,7 +106,7 @@ export function validatePluginModule(pluginInfo, pluginModule) {
     if (userRank < requiredRank) {
       logWarn(
         'PluginManager',
-        `Plugin ${plugin.id} requiert tier "${requiredTier}", utilisateur a "${pluginInfo._licenseTier}"`
+        `Plugin ${plugin.id} requires tier "${requiredTier}", user has "${pluginInfo._licenseTier}"`
       )
       return null
     }
@@ -98,7 +116,11 @@ export function validatePluginModule(pluginInfo, pluginModule) {
 }
 
 /**
- * Enregistre les pages du plugin dans le manager.
+ * Registers the plugin's pages in the manager.
+ *
+ * @param {Object} pluginManager
+ * @param {Object} plugin
+ * @returns {void}
  */
 export function registerPluginPages(pluginManager, plugin) {
   if (!plugin.pages) return
@@ -118,7 +140,9 @@ export function registerPluginPages(pluginManager, plugin) {
 }
 
 /**
- * Vérifie que l'ID du plugin est un plugin intégré.
+ * Returns `true` if the given ID belongs to an integrated plugin.
+ * @param {string} pluginId
+ * @returns {boolean}
  */
 export function isIntegrated(pluginId) {
   return INTEGRATED_PLUGIN_IDS.has(pluginId)

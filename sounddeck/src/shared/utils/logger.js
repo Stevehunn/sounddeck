@@ -1,10 +1,23 @@
-// src/shared/utils/logger.js
+/**
+ * @file Dev-only logger with context tags.
+ *
+ * All loggers are silent in production (`import.meta.env.DEV === false`)
+ * — the bundler strips them out completely (no-op functions after build).
+ *
+ * Each log takes a `context` tag (e.g. `"AudioService"`, `"PluginManager"`)
+ * so DevTools filtering is easy.
+ *
+ * @see @shared/utils/errorHandler.js (persists errors in the store)
+ */
 
 const __DEV__ =
   typeof import.meta !== 'undefined' && import.meta.env?.DEV
 
 /**
- * Extrait un message lisible d'une erreur.
+ * Extracts a human-readable message from any error-like value.
+ *
+ * @param {Error|string|any} e
+ * @returns {string}
  */
 function getErrorMessage(e) {
   if (!e) return ''
@@ -14,10 +27,12 @@ function getErrorMessage(e) {
 }
 
 /**
- * Log une erreur (DEV uniquement, silencieux en prod).
- * @param {string} context - ex: 'AudioService', 'PluginManager'
+ * Logs an error (dev only, no-op in prod).
+ *
+ * @param {string} context - Module tag (e.g. `'AudioService'`).
  * @param {Error|string} error
- * @param {Object} [meta] - données complémentaires
+ * @param {Object} [meta] - Extra debug data.
+ * @returns {void}
  */
 export function logError(context, error, meta = null) {
   if (!__DEV__) return
@@ -30,10 +45,12 @@ export function logError(context, error, meta = null) {
 }
 
 /**
- * Log un avertissement (DEV uniquement).
+ * Logs a warning (dev only, no-op in prod).
+ *
  * @param {string} context
  * @param {string} message
  * @param {Object} [meta]
+ * @returns {void}
  */
 export function logWarn(context, message, meta = null) {
   if (!__DEV__) return
@@ -45,7 +62,12 @@ export function logWarn(context, message, meta = null) {
 }
 
 /**
- * Log info (DEV uniquement).
+ * Logs an informational message (dev only, no-op in prod).
+ *
+ * @param {string} context
+ * @param {string} message
+ * @param {Object} [meta]
+ * @returns {void}
  */
 export function logInfo(context, message, meta = null) {
   if (!__DEV__) return

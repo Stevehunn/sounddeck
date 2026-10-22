@@ -1,4 +1,3 @@
-// src/shared/constants/cardSizes.js
 export const CARD_SIZES = {
   small: 90,
   medium: 110,

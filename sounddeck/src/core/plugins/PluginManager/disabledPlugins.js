@@ -1,13 +1,19 @@
-// src/core/plugins/PluginManager/disabledPlugins.js
+/**
+ * @file Disabled plugins persistence.
+ *
+ * Tracks plugins the user has explicitly disabled. Two store keys:
+ * - `disabledPlugins` — array of plugin IDs
+ * - `disabledPluginsMeta` — `{ [pluginId]: { id, name, version, … } }`
+ *
+ * @see ./constants.js (`STORE_KEY_DISABLED`, `STORE_KEY_DISABLED_META`)
+ */
+
 import { logWarn } from '@shared/utils/logger'
 import {
   STORE_KEY_DISABLED,
   STORE_KEY_DISABLED_META,
 } from './constants'
 
-/**
- * Gestion des plugins désactivés (persistance electron-store).
- */
 export class DisabledPluginsManager {
   constructor() {
     this.set = new Set()
@@ -15,6 +21,10 @@ export class DisabledPluginsManager {
     this.loaded = false
   }
 
+  /**
+   * Loads the disabled plugin list from the store (lazy, once).
+   * @returns {Promise<void>}
+   */
   async ensureLoaded() {
     if (this.loaded) return
     this.loaded = true
@@ -31,10 +41,14 @@ export class DisabledPluginsManager {
         this.meta = { ...rawMeta }
       }
     } catch (e) {
-      logWarn('PluginManager', 'Erreur chargement disabled plugins', e)
+      logWarn('PluginManager', 'Load disabled plugins error', e)
     }
   }
 
+  /**
+   * Persists the current disabled list + metadata.
+   * @returns {Promise<void>}
+   */
   async save() {
     try {
       await window.electronAPI?.storeSet?.(
@@ -43,18 +57,33 @@ export class DisabledPluginsManager {
       )
       await window.electronAPI?.storeSet?.(STORE_KEY_DISABLED_META, this.meta)
     } catch (e) {
-      logWarn('PluginManager', 'Erreur save disabled plugins', e)
+      logWarn('PluginManager', 'Save disabled plugins error', e)
     }
   }
 
+  /**
+   * Returns `true` if the given plugin is disabled.
+   * @param {string} pluginId
+   * @returns {boolean}
+   */
   has(pluginId) {
     return this.set.has(pluginId)
   }
 
+  /**
+   * Returns the full list of disabled plugins (with metadata).
+   * @returns {Array<Object>}
+   */
   list() {
     return Object.values(this.meta || {})
   }
 
+  /**
+   * Marks a plugin as disabled.
+   * @param {string} pluginId
+   * @param {Object} plugin - Plugin object (for metadata).
+   * @returns {Promise<void>}
+   */
   async add(pluginId, plugin) {
     await this.ensureLoaded()
     this.set.add(pluginId)
@@ -64,7 +93,7 @@ export class DisabledPluginsManager {
       name: plugin.name || pluginId,
       nameKey: plugin.nameKey || null,
       version: plugin.version || '1.0.0',
-      author: plugin.author || 'Inconnu',
+      author: plugin.author || 'Unknown',
       isIntegrated: !!plugin.isIntegrated,
       disabledAt: Date.now(),
     }
@@ -72,6 +101,11 @@ export class DisabledPluginsManager {
     await this.save()
   }
 
+  /**
+   * Removes a plugin from the disabled list.
+   * @param {string} pluginId
+   * @returns {Promise<void>}
+   */
   async remove(pluginId) {
     await this.ensureLoaded()
     this.set.delete(pluginId)

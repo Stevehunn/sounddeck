@@ -1,10 +1,43 @@
-// src/shared/utils/waveformGenerator.js
+/**
+ * @file Waveform peak data generator.
+ *
+ * Decodes an audio file and produces a downsampled array of `samples` peak
+ * values (0-1). Used by `Waveform.jsx` to draw the waveform on a `<canvas>`.
+ *
+ * ## Caching
+ *
+ * Results are cached per `(filePath, samples, startOffset, sliceDuration)`
+ * combination. The cache is a module-level `Map` (never evicted) — waveform
+ * data is tiny (~300 floats) so it's safe to keep forever.
+ *
+ * ## Slicing
+ *
+ * `startOffset` and `sliceDuration` allow extracting a sub-region (e.g. the
+ * part of a clip that's actually used in the editor). When both are `null`,
+ * the entire file is analyzed.
+ *
+ * @see @shared/components/audio/Waveform.jsx
+ * @see @shared/utils/audioContext.js (`withTemporaryAudioContext`)
+ */
+
 import { withTemporaryAudioContext } from './audioContext.js'
 import { buildFileUrl } from './fileUrl.js'
 import { logError, logWarn } from './logger'
 
 const waveformCache = new Map()
 
+/**
+ * Generates waveform peak data for the given file.
+ *
+ * @param {string} filePath - Absolute path to the audio file.
+ * @param {number} [samples=200] - Number of bars to produce.
+ * @param {number} [startOffset=0] - Start of the analyzed region (seconds).
+ * @param {number|null} [sliceDuration=null] - Length of the analyzed region
+ *   (`null` = to the end of the file).
+ * @param {boolean} [useCache=true] - If `false`, always re-generates.
+ * @returns {Promise<number[]|null>} Array of normalized peak values (0-1),
+ *   or `null` on error.
+ */
 export async function generateWaveformData(
   filePath,
   samples = 200,
@@ -21,11 +54,11 @@ export async function generateWaveformData(
     try {
       const exists = await window.electronAPI.fileExists(filePath)
       if (!exists) {
-        logError('waveformGenerator', `Fichier non trouvé: ${filePath}`)
+        logError('waveformGenerator', `File not found: ${filePath}`)
         return null
       }
     } catch (e) {
-      logWarn('waveformGenerator', 'Erreur vérification existence', e)
+      logWarn('waveformGenerator', 'fileExists check failed', e)
     }
 
     const fileUrl = buildFileUrl(filePath)
@@ -82,6 +115,13 @@ export async function generateWaveformData(
   }
 }
 
+/**
+ * Invalidates cached waveform data.
+ *
+ * @param {string} [filePath] - If provided, only clears entries for this
+ *   file. Otherwise clears the whole cache.
+ * @returns {void}
+ */
 export function invalidateWaveformCache(filePath) {
   if (filePath) {
     const keys = Array.from(waveformCache.keys()).filter((k) =>

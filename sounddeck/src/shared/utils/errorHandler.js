@@ -1,4 +1,26 @@
-// src/shared/utils/errorHandler.js
+/**
+ * @file Global error handler + error-log UI.
+ *
+ * Responsibilities:
+ * - **Setup** — attaches `window.onerror` and `window.onunhandledrejection`
+ *   listeners so uncaught errors are logged and (if critical) surfaced to
+ *   the user.
+ * - **Persistence** — keeps the last 100 error logs in electron-store under
+ *   `errorLogs` (falls back to `localStorage` in the browser). Writes are
+ *   debounced (300ms) to avoid thrashing on error bursts.
+ * - **Dialog** — displays a vanilla-DOM modal when a critical error
+ *   happens (out-of-memory, "undefined is not", etc.), with a "Report"
+ *   button that attaches the log to the next feedback submission.
+ * - **Hooks** — `useErrorHandler()` and `useErrorLogs()` for React
+ *   components that want to read/react to error state.
+ *
+ * The handler is idempotent: calling `setupGlobalErrorHandler()` twice
+ * won't double-register listeners.
+ *
+ * @see src/main.jsx — calls `setupGlobalErrorHandler()` at boot
+ * @see @shared/components/modals/FeedbackModal.jsx — consumes `errorLogs`
+ */
+
 import { useState, useEffect } from 'react'
 
 const MAX_LOGS = 100
@@ -8,8 +30,13 @@ let isErrorDialogOpen = false
 let errorDialogCallbacks = []
 let pendingWrite = null
 
-// ─── STORAGE ────────────────────────────────────────────────────────────────
+// ─── STORAGE ───────────────────────────────────────────────────────────
 
+/**
+ * Reads the persisted error logs from the store (or `localStorage`).
+ *
+ * @returns {Promise<Array<Object>>}
+ */
 async function readLogsFromStore() {
   try {
     if (typeof window === 'undefined') return []
@@ -25,6 +52,12 @@ async function readLogsFromStore() {
   }
 }
 
+/**
+ * Persists the given logs (or the current buffer when no argument is given).
+ *
+ * @param {Array<Object>} logs
+ * @returns {Promise<void>}
+ */
 async function writeLogsToStore(logs) {
   try {
     if (typeof window === 'undefined') return
@@ -39,6 +72,10 @@ async function writeLogsToStore(logs) {
   }
 }
 
+/**
+ * Schedules a debounced write of the current error buffer (300ms).
+ * @returns {void}
+ */
 function scheduleWrite() {
   if (pendingWrite) return
   pendingWrite = setTimeout(async () => {
@@ -47,12 +84,16 @@ function scheduleWrite() {
   }, 300)
 }
 
-// ─── SETUP ──────────────────────────────────────────────────────────────────
+// ─── SETUP ─────────────────────────────────────────────────────────────
 
+/**
+ * Installs the global error listeners. Safe to call multiple times.
+ * @returns {void}
+ */
 export function setupGlobalErrorHandler() {
   if (typeof window === 'undefined') return
 
-  readLogsFromStore().then(logs => {
+  readLogsFromStore().then((logs) => {
     if (logs.length > 0) {
       errorLogs = logs
     }
@@ -62,7 +103,7 @@ export function setupGlobalErrorHandler() {
     handleError(event.error || event.message, 'uncaught', {
       source: event.filename,
       line: event.lineno,
-      column: event.colno
+      column: event.colno,
     })
   })
 
@@ -71,14 +112,23 @@ export function setupGlobalErrorHandler() {
   })
 }
 
-// ─── CORE ───────────────────────────────────────────────────────────────────
+// ─── CORE ──────────────────────────────────────────────────────────────
 
+/**
+ * Records an error and notifies listeners. Opens the error dialog if the
+ * error looks critical.
+ *
+ * @param {Error|string} error
+ * @param {string} [type='unknown'] - Category tag (e.g. `'uncaught'`).
+ * @param {Object|null} [context] - Extra JSON-serializable context.
+ * @returns {Object} The recorded log entry.
+ */
 export function handleError(error, type = 'unknown', context = null) {
   const errorEntry = {
     id: Date.now() + '_' + Math.random().toString(36).slice(2, 7),
     timestamp: new Date().toISOString(),
     type,
-    message: error?.message || String(error) || 'Erreur inconnue',
+    message: error?.message || String(error) || 'Unknown error',
     stack: (error?.stack || '').slice(0, 4000),
     context: context ? safeStringify(context) : null,
     userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
@@ -93,8 +143,12 @@ export function handleError(error, type = 'unknown', context = null) {
 
   scheduleWrite()
 
-  errorDialogCallbacks.forEach(cb => {
-    try { cb(errorEntry) } catch (e) { /* silent */ }
+  errorDialogCallbacks.forEach((cb) => {
+    try {
+      cb(errorEntry)
+    } catch {
+      // ignore
+    }
   })
 
   if (isCriticalError(error)) {
@@ -104,12 +158,24 @@ export function handleError(error, type = 'unknown', context = null) {
   return errorEntry
 }
 
+/**
+ * Returns `true` when running on `localhost` / `127.0.0.1`.
+ * @returns {boolean}
+ */
 function isDev() {
   if (typeof window === 'undefined') return false
-  return window.location?.hostname === 'localhost' ||
-         window.location?.hostname === '127.0.0.1'
+  return (
+    window.location?.hostname === 'localhost' ||
+    window.location?.hostname === '127.0.0.1'
+  )
 }
 
+/**
+ * JSON-serializes `obj`, falling back to `String(obj)` on error.
+ *
+ * @param {any} obj
+ * @returns {string}
+ */
 function safeStringify(obj) {
   try {
     return JSON.stringify(obj)
@@ -118,17 +184,33 @@ function safeStringify(obj) {
   }
 }
 
+/**
+ * Returns `true` if the given error matches a "critical" pattern
+ * (out-of-memory, crash, null/undefined access, …).
+ *
+ * @param {Error|string} error
+ * @returns {boolean}
+ */
 function isCriticalError(error) {
   const criticalMessages = [
-    'out of memory', 'fatal', 'crash',
-    'cannot read property', 'undefined is not', 'null is not'
+    'out of memory',
+    'fatal',
+    'crash',
+    'cannot read property',
+    'undefined is not',
+    'null is not',
   ]
   const message = (error?.message || String(error) || '').toLowerCase()
-  return criticalMessages.some(msg => message.includes(msg))
+  return criticalMessages.some((msg) => message.includes(msg))
 }
 
-// ─── DIALOG ─────────────────────────────────────────────────────────────────
+// ─── DIALOG ────────────────────────────────────────────────────────────
 
+/**
+ * Shows a toast (if available) and opens the error dialog.
+ * @param {Object} errorEntry
+ * @returns {void}
+ */
 function showErrorToUser(errorEntry) {
   if (typeof window !== 'undefined' && window.addToast) {
     window.addToast(`❌ Erreur: ${errorEntry.message.slice(0, 100)}`, 'error')
@@ -136,6 +218,14 @@ function showErrorToUser(errorEntry) {
   openErrorDialog(errorEntry)
 }
 
+/**
+ * Opens the vanilla-DOM error dialog (no React).
+ *
+ * Idempotent: calling it while a dialog is already open is a no-op.
+ *
+ * @param {Object} errorEntry
+ * @returns {void}
+ */
 export function openErrorDialog(errorEntry) {
   if (isErrorDialogOpen) return
   if (typeof document === 'undefined') return
@@ -168,20 +258,22 @@ export function openErrorDialog(errorEntry) {
   `
 
   const safeMessage = escapeHtml(errorEntry.message)
-  const safeStack = escapeHtml(errorEntry.stack || 'Aucune stack disponible')
-  const safeContext = errorEntry.context ? escapeHtml('\n\nContexte: ' + errorEntry.context) : ''
+  const safeStack = escapeHtml(errorEntry.stack || 'No stack trace')
+  const safeContext = errorEntry.context
+    ? escapeHtml('\n\nContext: ' + errorEntry.context)
+    : ''
 
   content.innerHTML = `
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
       <i class="ti ti-alert-triangle" style="color: var(--danger); font-size: 24px;"></i>
-      <span style="font-weight: 600; font-size: 16px;">Une erreur est survenue</span>
+      <span style="font-weight: 600; font-size: 16px;">An error occurred</span>
     </div>
     <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
       ${safeMessage}
     </div>
     <details style="margin-bottom: 16px;">
       <summary style="cursor: pointer; font-size: 12px; color: var(--text-tertiary);">
-        Détails techniques
+        Technical details
       </summary>
       <pre style="font-size: 11px; color: var(--text-tertiary); background: var(--bg-tertiary); padding: 12px; border-radius: var(--radius-sm); overflow: auto; max-height: 200px; white-space: pre-wrap; word-break: break-all;">
 ${safeStack}${safeContext}
@@ -189,10 +281,10 @@ ${safeStack}${safeContext}
     </details>
     <div style="display: flex; gap: 8px; justify-content: flex-end;">
       <button class="btn-secondary" data-action="close">
-        <i class="ti ti-x"></i> Fermer
+        <i class="ti ti-x"></i> Close
       </button>
       <button class="btn-primary" data-action="report">
-        <i class="ti ti-send"></i> Signaler
+        <i class="ti ti-send"></i> Report
       </button>
     </div>
   `
@@ -205,13 +297,21 @@ ${safeStack}${safeContext}
     isErrorDialogOpen = false
   }
 
-  content.querySelector('[data-action="close"]').addEventListener('click', closeDialog)
+  content
+    .querySelector('[data-action="close"]')
+    .addEventListener('click', closeDialog)
   content.querySelector('[data-action="report"]').addEventListener('click', () => {
     reportError(errorEntry.id)
     closeDialog()
   })
 }
 
+/**
+ * HTML-escapes the given string (used in the raw `innerHTML` template).
+ *
+ * @param {string} str
+ * @returns {string}
+ */
 function escapeHtml(str) {
   if (!str) return ''
   return String(str)
@@ -222,19 +322,26 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;')
 }
 
-// ─── REPORT ─────────────────────────────────────────────────────────────────
+// ─── REPORT ────────────────────────────────────────────────────────────
 
+/**
+ * Marks an error as "reported". In practice, this attaches the log to the
+ * next `FeedbackModal` submission.
+ *
+ * @param {string} errorId
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
 export async function reportError(errorId) {
-  const error = errorLogs.find(e => e.id === errorId)
-  if (!error) return { success: false, error: 'Erreur introuvable' }
+  const error = errorLogs.find((e) => e.id === errorId)
+  if (!error) return { success: false, error: 'Error not found' }
 
   try {
     if (isDev()) {
-      console.info('📤 [reportError] Erreur signalée:', error)
+      console.info('📤 [reportError] Error reported:', error)
     }
 
     if (typeof window !== 'undefined' && window.addToast) {
-      window.addToast('Merci ! Votre signalement a été pris en compte.', 'success')
+      window.addToast('Thanks! Your report has been recorded.', 'success')
     }
     return { success: true }
   } catch (e) {
@@ -242,8 +349,17 @@ export async function reportError(errorId) {
   }
 }
 
-// ─── HOOKS ──────────────────────────────────────────────────────────────────
+// ─── HOOKS ─────────────────────────────────────────────────────────────
 
+/**
+ * Local error-handling hook (single component).
+ *
+ * @returns {{
+ *   error: Object|null,
+ *   setError: (err: any) => void,
+ *   clearError: () => void,
+ * }}
+ */
 export function useErrorHandler() {
   const [error, setError] = useState(null)
 
@@ -257,13 +373,22 @@ export function useErrorHandler() {
   return { error, setError: handleErrorLocal, clearError }
 }
 
+/**
+ * Subscribes to the global error log stream.
+ *
+ * @returns {{
+ *   logs: Array<Object>,
+ *   clearLogs: () => Promise<void>,
+ *   exportLogs: () => Promise<{success: boolean, path?: string, error?: string}>,
+ * }}
+ */
 export function useErrorLogs() {
   const [logs, setLogs] = useState([])
 
   useEffect(() => {
     let mounted = true
 
-    readLogsFromStore().then(loaded => {
+    readLogsFromStore().then((loaded) => {
       if (mounted) {
         setLogs(loaded)
         errorLogs = loaded
@@ -272,7 +397,7 @@ export function useErrorLogs() {
 
     const callback = (entry) => {
       if (!entry) return
-      setLogs(prev => [entry, ...prev].slice(0, MAX_LOGS))
+      setLogs((prev) => [entry, ...prev].slice(0, MAX_LOGS))
     }
     errorDialogCallbacks.push(callback)
 
@@ -288,20 +413,25 @@ export function useErrorLogs() {
     setLogs([])
   }
 
-  // ✅ FIX S4 : exportLogs utilise exportJsonFile (IPC) au lieu de Blob
+  /**
+   * Exports the current log list to a JSON file (native save dialog).
+   * @returns {Promise<{success: boolean, path?: string, error?: string}>}
+   */
   const exportLogs = async () => {
     const json = JSON.stringify(logs, null, 2)
-    const defaultName = `sounddeck-error-logs-${new Date().toISOString().slice(0, 10)}.json`
+    const defaultName = `sounddeck-error-logs-${new Date()
+      .toISOString()
+      .slice(0, 10)}.json`
 
     if (window.electronAPI?.exportJsonFile) {
       return await window.electronAPI.exportJsonFile(
         json,
         defaultName,
-        'Exporter les logs d\'erreur'
+        'Exporter les logs d’erreur'
       )
     }
 
-    // Fallback : download navigateur
+    // Fallback: browser download
     try {
       const blob = new Blob([json], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
@@ -319,13 +449,22 @@ export function useErrorLogs() {
   return { logs, clearLogs, exportLogs }
 }
 
+/**
+ * Clears all error logs (memory + storage).
+ * @returns {Promise<void>}
+ */
 export async function clearAllErrorLogs() {
   errorLogs = []
   await writeLogsToStore([])
 }
 
-// ─── HELPERS PUBLICS ────────────────────────────────────────────────────────
+// ─── PUBLIC HELPERS ────────────────────────────────────────────────────
 
+/**
+ * Returns the current logs from storage (bypassing the in-memory buffer).
+ *
+ * @returns {Promise<Array<Object>>}
+ */
 export async function getErrorLogsFromStore() {
   return await readLogsFromStore()
 }

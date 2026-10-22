@@ -1,18 +1,25 @@
-// src/core/plugins/PluginManager/licenseManager.js
-//
-// Vérification et parsing des tokens de licence Pro.
-//
-// Un token a le format :  SDCK1.<payload_b64url>.<signature_b64url>
-//
-// Le payload est un JSON lisible en clair :
-//   { v, tier, donorId, donorName, issuedAt, neverExpires }
-//
-// La signature Ed25519 garantit l'authenticité. Aucun appel réseau,
-// aucune donnée machine — le token est 100% portable.
+/**
+ * @file License token verification + tier comparison.
+ *
+ * A license token has the shape:
+ *
+ *   `SDCK1.<payload_base64url>.<signature_base64url>`
+ *
+ * The payload is plain JSON (readable, non-secret):
+ *
+ *   `{ v, tier, donorId, donorName, issuedAt, neverExpires }`
+ *
+ * The Ed25519 signature guarantees authenticity. No network call, no
+ * machine binding — the token is 100% portable.
+ *
+ * @see ./licenseKeys.js — the public key + tier definitions
+ * @see ./revokedDonors.js — revoked donor list
+ * @see @core/services/LicenseService.js — storage + activation
+ */
 
 import * as ed from '@noble/ed25519'
 import { sha512 } from '@noble/hashes/sha512'
-import { logWarn, logError } from '@shared/utils/logger'
+import { logWarn } from '@shared/utils/logger'
 import {
   PUBLIC_KEY_HEX,
   TOKEN_VERSION,
@@ -22,11 +29,16 @@ import {
 } from './licenseKeys'
 import { isDonorRevoked } from './revokedDonors'
 
-// @noble/ed25519 v2 requiert un hash injecté
+// @noble/ed25519 v2 requires an injected hash function
 ed.etc.sha512Sync = (...m) => sha512(ed.etc.concatBytes(...m))
 
-// ─── Helpers base64url ─────────────────────────────────────────────────
+// ─── base64url helpers ────────────────────────────────────────────────
 
+/**
+ * Decodes a base64url string to bytes.
+ * @param {string} str
+ * @returns {Uint8Array|null} `null` on invalid input.
+ */
 function b64urlDecode(str) {
   if (typeof str !== 'string') return null
   try {
@@ -36,11 +48,16 @@ function b64urlDecode(str) {
     const bytes = new Uint8Array(bin.length)
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
     return bytes
-  } catch (e) {
+  } catch {
     return null
   }
 }
 
+/**
+ * Converts a hex string to bytes.
+ * @param {string} hex
+ * @returns {Uint8Array|null} `null` on invalid input.
+ */
 function hexToBytes(hex) {
   if (typeof hex !== 'string' || hex.length % 2 !== 0) return null
   try {
@@ -49,36 +66,42 @@ function hexToBytes(hex) {
       bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16)
     }
     return bytes
-  } catch (e) {
+  } catch {
     return null
   }
 }
 
+/**
+ * Safely parses a JSON string.
+ * @param {string} str
+ * @returns {Object|null} `null` on invalid input.
+ */
 function safeJsonParse(str) {
   try {
     return JSON.parse(str)
-  } catch (e) {
+  } catch {
     return null
   }
 }
 
-// ─── API publique ──────────────────────────────────────────────────────
+// ─── PUBLIC API ────────────────────────────────────────────────────────
 
 /**
- * Résultat d'une vérification de licence.
+ * Result of a license verification.
  * @typedef {Object} LicenseResult
  * @property {boolean} valid
- * @property {string}  [tier]         'free' | 'pro' | 'dev'
- * @property {number}  [rank]         Rang numérique pour comparaisons
+ * @property {string}  [tier]       'free' | 'pro' | 'dev'
+ * @property {number}  [rank]       Numeric rank for comparisons
  * @property {string}  [donorId]
  * @property {string}  [donorName]
  * @property {number}  [issuedAt]
- * @property {string}  [error]        Code d'erreur si invalide
- * @property {object}  [payload]      Payload brut (debug)
+ * @property {string}  [error]      Error code if invalid
+ * @property {Object}  [payload]    Raw payload (debug)
  */
 
 /**
- * Vérifie un token de licence.
+ * Verifies a license token.
+ *
  * @param {string} token
  * @returns {Promise<LicenseResult>}
  */
@@ -107,7 +130,7 @@ export async function verifyLicense(token) {
     return { valid: false, tier: 'free', error: 'WRONG_PREFIX' }
   }
 
-  // 3. Décodage
+  // 3. Decode
   const payloadBytes = b64urlDecode(payloadB64)
   const signature = b64urlDecode(signatureB64)
   const publicKey = hexToBytes(PUBLIC_KEY_HEX)
@@ -116,12 +139,12 @@ export async function verifyLicense(token) {
     return { valid: false, tier: 'free', error: 'DECODE_ERROR' }
   }
 
-  // 4. Vérification cryptographique
-  let cryptoValid = false
+  // 4. Cryptographic verification
+  let cryptoValid
   try {
     cryptoValid = await ed.verifyAsync(signature, payloadBytes, publicKey)
   } catch (e) {
-    logWarn('licenseManager', 'Erreur vérification Ed25519', e)
+    logWarn('licenseManager', 'Ed25519 verification error', e)
     return { valid: false, tier: 'free', error: 'VERIFY_THREW' }
   }
 
@@ -129,7 +152,7 @@ export async function verifyLicense(token) {
     return { valid: false, tier: 'free', error: 'INVALID_SIGNATURE' }
   }
 
-  // 5. Parsing du payload
+  // 5. Payload parsing
   const payloadJson = new TextDecoder().decode(payloadBytes)
   const payload = safeJsonParse(payloadJson)
 
@@ -141,7 +164,7 @@ export async function verifyLicense(token) {
     return { valid: false, tier: 'free', error: 'UNSUPPORTED_VERSION' }
   }
 
-  // 6. Révocation
+  // 6. Revocation
   if (payload.donorId && isDonorRevoked(payload.donorId)) {
     return {
       valid: false,
@@ -151,7 +174,7 @@ export async function verifyLicense(token) {
     }
   }
 
-  // 7. Tier inconnu ?
+  // 7. Unknown tier?
   const tierInfo = LICENSE_TIERS[payload.tier]
   if (!tierInfo) {
     return { valid: false, tier: 'free', error: 'UNKNOWN_TIER' }
@@ -169,7 +192,8 @@ export async function verifyLicense(token) {
 }
 
 /**
- * Vérifie si un tier donné satisfait un tier minimum requis.
+ * Returns `true` if `userTier` meets or exceeds `requiredTier`.
+ *
  * @param {string} userTier
  * @param {string} requiredTier
  * @returns {boolean}
@@ -181,7 +205,8 @@ export function meetsTier(userTier, requiredTier) {
 }
 
 /**
- * Retourne le tier par défaut si aucune licence (free).
+ * Returns the default tier (no license → free).
+ * @returns {'free'}
  */
 export function getDefaultTier() {
   return 'free'

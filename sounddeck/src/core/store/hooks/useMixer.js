@@ -1,5 +1,27 @@
-// src/core/store/hooks/useMixer.js
-import { useState, useCallback, useRef } from 'react'
+/**
+ * @file Mixer hook — manages the microphone + sounds mixer state.
+ *
+ * Wraps `AudioMixerService` and stores every relevant setting in the store
+ * (via the `save` callback). Provides:
+ * - Reactive state for all mixer settings (device, volumes, noise, latency)
+ * - `updateMixerEnabled` — activate / deactivate the mixer (with rollback)
+ * - `initMixerOnStartup` — restore mixer state at boot
+ * - Various `update*` setters (each persists to the store)
+ *
+ * A `storeValuesRef` is passed by the parent so we can build a snapshot
+ * of the store (audio device, local device, monitoring…) without
+ * re-subscribing to the store on every render.
+ *
+ * The `mixerSoundVolumeRef`, `monitoringEnabledRef`, etc. are aliased via
+ * `useLatestRef` so callers can access the current values from stable
+ * async callbacks without creating a stale closure.
+ *
+ * @see @core/services/AudioMixerService.js
+ * @see @shared/hooks/useLatestRefs.js
+ */
+
+import { useState, useCallback } from 'react'
+import { useLatestRef } from '@shared/hooks/useLatestRefs'
 import { logWarn, logError } from '@shared/utils/logger'
 
 export function useMixer(save, storeValuesRef) {
@@ -12,16 +34,18 @@ export function useMixer(save, storeValuesRef) {
   const [lowLatencyMode, setLowLatencyMode] = useState(false)
   const [monitoringEnabled, setMonitoringEnabled] = useState(false)
 
-  const mixerSoundVolumeRef = useRef(mixerSoundVolume)
-  const monitoringEnabledRef = useRef(monitoringEnabled)
-  const microphoneDeviceRef = useRef(microphoneDevice)
-  const noiseSuppressionModeRef = useRef(noiseSuppressionMode)
+  // Latest-value refs (updated in an effect, safe for async callbacks)
+  const mixerSoundVolumeRef = useLatestRef(mixerSoundVolume)
+  const monitoringEnabledRef = useLatestRef(monitoringEnabled)
+  const microphoneDeviceRef = useLatestRef(microphoneDevice)
+  const noiseSuppressionModeRef = useLatestRef(noiseSuppressionMode)
 
-  mixerSoundVolumeRef.current = mixerSoundVolume
-  monitoringEnabledRef.current = monitoringEnabled
-  microphoneDeviceRef.current = microphoneDevice
-  noiseSuppressionModeRef.current = noiseSuppressionMode
-
+  /**
+   * Builds a snapshot of the current store for AudioMixerService.
+   *
+   * @param {boolean} mixerIsEnabled
+   * @returns {Object}
+   */
   const buildStoreSnapshot = useCallback(
     (mixerIsEnabled) => {
       const values = storeValuesRef?.current || {}
@@ -34,9 +58,17 @@ export function useMixer(save, storeValuesRef) {
         mixerEnabled: mixerIsEnabled,
       }
     },
-    [storeValuesRef]
+    [storeValuesRef, monitoringEnabledRef, mixerSoundVolumeRef]
   )
 
+  /**
+   * Enables or disables the audio mixer.
+   *
+   * On failure, rolls back `mixerEnabled` to `false` and returns an error.
+   *
+   * @param {boolean} enabled
+   * @returns {Promise<{success: boolean, message?: string, error?: string}>}
+   */
   const updateMixerEnabled = useCallback(
     async (enabled) => {
       setMixerEnabled(enabled)
@@ -64,7 +96,7 @@ export function useMixer(save, storeValuesRef) {
             return { success: false, message: 'mixerActivationError' }
           }
         } catch (e) {
-          logError('useMixer', 'Erreur activation mixeur', e)          
+          logError('useMixer', 'Mixer activation error', e)
           setMixerEnabled(false)
           await save('mixerEnabled', false)
           return { success: false, message: 'error', error: e.message }
@@ -75,13 +107,16 @@ export function useMixer(save, storeValuesRef) {
         return { success: true, message: 'mixerDeactivated' }
       }
     },
-    [save, buildStoreSnapshot]
+    [save, buildStoreSnapshot, microphoneDeviceRef]
   )
 
+  /**
+   * Restores the mixer state at boot (start or stop based on store state).
+   * @returns {Promise<boolean>}
+   */
   const initMixerOnStartup = useCallback(async () => {
     try {
       const {
-        getMixerFullState,
         isMixerActive,
         stopMixer,
         initAudioMixer,
@@ -117,7 +152,9 @@ export function useMixer(save, storeValuesRef) {
           ) {
             try {
               setNoiseSuppressionMode(noiseSuppressionModeRef.current)
-            } catch (e) {}
+            } catch {
+              // Silent — noise mode is best-effort.
+            }
           }
           return true
         } else {
@@ -128,16 +165,30 @@ export function useMixer(save, storeValuesRef) {
       }
       return true
     } catch (e) {
+      logError('useMixer', 'Startup init error', e)
       try {
         const { stopMixer } = await import('@core/services/AudioMixerService')
         await stopMixer()
-      } catch (_) {}
+      } catch {
+        // ignore
+      }
       setMixerEnabled(false)
       await save('mixerEnabled', false)
       return false
     }
-  }, [mixerEnabled, save, buildStoreSnapshot])
+  }, [
+    mixerEnabled,
+    save,
+    buildStoreSnapshot,
+    microphoneDeviceRef,
+    noiseSuppressionModeRef,
+  ])
 
+  /**
+   * Changes the microphone device (falls back to 'default' if missing).
+   * @param {string} deviceId
+   * @returns {Promise<void>}
+   */
   const updateMicrophoneDeviceId = useCallback(
     async (deviceId) => {
       if (deviceId && deviceId !== 'default') {
@@ -148,7 +199,7 @@ export function useMixer(save, storeValuesRef) {
           if (!deviceExists) {
             deviceId = 'default'
           }
-        } catch (e) {
+        } catch {
           deviceId = 'default'
         }
       }
@@ -198,19 +249,30 @@ export function useMixer(save, storeValuesRef) {
     [save]
   )
 
-  const toggleMonitoring = useCallback(async (enabled) => {
-    const newState = typeof enabled === 'boolean' ? enabled : !monitoringEnabled
-    setMonitoringEnabled(newState)
-    await save('monitoringEnabled', newState)
+  /**
+   * Toggles self-monitoring (hear yourself in headphones).
+   * @param {boolean} [enabled] - If omitted, toggles.
+   * @returns {Promise<boolean>} The new state.
+   */
+  const toggleMonitoring = useCallback(
+    async (enabled) => {
+      const newState =
+        typeof enabled === 'boolean' ? enabled : !monitoringEnabled
+      setMonitoringEnabled(newState)
+      await save('monitoringEnabled', newState)
 
-    try {
-      const { setMonitoring } = await import('@core/services/AudioMixerService')
-      setMonitoring(newState)
-    } catch (e) {
-      logWarn('useMixer', 'Erreur mise à jour monitoring', e)    
-    }
-    return newState
-  }, [monitoringEnabled, save])
+      try {
+        const { setMonitoring } = await import(
+          '@core/services/AudioMixerService'
+        )
+        setMonitoring(newState)
+      } catch (e) {
+        logWarn('useMixer', 'Monitoring update error', e)
+      }
+      return newState
+    },
+    [monitoringEnabled, save]
+  )
 
   return {
     mixerEnabled,

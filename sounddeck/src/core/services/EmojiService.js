@@ -1,8 +1,20 @@
-// src/core/services/EmojiService.js
+/**
+ * @file Emoji service — persistence + custom emoji collection.
+ *
+ * Owns the list of user-added custom emojis and their metadata (category,
+ * add date). Listens to changes and notifies subscribers so React hooks
+ * (see `@shared/hooks/useEmojis.js`) can re-render.
+ *
+ * All custom emojis are stored in electron-store under two keys:
+ * - `customEmojis` — string[] of emoji characters
+ * - `emojiMetadata` — `{ [emoji]: { category, addedAt } }`
+ *
+ * @see @shared/constants/emojis.js — the default catalog
+ * @see @shared/hooks/useEmojis.js — reactive wrapper
+ */
 
 import {
   DEFAULT_EMOJIS,
-  EMOJI_CATEGORIES,
   getDefaultEmojiCategory,
   isValidEmoji,
 } from '@shared/constants/emojis'
@@ -13,15 +25,19 @@ const STORE_KEY_METADATA = 'emojiMetadata'
 
 class EmojiService {
   constructor() {
-    this.customEmojis = []       // ['🦄', '🦊', '⭐']
-    this.metadata = {}            // { '🦄': { category: 'animals', addedAt: 123 }, ... }
+    this.customEmojis = [] // ['🦄', '🦊', '⭐']
+    this.metadata = {} // { '🦄': { category: 'animals', addedAt: 123 }, ... }
     this.listeners = new Set()
     this.loaded = false
     this.loadingPromise = null
   }
 
-  // ─── CHARGEMENT ─────────────────────────────────────────────────────────
+  // ─── LOADING ────────────────────────────────────────────────────────
 
+  /**
+   * Loads custom emojis from the store (idempotent, async).
+   * @returns {Promise<void>}
+   */
   async load() {
     if (this.loaded) return
     if (this.loadingPromise) return this.loadingPromise
@@ -32,11 +48,12 @@ class EmojiService {
         const metadata = await this._readStore(STORE_KEY_METADATA, {})
 
         this.customEmojis = Array.isArray(emojis) ? emojis : []
-        this.metadata = metadata && typeof metadata === 'object' ? metadata : {}
+        this.metadata =
+          metadata && typeof metadata === 'object' ? metadata : {}
         this.loaded = true
         this._notify()
       } catch (e) {
-        logWarn('EmojiService', 'Erreur load', e)
+        logWarn('EmojiService', 'Load error', e)
         this.loaded = true
       } finally {
         this.loadingPromise = null
@@ -46,22 +63,35 @@ class EmojiService {
     return this.loadingPromise
   }
 
-  // ─── PERSISTANCE ────────────────────────────────────────────────────────
+  // ─── PERSISTENCE ────────────────────────────────────────────────────
 
+  /**
+   * Reads a key from electron-store (falls back to localStorage in web dev).
+   *
+   * @param {string} key
+   * @param {any} fallback
+   * @returns {Promise<any>}
+   */
   async _readStore(key, fallback) {
     try {
       if (window.electronAPI?.storeGet) {
         const value = await window.electronAPI.storeGet(key)
         return value ?? fallback
       }
-      // Fallback dev web
       const raw = localStorage.getItem(`sounddeck-${key}`)
       return raw ? JSON.parse(raw) : fallback
-    } catch (e) {
+    } catch {
       return fallback
     }
   }
 
+  /**
+   * Writes a key to electron-store (falls back to localStorage in web dev).
+   *
+   * @param {string} key
+   * @param {any} value
+   * @returns {Promise<void>}
+   */
   async _writeStore(key, value) {
     try {
       if (window.electronAPI?.storeSet) {
@@ -70,50 +100,76 @@ class EmojiService {
         localStorage.setItem(`sounddeck-${key}`, JSON.stringify(value))
       }
     } catch (e) {
-      logWarn('EmojiService', `Erreur write ${key}`, e)
+      logWarn('EmojiService', `Write error ${key}`, e)
     }
   }
 
+  /**
+   * Persists both custom emojis and metadata.
+   * @returns {Promise<void>}
+   */
   async _persist() {
     await this._writeStore(STORE_KEY_EMOJIS, this.customEmojis)
     await this._writeStore(STORE_KEY_METADATA, this.metadata)
   }
 
-  // ─── EVENTS ─────────────────────────────────────────────────────────────
+  // ─── EVENTS ─────────────────────────────────────────────────────────
 
+  /**
+   * Subscribes to service changes.
+   * @param {() => void} listener
+   * @returns {() => void} Unsubscribe function.
+   */
   subscribe(listener) {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
   }
 
+  /**
+   * Notifies all listeners. Errors in one listener don't block others.
+   * @returns {void}
+   */
   _notify() {
     for (const listener of this.listeners) {
-      try { listener() } catch (e) { logWarn('EmojiService', 'Erreur listener', e) }
+      try {
+        listener()
+      } catch (e) {
+        logWarn('EmojiService', 'Listener error', e)
+      }
     }
   }
 
-  // ─── ACTIONS ────────────────────────────────────────────────────────────
+  // ─── ACTIONS ────────────────────────────────────────────────────────
 
   /**
-   * Ajoute un emoji.
+   * Adds a custom emoji.
+   *
    * @param {string} emoji
-   * @param {string|null} categoryId - Catégorie d'origine (optionnel)
-   * @returns {Promise<{ success: boolean, error?: string }>}
+   * @param {string|null} [categoryId=null] - Source category (optional).
+   * @returns {Promise<{success: boolean, error?: string}>}
    */
   async addEmoji(emoji, categoryId = null) {
     await this.load()
 
     const trimmed = String(emoji).trim()
-    if (!trimmed) return { success: false, error: 'Emoji vide' }
-    if (!isValidEmoji(trimmed)) return { success: false, error: 'Ce n\'est pas un emoji valide' }
+    if (!trimmed) return { success: false, error: 'Empty emoji' }
+    if (!isValidEmoji(trimmed))
+      return { success: false, error: 'Not a valid emoji' }
 
-    // Déjà dans les défauts ?
+    // Already a default emoji?
     const defaultCat = getDefaultEmojiCategory(trimmed)
-    if (defaultCat) return { success: false, error: 'Cet emoji est déjà disponible par défaut' }
+    if (defaultCat)
+      return {
+        success: false,
+        error: 'This emoji is already available by default',
+      }
 
-    // Déjà dans les customs ?
+    // Already a custom emoji?
     if (this.customEmojis.includes(trimmed)) {
-      return { success: false, error: 'Cet emoji est déjà dans votre bibliothèque' }
+      return {
+        success: false,
+        error: 'This emoji is already in your library',
+      }
     }
 
     this.customEmojis = [...this.customEmojis, trimmed]
@@ -127,10 +183,11 @@ class EmojiService {
   }
 
   /**
-   * Ajoute une catégorie entière d'un coup.
+   * Adds an entire category of emojis in one call.
+   *
    * @param {string} categoryId
    * @param {string[]} emojis
-   * @returns {Promise<{ success: boolean, added: number, skipped: number }>}
+   * @returns {Promise<{success: boolean, added: number, skipped: number}>}
    */
   async addCategory(categoryId, emojis) {
     await this.load()
@@ -142,12 +199,24 @@ class EmojiService {
 
     for (const raw of emojis) {
       const emoji = String(raw).trim()
-      if (!emoji || !isValidEmoji(emoji)) { skipped++; continue }
-      if (getDefaultEmojiCategory(emoji)) { skipped++; continue }
-      if (nextEmojis.includes(emoji)) { skipped++; continue }
+      if (!emoji || !isValidEmoji(emoji)) {
+        skipped++
+        continue
+      }
+      if (getDefaultEmojiCategory(emoji)) {
+        skipped++
+        continue
+      }
+      if (nextEmojis.includes(emoji)) {
+        skipped++
+        continue
+      }
 
       nextEmojis.push(emoji)
-      nextMetadata[emoji] = { category: categoryId || null, addedAt: Date.now() }
+      nextMetadata[emoji] = {
+        category: categoryId || null,
+        addedAt: Date.now(),
+      }
       added++
     }
 
@@ -161,17 +230,19 @@ class EmojiService {
   }
 
   /**
-   * Retire un emoji custom.
+   * Removes a single custom emoji.
+   * @param {string} emoji
+   * @returns {Promise<{success: boolean, error?: string}>}
    */
   async removeEmoji(emoji) {
     await this.load()
 
     const trimmed = String(emoji).trim()
     if (!this.customEmojis.includes(trimmed)) {
-      return { success: false, error: 'Emoji non trouvé' }
+      return { success: false, error: 'Emoji not found' }
     }
 
-    this.customEmojis = this.customEmojis.filter(e => e !== trimmed)
+    this.customEmojis = this.customEmojis.filter((e) => e !== trimmed)
     const nextMetadata = { ...this.metadata }
     delete nextMetadata[trimmed]
     this.metadata = nextMetadata
@@ -182,18 +253,20 @@ class EmojiService {
   }
 
   /**
-   * Retire une catégorie entière (tous les emojis ajoutés depuis cette catégorie).
+   * Removes every emoji added from the given category.
+   * @param {string} categoryId
+   * @returns {Promise<{success: boolean, removed: number}>}
    */
   async removeCategory(categoryId) {
     await this.load()
 
     const toRemove = this.customEmojis.filter(
-      e => this.metadata[e]?.category === categoryId
+      (e) => this.metadata[e]?.category === categoryId
     )
     if (toRemove.length === 0) return { success: false, removed: 0 }
 
     const removeSet = new Set(toRemove)
-    this.customEmojis = this.customEmojis.filter(e => !removeSet.has(e))
+    this.customEmojis = this.customEmojis.filter((e) => !removeSet.has(e))
 
     const nextMetadata = { ...this.metadata }
     for (const e of toRemove) delete nextMetadata[e]
@@ -204,21 +277,31 @@ class EmojiService {
     return { success: true, removed: toRemove.length }
   }
 
-  // ─── GETTERS ────────────────────────────────────────────────────────────
+  // ─── GETTERS ────────────────────────────────────────────────────────
 
+  /**
+   * Returns a shallow copy of the custom emojis array.
+   * @returns {string[]}
+   */
   getCustomEmojis() {
     return [...this.customEmojis]
   }
 
+  /**
+   * Returns every emoji (defaults + custom), deduped.
+   * @returns {string[]}
+   */
   getAllEmojis() {
-    // Défauts + customs, dédupliqué
     const set = new Set([...DEFAULT_EMOJIS, ...this.customEmojis])
     return Array.from(set)
   }
 
   /**
-   * Retourne les customs groupés par catégorie.
-   * Format : { [categoryId]: string[], __uncategorized__: string[] }
+   * Returns the custom emojis grouped by category.
+   *
+   * Format: `{ [categoryId]: string[], __uncategorized__: string[] }`.
+   *
+   * @returns {Record<string, string[]>}
    */
   getCustomGrouped() {
     const groups = {}
@@ -230,23 +313,43 @@ class EmojiService {
     return groups
   }
 
+  /**
+   * Returns `true` if the given emoji exists (default OR custom).
+   * @param {string} emoji
+   * @returns {boolean}
+   */
   hasEmoji(emoji) {
     const trimmed = String(emoji).trim()
-    return DEFAULT_EMOJIS.includes(trimmed) || this.customEmojis.includes(trimmed)
+    return (
+      DEFAULT_EMOJIS.includes(trimmed) || this.customEmojis.includes(trimmed)
+    )
   }
 
+  /**
+   * Returns `true` if the given emoji was added by the user.
+   * @param {string} emoji
+   * @returns {boolean}
+   */
   isCustom(emoji) {
     return this.customEmojis.includes(String(emoji).trim())
   }
 
   /**
-   * Vérifie si TOUS les emojis d'une catégorie donnée sont déjà possédés.
+   * Returns `true` if every emoji from the given list is already owned.
+   * @param {string} categoryId
+   * @param {string[]} emojis
+   * @returns {boolean}
    */
   hasCategory(categoryId, emojis) {
     if (!emojis || emojis.length === 0) return false
-    return emojis.every(e => this.hasEmoji(e))
+    return emojis.every((e) => this.hasEmoji(e))
   }
 
+  /**
+   * Returns the metadata for a custom emoji, or `null`.
+   * @param {string} emoji
+   * @returns {{category: string|null, addedAt: number}|null}
+   */
   getMetadata(emoji) {
     return this.metadata[String(emoji).trim()] || null
   }

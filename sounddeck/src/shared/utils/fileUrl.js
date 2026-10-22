@@ -1,29 +1,42 @@
-// src/shared/utils/fileUrl.js
+/**
+ * @file Local file URL builder (custom `sounddeck-local://` protocol).
+ *
+ * Files are served through a custom Electron protocol instead of `file://`
+ * because `file://` URLs are blocked by the renderer's CSP in production.
+ *
+ * The helper normalizes input paths (Windows backslashes, `file://`
+ * prefix) and produces a URL of the form:
+ *
+ *   `sounddeck-local://file/<encoded-path>`
+ *
+ * - `http(s)://` URLs are returned as-is (remote sounds).
+ * - Already-`sounddeck-local://` URLs are returned as-is.
+ * - `file:///C:/...` is re-encoded into the custom protocol.
+ *
+ * @see electron/modules/protocolHandler.js (server side)
+ * @see @shared/utils/audioContext.js (consumer)
+ */
 
 /**
- * Construit une URL pour un fichier local.
- * - Si HTTP/HTTPS → tel quel
- * - Si déjà `sounddeck-local://` → tel quel
- * - Si `file://` → reconverti en sounddeck-local
- * - Sinon → converti en sounddeck-local
+ * Builds a `sounddeck-local://` URL from a local file path.
  *
- * @param {string} filePath
- * @returns {string|null}
+ * @param {string} filePath - Local path, `file://` URL, or remote URL.
+ * @returns {string|null} The URL, or `null` if `filePath` is falsy.
  */
 export function buildFileUrl(filePath) {
   if (!filePath) return null
 
-  // URL distante → inchangée
+  // Remote URL: return unchanged
   if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
     return filePath
   }
 
-  // Déjà un sounddeck-local → inchangé
+  // Already a sounddeck-local URL: return unchanged
   if (filePath.startsWith('sounddeck-local://')) {
     return filePath
   }
 
-  // file:///C:/... → reconvertir en sounddeck-local
+  // file:///C:/... → re-encode into sounddeck-local
   if (filePath.startsWith('file://')) {
     const withoutProtocol = filePath.replace(/^file:\/\/\/?/, '')
     return buildLocalUrl(withoutProtocol)
@@ -32,20 +45,26 @@ export function buildFileUrl(filePath) {
   return buildLocalUrl(filePath)
 }
 
+/**
+ * Encodes a filesystem path into a `sounddeck-local://file/...` URL.
+ *
+ * Splits on `/` and encodes each segment individually so that `:` in the
+ * drive letter (e.g. `C:`) survives as `%3A`, while `/` separators are
+ * preserved.
+ *
+ * @param {string} filePath
+ * @returns {string}
+ */
 function buildLocalUrl(filePath) {
-  // Normalise les backslashes Windows → forward slashes
+  // Normalize Windows backslashes → forward slashes
   const normalized = String(filePath).replace(/\\/g, '/')
 
-  // Encode le path entier en une seule fois (comme un paramètre)
-  // Note : on ne peut pas utiliser encodeURIComponent directement car il
-  // encode aussi les `/`. On split par segment puis on réassemble.
   const parts = normalized.split('/')
 
   const encoded = parts
     .map((part) => {
       if (part === '') return part
-      // Préserve `C:` tel quel (les `:` sont valides en path, mais pas
-      // dans certaines URL — encodeURIComponent les convertit en %3A)
+      // Preserve `C:` as `C%3A` (valid in path segments)
       if (/^[A-Za-z]:$/.test(part)) {
         return part.replace(':', '%3A')
       }

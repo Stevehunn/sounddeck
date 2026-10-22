@@ -1,16 +1,32 @@
-// src/core/store/utils/volumeUtils.js
+/**
+ * @file Volume migration helpers (legacy 0-100 → new dB scale).
+ *
+ * Before v1.3, volumes were stored as a linear 0-100 value. Starting with
+ * v1.3, the app uses a dB scale (-24 to +24) where 0 dB is "neutral"
+ * (the sound's native loudness) — matching how Discord handles per-user
+ * volume.
+ *
+ * `migrateSoundVolume(sound)` is called on every sound at hydration time
+ * (see `store/index.js`): it's a **no-op** for sounds that already have
+ * `volumeDb`, and a **one-shot migration** for legacy sounds.
+ *
+ * @see src/core/store/index.js (hydration)
+ * @see @shared/utils/audioContext.js (uses `volumeDb` for playback)
+ */
 
 /**
- * Convertit un ancien volume (0-100) vers la nouvelle échelle dB (-24..+24).
- * Tolère les valeurs déjà en dB.
+ * Converts a legacy 0-100 volume to the new dB scale (-24..+24).
+ *
+ * The mapping is linear: 0 → -24 dB, 50 → 0 dB, 100 → +24 dB.
+ *
+ * ⚠️ NOTE: `0` is ambiguous — it could mean "0% of the old system" OR
+ * "0 dB". The current implementation treats `0` as **already in dB**
+ * (returned as-is). Consequence: a silent legacy sound (0%) becomes
+ * 0 dB (neutral). Revisit if users report this edge case.
  *
  * @param {number|undefined|null} oldVolume
- * @returns {number} Valeur en dB
+ * @returns {number} Volume in dB.
  */
-// ⚠️ NOTE : `0` est ambigu — peut signifier 0% de l'ancien système OU 0 dB.
-// Le choix actuel : 0 est traité comme "déjà en dB" (retourné tel quel).
-// Conséquence : un ancien volume muet (0%) devient 0 dB (neutre).
-// À revoir si des utilisateurs remontent ce cas.
 export function convertOldVolumeToDb(oldVolume) {
   if (oldVolume === undefined || oldVolume === null) return 0
   if (oldVolume >= -24 && oldVolume <= 24) return oldVolume
@@ -18,11 +34,14 @@ export function convertOldVolumeToDb(oldVolume) {
 }
 
 /**
- * Applique la migration à un objet sound.
- * Retourne l'objet inchangé si `volumeDb` est déjà défini.
+ * Applies the volume migration to a sound object.
+ *
+ * Returns the sound unchanged if `volumeDb` is already defined (new
+ * schema). Otherwise, computes `volumeDb` from the legacy `volume`
+ * field and mirrors the result back to `volume` for compatibility.
  *
  * @param {Object} sound
- * @returns {Object}
+ * @returns {Object} A new sound object (or the original if already migrated).
  */
 export function migrateSoundVolume(sound) {
   if (!sound) return sound

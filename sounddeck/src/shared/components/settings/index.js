@@ -1,4 +1,3 @@
-// src/shared/components/settings/index.js
 export { default as BackupSettings } from './BackupSettings'
 export { default as OBSControl } from './OBSControl'
 export { default as PluginInstaller } from './PluginInstaller'

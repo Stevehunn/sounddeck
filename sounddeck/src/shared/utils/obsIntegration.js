@@ -1,4 +1,27 @@
-// src/shared/utils/obsIntegration.js
+/**
+ * @file OBS Studio WebSocket integration (obs-websocket v5).
+ *
+ * Manages a single WebSocket connection to a running OBS instance:
+ * - **`connectOBS(config)`** — connects (host/port/password), resets the
+ *   reconnect backoff, and installs event handlers.
+ * - **`disconnectOBS()`** — closes the socket and cancels pending
+ *   reconnects.
+ * - **`sendOBSCommand(cmd, params)`** — low-level `call()` wrapper.
+ * - **High-level commands** — `switchOBSScene`, `startOBSRecording`,
+ *   `stopOBSRecording`, `startOBSStreaming`, `stopOBSStreaming`,
+ *   `toggleStudioMode`.
+ * - **`getOBSStatus()`** — returns the current connection state for the UI.
+ *
+ * **Reconnection strategy**: on `ConnectionClosed`, the module schedules a
+ * reconnect with exponential backoff (5s → 10s → 20s → 40s → 60s), capped
+ * at 5 attempts. A manual `connectOBS()` resets the counter.
+ *
+ * `sendOBSAlert` is a stub (kept for API compatibility) — alerts were
+ * originally planned to trigger OBS events but never implemented.
+ *
+ * @see src/shared/components/settings/OBSControl.jsx
+ */
+
 import { logInfo, logWarn, logError } from './logger'
 
 let obsWebSocket = null
@@ -20,6 +43,10 @@ const DEFAULT_OBS_CONFIG = {
 
 let lastUsedConfig = { ...DEFAULT_OBS_CONFIG }
 
+/**
+ * Cancels any pending reconnect attempt and resets the backoff counter.
+ * @returns {void}
+ */
 function cancelReconnect() {
   if (reconnectTimer) {
     clearTimeout(reconnectTimer)
@@ -28,13 +55,18 @@ function cancelReconnect() {
   reconnectAttempts = 0
 }
 
+/**
+ * Schedules a reconnect attempt with exponential backoff.
+ * No-op if a reconnect is already scheduled or the max attempts are reached.
+ * @returns {void}
+ */
 function scheduleReconnect() {
   if (reconnectTimer) return
 
   if (reconnectAttempts >= RECONNECT_MAX_ATTEMPTS) {
     logWarn(
       'obsIntegration',
-      `Abandon reconnexion après ${RECONNECT_MAX_ATTEMPTS} tentatives — cliquez sur "Se connecter" pour réessayer`
+      `Giving up reconnection after ${RECONNECT_MAX_ATTEMPTS} attempts — click "Connect" to retry`
     )
     return
   }
@@ -48,7 +80,7 @@ function scheduleReconnect() {
 
   logInfo(
     'obsIntegration',
-    `🔄 Reconnexion dans ${delay}ms (tentative ${attempt}/${RECONNECT_MAX_ATTEMPTS})`
+    `🔄 Reconnecting in ${delay}ms (attempt ${attempt}/${RECONNECT_MAX_ATTEMPTS})`
   )
 
   reconnectTimer = setTimeout(async () => {
@@ -60,23 +92,34 @@ function scheduleReconnect() {
       const result = await connectOBS(lastUsedConfig)
       if (result?.success) {
         reconnectAttempts = 0
-        logInfo('obsIntegration', '✅ Reconnexion réussie')
+        logInfo('obsIntegration', '✅ Reconnect successful')
       } else {
         scheduleReconnect()
       }
-    } catch (e) {
+    } catch {
       scheduleReconnect()
     }
   }, delay)
 }
 
+/**
+ * Connects to OBS via WebSocket.
+ *
+ * @param {Object} [config]
+ * @param {string} [config.host='localhost']
+ * @param {number} [config.port=4455]
+ * @param {string} [config.password='']
+ * @returns {Promise<{success: boolean, connected?: boolean, error?: string}>}
+ */
 export async function connectOBS(config = {}) {
   cancelReconnect()
 
   if (obsWebSocket) {
     try {
       obsWebSocket.disconnect()
-    } catch (e) {}
+    } catch {
+      // ignore
+    }
     obsWebSocket = null
   }
 
@@ -101,12 +144,16 @@ export async function connectOBS(config = {}) {
 
     return { success: true, connected: true }
   } catch (e) {
-    logError('obsIntegration', 'Erreur connexion OBS', e)
+    logError('obsIntegration', 'OBS connection error', e)
     obsConnected = false
     return { success: false, error: e.message }
   }
 }
 
+/**
+ * Disconnects from OBS and cancels any pending reconnect.
+ * @returns {void}
+ */
 export function disconnectOBS() {
   cancelReconnect()
 
@@ -114,13 +161,17 @@ export function disconnectOBS() {
     try {
       obsWebSocket.disconnect()
     } catch (e) {
-      logWarn('obsIntegration', 'Erreur déconnexion OBS', e)
+      logWarn('obsIntegration', 'OBS disconnect error', e)
     }
     obsWebSocket = null
   }
   obsConnected = false
 }
 
+/**
+ * Installs the OBS event handlers (ConnectionClosed, error).
+ * @returns {void}
+ */
 function setupOBSEvents() {
   if (!obsWebSocket) return
 
@@ -132,32 +183,48 @@ function setupOBSEvents() {
     })
 
     obsWebSocket.on('error', (error) => {
-      logError('obsIntegration', 'Erreur OBS', error)
+      logError('obsIntegration', 'OBS error', error)
     })
   } catch (e) {
-    logWarn('obsIntegration', 'Erreur configuration événements OBS', e)
+    logWarn('obsIntegration', 'Error setting up OBS events', e)
   }
 }
 
+/**
+ * Sends a raw OBS command.
+ *
+ * @param {string} command - The obs-websocket command name.
+ * @param {Object} [params={}]
+ * @returns {Promise<{success: boolean, result?: any, error?: string}>}
+ */
 export async function sendOBSCommand(command, params = {}) {
   if (!obsConnected || !obsWebSocket) {
-    logWarn('obsIntegration', 'OBS non connecté')
-    return { success: false, error: 'OBS non connecté' }
+    logWarn('obsIntegration', 'OBS not connected')
+    return { success: false, error: 'OBS not connected' }
   }
 
   try {
     const result = await obsWebSocket.call(command, params)
     return { success: true, result }
   } catch (e) {
-    logError('obsIntegration', `Erreur commande OBS ${command}`, e)
+    logError('obsIntegration', `OBS command error ${command}`, e)
     return { success: false, error: e.message }
   }
 }
 
+/**
+ * Switches the current program scene.
+ * @param {string} sceneName
+ * @returns {Promise<{success: boolean, result?: any, error?: string}>}
+ */
 export async function switchOBSScene(sceneName) {
   return await sendOBSCommand('SetCurrentProgramScene', { sceneName })
 }
 
+/**
+ * Toggles Studio Mode on/off.
+ * @returns {Promise<{success: boolean, result?: any, error?: string}>}
+ */
 export async function toggleStudioMode() {
   const state = await sendOBSCommand('GetStudioModeEnabled')
   if (state.success) {
@@ -168,26 +235,60 @@ export async function toggleStudioMode() {
   return state
 }
 
+/**
+ * Starts recording in OBS.
+ * @returns {Promise<{success: boolean, result?: any, error?: string}>}
+ */
 export async function startOBSRecording() {
   return await sendOBSCommand('StartRecord')
 }
 
+/**
+ * Stops recording in OBS.
+ * @returns {Promise<{success: boolean, result?: any, error?: string}>}
+ */
 export async function stopOBSRecording() {
   return await sendOBSCommand('StopRecord')
 }
 
+/**
+ * Starts streaming in OBS.
+ * @returns {Promise<{success: boolean, result?: any, error?: string}>}
+ */
 export async function startOBSStreaming() {
   return await sendOBSCommand('StartStream')
 }
 
+/**
+ * Stops streaming in OBS.
+ * @returns {Promise<{success: boolean, result?: any, error?: string}>}
+ */
 export async function stopOBSStreaming() {
   return await sendOBSCommand('StopStream')
 }
 
-export function sendOBSAlert(message, type = 'info', duration = 3000) {
+/**
+ * Stub: OBS alerts were never implemented. Kept for API compatibility.
+ *
+ * @param {string} _message
+ * @param {string} [_type='info']
+ * @param {number} [_duration=3000]
+ * @returns {{success: boolean}}
+ */
+export function sendOBSAlert(_message, _type = 'info', _duration = 3000) {
   return { success: true }
 }
 
+/**
+ * Returns the current OBS connection state.
+ *
+ * @returns {{
+ *   connected: boolean,
+ *   websocket: boolean,
+ *   reconnectAttempts: number,
+ *   reconnectMaxAttempts: number,
+ * }}
+ */
 export function getOBSStatus() {
   return {
     connected: obsConnected,

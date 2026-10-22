@@ -1,11 +1,17 @@
-// src/core/plugins/PluginManager/constants.js
+/**
+ * @file Plugin engine constants (store keys, integrated plugins, core pages).
+ *
+ * @see ./index.js
+ * @see ./disabledPlugins.js
+ */
+
 import { CORE_PAGES as CORE_PAGES_DEFS } from '@shared/constants/pages'
 
-// ─── CLÉS STORE ─────────────────────────────────────────────────────────
+// ─── STORE KEYS ────────────────────────────────────────────────────────
 export const STORE_KEY_DISABLED = 'disabledPlugins'
 export const STORE_KEY_DISABLED_META = 'disabledPluginsMeta'
 
-// ─── PLUGINS INTÉGRÉS (bundlés) ─────────────────────────────────────────
+// ─── INTEGRATED (bundled) PLUGINS ──────────────────────────────────────
 export const INTEGRATED_PLUGIN_LOADERS = import.meta.glob(
   '../../../plugins/*/index.js'
 )
@@ -23,7 +29,7 @@ export const INTEGRATED_PLUGINS = (() => {
 
 export const INTEGRATED_PLUGIN_IDS = new Set(INTEGRATED_PLUGINS.keys())
 
-// ─── PAGES CORE ─────────────────────────────────────────────────────────
+// ─── CORE PAGES ────────────────────────────────────────────────────────
 export const CORE_PAGES = CORE_PAGES_DEFS.map((p) => ({
   id: p.id,
   labelKey: p.labelKey,

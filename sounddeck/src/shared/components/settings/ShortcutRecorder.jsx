@@ -1,4 +1,30 @@
-// src/shared/components/settings/ShortcutRecorder.jsx
+/**
+ * @file Keyboard shortcut recorder.
+ *
+ * Captures keyboard input and converts it to an Electron accelerator
+ * (e.g. `"CommandOrControl+Shift+K"`). Used inline in `SoundCard` and in
+ * the Options → Shortcuts section.
+ *
+ * Key mapping:
+ * - `Ctrl` / `Cmd` → `CommandOrControl` (cross-platform)
+ * - `Alt`, `Shift` → as-is
+ * - Function keys (`F1`-`F12`), arrows, Home/End/Insert/Delete/Backspace,
+ *   numpad keys — mapped explicitly
+ * - Letter keys are uppercased (physical key, layout-independent)
+ * - AZERTY: `e.key` is the displayed character → mapped to the physical
+ *   QWERTY key via `AZERTY_TO_PHYSICAL` so accelerators stay identical
+ *   across layouts.
+ *
+ * Modes:
+ * - **Recorder** (default): the user must press a combination. Escape cancels,
+ *   Backspace/Delete clears the binding.
+ * - **Compact**: smaller UI, used inside the SoundCard.
+ * - **Require modifier**: refuses key-only bindings (used by global shortcuts).
+ *
+ * @see @shared/utils/keyboardLayouts.js
+ * @see @shared/components/ui/DeleteButton.jsx
+ */
+
 import { useState, useRef, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { DeleteButton } from '@shared/components/ui'
@@ -7,7 +33,9 @@ import {
   AZERTY_TO_PHYSICAL,
 } from '@shared/utils/keyboardLayouts'
 
-// table NUMPAD locale (spécifique au recorder)
+/**
+ * Numpad `e.key` → accelerator key name (local, used only by this module).
+ */
 const NUMPAD_KEYS = {
   '0': 'Num0', '1': 'Num1', '2': 'Num2', '3': 'Num3', '4': 'Num4',
   '5': 'Num5', '6': 'Num6', '7': 'Num7', '8': 'Num8', '9': 'Num9',
@@ -15,6 +43,14 @@ const NUMPAD_KEYS = {
   '*': 'NumMultiply', '/': 'NumDivide',
 }
 
+/**
+ * Converts a `keydown` event to an Electron accelerator.
+ *
+ * @param {KeyboardEvent} e
+ * @param {boolean} [requireMod=false] - If `true`, refuse key-only bindings.
+ * @param {'qwerty'|'azerty'} [layout='qwerty']
+ * @returns {string|null} The accelerator, or `null` if invalid.
+ */
 function eventToAccelerator(e, requireMod = false, layout = 'qwerty') {
   const ignored = [
     'Control', 'Meta', 'Alt', 'Shift', 'Tab', 'CapsLock', 'Escape',
@@ -89,9 +125,19 @@ function eventToAccelerator(e, requireMod = false, layout = 'qwerty') {
 }
 
 /**
- * Convertit un accelerator (ex: 'CommandOrControl+Q') en affichage humain
- * selon le layout ('Ctrl+Q' ou 'Ctrl+A' en AZERTY).
+ * Converts an accelerator to a human-readable string for the given layout.
+ *
+ * @param {string} shortcut - Accelerator (e.g. `"CommandOrControl+Q"`).
+ * @param {'qwerty'|'azerty'} [layout='qwerty']
+ * @returns {string} Display string (e.g. `"Ctrl+Q"` or `"Ctrl+A"` in AZERTY).
  */
+// `displayShortcut` is exported for backward compatibility (used by
+// consumers that format accelerators outside of the recorder UI). Fast
+// Refresh normally requires a file to export only components — this
+// disable is safe because the function is pure and doesn't depend on
+// any component state, so HMR simply falls back to a full reload when
+// editing this file.
+// eslint-disable-next-line react-refresh/only-export-components
 export function displayShortcut(shortcut, layout = 'qwerty') {
   if (!shortcut) return ''
 
@@ -109,12 +155,12 @@ export function displayShortcut(shortcut, layout = 'qwerty') {
       return numMap[part] || part
     }
 
-    // Modificateurs
+    // Modifiers
     if (part === 'CommandOrControl') return 'Ctrl'
     if (part === 'Shift') return layout === 'azerty' ? 'Maj' : 'Shift'
     if (part === 'Alt') return 'Alt'
 
-    // Touches normales en AZERTY
+    // Normal keys in AZERTY
     if (layout === 'azerty') {
       const azertyChar = PHYSICAL_TO_AZERTY[part]
       if (azertyChar) return azertyChar
@@ -127,6 +173,22 @@ export function displayShortcut(shortcut, layout = 'qwerty') {
   return displayParts.join('+')
 }
 
+/**
+ * Shortcut recorder button.
+ *
+ * @param {Object} props
+ * @param {string} props.value - Current accelerator (empty string if unbound).
+ * @param {(acc: string) => void} props.onSave - Called when a valid accelerator is recorded.
+ * @param {() => void} [props.onClear] - Called when the user clears the binding.
+ * @param {string} [props.placeholder='+ Raccourci']
+ * @param {boolean} [props.compact=false] - Compact UI (used inside SoundCard).
+ * @param {boolean} [props.requireMod=false] - Refuse key-only bindings.
+ * @param {'fr'|'en'|'es'} [_lang='fr'] - Kept for API compatibility; the
+ *   effective language comes from `useLanguage()`.
+ * @param {'qwerty'|'azerty'} [props.layout='qwerty']
+ * @param {boolean} [props.deleteWithConfirm=false] - Use `DeleteButton` (with confirmation) instead of a plain "×" button.
+ * @returns {JSX.Element}
+ */
 export default function ShortcutRecorder({
   value,
   onSave,
@@ -134,11 +196,11 @@ export default function ShortcutRecorder({
   placeholder = '+ Raccourci',
   compact = false,
   requireMod = false,
-  lang = 'fr',
+  _lang = 'fr',
   layout = 'qwerty',
   deleteWithConfirm = false,
 }) {
-  const { t, currentLang } = useLanguage()
+  const { t } = useLanguage()
   const [recording, setRecording] = useState(false)
   const [preview, setPreview] = useState('')
   const inputRef = useRef(null)
@@ -147,6 +209,11 @@ export default function ShortcutRecorder({
     if (recording && inputRef.current) inputRef.current.focus()
   }, [recording])
 
+  /**
+   * Handles a `keydown` while recording.
+   * @param {React.KeyboardEvent} e
+   * @returns {void}
+   */
   const handleKeyDown = (e) => {
     e.preventDefault()
     e.stopPropagation()
@@ -223,7 +290,8 @@ export default function ShortcutRecorder({
             setPreview('')
           }}
         >
-          {preview || (compact ? t('shortcutPressCompact') : t('shortcutPressKey'))}
+          {preview ||
+            (compact ? t('shortcutPressCompact') : t('shortcutPressKey'))}
         </div>
       </div>
     )
@@ -256,7 +324,9 @@ export default function ShortcutRecorder({
           <DeleteButton
             onDelete={() => onClear?.()}
             confirmTitle={t('clearShortcut')}
-            confirmMessage={t('confirmClearShortcut', { shortcut: displayValue })}
+            confirmMessage={t('confirmClearShortcut', {
+              shortcut: displayValue,
+            })}
             itemName={displayValue}
             size="sm"
             variant="ghost-danger"

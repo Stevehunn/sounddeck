@@ -1,8 +1,26 @@
-// src/shared/utils/wavEncoder.js
+/**
+ * @file WAV encoder (16-bit PCM).
+ *
+ * Converts a Web Audio `AudioBuffer` to a standard `.wav` file (RIFF/WAVE,
+ * PCM 16-bit little-endian). Used by:
+ * - **`mixdown.js`** — exports the final mix.
+ * - **`normalizeUtils.js`** — writes the normalized file.
+ *
+ * The output respects the Web Audio spec:
+ * - `fmt ` chunk with `AudioFormat = 1` (PCM).
+ * - `data` chunk with interleaved 16-bit samples.
+ * - Handles mono, stereo, and multichannel buffers.
+ *
+ * @see https://ccrma.stanford.edu/courses/422-winter-2014/notes/WaveFileFormat.pdf
+ * @see @shared/utils/mixdown.js
+ * @see @shared/utils/normalizeUtils.js
+ */
 
 /**
- * Convertit un AudioBuffer en fichier WAV (ArrayBuffer, 16-bit PCM)
- * Utilisé par mixdown et normalizeUtils.
+ * Converts an `AudioBuffer` to a WAV `ArrayBuffer` (16-bit PCM).
+ *
+ * @param {AudioBuffer} buffer
+ * @returns {ArrayBuffer} WAV file (44-byte header + PCM data).
  */
 export function audioBufferToWav(buffer) {
   const numChannels = buffer.numberOfChannels
@@ -53,6 +71,14 @@ export function audioBufferToWav(buffer) {
   return wav
 }
 
+/**
+ * Writes an ASCII string into a `DataView` (used for RIFF chunk IDs).
+ *
+ * @param {DataView} view
+ * @param {number} offset
+ * @param {string} string
+ * @returns {void}
+ */
 function writeString(view, offset, string) {
   for (let i = 0; i < string.length; i++) {
     view.setUint8(offset + i, string.charCodeAt(i))

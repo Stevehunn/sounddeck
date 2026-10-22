@@ -1,77 +1,36 @@
-// src/shared/contexts/NetworkContext.jsx
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react'
+/**
+ * @file Network provider + "no connection" modal.
+ *
+ * Tracks actual internet reachability (not just `navigator.onLine`), shows
+ * a modal when the user goes offline or when a network error is detected,
+ * and exposes imperative helpers via `NetworkContext`.
+ *
+ * Strategy:
+ * - Subscribe to `window.online` / `window.offline` for fast state updates.
+ * - On offline → show the modal immediately.
+ * - On online  → hide the modal and reset the probe cache.
+ * - `ensureOnline()` runs a full probe and can be called before any
+ *   network operation (e.g. before fetching emojis from getemoji.com).
+ *
+ * The modal is rendered as a portal so it overlays everything.
+ *
+ * @see ./NetworkContext.js (context + `useNetwork` hook)
+ * @see ./probeNetwork.js (the actual probe util)
+ */
+
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useLanguage } from '@core/i18n/LanguageContext'
+import { NetworkContext } from './NetworkContext'
+import { probeNetwork, resetProbeCache } from './probeNetwork'
 
-const NetworkContext = createContext(null)
-
-const PROBE_URLS = [
-  'https://www.google.com/favicon.ico',
-  'https://www.cloudflare.com/favicon.ico',
-  'https://www.myinstants.com/favicon.ico',
-]
-
-const PROBE_TIMEOUT_MS = 3000
-const PROBE_CACHE_MS = 3000
-
-let lastProbeTime = 0
-let lastProbeResult = true
-
-function probeOneUrl(baseUrl) {
-  return new Promise((resolve) => {
-    const img = new Image()
-    let resolved = false
-
-    const timer = setTimeout(() => {
-      if (resolved) return
-      resolved = true
-      img.onload = img.onerror = null
-      img.src = ''
-      resolve(false)
-    }, PROBE_TIMEOUT_MS)
-
-    img.onload = () => {
-      if (resolved) return
-      resolved = true
-      clearTimeout(timer)
-      resolve(true)
-    }
-
-    img.onerror = () => {
-      if (resolved) return
-      resolved = true
-      clearTimeout(timer)
-      resolve(false)
-    }
-
-    img.src = `${baseUrl}?_=${Date.now()}`
-  })
-}
-
-export async function probeNetwork() {
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-    return false
-  }
-
-  const now = Date.now()
-  if (now - lastProbeTime < PROBE_CACHE_MS) {
-    return lastProbeResult
-  }
-
-  for (const url of PROBE_URLS) {
-    const ok = await probeOneUrl(url)
-    if (ok) {
-      lastProbeTime = now
-      lastProbeResult = true
-      return true
-    }
-  }
-
-  lastProbeTime = now
-  lastProbeResult = false
-  return false
-}
-
+/**
+ * Provides network context to its subtree.
+ *
+ * @param {Object} props
+ * @param {React.ReactNode} props.children
+ * @returns {JSX.Element}
+ */
 export function NetworkProvider({ children }) {
   const { t } = useLanguage()
 
@@ -85,12 +44,12 @@ export function NetworkProvider({ children }) {
     const handleOnline = () => {
       setIsOnline(true)
       setShowModal(false)
-      lastProbeTime = 0
+      resetProbeCache()
     }
     const handleOffline = () => {
       setIsOnline(false)
       setShowModal(true)
-      lastProbeTime = 0
+      resetProbeCache()
     }
 
     window.addEventListener('online', handleOnline)
@@ -158,14 +117,14 @@ export function NetworkProvider({ children }) {
   )
 }
 
-export function useNetwork() {
-  const ctx = useContext(NetworkContext)
-  if (!ctx) {
-    throw new Error('useNetwork must be used within NetworkProvider')
-  }
-  return ctx
-}
-
+/**
+ * Modal shown when the user is (or appears to be) offline.
+ *
+ * @param {Object} props
+ * @param {(key: string) => string} props.t - i18n function.
+ * @param {() => void} props.onClose - Called when the user dismisses the modal.
+ * @returns {JSX.Element}
+ */
 function NoConnectionModal({ t, onClose }) {
   useEffect(() => {
     const handler = (e) => {

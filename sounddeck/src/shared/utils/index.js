@@ -1,4 +1,3 @@
-// src/shared/utils/index.js
 export * from './format'
 export * from './errorHandler'
 export * from './waveformGenerator'
