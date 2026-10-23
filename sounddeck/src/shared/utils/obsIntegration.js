@@ -19,10 +19,14 @@
  * `sendOBSAlert` is a stub (kept for API compatibility) — alerts were
  * originally planned to trigger OBS events but never implemented.
  *
+ * User-facing error messages are translated via `translate()`.
+ *
  * @see src/shared/components/settings/OBSControl.jsx
+ * @see @shared/utils/translator.js
  */
 
 import { logInfo, logWarn, logError } from './logger'
+import { translate } from './translator'
 
 let obsWebSocket = null
 let obsConnected = false
@@ -200,7 +204,7 @@ function setupOBSEvents() {
 export async function sendOBSCommand(command, params = {}) {
   if (!obsConnected || !obsWebSocket) {
     logWarn('obsIntegration', 'OBS not connected')
-    return { success: false, error: 'OBS not connected' }
+    return { success: false, error: translate('obsErrorNotConnected') }
   }
 
   try {

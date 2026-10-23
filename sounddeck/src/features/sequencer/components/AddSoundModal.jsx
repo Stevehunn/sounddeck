@@ -1,8 +1,28 @@
-// src/features/sequencer/components/AddSoundModal.jsx
+/**
+ * @file Modal to add sounds to a playlist.
+ *
+ * Shows a searchable list of every sound with checkboxes. Already-added
+ * sounds are labeled "Already added" but still selectable (allows
+ * duplicates if desired). The "Add" button is disabled when nothing is
+ * checked.
+ *
+ * @see ./PlaylistEditor.jsx (parent)
+ */
+
 import { useState } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 
+/**
+ * Add-sounds modal.
+ *
+ * @param {Object} props
+ * @param {Array<Object>} props.sounds - All sounds in the library.
+ * @param {string[]} props.existingIds - IDs already in the playlist.
+ * @param {(ids: string[]) => void} props.onAdd - Called with the selection.
+ * @param {() => void} props.onClose
+ * @returns {JSX.Element}
+ */
 export default function AddSoundModal({
   sounds,
   existingIds,
@@ -17,6 +37,11 @@ export default function AddSoundModal({
     s.name.toLowerCase().includes(search.toLowerCase())
   )
 
+  /**
+   * Toggles the checkbox for a sound.
+   * @param {string} id
+   * @returns {void}
+   */
   const toggle = (id) => {
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -103,7 +128,11 @@ export default function AddSoundModal({
                   {imageUrl ? (
                     <img
                       src={imageUrl}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
                     />
                   ) : (
                     sound.emoji

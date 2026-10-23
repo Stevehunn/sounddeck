@@ -12,9 +12,13 @@
  * provided, `updateClipWithPath` is called so the project references the
  * new file.
  *
+ * User-facing strings (`hasAudio`, `recommendation`) are translated via
+ * `translate()`.
+ *
  * @see @shared/utils/audioContext.js (`withTemporaryAudioContext`)
  * @see @shared/utils/wavEncoder.js
  * @see @shared/utils/fileExport.js
+ * @see @shared/utils/translator.js
  */
 
 import { audioBufferToWav } from './wavEncoder'
@@ -22,6 +26,7 @@ import { withTemporaryAudioContext } from './audioContext'
 import { saveAudioBuffer } from './fileExport'
 import { buildFileUrl } from './fileUrl'
 import { logWarn, logError, logInfo } from './logger'
+import { translate } from './translator'
 
 /**
  * Analyzes an audio file's levels (peak, RMS, dB).
@@ -341,16 +346,16 @@ export async function getVolumeInfo(filePath) {
     summary: {
       peak: analysis.peakDb.toFixed(1) + ' dB',
       rms: analysis.rmsDb.toFixed(1) + ' dB',
-      hasAudio: analysis.hasAudio ? 'Yes' : 'No',
+      hasAudio: analysis.hasAudio ? translate('yes') : translate('no'),
       duration: analysis.duration.toFixed(1) + 's',
       channels: analysis.numberOfChannels,
     },
     recommendation:
       analysis.maxPeak < 0.1
-        ? '⚠️ Very quiet file, normalization recommended'
+        ? translate('normalizeRecommendationQuiet')
         : analysis.maxPeak > 0.9
-          ? '⚠️ File close to clipping, reduce volume'
-          : '✅ Correct level',
+          ? translate('normalizeRecommendationClipping')
+          : translate('normalizeRecommendationCorrect'),
   }
 }
 

@@ -5,10 +5,15 @@
  * - `disabledPlugins` — array of plugin IDs
  * - `disabledPluginsMeta` — `{ [pluginId]: { id, name, version, … } }`
  *
+ * The default author label ("Unknown") is user-facing (shown in the
+ * plugin list) and is translated via `translate()`.
+ *
  * @see ./constants.js (`STORE_KEY_DISABLED`, `STORE_KEY_DISABLED_META`)
+ * @see @shared/utils/translator.js
  */
 
 import { logWarn } from '@shared/utils/logger'
+import { translate } from '@shared/utils/translator'
 import {
   STORE_KEY_DISABLED,
   STORE_KEY_DISABLED_META,
@@ -93,7 +98,7 @@ export class DisabledPluginsManager {
       name: plugin.name || pluginId,
       nameKey: plugin.nameKey || null,
       version: plugin.version || '1.0.0',
-      author: plugin.author || 'Unknown',
+      author: plugin.author || translate('pluginAuthorUnknown'),
       isIntegrated: !!plugin.isIntegrated,
       disabledAt: Date.now(),
     }

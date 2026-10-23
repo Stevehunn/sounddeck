@@ -1,9 +1,10 @@
 // src/test/components/VolumePanel.test.jsx
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { useState } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import VolumePanel from "@shared/components/audio/SoundCard/VolumePanel";
 
-// Valeurs FR
+// FR translations used by the component via useLanguage().t()
 const FR = {
   menuVolume: "Volume",
   volumeReset: "Réinitialiser le volume",
@@ -25,11 +26,12 @@ const defaultProps = (overrides = {}) => ({
 });
 
 beforeEach(() => {
+  // Clean up any leftover portal from a previous test
   document.querySelectorAll("#volume-panel").forEach((el) => el.remove());
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// RENDU
+// RENDERING
 // ═══════════════════════════════════════════════════════════════════════
 describe("VolumePanel > Rendu", () => {
   it("affiche la première lettre du soundName en majuscule", () => {
@@ -44,7 +46,7 @@ describe("VolumePanel > Rendu", () => {
 
   it('affiche le titre "Volume"', () => {
     render(<VolumePanel {...defaultProps()} />);
-    // "Volume" apparaît dans le header
+    // "Volume" appears in the header
     expect(screen.getAllByText("Volume").length).toBeGreaterThan(0);
   });
 
@@ -97,7 +99,18 @@ describe("VolumePanel > Slider", () => {
   });
 
   it("met à jour la valeur locale", () => {
-    render(<VolumePanel {...defaultProps({ volume: 0 })} />);
+    // VolumePanel is a controlled component: `volume` comes from the parent
+    // (SoundCard/index.jsx), which owns `localVolume`. Simulate a parent
+    // with local state to verify the round-trip: onChange → re-render →
+    // slider.value.
+    function Wrapper() {
+      const [vol, setVol] = useState(0);
+      return (
+        <VolumePanel {...defaultProps({ volume: vol, onChange: setVol })} />
+      );
+    }
+
+    render(<Wrapper />);
     const slider = document.querySelector('input[type="range"]');
     fireEvent.change(slider, { target: { value: "12" } });
     expect(slider.value).toBe("12");
@@ -141,7 +154,7 @@ describe("VolumePanel > Slider", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// RESET / FERMER
+// RESET / CLOSE
 // ═══════════════════════════════════════════════════════════════════════
 describe("VolumePanel > Reset / Fermer", () => {
   it("resetToZero met la valeur à 0 et commit", () => {
@@ -151,7 +164,8 @@ describe("VolumePanel > Reset / Fermer", () => {
       <VolumePanel {...defaultProps({ onChange, onCommit, volume: 10 })} />,
     );
 
-    // ⚠️ La clé 'volumeReset' n'existe pas en FR → t() retourne la clé comme fallback
+    // Note: 'volumeReset' key does not exist in the mocked FR dict → t()
+    // falls back to the key itself.
     fireEvent.click(screen.getByTitle("volumeReset"));
     expect(onChange).toHaveBeenCalledWith(0);
     expect(onCommit).toHaveBeenCalledWith(0);
@@ -163,7 +177,7 @@ describe("VolumePanel > Reset / Fermer", () => {
       <VolumePanel {...defaultProps({ onClose })} />,
     );
 
-    // Le bouton X est le premier bouton contenant .ti-x
+    // The X button is the first button containing .ti-x
     const xBtns = container.querySelectorAll("button");
     const xBtn = Array.from(xBtns).find((b) => b.querySelector(".ti-x"));
     fireEvent.click(xBtn);
@@ -174,7 +188,7 @@ describe("VolumePanel > Reset / Fermer", () => {
     const onClose = vi.fn();
     render(<VolumePanel {...defaultProps({ onClose })} />);
 
-    // Le bouton "Fermer" a la classe btn-primary
+    // The bottom "Fermer" button has the btn-primary class
     const primaryBtn = document.querySelector(".btn-primary");
     fireEvent.click(primaryBtn);
     expect(onClose).toHaveBeenCalled();
@@ -187,7 +201,7 @@ describe("VolumePanel > Reset / Fermer", () => {
       <VolumePanel {...defaultProps({ onChange, onCommit, volume: 10 })} />,
     );
 
-    // Le bouton avec icône ti-refresh
+    // The button with the ti-refresh icon
     const btns = document.querySelectorAll("button");
     const resetBtn = Array.from(btns).find((b) =>
       b.querySelector(".ti-refresh"),
@@ -233,7 +247,7 @@ describe("VolumePanel > Click outside", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// SYNCHRONISATION DE LA PROP volume
+// PROPS SYNC
 // ═══════════════════════════════════════════════════════════════════════
 describe("VolumePanel > Sync", () => {
   it("met à jour la valeur locale quand la prop change", () => {
@@ -249,7 +263,7 @@ describe("VolumePanel > Sync", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// COULEURS CONDITIONNELLES
+// CONDITIONAL COLORS
 // ═══════════════════════════════════════════════════════════════════════
 describe("VolumePanel > Couleurs", () => {
   it("rendu OK avec volume 0", () => {

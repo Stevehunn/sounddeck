@@ -11,9 +11,14 @@
  * Positions are 3×3 grid corners/edges (excluding the center, which would
  * obstruct the app). Each popup auto-hides after `hideDelay` ms.
  *
+ * User-facing placeholder strings are translated via `translate()`.
+ *
  * @see src/popup/SoundPopupWindow.jsx — the actual popup renderer
  * @see electron/modules/soundPopupManager.js — window lifecycle
+ * @see @shared/utils/translator.js
  */
+
+import { translate } from '@shared/utils/translator'
 
 /**
  * Available popup positions.
@@ -228,7 +233,7 @@ export function previewSoundPopup(payload = {}) {
   const api = getAPI()
   if (!api?.preview) return
   api.preview({
-    name: payload.name || 'Sample sound',
+    name: payload.name || translate('soundPopupSampleName'),
     emoji: payload.emoji || '🔊',
     image: payload.image || null,
     duration: payload.duration ?? 12.4,

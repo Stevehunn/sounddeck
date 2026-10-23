@@ -1,6 +1,29 @@
-// src/features/sequencer/components/PlaylistHeader.jsx
+/**
+ * @file Playlist header — name, count, loop toggle, add-sounds button,
+ * play/stop (or prev/next/stop when playing).
+ *
+ * @see ./PlaylistEditor.jsx (parent)
+ */
+
 import { useLanguage } from '@core/i18n/LanguageContext'
 
+/**
+ * Playlist header.
+ *
+ * @param {Object} props
+ * @param {{id: string, name: string}} props.playlist
+ * @param {number} props.itemsCount
+ * @param {number} props.totalDelay - Sum of all item delays (seconds).
+ * @param {boolean} props.playing
+ * @param {boolean} props.loopPlaylist
+ * @param {() => void} props.onToggleLoop
+ * @param {() => void} props.onAddSounds
+ * @param {() => void} props.onStart
+ * @param {() => void} props.onStop
+ * @param {() => void} props.onPrev
+ * @param {() => void} props.onNext
+ * @returns {JSX.Element}
+ */
 export default function PlaylistHeader({
   playlist,
   itemsCount,
@@ -69,7 +92,12 @@ export default function PlaylistHeader({
 
       {playing ? (
         <div
-          style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            flexWrap: 'wrap',
+          }}
         >
           <div style={{ display: 'flex', gap: 4 }}>
             <button
@@ -94,7 +122,10 @@ export default function PlaylistHeader({
                 padding: '4px 8px',
               }}
             >
-              <i className="ti ti-player-skip-forward" style={{ fontSize: 14 }} />
+              <i
+                className="ti ti-player-skip-forward"
+                style={{ fontSize: 14 }}
+              />
             </button>
           </div>
           <button

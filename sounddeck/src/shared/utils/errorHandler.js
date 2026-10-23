@@ -14,14 +14,17 @@
  * - **Hooks** — `useErrorHandler()` and `useErrorLogs()` for React
  *   components that want to read/react to error state.
  *
- * The handler is idempotent: calling `setupGlobalErrorHandler()` twice
- * won't double-register listeners.
+ * User-facing strings are translated via `translate()` (FR/EN/ES). The
+ * handler is idempotent: calling `setupGlobalErrorHandler()` twice won't
+ * double-register listeners.
  *
  * @see src/main.jsx — calls `setupGlobalErrorHandler()` at boot
  * @see @shared/components/modals/FeedbackModal.jsx — consumes `errorLogs`
+ * @see @shared/utils/translator.js
  */
 
 import { useState, useEffect } from 'react'
+import { translate } from './translator'
 
 const MAX_LOGS = 100
 
@@ -213,7 +216,8 @@ function isCriticalError(error) {
  */
 function showErrorToUser(errorEntry) {
   if (typeof window !== 'undefined' && window.addToast) {
-    window.addToast(`❌ Erreur: ${errorEntry.message.slice(0, 100)}`, 'error')
+    const prefix = translate('errorHandlerToastPrefix')
+    window.addToast(`${prefix} ${errorEntry.message.slice(0, 100)}`, 'error')
   }
   openErrorDialog(errorEntry)
 }
@@ -258,22 +262,26 @@ export function openErrorDialog(errorEntry) {
   `
 
   const safeMessage = escapeHtml(errorEntry.message)
-  const safeStack = escapeHtml(errorEntry.stack || 'No stack trace')
+  const safeStack = escapeHtml(
+    errorEntry.stack || translate('errorHandlerNoStack')
+  )
   const safeContext = errorEntry.context
-    ? escapeHtml('\n\nContext: ' + errorEntry.context)
+    ? escapeHtml(
+        '\n\n' + translate('errorHandlerContextPrefix') + errorEntry.context
+      )
     : ''
 
   content.innerHTML = `
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
       <i class="ti ti-alert-triangle" style="color: var(--danger); font-size: 24px;"></i>
-      <span style="font-weight: 600; font-size: 16px;">An error occurred</span>
+      <span style="font-weight: 600; font-size: 16px;">${escapeHtml(translate('errorHandlerErrorTitle'))}</span>
     </div>
     <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
       ${safeMessage}
     </div>
     <details style="margin-bottom: 16px;">
       <summary style="cursor: pointer; font-size: 12px; color: var(--text-tertiary);">
-        Technical details
+        ${escapeHtml(translate('errorHandlerTechnicalDetails'))}
       </summary>
       <pre style="font-size: 11px; color: var(--text-tertiary); background: var(--bg-tertiary); padding: 12px; border-radius: var(--radius-sm); overflow: auto; max-height: 200px; white-space: pre-wrap; word-break: break-all;">
 ${safeStack}${safeContext}
@@ -281,10 +289,10 @@ ${safeStack}${safeContext}
     </details>
     <div style="display: flex; gap: 8px; justify-content: flex-end;">
       <button class="btn-secondary" data-action="close">
-        <i class="ti ti-x"></i> Close
+        <i class="ti ti-x"></i> ${escapeHtml(translate('close'))}
       </button>
       <button class="btn-primary" data-action="report">
-        <i class="ti ti-send"></i> Report
+        <i class="ti ti-send"></i> ${escapeHtml(translate('errorHandlerReport'))}
       </button>
     </div>
   `
@@ -341,7 +349,7 @@ export async function reportError(errorId) {
     }
 
     if (typeof window !== 'undefined' && window.addToast) {
-      window.addToast('Thanks! Your report has been recorded.', 'success')
+      window.addToast(translate('errorHandlerReportThanks'), 'success')
     }
     return { success: true }
   } catch (e) {
@@ -427,7 +435,7 @@ export function useErrorLogs() {
       return await window.electronAPI.exportJsonFile(
         json,
         defaultName,
-        'Exporter les logs d’erreur'
+        translate('errorHandlerExportDialogTitle')
       )
     }
 

@@ -1,5 +1,4 @@
-// src/features/stats/Stats.test.jsx
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import Stats from './Stats'
 
@@ -261,7 +260,7 @@ describe('Stats', () => {
   })
 
   // ════════════════════════════════════════════════════════════════════
-  // SONS PAR PROFIL
+  // SOUNDS BY PROFILE
   // ════════════════════════════════════════════════════════════════════
 
   describe('sons par profil', () => {
@@ -319,7 +318,7 @@ describe('Stats', () => {
   })
 
   // ════════════════════════════════════════════════════════════════════
-  // FILTRES
+  // FILTERS
   // ════════════════════════════════════════════════════════════════════
 
   describe('filtres de période', () => {

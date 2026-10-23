@@ -1,4 +1,3 @@
-// src/features/stats/tutorialSteps.js
 export const TUTORIAL_STEPS = (t) => [
   {
     id: 'stats-1',

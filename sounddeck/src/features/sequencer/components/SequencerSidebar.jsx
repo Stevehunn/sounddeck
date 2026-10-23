@@ -1,8 +1,33 @@
-// src/features/sequencer/components/SequencerSidebar.jsx
+/**
+ * @file Sequencer sidebar — playlist list, create / delete, sound popup
+ * toggle + config button.
+ *
+ * The "new playlist" flow is inline: clicking the button reveals an input
+ * + confirm/cancel buttons. On Enter, the playlist is created and the
+ * selection moves to it.
+ *
+ * @see ./PlaylistEditor.jsx (main panel)
+ * @see src/features/sequencer/Sequencer.jsx (parent)
+ */
+
 import { useState } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { DeleteButton } from '@shared/components/ui'
 
+/**
+ * Sequencer sidebar.
+ *
+ * @param {Object} props
+ * @param {Array<Object>} props.playlists
+ * @param {string|null} props.activePlaylistId
+ * @param {(name: string) => Promise<Object|null>} props.onCreatePlaylist
+ * @param {(id: string) => void} props.onSelectPlaylist
+ * @param {(id: string) => Promise<void>} props.onDeletePlaylist
+ * @param {boolean} props.soundPopupEnabled
+ * @param {() => void} props.onToggleSoundPopup
+ * @param {() => void} props.onOpenSoundPopupConfig
+ * @returns {JSX.Element}
+ */
 export default function SequencerSidebar({
   playlists,
   activePlaylistId,
@@ -17,6 +42,10 @@ export default function SequencerSidebar({
   const [showNewPlaylist, setShowNewPlaylist] = useState(false)
   const [newPlaylistName, setNewPlaylistName] = useState('')
 
+  /**
+   * Creates the playlist from the input value.
+   * @returns {Promise<void>}
+   */
   const handleCreate = async () => {
     if (!newPlaylistName.trim()) return
     await onCreatePlaylist(newPlaylistName)
@@ -24,6 +53,10 @@ export default function SequencerSidebar({
     setShowNewPlaylist(false)
   }
 
+  /**
+   * Cancels the creation flow.
+   * @returns {void}
+   */
   const handleCancel = () => {
     setNewPlaylistName('')
     setShowNewPlaylist(false)
@@ -157,7 +190,9 @@ export default function SequencerSidebar({
               className={`sidebar-item ${isActive ? 'active' : ''}`}
               style={{
                 borderLeft: `2px solid ${isActive ? 'var(--accent)' : 'transparent'}`,
-                backgroundColor: isActive ? 'var(--accent-light)' : 'transparent',
+                backgroundColor: isActive
+                  ? 'var(--accent-light)'
+                  : 'transparent',
                 color: isActive ? 'var(--accent)' : undefined,
               }}
               data-testid={`playlist-item-${pl.id}`}
@@ -177,7 +212,9 @@ export default function SequencerSidebar({
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
-                    color: isActive ? 'var(--accent)' : 'var(--text-primary)',
+                    color: isActive
+                      ? 'var(--accent)'
+                      : 'var(--text-primary)',
                   }}
                 >
                   {pl.name}
@@ -202,7 +239,7 @@ export default function SequencerSidebar({
         })}
       </div>
 
-      {/* ─── SECTION POPUP SONORE ───────────────────────────────────────── */}
+      {/* Sound popup section */}
       <div
         style={{
           borderTop: '1px solid var(--border)',
@@ -241,8 +278,12 @@ export default function SequencerSidebar({
               padding: '6px 10px',
               borderRadius: 'var(--radius-md)',
               border: `1px solid ${soundPopupEnabled ? 'var(--accent)' : 'var(--border)'}`,
-              background: soundPopupEnabled ? 'var(--accent-light)' : 'var(--bg-tertiary)',
-              color: soundPopupEnabled ? 'var(--accent)' : 'var(--text-secondary)',
+              background: soundPopupEnabled
+                ? 'var(--accent-light)'
+                : 'var(--bg-tertiary)',
+              color: soundPopupEnabled
+                ? 'var(--accent)'
+                : 'var(--text-secondary)',
               cursor: 'pointer',
               fontSize: 11,
               fontWeight: 500,

@@ -1,6 +1,14 @@
-// src/features/sequencer/components/EmptyState.jsx
+/**
+ * @file Empty state shown when no playlist is selected.
+ * @see ./PlaylistEditor.jsx (the alternate view)
+ */
+
 import { useLanguage } from '@core/i18n/LanguageContext'
 
+/**
+ * Empty state placeholder.
+ * @returns {JSX.Element}
+ */
 export default function EmptyState() {
   const { t } = useLanguage()
 

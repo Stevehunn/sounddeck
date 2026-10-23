@@ -9,8 +9,12 @@
  * - `customEmojis` — string[] of emoji characters
  * - `emojiMetadata` — `{ [emoji]: { category, addedAt } }`
  *
+ * Error messages returned to the UI are translated via `translate()`
+ * (FR/EN/ES) so they display in the user's language.
+ *
  * @see @shared/constants/emojis.js — the default catalog
  * @see @shared/hooks/useEmojis.js — reactive wrapper
+ * @see @shared/utils/translator.js
  */
 
 import {
@@ -19,6 +23,7 @@ import {
   isValidEmoji,
 } from '@shared/constants/emojis'
 import { logWarn } from '@shared/utils/logger'
+import { translate } from '@shared/utils/translator'
 
 const STORE_KEY_EMOJIS = 'customEmojis'
 const STORE_KEY_METADATA = 'emojiMetadata'
@@ -152,23 +157,27 @@ class EmojiService {
     await this.load()
 
     const trimmed = String(emoji).trim()
-    if (!trimmed) return { success: false, error: 'Empty emoji' }
-    if (!isValidEmoji(trimmed))
-      return { success: false, error: 'Not a valid emoji' }
+    if (!trimmed) {
+      return { success: false, error: translate('emojiEmptyInput') }
+    }
+    if (!isValidEmoji(trimmed)) {
+      return { success: false, error: translate('emojiInvalidInput') }
+    }
 
     // Already a default emoji?
     const defaultCat = getDefaultEmojiCategory(trimmed)
-    if (defaultCat)
+    if (defaultCat) {
       return {
         success: false,
-        error: 'This emoji is already available by default',
+        error: translate('emojiAlreadyDefault'),
       }
+    }
 
     // Already a custom emoji?
     if (this.customEmojis.includes(trimmed)) {
       return {
         success: false,
-        error: 'This emoji is already in your library',
+        error: translate('emojiAlreadyCustom'),
       }
     }
 
@@ -239,7 +248,7 @@ class EmojiService {
 
     const trimmed = String(emoji).trim()
     if (!this.customEmojis.includes(trimmed)) {
-      return { success: false, error: 'Emoji not found' }
+      return { success: false, error: translate('emojiNotFound') }
     }
 
     this.customEmojis = this.customEmojis.filter((e) => e !== trimmed)

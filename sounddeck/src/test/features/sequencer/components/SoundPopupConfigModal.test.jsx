@@ -12,7 +12,8 @@ vi.mock('@core/services/SoundPopupService', () => ({
   previewSoundPopup: vi.fn(),
 }))
 
-// ✅ NOUVEAU : i18n retourne la clé brute pour des assertions stables
+// ✅ i18n mock returns the raw key so assertions are stable regardless
+// of the active language. `t('cancel')` → `'cancel'`, etc.
 vi.mock('@core/i18n/LanguageContext', () => ({
   useLanguage: () => ({
     t: (k) => k,
@@ -48,7 +49,7 @@ beforeEach(() => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════
-// RENDU
+// RENDERING
 // ═══════════════════════════════════════════════════════════════════════
 describe('SoundPopupConfigModal > Rendu', () => {
   it('affiche les 8 boutons de position', () => {
@@ -71,7 +72,10 @@ describe('SoundPopupConfigModal > Rendu', () => {
 
   it('affiche la taille de carte utilisée', () => {
     renderModal({ cardSize: 'large' })
-    expect(screen.getByText(/Grande/)).toBeInTheDocument()
+    // The component maps `large` → i18n key `cardSizeLarge`. The test mock
+    // returns the key as-is, so we assert on the key (same pattern as
+    // `getByText('cancel')` below).
+    expect(screen.getByText('cardSizeLarge')).toBeInTheDocument()
   })
 
   it('affiche le bouton Preview', () => {
@@ -86,7 +90,7 @@ describe('SoundPopupConfigModal > Rendu', () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════
-// SÉLECTION
+// SELECTION
 // ═══════════════════════════════════════════════════════════════════════
 describe('SoundPopupConfigModal > Sélection', () => {
   it('initialPosition est sélectionnée par défaut', () => {
@@ -154,7 +158,7 @@ describe('SoundPopupConfigModal > Preview', () => {
   it('envoie la position sélectionnée (pas la validée)', () => {
     renderModal({ initialPosition: 'top-right' })
 
-    // L'utilisateur clique sur top-left
+    // The user clicks on top-left
     fireEvent.click(screen.getByTestId('sound-popup-position-top-left'))
     fireEvent.click(screen.getByTestId('sound-popup-preview-button'))
 
@@ -178,7 +182,7 @@ describe('SoundPopupConfigModal > Preview', () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════
-// FERMETURE
+// CLOSING
 // ═══════════════════════════════════════════════════════════════════════
 describe('SoundPopupConfigModal > Fermeture', () => {
   it('bouton Annuler appelle onClose', () => {

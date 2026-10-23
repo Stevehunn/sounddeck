@@ -1,12 +1,11 @@
+// src/test/shared/contexts/NetworkContext.test.jsx
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   render,
   screen,
   act,
-  waitFor,
   renderHook,
 } from "@testing-library/react";
-import { useMemo } from "react";
 
 // ─── Mock i18n ──────────────────────────────────────────────────────────
 vi.mock("@core/i18n/LanguageContext", () => ({
@@ -23,7 +22,7 @@ vi.mock("@core/i18n/LanguageContext", () => ({
   })),
 }));
 
-// ─── Mock constructible pour new Image() ────────────────────────────────
+// ─── Constructible mock for `new Image()` ──────────────────────────────
 let imageInstances = [];
 let imageBehavior = "success"; // 'success' | 'error' | 'pending'
 
@@ -38,7 +37,7 @@ class MockImage {
 
   set src(value) {
     this._src = value;
-    // Ne déclenche rien tout de suite (laisse le test contrôler)
+    // Do not fire anything immediately (let the test decide timing)
     if (imageBehavior === "success") {
       queueMicrotask(() => {
         if (this.onload) this.onload();
@@ -48,7 +47,7 @@ class MockImage {
         if (this.onerror) this.onerror();
       });
     }
-    // 'pending' : on ne déclenche rien → timeout attendu
+    // 'pending' : nothing fires → timeout is expected
   }
 
   get src() {
@@ -56,7 +55,7 @@ class MockImage {
   }
 }
 
-// ─── Reset du module entre tests (cache module-level) ───────────────────
+// ─── Module reset between tests (module-level cache) ───────────────────
 let NetworkContextModule;
 
 beforeEach(async () => {
@@ -69,13 +68,15 @@ beforeEach(async () => {
 
   window.Image = MockImage;
 
-  // Par défaut online
+  // Default: online
   Object.defineProperty(navigator, "onLine", {
     value: true,
     configurable: true,
   });
 
-  NetworkContextModule = await import("@shared/contexts/NetworkContext");
+  // ⚠️ Import the public index (@shared/contexts), NOT `NetworkContext.js`
+  // (which only holds the Context + useNetwork after the 4-file split).
+  NetworkContextModule = await import("@shared/contexts");
 });
 
 afterEach(() => {
@@ -115,7 +116,7 @@ describe("probeNetwork", () => {
     await NetworkContextModule.probeNetwork();
     const callsBefore = imageInstances.length;
 
-    // 2e appel immédiat → cache (pas de nouvelle image)
+    // Immediate 2nd call → cache (no new image)
     await NetworkContextModule.probeNetwork();
     expect(imageInstances.length).toBe(callsBefore);
   });
@@ -131,7 +132,7 @@ describe("probeNetwork", () => {
 
     const promise = NetworkContextModule.probeNetwork();
 
-    // ✅ Avance 3 URLs × 3s = 9000ms + marge
+    // ✅ Advance 3 URLs × 3s = 9000ms + margin
     await vi.advanceTimersByTimeAsync(10000);
 
     const result = await promise;
@@ -185,7 +186,7 @@ describe("NetworkProvider", () => {
       wrapper: ({ children }) => <NetworkProvider>{children}</NetworkProvider>,
     });
 
-    // Passe offline
+    // Go offline
     act(() => {
       Object.defineProperty(navigator, "onLine", {
         value: false,
@@ -195,7 +196,7 @@ describe("NetworkProvider", () => {
     });
     expect(result.current.isOnline).toBe(false);
 
-    // Revient online
+    // Back online
     act(() => {
       Object.defineProperty(navigator, "onLine", {
         value: true,
@@ -271,7 +272,7 @@ describe("useNetwork", () => {
   it("devrait throw si utilisé hors NetworkProvider", () => {
     const { useNetwork } = NetworkContextModule;
 
-    // Silence console.error pour éviter le bruit
+    // Silence console.error to reduce noise
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     expect(() => {
@@ -408,7 +409,7 @@ describe("ensureOnline", () => {
       await Promise.all([p1, p2]);
     });
 
-    // Une seule rafale d'images (3 URLs en parallèle → au plus 3)
+    // Only one burst of images (3 URLs in parallel → at most 3)
     const imagesAfter = imageInstances.length - imagesBefore;
     expect(imagesAfter).toBeLessThanOrEqual(3);
   });

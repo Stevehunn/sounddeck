@@ -1,114 +1,174 @@
-// src/features/sequencer/tutorialSteps.js
+/**
+ * @file Tutorial steps for the sequencer page.
+ *
+ * Each step targets a UI element (button, list item, etc.). Many steps
+ * also perform a side-effect when navigating to them (e.g. select the
+ * first playlist so the tutorial has an item to point at).
+ *
+ * @see @shared/components/ui/Tutorial.jsx
+ */
 
+/**
+ * Resolves the "New playlist" button.
+ * @returns {Element|null}
+ */
 function findNewPlaylistButton() {
-  const btn = document.querySelector('[data-testid="new-playlist-button"]');
-  if (btn && btn.offsetParent !== null) return btn;
+  const btn = document.querySelector('[data-testid="new-playlist-button"]')
+  if (btn && btn.offsetParent !== null) return btn
 
-  const buttons = document.querySelectorAll('button');
-  for (const btn of buttons) {
-    const text = btn.textContent?.trim() || '';
-    if (text.includes('Nouvelle playlist') ||
-        text.includes('New playlist') ||
-        text.includes('Nueva lista')) {
-      if (btn.offsetParent !== null) return btn;
+  const buttons = document.querySelectorAll('button')
+  for (const b of buttons) {
+    const text = b.textContent?.trim() || ''
+    if (
+      text.includes('Nouvelle playlist') ||
+      text.includes('New playlist') ||
+      text.includes('Nueva lista')
+    ) {
+      if (b.offsetParent !== null) return b
     }
   }
 
-  const plusBtn = document.querySelector('.btn-primary:has(.ti-plus)');
-  if (plusBtn && plusBtn.offsetParent !== null) return plusBtn;
+  const plusBtn = document.querySelector('.btn-primary:has(.ti-plus)')
+  if (plusBtn && plusBtn.offsetParent !== null) return plusBtn
 
-  return null;
+  return null
 }
 
+/**
+ * Selects the first playlist in the sidebar (auto-selection for step 2).
+ * @returns {Element|null}
+ */
 function selectFirstPlaylist() {
-  const playlistItem = document.querySelector('[data-testid^="playlist-item-"]');
+  const playlistItem = document.querySelector(
+    '[data-testid^="playlist-item-"]'
+  )
   if (playlistItem && playlistItem.offsetParent !== null) {
-    const isActive = playlistItem.classList.contains('active');
+    const isActive = playlistItem.classList.contains('active')
     if (!isActive) {
-      try { playlistItem.click(); } catch (e) {}
+      try {
+        playlistItem.click()
+      } catch {
+        // Ignore — the playlist is simply not selectable.
+      }
     }
-    return playlistItem;
+    return playlistItem
   }
 
-  const fallback = document.querySelector('.sidebar-item:has(.ti-playlist)');
+  const fallback = document.querySelector('.sidebar-item:has(.ti-playlist)')
   if (fallback && fallback.offsetParent !== null) {
-    try { fallback.click(); } catch (e) {}
-    return fallback;
+    try {
+      fallback.click()
+    } catch {
+      // Ignore.
+    }
+    return fallback
   }
 
-  return null;
+  return null
 }
 
+/**
+ * Resolves the "Add sounds" button.
+ * @returns {Element|null}
+ */
 function findAddSoundsButton() {
-  const btn = document.querySelector('[data-testid="add-sounds-button"]');
-  if (btn && btn.offsetParent !== null) return btn;
+  const btn = document.querySelector('[data-testid="add-sounds-button"]')
+  if (btn && btn.offsetParent !== null) return btn
 
-  const buttons = document.querySelectorAll('button');
-  for (const btn of buttons) {
-    const text = btn.textContent?.trim() || '';
-    if (text.includes('Ajouter des sons') ||
-        text.includes('Add sounds') ||
-        text.includes('Agregar sonidos')) {
-      if (btn.offsetParent !== null) return btn;
+  const buttons = document.querySelectorAll('button')
+  for (const b of buttons) {
+    const text = b.textContent?.trim() || ''
+    if (
+      text.includes('Ajouter des sons') ||
+      text.includes('Add sounds') ||
+      text.includes('Agregar sonidos')
+    ) {
+      if (b.offsetParent !== null) return b
     }
   }
 
-  const plusBtn = document.querySelector('.btn-secondary:has(.ti-plus)');
-  if (plusBtn && plusBtn.offsetParent !== null) return plusBtn;
+  const plusBtn = document.querySelector('.btn-secondary:has(.ti-plus)')
+  if (plusBtn && plusBtn.offsetParent !== null) return plusBtn
 
-  return null;
+  return null
 }
 
+/**
+ * Resolves the "Play sequence" button.
+ * @returns {Element|null}
+ */
 function findPlayButton() {
-  const btn = document.querySelector('[data-testid="play-sequence-button"]');
-  if (btn && btn.offsetParent !== null) return btn;
+  const btn = document.querySelector('[data-testid="play-sequence-button"]')
+  if (btn && btn.offsetParent !== null) return btn
 
-  const playBtn = document.querySelector('.btn-primary:has(.ti-player-play)');
-  if (playBtn && playBtn.offsetParent !== null) return playBtn;
+  const playBtn = document.querySelector('.btn-primary:has(.ti-player-play)')
+  if (playBtn && playBtn.offsetParent !== null) return playBtn
 
-  return null;
+  return null
 }
 
+/**
+ * Resolves the "Loop" button.
+ * @returns {Element|null}
+ */
 function findLoopButton() {
-  const btn = document.querySelector('[data-testid="loop-sequence-button"]');
-  if (btn && btn.offsetParent !== null) return btn;
+  const btn = document.querySelector('[data-testid="loop-sequence-button"]')
+  if (btn && btn.offsetParent !== null) return btn
 
-  const buttons = document.querySelectorAll('button');
-  for (const btn of buttons) {
-    const icon = btn.querySelector('.ti-repeat');
-    if (icon && btn.offsetParent !== null) {
-      const text = btn.textContent?.trim() || '';
-      if (text.includes('Loop') || text.includes('Boucle') || text.includes('Repetir')) {
-        return btn;
+  const buttons = document.querySelectorAll('button')
+  for (const b of buttons) {
+    const icon = b.querySelector('.ti-repeat')
+    if (icon && b.offsetParent !== null) {
+      const text = b.textContent?.trim() || ''
+      if (
+        text.includes('Loop') ||
+        text.includes('Boucle') ||
+        text.includes('Repetir')
+      ) {
+        return b
       }
     }
   }
 
-  return null;
+  return null
 }
 
+/**
+ * Resolves the first playlist item (main content, not sidebar).
+ * @returns {Element|null}
+ */
 function findFirstPlaylistItem() {
-  const mainContent = document.querySelector('[style*="flex: 1"]') || document.body;
+  const mainContent =
+    document.querySelector('[style*="flex: 1"]') || document.body
 
-  const items = mainContent.querySelectorAll('.sequencer-item');
+  const items = mainContent.querySelectorAll('.sequencer-item')
   for (const item of items) {
-    if (item.offsetParent !== null) return item;
+    if (item.offsetParent !== null) return item
   }
 
-  const allItems = document.querySelectorAll('[data-testid^="playlist-item-"]');
+  const allItems = document.querySelectorAll(
+    '[data-testid^="playlist-item-"]'
+  )
   for (const item of allItems) {
-    const isInSidebar = item.closest('.sidebar, aside, [class*="sidebar"]');
-    if (!isInSidebar && item.offsetParent !== null) return item;
+    const isInSidebar = item.closest(
+      '.sidebar, aside, [class*="sidebar"]'
+    )
+    if (!isInSidebar && item.offsetParent !== null) return item
   }
 
-  return null;
+  return null
 }
 
-// ✅ NOUVEAU : cible de l'étape 8 (popup sonore)
+/**
+ * Resolves the "Configure sound popup" button.
+ * @returns {Element|null}
+ */
 function findSoundPopupConfigButton() {
-  const btn = document.querySelector('[data-testid="sound-popup-config-button"]');
-  if (btn && btn.offsetParent !== null) return btn;
-  return null;
+  const btn = document.querySelector(
+    '[data-testid="sound-popup-config-button"]'
+  )
+  if (btn && btn.offsetParent !== null) return btn
+  return null
 }
 
 export const TUTORIAL_STEPS = (t) => [
@@ -155,7 +215,8 @@ export const TUTORIAL_STEPS = (t) => [
     description: t('tutorialSequencerStep5Desc'),
     hint: t('tutorialSequencerStep5Hint'),
     target: findLoopButton,
-    fallbackTarget: '.btn-success:has(.ti-repeat), .btn-secondary:has(.ti-repeat)',
+    fallbackTarget:
+      '.btn-success:has(.ti-repeat), .btn-secondary:has(.ti-repeat)',
   },
   {
     id: 'sequencer-step6',
@@ -173,9 +234,9 @@ export const TUTORIAL_STEPS = (t) => [
     description: t('tutorialSequencerStep7Desc'),
     hint: t('tutorialSequencerStep7Hint'),
     target: () => {
-      const item = document.querySelector('.sequencer-item');
-      if (item && item.offsetParent !== null) return item;
-      return document.querySelector('.btn-danger:has(.ti-player-stop)');
+      const item = document.querySelector('.sequencer-item')
+      if (item && item.offsetParent !== null) return item
+      return document.querySelector('.btn-danger:has(.ti-player-stop)')
     },
     fallbackTarget: '.sequencer-item:first-child, .btn-danger',
   },
@@ -188,4 +249,4 @@ export const TUTORIAL_STEPS = (t) => [
     target: findSoundPopupConfigButton,
     fallbackTarget: '[data-testid="sound-popup-config-button"]',
   },
-];
+]

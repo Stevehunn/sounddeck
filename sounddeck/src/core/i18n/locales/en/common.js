@@ -405,4 +405,77 @@ export default {
   updateDownloading: "Downloading...",
   updateRestart: "Install and restart",
   updateRetryGithub: "Open GitHub",
+
+  // ─── UTILS / BACKUP ──────────────────────────────────────────────
+  backupErrorNotFound: "Backup not found",
+  backupErrorInvalidIndex: "Invalid index",
+  backupErrorNoBackups: "No backups to export",
+  backupErrorInvalidFormat: "Invalid format",
+  backupExportDialogTitle: "Export backups",
+
+  // ─── UTILS / ERROR HANDLER ───────────────────────────────────────
+  errorHandlerErrorTitle: "An error occurred",
+  errorHandlerTechnicalDetails: "Technical details",
+  errorHandlerNoStack: "No stack trace",
+  errorHandlerReport: "Report",
+  errorHandlerContextPrefix: "Context: ",
+  errorHandlerReportThanks: "Thanks! Your report has been recorded.",
+  errorHandlerErrorNotFound: "Error not found",
+  errorHandlerExportDialogTitle: "Export error logs",
+  errorHandlerToastPrefix: "❌ Error:",
+
+  // ─── UTILS / FILE COMPRESSION ────────────────────────────────────
+  fileCompressionConvertUnavailable: "convertAudio not available",
+
+  // ─── UTILS / FILE EXPORT ─────────────────────────────────────────
+  fileExportErrorMissingPath: "Missing outputPath",
+
+  // ─── UTILS / MIXDOWN ─────────────────────────────────────────────
+  mixdownErrorEmptyProject: "Empty project",
+  mixdownErrorNoClips: "No clips to mix in the selection",
+  mixdownErrorRenderError: "Audio render error",
+  mixdownErrorMissingPath: "outputPath missing",
+  mixdownWarningConversionFailed: "Conversion failed, exported as WAV",
+  mixdownWarningConversionError: "Conversion error, exported as WAV",
+
+  // ─── UTILS / NORMALIZE ───────────────────────────────────────────
+  normalizeRecommendationQuiet: "⚠️ Very quiet file, normalization recommended",
+  normalizeRecommendationClipping: "⚠️ File close to clipping, reduce volume",
+  normalizeRecommendationCorrect: "✅ Correct level",
+
+  // ─── UTILS / OBS ─────────────────────────────────────────────────
+  obsErrorNotConnected: "OBS not connected",
+
+  // ─── UTILS / PLATFORM IMPORT ─────────────────────────────────────
+  platformErrorInvalidSpotifyUrl: "Invalid Spotify URL",
+  platformErrorInvalidSoundCloudUrl: "Invalid SoundCloud URL",
+  platformSpotifyPrefix: "Spotify -",
+  platformArtistPlaceholder: "Artist (enter the name)",
+  platformSoundCloudTrack: "SoundCloud track",
+  platformUnknownArtist: "Unknown artist",
+  platformSoundCloudArtist: "SoundCloud artist",
+
+  // ─── COMMON YES/NO ───────────────────────────────────────────────
+  yes: "Yes",
+  no: "No",
+
+  // ─── UTILS / AUDIO MIXER ─────────────────────────────────────────
+  micDspDisabled:
+    "Browser DSP disabled — raw voice (recommended with headphones)",
+  micDspEnabled: "Browser DSP enabled — echo cancel + noise suppress + AGC",
+
+  // ─── UTILS / EMOJI SERVICE ────────────────────────────────────────
+  emojiEmptyInput: "Empty emoji",
+  emojiInvalidInput: "Not a valid emoji",
+  emojiAlreadyDefault: "This emoji is already available by default",
+  emojiAlreadyCustom: "This emoji is already in your library",
+  emojiNotFound: "Emoji not found",
+
+  // ─── UTILS / SOUND POPUP ──────────────────────────────────────────
+  soundPopupSampleName: "Sample sound",
+
+  // ─── UTILS / PLUGINS ──────────────────────────────────────────────
+  pluginComponentNotFound: "Component not found",
+  pluginLoadingError: "Loading error",
+  pluginAuthorUnknown: "Unknown",
 };

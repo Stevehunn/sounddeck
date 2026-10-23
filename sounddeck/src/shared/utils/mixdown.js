@@ -13,15 +13,19 @@
  * `applyEffectsToBuffer` from `realTimeEffects.js` — if that module fails
  * to load, the mixdown continues without effects (logged).
  *
+ * User-facing error/warning messages are translated via `translate()`.
+ *
  * @see @shared/utils/realTimeEffects.js
  * @see @shared/utils/wavEncoder.js
  * @see @shared/utils/fileExport.js
+ * @see @shared/utils/translator.js
  */
 
 import { audioBufferToWav } from './wavEncoder'
 import { saveAudioBuffer } from './fileExport'
 import { buildFileUrl } from './fileUrl'
 import { logWarn, logError } from './logger'
+import { translate } from './translator'
 
 /**
  * Renders a project to a single `AudioBuffer`.
@@ -43,7 +47,7 @@ export async function mixdownProject(
   exportEnd = null
 ) {
   if (!project || !project.tracks || project.tracks.length === 0) {
-    throw new Error('Empty project')
+    throw new Error(translate('mixdownErrorEmptyProject'))
   }
 
   let totalDuration = 0
@@ -82,7 +86,7 @@ export async function mixdownProject(
   }
 
   if (clipsWithInfo.length === 0) {
-    throw new Error('No clips to mix in the selection')
+    throw new Error(translate('mixdownErrorNoClips'))
   }
 
   const offlineContext = new OfflineAudioContext(
@@ -222,7 +226,7 @@ export async function mixdownProject(
     renderedBuffer = await offlineContext.startRendering()
   } catch (e) {
     logError('mixdown', 'Render error', e)
-    throw new Error('Audio render error', { cause: e })
+    throw new Error(translate('mixdownErrorRenderError'), { cause: e })
   }
 
   return renderedBuffer
@@ -259,7 +263,7 @@ export async function exportMixdown(
   try {
     if (!outputPath) {
       logError('mixdown', 'outputPath is undefined')
-      return { success: false, error: 'outputPath missing' }
+      return { success: false, error: translate('mixdownErrorMissingPath') }
     }
 
     if (onProgress) onProgress(0.1)
@@ -285,7 +289,7 @@ export async function exportMixdown(
           success: true,
           path: fallbackPath,
           format: 'wav',
-          warning: 'Conversion failed, exported as WAV',
+          warning: translate('mixdownWarningConversionFailed'),
         }
       }
 
@@ -323,7 +327,7 @@ export async function exportMixdown(
         success: true,
         path: fallbackPath,
         format: 'wav',
-        warning: 'Conversion failed, exported as WAV',
+        warning: translate('mixdownWarningConversionFailed'),
       }
     } catch (e) {
       logWarn('mixdown', 'Conversion error', e)
@@ -335,7 +339,7 @@ export async function exportMixdown(
         success: true,
         path: fallbackPath,
         format: 'wav',
-        warning: 'Conversion error, exported as WAV',
+        warning: translate('mixdownWarningConversionError'),
       }
     }
   } catch (e) {

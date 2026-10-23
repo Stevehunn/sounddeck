@@ -181,6 +181,13 @@ vi.mock("@core/i18n/LanguageContext", async (importOriginal) => {
     { code: "es", label: "Español", flag: "🇪🇸" },
   ];
 
+  // Boot the pure translator so non-React modules (backupManager,
+  // errorHandler, mixdown, …) can translate user-facing strings.
+  // ⚠️ Use the Vite alias (`@shared`), NOT `./utils/translator` which
+  //    would resolve to `src/test/utils/translator.js` (does not exist).
+  const { configureTranslator } = await import("@shared/utils/translator");
+  configureTranslator(original.TRANSLATIONS || { fr: FR }, "fr");
+
   return {
     useLanguage: () => ({
       t: (key, params) => {

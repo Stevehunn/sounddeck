@@ -1,4 +1,21 @@
-// src/features/sequencer/Sequencer.jsx
+/**
+ * @file Sequencer page — build and play playlists of sounds.
+ *
+ * Two-column layout:
+ * - **Left sidebar** (`SequencerSidebar`) — playlist list, create/delete,
+ *   sound popup toggle + config button.
+ * - **Main panel** (`PlaylistEditor` when a playlist is selected, else
+ *   `EmptyState`).
+ *
+ * On mount, loads the sound-popup preference (enabled + position) from
+ * the store and initializes `SoundPopupService` accordingly. Both values
+ * are persisted as soon as the user changes them.
+ *
+ * @see ./hooks/usePlaylists.js — playlist persistence
+ * @see ./hooks/useSequencePlayer.js — playback engine
+ * @see @core/services/SoundPopupService.js
+ */
+
 import { useState, useEffect, useCallback } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { usePlaylists } from './hooks/usePlaylists'
@@ -17,6 +34,14 @@ import {
 const STORE_KEY_ENABLED = 'soundPopupEnabled'
 const STORE_KEY_POSITION = 'soundPopupPosition'
 
+/**
+ * Sequencer page.
+ *
+ * @param {Object} props
+ * @param {Object} props.store - App store.
+ * @param {(msg: string, type?: string) => void} props.addToast
+ * @returns {JSX.Element}
+ */
 export default function Sequencer({ store, addToast }) {
   const { t } = useLanguage()
   const playlists = usePlaylists()
@@ -24,6 +49,10 @@ export default function Sequencer({ store, addToast }) {
   const [showConfigModal, setShowConfigModal] = useState(false)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
 
+  // Load persisted popup settings once, then init SoundPopupService.
+  // Deps are intentionally empty: we only want to run this once on mount,
+  // even if the user updates the theme/size afterward (handled in the
+  // next effect).
   useEffect(() => {
     let mounted = true
     const load = async () => {
@@ -54,15 +83,22 @@ export default function Sequencer({ store, addToast }) {
       }
     }
     load()
-    return () => { mounted = false }
+    return () => {
+      mounted = false
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Keep the popup theme in sync when the user changes it in the store.
   useEffect(() => {
     if (!settingsLoaded) return
     setPopupTheme(store.theme || 'dark', store.customTheme || null)
   }, [store.theme, store.customTheme, settingsLoaded])
 
+  /**
+   * Toggles the sound popup on/off.
+   * @returns {Promise<void>}
+   */
   const handleToggleSoundPopup = useCallback(async () => {
     const next = !popupEnabled
     setPopupEnabledState(next)
@@ -73,11 +109,20 @@ export default function Sequencer({ store, addToast }) {
         next ? t('soundPopupEnabledToast') : t('soundPopupDisabledToast'),
         'info'
       )
-    } catch { /* noop */ }
+    } catch {
+      // Silent — UI already reflects the optimistic update.
+    }
   }, [popupEnabled, addToast, t])
 
   const handleOpenConfig = useCallback(() => setShowConfigModal(true), [])
 
+  /**
+   * Validates a new popup position: persists it, re-enables the popup,
+   * closes the config modal.
+   *
+   * @param {string} position
+   * @returns {Promise<void>}
+   */
   const handleValidatePosition = useCallback(
     async (position) => {
       setPopupPosition(position)
@@ -89,12 +134,19 @@ export default function Sequencer({ store, addToast }) {
           window.electronAPI.storeSet(STORE_KEY_ENABLED, true),
         ])
         addToast?.(t('soundPopupPositionSaved'), 'success')
-      } catch { /* noop */ }
+      } catch {
+        // Silent — UI already reflects the change.
+      }
       setShowConfigModal(false)
     },
     [addToast, t]
   )
 
+  /**
+   * Deletes a playlist by ID.
+   * @param {string} id
+   * @returns {Promise<void>}
+   */
   const handleDeletePlaylist = async (id) => {
     await playlists.deletePlaylist(id)
   }

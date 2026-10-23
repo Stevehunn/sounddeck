@@ -16,11 +16,16 @@
  * The list is capped at `backupConfig.maxBackups` (default 10). The oldest
  * backup is dropped when the cap is exceeded (FIFO).
  *
+ * User-facing strings are translated via `translate()` (FR/EN/ES).
+ * Non-user-facing error messages (logs, raw exception messages) stay in
+ * English, per project convention.
+ *
  * @see src/shared/components/settings/BackupSettings.jsx
  * @see electron/store.js
  */
 
 import { logWarn, logError } from './logger'
+import { translate } from './translator'
 
 let backupInterval = null
 let backupConfig = {
@@ -221,7 +226,7 @@ export async function getBackup(index) {
 export async function restoreBackup(store, index) {
   const backup = await getBackup(index)
   if (!backup) {
-    return { success: false, error: 'Backup not found' }
+    return { success: false, error: translate('backupErrorNotFound') }
   }
 
   try {
@@ -229,7 +234,7 @@ export async function restoreBackup(store, index) {
     if (backup.profiles && typeof store.replaceAllProfiles === 'function') {
       const allProfile = {
         id: 'all',
-        name: 'Tous les sons',
+        name: translate('allSounds'),
         nameKey: 'allSounds',
         isDefault: true,
       }
@@ -317,7 +322,7 @@ export async function deleteBackup(index) {
     const backups = await readBackups()
 
     if (index < 0 || index >= backups.length) {
-      return { success: false, error: 'Invalid index' }
+      return { success: false, error: translate('backupErrorInvalidIndex') }
     }
 
     backups.splice(index, 1)
@@ -362,7 +367,7 @@ export async function exportBackups() {
     const backups = await readBackups()
 
     if (backups.length === 0) {
-      return { success: false, error: 'No backups to export' }
+      return { success: false, error: translate('backupErrorNoBackups') }
     }
 
     const json = JSON.stringify(backups, null, 2)
@@ -373,7 +378,7 @@ export async function exportBackups() {
     const r = await window.electronAPI.exportJsonFile(
       json,
       defaultName,
-      'Exporter les sauvegardes'
+      translate('backupExportDialogTitle')
     )
 
     if (r?.success) {
@@ -407,7 +412,7 @@ export function importBackups(file) {
           await writeBackups(data)
           resolve({ success: true, count: data.length })
         } else {
-          reject(new Error('Invalid format'))
+          reject(new Error(translate('backupErrorInvalidFormat')))
         }
       } catch (err) {
         reject(err)

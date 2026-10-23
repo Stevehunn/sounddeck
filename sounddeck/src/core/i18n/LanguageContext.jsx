@@ -12,8 +12,13 @@
  * - **`changeLanguage(lang)`** — persists the choice and notifies listeners.
  * - **`subscribe(fn)`** — for external observers (e.g. tray icon updates).
  *
+ * Also configures the non-React translator (`@shared/utils/translator`)
+ * so pure modules (backupManager, errorHandler, mixdown, …) can translate
+ * user-facing strings without importing React.
+ *
  * @see ./locales/{fr,en,es}/index.js
  * @see ./constants.js (`LANGUAGES`)
+ * @see @shared/utils/translator.js
  */
 
 import {
@@ -30,6 +35,7 @@ import { LANGUAGES } from './constants.js'
 import frTranslations from './locales/fr/index.js'
 import enTranslations from './locales/en/index.js'
 import esTranslations from './locales/es/index.js'
+import { configureTranslator } from '@shared/utils/translator'
 
 const pluginI18nModules = import.meta.glob('../../plugins/*/i18n.js', {
   eager: true,
@@ -92,6 +98,12 @@ export function LanguageProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true)
   const [version, setVersion] = useState(0)
   const listenersRef = useRef([])
+
+  // Boot the pure translator on every language change so non-React
+  // modules (backupManager, errorHandler, mixdown, …) can translate.
+  useEffect(() => {
+    configureTranslator(MERGED_TRANSLATIONS, currentLang)
+  }, [currentLang])
 
   useEffect(() => {
     const loadLang = async () => {

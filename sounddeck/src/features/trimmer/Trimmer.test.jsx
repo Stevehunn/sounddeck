@@ -63,7 +63,6 @@ vi.mock("@shared/components/audio/Waveform", () => ({
 describe("Trimmer", () => {
   let store;
   let addToast;
-  let AudioMock;
 
   const createSound = (id = "s1", name = "Mon son") => ({
     id,

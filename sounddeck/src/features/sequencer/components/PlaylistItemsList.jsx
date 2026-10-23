@@ -1,8 +1,32 @@
-// src/features/sequencer/components/PlaylistItemsList.jsx
+/**
+ * @file Playlist items list — drag & drop reordering, empty state.
+ *
+ * Drag state is tracked locally (`dragOverIdx`); the actual reorder is
+ * delegated to `onSaveItemsOnly` (parent) so it's persisted immediately.
+ *
+ * @see ./PlaylistItem.jsx
+ * @see ./PlaylistEditor.jsx
+ */
+
 import { useState } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import PlaylistItem from './PlaylistItem'
 
+/**
+ * Playlist items list.
+ *
+ * @param {Object} props
+ * @param {Array<Object>} props.items
+ * @param {Array<Object>} props.sounds
+ * @param {boolean} props.playing
+ * @param {number} props.currentIdx
+ * @param {Object|null} props.currentProgress
+ * @param {(items: Array) => void} props.onSaveItemsOnly
+ * @param {(idx: number, changes: Object) => void} props.onUpdateItem
+ * @param {(idx: number) => void} props.onRemove
+ * @param {() => void} props.onAddSounds
+ * @returns {JSX.Element}
+ */
 export default function PlaylistItemsList({
   items,
   sounds,
@@ -17,6 +41,12 @@ export default function PlaylistItemsList({
   const { t } = useLanguage()
   const [dragOverIdx, setDragOverIdx] = useState(null)
 
+  /**
+   * Starts dragging an item (adds opacity + class for visual feedback).
+   * @param {React.DragEvent} e
+   * @param {number} idx
+   * @returns {void}
+   */
   const handleDragStart = (e, idx) => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', String(idx))
@@ -29,6 +59,11 @@ export default function PlaylistItemsList({
     }, 0)
   }
 
+  /**
+   * Clears the drag state and resets the visual feedback.
+   * @param {React.DragEvent} e
+   * @returns {void}
+   */
   const handleDragEnd = (e) => {
     if (e.target) {
       e.target.style.opacity = '1'
@@ -37,16 +72,32 @@ export default function PlaylistItemsList({
     setDragOverIdx(null)
   }
 
+  /**
+   * Highlights the drop target.
+   * @param {React.DragEvent} e
+   * @param {number} idx
+   * @returns {void}
+   */
   const handleDragOver = (e, idx) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
     setDragOverIdx(idx)
   }
 
+  /**
+   * Clears the drop highlight.
+   * @returns {void}
+   */
   const handleDragLeave = () => {
     setDragOverIdx(null)
   }
 
+  /**
+   * Reorders the items: moves the dragged item to `toIdx` and persists.
+   * @param {React.DragEvent} e
+   * @param {number} toIdx
+   * @returns {void}
+   */
   const handleDrop = (e, toIdx) => {
     e.preventDefault()
     e.stopPropagation()

@@ -1,7 +1,32 @@
-// src/features/sequencer/components/PlaylistItem.jsx
+/**
+ * @file One row in the playlist items list — draggable, editable delay,
+ * delete button, active/progress indicators.
+ *
+ * @see ./PlaylistItemsList.jsx (parent)
+ */
+
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 
+/**
+ * One playlist item.
+ *
+ * @param {Object} props
+ * @param {Object} props.item - `{id, soundId, delay}`.
+ * @param {number} props.idx
+ * @param {Object|null} props.sound - The matching sound (or `null` if deleted).
+ * @param {boolean} props.isActive - Currently playing.
+ * @param {boolean} props.isDragOver - Show the drop indicator.
+ * @param {{ratio: number, current: number, duration: number}|null} props.currentProgress
+ * @param {(e: React.DragEvent, idx: number) => void} props.onDragStart
+ * @param {(e: React.DragEvent) => void} props.onDragEnd
+ * @param {(e: React.DragEvent, idx: number) => void} props.onDragOver
+ * @param {(e: React.DragEvent) => void} props.onDragLeave
+ * @param {(e: React.DragEvent, idx: number) => void} props.onDrop
+ * @param {(idx: number, changes: Object) => void} props.onUpdateItem
+ * @param {(idx: number) => void} props.onRemove
+ * @returns {JSX.Element}
+ */
 export default function PlaylistItem({
   item,
   idx,
@@ -217,7 +242,9 @@ export default function PlaylistItem({
               }}
               onClick={(e) => e.stopPropagation()}
             />
-            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>s</span>
+            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+              s
+            </span>
           </div>
         </div>
       </div>

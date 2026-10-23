@@ -32,6 +32,7 @@
  * @see @core/store/hooks/useMixer.js
  * @see src/shared/components/settings/OBSControl.jsx
  */
+import { translate } from "@shared/utils/translator";
 
 let audioContext = null;
 let microphoneSource = null;
@@ -468,8 +469,8 @@ export function getHighQualityMicStatus() {
   return {
     enabled: highQualityMicMode,
     description: highQualityMicMode
-      ? "Browser DSP disabled — raw voice (recommended with headphones)"
-      : "Browser DSP enabled — echo cancel + noise suppress + AGC",
+      ? translate("micDspDisabled")
+      : translate("micDspEnabled"),
   };
 }
 

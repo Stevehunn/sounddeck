@@ -1,7 +1,24 @@
-// src/features/sequencer/components/PlaylistProgressBar.jsx
+/**
+ * @file Progress bar shown above the item list while a sequence plays.
+ * Shows the current sound name, elapsed / total time, and index/total.
+ *
+ * @see ./PlaylistEditor.jsx (parent)
+ */
+
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { formatTime } from '@shared/utils/format'
 
+/**
+ * Playlist progress bar.
+ *
+ * @param {Object} props
+ * @param {boolean} props.playing
+ * @param {{ratio: number, current: number, duration: number}|null} props.currentProgress
+ * @param {number} props.currentIdx
+ * @param {Array<Object>} props.items
+ * @param {Array<Object>} props.sounds
+ * @returns {JSX.Element|null}
+ */
 export default function PlaylistProgressBar({
   playing,
   currentProgress,

@@ -10,11 +10,15 @@
  * The setState calls inside the effect are deferred via `setTimeout(0)` so
  * they don't run synchronously in the effect body (React 19 rule).
  *
+ * Error messages shown to the user are translated via `translate()`.
+ *
  * @see @core/plugins/PluginContext.jsx
+ * @see @shared/utils/translator.js
  */
 
 import { useState, useEffect, useCallback } from 'react'
 import { usePlugins } from '../PluginContext'
+import { translate } from '@shared/utils/translator'
 
 /**
  * Loads and returns a plugin page component.
@@ -54,11 +58,11 @@ export function usePluginPage(pageId) {
       if (component) {
         setComponent(() => component)
       } else {
-        setError('Component not found')
+        setError(translate('pluginComponentNotFound'))
       }
     } catch (err) {
       console.error(`❌ Error loading plugin page ${pageId}:`, err)
-      setError(err.message || 'Loading error')
+      setError(err.message || translate('pluginLoadingError'))
     } finally {
       setLoading(false)
     }

@@ -10,10 +10,14 @@
  * format, …) returns `{ success: true, path: originalPath, compressed: false }`
  * — the caller can always use the original file.
  *
+ * User-facing warnings (via `onWarning`) are translated.
+ *
  * @see electron/modules/fileHandlers.js (`convertAudio`)
+ * @see @shared/utils/translator.js
  */
 
 import { logWarn } from './logger'
+import { translate } from './translator'
 
 /**
  * Compresses an audio file if compression is enabled.
@@ -47,7 +51,7 @@ export async function compressFileIfNeeded(filePath, options = {}) {
   }
 
   if (typeof window.electronAPI?.convertAudio !== 'function') {
-    onWarning?.('convertAudio not available')
+    onWarning?.(translate('fileCompressionConvertUnavailable'))
     return { success: true, path: filePath, compressed: false }
   }
 
@@ -68,6 +72,8 @@ export async function compressFileIfNeeded(filePath, options = {}) {
     )
 
     if (!result?.success) {
+      // Technical ffmpeg error → keep raw (English), but the caller can
+      // still choose to display it.
       onWarning?.(result?.error || 'Compression failed')
       return { success: true, path: originalPath, compressed: false }
     }

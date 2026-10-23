@@ -12,12 +12,16 @@
  * Each step returns `{ success, path }` on success, so the caller can
  * always tell how the file ended up being written (and its final path).
  *
+ * User-facing error messages are translated via `translate()`.
+ *
  * @see @shared/utils/wavEncoder.js (produces the `Uint8Array` input)
  * @see @shared/utils/mixdown.js (consumer)
  * @see @shared/utils/normalizeUtils.js (consumer)
+ * @see @shared/utils/translator.js
  */
 
 import { logWarn, logError } from './logger'
+import { translate } from './translator'
 
 /**
  * Saves an audio buffer (WAV `ArrayBuffer` / `Uint8Array`) to disk.
@@ -34,7 +38,7 @@ import { logWarn, logError } from './logger'
  */
 export async function saveAudioBuffer(data, outputPath) {
   if (!outputPath) {
-    return { success: false, error: 'Missing outputPath' }
+    return { success: false, error: translate('fileExportErrorMissingPath') }
   }
 
   const uint8Array = data instanceof Uint8Array ? data : new Uint8Array(data)

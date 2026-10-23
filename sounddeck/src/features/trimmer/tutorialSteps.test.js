@@ -1,4 +1,3 @@
-// src/features/trimmer/tutorialSteps.test.js
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { TUTORIAL_STEPS } from './tutorialSteps'
 

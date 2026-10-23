@@ -1,48 +1,61 @@
-// src/features/trimmer/tutorialSteps.js
+/**
+ * @file Tutorial steps for the trimmer page.
+ *
+ * Each step targets a UI element. Most targets are plain CSS selectors,
+ * but a few need to be functions because they depend on the DOM state
+ * (e.g. "first sound in the list" only exists once the user has sounds).
+ *
+ * All resolvers fall back to a safe element (search bar, empty state) so
+ * the tutorial never blocks if a target is missing.
+ *
+ * @see @shared/components/ui/Tutorial.jsx
+ */
 
 /**
- * Cible : le son actuellement sélectionné (priorité) ou le premier de la liste.
- * Fallback : la zone de recherche si aucun son n'est dispo.
+ * Resolves the highlighted sound (or the first one in the list).
+ * Falls back to the search input, which is always visible.
+ *
+ * @returns {Element|null}
  */
 function findSoundInList() {
-  // 1) Le son actuellement actif (mis en surbrillance)
   const activeItem = document.querySelector(
     '[data-testid^="sound-list-item-"][data-active="true"]'
   )
   if (activeItem && activeItem.offsetParent !== null) return activeItem
 
-  // 2) Le premier son de la liste
   const firstItem = document.querySelector('[data-testid^="sound-list-item-"]')
   if (firstItem && firstItem.offsetParent !== null) return firstItem
 
-  // 3) La zone de recherche en haut du sidebar (toujours visible)
   return document.querySelector('[data-testid="trimmer-search-input"]')
 }
 
 /**
- * Cible : la waveform interactive.
- * Fallback : la zone vide si aucun son n'est sélectionné.
+ * Resolves the interactive waveform (or the empty state if no sound
+ * is selected).
+ *
+ * @returns {Element|null}
  */
 function findWaveformArea() {
-  const waveform = document.querySelector('[data-testid="trimmer-waveform-container"]')
+  const waveform = document.querySelector(
+    '[data-testid="trimmer-waveform-container"]'
+  )
   if (waveform && waveform.offsetParent !== null) return waveform
-
   return document.querySelector('[data-testid="trimmer-empty-state"]')
 }
 
 /**
- * Cible : le bouton "Écouter la sélection".
+ * Resolves the "Play selection" button (or "Reset" as fallback).
+ * @returns {Element|null}
  */
 function findListenButton() {
   const btn = document.querySelector('[data-testid="trimmer-listen-button"]')
   if (btn && btn.offsetParent !== null) return btn
-
-  // Fallback : le bouton "reset"
   return document.querySelector('[data-testid="trimmer-reset-button"]')
 }
 
 /**
- * Cible : le bouton "Tout sélectionner".
+ * Resolves the "Select all" button.
+ * @returns {Element|null}
  */
 function findResetButton() {
   const btn = document.querySelector('[data-testid="trimmer-reset-button"]')
@@ -51,7 +64,8 @@ function findResetButton() {
 }
 
 /**
- * Cible : le champ "Nom du son".
+ * Resolves the "Sound name" input.
+ * @returns {Element|null}
  */
 function findNameInput() {
   const input = document.querySelector('[data-testid="trimmer-name-input"]')
@@ -60,7 +74,8 @@ function findNameInput() {
 }
 
 /**
- * Cible : le bouton "Créer".
+ * Resolves the "Create sound" button.
+ * @returns {Element|null}
  */
 function findCreateButton() {
   const btn = document.querySelector('[data-testid="trimmer-create-button"]')
@@ -77,17 +92,19 @@ export const TUTORIAL_STEPS = (t) => [
     hint: t('tutorialTrimmerStep1Hint'),
     target: findSoundInList,
     fallbackTarget: '[data-testid="trimmer-search-input"]',
-    // ✅ Sélectionne automatiquement le premier son avant de passer à l'étape 2
-    // pour que les éléments cibles (waveform, boutons, etc.) existent dans le DOM.
+    // Auto-select the first sound before moving to step 2, so the
+    // targets (waveform, buttons, etc.) actually exist in the DOM.
     afterNextStep: () => {
       if (typeof window !== 'undefined' && window.__trimmerSelectFirstSound) {
         const ok = window.__trimmerSelectFirstSound()
         if (!ok) {
-          console.warn('[Tutorial Trimmer] Aucun son disponible à auto-sélectionner')
+          console.warn(
+            '[Tutorial Trimmer] No sound available to auto-select'
+          )
         }
       }
     },
-    // Attend que la waveform se génère (analyse audio async ~1-2s)
+    // Wait for the waveform to render (async audio analysis ~1-2s).
     afterNextStepDelay: 2500,
   },
   {

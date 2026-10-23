@@ -1,4 +1,20 @@
-// src/features/sequencer/components/PlaylistEditor.jsx
+/**
+ * @file Playlist editor — header + progress + item list + add modal.
+ *
+ * Owns the local `items` state (mirrored from the playlist prop) and
+ * delegates playback to `useSequencePlayer`. Every mutation is persisted
+ * immediately via `onSaveItems(playlistId, items, loop?)`.
+ *
+ * The `itemsRef` and `playlistIdRef` refs are kept in sync so async
+ * callbacks (e.g. the sequence player's recursive `playFrom`) always see
+ * the latest state without re-creating dependencies.
+ *
+ * @see ./PlaylistHeader.jsx
+ * @see ./PlaylistProgressBar.jsx
+ * @see ./PlaylistItemsList.jsx
+ * @see ../hooks/useSequencePlayer.js
+ */
+
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import PlaylistHeader from './PlaylistHeader'
@@ -8,6 +24,19 @@ import AddSoundModal from './AddSoundModal'
 import { useSequencePlayer } from '../hooks/useSequencePlayer'
 import { uuid } from '@shared/utils/uuid'
 
+/**
+ * Playlist editor.
+ *
+ * @param {Object} props
+ * @param {Object} props.playlist - The playlist being edited.
+ * @param {Array<Object>} props.sounds - All sounds in the library.
+ * @param {string} props.audioDevice
+ * @param {number} props.volume
+ * @param {'small'|'medium'|'large'} [props.cardSize='medium']
+ * @param {(playlistId: string, items: Array, loop?: boolean) => Promise<void>} props.onSaveItems
+ * @param {(msg: string, type?: string) => void} props.addToast
+ * @returns {JSX.Element}
+ */
 export default function PlaylistEditor({
   playlist,
   sounds,
@@ -43,6 +72,11 @@ export default function PlaylistEditor({
     cardSize,
   })
 
+  /**
+   * Saves only the items (loop flag unchanged).
+   * @param {Array<Object>} updatedItems
+   * @returns {Promise<void>}
+   */
   const saveItemsOnly = async (updatedItems) => {
     setItems(updatedItems)
     if (onSaveItems) {
@@ -50,11 +84,23 @@ export default function PlaylistEditor({
     }
   }
 
+  /**
+   * Saves items + loop flag.
+   * @param {Array<Object>} updatedItems
+   * @param {boolean} [loop=loopPlaylist]
+   * @returns {Promise<void>}
+   */
   const saveItems = async (updatedItems, loop = loopPlaylist) => {
     setItems(updatedItems)
     await onSaveItems(playlistIdRef.current, updatedItems, loop)
   }
 
+  /**
+   * Updates one item (by index).
+   * @param {number} idx
+   * @param {Object} changes
+   * @returns {void}
+   */
   const updateItem = (idx, changes) => {
     const updated = items.map((item, i) =>
       i === idx ? { ...item, ...changes } : item
@@ -62,11 +108,21 @@ export default function PlaylistEditor({
     saveItemsOnly(updated)
   }
 
+  /**
+   * Removes one item (by index).
+   * @param {number} idx
+   * @returns {void}
+   */
   const removeItem = (idx) => {
     const updated = items.filter((_, i) => i !== idx)
     saveItemsOnly(updated)
   }
 
+  /**
+   * Appends one item per sound ID with a 0s delay.
+   * @param {string[]} soundIds
+   * @returns {void}
+   */
   const addSounds = (soundIds) => {
     const newItems = soundIds.map((id) => ({
       id: uuid(),
@@ -78,6 +134,10 @@ export default function PlaylistEditor({
     setShowAddSound(false)
   }
 
+  /**
+   * Starts playback (or shows an error toast if the playlist is empty).
+   * @returns {void}
+   */
   const handleStart = () => {
     if (items.length === 0) {
       addToast(t('emptyPlaylist'), 'error')
@@ -86,6 +146,10 @@ export default function PlaylistEditor({
     player.start()
   }
 
+  /**
+   * Toggles the playlist loop flag (persists it).
+   * @returns {void}
+   */
   const handleToggleLoop = () => {
     const next = !loopPlaylist
     setLoopPlaylist(next)

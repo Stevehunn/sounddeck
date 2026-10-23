@@ -25,11 +25,15 @@
  *   or `null`.
  * - `sanitizeFilename(title)` — safe filename for downloads.
  *
+ * User-facing placeholder / error strings are translated via `translate()`.
+ *
  * @see src/plugins/youtube/YouTube.jsx
  * @see electron/modules/fileHandlers.js (`downloadPlatformTrack`)
+ * @see @shared/utils/translator.js
  */
 
 import { logInfo, logWarn } from './logger'
+import { translate } from './translator'
 
 /**
  * Parses a Spotify track URL into a placeholder track object.
@@ -48,17 +52,18 @@ export async function getSpotifyTrack(url) {
       /spotify\.com\/(?:intl-\w+\/)?track\/([a-zA-Z0-9]+)/
     )
     if (!match) {
-      return { success: false, error: 'Invalid Spotify URL' }
+      return { success: false, error: translate('platformErrorInvalidSpotifyUrl') }
     }
 
     const trackId = match[1]
+    const prefix = translate('platformSpotifyPrefix')
 
     return {
       success: true,
       data: {
         id: trackId,
-        title: `Spotify - ${trackId.slice(0, 8)}`,
-        artist: 'Artist (enter the name)',
+        title: `${prefix} ${trackId.slice(0, 8)}`,
+        artist: translate('platformArtistPlaceholder'),
         duration: 180,
         cover: null,
         previewUrl: null,
@@ -112,7 +117,7 @@ export async function getSoundCloudTrack(url) {
   try {
     const match = url.match(/soundcloud\.com\/(?:.*)\/([a-zA-Z0-9_-]+)/)
     if (!match) {
-      return { success: false, error: 'Invalid SoundCloud URL' }
+      return { success: false, error: translate('platformErrorInvalidSoundCloudUrl') }
     }
 
     const trackId = match[1]
@@ -124,8 +129,8 @@ export async function getSoundCloudTrack(url) {
           success: true,
           data: {
             id: trackId,
-            title: result.title || 'SoundCloud track',
-            artist: result.artist || 'Unknown artist',
+            title: result.title || translate('platformSoundCloudTrack'),
+            artist: result.artist || translate('platformUnknownArtist'),
             duration: result.duration || 180,
             cover: result.cover || null,
             streamUrl: result.streamUrl || null,
@@ -145,8 +150,8 @@ export async function getSoundCloudTrack(url) {
       success: true,
       data: {
         id: trackId,
-        title: `SoundCloud track (ID: ${trackId.slice(0, 8)})`,
-        artist: 'SoundCloud artist',
+        title: `${translate('platformSoundCloudTrack')} (ID: ${trackId.slice(0, 8)})`,
+        artist: translate('platformSoundCloudArtist'),
         duration: 180 + Math.floor(Math.random() * 120),
         cover: null,
         streamUrl: null,

@@ -1,16 +1,9 @@
-// src/features/welcome/WelcomeScreen.test.jsx
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-} from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import WelcomeScreen from "./WelcomeScreen";
 
 // ═══════════════════════════════════════════════════════════════════════
-// MOCKS HOISTÉS
+// HOISTED MOCKS
 // ═══════════════════════════════════════════════════════════════════════
 const { mockChangeLanguage } = vi.hoisted(() => ({
   mockChangeLanguage: vi.fn(),
@@ -112,7 +105,7 @@ describe("WelcomeScreen", () => {
   });
 
   // ════════════════════════════════════════════════════════════════════
-  // DÉTECTION SYSTÈME
+  // SYSTEM DETECTION
   // ════════════════════════════════════════════════════════════════════
 
   describe("détection système", () => {
@@ -169,7 +162,7 @@ describe("WelcomeScreen", () => {
   });
 
   // ════════════════════════════════════════════════════════════════════
-  // SÉLECTION LANGUE
+  // LANGUAGE SELECTION
   // ════════════════════════════════════════════════════════════════════
 
   describe("sélection langue", () => {
@@ -208,7 +201,7 @@ describe("WelcomeScreen", () => {
   });
 
   // ════════════════════════════════════════════════════════════════════
-  // SÉLECTION KEYBOARD
+  // SELECTION KEYBOARD
   // ════════════════════════════════════════════════════════════════════
 
   describe("sélection clavier", () => {
@@ -336,7 +329,7 @@ describe("WelcomeScreen", () => {
   });
 
   // ════════════════════════════════════════════════════════════════════
-  // RENDU
+  // DISPLAY
   // ════════════════════════════════════════════════════════════════════
 
   it("devrait afficher le titre SoundDeck", async () => {

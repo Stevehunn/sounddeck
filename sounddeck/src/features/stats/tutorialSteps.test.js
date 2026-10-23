@@ -1,4 +1,3 @@
-// src/features/stats/tutorialSteps.test.js
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { TUTORIAL_STEPS } from './tutorialSteps'
 

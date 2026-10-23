@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+// src/test/hooks/useKeyboardNavigation.test.jsx
+import { describe, it, expect, vi } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useKeyboardNavigation } from '@shared/hooks/useKeyboardNavigation'
 
@@ -9,13 +10,14 @@ describe('useKeyboardNavigation', () => {
     { id: 'c', name: 'Charlie' },
   ]
 
+  // Builds a minimal keyboard event object matching what the hook expects
   const createKeyEvent = (key) => ({
     key,
     preventDefault: vi.fn(),
     target: { tagName: 'DIV' },
   })
 
-  // ─── VALEURS INITIALES ───────────────────────────────────────────────
+  // ─── INITIAL VALUES ──────────────────────────────────────────────────
 
   it('devrait démarrer avec focusedIndex = -1', () => {
     const { result } = renderHook(() =>
@@ -95,7 +97,7 @@ describe('useKeyboardNavigation', () => {
     act(() => result.current.setFocus(2))
     act(() => result.current.navigate(1))
 
-    expect(result.current.focusedIndex).toBe(2) // reste
+    expect(result.current.focusedIndex).toBe(2) // stays
   })
 
   it('ne devrait rien faire si items est vide', () => {
@@ -268,7 +270,7 @@ describe('useKeyboardNavigation', () => {
     expect(result.current.focusedIndex).toBe(2)
   })
 
-  // ─── RECHERCHE PAR LETTRE ────────────────────────────────────────────
+  // ─── TYPE-AHEAD SEARCH ───────────────────────────────────────────────
 
   it('devrait focus un item par sa première lettre', () => {
     const { result } = renderHook(() => useKeyboardNavigation({ items }))
@@ -291,7 +293,7 @@ describe('useKeyboardNavigation', () => {
     expect(result.current.focusedIndex).toBe(-1)
   })
 
-  // ─── ARROWS LEFT/RIGHT (via onSelect) ───────────────────────────────
+  // ─── ARROWS LEFT / RIGHT (via onSelect) ──────────────────────────────
 
   it('ArrowRight devrait appeler onSelect avec "right"', () => {
     const onSelect = vi.fn()
@@ -317,9 +319,9 @@ describe('useKeyboardNavigation', () => {
     expect(onSelect).toHaveBeenCalledWith(items[1], 'left')
   })
 
-  // ─── RESET QUAND ITEMS CHANGE ────────────────────────────────────────
+  // ─── RESET WHEN ITEMS CHANGE ─────────────────────────────────────────
 
-  it('devrait reset focusedIndex quand items change', () => {
+  it('devrait reset focusedIndex quand items change', async () => {
     const { result, rerender } = renderHook(
       ({ items: its }) => useKeyboardNavigation({ items: its }),
       { initialProps: { items } }
@@ -328,9 +330,12 @@ describe('useKeyboardNavigation', () => {
     act(() => result.current.setFocus(1))
     expect(result.current.focusedIndex).toBe(1)
 
-    // Change les items
+    // Reset is deferred via setTimeout(0) (React 19 fix) → wait for the
+    // next tick before asserting.
     rerender({ items: [{ id: 'x', name: 'X' }] })
-    expect(result.current.focusedIndex).toBe(-1)
+    await waitFor(() => {
+      expect(result.current.focusedIndex).toBe(-1)
+    })
   })
 
   // ─── AUTOFOCUS ───────────────────────────────────────────────────────
@@ -340,7 +345,7 @@ describe('useKeyboardNavigation', () => {
       useKeyboardNavigation({ items, autoFocus: true })
     )
 
-    // ⚠️ L'auto-focus passe par useEffect → attendre le commit
+    // Auto-focus goes through useEffect → wait for the commit
     await waitFor(() => {
       expect(result.current.focusedIndex).toBe(0)
     })
