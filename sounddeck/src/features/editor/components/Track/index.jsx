@@ -1,9 +1,62 @@
-// src/features/editor/components/Track/index.jsx
-import React, { useMemo } from 'react'
-import EditorClip from '../Clip'
-import { TRACK_COLORS, getTrackColor } from '../../utils/trackColors'
+/**
+ * @file Track row in the timeline — renders one header (color bar, name,
+ * controls) and one `<EditorClip>` per clip on the track.
+ *
+ * Drag, resize, fade, loop, and action handlers are all delegated to the
+ * clip children; this component only wires `handlers` (via `useMemo` so
+ * `EditorClip` re-renders don't recreate the callbacks) and `ui` (per-clip
+ * waveform + track color).
+ *
+ * @see ./TrackHeader.jsx
+ * @see ./TrackControls.jsx
+ * @see ../Clip/index.jsx
+ * @see ../../utils/trackColors.js
+ */
 
-const EditorTrack = ({
+import { useMemo } from 'react'
+import EditorClip from '../Clip'
+import { getTrackColor } from '../../utils/trackColors'
+
+/** Default clip duration (seconds) when neither `clipDurations` nor
+ *  `clip.duration` is available. */
+const DEFAULT_CLIP_DURATION = 3
+
+/**
+ * One timeline track row.
+ *
+ * @param {Object} props
+ * @param {{id: string, name?: string, clips: Array<Object>}} props.track
+ * @param {number} props.trackIndex - Fallback color index.
+ * @param {number} props.totalDuration - Total timeline duration (seconds).
+ * @param {number} props.pixelsPerSecond - Horizontal scale (px / s).
+ * @param {string|null} props.selectedClipId
+ * @param {string|null} props.selectedTrackId
+ * @param {Function} [props.onClipSelect]
+ * @param {Function} [props.onClipMove]
+ * @param {Function} [props.onClipUpdate]
+ * @param {Function} [props.onClipRemove]
+ * @param {Function} [props.onClipDuplicate]
+ * @param {Function} [props.onClipFade]
+ * @param {Function} [props.onClipContextMenu]
+ * @param {Function} [props.onDragCheckpoint]
+ * @param {Object} [props.waveformData] - `{ [clipId]: number[] }`.
+ * @param {boolean} props.isPlaying
+ * @param {number} props.currentTime
+ * @param {Object} [props.clipDurations] - `{ [clipId]: number }`.
+ * @param {Function} [props.onUpdateClipDuration]
+ * @param {string} [props.trackColor] - Overrides the fallback color.
+ * @param {boolean} props.snapEnabled
+ * @param {Object} [props.snapContext]
+ * @param {(key: string, params?: Object) => string} props.tr
+ * @param {Function} [props.onPlayClip]
+ * @param {Function} [props.onStopClip]
+ * @param {Function} [props.onCopyClip]
+ * @param {Function} [props.onCutClip]
+ * @param {Function} [props.onPasteClip]
+ * @param {Object} [props.loopState]
+ * @returns {JSX.Element}
+ */
+export default function EditorTrack({
   track,
   trackIndex,
   totalDuration,
@@ -33,7 +86,7 @@ const EditorTrack = ({
   onCutClip,
   onPasteClip,
   loopState = {},
-}) => {
+}) {
   const color = useMemo(
     () => trackColor || getTrackColor(trackIndex),
     [trackColor, trackIndex]
@@ -96,7 +149,8 @@ const EditorTrack = ({
       }}
     >
       {track.clips?.map((clip) => {
-        const duration = clipDurations?.[clip.id] || clip.duration || 3
+        const duration =
+          clipDurations?.[clip.id] || clip.duration || DEFAULT_CLIP_DURATION
         const clipStart = clip.start || 0
         const isSelected = selectedClipId === clip.id
 
@@ -131,5 +185,3 @@ const EditorTrack = ({
     </div>
   )
 }
-
-export default EditorTrack

@@ -17,13 +17,21 @@ const makeTrack = (overrides = {}) => ({
   ...overrides,
 })
 
-const tr = (k) => {
+const tr = (k, params) => {
   const FR = {
     editorDoubleClickToRename: 'Double-cliquer pour renommer',
     confirmDeleteTrack: 'Confirmer la suppression de la piste',
     confirmDeleteTrackMessage: 'Voulez-vous vraiment supprimer cette piste ?',
+    editorTrackFallback: 'Piste {n}',
   }
-  return FR[k] || k
+  let value = FR[k]
+  if (!value) return k
+  if (typeof params === 'object' && params !== null) {
+    return value.replace(/\{(\w+)\}/g, (m, key) =>
+      params[key] != null ? String(params[key]) : m
+    )
+  }
+  return value
 }
 
 const defaultProps = (overrides = {}) => ({

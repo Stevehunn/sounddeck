@@ -1,7 +1,51 @@
-// src/features/editor/components/Toolbar/ProjectControls.jsx
-import React, { useState } from 'react'
+/**
+ * @file Project save / load / export / import controls + manager modal.
+ *
+ * Renders four buttons:
+ * 1. **Projects** — opens `<ProjectManagerModal>`.
+ * 2. **Save** — calls `onSaveProject`.
+ * 3. **Package dropdown** — Export to `.sounddeck` file / Import from
+ *    `.sounddeck` or `.json` file.
+ *
+ * Export/import use `window.electronAPI.saveFileDialog` /
+ * `openFileDialog`, then delegate to `onExportProject(path)` /
+ * `onImportProject(path)`. All errors are logged (EN) and swallowed so
+ * the UI never crashes on IPC failure.
+ *
+ * @see ./index.jsx
+ * @see ../Modals/ProjectManagerModal.jsx
+ */
+
+import { useState } from 'react'
 import ProjectManagerModal from '../Modals/ProjectManagerModal'
 
+/** Extension used for project archives. */
+const PROJECT_EXTENSION = '.sounddeck'
+
+/** Allowed import extensions. */
+const IMPORT_EXTENSIONS = ['.sounddeck', '.json']
+
+/**
+ * Project save / load / export / import controls.
+ *
+ * @param {Object} props
+ * @param {Object} [props.project] - Current project (`{ id, name }`).
+ * @param {Array} [props.projectList]
+ * @param {Array} [props.recentProjects]
+ * @param {boolean} [props.isSaving]
+ * @param {boolean} [props.isLoading]
+ * @param {Function} [props.onSaveProject]
+ * @param {Function} [props.onLoadProject]
+ * @param {Function} [props.onCreateProject]
+ * @param {Function} [props.onDeleteProject]
+ * @param {Function} [props.onDuplicateProject]
+ * @param {Function} [props.onRenameProject]
+ * @param {Function} [props.onLoadProjectList]
+ * @param {(project: Object, path: string) => Promise<void>} [props.onExportProject]
+ * @param {(path: string) => Promise<void>} [props.onImportProject]
+ * @param {(key: string) => string} props.tr - i18n translator.
+ * @returns {JSX.Element}
+ */
 export default function ProjectControls({
   project,
   projectList,
@@ -17,43 +61,54 @@ export default function ProjectControls({
   onLoadProjectList,
   onExportProject,
   onImportProject,
-  tr
+  tr,
 }) {
   const [showProjectManager, setShowProjectManager] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
 
+  /**
+   * Opens the native "Save file" dialog, then exports the current project.
+   * @returns {Promise<void>}
+   */
   const handleExport = async () => {
     setIsExporting(true)
     try {
-      const result = await window.electronAPI.saveFileDialog?.(
-        `${project?.name || 'projet'}.sounddeck`,
-        null
-      )
+      const fallbackName = tr('projectFallbackName') || 'project'
+      const defaultName = `${project?.name || fallbackName}${PROJECT_EXTENSION}`
+      const result = await window.electronAPI.saveFileDialog?.(defaultName, null)
       if (result?.success && result?.path) {
         await onExportProject?.(project, result.path)
       }
     } catch (e) {
-      console.error('Erreur export:', e)
+      console.error('[ProjectControls] export failed:', e)
     } finally {
       setIsExporting(false)
       setShowExportMenu(false)
     }
   }
 
+  /**
+   * Opens the native "Open file" dialog, validates the extension, then
+   * imports the selected project.
+   * @returns {Promise<void>}
+   */
   const handleImport = async () => {
     setIsImporting(true)
     try {
       const result = await window.electronAPI.openFileDialog?.()
       if (result && result.length > 0) {
         const filePath = result[0]
-        if (filePath.endsWith('.sounddeck') || filePath.endsWith('.json')) {
+        const ext = IMPORT_EXTENSIONS.find((e) =>
+          filePath.toLowerCase().endsWith(e)
+        )
+        if (ext) {
           await onImportProject?.(filePath)
         }
       }
     } catch (e) {
-      console.error('Erreur import:', e)
+      console.error('[ProjectControls] import failed:', e)
     } finally {
       setIsImporting(false)
     }
@@ -61,11 +116,13 @@ export default function ProjectControls({
 
   return (
     <>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 4
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+        }}
+      >
         <button
           className="btn-secondary btn-sm"
           onClick={() => {
@@ -77,12 +134,12 @@ export default function ProjectControls({
             padding: '4px 10px',
             display: 'flex',
             alignItems: 'center',
-            gap: 4
+            gap: 4,
           }}
-          title={tr('projectManager') || 'Gérer les projets'}
+          title={tr('projectManager') || 'Manage projects'}
         >
           <i className="ti ti-folder" />
-          <span>{tr('projects') || 'Projets'}</span>
+          <span>{tr('projects') || 'Projects'}</span>
         </button>
 
         <button
@@ -95,16 +152,23 @@ export default function ProjectControls({
             display: 'flex',
             alignItems: 'center',
             gap: 4,
-            opacity: isSaving ? 0.6 : 1
+            opacity: isSaving ? 0.6 : 1,
           }}
-          title={tr('saveProject') || 'Sauvegarder le projet (Ctrl+S)'}
+          title={tr('saveProject') || 'Save project (Ctrl+S)'}
         >
           {isSaving ? (
-            <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
+            <i
+              className="ti ti-loader"
+              style={{ animation: 'spin 1s linear infinite' }}
+            />
           ) : (
             <i className="ti ti-device-floppy" />
           )}
-          <span>{isSaving ? (tr('saving') || 'Sauvegarde...') : (tr('save') || 'Sauvegarder')}</span>
+          <span>
+            {isSaving
+              ? tr('saving') || 'Saving…'
+              : tr('save') || 'Save'}
+          </span>
         </button>
 
         <div style={{ position: 'relative' }}>
@@ -116,27 +180,37 @@ export default function ProjectControls({
               padding: '4px 8px',
               display: 'flex',
               alignItems: 'center',
-              gap: 4
+              gap: 4,
             }}
+            title={
+              tr('projectExportImport') || 'Export / Import project'
+            }
           >
             <i className="ti ti-package" />
-            <i className={`ti ${showExportMenu ? 'ti-chevron-up' : 'ti-chevron-down'}`} style={{ fontSize: 10 }} />
+            <i
+              className={`ti ${
+                showExportMenu ? 'ti-chevron-up' : 'ti-chevron-down'
+              }`}
+              style={{ fontSize: 10 }}
+            />
           </button>
 
           {showExportMenu && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              right: 0,
-              marginTop: 4,
-              background: 'var(--bg-secondary)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-md)',
-              padding: '4px',
-              zIndex: 20,
-              minWidth: 180,
-              boxShadow: 'var(--shadow-lg)'
-            }}>
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: 4,
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                padding: '4px',
+                zIndex: 20,
+                minWidth: 180,
+                boxShadow: 'var(--shadow-lg)',
+              }}
+            >
               <button
                 className="btn-ghost btn-sm"
                 onClick={handleExport}
@@ -148,14 +222,20 @@ export default function ProjectControls({
                   fontSize: 12,
                   gap: 8,
                   alignItems: 'center',
-                  justifyContent: 'flex-start'
+                  justifyContent: 'flex-start',
                 }}
               >
                 <i className="ti ti-file-export" />
                 {isExporting ? (
-                  <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('exporting') || 'Export...'}</>
+                  <>
+                    <i
+                      className="ti ti-loader"
+                      style={{ animation: 'spin 1s linear infinite' }}
+                    />{' '}
+                    {tr('exporting') || 'Exporting…'}
+                  </>
                 ) : (
-                  tr('exportProject') || '📤 Exporter le projet'
+                  tr('exportProject') || '📤 Export project'
                 )}
               </button>
               <button
@@ -169,14 +249,20 @@ export default function ProjectControls({
                   fontSize: 12,
                   gap: 8,
                   alignItems: 'center',
-                  justifyContent: 'flex-start'
+                  justifyContent: 'flex-start',
                 }}
               >
                 <i className="ti ti-file-import" />
                 {isImporting ? (
-                  <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {tr('importing') || 'Import...'}</>
+                  <>
+                    <i
+                      className="ti ti-loader"
+                      style={{ animation: 'spin 1s linear infinite' }}
+                    />{' '}
+                    {tr('importing') || 'Importing…'}
+                  </>
                 ) : (
-                  tr('importProject') || '📥 Importer un projet'
+                  tr('importProject') || '📥 Import project'
                 )}
               </button>
             </div>

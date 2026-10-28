@@ -1,4 +1,27 @@
-// src/features/editor/contexts/EditorContext.jsx
+/**
+ * @file Editor context provider + consumer hook.
+ *
+ * Wraps the editor's domain hooks (`useEditorCore`, `useEditorAudioPlayback`,
+ * `useEditorTracks`, `useEditorClips`, `useEditorEffects`, `useEditorLoops`,
+ * `useEditorOverlay`, `useEditorMarkers`) into a single context value
+ * consumed by the entire editor UI tree.
+ *
+ * **Fast Refresh note**: `useEditor` is a hook, not a component. React
+ * Fast Refresh would force a full reload when editing this file — which
+ * is safe here (no local state to lose). The `eslint-disable` below is
+ * intentional and matches the exact same pattern used by
+ * `LanguageContext.jsx` for `useLanguage`.
+ *
+ * @see ./hooks/useEditorCore.js
+ * @see ./hooks/useEditorAudioPlayback.js
+ * @see ./hooks/useEditorTracks.js
+ * @see ./hooks/useEditorClips.js
+ * @see ./hooks/useEditorEffects.js
+ * @see ./hooks/useEditorLoops.js
+ * @see ./hooks/useEditorOverlay.js
+ * @see ./hooks/useEditorMarkers.js
+ */
+
 import React, { createContext, useContext } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
@@ -13,6 +36,20 @@ import { useEditorMarkers } from './hooks/useEditorMarkers'
 
 const EditorContext = createContext(null)
 
+/**
+ * Editor context provider.
+ *
+ * Aggregates every editor domain hook into a single context value, so
+ * that consumers can `useEditor()` instead of importing each hook
+ * separately.
+ *
+ * @param {Object} props
+ * @param {React.ReactNode} props.children
+ * @param {Object} props.store - App store (sounds, profiles, settings).
+ * @param {(msg: string, type?: string) => void} props.addToast
+ * @param {(options: Object) => Promise<boolean>} props.confirm - `useConfirm` handler.
+ * @returns {JSX.Element}
+ */
 export function EditorProvider({ children, store, addToast, confirm }) {
   const { t } = useLanguage()
 
@@ -25,17 +62,22 @@ export function EditorProvider({ children, store, addToast, confirm }) {
   const overlay = useEditorOverlay(core, loops, clips)
   const markers = useEditorMarkers(core, audioPlayback)
 
+  /**
+   * Zoom setter with clamping (0.05x → 10x).
+   * @param {number} newZoom
+   * @returns {void}
+   */
   const handleZoomChange = (newZoom) => {
     core.setZoomLevel(Math.max(0.05, Math.min(10, newZoom)))
   }
 
   const value = {
-    // ─── ÉTAT ──────────────────────────────────────────────────────────
+    // ─── STATE ─────────────────────────────────────────────────────────
     project: core.project,
     setProject: core.setProject,
     tracks: core.project?.tracks || [],
 
-    // ─── SÉLECTION ─────────────────────────────────────────────────────
+    // ─── SELECTION ─────────────────────────────────────────────────────
     selectedClipId: core.selectedClipId,
     setSelectedClipId: core.setSelectedClipId,
     selectedTrackId: core.selectedTrackId,
@@ -78,7 +120,7 @@ export function EditorProvider({ children, store, addToast, confirm }) {
     autoCrossfade: core.autoCrossfade,
     setAutoCrossfade: core.setAutoCrossfade,
 
-    // ─── DURÉES / WAVEFORMS ────────────────────────────────────────────
+    // ─── DURATIONS / WAVEFORMS ─────────────────────────────────────────
     clipDurations: core.clipDurations,
     setClipDurations: core.setClipDurations,
     waveformData: core.waveformData,
@@ -86,7 +128,7 @@ export function EditorProvider({ children, store, addToast, confirm }) {
     isDurationsLoaded: core.isDurationsLoaded,
     totalDuration: core.totalDuration,
 
-    // ─── ÉTAT SYSTÈME ──────────────────────────────────────────────────
+    // ─── SYSTEM STATE ──────────────────────────────────────────────────
     isInitialized: core.isInitialized,
     isLoading: core.isLoading,
     isDirty: core.isDirty,
@@ -99,7 +141,7 @@ export function EditorProvider({ children, store, addToast, confirm }) {
     redoEditor: core.redoEditor,
     pushEditorHistoryCheckpoint: core.pushEditorHistoryCheckpoint,
 
-    // ─── PROJET ────────────────────────────────────────────────────────
+    // ─── PROJECT ───────────────────────────────────────────────────────
     updateEditorProjectName: core.updateEditorProjectName,
     reorderTracks: core.reorderTracks,
     loadProject: core.loadProject,
@@ -126,14 +168,14 @@ export function EditorProvider({ children, store, addToast, confirm }) {
     selectClip: clips.selectClip,
     deselectClip: clips.deselectClip,
 
-    // ─── EFFETS ────────────────────────────────────────────────────────
+    // ─── EFFECTS ───────────────────────────────────────────────────────
     addEffectToClip: effects.addEffectToClip,
     removeEffectFromClip: effects.removeEffectFromClip,
     updateEffectParam: effects.updateEffectParam,
     toggleEffect: effects.toggleEffect,
     setClipFade: effects.setClipFade,
 
-    // ─── BOUCLES ───────────────────────────────────────────────────────
+    // ─── LOOPS ─────────────────────────────────────────────────────────
     loopState: core.loopState,
     setLoopState: core.setLoopState,
     toggleClipLoop: loops.toggleClipLoop,
@@ -145,7 +187,7 @@ export function EditorProvider({ children, store, addToast, confirm }) {
     toggleLoop: loops.toggleLoop,
     clearLoop: loops.clearLoop,
 
-    // ─── OVERLAY (mode clic) ───────────────────────────────────────────
+    // ─── OVERLAY (click-mode) ──────────────────────────────────────────
     actionOverlay: core.actionOverlay,
     isActionOverlayActive: core.actionOverlay.type !== null,
     cancelActionOverlay: overlay.cancelActionOverlay,
@@ -163,7 +205,7 @@ export function EditorProvider({ children, store, addToast, confirm }) {
     updateMarker: markers.updateMarker,
     navigateToMarker: markers.navigateToMarker,
 
-    // ─── DIVERS ────────────────────────────────────────────────────────
+    // ─── MISC ──────────────────────────────────────────────────────────
     store: core.storeRef.current,
     addToast,
     t,
@@ -176,6 +218,13 @@ export function EditorProvider({ children, store, addToast, confirm }) {
   )
 }
 
+/**
+ * Reads the editor context from the nearest `EditorProvider`.
+ *
+ * @throws {Error} If called outside an `EditorProvider`.
+ * @returns {Object}
+ */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useEditor() {
   const context = useContext(EditorContext)
   if (!context) {

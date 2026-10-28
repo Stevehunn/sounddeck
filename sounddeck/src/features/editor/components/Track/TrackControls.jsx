@@ -1,21 +1,47 @@
-// src/features/editor/components/Track/TrackControls.jsx
-import React, { memo } from 'react'
+/**
+ * @file Per-track mute / solo / volume controls.
+ *
+ * Renders three elements in a row:
+ * - **Mute** — toggles `track.muted`, dims the icon when active.
+ * - **Solo** — toggles `track.solo`, green when active.
+ * - **Volume** — 0-200% range slider (values are divided by 100 to
+ *   produce a 0-2 gain for the audio graph).
+ *
+ * @see ./index.jsx
+ * @see ./TrackHeader.jsx
+ */
 
-const TrackControls = memo(({
+import { memo } from 'react'
+
+/**
+ * Track mute / solo / volume controls.
+ *
+ * @param {Object} props
+ * @param {{id: string, muted?: boolean, solo?: boolean, volume?: number}} props.track
+ * @param {string} props.trackColor - Slider accent color.
+ * @param {(trackId: string, muted: boolean) => void} [props.onTrackMute]
+ * @param {(trackId: string, solo: boolean) => void} [props.onTrackSolo]
+ * @param {(trackId: string, volume: number) => void} [props.onTrackVolume]
+ * @param {(key: string) => string} props.tr
+ * @returns {JSX.Element}
+ */
+const TrackControls = memo(function TrackControls({
   track,
   trackColor,
   onTrackMute,
   onTrackSolo,
   onTrackVolume,
-  tr
-}) => {
+  tr,
+}) {
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 2,
-      flexShrink: 0
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2,
+        flexShrink: 0,
+      }}
+    >
       <button
         className="btn-ghost btn-sm"
         onClick={() => onTrackMute?.(track.id, !track.muted)}
@@ -32,7 +58,7 @@ const TrackControls = memo(({
           background: track.muted ? 'rgba(224, 82, 82, 0.1)' : 'transparent',
           border: 'none',
           cursor: 'pointer',
-          transition: 'all 0.2s ease'
+          transition: 'all 0.2s ease',
         }}
         onMouseEnter={(e) => {
           if (!track.muted) {
@@ -46,11 +72,11 @@ const TrackControls = memo(({
             e.currentTarget.style.background = 'transparent'
           }
         }}
-        title={tr('editorMute')}
+        title={tr?.('editorMute')}
       >
         <i className={`ti ${track.muted ? 'ti-volume-3' : 'ti-volume'}`} />
       </button>
-      
+
       <button
         className="btn-ghost btn-sm"
         onClick={() => onTrackSolo?.(track.id, !track.solo)}
@@ -67,7 +93,7 @@ const TrackControls = memo(({
           background: track.solo ? 'rgba(29, 158, 117, 0.1)' : 'transparent',
           border: 'none',
           cursor: 'pointer',
-          transition: 'all 0.2s ease'
+          transition: 'all 0.2s ease',
         }}
         onMouseEnter={(e) => {
           if (!track.solo) {
@@ -81,30 +107,34 @@ const TrackControls = memo(({
             e.currentTarget.style.background = 'transparent'
           }
         }}
-        title={tr('editorSolo')}
+        title={tr?.('editorSolo')}
       >
         <i className="ti ti-headphones" />
       </button>
 
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        width: 40
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          width: 40,
+        }}
+      >
         <input
           type="range"
           min="0"
           max="200"
           value={track.volume !== undefined ? track.volume * 100 : 100}
-          onChange={(e) => onTrackVolume?.(track.id, parseFloat(e.target.value) / 100)}
+          onChange={(e) =>
+            onTrackVolume?.(track.id, parseFloat(e.target.value) / 100)
+          }
           style={{
             width: '100%',
             height: 3,
             accentColor: trackColor,
             cursor: 'pointer',
-            background: 'transparent'
+            background: 'transparent',
           }}
-          title={tr('editorTrackVolume') || 'Volume de la piste'}
+          title={tr?.('editorTrackVolume') || 'Track volume'}
         />
       </div>
     </div>

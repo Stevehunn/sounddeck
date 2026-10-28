@@ -1,5 +1,26 @@
-// src/features/editor/components/Timeline/index.jsx
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+/**
+ * @file Timeline — orchestrates the ruler, loop strip, tracks, clips,
+ * markers panel, and zoom controls. Owns the horizontal scroll sync
+ * (`useTimelineScroll`), the ruler/timeline click handlers
+ * (`useTimelineClickHandlers`), the clip index for O(1) loop lookups
+ * (`useClipIndex`), and the snap context shared by every clip.
+ *
+ * Layout (top → bottom):
+ * 1. **Ruler** — `TimelineRuler` + `TimelinePlayhead` + markers.
+ * 2. **Loop strip** — `TimelineLoop` (global timeline loop).
+ * 3. **Tracks** — one `<EditorTrack>` per track, with a matching
+ *    `<TrackHeader>` + `<TrackControls>` on the left.
+ * 4. **Markers panel** — toggled, persisted in `appStorage`.
+ * 5. **Zoom controls** — sticky at the bottom.
+ *
+ * @see ./useTimelineScroll.js
+ * @see ./useTimelineClickHandlers.js
+ * @see ./useClipIndex.js
+ * @see ../Track/index.jsx
+ * @see ../Clip/index.jsx
+ */
+
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useEditor } from '../../contexts/EditorContext'
 import EditorTrack from '../Track'
 import TrackHeader from '../Track/TrackHeader'
@@ -18,11 +39,88 @@ import { getTrackColor } from '../../utils/trackColors'
 import { formatTime } from '@shared/utils/format'
 import { getBoolean, setItem } from '@shared/utils/appStorage'
 
+/** Width of the left column (track headers). */
 const TRACK_HEAD_WIDTH = 200
+
+/** Base horizontal scale (px / s) at zoomLevel = 1. */
 const BASE_PIXELS_PER_SECOND = 80
+
+/** Storage keys for the markers panel state. */
 const STORAGE_KEY = 'sounddeck_markers_panel_open'
 const AUTO_OPEN_KEY = 'sounddeck_markers_auto_open'
 
+/** Min timeline width (px) — prevents the ruler from collapsing when the
+ *  project is empty. */
+const MIN_TIMELINE_WIDTH = 600
+
+/** Track row height (px). */
+const TRACK_HEIGHT_PX = 96
+
+/**
+ * Timeline root component (see file header).
+ *
+ * @param {Object} props
+ * @param {Array} props.tracks
+ * @param {string|null} props.selectedClipId
+ * @param {string|null} props.selectedTrackId
+ * @param {number} props.totalDuration
+ * @param {number} props.currentTime
+ * @param {boolean} props.isPlaying
+ * @param {Object} [props.clipDurations]
+ * @param {Object} [props.waveformData]
+ * @param {number} props.zoomLevel
+ * @param {boolean} props.snapEnabled
+ * @param {Object} [props.loopRegion]
+ * @param {boolean} [props.autoCrossfade]
+ * @param {Function} [props.onClipSelect]
+ * @param {Function} [props.onClipMove]
+ * @param {Function} [props.onClipUpdate]
+ * @param {Function} [props.onClipRemove]
+ * @param {Function} [props.onClipDuplicate]
+ * @param {Function} [props.onClipFade]
+ * @param {Function} [props.onClipContextMenu]
+ * @param {Function} [props.onDragCheckpoint]
+ * @param {Function} [props.onTrackRemove]
+ * @param {Function} [props.onSeek]
+ * @param {Function} [props.onTrackMute]
+ * @param {Function} [props.onTrackSolo]
+ * @param {Function} [props.onTrackVolume]
+ * @param {Function} [props.onTrackReorder]
+ * @param {Function} [props.onRenameTrack]
+ * @param {Function} [props.onSetLoopRegion]
+ * @param {Function} [props.onClearLoop]
+ * @param {Function} [props.onToggleLoop]
+ * @param {Function} [props.onUpdateClipDuration]
+ * @param {Function} [props.onZoomChange]
+ * @param {Function} [props.onSplitClip]
+ * @param {Function} [props.addToast]
+ * @param {Object} [props.store]
+ * @param {Function} [props.setClipDurations]
+ * @param {Function} [props.removeTrack]
+ * @param {(key: string, params?: Object) => string} props.tr
+ * @param {Function} [props.onPlayClip]
+ * @param {Function} [props.onStopClip]
+ * @param {Function} [props.onCopyClip]
+ * @param {Function} [props.onCutClip]
+ * @param {Function} [props.onPasteClip]
+ * @param {Array} [props.markers]
+ * @param {Function} [props.onAddMarker]
+ * @param {Function} [props.onRemoveMarker]
+ * @param {Function} [props.onUpdateMarker]
+ * @param {Function} [props.onNavigateToMarker]
+ * @param {Object} [props.loopState]
+ * @param {boolean} [props.isPendingAction]
+ * @param {Object} [props.pendingAction]
+ * @param {Function} [props.onExecutePendingAction]
+ * @param {Function} [props.onCancelPendingAction]
+ * @param {Function} [props.onToggleTimelineLoop]
+ * @param {Function} [props.onSetTimelineLoop]
+ * @param {Function} [props.onOpenLoopPanel]
+ * @param {Function} [props.onActivateTimelineLoopManualClick]
+ * @param {boolean} [props.isTimelineClickModeActive]
+ * @param {Function} [props.onTimelineClickForLoop]
+ * @returns {JSX.Element}
+ */
 export default function EditorTimeline({
   tracks,
   selectedClipId,
@@ -49,7 +147,7 @@ export default function EditorTimeline({
   onTrackMute,
   onTrackSolo,
   onTrackVolume,
-  onTrackReorder,
+  onTrackReorder: _onTrackReorder,
   onRenameTrack,
   onSetLoopRegion,
   onClearLoop,
@@ -59,8 +157,8 @@ export default function EditorTimeline({
   onSplitClip,
   addToast,
   store: storeProp,
-  setClipDurations,
-  removeTrack,
+  setClipDurations: _setClipDurations,
+  removeTrack: _removeTrack,
   tr,
   onPlayClip,
   onStopClip,
@@ -74,7 +172,7 @@ export default function EditorTimeline({
   onNavigateToMarker,
   loopState = {},
   isPendingAction = false,
-  pendingAction = null,
+  pendingAction: _pendingAction,
   onExecutePendingAction,
   onCancelPendingAction,
   onToggleTimelineLoop,
@@ -93,16 +191,20 @@ export default function EditorTimeline({
   const [isInitialized, setIsInitialized] = useState(false)
   const hasInitializedRef = useRef(false)
 
-  // Scroll sync (ruler + loop)
+  // Horizontal scroll sync (ruler + loop strip follow the clips container).
   const scroll = useTimelineScroll()
 
-  // Index clips (O(1) lookup pour loop markers)
+  // O(1) clip index for loop markers.
   const clipIndex = useClipIndex(tracks, clipDurations)
 
   const pixelsPerSecond = BASE_PIXELS_PER_SECOND * zoomLevel
-  const totalWidth = Math.max(totalDuration * pixelsPerSecond + 100, 600)
+  const totalWidth = Math.max(
+    totalDuration * pixelsPerSecond + 100,
+    MIN_TIMELINE_WIDTH
+  )
 
-  // Contexte de snap partagé par tous les clips (bords clips, marqueurs, playhead, timeline)
+  // Snap context shared by all clips (other clip edges, markers, playhead,
+  // and the timeline end).
   const snapContext = useMemo(() => {
     const allClips = []
     for (const track of tracks || []) {
@@ -122,38 +224,34 @@ export default function EditorTimeline({
     }
   }, [tracks, clipDurations, markers, currentTime, totalDuration])
 
-  // Click handlers (ruler + timeline)
-  const {
-    handleTimelineClick,
-    handleRulerClick,
-    handleRulerDoubleClick,
-  } = useTimelineClickHandlers({
-    clipsContainerRef: scroll.clipsContainerRef,
-    rulerContainerRef: scroll.rulerContainerRef,
-    pixelsPerSecond,
-    totalWidth,
-    totalDuration,
-    isPendingAction,
-    isTimelineClickModeActive,
-    onTimelineClickForLoop,
-    onExecutePendingAction,
-    onCancelPendingAction,
-    onSeek,
-    selectedClipId,
-    selectedTrackId,
-    tracks,
-    clipDurations,
-    onSplitClip,
-    addToast,
-    tr,
-  })
+  const { handleTimelineClick, handleRulerClick, handleRulerDoubleClick } =
+    useTimelineClickHandlers({
+      clipsContainerRef: scroll.clipsContainerRef,
+      rulerContainerRef: scroll.rulerContainerRef,
+      pixelsPerSecond,
+      totalWidth,
+      totalDuration,
+      isPendingAction,
+      isTimelineClickModeActive,
+      onTimelineClickForLoop,
+      onExecutePendingAction,
+      onCancelPendingAction,
+      onSeek,
+      selectedClipId,
+      selectedTrackId,
+      tracks,
+      clipDurations,
+      onSplitClip,
+      addToast,
+      tr,
+    })
 
-  // ─── Init markers panel ────────────────────────────────────────────
+  // Initialize the markers panel from `appStorage` (once).
   useEffect(() => {
     if (hasInitializedRef.current) return
     hasInitializedRef.current = true
 
-    ;(async () => {
+    const init = async () => {
       try {
         const autoOpen = await getBoolean(AUTO_OPEN_KEY, false)
         if (!autoOpen) {
@@ -165,17 +263,20 @@ export default function EditorTimeline({
         await setItem(STORAGE_KEY, true)
         setIsInitialized(true)
       } catch (e) {
-        console.warn('[Timeline] Erreur init markers panel:', e)
+        console.warn('[Timeline] Error initializing markers panel:', e)
         setIsInitialized(true)
       }
-    })()
+    }
+    init()
   }, [])
 
   const handleToggleMarkersPanel = useCallback(async (show) => {
     setShowMarkersPanel(show)
     try {
       await setItem(STORAGE_KEY, show)
-    } catch (e) {}
+    } catch {
+      // ignore — persistence is best-effort
+    }
   }, [])
 
   const handleAutoOpenChange = useCallback(async (autoOpen) => {
@@ -188,10 +289,12 @@ export default function EditorTimeline({
         setShowMarkersPanel(false)
         await setItem(STORAGE_KEY, false)
       }
-    } catch (e) {}
+    } catch {
+      // ignore
+    }
   }, [])
 
-  // ─── Wheel zoom sur la zone clips ──────────────────────────────────
+  // Ctrl/Cmd + wheel → zoom. Plain wheel → horizontal scroll.
   useEffect(() => {
     const el = scroll.clipsContainerRef.current
     if (!el) return
@@ -214,7 +317,6 @@ export default function EditorTimeline({
 
   const shouldShowPanel = isInitialized && showMarkersPanel && onAddMarker
 
-  // ─── RENDER ────────────────────────────────────────────────────────
   return (
     <div
       ref={containerRef}
@@ -228,7 +330,7 @@ export default function EditorTimeline({
         position: 'relative',
       }}
     >
-      {/* ─── Ruler ────────────────────────────────────────────────── */}
+      {/* ─── Ruler ─────────────────────────────────────────────────── */}
       <div
         style={{
           display: 'flex',
@@ -288,7 +390,7 @@ export default function EditorTimeline({
               }}
             >
               <i className="ti ti-click" />
-              <span>{tr('clickHere') || '🖱️ Cliquez ici'}</span>
+              <span>{tr('clickHere') || '🖱️ Click here'}</span>
             </div>
           )}
 
@@ -337,7 +439,7 @@ export default function EditorTimeline({
         </div>
       </div>
 
-      {/* ─── Loop strip ───────────────────────────────────────────── */}
+      {/* ─── Loop strip ────────────────────────────────────────────── */}
       <div
         style={{
           display: 'flex',
@@ -406,7 +508,7 @@ export default function EditorTimeline({
           position: 'relative',
         }}
       >
-        {/* Track headers */}
+        {/* Left column: track headers + controls */}
         <div
           style={{
             width: TRACK_HEAD_WIDTH,
@@ -445,8 +547,8 @@ export default function EditorTimeline({
               <div
                 key={`header-${track.id}`}
                 style={{
-                  height: 96,
-                  minHeight: 96,
+                  height: TRACK_HEIGHT_PX,
+                  minHeight: TRACK_HEIGHT_PX,
                   display: 'flex',
                   alignItems: 'center',
                   padding: '4px 8px',
@@ -481,7 +583,7 @@ export default function EditorTimeline({
           })}
         </div>
 
-        {/* Clips area */}
+        {/* Right column: clips */}
         <div
           ref={scroll.clipsContainerRef}
           data-testid="editor-timeline"
@@ -499,7 +601,7 @@ export default function EditorTimeline({
           <div
             style={{
               position: 'relative',
-              width: Math.max(totalWidth, 600),
+              width: Math.max(totalWidth, MIN_TIMELINE_WIDTH),
               height: '100%',
             }}
           >
@@ -550,7 +652,7 @@ export default function EditorTimeline({
           </div>
         </div>
 
-        {/* Markers panel (ou bouton flottant) */}
+        {/* Markers panel (or floating "add marker" button) */}
         {isInitialized && (
           <TimelineMarkersPanel
             isOpen={shouldShowPanel}
@@ -569,7 +671,7 @@ export default function EditorTimeline({
         )}
       </div>
 
-      {/* ─── Zoom controls ────────────────────────────────────────── */}
+      {/* ─── Zoom controls ─────────────────────────────────────────── */}
       <div
         data-testid="editor-zoom-controls"
         style={{

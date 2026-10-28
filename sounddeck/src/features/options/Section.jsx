@@ -1,6 +1,26 @@
-// src/features/options/Section.jsx
+/**
+ * @file Always-visible section wrapper (Options page).
+ *
+ * Renders a colored title bar with an icon and its children stacked
+ * vertically. `forwardRef` because `useSectionObserver` needs a DOM ref
+ * to attach the `IntersectionObserver`.
+ *
+ * @see ./Options.jsx
+ * @see ./hooks/useSectionObserver.js
+ */
+
 import { forwardRef } from 'react'
 
+/**
+ * Options section wrapper.
+ *
+ * @type {React.ForwardRefExoticComponent<{
+ *   title: string,
+ *   icon: string,
+ *   children?: React.ReactNode,
+ *   id?: string,
+ * } & React.RefAttributes<HTMLDivElement>>}
+ */
 const Section = forwardRef(({ title, icon, children, id }, ref) => {
   return (
     <div

@@ -1,10 +1,27 @@
-// src/features/emoji/EmojiPage.jsx
-import React, { useState, useMemo, useCallback } from 'react'
+/**
+ * @file "My emojis" page — manages the user's custom emoji collection.
+ *
+ * Two sections:
+ * - **My added emojis** — grouped by original category, with per-emoji
+ *   and per-category removal.
+ * - **Default emojis** — read-only showcase of the built-in catalog.
+ *
+ * Also provides:
+ * - A manual-add input (paste an emoji character).
+ * - A shortcut to the "Discover emojis" plugin page.
+ *
+ * @see @shared/hooks/useEmojis
+ * @see @shared/hooks/useConfirm
+ * @see @core/plugins/PluginContext
+ */
+
+import { useState, useCallback } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { useEmojis } from '@shared/hooks/useEmojis'
 import { usePlugins } from '@core/plugins/PluginContext'
 import useConfirm from '@shared/hooks/useConfirm'
 
+/** i18n key per plugin category ID. */
 const PLUGIN_CATEGORY_LABELS = {
   smileys: 'emojiDiscoverCatSmileys',
   people: 'emojiDiscoverCatPeople',
@@ -17,6 +34,7 @@ const PLUGIN_CATEGORY_LABELS = {
   flags: 'emojiDiscoverCatFlags',
 }
 
+/** Tabler icon per plugin category ID. */
 const PLUGIN_CATEGORY_ICONS = {
   smileys: 'ti-mood-happy',
   people: 'ti-user',
@@ -29,7 +47,14 @@ const PLUGIN_CATEGORY_ICONS = {
   flags: 'ti-flag',
 }
 
-export default function EmojiPage({ store, addToast }) {
+/**
+ * My-emojis page.
+ *
+ * @param {Object} props
+ * @param {(msg: string, type?: string) => void} props.addToast
+ * @returns {JSX.Element}
+ */
+export default function EmojiPage({ addToast }) {
   const { t, currentLang } = useLanguage()
   const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
   const { pluginManager } = usePlugins()
@@ -86,7 +111,7 @@ export default function EmojiPage({ store, addToast }) {
     [t, getCategoryInfo]
   )
 
-  // ─── HANDLERS ─────────────────────────────────────────────────────────
+  // ─── HANDLERS ──────────────────────────────────────────────────────
   const handleRemoveEmoji = useCallback(
     async (emoji) => {
       const confirmed = await confirm({
@@ -177,7 +202,7 @@ export default function EmojiPage({ store, addToast }) {
     }
   }, [pluginManager, confirm, addToast, t])
 
-  // ─── RENDER ───────────────────────────────────────────────────────────
+  // ─── RENDER ────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div
@@ -205,7 +230,7 @@ export default function EmojiPage({ store, addToast }) {
           overflow: 'hidden',
         }}
       >
-        {/* ─── HEADER ────────────────────────────────────────────────── */}
+        {/* ─── HEADER ──────────────────────────────────────────────── */}
         <div
           style={{
             padding: '12px 20px',
@@ -263,7 +288,7 @@ export default function EmojiPage({ store, addToast }) {
           </button>
         </div>
 
-        {/* Input ajout manuel */}
+        {/* Manual add input */}
         {showManualAdd && (
           <div
             style={{
@@ -295,7 +320,7 @@ export default function EmojiPage({ store, addToast }) {
                 flexShrink: 0,
                 overflow: 'hidden',
               }}
-              title={t('emojiPickerAddPreview') || 'Prévisualisation'}
+              title={t('emojiPickerAddPreview')}
             >
               {manualValue.trim() || '❓'}
             </div>
@@ -363,7 +388,7 @@ export default function EmojiPage({ store, addToast }) {
           </div>
         )}
 
-        {/* ─── CONTENU SCROLLABLE ───────────────────────────────────── */}
+        {/* ─── SCROLLABLE CONTENT ─────────────────────────────────── */}
         <div
           style={{
             flex: 1,
@@ -371,7 +396,7 @@ export default function EmojiPage({ store, addToast }) {
             padding: '16px 20px',
           }}
         >
-          {/* ── Section : Mes emojis ajoutés ──────────────────────── */}
+          {/* ── Section: My added emojis ───────────────────────────── */}
           <section
             data-testid="emoji-page-custom-section"
             style={{ marginBottom: 28 }}
@@ -592,7 +617,7 @@ export default function EmojiPage({ store, addToast }) {
             })}
           </section>
 
-          {/* ── Section : Emojis par défaut ───────────────────────── */}
+          {/* ── Section: Default emojis ────────────────────────────── */}
           <section
             data-testid="emoji-page-default-section"
             style={{ marginBottom: 20 }}

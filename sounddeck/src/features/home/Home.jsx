@@ -1,50 +1,85 @@
-// src/features/home/Home.jsx
-import { useState, useEffect, useRef, useCallback } from 'react'
-import ProfileManagerModal from '@shared/components/modals/ProfileManagerModal'
-import { useLanguage } from '@core/i18n/LanguageContext'
-import { useNetwork } from '@shared/contexts'
-import useConfirm from '@shared/hooks/useConfirm'
-import { compressFileIfNeeded } from '@shared/utils/fileCompression'
+/**
+ * @file Home page — "My sounds".
+ *
+ * Displays sounds for the current profile, with:
+ * - a search bar + sort dropdown
+ * - a favorites section (starred sounds)
+ * - a "profile sounds" section
+ * - a "other sounds" section (sounds not in the current profile)
+ * - an import modal (file / manual / URL tabs)
+ * - a profile manager modal
+ *
+ * **Drag & drop reordering** only works when `sortBy === 'custom'` (other
+ * sorts recompute the order from immutable data, so DnD would be a no-op
+ * from the user's perspective).
+ *
+ * **Dynamic column count** based on card size and available width, with a
+ * deferred initial calculation to respect React 19's `set-state-in-effect`
+ * rule (the width isn't known until after the first paint).
+ *
+ * @see ./useHomeImport.js — file import logic
+ * @see ./SoundGrid.jsx — the grid itself
+ * @see ./ImportModal — the import modal
+ * @see @shared/components/modals/ProfileManagerModal.jsx
+ */
 
-import Section from './Section'
-import OutsideCard from './OutsideCard'
-import SoundGrid from './SoundGrid'
-import ImportModal from './ImportModal'
-import { useHomeImport } from './useHomeImport'
+import { useState, useEffect, useRef, useCallback } from "react";
+import ProfileManagerModal from "@shared/components/modals/ProfileManagerModal";
+import { useLanguage } from "@core/i18n/LanguageContext";
+import { useNetwork } from "@shared/contexts";
+import useConfirm from "@shared/hooks/useConfirm";
+import { compressFileIfNeeded } from "@shared/utils/fileCompression";
 
+import Section from "./Section";
+import OutsideCard from "./OutsideCard";
+import SoundGrid from "./SoundGrid";
+import ImportModal from "./ImportModal";
+import { useHomeImport } from "./useHomeImport";
+
+/** Card sizes (matches `SoundGrid`). */
+const CARD_SIZES = { small: 90, medium: 110, large: 140 };
+
+/**
+ * Home page component.
+ *
+ * @param {Object} props
+ * @param {Object} props.store - App store (sounds, profiles, settings).
+ * @param {(msg: string, type?: string) => void} props.addToast
+ * @param {boolean} props.loopEnabled - Global loop flag.
+ * @returns {JSX.Element}
+ */
 export default function Home({ store, addToast, loopEnabled }) {
-  const { t, currentLang } = useLanguage()
-  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
-  const { showNoConnection, ensureOnline } = useNetwork()
-  const playLocally = store.playLocally
+  const { t, currentLang } = useLanguage();
+  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang });
+  const { showNoConnection, ensureOnline } = useNetwork();
+  const playLocally = store.playLocally;
 
-  const [showAll, setShowAll] = useState(false)
-  const [showAllOther, setShowAllOther] = useState(false)
-  const [showImport, setShowImport] = useState(false)
-  const [showProfileManager, setShowProfileManager] = useState(false)
-  const [sortBy, setSortBy] = useState('custom')
-  const [dragOver, setDragOver] = useState(false)
-  const [localSearch, setLocalSearch] = useState('')
-  const [columns, setColumns] = useState(6)
-  const gridRef = useRef(null)
-  const favoritesGridRef = useRef(null)
+  const [showAll, setShowAll] = useState(false);
+  const [showAllOther, setShowAllOther] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [showProfileManager, setShowProfileManager] = useState(false);
+  const [sortBy, setSortBy] = useState("custom");
+  const [dragOver, setDragOver] = useState(false);
+  const [localSearch, setLocalSearch] = useState("");
+  const [columns, setColumns] = useState(6);
+  const gridRef = useRef(null);
+  const favoritesGridRef = useRef(null);
 
-  const searchTerm = localSearch
+  const searchTerm = localSearch;
 
-  const [draggedSoundId, setDraggedSoundId] = useState(null)
-  const [dragOverIndex, setDragOverIndex] = useState(null)
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragSource, setDragSource] = useState(null)
+  const [draggedSoundId, setDraggedSoundId] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [, setDragSource] = useState(null);
 
   const {
     currentSounds,
-    favoriteSounds,
     shortcuts,
     audioDevice,
     volume,
     sounds,
     currentProfileId,
-  } = store
+  } = store;
 
   const {
     isImporting,
@@ -53,267 +88,304 @@ export default function Home({ store, addToast, loopEnabled }) {
     importSuccess,
     importFromPaths,
     importFromDrop,
-  } = useHomeImport({ store, addToast, currentProfileId, t })
+  } = useHomeImport({ store, addToast, currentProfileId, t });
 
-  const soundsOutsideProfile = currentProfileId !== 'all'
-    ? sounds.filter(s => !s.profiles.includes(currentProfileId))
-    : []
+  const soundsOutsideProfile =
+    currentProfileId !== "all"
+      ? sounds.filter((s) => !s.profiles.includes(currentProfileId))
+      : [];
 
   const favoriteSoundsForProfile = currentSounds.filter(
-    s => s.favorites?.includes(currentProfileId) || false
-  )
+    (s) => s.favorites?.includes(currentProfileId) || false,
+  );
 
+  // ─── DRAG-OVER RESET (window-level) ────────────────────────────────
+  // Resets the drop overlay when a drag ends outside the drop zone
+  // (or when the user drags out of the window entirely).
   useEffect(() => {
-    const resetDragOver = () => setDragOver(false)
+    const resetDragOver = () => setDragOver(false);
+    const handleDragLeave = (e) => {
+      if (!e.relatedTarget) resetDragOver();
+    };
 
-    window.addEventListener('dragend', resetDragOver)
-    window.addEventListener('drop', resetDragOver)
-    window.addEventListener('dragleave', (e) => {
-      if (!e.relatedTarget) resetDragOver()
-    })
+    window.addEventListener("dragend", resetDragOver);
+    window.addEventListener("drop", resetDragOver);
+    window.addEventListener("dragleave", handleDragLeave);
 
     return () => {
-      window.removeEventListener('dragend', resetDragOver)
-      window.removeEventListener('drop', resetDragOver)
-    }
-  }, [])
+      window.removeEventListener("dragend", resetDragOver);
+      window.removeEventListener("drop", resetDragOver);
+      window.removeEventListener("dragleave", handleDragLeave);
+    };
+  }, []);
 
+  // ─── DYNAMIC COLUMN COUNT ──────────────────────────────────────────
+  // Deferred initial calculation (React 19 `set-state-in-effect`):
+  // the grid width isn't available until after the first paint.
   useEffect(() => {
     const calculateColumns = () => {
-      if (!gridRef.current) return
-      const containerWidth = gridRef.current.offsetWidth
+      if (!gridRef.current) return;
+      const containerWidth = gridRef.current.offsetWidth;
+      const cardWidth = (CARD_SIZES[store.cardSize || "medium"] || 110) + 10;
+      const nbColumns = Math.max(2, Math.floor(containerWidth / cardWidth));
+      setColumns(nbColumns);
+    };
 
-      const cardSizes = { small: 90, medium: 110, large: 140 }
-      const cardWidth = cardSizes[store.cardSize || 'medium'] + 10
-      const nbColumns = Math.max(2, Math.floor(containerWidth / cardWidth))
-      setColumns(nbColumns)
-    }
+    const timer = setTimeout(calculateColumns, 0);
+    window.addEventListener("resize", calculateColumns);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", calculateColumns);
+    };
+  }, [store.cardSize]);
 
-    calculateColumns()
-    window.addEventListener('resize', calculateColumns)
-    return () => window.removeEventListener('resize', calculateColumns)
-  }, [store.cardSize])
-
+  // ─── SEARCH + SORT ─────────────────────────────────────────────────
   const filtered = searchTerm
-    ? currentSounds.filter(s => {
-        const nameMatch = s.name.toLowerCase().includes(searchTerm.toLowerCase())
-        const tagMatch = (store.tags[s.id] || []).some(t =>
-          t.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-        return nameMatch || tagMatch
+    ? currentSounds.filter((s) => {
+        const nameMatch = s.name
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase());
+        const tagMatch = (store.tags[s.id] || []).some((tag) =>
+          tag.toLowerCase().includes(searchTerm.toLowerCase()),
+        );
+        return nameMatch || tagMatch;
       })
-    : currentSounds
+    : currentSounds;
 
   const sortedFiltered = [...filtered].sort((a, b) => {
-    if (sortBy === 'custom') return 0
-    if (sortBy === 'popular') return (b.playCount || 0) - (a.playCount || 0)
-    if (sortBy === 'recent') return (b.lastPlayed || 0) - (a.lastPlayed || 0)
-    if (sortBy === 'alpha') return a.name.localeCompare(b.name)
-    return (b.createdAt || 0) - (a.createdAt || 0)
-  })
+    if (sortBy === "custom") return 0;
+    if (sortBy === "popular") return (b.playCount || 0) - (a.playCount || 0);
+    if (sortBy === "recent") return (b.lastPlayed || 0) - (a.lastPlayed || 0);
+    if (sortBy === "alpha") return a.name.localeCompare(b.name);
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
 
-  const itemsPerPage = columns * 2
-  const displayed = showAll ? sortedFiltered : sortedFiltered.slice(0, itemsPerPage)
+  const itemsPerPage = columns * 2;
+  const displayed = showAll
+    ? sortedFiltered
+    : sortedFiltered.slice(0, itemsPerPage);
   const displayedOther = showAllOther
     ? soundsOutsideProfile
-    : soundsOutsideProfile.slice(0, itemsPerPage)
+    : soundsOutsideProfile.slice(0, itemsPerPage);
 
-  const findGlobalIndex = (soundId) => {
-    return currentSounds.findIndex(s => s.id === soundId)
-  }
+  const findGlobalIndex = (soundId) =>
+    currentSounds.findIndex((s) => s.id === soundId);
 
-  const getOrderedFavorites = () => {
-    return currentSounds.filter(s => s.favorites?.includes(currentProfileId) || false)
-  }
+  const getOrderedFavorites = () =>
+    currentSounds.filter(
+      (s) => s.favorites?.includes(currentProfileId) || false,
+    );
 
-  // ─── DRAG & DROP (réorganisation) ───────────────────────────────────
+  // ─── DRAG & DROP (reordering) ──────────────────────────────────────
 
   const handleDragStart = (e, soundId, index, source) => {
-    if (sortBy !== 'custom') {
-      addToast(t('dragDropCustomOnly'), 'info')
-      e.preventDefault()
-      return
+    if (sortBy !== "custom") {
+      addToast(t("dragDropCustomOnly"), "info");
+      e.preventDefault();
+      return;
     }
-    setDraggedSoundId(soundId)
-    setDragOverIndex(index)
-    setIsDragging(true)
-    setDragSource(source)
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', `${soundId}|${index}|${source}`)
+    setDraggedSoundId(soundId);
+    setDragOverIndex(index);
+    setIsDragging(true);
+    setDragSource(source);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", `${soundId}|${index}|${source}`);
     setTimeout(() => {
-      if (e.target) e.target.style.opacity = '0.4'
-    }, 0)
-  }
+      if (e.target) e.target.style.opacity = "0.4";
+    }, 0);
+  };
 
   const handleDragEnd = (e) => {
-    if (e.target) e.target.style.opacity = '1'
-    setDraggedSoundId(null)
-    setDragOverIndex(null)
-    setIsDragging(false)
-    setDragSource(null)
-  }
+    if (e.target) e.target.style.opacity = "1";
+    setDraggedSoundId(null);
+    setDragOverIndex(null);
+    setIsDragging(false);
+    setDragSource(null);
+  };
 
   const handleDragOver = (e, index) => {
-    e.preventDefault()
-    if (!isDragging) return
-    setDragOverIndex(index)
-  }
+    e.preventDefault();
+    if (!isDragging) return;
+    setDragOverIndex(index);
+  };
 
   const handleDrop = async (e, dropIndex, targetSource) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!draggedSoundId) return
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggedSoundId) return;
 
-    const data = e.dataTransfer.getData('text/plain')
-    if (!data) return
-    const [sourceId, sourceIndex, sourceType] = data.split('|')
+    const data = e.dataTransfer.getData("text/plain");
+    if (!data) return;
+    const [sourceId, sourceIndex, sourceType] = data.split("|");
 
-    if (sourceId !== draggedSoundId) return
+    if (sourceId !== draggedSoundId) return;
 
-    const startIndex = parseInt(sourceIndex)
-    const endIndex = dropIndex
+    const startIndex = parseInt(sourceIndex);
+    const endIndex = dropIndex;
 
     if (startIndex === endIndex && sourceType === targetSource) {
-      setDraggedSoundId(null)
-      setDragOverIndex(null)
-      setIsDragging(false)
-      setDragSource(null)
-      return
+      setDraggedSoundId(null);
+      setDragOverIndex(null);
+      setIsDragging(false);
+      setDragSource(null);
+      return;
     }
 
-    let globalStartIndex = findGlobalIndex(sourceId)
+    const globalStartIndex = findGlobalIndex(sourceId);
     if (globalStartIndex === -1) {
-      setDraggedSoundId(null)
-      setDragOverIndex(null)
-      setIsDragging(false)
-      setDragSource(null)
-      return
+      setDraggedSoundId(null);
+      setDragOverIndex(null);
+      setIsDragging(false);
+      setDragSource(null);
+      return;
     }
 
-    let globalEndIndex
-    if (targetSource === 'favorites') {
-      const orderedFavorites = getOrderedFavorites()
+    let globalEndIndex;
+    if (targetSource === "favorites") {
+      const orderedFavorites = getOrderedFavorites();
       if (endIndex < orderedFavorites.length) {
-        const targetSoundId = orderedFavorites[endIndex]?.id
+        const targetSoundId = orderedFavorites[endIndex]?.id;
         if (targetSoundId) {
-          globalEndIndex = findGlobalIndex(targetSoundId)
+          globalEndIndex = findGlobalIndex(targetSoundId);
         } else {
-          const lastFavorite = orderedFavorites[orderedFavorites.length - 1]
-          globalEndIndex = lastFavorite ? findGlobalIndex(lastFavorite.id) + 1 : 0
+          const lastFavorite = orderedFavorites[orderedFavorites.length - 1];
+          globalEndIndex = lastFavorite
+            ? findGlobalIndex(lastFavorite.id) + 1
+            : 0;
         }
       } else {
-        const lastFavorite = orderedFavorites[orderedFavorites.length - 1]
-        globalEndIndex = lastFavorite ? findGlobalIndex(lastFavorite.id) + 1 : 0
+        const lastFavorite = orderedFavorites[orderedFavorites.length - 1];
+        globalEndIndex = lastFavorite
+          ? findGlobalIndex(lastFavorite.id) + 1
+          : 0;
       }
     } else {
-      globalEndIndex = endIndex
+      globalEndIndex = endIndex;
     }
 
-    if (globalEndIndex < 0) globalEndIndex = 0
-    if (globalEndIndex > currentSounds.length) globalEndIndex = currentSounds.length
+    if (globalEndIndex < 0) globalEndIndex = 0;
+    if (globalEndIndex > currentSounds.length)
+      globalEndIndex = currentSounds.length;
 
-    const ok = await store.reorderSounds(globalStartIndex, globalEndIndex)
+    const ok = await store.reorderSounds(globalStartIndex, globalEndIndex);
 
-    setDraggedSoundId(null)
-    setDragOverIndex(null)
-    setIsDragging(false)
-    if (ok) addToast(t('soundMoved'), 'success')
-  }
+    setDraggedSoundId(null);
+    setDragOverIndex(null);
+    setIsDragging(false);
+    if (ok) addToast(t("soundMoved"), "success");
+  };
 
   const handleMainDrop = async (e, dropIndex) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!draggedSoundId) return
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggedSoundId) return;
 
-    const data = e.dataTransfer.getData('text/plain')
-    if (!data) return
-    const [sourceId, sourceIndex, sourceType] = data.split('|')
+    const data = e.dataTransfer.getData("text/plain");
+    if (!data) return;
+    const [sourceId, sourceIndex, sourceType] = data.split("|");
 
-    if (sourceId !== draggedSoundId) return
+    if (sourceId !== draggedSoundId) return;
 
-    const startIndex = parseInt(sourceIndex)
-    const endIndex = dropIndex
+    const startIndex = parseInt(sourceIndex);
+    const endIndex = dropIndex;
 
-    if (startIndex === endIndex && sourceType === 'profile') {
-      setDraggedSoundId(null)
-      setDragOverIndex(null)
-      setIsDragging(false)
-      setDragSource(null)
-      return
+    if (startIndex === endIndex && sourceType === "profile") {
+      setDraggedSoundId(null);
+      setDragOverIndex(null);
+      setIsDragging(false);
+      setDragSource(null);
+      return;
     }
 
-    const ok = await store.reorderSounds(startIndex, endIndex)
+    const ok = await store.reorderSounds(startIndex, endIndex);
 
-    setDraggedSoundId(null)
-    setDragOverIndex(null)
-    setIsDragging(false)
-    if (ok) addToast(t('soundMoved'), 'success')
-  }
+    setDraggedSoundId(null);
+    setDragOverIndex(null);
+    setIsDragging(false);
+    if (ok) addToast(t("soundMoved"), "success");
+  };
 
-  // ─── IMPORT ─────────────────────────────────────────────────────────
+  // ─── IMPORT ────────────────────────────────────────────────────────
 
   const handleOpenDialog = async () => {
-    const paths = await window.electronAPI.openFileDialog()
+    const paths = await window.electronAPI.openFileDialog();
     if (paths.length) {
-      await importFromPaths(paths)
-      setShowImport(false)
+      await importFromPaths(paths);
+      setShowImport(false);
     }
-  }
+  };
 
   const handleDropFiles = async (e) => {
-    e.preventDefault()
-    setDragOver(false)
-    setShowImport(false)
+    e.preventDefault();
+    setDragOver(false);
+    setShowImport(false);
 
-    if (draggedSoundId) return
+    if (draggedSoundId) return;
 
-    await importFromDrop(e.dataTransfer)
-  }
+    await importFromDrop(e.dataTransfer);
+  };
 
-  const handleDeleteSound = useCallback(async (soundId) => {
-    const sound = store.sounds.find(s => s.id === soundId)
-    if (!sound) return
+  // ─── DELETE ────────────────────────────────────────────────────────
+  const handleDeleteSound = useCallback(
+    async (soundId) => {
+      const sound = store.sounds.find((s) => s.id === soundId);
+      if (!sound) return;
 
-    const confirmed = await confirm({
-      title: t('confirmDeleteSound') || 'Confirmer la suppression du son',
-      message: t('confirmDeleteSoundMessage', { name: sound.name }) ||
-        `Voulez-vous vraiment supprimer définitivement le son "${sound.name}" ?`,
-      type: 'danger',
-      confirmText: t('menuDelete') || 'Supprimer définitivement',
-      cancelText: t('cancel') || 'Annuler',
-    })
+      const confirmed = await confirm({
+        title: t("confirmDeleteSound"),
+        message: t("confirmDeleteSoundMessage", { name: sound.name }),
+        type: "danger",
+        confirmText: t("menuDelete"),
+        cancelText: t("cancel"),
+      });
 
-    if (confirmed) {
-      await store.deleteSound(soundId)
-      addToast(`"${sound.name}" ${t('deleted')}`, 'info')
-    }
-  }, [store, confirm, addToast, t])
+      if (confirmed) {
+        await store.deleteSound(soundId);
+        addToast(`"${sound.name}" ${t("deleted")}`, "info");
+      }
+    },
+    [store, confirm, addToast, t],
+  );
 
-  const currentProfile = store.profiles.find(p => p.id === currentProfileId)
+  const currentProfile = store.profiles.find((p) => p.id === currentProfileId);
 
   return (
     <>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-        <div style={{
-          padding: '12px 20px',
-          borderBottom: '1px solid var(--border)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          flexShrink: 0,
-          flexWrap: 'wrap',
-        }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          overflow: "hidden",
+        }}
+      >
+        {/* ─── TOOLBAR ─────────────────────────────────────────────── */}
+        <div
+          style={{
+            padding: "12px 20px",
+            borderBottom: "1px solid var(--border)",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexShrink: 0,
+            flexWrap: "wrap",
+          }}
+        >
           <div style={{ flex: 1, minWidth: 150 }}>
             <div style={{ fontWeight: 600, fontSize: 15 }}>
-              {currentProfile?.id === 'all' ? t('allSounds') : currentProfile?.name}
+              {currentProfile?.id === "all"
+                ? t("allSounds")
+                : currentProfile?.name}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-              {currentSounds.length} {t('sounds')}
+            <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+              {currentSounds.length} {t("sounds")}
             </div>
             {searchTerm && (
-              <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>
-                <i className="ti ti-search" style={{ fontSize: 10 }} />{' '}
-                {t('resultsFor')} "{searchTerm}" ({filtered.length})
+              <div
+                style={{ fontSize: 11, color: "var(--accent)", marginTop: 2 }}
+              >
+                <i className="ti ti-search" style={{ fontSize: 10 }} />{" "}
+                {t("resultsFor")} "{searchTerm}" ({filtered.length})
               </div>
             )}
           </div>
@@ -321,22 +393,22 @@ export default function Home({ store, addToast, loopEnabled }) {
           <select
             data-testid="sort-select"
             value={sortBy}
-            onChange={e => setSortBy(e.target.value)}
+            onChange={(e) => setSortBy(e.target.value)}
             className="input-sm"
-            style={{ width: 'auto', minWidth: 120 }}
+            style={{ width: "auto", minWidth: 120 }}
           >
-            <option value="custom">{t('sortCustom')}</option>
-            <option value="default">{t('sortDefault')}</option>
-            <option value="popular">{t('sortPopular')}</option>
-            <option value="recent">{t('sortRecent')}</option>
-            <option value="alpha">{t('sortAlpha')}</option>
+            <option value="custom">{t("sortCustom")}</option>
+            <option value="default">{t("sortDefault")}</option>
+            <option value="popular">{t("sortPopular")}</option>
+            <option value="recent">{t("sortRecent")}</option>
+            <option value="alpha">{t("sortAlpha")}</option>
           </select>
 
           <input
             data-testid="search-input"
             value={localSearch}
-            onChange={e => setLocalSearch(e.target.value)}
-            placeholder={t('search')}
+            onChange={(e) => setLocalSearch(e.target.value)}
+            placeholder={t("search")}
             className="input-sm"
             style={{ width: 160, minWidth: 120 }}
           />
@@ -347,117 +419,161 @@ export default function Home({ store, addToast, loopEnabled }) {
             onClick={() => setShowImport(true)}
             style={{ minHeight: 34 }}
           >
-            <i className="ti ti-plus" /> {t('addSound')}
+            <i className="ti ti-plus" /> {t("addSound")}
           </button>
 
-          {currentProfileId !== 'all' && (
+          {currentProfileId !== "all" && (
             <button
               className="btn-secondary btn-sm"
               onClick={() => setShowProfileManager(true)}
               style={{ minHeight: 34 }}
             >
-              <i className="ti ti-settings" /> {t('manageProfile')}
+              <i className="ti ti-settings" /> {t("manageProfile")}
             </button>
           )}
         </div>
 
+        {/* ─── MAIN CONTENT (scrollable) ───────────────────────────── */}
         <div
           style={{
             flex: 1,
-            overflowY: isImporting ? 'hidden' : 'auto',
-            padding: '16px 20px',
-            position: 'relative',
+            overflowY: isImporting ? "hidden" : "auto",
+            padding: "16px 20px",
+            position: "relative",
           }}
-          onDragEnter={e => { e.preventDefault(); setDragOver(true) }}
-          onDragOver={e => { e.preventDefault(); if (!dragOver) setDragOver(true) }}
-          onDragLeave={e => {
-            if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false)
+          onDragEnter={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (!dragOver) setDragOver(true);
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false);
           }}
           onDrop={handleDropFiles}
         >
+          {/* Drop overlay */}
           {dragOver && (
             <div className="drop-overlay">
-              <i className="ti ti-music-plus" style={{ fontSize: 48, color: 'var(--accent)' }} />
-              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--accent)' }}>
-                {t('dropToImport')}
+              <i
+                className="ti ti-music-plus"
+                style={{ fontSize: 48, color: "var(--accent)" }}
+              />
+              <div
+                style={{
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: "var(--accent)",
+                }}
+              >
+                {t("dropToImport")}
               </div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
                 MP3, WAV, OGG, FLAC, M4A
               </div>
             </div>
           )}
 
+          {/* Import in progress */}
           {isImporting && (
             <div className="import-overlay">
-              <i className="ti ti-loader" style={{
-                fontSize: 40,
-                color: 'var(--accent)',
-                animation: 'spin 1s linear infinite',
-              }} />
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>
-                {t('importing')}
+              <i
+                className="ti ti-loader"
+                style={{
+                  fontSize: 40,
+                  color: "var(--accent)",
+                  animation: "spin 1s linear infinite",
+                }}
+              />
+              <div style={{ fontSize: 15, fontWeight: 600, color: "white" }}>
+                {t("importing")}
               </div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
                 {totalFiles > 0
-                  ? `${importProgress} / ${totalFiles} fichiers`
-                  : t('importingFiles')}
+                  ? `${importProgress} / ${totalFiles} ${t("files")}`
+                  : t("importingFiles")}
               </div>
               {totalFiles > 0 && (
-                <div style={{
-                  width: 200,
-                  height: 4,
-                  background: 'rgba(255,255,255,0.2)',
-                  borderRadius: 2,
-                  overflow: 'hidden',
-                }}>
-                  <div style={{
-                    width: `${(importProgress / totalFiles) * 100}%`,
-                    height: '100%',
-                    background: 'var(--accent)',
+                <div
+                  style={{
+                    width: 200,
+                    height: 4,
+                    background: "rgba(255,255,255,0.2)",
                     borderRadius: 2,
-                    transition: 'width 0.3s ease',
-                  }} />
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${(importProgress / totalFiles) * 100}%`,
+                      height: "100%",
+                      background: "var(--accent)",
+                      borderRadius: 2,
+                      transition: "width 0.3s ease",
+                    }}
+                  />
                 </div>
               )}
             </div>
           )}
 
+          {/* Import success */}
           {importSuccess > 0 && !isImporting && (
             <div className="success-overlay">
-              <div style={{
-                width: 64,
-                height: 64,
-                borderRadius: '50%',
-                background: 'var(--success)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <i className="ti ti-check" style={{ fontSize: 32, color: 'white' }} />
+              <div
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: "50%",
+                  background: "var(--success)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <i
+                  className="ti ti-check"
+                  style={{ fontSize: 32, color: "white" }}
+                />
               </div>
-              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--success)' }}>
-                {importSuccess} {t('sounds')} {t('added')} !
+              <div
+                style={{
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: "var(--success)",
+                }}
+              >
+                {importSuccess} {t("sounds")} {t("added")} !
               </div>
             </div>
           )}
 
-          {filtered.length === 0 && soundsOutsideProfile.length === 0 && !isImporting && (
-            <div
-              className="drop-zone"
-              onClick={() => setShowImport(true)}
-              style={{ cursor: 'pointer' }}
-            >
-              <i className="ti ti-music-plus" style={{ fontSize: 32, display: 'block', marginBottom: 8 }} />
-              <div style={{ fontWeight: 500, marginBottom: 4 }}>
-                {t('noSoundsForProfile')}
+          {/* Empty state */}
+          {filtered.length === 0 &&
+            soundsOutsideProfile.length === 0 &&
+            !isImporting && (
+              <div
+                className="drop-zone"
+                onClick={() => setShowImport(true)}
+                style={{ cursor: "pointer" }}
+              >
+                <i
+                  className="ti ti-music-plus"
+                  style={{ fontSize: 32, display: "block", marginBottom: 8 }}
+                />
+                <div style={{ fontWeight: 500, marginBottom: 4 }}>
+                  {t("noSoundsForProfile")}
+                </div>
+                <div style={{ fontSize: 12 }}>{t("dropHere")}</div>
               </div>
-              <div style={{ fontSize: 12 }}>{t('dropHere')}</div>
-            </div>
-          )}
+            )}
 
+          {/* Favorites */}
           {favoriteSoundsForProfile.length > 0 && (
             <Section
-              title={t('favorites')}
+              title={t("favorites")}
               icon="ti-star-filled"
               iconColor="var(--warning)"
               count={favoriteSoundsForProfile.length}
@@ -473,7 +589,7 @@ export default function Home({ store, addToast, loopEnabled }) {
                 store={store}
                 addToast={addToast}
                 gridRef={favoritesGridRef}
-                draggable={sortBy === 'custom'}
+                draggable={sortBy === "custom"}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
                 onDragOver={handleDragOver}
@@ -487,9 +603,10 @@ export default function Home({ store, addToast, loopEnabled }) {
             </Section>
           )}
 
+          {/* Profile sounds */}
           {filtered.length > 0 && (
             <Section
-              title={t('profileSounds')}
+              title={t("profileSounds")}
               icon="ti-music"
               count={filtered.length}
               testId="profile-sounds-section"
@@ -504,7 +621,7 @@ export default function Home({ store, addToast, loopEnabled }) {
                 store={store}
                 addToast={addToast}
                 gridRef={gridRef}
-                draggable={sortBy === 'custom'}
+                draggable={sortBy === "custom"}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
                 onDragOver={handleDragOver}
@@ -519,39 +636,56 @@ export default function Home({ store, addToast, loopEnabled }) {
                 <button
                   className="btn-secondary btn-sm"
                   onClick={() => setShowAll(!showAll)}
-                  style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}
+                  style={{
+                    width: "100%",
+                    justifyContent: "center",
+                    marginTop: 10,
+                  }}
                 >
-                  <i className={`ti ${showAll ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
-                  {showAll ? t('showLess') : `${t('showMore')} ${filtered.length - itemsPerPage}`}
+                  <i
+                    className={`ti ${showAll ? "ti-chevron-up" : "ti-chevron-down"}`}
+                  />
+                  {showAll
+                    ? t("showLess")
+                    : `${t("showMore")} ${filtered.length - itemsPerPage}`}
                 </button>
               )}
             </Section>
           )}
 
+          {/* Other sounds (not in current profile) */}
           {soundsOutsideProfile.length > 0 && (
             <Section
-              title={t('otherSounds')}
+              title={t("otherSounds")}
               icon="ti-circle-plus"
               iconColor="var(--text-tertiary)"
               count={soundsOutsideProfile.length}
               muted
               testId="other-sounds-section"
             >
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>
-                {t('clickToAdd')}
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-tertiary)",
+                  marginBottom: 10,
+                }}
+              >
+                {t("clickToAdd")}
               </div>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
-                gap: 10,
-              }}>
-                {displayedOther.map(s => (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {displayedOther.map((s) => (
                   <OutsideCard
                     key={s.id}
                     sound={s}
                     onAdd={async () => {
-                      await store.addSoundToProfile(s.id, currentProfileId)
-                      addToast(`"${s.name}" ${t('addedToProfile')}`, 'success')
+                      await store.addSoundToProfile(s.id, currentProfileId);
+                      addToast(`"${s.name}" ${t("addedToProfile")}`, "success");
                     }}
                   />
                 ))}
@@ -560,18 +694,25 @@ export default function Home({ store, addToast, loopEnabled }) {
                 <button
                   className="btn-secondary btn-sm"
                   onClick={() => setShowAllOther(!showAllOther)}
-                  style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}
+                  style={{
+                    width: "100%",
+                    justifyContent: "center",
+                    marginTop: 10,
+                  }}
                 >
-                  <i className={`ti ${showAllOther ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
+                  <i
+                    className={`ti ${showAllOther ? "ti-chevron-up" : "ti-chevron-down"}`}
+                  />
                   {showAllOther
-                    ? t('showLess')
-                    : `${t('showMore')} ${soundsOutsideProfile.length - itemsPerPage}`}
+                    ? t("showLess")
+                    : `${t("showMore")} ${soundsOutsideProfile.length - itemsPerPage}`}
                 </button>
               )}
             </Section>
           )}
         </div>
 
+        {/* ─── IMPORT MODAL ────────────────────────────────────────── */}
         {showImport && (
           <ImportModal
             onClose={() => setShowImport(false)}
@@ -585,59 +726,64 @@ export default function Home({ store, addToast, loopEnabled }) {
               const comp = await compressFileIfNeeded(filePath, {
                 enabled: store.compressOnImport,
                 bitrate: store.compressionBitrate || 128,
-              })
-              const finalPath = comp.path
+              });
+              const finalPath = comp.path;
 
               await store.addSound({
                 name,
                 path: finalPath,
                 image: imagePath || null,
-                emoji: emoji || '🔊',
+                emoji: emoji || "🔊",
                 profiles: [currentProfileId],
-              })
-              addToast(`"${name}" ${t('added')}`, 'success')
-              setShowImport(false)
+              });
+              addToast(`"${name}" ${t("added")}`, "success");
+              setShowImport(false);
             }}
             onUrlImport={async (url, name) => {
-              const online = await ensureOnline()
-              if (!online) return
+              const online = await ensureOnline();
+              if (!online) return;
 
-              const safeName = name.replace(/\s+/g, '_') + '_' + Date.now() + '.mp3'
-              let result = await window.electronAPI.downloadSoundUrl(url, safeName)
+              const safeName =
+                name.replace(/\s+/g, "_") + "_" + Date.now() + ".mp3";
+              let result = await window.electronAPI.downloadSoundUrl(
+                url,
+                safeName,
+              );
 
               if (!result.success && result.isNetworkError) {
-                showNoConnection()
-                return
+                showNoConnection();
+                return;
               }
 
               if (result.success) {
                 const comp = await compressFileIfNeeded(result.path, {
                   enabled: store.compressOnImport,
                   bitrate: store.compressionBitrate || 128,
-                })
-                result.path = comp.path
+                });
+                result.path = comp.path;
               }
 
               if (result.success) {
                 await store.addSound({
                   name,
                   path: result.path,
-                  emoji: '🔊',
+                  emoji: "🔊",
                   profiles: [currentProfileId],
-                })
-                addToast(`"${name}" ${t('downloaded')}`, 'success')
+                });
+                addToast(`"${name}" ${t("downloaded")}`, "success");
               } else {
-                addToast(`${t('error')} : ${result.error}`, 'error')
+                addToast(`${t("error")}: ${result.error}`, "error");
               }
-              setShowImport(false)
+              setShowImport(false);
             }}
           />
         )}
 
+        {/* ─── PROFILE MANAGER MODAL ───────────────────────────────── */}
         {showProfileManager && (
           <ProfileManagerModal
             profileId={currentProfileId}
-            profileName={currentProfile?.name || t('profile')}
+            profileName={currentProfile?.name || t("profile")}
             sounds={currentSounds}
             store={store}
             onClose={() => setShowProfileManager(false)}
@@ -649,5 +795,5 @@ export default function Home({ store, addToast, loopEnabled }) {
       </div>
       <ConfirmWrapper />
     </>
-  )
+  );
 }

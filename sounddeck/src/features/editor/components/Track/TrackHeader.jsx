@@ -1,19 +1,56 @@
-// src/features/editor/components/Track/TrackHeader.jsx
-import React, { useState, memo } from 'react'
+/**
+ * @file Track header row — color bar, editable name (double-click to
+ * rename), and a generic delete button.
+ *
+ * Rename flow:
+ * - **Double-click** the name → inline `<input>` prefilled with the name.
+ * - **Enter / blur** → commit (`onRenameTrack(track.id, trimmedName)`) if
+ *   the name is non-empty and actually changed.
+ * - **Escape** → revert to `track.name`.
+ *
+ * @see ./index.jsx
+ * @see ./TrackControls.jsx
+ * @see @shared/components/ui/DeleteButton
+ */
+
+import { useState, memo } from 'react'
 import { DeleteButton } from '@shared/components/ui'
 
-const TrackHeader = memo(({
+/**
+ * Track header (name + color bar + delete).
+ *
+ * @param {Object} props
+ * @param {{id: string, name?: string, clips?: Array}} props.track
+ * @param {number} props.trackIndex - Used for the `Piste N` fallback name.
+ * @param {string} props.trackColor - Color bar color.
+ * @param {boolean} [props.isHovering] - Reserved for future hover styling.
+ * @param {string|null} [props.selectedTrackId]
+ * @param {(trackId: string) => void} [props.onTrackRemove]
+ * @param {(trackId: string, newName: string) => void} [props.onRenameTrack]
+ * @param {(key: string, params?: Object) => string} props.tr
+ * @returns {JSX.Element}
+ */
+const TrackHeader = memo(function TrackHeader({
   track,
   trackIndex,
   trackColor,
-  isHovering,
+  isHovering: _isHovering,
   selectedTrackId,
   onTrackRemove,
   onRenameTrack,
-  tr
-}) => {
+  tr,
+}) {
+  /**
+   * Returns the "track N" fallback label, localized and indexed.
+   * @param {number} index
+   * @returns {string}
+   */
+  const getFallbackName = (index) =>
+    tr?.('editorTrackFallback', { n: index + 1 }) || `Track ${index + 1}`
+
+  const fallbackName = getFallbackName(trackIndex)
   const [isEditing, setIsEditing] = useState(false)
-  const [name, setName] = useState(track.name || `Piste ${trackIndex + 1}`)
+  const [name, setName] = useState(track.name || fallbackName)
 
   const handleDoubleClick = () => {
     setIsEditing(true)
@@ -24,7 +61,7 @@ const TrackHeader = memo(({
     if (name.trim() && name !== track.name) {
       onRenameTrack?.(track.id, name.trim())
     } else {
-      setName(track.name || `Piste ${trackIndex + 1}`)
+      setName(track.name || fallbackName)
     }
   }
 
@@ -32,31 +69,32 @@ const TrackHeader = memo(({
     if (e.key === 'Enter') {
       handleBlur()
     } else if (e.key === 'Escape') {
-      setName(track.name || `Piste ${trackIndex + 1}`)
+      setName(track.name || fallbackName)
       setIsEditing(false)
     }
   }
 
-  // Vérifier si la piste contient des clips
-  const hasClips = track.clips && track.clips.length > 0
-
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 4,
-      flex: 1,
-      minWidth: 0,
-      overflow: 'hidden'
-    }}>
-      <div style={{
-        width: 3,
-        height: 24,
-        borderRadius: 2,
-        background: trackColor,
-        flexShrink: 0
-      }} />
-      
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        flex: 1,
+        minWidth: 0,
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          width: 3,
+          height: 24,
+          borderRadius: 2,
+          background: trackColor,
+          flexShrink: 0,
+        }}
+      />
+
       {isEditing ? (
         <input
           type="text"
@@ -75,7 +113,7 @@ const TrackHeader = memo(({
             borderRadius: 3,
             outline: 'none',
             flex: 1,
-            minWidth: 40
+            minWidth: 40,
           }}
         />
       ) : (
@@ -84,7 +122,10 @@ const TrackHeader = memo(({
           style={{
             fontSize: 11,
             fontWeight: 500,
-            color: selectedTrackId === track.id ? 'var(--accent)' : 'var(--text-primary)',
+            color:
+              selectedTrackId === track.id
+                ? 'var(--accent)'
+                : 'var(--text-primary)',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
@@ -93,19 +134,23 @@ const TrackHeader = memo(({
             padding: '2px 4px',
             borderRadius: 3,
             border: '1px solid transparent',
-            transition: 'border-color 0.15s'
+            transition: 'border-color 0.15s',
           }}
-          title={tr('editorDoubleClickToRename')}
+          title={tr?.('editorDoubleClickToRename')}
         >
           {name}
         </div>
       )}
 
-      {/* Bouton Supprimer générique */}
       <DeleteButton
         onDelete={() => onTrackRemove?.(track.id)}
-        confirmTitle={tr('confirmDeleteTrack') || 'Confirmer la suppression de la piste'}
-        confirmMessage={tr('confirmDeleteTrackMessage') || 'Voulez-vous vraiment supprimer cette piste ?'}
+        confirmTitle={
+          tr?.('confirmDeleteTrack') || 'Confirm track deletion'
+        }
+        confirmMessage={
+          tr?.('confirmDeleteTrackMessage') ||
+          'Do you really want to delete this track?'
+        }
         itemName={name}
         size="sm"
         variant="ghost"

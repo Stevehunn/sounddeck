@@ -1,40 +1,164 @@
-// src/features/editor/Editor.jsx
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
-import { createPortal } from 'react-dom'
-import { useLanguage } from '@core/i18n/LanguageContext'
-import { EditorProvider, useEditor } from './contexts/EditorContext'
-import EditorTimeline from './components/Timeline'
-import EditorToolbar from './components/Toolbar'
-import EditorEffectsPanel from './components/EffectsPanel'
-import EditorMasterVolume from './components/MasterVolume'
-import ClipActionsMenu from './components/ClipActionsMenu'
-import ActionOverlay from './components/ActionOverlay'
-import AddTrackModal from './components/Modals/AddTrackModal'
-import TrimClipModal from './components/Modals/TrimClipModal'
-import NormalizeModal from './components/Modals/NormalizeModal'
-import ExportModal from './components/Modals/ExportModal'
-import ImportFileModal from './components/Modals/ImportFileModal'
-import TimelineLoopModal from './components/Modals/TimelineLoopModal'
-import { getClipById, formatTime } from './utils'
-import { mixdownProject, exportMixdown } from '@shared/utils/mixdown'
-import { normalizeClip } from '@shared/utils/normalizeUtils'
-import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
-import useConfirm from '@shared/hooks/useConfirm'
-import useProjectManager from './hooks/useProjectManager'
-import { buildFileUrl } from '@shared/utils/fileUrl'
-import { getBoolean, getNumber, setItem } from '@shared/utils/appStorage'
-import { uuid } from '@shared/utils/uuid'
-import { logError } from '@shared/utils/logger'
+/**
+ * @file Editor page — timeline, tracks, clips, effects, export.
+ *
+ * Top-level component for the multi-track audio editor. Three layers:
+ *
+ * 1. **`Editor`** — wraps everything in `EditorProvider` + `ConfirmWrapper`.
+ * 2. **`EditorContent`** — shows loading / "no project" states, otherwise
+ *    delegates to `EditorTimelineContent`.
+ * 3. **`EditorTimelineContent`** — the actual editor UI: toolbar, timeline,
+ *    effects panel, master volume, modals (add track, trim, normalize,
+ *    export, import, timeline loop), clip context menu.
+ *
+ * ## Playback
+ *
+ * Playback state is owned by `useEditor()` (see `contexts/EditorContext.jsx`).
+ * This file only dispatches user intents (play, pause, stop, seek, …) and
+ * renders the resulting state.
+ *
+ * ## Modals
+ *
+ * All modals are portals attached to `document.body` (see `createPortal`).
+ * They're conditionally mounted so their internal state resets on close.
+ *
+ * ## i18n
+ *
+ * All user-facing strings go through `t()` (from `useLanguage()`). Dev
+ * logs stay in English per the project convention.
+ *
+ * @see ./contexts/EditorContext.jsx
+ * @see ./components/Timeline
+ * @see ./components/Toolbar
+ * @see ./components/Modals
+ * @see ./hooks/useProjectManager.js
+ * @see ./hooks/useKeyboardShortcuts.js
+ */
 
-const __DEBUG__ = typeof import.meta !== 'undefined' && import.meta.env?.DEV
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
+import { useLanguage } from "@core/i18n/LanguageContext";
+import { EditorProvider, useEditor } from "./contexts/EditorContext";
+import EditorTimeline from "./components/Timeline";
+import EditorToolbar from "./components/Toolbar";
+import EditorEffectsPanel from "./components/EffectsPanel";
+import EditorMasterVolume from "./components/MasterVolume";
+import ClipActionsMenu from "./components/ClipActionsMenu";
+import ActionOverlay from "./components/ActionOverlay";
+import AddTrackModal from "./components/Modals/AddTrackModal";
+import TrimClipModal from "./components/Modals/TrimClipModal";
+import NormalizeModal from "./components/Modals/NormalizeModal";
+import ExportModal from "./components/Modals/ExportModal";
+import ImportFileModal from "./components/Modals/ImportFileModal";
+import TimelineLoopModal from "./components/Modals/TimelineLoopModal";
+import { getClipById, formatTime } from "./utils";
+import { mixdownProject, exportMixdown } from "@shared/utils/mixdown";
+import { normalizeClip } from "@shared/utils/normalizeUtils";
+import useKeyboardShortcuts from "./hooks/useKeyboardShortcuts";
+import useConfirm from "@shared/hooks/useConfirm";
+import useProjectManager from "./hooks/useProjectManager";
+import { buildFileUrl } from "@shared/utils/fileUrl";
+import { getBoolean, getNumber, setItem } from "@shared/utils/appStorage";
+import { uuid } from "@shared/utils/uuid";
+import { logError } from "@shared/utils/logger";
 
-const STORE_KEY_METRONOME_ENABLED = 'sounddeck_metronome_enabled'
-const STORE_KEY_METRONOME_BPM = 'sounddeck_metronome_bpm'
-const STORE_KEY_MASTER_VOLUME = 'sounddeck_master_volume'
+// ─── CONSTANTS ────────────────────────────────────────────────────────
 
+/** True when the editor runs in dev mode (enables extra console logs). */
+const __DEBUG__ = typeof import.meta !== "undefined" && import.meta.env?.DEV;
+
+/** Storage key for the metronome enable flag. */
+const STORE_KEY_METRONOME_ENABLED = "sounddeck_metronome_enabled";
+
+/** Storage key for the metronome BPM. */
+const STORE_KEY_METRONOME_BPM = "sounddeck_metronome_bpm";
+
+/** Storage key for the master volume. */
+const STORE_KEY_MASTER_VOLUME = "sounddeck_master_volume";
+
+/** Master volume clamp bounds (percent). */
+const MASTER_VOLUME_MIN = 0;
+const MASTER_VOLUME_MAX = 200;
+const MASTER_VOLUME_DEFAULT = 100;
+
+/** BPM clamp bounds. */
+const BPM_DEFAULT = 120;
+
+/** Clip duration used when nothing else is known (seconds). */
+const DEFAULT_CLIP_DURATION = 3;
+
+/** Clipboard TTL — pastes older than this are rejected (ms). */
+const CLIPBOARD_TTL_MS = 300_000; // 5 minutes
+
+/** Extra time after the clip end when starting a manual clip loop. */
+const LOOP_MIN_DURATION = 0.1;
+
+/** Master volume default used as fallback when restoring from mute. */
+const MASTER_VOLUME_RESTORE_FALLBACK = 100;
+
+/** Default duration of a fresh project (seconds). */
+const DEFAULT_PROJECT_DURATION = 60;
+
+/** Debounce for the delete-clip flow (prevents double-confirm dialogs). */
+const DELETE_DEBOUNCE_MS = 400;
+
+/** Max preview playback duration when testing effects (ms). */
+const EFFECT_PREVIEW_MAX_MS = 5000;
+
+/** Preview gain (relative to master) when testing effects. */
+const EFFECT_PREVIEW_GAIN = 0.5;
+
+/** @type {string} Default hex color when creating a marker. */
+const DEFAULT_MARKER_COLOR = "#3b82f6";
+
+// ─── HELPERS ──────────────────────────────────────────────────────────
+
+/**
+ * Returns a brand new empty project, ready to be loaded.
+ *
+ * @param {string} name - Display name (default: "Nouveau projet" — caller
+ *   should pass a translated string).
+ * @returns {Object} Project object compatible with `commitProject`.
+ */
+function createEmptyProject(name = "Nouveau projet") {
+  return {
+    id: uuid("project"),
+    name,
+    tracks: [],
+    markers: [],
+    loops: {
+      clips: {},
+      timeline: {
+        enabled: false,
+        start: 0,
+        end: 10,
+        color: "#7C6FF7",
+        durationMode: "cycles",
+        cycleCount: 3,
+        manualDuration: 10,
+      },
+    },
+    duration: DEFAULT_PROJECT_DURATION,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+}
+
+// ─── WRAPPER + STATES ─────────────────────────────────────────────────
+
+/**
+ * Editor page (top-level wrapper).
+ *
+ * Sets up the `EditorProvider` + `ConfirmWrapper`, then delegates to
+ * `EditorContent`.
+ *
+ * @param {Object} props
+ * @param {Object} props.store - App store.
+ * @param {(msg: string, type?: string) => void} props.addToast
+ * @returns {JSX.Element}
+ */
 export default function Editor({ store, addToast }) {
-  const { currentLang } = useLanguage()
-  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang })
+  const { currentLang } = useLanguage();
+  const { confirm, ConfirmWrapper } = useConfirm({ lang: currentLang });
 
   return (
     <>
@@ -43,100 +167,117 @@ export default function Editor({ store, addToast }) {
       </EditorProvider>
       <ConfirmWrapper />
     </>
-  )
+  );
 }
 
+/**
+ * Renders the loading state, the "no project" empty state, or the full
+ * editor timeline.
+ *
+ * @returns {JSX.Element}
+ */
 function EditorContent() {
-  const { t } = useLanguage()
-  const context = useEditor()
+  const { t } = useLanguage();
+  const context = useEditor();
 
   if (!context || !context.isInitialized) {
     return (
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
-          color: 'var(--text-tertiary)',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100%",
+          color: "var(--text-tertiary)",
           gap: 12,
         }}
       >
         <i
           className="ti ti-loader"
-          style={{ animation: 'spin 1s linear infinite' }}
+          style={{ animation: "spin 1s linear infinite" }}
         />
-        <span>{t('editorLoading')}</span>
+        <span>{t("editorLoading")}</span>
       </div>
-    )
+    );
   }
 
   if (!context.project || !context.project.id) {
     return (
       <div
         style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
-          color: 'var(--text-tertiary)',
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100%",
+          color: "var(--text-tertiary)",
           gap: 12,
           padding: 20,
         }}
       >
         <i
           className="ti ti-folder-plus"
-          style={{ fontSize: 32, color: 'var(--accent)' }}
+          style={{ fontSize: 32, color: "var(--accent)" }}
         />
         <div style={{ fontSize: 16, fontWeight: 600 }}>
-          {t('editorNoProject')}
+          {t("editorNoProject")}
         </div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-          {t('editorNoProjectDesc')}
+        <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+          {t("editorNoProjectDesc")}
         </div>
-        <button
-          className="btn-primary btn-sm"
-          onClick={() => {
-            const newProject = {
-              id: uuid('project'),
-              name: 'Nouveau projet',
-              tracks: [],
-              markers: [],
-              loops: {
-                clips: {},
-                timeline: {
-                  enabled: false,
-                  start: 0,
-                  end: 10,
-                  color: '#7C6FF7',
-                  durationMode: 'cycles',
-                  cycleCount: 3,
-                  manualDuration: 10,
-                },
-              },
-              duration: 60,
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            }
-            context.setProject(newProject)
-            context.commitProject(newProject, { skipHistory: true })
+        <NewProjectButton
+          label={t("editorCreateProject")}
+          onCreate={() => {
+            const newProject = createEmptyProject(t("editorNewProject"));
+            context.setProject(newProject);
+            context.commitProject(newProject, { skipHistory: true });
           }}
-          style={{ marginTop: 8 }}
-        >
-          <i className="ti ti-plus" /> {t('editorCreateProject')}
-        </button>
+        />
       </div>
-    )
+    );
   }
 
-  return <EditorTimelineContent />
+  return <EditorTimelineContent />;
 }
 
+/**
+ * Empty-state "create a project" button (used in `EditorContent`).
+ *
+ * Extracted to module level so React Compiler can optimize it
+ * (`react-hooks/static-components` rule).
+ *
+ * @param {Object} props
+ * @param {string} props.label - Already-translated button label.
+ * @param {() => void} props.onCreate - Called when the user clicks.
+ * @returns {JSX.Element}
+ */
+function NewProjectButton({ label, onCreate }) {
+  return (
+    <button
+      className="btn-primary btn-sm"
+      onClick={onCreate}
+      style={{ marginTop: 8 }}
+    >
+      <i className="ti ti-plus" /> {label}
+    </button>
+  );
+}
+
+// ─── MAIN EDITOR ──────────────────────────────────────────────────────
+
+/**
+ * Full editor UI: toolbar, timeline, effects panel, master volume, modals.
+ *
+ * Pulls every state/handler from `useEditor()` (the provider is already
+ * mounted by `Editor`). Maintains its own local UI state (which modal is
+ * open, which clip is selected for the context menu, etc.).
+ *
+ * @returns {JSX.Element}
+ */
 function EditorTimelineContent() {
-  const { t } = useLanguage()
-  const context = useEditor()
-  const { confirm } = context
+  const { t } = useLanguage();
+  const context = useEditor();
+  const { confirm } = context;
 
   const {
     project,
@@ -173,9 +314,7 @@ function EditorTimelineContent() {
     resume,
     stop,
     seek,
-    togglePlay,
     selectClip,
-    deselectClip,
     loopRegion,
     setLoopRegion,
     toggleLoop,
@@ -203,135 +342,163 @@ function EditorTimelineContent() {
     isPausedRef,
     currentTimeRef,
     setSoloPlayClipId,
-    masterGain,
     setMasterGain,
-  } = context
+  } = context;
 
-  // ─── ÉTATS LOCAUX ──────────────────────────────────────────────────────
-  const [clipMenu, setClipMenu] = useState(null)
-  const [selectedClipForMenu, setSelectedClipForMenu] = useState(null)
-  const [selectedTrackForMenu, setSelectedTrackForMenu] = useState(null)
-  const [showAddTrackModal, setShowAddTrackModal] = useState(false)
-  const [pendingTrackName, setPendingTrackName] = useState('')
-  const [showTrimModal, setShowTrimModal] = useState(false)
-  const [trimClipId, setTrimClipId] = useState(null)
-  const [showNormalizeModal, setShowNormalizeModal] = useState(false)
-  const [normalizeClipId, setNormalizeClipId] = useState(null)
-  const [masterVolume, setMasterVolume] = useState(100)
-  const [isMasterMuted, setIsMasterMuted] = useState(false)
-  const [showExportModal, setShowExportModal] = useState(false)
-  const [exportName, setExportName] = useState('')
-  const [isExporting, setIsExporting] = useState(false)
-  const [showEffectsPanel, setShowEffectsPanel] = useState(true)
-  const [showEffectsAddMenu, setShowEffectsAddMenu] = useState(false)
-  const [showImportModal, setShowImportModal] = useState(false)
-  const [selectedImportTrackId, setSelectedImportTrackId] = useState('')
-  const [pendingImportFile, setPendingImportFile] = useState(null)
-  const [pendingImportFileName, setPendingImportFileName] = useState('')
-  const [showTimelineLoopModal, setShowTimelineLoopModal] = useState(false)
-
-  const [isTimelineClickModeActive, setIsTimelineClickModeActive] = useState(false)
+  // ─── LOCAL UI STATE ─────────────────────────────────────────────────
+  const [clipMenu, setClipMenu] = useState(null);
+  const [selectedClipForMenu, setSelectedClipForMenu] = useState(null);
+  const [selectedTrackForMenu, setSelectedTrackForMenu] = useState(null);
+  const [showAddTrackModal, setShowAddTrackModal] = useState(false);
+  const [pendingTrackName, setPendingTrackName] = useState("");
+  const [showTrimModal, setShowTrimModal] = useState(false);
+  const [trimClipId, setTrimClipId] = useState(null);
+  const [showNormalizeModal, setShowNormalizeModal] = useState(false);
+  const [normalizeClipId, setNormalizeClipId] = useState(null);
+  const [masterVolume, setMasterVolume] = useState(MASTER_VOLUME_DEFAULT);
+  const [isMasterMuted, setIsMasterMuted] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportName, setExportName] = useState("");
+  const [showEffectsPanel, setShowEffectsPanel] = useState(true);
+  const [showEffectsAddMenu, setShowEffectsAddMenu] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [selectedImportTrackId, setSelectedImportTrackId] = useState("");
+  const [pendingImportFile, setPendingImportFile] = useState(null);
+  const [pendingImportFileName, setPendingImportFileName] = useState("");
+  const [showTimelineLoopModal, setShowTimelineLoopModal] = useState(false);
+  const [isTimelineClickModeActive, setIsTimelineClickModeActive] =
+    useState(false);
   const [timelineClickData, setTimelineClickData] = useState({
     start: null,
     end: null,
     duration: null,
-  })
-  const [timelineClickStep, setTimelineClickStep] = useState(0)
+  });
+  const [timelineClickStep, setTimelineClickStep] = useState(0);
+  const [metronomeEnabled, setMetronomeEnabled] = useState(false);
+  const [bpm, setBpm] = useState(BPM_DEFAULT);
+  const [clipboard, setClipboard] = useState(null);
+  const [isDeletingClip, setIsDeletingClip] = useState(false);
 
-  const [metronomeEnabled, setMetronomeEnabled] = useState(false)
-  const [bpm, setBpm] = useState(120)
-  const [clipboard, setClipboard] = useState(null)
-  const [isDeletingClip, setIsDeletingClip] = useState(false)
+  const masterVolumeRef = useRef(MASTER_VOLUME_DEFAULT);
 
-  const masterVolumeRef = useRef(100)
+  const projectManager = useProjectManager(
+    store,
+    project,
+    setProject,
+    addToast,
+  );
 
-  const projectManager = useProjectManager(store, project, setProject, addToast)
-
+  // ─── PREFS LOAD (metronome + master volume) ────────────────────────
   useEffect(() => {
-    let mounted = true
-    ;(async () => {
+    let mounted = true;
+    (async () => {
       try {
         const [savedEnabled, savedBpm, savedVolume] = await Promise.all([
           getBoolean(STORE_KEY_METRONOME_ENABLED, false),
-          getNumber(STORE_KEY_METRONOME_BPM, 120),
-          getNumber(STORE_KEY_MASTER_VOLUME, 100),
-        ])
+          getNumber(STORE_KEY_METRONOME_BPM, BPM_DEFAULT),
+          getNumber(STORE_KEY_MASTER_VOLUME, MASTER_VOLUME_DEFAULT),
+        ]);
 
-        if (!mounted) return
+        if (!mounted) return;
 
-        setMetronomeEnabled(savedEnabled)
-        setBpm(savedBpm)
+        setMetronomeEnabled(savedEnabled);
+        setBpm(savedBpm);
 
-        const clampedVolume = Math.max(0, Math.min(200, savedVolume))
-        setMasterVolume(clampedVolume)
-        masterVolumeRef.current = clampedVolume
-        setMasterGain(clampedVolume / 100)
+        const clampedVolume = Math.max(
+          MASTER_VOLUME_MIN,
+          Math.min(MASTER_VOLUME_MAX, savedVolume),
+        );
+        setMasterVolume(clampedVolume);
+        masterVolumeRef.current = clampedVolume;
+        setMasterGain(clampedVolume / 100);
       } catch (e) {
-        if (__DEBUG__) console.warn('[Editor] Erreur chargement prefs:', e)
+        if (__DEBUG__) console.warn("[Editor] Failed to load preferences:", e);
       }
-    })()
+    })();
 
-    return () => { mounted = false }
-  }, [setMasterGain])
+    return () => {
+      mounted = false;
+    };
+  }, [setMasterGain]);
 
+  // ─── DERIVED VALUES ────────────────────────────────────────────────
   const selectedClipForPanel = useMemo(() => {
-    if (!selectedClipId) return null
-    return getClipById(tracks, selectedClipId)
-  }, [tracks, selectedClipId])
+    if (!selectedClipId) return null;
+    return getClipById(tracks, selectedClipId);
+  }, [tracks, selectedClipId]);
 
   const totalClipCount = useMemo(
-    () => tracks.reduce((sum, t) => sum + (t.clips?.length || 0), 0),
-    [tracks]
-  )
+    () => tracks.reduce((sum, track) => sum + (track.clips?.length || 0), 0),
+    [tracks],
+  );
 
-  // ─── HANDLERS ───────────────────────────────────────────────────────────
+  // ─── HANDLERS ──────────────────────────────────────────────────────
 
+  /**
+   * Opens the "add track" modal with a default name derived from the
+   * current track count.
+   * @returns {void}
+   */
   const handleAddTrack = useCallback(() => {
-    const trackIndex = tracks.length + 1
-    const defaultName = t('editorTrackDefault').replace('{index}', trackIndex)
-    setPendingTrackName(defaultName)
-    setShowAddTrackModal(true)
-  }, [tracks.length, t])
+    const trackIndex = tracks.length + 1;
+    const defaultName = t("editorTrackDefault").replace("{index}", trackIndex);
+    setPendingTrackName(defaultName);
+    setShowAddTrackModal(true);
+  }, [tracks.length, t]);
 
+  /**
+   * Confirms the "add track" modal — calls `addTrack` and shows a toast.
+   *
+   * @param {string} name
+   * @param {string} color
+   * @returns {Promise<Object|null>} The new track, or `null` on error.
+   */
   const handleAddTrackConfirm = useCallback(
     async (name, color) => {
-      if (typeof addTrack !== 'function') {
-        addToast?.(t('toastEditorAddTrackUnavailable'), 'error')
-        setShowAddTrackModal(false)
-        return null
+      if (typeof addTrack !== "function") {
+        addToast?.(t("toastEditorAddTrackUnavailable"), "error");
+        setShowAddTrackModal(false);
+        return null;
       }
 
       try {
-        const result = await addTrack(name, color)
+        const result = await addTrack(name, color);
         if (result) {
-          addToast?.(t('toastEditorTrackAdded', { name: result.name }), 'success')
+          addToast?.(
+            t("toastEditorTrackAdded", { name: result.name }),
+            "success",
+          );
         } else {
-          addToast?.(t('toastEditorTrackAddError'), 'error')
+          addToast?.(t("toastEditorTrackAddError"), "error");
         }
-        setShowAddTrackModal(false)
-        return result
+        setShowAddTrackModal(false);
+        return result;
       } catch (e) {
-        addToast?.(`${t('toastEditorTrackAddError')}: ${e.message}`, 'error')
-        setShowAddTrackModal(false)
-        return null
+        addToast?.(`${t("toastEditorTrackAddError")}: ${e.message}`, "error");
+        setShowAddTrackModal(false);
+        return null;
       }
     },
-    [addTrack, addToast, t]
-  )
+    [addTrack, addToast, t],
+  );
 
+  /**
+   * Play/pause/resume toggle. Reads refs to avoid stale closures.
+   * @returns {void}
+   */
   const handlePlayToggle = useCallback(() => {
-    const currentlyPlaying = isPlayingRef?.current ?? isPlaying
-    const currentlyPaused = isPausedRef?.current ?? isPaused
+    const currentlyPlaying = isPlayingRef?.current ?? isPlaying;
+    const currentlyPaused = isPausedRef?.current ?? isPaused;
 
     if (currentlyPlaying) {
-      pause()
+      pause();
     } else if (currentlyPaused) {
-      resume()
+      resume();
     } else {
-      setCurrentTime(0)
-      if (currentTimeRef) currentTimeRef.current = 0
-      setSoloPlayClipId(null)
-      play()
+      setCurrentTime(0);
+      if (currentTimeRef) currentTimeRef.current = 0;
+      setSoloPlayClipId(null);
+      play();
     }
   }, [
     isPlaying,
@@ -344,239 +511,342 @@ function EditorTimelineContent() {
     currentTimeRef,
     setCurrentTime,
     setSoloPlayClipId,
-  ])
+  ]);
 
+  /**
+   * Removes a track (with confirmation if it contains clips).
+   *
+   * @param {string} trackId
+   * @returns {Promise<void>}
+   */
   const handleRemoveTrack = useCallback(
     async (trackId) => {
       try {
-        const track = tracks.find((t) => t.id === trackId)
-        if (!track) return
+        const track = tracks.find((tk) => tk.id === trackId);
+        if (!track) return;
 
         if (tracks.length <= 1) {
-          addToast?.(t('toastEditorLastTrackCannotBeRemoved'), 'warning')
-          return
+          addToast?.(t("toastEditorLastTrackCannotBeRemoved"), "warning");
+          return;
         }
 
         if (track.clips.length > 0) {
           const confirmed = await confirm({
-            title: t('confirmDeleteTrack'),
-            message:
-              t('confirmDeleteTrackMessage') ||
-              'Voulez-vous vraiment supprimer cette piste ?',
-            type: 'danger',
-            confirmText: t('delete') || 'Supprimer',
-            cancelText: t('cancel') || 'Annuler',
-          })
-          if (!confirmed) return
+            title: t("confirmDeleteTrack"),
+            message: t("confirmDeleteTrackMessage"),
+            type: "danger",
+            confirmText: t("delete"),
+            cancelText: t("cancel"),
+          });
+          if (!confirmed) return;
         }
 
-        await removeTrack(trackId)
-        addToast?.(t('toastEditorTrackRemoved', { name: track.name }), 'info')
+        await removeTrack(trackId);
+        addToast?.(t("toastEditorTrackRemoved", { name: track.name }), "info");
       } catch (e) {
-        logError('Editor', 'Erreur lors de la suppression de piste', e)
-        addToast?.(t('toastProjectDeleteError'), 'error')
+        logError("Editor", "Track removal failed", e);
+        addToast?.(t("toastProjectDeleteError"), "error");
       }
     },
-    [tracks, removeTrack, addToast, confirm, t]
-  )
+    [tracks, removeTrack, addToast, confirm, t],
+  );
 
+  /**
+   * Adds a clip from a library sound.
+   *
+   * @param {string} trackId
+   * @param {string} soundId
+   * @param {number} startPosition
+   * @returns {Promise<void>}
+   */
   const handleAddClip = useCallback(
     async (trackId, soundId, startPosition) => {
-      await addClip(trackId, soundId, startPosition)
+      await addClip(trackId, soundId, startPosition);
     },
-    [addClip]
-  )
+    [addClip],
+  );
 
+  /**
+   * Opens the native file picker and stages the file for import.
+   * @returns {Promise<void>}
+   */
   const handleAddFileClick = useCallback(async () => {
     if (tracks.length === 0) {
-      addToast?.(t('editorNoTracks'), 'error')
-      return
+      addToast?.(t("editorNoTracks"), "error");
+      return;
     }
 
     try {
-      const result = await window.electronAPI.openFileDialog?.()
-      if (!result || result.length === 0) return
+      const result = await window.electronAPI.openFileDialog?.();
+      if (!result || result.length === 0) return;
 
-      const filePath = result[0]
-      const fileName = filePath.split(/[\\/]/).pop() || 'Fichier audio'
+      const filePath = result[0];
+      const fileName =
+        filePath.split(/[\\/]/).pop() || t("editorAudioFileFallback");
 
-      setPendingImportFile(filePath)
-      setPendingImportFileName(fileName)
-      setSelectedImportTrackId(tracks[0].id)
-      setShowImportModal(true)
+      setPendingImportFile(filePath);
+      setPendingImportFileName(fileName);
+      setSelectedImportTrackId(tracks[0].id);
+      setShowImportModal(true);
     } catch (e) {
-      logError('Editor', 'Erreur ouverture dialog fichier', e)
-      addToast?.(`${t('editorFileImportError')}: ${e.message}`, 'error')
+      logError("Editor", "File dialog opening failed", e);
+      addToast?.(`${t("editorFileImportError")}: ${e.message}`, "error");
     }
-  }, [tracks, addToast, t])
+  }, [tracks, addToast, t]);
 
+  /**
+   * Confirms the import modal — actually adds the clip from the file.
+   *
+   * @param {{filePath: string, fileName: string, trackId: string, startTime: number}} payload
+   * @returns {Promise<void>}
+   */
   const handleImportConfirm = useCallback(
-    async ({ filePath, fileName, trackId, startTime }) => {
+    // NOTE: `_fileName` is accepted for API symmetry with the caller
+    // (ImportFileModal passes `{filePath, fileName, trackId, startTime}`)
+    // but it's not used — the clip keeps its own `name` from the sound.
+    async ({ filePath, _fileName, trackId, startTime }) => {
       if (!filePath) {
-        addToast?.(t('toastEditorNoTrackAvailable'), 'error')
-        return
+        addToast?.(t("toastEditorNoTrackAvailable"), "error");
+        return;
       }
 
       try {
-        const result = await addClipFromFile(trackId, filePath, startTime)
+        const result = await addClipFromFile(trackId, filePath, startTime);
         if (result) {
-          addToast?.(t('editorFileImported'), 'success')
+          addToast?.(t("editorFileImported"), "success");
         } else {
-          addToast?.(t('editorFileImportError'), 'error')
+          addToast?.(t("editorFileImportError"), "error");
         }
       } catch (e) {
-        logError('Editor', 'Erreur import fichier', e)
-        addToast?.(`${t('editorFileImportError')}: ${e.message}`, 'error')
+        logError("Editor", "File import failed", e);
+        addToast?.(`${t("editorFileImportError")}: ${e.message}`, "error");
       }
 
-      setShowImportModal(false)
-      setPendingImportFile(null)
-      setPendingImportFileName('')
+      setShowImportModal(false);
+      setPendingImportFile(null);
+      setPendingImportFileName("");
     },
-    [addClipFromFile, addToast, t]
-  )
+    [addClipFromFile, addToast, t],
+  );
 
+  /**
+   * Removes a clip.
+   *
+   * @param {string} trackId
+   * @param {string} clipId
+   * @returns {void}
+   */
   const handleRemoveClip = useCallback(
     (trackId, clipId) => {
-      removeClip(trackId, clipId)
+      removeClip(trackId, clipId);
     },
-    [removeClip]
-  )
+    [removeClip],
+  );
 
+  /**
+   * Selects a clip.
+   *
+   * @param {string} clipId
+   * @param {string} trackId
+   * @returns {void}
+   */
   const handleClipSelect = useCallback(
     (clipId, trackId) => {
-      selectClip(clipId, trackId)
+      selectClip(clipId, trackId);
     },
-    [selectClip]
-  )
+    [selectClip],
+  );
 
+  /**
+   * Opens the clip context menu at the cursor position.
+   *
+   * @param {MouseEvent} e
+   * @param {string} clipId
+   * @param {string} trackId
+   * @returns {void}
+   */
   const handleClipContextMenu = useCallback(
     (e, clipId, trackId) => {
-      e.preventDefault()
-      e.stopPropagation()
+      e.preventDefault();
+      e.stopPropagation();
 
-      const clip = getClipById(tracks, clipId)
-      if (!clip) return
+      const clip = getClipById(tracks, clipId);
+      if (!clip) return;
 
-      setSelectedClipForMenu(clip)
-      setSelectedTrackForMenu(trackId)
-      setClipMenu({ top: e.clientY, left: e.clientX })
+      setSelectedClipForMenu(clip);
+      setSelectedTrackForMenu(trackId);
+      setClipMenu({ top: e.clientY, left: e.clientX });
     },
-    [tracks]
-  )
+    [tracks],
+  );
 
+  /**
+   * Persists a new clip duration (used by the resize handles).
+   *
+   * @param {string} clipId
+   * @param {number} newDuration
+   * @returns {void}
+   */
   const handleUpdateClipDuration = useCallback(
     (clipId, newDuration) => {
       if (selectedTrackId) {
-        updateClip(selectedTrackId, clipId, { duration: newDuration })
-        setClipDurations((prev) => ({ ...prev, [clipId]: newDuration }))
+        updateClip(selectedTrackId, clipId, { duration: newDuration });
+        setClipDurations((prev) => ({ ...prev, [clipId]: newDuration }));
       }
     },
-    [selectedTrackId, updateClip, setClipDurations]
-  )
+    [selectedTrackId, updateClip, setClipDurations],
+  );
 
+  /**
+   * Opens the export modal (or shows an info toast if the project is empty).
+   * @returns {void}
+   */
   const handleExportClick = useCallback(() => {
     if (
       !project ||
       project.tracks.length === 0 ||
-      project.tracks.every((t) => t.clips.length === 0)
+      project.tracks.every((tk) => tk.clips.length === 0)
     ) {
-      addToast?.(t('editorNothingToExport'), 'info')
-      return
+      addToast?.(t("editorNothingToExport"), "info");
+      return;
     }
-    setExportName(project.name || 'Mon mix')
-    setShowExportModal(true)
-  }, [project, addToast, t])
+    setExportName(project.name || t("editorDefaultMixName"));
+    setShowExportModal(true);
+  }, [project, addToast, t]);
 
+  /**
+   * Sets the master volume (clamped) and persists it.
+   *
+   * @param {number} value - Volume in percent (0-200).
+   * @returns {void}
+   */
   const handleMasterVolumeChange = useCallback(
     (value) => {
-      const normalized = Math.max(0, Math.min(200, value))
-      setMasterVolume(normalized)
-      masterVolumeRef.current = normalized
-      setMasterGain(normalized / 100)
-      setItem(STORE_KEY_MASTER_VOLUME, normalized).catch(() => {})
+      const normalized = Math.max(
+        MASTER_VOLUME_MIN,
+        Math.min(MASTER_VOLUME_MAX, value),
+      );
+      setMasterVolume(normalized);
+      masterVolumeRef.current = normalized;
+      setMasterGain(normalized / 100);
+      setItem(STORE_KEY_MASTER_VOLUME, normalized).catch(() => {});
     },
-    [setMasterGain]
-  )
+    [setMasterGain],
+  );
 
+  /**
+   * Toggles master mute. When muting, stores the last volume so it can
+   * be restored on unmute.
+   * @returns {void}
+   */
   const handleMasterMuteToggle = useCallback(() => {
-    const newMuted = !isMasterMuted
-    setIsMasterMuted(newMuted)
+    const newMuted = !isMasterMuted;
+    setIsMasterMuted(newMuted);
     if (newMuted) {
-      setMasterGain(0)
+      setMasterGain(0);
     } else {
-      const restoredValue = masterVolumeRef.current || 100
-      setMasterVolume(restoredValue)
-      setMasterGain(restoredValue / 100)
+      const restoredValue =
+        masterVolumeRef.current || MASTER_VOLUME_RESTORE_FALLBACK;
+      setMasterVolume(restoredValue);
+      setMasterGain(restoredValue / 100);
     }
-  }, [isMasterMuted, setMasterGain])
+  }, [isMasterMuted, setMasterGain]);
 
+  /**
+   * Resets every volume (master + tracks) to 100%.
+   * @returns {void}
+   */
   const handleResetVolumes = useCallback(() => {
-    setMasterVolume(100)
-    masterVolumeRef.current = 100
-    setMasterGain(1)
-    setItem(STORE_KEY_MASTER_VOLUME, 100).catch(() => {})
+    setMasterVolume(MASTER_VOLUME_DEFAULT);
+    masterVolumeRef.current = MASTER_VOLUME_DEFAULT;
+    setMasterGain(1);
+    setItem(STORE_KEY_MASTER_VOLUME, MASTER_VOLUME_DEFAULT).catch(() => {});
 
     if (project?.tracks) {
       const updatedTracks = project.tracks.map((track) => ({
         ...track,
         volume: 1,
-      }))
+      }));
 
       const updatedProject = {
         ...project,
         tracks: updatedTracks,
         updatedAt: Date.now(),
-      }
+      };
 
-      context.commitProject(updatedProject, { skipHistory: true })
+      context.commitProject(updatedProject, { skipHistory: true });
 
       if (context.setTrackVolume) {
         for (const track of updatedTracks) {
-          context.setTrackVolume(track.id, 1)
+          context.setTrackVolume(track.id, 1);
         }
       }
 
-      context.setMasterGain(1)
-      addToast?.(
-        t('editorResetVolumesSuccess') || 'Tous les volumes réinitialisés à 100%',
-        'success'
-      )
+      context.setMasterGain(1);
+      addToast?.(t("editorResetVolumesSuccess"), "success");
     }
-  }, [project, context, addToast, setMasterVolume, setMasterGain, t])
+  }, [project, context, addToast, t, setMasterGain]);
 
+  /**
+   * Enables/disables the metronome and persists the choice.
+   *
+   * @param {boolean} enabled
+   * @returns {void}
+   */
   const handleToggleMetronome = useCallback((enabled) => {
-    setMetronomeEnabled(enabled)
-    setItem(STORE_KEY_METRONOME_ENABLED, enabled).catch(() => {})
-  }, [])
+    setMetronomeEnabled(enabled);
+    setItem(STORE_KEY_METRONOME_ENABLED, enabled).catch(() => {});
+  }, []);
 
+  /**
+   * Updates the metronome BPM and persists it.
+   *
+   * @param {number} newBpm
+   * @returns {void}
+   */
   const handleBpmChange = useCallback((newBpm) => {
-    setBpm(newBpm)
-    setItem(STORE_KEY_METRONOME_BPM, newBpm).catch(() => {})
-  }, [])
+    setBpm(newBpm);
+    setItem(STORE_KEY_METRONOME_BPM, newBpm).catch(() => {});
+  }, []);
 
+  /**
+   * Selects a clip and opens the effects panel with the "add effect"
+   * menu visible.
+   *
+   * @param {string} clipId
+   * @param {string} trackId
+   * @returns {void}
+   */
   const handleAddEffectFromMenu = useCallback(
     (clipId, trackId) => {
-      selectClip(clipId, trackId)
-      setShowEffectsPanel(true)
-      setShowEffectsAddMenu(true)
+      selectClip(clipId, trackId);
+      setShowEffectsPanel(true);
+      setShowEffectsAddMenu(true);
 
-      const clipName = getClipById(tracks, clipId)?.name || 'clip'
-      addToast?.(t('toastEditorEffectPanelOpened', { name: clipName }), 'info')
+      const clipName =
+        getClipById(tracks, clipId)?.name || t("editorClipFallback");
+      addToast?.(t("toastEditorEffectPanelOpened", { name: clipName }), "info");
     },
-    [selectClip, tracks, addToast, t]
-  )
+    [selectClip, tracks, addToast, t],
+  );
 
+  /**
+   * Normalizes a clip using the options from the normalize modal.
+   *
+   * @param {string} clipId
+   * @param {{method: 'peak'|'rms', target: number, maxGain: number, outputFormat: 'wav'|'mp3'}} options
+   * @returns {Promise<void>}
+   */
   const handleNormalizeWithOptions = useCallback(
     async (clipId, options) => {
-      const clip = getClipById(tracks, clipId)
+      const clip = getClipById(tracks, clipId);
       if (!clip) {
-        addToast?.(t('toastEditorClipNotFound'), 'error')
-        return
+        addToast?.(t("toastEditorClipNotFound"), "error");
+        return;
       }
 
-      const { method, target, maxGain, outputFormat = 'wav' } = options
-      addToast?.(t('toastEditorNormalizing', { name: clip.name }), 'info')
+      const { method, target, maxGain, outputFormat = "wav" } = options;
+      addToast?.(t("toastEditorNormalizing", { name: clip.name }), "info");
 
       try {
         const result = await normalizeClip(clip, target, store, {
@@ -584,57 +854,69 @@ function EditorTimelineContent() {
           preserveOriginal: false,
           maxGain: maxGain || 10,
           minGain: 0.1,
-          useRMS: method === 'rms',
+          useRMS: method === "rms",
           targetRMS: target * 0.3,
-        })
+        });
 
         if (result?.normalized) {
           if (result.newPath) {
-            const updatedTracks = tracks.map((t) => {
-              if (t.id !== selectedTrackId) return t
+            const updatedTracks = tracks.map((track) => {
+              if (track.id !== selectedTrackId) return track;
               return {
-                ...t,
-                clips: t.clips.map((c) =>
+                ...track,
+                clips: track.clips.map((c) =>
                   c.id === clipId
                     ? { ...c, path: result.newPath, duration: clip.duration }
-                    : c
+                    : c,
                 ),
-              }
-            })
+              };
+            });
 
             const updatedProject = {
               ...project,
               tracks: updatedTracks,
               updatedAt: Date.now(),
-            }
+            };
 
-            context.commitProject(updatedProject)
+            context.commitProject(updatedProject);
           }
 
           addToast?.(
-            t('toastEditorNormalizeSuccess', {
+            t("toastEditorNormalizeSuccess", {
               name: clip.name,
               gain: result.gain.toFixed(2),
             }),
-            'success'
-          )
+            "success",
+          );
         } else if (result === null) {
-          addToast?.(t('toastEditorNormalizeError', { name: clip.name }), 'error')
+          addToast?.(
+            t("toastEditorNormalizeError", { name: clip.name }),
+            "error",
+          );
         } else {
-          addToast?.(t('toastEditorAlreadyOptimal', { name: clip.name }), 'info')
+          addToast?.(
+            t("toastEditorAlreadyOptimal", { name: clip.name }),
+            "info",
+          );
         }
       } catch (e) {
-        addToast?.(`${t('error')}: ${e.message}`, 'error')
+        addToast?.(`${t("error")}: ${e.message}`, "error");
       }
     },
-    [tracks, selectedTrackId, project, store, context, addToast, t]
-  )
+    [tracks, selectedTrackId, project, store, context, addToast, t],
+  );
 
+  /**
+   * Copies a clip to the internal clipboard (with a TTL).
+   *
+   * @param {Object} clip
+   * @returns {void}
+   */
   const handleCopyClip = useCallback(
     (clip) => {
       if (!clip) {
-        addToast?.(t('toastEditorNoClipToCopy'), 'warning')
-        return
+        addToast?.(t("toastEditorNoClipToCopy"), "warning");
+        return;
       }
 
       setClipboard({
@@ -644,18 +926,24 @@ function EditorTimelineContent() {
           _copiedAt: Date.now(),
         },
         trackId: selectedTrackId,
-      })
+      });
 
-      addToast?.(`"${clip.name}" ${t('editorCopied')}`, 'success')
+      addToast?.(`"${clip.name}" ${t("editorCopied")}`, "success");
     },
-    [selectedTrackId, addToast, t]
-  )
+    [selectedTrackId, addToast, t],
+  );
 
+  /**
+   * Cuts a clip to the internal clipboard (removes it from the project).
+   *
+   * @param {Object} clip
+   * @returns {void}
+   */
   const handleCutClip = useCallback(
     (clip) => {
       if (!clip) {
-        addToast?.(t('toastEditorNoClipToCut'), 'warning')
-        return
+        addToast?.(t("toastEditorNoClipToCut"), "warning");
+        return;
       }
 
       setClipboard({
@@ -665,87 +953,95 @@ function EditorTimelineContent() {
           _copiedAt: Date.now(),
         },
         trackId: selectedTrackId,
-      })
+      });
 
       if (selectedTrackId && clip.id) {
-        removeClip(selectedTrackId, clip.id)
-        addToast?.(`"${clip.name}" ${t('editorCutAction')}`, 'info')
+        removeClip(selectedTrackId, clip.id);
+        addToast?.(`"${clip.name}" ${t("editorCutAction")}`, "info");
       } else {
-        addToast?.(t('toastEditorClipCannotBeCut'), 'error')
+        addToast?.(t("toastEditorClipCannotBeCut"), "error");
       }
     },
-    [selectedTrackId, removeClip, addToast, t]
-  )
+    [selectedTrackId, removeClip, addToast, t],
+  );
 
+  /**
+   * Pastes the clipboard content as a new clip (with new IDs).
+   *
+   * @returns {Promise<void>}
+   */
   const handlePasteClip = useCallback(async () => {
     if (!clipboard) {
-      addToast?.(t('editorClipboardEmpty'), 'warning')
-      return
+      addToast?.(t("editorClipboardEmpty"), "warning");
+      return;
     }
 
-    if (Date.now() - clipboard._copiedAt > 300000) {
-      setClipboard(null)
-      addToast?.(t('editorClipboardExpired'), 'warning')
-      return
+    if (Date.now() - clipboard._copiedAt > CLIPBOARD_TTL_MS) {
+      setClipboard(null);
+      addToast?.(t("editorClipboardExpired"), "warning");
+      return;
     }
 
-    const { clip, trackId: sourceTrackId } = clipboard
+    const { clip, trackId: sourceTrackId } = clipboard;
     if (!clip) {
-      addToast?.(t('editorClipboardEmpty'), 'warning')
-      return
+      addToast?.(t("editorClipboardEmpty"), "warning");
+      return;
     }
 
-    const targetTrackId = selectedTrackId || sourceTrackId || tracks[0]?.id
+    const targetTrackId = selectedTrackId || sourceTrackId || tracks[0]?.id;
     if (!targetTrackId) {
-      addToast?.(t('toastEditorNoTrackAvailable'), 'error')
-      return
+      addToast?.(t("toastEditorNoTrackAvailable"), "error");
+      return;
     }
 
     if (!project) {
-      addToast?.(t('toastEditorClipCannotBeCut'), 'error')
-      return
+      addToast?.(t("toastEditorClipCannotBeCut"), "error");
+      return;
     }
 
-    const clipId = uuid('clip')
+    const clipId = uuid("clip");
 
     const newClip = {
       id: clipId,
-      name: clip.name || 'Clip collé',
+      name: clip.name || t("editorClipFallback"),
       path: clip.path,
       start: (clip.start || 0) + 1,
-      duration: clip.duration || 3,
+      duration: clip.duration || DEFAULT_CLIP_DURATION,
       offset: clip.offset || 0,
       volume: clip.volume || 0,
       volumeDb: clip.volumeDb || 0,
-      effects: (clip.effects || []).map((e) => ({ ...e, id: uuid('effect') })),
+      effects: (clip.effects || []).map((e) => ({ ...e, id: uuid("effect") })),
       fadeIn: clip.fadeIn || 0,
       fadeOut: clip.fadeOut || 0,
       pitch: clip.pitch || 0,
       speed: clip.speed || 1,
       isExternal: clip.isExternal || false,
-    }
+    };
 
-    const updatedTracks = project.tracks.map((t) => {
-      if (t.id === targetTrackId) {
-        const clips = [...t.clips, newClip]
-        clips.sort((a, b) => a.start - b.start)
-        return { ...t, clips }
+    const updatedTracks = project.tracks.map((track) => {
+      if (track.id === targetTrackId) {
+        const clips = [...track.clips, newClip];
+        clips.sort((a, b) => a.start - b.start);
+        return { ...track, clips };
       }
-      return t
-    })
+      return track;
+    });
 
     const updatedProject = {
       ...project,
       tracks: updatedTracks,
       updatedAt: Date.now(),
-    }
+    };
 
-    context.commitProject(updatedProject)
-    setClipDurations((prev) => ({ ...prev, [newClip.id]: newClip.duration || 3 }))
+    context.commitProject(updatedProject);
+    setClipDurations((prev) => ({
+      ...prev,
+      [newClip.id]: newClip.duration || DEFAULT_CLIP_DURATION,
+    }));
 
-    addToast?.(`"${newClip.name}" ${t('editorPasted')}`, 'success')
-    setSelectedClipId(newClip.id)
-    setSelectedTrackId(targetTrackId)
+    addToast?.(`"${newClip.name}" ${t("editorPasted")}`, "success");
+    setSelectedClipId(newClip.id);
+    setSelectedTrackId(targetTrackId);
   }, [
     clipboard,
     selectedTrackId,
@@ -757,243 +1053,338 @@ function EditorTimelineContent() {
     setSelectedTrackId,
     addToast,
     t,
-  ])
+  ]);
 
+  /**
+   * Deletes a clip with confirmation (debounced to avoid double-dialogs).
+   *
+   * @param {string} trackId
+   * @param {string} clipId
+   * @param {string} [clipName]
+   * @returns {Promise<void>}
+   */
   const handleDeleteWithConfirm = useCallback(
     async (trackId, clipId, clipName) => {
-      if (isDeletingClip) return
-      setIsDeletingClip(true)
+      if (isDeletingClip) return;
+      setIsDeletingClip(true);
 
       try {
-        let name = clipName
+        let name = clipName;
         if (!name) {
-          const clip = getClipById(tracks, clipId)
-          name = clip?.name || 'ce clip'
+          const clip = getClipById(tracks, clipId);
+          name = clip?.name || t("editorThisClip");
         }
 
-        const message = t('confirmDeleteClipMessage', { name })
+        const message = t("confirmDeleteClipMessage", { name });
 
         const confirmed = await confirm({
-          title: t('confirmDeleteClip') || 'Confirmer la suppression du clip',
+          title: t("confirmDeleteClip"),
           message,
-          type: 'danger',
-          confirmText: t('editorDelete') || 'Supprimer',
-          cancelText: t('cancel') || 'Annuler',
-        })
+          type: "danger",
+          confirmText: t("editorDelete"),
+          cancelText: t("cancel"),
+        });
 
         if (confirmed) {
-          removeClip(trackId, clipId)
-          addToast?.(t('toastEditorClipRemoved', { name }), 'info')
+          removeClip(trackId, clipId);
+          addToast?.(t("toastEditorClipRemoved", { name }), "info");
         }
       } catch (e) {
-        logError('Editor', 'Erreur suppression clip', e)
+        logError("Editor", "Clip deletion failed", e);
       } finally {
-        setTimeout(() => setIsDeletingClip(false), 400)
+        setTimeout(() => setIsDeletingClip(false), DELETE_DEBOUNCE_MS);
       }
     },
-    [tracks, removeClip, addToast, confirm, t, isDeletingClip]
-  )
+    [tracks, removeClip, addToast, confirm, t, isDeletingClip],
+  );
 
+  /**
+   * Previews a clip with its effects applied (offline render + one-shot
+   * playback).
+   *
+   * @param {Object} clip
+   * @returns {Promise<void>}
+   */
   const handlePreviewEffects = useCallback(
     async (clip) => {
-      if (!clip || !clip.path) return
+      if (!clip || !clip.path) return;
 
       try {
-        const { applyEffectsToBuffer } = await import(
-          '@shared/utils/realTimeEffects'
-        )
+        const { applyEffectsToBuffer } =
+          await import("@shared/utils/realTimeEffects");
 
-        const fileUrl = buildFileUrl(clip.path)
+        const fileUrl = buildFileUrl(clip.path);
 
-        const response = await fetch(fileUrl)
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-        const arrayBuffer = await response.arrayBuffer()
+        const response = await fetch(fileUrl);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const arrayBuffer = await response.arrayBuffer();
 
-        const audioContext = new (window.AudioContext ||
-          window.webkitAudioContext)()
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+        const audioContext = new (
+          window.AudioContext || window.webkitAudioContext
+        )();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-        const hasActiveEffects = clip.effects?.some((e) => e.enabled) || false
-        let processedBuffer = audioBuffer
+        const hasActiveEffects = clip.effects?.some((e) => e.enabled) || false;
+        let processedBuffer = audioBuffer;
 
         if (hasActiveEffects) {
           processedBuffer = applyEffectsToBuffer(
             audioBuffer,
             clip.effects,
             audioContext.sampleRate,
-            true
-          )
+            true,
+          );
         }
 
-        const source = audioContext.createBufferSource()
-        source.buffer = processedBuffer
+        const source = audioContext.createBufferSource();
+        source.buffer = processedBuffer;
 
-        const gainNode = audioContext.createGain()
-        gainNode.gain.value = 0.5
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = EFFECT_PREVIEW_GAIN;
 
-        source.connect(gainNode)
-        gainNode.connect(audioContext.destination)
+        source.connect(gainNode);
+        gainNode.connect(audioContext.destination);
 
-        source.start(0)
+        source.start(0);
 
         source.onended = () => {
-          audioContext.close().catch(() => {})
-        }
+          audioContext.close().catch(() => {});
+        };
 
-        setTimeout(() => {
-          try {
-            source.stop()
-            audioContext.close().catch(() => {})
-          } catch (e) {}
-        }, Math.min(processedBuffer.duration * 1000, 5000))
+        setTimeout(
+          () => {
+            try {
+              source.stop();
+              audioContext.close().catch(() => {});
+            } catch {
+              // Ignore — already stopped.
+            }
+          },
+          Math.min(processedBuffer.duration * 1000, EFFECT_PREVIEW_MAX_MS),
+        );
       } catch (e) {
-        logError('Editor', 'Erreur prévisualisation effets', e)
-        addToast?.(
-          t('editorEffectPreviewError') || 'Erreur lors de la prévisualisation',
-          'error'
-        )
+        logError("Editor", "Effect preview failed", e);
+        addToast?.(t("editorEffectPreviewError"), "error");
       }
     },
-    [addToast, t]
-  )
+    [addToast, t],
+  );
 
+  /**
+   * Adds a marker at the current playhead (or the given position).
+   *
+   * @param {Object} markerData
+   * @returns {void}
+   */
   const handleAddMarker = useCallback(
     (markerData) => {
-      const { addMarker } = context
-      if (addMarker) addMarker(markerData)
-      else addToast?.(t('toastEditorAddMarkerUnavailable'), 'error')
+      const { addMarker } = context;
+      if (addMarker) addMarker(markerData);
+      else addToast?.(t("toastEditorAddMarkerUnavailable"), "error");
     },
-    [context, addToast, t]
-  )
+    [context, addToast, t],
+  );
 
+  /**
+   * Removes a marker.
+   *
+   * @param {string} markerId
+   * @returns {void}
+   */
   const handleRemoveMarker = useCallback(
     (markerId) => {
-      const { removeMarker } = context
-      if (removeMarker) removeMarker(markerId)
+      const { removeMarker } = context;
+      if (removeMarker) removeMarker(markerId);
     },
-    [context]
-  )
+    [context],
+  );
 
+  /**
+   * Updates a marker.
+   *
+   * @param {string} markerId
+   * @param {Object} updates
+   * @returns {void}
+   */
   const handleUpdateMarker = useCallback(
     (markerId, updates) => {
-      const { updateMarker } = context
-      if (updateMarker) updateMarker(markerId, updates)
+      const { updateMarker } = context;
+      if (updateMarker) updateMarker(markerId, updates);
     },
-    [context]
-  )
+    [context],
+  );
 
+  /**
+   * Moves the playhead to a marker (or seeks directly if the context
+   * method isn't available).
+   *
+   * @param {number} time
+   * @returns {void}
+   */
   const handleNavigateToMarker = useCallback(
     (time) => {
-      const { navigateToMarker } = context
-      if (navigateToMarker) navigateToMarker(time)
-      else seek(time)
+      const { navigateToMarker } = context;
+      if (navigateToMarker) navigateToMarker(time);
+      else seek(time);
     },
-    [context, seek]
-  )
+    [context, seek],
+  );
 
+  /**
+   * Moves a clip to the previous track.
+   *
+   * @param {string} trackId
+   * @param {string} clipId
+   * @returns {void}
+   */
   const moveClipUp = useCallback(
     (trackId, clipId) => {
-      const currentTrackIndex = tracks.findIndex((t) => t.id === trackId)
-      if (currentTrackIndex <= 0) return
+      const currentTrackIndex = tracks.findIndex((tk) => tk.id === trackId);
+      if (currentTrackIndex <= 0) return;
 
-      const clip = getClipById(tracks, clipId)
-      if (!clip) return
+      const clip = getClipById(tracks, clipId);
+      if (!clip) return;
 
-      const targetTrack = tracks[currentTrackIndex - 1]
-      if (!targetTrack) return
+      const targetTrack = tracks[currentTrackIndex - 1];
+      if (!targetTrack) return;
 
-      moveClip(trackId, clipId, clip.start || 0, targetTrack.id)
-      setSelectedTrackId(targetTrack.id)
-      addToast?.(t('editorClipMovedUp') || 'Clip déplacé vers le haut', 'info')
+      moveClip(trackId, clipId, clip.start || 0, targetTrack.id);
+      setSelectedTrackId(targetTrack.id);
+      addToast?.(t("editorClipMovedUp"), "info");
     },
-    [tracks, moveClip, setSelectedTrackId, addToast, t]
-  )
+    [tracks, moveClip, setSelectedTrackId, addToast, t],
+  );
 
+  /**
+   * Moves a clip to the next track.
+   *
+   * @param {string} trackId
+   * @param {string} clipId
+   * @returns {void}
+   */
   const moveClipDown = useCallback(
     (trackId, clipId) => {
-      const currentTrackIndex = tracks.findIndex((t) => t.id === trackId)
-      if (currentTrackIndex >= tracks.length - 1) return
+      const currentTrackIndex = tracks.findIndex((tk) => tk.id === trackId);
+      if (currentTrackIndex >= tracks.length - 1) return;
 
-      const clip = getClipById(tracks, clipId)
-      if (!clip) return
+      const clip = getClipById(tracks, clipId);
+      if (!clip) return;
 
-      const targetTrack = tracks[currentTrackIndex + 1]
-      if (!targetTrack) return
+      const targetTrack = tracks[currentTrackIndex + 1];
+      if (!targetTrack) return;
 
-      moveClip(trackId, clipId, clip.start || 0, targetTrack.id)
-      setSelectedTrackId(targetTrack.id)
-      addToast?.(t('editorClipMovedDown') || 'Clip déplacé vers le bas', 'info')
+      moveClip(trackId, clipId, clip.start || 0, targetTrack.id);
+      setSelectedTrackId(targetTrack.id);
+      addToast?.(t("editorClipMovedDown"), "info");
     },
-    [tracks, moveClip, setSelectedTrackId, addToast, t]
-  )
+    [tracks, moveClip, setSelectedTrackId, addToast, t],
+  );
 
+  /**
+   * Returns `true` if the clip's track has a previous track.
+   *
+   * @param {string} trackId
+   * @returns {boolean}
+   */
   const getCanMoveUp = useCallback(
     (trackId) => {
-      const currentTrackIndex = tracks.findIndex((t) => t.id === trackId)
-      return currentTrackIndex > 0
+      const currentTrackIndex = tracks.findIndex((tk) => tk.id === trackId);
+      return currentTrackIndex > 0;
     },
-    [tracks]
-  )
+    [tracks],
+  );
 
+  /**
+   * Returns `true` if the clip's track has a next track.
+   *
+   * @param {string} trackId
+   * @returns {boolean}
+   */
   const getCanMoveDown = useCallback(
     (trackId) => {
-      const currentTrackIndex = tracks.findIndex((t) => t.id === trackId)
-      return currentTrackIndex < tracks.length - 1
+      const currentTrackIndex = tracks.findIndex((tk) => tk.id === trackId);
+      return currentTrackIndex < tracks.length - 1;
     },
-    [tracks]
-  )
+    [tracks],
+  );
 
+  /**
+   * Applies a new timeline loop config.
+   *
+   * @param {Object} options
+   * @returns {void}
+   */
   const handleSetTimelineLoop = useCallback(
     (options) => {
-      setTimelineLoop?.(options)
+      setTimelineLoop?.(options);
     },
-    [setTimelineLoop]
-  )
+    [setTimelineLoop],
+  );
 
+  /**
+   * Toggles the timeline loop on/off.
+   * @returns {void}
+   */
   const handleToggleTimelineLoop = useCallback(() => {
-    toggleTimelineLoop?.()
-  }, [toggleTimelineLoop])
+    toggleTimelineLoop?.();
+  }, [toggleTimelineLoop]);
 
+  /**
+   * Opens the timeline loop configuration modal.
+   * @returns {void}
+   */
   const handleOpenLoopPanel = useCallback(() => {
-    setShowTimelineLoopModal(true)
-  }, [])
+    setShowTimelineLoopModal(true);
+  }, []);
 
+  /**
+   * Activates / deactivates the "click mode" for the timeline loop.
+   *
+   * @param {boolean} [active=true]
+   * @returns {void}
+   */
   const handleActivateTimelineClickMode = useCallback(
     (active = true) => {
-      setIsTimelineClickModeActive(active)
+      setIsTimelineClickModeActive(active);
       if (active) {
-        setTimelineClickStep(0)
-        setTimelineClickData({ start: null, end: null, duration: null })
-        activateTimelineLoopManualClick()
+        setTimelineClickStep(0);
+        setTimelineClickData({ start: null, end: null, duration: null });
+        activateTimelineLoopManualClick();
       } else {
-        setTimelineClickStep(0)
-        setTimelineClickData({ start: null, end: null, duration: null })
-        cancelActionOverlay()
+        setTimelineClickStep(0);
+        setTimelineClickData({ start: null, end: null, duration: null });
+        cancelActionOverlay();
       }
     },
-    [activateTimelineLoopManualClick, cancelActionOverlay]
-  )
+    [activateTimelineLoopManualClick, cancelActionOverlay],
+  );
 
+  /**
+   * Handles a timeline click while the loop click-mode is active.
+   *
+   * @param {number} time
+   * @returns {void}
+   */
   const handleTimelineClickForLoop = useCallback(
     (time) => {
-      if (!isTimelineClickModeActive) return
-      if (executeActionOverlay) executeActionOverlay(time)
+      if (!isTimelineClickModeActive) return;
+      if (executeActionOverlay) executeActionOverlay(time);
 
-      const clampedTime = Math.max(0, Math.min(time, totalDuration))
+      const clampedTime = Math.max(0, Math.min(time, totalDuration));
 
       if (timelineClickStep === 0) {
-        setTimelineClickData((prev) => ({ ...prev, start: clampedTime }))
-        setTimelineClickStep(1)
+        setTimelineClickData((prev) => ({ ...prev, start: clampedTime }));
+        setTimelineClickStep(1);
       } else if (timelineClickStep === 1) {
         if (clampedTime > timelineClickData.start) {
-          setTimelineClickData((prev) => ({ ...prev, end: clampedTime }))
-          setTimelineClickStep(2)
+          setTimelineClickData((prev) => ({ ...prev, end: clampedTime }));
+          setTimelineClickStep(2);
         }
       } else if (timelineClickStep === 2) {
-        const duration = clampedTime - timelineClickData.start
-        if (duration > 0.1) {
-          setTimelineClickData((prev) => ({ ...prev, duration }))
-          setShowTimelineLoopModal(false)
+        const duration = clampedTime - timelineClickData.start;
+        if (duration > LOOP_MIN_DURATION) {
+          setTimelineClickData((prev) => ({ ...prev, duration }));
+          setShowTimelineLoopModal(false);
         }
       }
     },
@@ -1004,64 +1395,72 @@ function EditorTimelineContent() {
       timelineClickStep,
       timelineClickData,
       setShowTimelineLoopModal,
-    ]
-  )
+    ],
+  );
 
-  const undoEditor = context.undoEditor
-  const redoEditor = context.redoEditor
-  const canUndo = context.canUndoEditor
-  const canRedo = context.canRedoEditor
+  const undoEditor = context.undoEditor;
+  const redoEditor = context.redoEditor;
+  const canUndo = context.canUndoEditor;
+  const canRedo = context.canRedoEditor;
 
+  /**
+   * Shows/hides the effects panel (and closes the "add effect" menu when
+   * hiding).
+   *
+   * @param {boolean} show
+   * @returns {void}
+   */
   const handleToggleEffectsPanel = useCallback((show) => {
-    setShowEffectsPanel(show)
-    if (!show) setShowEffectsAddMenu(false)
-  }, [])
+    setShowEffectsPanel(show);
+    if (!show) setShowEffectsAddMenu(false);
+  }, []);
 
+  // ─── WINDOW TEST HOOKS (for the tutorial) ──────────────────────────
   useEffect(() => {
     window.__editorHasClips = () =>
-      tracks.some((t) => t.clips && t.clips.length > 0)
+      tracks.some((tk) => tk.clips && tk.clips.length > 0);
 
     window.__editorGetFirstClipId = () => {
       for (const track of tracks) {
-        if (track.clips && track.clips.length > 0) return track.clips[0].id
+        if (track.clips && track.clips.length > 0) return track.clips[0].id;
       }
-      return null
-    }
+      return null;
+    };
 
     window.__editorSelectClip = (clipId, openEffects = true) => {
       for (const track of tracks) {
-        const clip = track.clips.find((c) => c.id === clipId)
+        const clip = track.clips.find((c) => c.id === clipId);
         if (clip) {
-          selectClip(clipId, track.id)
-          if (openEffects) setShowEffectsPanel(true)
-          return true
+          selectClip(clipId, track.id);
+          if (openEffects) setShowEffectsPanel(true);
+          return true;
         }
       }
-      return false
-    }
+      return false;
+    };
 
     window.__editorSelectFirstClip = (openEffects = true) => {
-      const clipId = window.__editorGetFirstClipId?.()
-      if (!clipId) return false
-      return window.__editorSelectClip?.(clipId, openEffects) || false
-    }
+      const clipId = window.__editorGetFirstClipId?.();
+      if (!clipId) return false;
+      return window.__editorSelectClip?.(clipId, openEffects) || false;
+    };
 
     window.__editorOpenClipMenu = (clipId = null) => {
-      const targetId = clipId || window.__editorGetFirstClipId?.()
-      if (!targetId) return false
+      const targetId = clipId || window.__editorGetFirstClipId?.();
+      if (!targetId) return false;
 
-      window.__editorSelectClip?.(targetId, false)
+      window.__editorSelectClip?.(targetId, false);
 
       const clipEl =
         document.querySelector(`[data-clip-id="${targetId}"]`) ||
         document.querySelector('[data-testid="editor-clip"]') ||
-        document.querySelector('.editor-clip-wrapper')
+        document.querySelector(".editor-clip-wrapper");
 
-      if (!clipEl) return false
+      if (!clipEl) return false;
 
-      const rect = clipEl.getBoundingClientRect()
+      const rect = clipEl.getBoundingClientRect();
 
-      const event = new MouseEvent('contextmenu', {
+      const event = new MouseEvent("contextmenu", {
         view: window,
         bubbles: true,
         cancelable: true,
@@ -1069,48 +1468,49 @@ function EditorTimelineContent() {
         buttons: 2,
         clientX: rect.left + Math.min(rect.width / 2, 60),
         clientY: rect.top + Math.min(rect.height / 2, 20),
-      })
-      clipEl.dispatchEvent(event)
-      return true
-    }
+      });
+      clipEl.dispatchEvent(event);
+      return true;
+    };
 
     window.__editorCloseClipMenu = () => {
-      const evt = new MouseEvent('mousedown', {
+      const evt = new MouseEvent("mousedown", {
         view: window,
         bubbles: true,
         cancelable: true,
         clientX: 5,
         clientY: 5,
-      })
-      document.body.dispatchEvent(evt)
-    }
+      });
+      document.body.dispatchEvent(evt);
+    };
 
     window.__editorOpenMarkersPanel = () => {
       const btn = document.querySelector(
-        '[data-testid="editor-add-marker-button"]'
-      )
+        '[data-testid="editor-add-marker-button"]',
+      );
       if (btn) {
-        btn.click()
-        return true
+        btn.click();
+        return true;
       }
       const panel = document.querySelector(
-        '[data-testid="editor-markers-panel"]'
-      )
-      if (panel) return true
-      return false
-    }
+        '[data-testid="editor-markers-panel"]',
+      );
+      if (panel) return true;
+      return false;
+    };
 
     return () => {
-      delete window.__editorHasClips
-      delete window.__editorGetFirstClipId
-      delete window.__editorSelectClip
-      delete window.__editorSelectFirstClip
-      delete window.__editorOpenClipMenu
-      delete window.__editorCloseClipMenu
-      delete window.__editorOpenMarkersPanel
-    }
-  }, [tracks, selectClip])
+      delete window.__editorHasClips;
+      delete window.__editorGetFirstClipId;
+      delete window.__editorSelectClip;
+      delete window.__editorSelectFirstClip;
+      delete window.__editorOpenClipMenu;
+      delete window.__editorCloseClipMenu;
+      delete window.__editorOpenMarkersPanel;
+    };
+  }, [tracks, selectClip]);
 
+  // ─── KEYBOARD SHORTCUTS ────────────────────────────────────────────
   useKeyboardShortcuts({
     onPlay: handlePlayToggle,
     onPause: pause,
@@ -1119,46 +1519,47 @@ function EditorTimelineContent() {
     onRedo: redoEditor,
     onAddTrack: handleAddTrack,
     onAddMarker: () => {
-      const markers = project?.markers || []
+      const markers = project?.markers || [];
       context.addMarker({
-        name: `Marqueur ${markers.length + 1}`,
+        name: t("editorMarkerDefault", { index: markers.length + 1 }),
         time: currentTime,
-        color: '#3b82f6',
-      })
+        color: DEFAULT_MARKER_COLOR,
+      });
     },
     onDelete: () => {
       if (selectedClipId && selectedTrackId) {
-        const clip = getClipById(tracks, selectedClipId)
-        handleDeleteWithConfirm(selectedTrackId, selectedClipId, clip?.name)
+        const clip = getClipById(tracks, selectedClipId);
+        handleDeleteWithConfirm(selectedTrackId, selectedClipId, clip?.name);
       } else {
-        addToast?.(t('toastEditorNoClipSelected'), 'info')
+        addToast?.(t("toastEditorNoClipSelected"), "info");
       }
     },
     onCopy: () => {
-      const clip = getClipById(tracks, selectedClipId)
-      if (clip) handleCopyClip(clip)
-      else addToast?.(t('toastEditorNoClipSelected'), 'warning')
+      const clip = getClipById(tracks, selectedClipId);
+      if (clip) handleCopyClip(clip);
+      else addToast?.(t("toastEditorNoClipSelected"), "warning");
     },
     onCut: () => {
-      const clip = getClipById(tracks, selectedClipId)
-      if (clip) handleCutClip(clip)
-      else addToast?.(t('toastEditorNoClipSelected'), 'warning')
+      const clip = getClipById(tracks, selectedClipId);
+      if (clip) handleCutClip(clip);
+      else addToast?.(t("toastEditorNoClipSelected"), "warning");
     },
     onPaste: handlePasteClip,
     onSplit: () => {
       if (selectedClipId && selectedTrackId) {
-        const clip = getClipById(tracks, selectedClipId)
+        const clip = getClipById(tracks, selectedClipId);
         if (clip) {
-          const duration = clipDurations[clip.id] || clip.duration || 3
-          const start = clip.start || 0
+          const duration =
+            clipDurations[clip.id] || clip.duration || DEFAULT_CLIP_DURATION;
+          const start = clip.start || 0;
           if (currentTime > start && currentTime < start + duration) {
-            splitClip(selectedTrackId, selectedClipId, currentTime)
+            splitClip(selectedTrackId, selectedClipId, currentTime);
           } else {
-            addToast?.(t('toastEditorPlayheadMustBeInside'), 'warning')
+            addToast?.(t("toastEditorPlayheadMustBeInside"), "warning");
           }
         }
       } else {
-        addToast?.(t('toastEditorNoClipSelected'), 'info')
+        addToast?.(t("toastEditorNoClipSelected"), "info");
       }
     },
     onToggleSnap: () => setSnapEnabled(!snapEnabled),
@@ -1170,17 +1571,18 @@ function EditorTimelineContent() {
     canUndo,
     canRedo,
     isEnabled: true,
-  })
+  });
 
+  // ─── RENDER ─────────────────────────────────────────────────────────
   return (
     <div
       data-testid="editor-container"
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        overflow: 'hidden',
-        background: 'var(--bg-primary)',
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        overflow: "hidden",
+        background: "var(--bg-primary)",
       }}
     >
       <EditorToolbar
@@ -1204,19 +1606,19 @@ function EditorTimelineContent() {
         onToggleSnap={() => setSnapEnabled(!snapEnabled)}
         autoCrossfade={autoCrossfade}
         onToggleCrossfade={() => setAutoCrossfade(!autoCrossfade)}
-        projectName={project?.name || 'Nouveau projet'}
+        projectName={project?.name || t("editorNewProject")}
         onRenameProject={async (newName) => {
           if (!newName || !newName.trim()) {
-            addToast?.(t('toastProjectRenameError'), 'warning')
-            return
+            addToast?.(t("toastProjectRenameError"), "warning");
+            return;
           }
-          const trimmed = newName.trim()
-          const ok = context.updateEditorProjectName(trimmed)
+          const trimmed = newName.trim();
+          const ok = context.updateEditorProjectName(trimmed);
           if (ok) {
             try {
-              await projectManager.renameProject(project.id, trimmed)
+              await projectManager.renameProject(project.id, trimmed);
             } catch (e) {
-              logError('Editor', 'Erreur rename fallback', e)
+              logError("Editor", "Rename fallback failed", e);
             }
           }
         }}
@@ -1251,9 +1653,9 @@ function EditorTimelineContent() {
       <div
         style={{
           flex: 1,
-          overflow: 'hidden',
-          position: 'relative',
-          minHeight: '320px',
+          overflow: "hidden",
+          position: "relative",
+          minHeight: "320px",
         }}
       >
         {isActionOverlayActive && (
@@ -1302,7 +1704,7 @@ function EditorTimelineContent() {
           onToggleLoop={handleToggleTimelineLoop}
           onUpdateClipDuration={handleUpdateClipDuration}
           onSplitClip={(trackId, clipId, splitTime) => {
-            return splitClip?.(trackId, clipId, splitTime)
+            return splitClip?.(trackId, clipId, splitTime);
           }}
           markers={context.markers}
           onAddMarker={handleAddMarker}
@@ -1312,7 +1714,7 @@ function EditorTimelineContent() {
           tr={t}
           addToast={addToast}
           onPlayClip={(clip, trackId) => {
-            playClipOnly(clip, trackId)
+            playClipOnly(clip, trackId);
           }}
           onStopClip={stop}
           onCopyClip={handleCopyClip}
@@ -1321,7 +1723,7 @@ function EditorTimelineContent() {
           store={store}
           loopState={loopState}
           onToggleClipLoop={(clipId, options) => {
-            toggleClipLoop(clipId, options)
+            toggleClipLoop(clipId, options);
           }}
           isPendingAction={isActionOverlayActive}
           pendingAction={actionOverlay}
@@ -1349,12 +1751,12 @@ function EditorTimelineContent() {
 
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '4px 16px',
-          borderTop: '1px solid var(--border)',
-          background: 'var(--bg-secondary)',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "4px 16px",
+          borderTop: "1px solid var(--border)",
+          background: "var(--bg-secondary)",
           flexShrink: 0,
         }}
       >
@@ -1369,19 +1771,19 @@ function EditorTimelineContent() {
         <div
           style={{
             fontSize: 10,
-            color: 'var(--text-tertiary)',
-            display: 'flex',
+            color: "var(--text-tertiary)",
+            display: "flex",
             gap: 12,
           }}
         >
           <span>
-            {t('editorClips')}: {totalClipCount}
+            {t("editorClips")}: {totalClipCount}
           </span>
           <span>
-            {t('editorTracks')}: {tracks.length}
+            {t("editorTracks")}: {tracks.length}
           </span>
           <span>
-            {t('editorDuration')}: {formatTime(totalDuration)}
+            {t("editorDuration")}: {formatTime(totalDuration)}
           </span>
         </div>
       </div>
@@ -1395,7 +1797,7 @@ function EditorTimelineContent() {
             defaultName={pendingTrackName}
             tr={t}
           />,
-          document.body
+          document.body,
         )}
 
       {showImportModal &&
@@ -1403,9 +1805,9 @@ function EditorTimelineContent() {
           <ImportFileModal
             isOpen={showImportModal}
             onClose={() => {
-              setShowImportModal(false)
-              setPendingImportFile(null)
-              setPendingImportFileName('')
+              setShowImportModal(false);
+              setPendingImportFile(null);
+              setPendingImportFileName("");
             }}
             onConfirm={handleImportConfirm}
             tracks={tracks}
@@ -1414,7 +1816,7 @@ function EditorTimelineContent() {
             fileName={pendingImportFileName}
             tr={t}
           />,
-          document.body
+          document.body,
         )}
 
       {showExportModal && (
@@ -1422,106 +1824,105 @@ function EditorTimelineContent() {
           isOpen={showExportModal}
           onClose={() => setShowExportModal(false)}
           onExport={async (options) => {
-            setIsExporting(true)
-
             try {
-              const buffer = await mixdownProject(project, clipDurations, 44100)
+              const buffer = await mixdownProject(
+                project,
+                clipDurations,
+                44100,
+              );
 
-              if (!buffer) throw new Error('Erreur lors du mixage')
+              if (!buffer) throw new Error("Mixdown error");
 
-              const exportResults = []
+              const exportResults = [];
 
               if (
-                options.exportLocation === 'file' ||
-                options.exportLocation === 'both'
+                options.exportLocation === "file" ||
+                options.exportLocation === "both"
               ) {
                 const saveResult = await window.electronAPI.saveFileDialog?.(
                   options.outputPath ||
                     `${options.name}.${
-                      options.format === 'wav' ? 'wav' : options.format
+                      options.format === "wav" ? "wav" : options.format
                     }`,
-                  null
-                )
+                  null,
+                );
 
                 if (saveResult?.success && saveResult?.path) {
                   const result = await exportMixdown(
                     buffer,
                     options.format,
                     options.bitrate,
-                    saveResult.path
-                  )
+                    saveResult.path,
+                  );
                   if (result.success) {
-                    exportResults.push({ type: 'file', path: saveResult.path })
+                    exportResults.push({ type: "file", path: saveResult.path });
                     addToast?.(
-                      `${t('editorExportSuccess')}: ${saveResult.path}`,
-                      'success'
-                    )
+                      `${t("editorExportSuccess")}: ${saveResult.path}`,
+                      "success",
+                    );
                   } else {
-                    throw new Error(result.error || 'Erreur export fichier')
+                    throw new Error(result.error || "File export error");
                   }
                 } else if (saveResult?.canceled) {
-                  setIsExporting(false)
-                  setShowExportModal(false)
-                  return
+                  setShowExportModal(false);
+                  return;
                 } else {
                   const fallbackPath =
                     options.outputPath ||
                     `${options.name}.${
-                      options.format === 'wav' ? 'wav' : options.format
-                    }`
+                      options.format === "wav" ? "wav" : options.format
+                    }`;
                   const result = await exportMixdown(
                     buffer,
                     options.format,
                     options.bitrate,
-                    fallbackPath
-                  )
+                    fallbackPath,
+                  );
                   if (result.success) {
-                    exportResults.push({ type: 'file', path: fallbackPath })
+                    exportResults.push({ type: "file", path: fallbackPath });
                     addToast?.(
-                      `${t('editorExportSuccess')}: ${fallbackPath}`,
-                      'success'
-                    )
+                      `${t("editorExportSuccess")}: ${fallbackPath}`,
+                      "success",
+                    );
                   } else {
-                    throw new Error(result.error || 'Erreur export fichier')
+                    throw new Error(result.error || "File export error");
                   }
                 }
               }
 
               if (
-                options.exportLocation === 'library' ||
-                options.exportLocation === 'both'
+                options.exportLocation === "library" ||
+                options.exportLocation === "both"
               ) {
-                const tempPath = `temp_${Date.now()}.wav`
+                const tempPath = `temp_${Date.now()}.wav`;
                 const tempResult = await exportMixdown(
                   buffer,
-                  'wav',
+                  "wav",
                   44100,
-                  tempPath
-                )
+                  tempPath,
+                );
 
                 if (tempResult.success) {
-                  const profiles = options.profiles || ['all']
+                  const profiles = options.profiles || ["all"];
                   await store.addSound({
-                    name: options.name || 'Export',
+                    name: options.name || t("editorDefaultMixName"),
                     path: tempResult.path,
-                    emoji: '🎵',
+                    emoji: "🎵",
                     profiles,
-                  })
-                  exportResults.push({ type: 'library', name: options.name })
-                  addToast?.(t('editorCreated'), 'success')
+                  });
+                  exportResults.push({ type: "library", name: options.name });
+                  addToast?.(t("editorCreated"), "success");
                 } else {
-                  throw new Error('Erreur ajout à la bibliothèque')
+                  throw new Error("Library add error");
                 }
               }
 
-              setIsExporting(false)
-              setShowExportModal(false)
-              return { success: true, results: exportResults }
+              setShowExportModal(false);
+              return { success: true, results: exportResults };
             } catch (e) {
-              logError('Editor', 'Erreur export', e)
-              addToast?.(`${t('editorExportError')}: ${e.message}`, 'error')
-              setIsExporting(false)
-              return { success: false, error: e.message }
+              logError("Editor", "Export failed", e);
+              addToast?.(`${t("editorExportError")}: ${e.message}`, "error");
+              return { success: false, error: e.message };
             }
           }}
           store={store}
@@ -1533,10 +1934,11 @@ function EditorTimelineContent() {
 
       {showTrimModal &&
         (() => {
-          const clip = getClipById(tracks, trimClipId)
-          if (!clip) return null
+          const clip = getClipById(tracks, trimClipId);
+          if (!clip) return null;
 
-          const duration = clipDurations[clip.id] || clip.duration || 3
+          const duration =
+            clipDurations[clip.id] || clip.duration || DEFAULT_CLIP_DURATION;
 
           return createPortal(
             <TrimClipModal
@@ -1545,21 +1947,21 @@ function EditorTimelineContent() {
               trackId={selectedTrackId}
               clipDuration={duration}
               onClose={() => {
-                setShowTrimModal(false)
-                setTrimClipId(null)
+                setShowTrimModal(false);
+                setTrimClipId(null);
               }}
               onTrim={() => {}}
               tr={t}
               addToast={addToast}
             />,
-            document.body
-          )
+            document.body,
+          );
         })()}
 
       {showNormalizeModal &&
         (() => {
-          const clip = getClipById(tracks, normalizeClipId)
-          if (!clip) return null
+          const clip = getClipById(tracks, normalizeClipId);
+          if (!clip) return null;
 
           return createPortal(
             <NormalizeModal
@@ -1567,14 +1969,14 @@ function EditorTimelineContent() {
               clip={clip}
               trackId={selectedTrackId}
               onClose={() => {
-                setShowNormalizeModal(false)
-                setNormalizeClipId(null)
+                setShowNormalizeModal(false);
+                setNormalizeClipId(null);
               }}
               onNormalize={handleNormalizeWithOptions}
               tr={t}
             />,
-            document.body
-          )
+            document.body,
+          );
         })()}
 
       {showTimelineLoopModal &&
@@ -1591,7 +1993,7 @@ function EditorTimelineContent() {
             isClickModeActive={isTimelineClickModeActive}
             clickModeData={timelineClickData}
           />,
-          document.body
+          document.body,
         )}
 
       {clipMenu && (
@@ -1600,54 +2002,60 @@ function EditorTimelineContent() {
           trackId={selectedTrackForMenu}
           position={clipMenu}
           onClose={() => {
-            setClipMenu(null)
-            setSelectedClipForMenu(null)
-            setSelectedTrackForMenu(null)
+            setClipMenu(null);
+            setSelectedClipForMenu(null);
+            setSelectedTrackForMenu(null);
           }}
           onSplit={(trackId, clipId) => {
-            const clip = getClipById(tracks, clipId)
+            const clip = getClipById(tracks, clipId);
             if (clip) {
-              const duration = clipDurations[clip.id] || clip.duration || 3
-              const start = clip.start || 0
-              const midPoint = start + duration / 2
-              splitClip(trackId, clipId, midPoint)
+              const duration =
+                clipDurations[clip.id] ||
+                clip.duration ||
+                DEFAULT_CLIP_DURATION;
+              const start = clip.start || 0;
+              const midPoint = start + duration / 2;
+              splitClip(trackId, clipId, midPoint);
             }
-            setClipMenu(null)
+            setClipMenu(null);
           }}
           onLoop={() => {
-            const clip = selectedClipForMenu
+            const clip = selectedClipForMenu;
             if (clip) {
-              const duration = clipDurations[clip.id] || clip.duration || 3
-              setLoopRegion(clip.start, clip.start + duration)
-              toggleLoop()
-              addToast?.(t('editorLoopSet'), 'success')
+              const duration =
+                clipDurations[clip.id] ||
+                clip.duration ||
+                DEFAULT_CLIP_DURATION;
+              setLoopRegion(clip.start, clip.start + duration);
+              toggleLoop();
+              addToast?.(t("editorLoopSet"), "success");
             }
-            setClipMenu(null)
+            setClipMenu(null);
           }}
           onTrim={(clipId) => {
-            setTrimClipId(clipId)
-            setShowTrimModal(true)
-            setClipMenu(null)
+            setTrimClipId(clipId);
+            setShowTrimModal(true);
+            setClipMenu(null);
           }}
           onNormalize={(clipId) => {
-            setNormalizeClipId(clipId)
-            setShowNormalizeModal(true)
-            setClipMenu(null)
+            setNormalizeClipId(clipId);
+            setShowNormalizeModal(true);
+            setClipMenu(null);
           }}
           onAddEffect={handleAddEffectFromMenu}
           onDuplicate={(trackId, clipId) => {
-            duplicateClip(trackId, clipId)
-            setClipMenu(null)
+            duplicateClip(trackId, clipId);
+            setClipMenu(null);
           }}
           onCopy={(clipId) => {
-            const clip = getClipById(tracks, clipId)
-            if (clip) handleCopyClip(clip)
-            setClipMenu(null)
+            const clip = getClipById(tracks, clipId);
+            if (clip) handleCopyClip(clip);
+            setClipMenu(null);
           }}
           onCut={(clipId) => {
-            const clip = getClipById(tracks, clipId)
-            if (clip) handleCutClip(clip)
-            setClipMenu(null)
+            const clip = getClipById(tracks, clipId);
+            if (clip) handleCutClip(clip);
+            setClipMenu(null);
           }}
           onDelete={handleDeleteWithConfirm}
           onPreviewEffects={handlePreviewEffects}
@@ -1655,7 +2063,7 @@ function EditorTimelineContent() {
           isLoopEnabled={loopRegion.enabled}
           tr={t}
           onToggleClipLoop={(clipId, options) => {
-            toggleClipLoop(clipId, options)
+            toggleClipLoop(clipId, options);
           }}
           onActivateLoopManualClick={activateLoopManualClick}
           onActivateSplitManualClick={activateSplitManualClick}
@@ -1667,9 +2075,27 @@ function EditorTimelineContent() {
         />
       )}
     </div>
-  )
+  );
 }
 
+/**
+ * Effects panel slot — renders `EditorEffectsPanel` only when a clip is
+ * selected and the panel is visible.
+ *
+ * Extracted to module level so React Compiler can optimize it
+ * (`react-hooks/static-components` rule).
+ *
+ * @param {Object} props
+ * @param {boolean} props.visible
+ * @param {Object|null} props.clip
+ * @param {string|null} props.trackId
+ * @param {Object} props.context - The `useEditor()` value.
+ * @param {Function} props.updateClip
+ * @param {(key: string) => string} props.tr - i18n translator.
+ * @param {boolean} props.showAddMenu
+ * @param {(v: boolean) => void} props.onShowAddMenuChange
+ * @returns {JSX.Element|null}
+ */
 function EffectsPanelSlot({
   visible,
   clip,
@@ -1680,7 +2106,7 @@ function EffectsPanelSlot({
   showAddMenu,
   onShowAddMenuChange,
 }) {
-  if (!visible || !clip) return null
+  if (!visible || !clip) return null;
 
   const {
     addEffectToClip,
@@ -1688,7 +2114,7 @@ function EffectsPanelSlot({
     updateEffectParam,
     toggleEffect,
     setClipFade,
-  } = context
+  } = context;
 
   return (
     <EditorEffectsPanel
@@ -1705,5 +2131,5 @@ function EffectsPanelSlot({
       showAddMenu={showAddMenu}
       onShowAddMenuChange={onShowAddMenuChange}
     />
-  )
+  );
 }

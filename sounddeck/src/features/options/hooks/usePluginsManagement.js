@@ -1,10 +1,35 @@
-// src/features/options/hooks/usePluginsManagement.js
+/**
+ * @file Plugin list management hook.
+ *
+ * Loads the current plugin list (enabled + disabled) from the plugin
+ * manager, and exposes imperative enable/uninstall handlers that keep the
+ * list in sync after each mutation.
+ *
+ * @see @core/plugins/PluginContext
+ * @see @core/store/hooks/useLicense
+ */
+
 import { useState, useCallback, useEffect } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { usePlugins } from '@core/plugins/PluginContext'
 import { useLicense } from '@core/store/hooks/useLicense'
 import { logWarn, logError } from '@shared/utils/logger'
 
+/**
+ * Plugin list management hook.
+ *
+ * @param {Object} options
+ * @param {(msg: string, type?: string) => void} options.addToast
+ * @returns {{
+ *   plugins: Array<Object>,
+ *   disabledPlugins: Array<Object>,
+ *   loadPlugins: () => Promise<void>,
+ *   handlePluginUninstall: (plugin: Object) => Promise<void>,
+ *   handlePluginEnable: (pluginMeta: Object) => Promise<void>,
+ *   licenseTier: string,
+ *   isPro: boolean,
+ * }}
+ */
 export function usePluginsManagement({ addToast }) {
   const { t } = useLanguage()
   const { pluginManager, refresh: refreshPlugins } = usePlugins()
@@ -12,6 +37,10 @@ export function usePluginsManagement({ addToast }) {
   const [plugins, setPlugins] = useState([])
   const [disabledPlugins, setDisabledPlugins] = useState([])
 
+  /**
+   * Refreshes the enabled/disabled plugin lists.
+   * @returns {Promise<void>}
+   */
   const loadPlugins = useCallback(async () => {
     try {
       const loaded = pluginManager.getLoadedPlugins()
@@ -19,7 +48,7 @@ export function usePluginsManagement({ addToast }) {
       setPlugins(loaded)
       setDisabledPlugins(disabled)
     } catch (e) {
-      logWarn('usePluginsManagement', 'Erreur chargement plugins', e)
+      logWarn('usePluginsManagement', 'Plugin loading error', e)
     }
   }, [pluginManager])
 
@@ -27,6 +56,13 @@ export function usePluginsManagement({ addToast }) {
     loadPlugins()
   }, [loadPlugins])
 
+  /**
+   * Uninstalls a plugin (permanent), removes its files if it isn't an
+   * integrated plugin, and refreshes the list.
+   *
+   * @param {Object} plugin
+   * @returns {Promise<void>}
+   */
   const handlePluginUninstall = useCallback(
     async (plugin) => {
       try {
@@ -35,8 +71,8 @@ export function usePluginsManagement({ addToast }) {
         if (!plugin.isIntegrated) {
           try {
             await window.electronAPI.uninstallPlugin?.(plugin.id)
-          } catch (e) {
-            // silencieux
+          } catch {
+            // Ignore — the file removal is best-effort.
           }
         }
 
@@ -51,13 +87,19 @@ export function usePluginsManagement({ addToast }) {
           'info'
         )
       } catch (e) {
-        logError('usePluginsManagement', 'Erreur uninstall plugin', e)
+        logError('usePluginsManagement', 'Plugin uninstall error', e)
         addToast(t('pluginsUninstallError') + ': ' + e.message, 'error')
       }
     },
     [t, addToast, loadPlugins, pluginManager, refreshPlugins]
   )
 
+  /**
+   * Re-enables a previously-disabled plugin.
+   *
+   * @param {{id: string, name?: string, nameKey?: string}} pluginMeta
+   * @returns {Promise<void>}
+   */
   const handlePluginEnable = useCallback(
     async (pluginMeta) => {
       try {
@@ -76,7 +118,7 @@ export function usePluginsManagement({ addToast }) {
           addToast(t('pluginsEnableError'), 'error')
         }
       } catch (e) {
-        logError('usePluginsManagement', 'Erreur enable plugin', e)
+        logError('usePluginsManagement', 'Plugin enable error', e)
         addToast(t('pluginsEnableError') + ': ' + e.message, 'error')
       }
     },
@@ -89,7 +131,6 @@ export function usePluginsManagement({ addToast }) {
     loadPlugins,
     handlePluginUninstall,
     handlePluginEnable,
-    // ✅ NOUVEAU : expose le tier pour les consommateurs (Options, etc.)
     licenseTier,
     isPro,
   }

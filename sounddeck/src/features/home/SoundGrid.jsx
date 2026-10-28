@@ -1,13 +1,54 @@
-// src/features/home/SoundGrid.jsx
+/**
+ * @file Sound grid — lays out SoundCards with drag & drop reordering.
+ *
+ * The grid uses `auto-fill, minmax(CARD_SIZE, 1fr)` so the column count
+ * adapts to the container width (the exact column count is computed by
+ * the parent so it can paginate).
+ *
+ * **Drag & drop** — each card wrapper handles the drag lifecycle and
+ * delegates to the parent's callbacks. The parent owns the actual
+ * `draggedSoundId` / `dragOverIndex` state so favorites and profile
+ * grids can drag between each other.
+ *
+ * @see ./Home.jsx — parent
+ * @see @shared/components/audio/SoundCard — the card itself
+ */
+
 import { useLanguage } from '@core/i18n/LanguageContext'
 import SoundCard from '@shared/components/audio/SoundCard'
 
+/** Card widths per size, in pixels. Matches `Home.jsx` `CARD_SIZES`. */
 const CARD_SIZES = {
   small: 90,
   medium: 110,
   large: 140,
 }
 
+/**
+ * Sound grid.
+ *
+ * @param {Object} props
+ * @param {Array<Object>} props.sounds
+ * @param {Record<string, string>} props.shortcuts - `{ [soundId]: accelerator }`.
+ * @param {string} props.audioDevice
+ * @param {number} props.volume
+ * @param {boolean} props.loopEnabled
+ * @param {boolean} props.playLocally
+ * @param {Object} props.store
+ * @param {(msg: string, type?: string) => void} props.addToast
+ * @param {{current: HTMLElement|null}} props.gridRef
+ * @param {boolean} props.draggable
+ * @param {(e: DragEvent, soundId: string, index: number, target: string) => void} props.onDragStart
+ * @param {(e: DragEvent) => void} props.onDragEnd
+ * @param {(e: DragEvent, index: number) => void} props.onDragOver
+ * @param {(e: DragEvent, index: number, target: string) => void} props.onDrop
+ * @param {string|null} props.draggedSoundId
+ * @param {number|null} props.dragOverIndex
+ * @param {'favorites'|'profile'} props.dropTarget
+ * @param {(soundId: string) => void} props.onDelete
+ * @param {string} [props.testId]
+ * @returns {JSX.Element}
+ */
 export default function SoundGrid({
   sounds,
   shortcuts,
@@ -52,7 +93,9 @@ export default function SoundGrid({
           <div
             key={s.id}
             draggable={draggable}
-            onDragStart={(e) => draggable && onDragStart(e, s.id, index, dropTarget)}
+            onDragStart={(e) =>
+              draggable && onDragStart(e, s.id, index, dropTarget)
+            }
             onDragEnd={(e) => draggable && onDragEnd(e)}
             onDragOver={(e) => draggable && onDragOver(e, index)}
             onDrop={(e) => draggable && onDrop(e, index, dropTarget)}
@@ -63,23 +106,27 @@ export default function SoundGrid({
               cursor: draggable ? 'grab' : 'default',
               position: 'relative',
               zIndex: isDragging ? 10 : 1,
-              boxShadow: isDragOver ? '0 0 20px rgba(124,111,247,0.3)' : 'none',
+              boxShadow: isDragOver
+                ? '0 0 20px rgba(124,111,247,0.3)'
+                : 'none',
             }}
           >
             {isDragOver && (
-              <div style={{
-                position: 'absolute',
-                top: -2,
-                left: 4,
-                right: 4,
-                height: 3,
-                background: 'var(--accent)',
-                borderRadius: 2,
-                pointerEvents: 'none',
-                zIndex: 5,
-                animation: 'fadeIn 0.2s ease',
-                boxShadow: '0 0 10px var(--accent)',
-              }} />
+              <div
+                style={{
+                  position: 'absolute',
+                  top: -2,
+                  left: 4,
+                  right: 4,
+                  height: 3,
+                  background: 'var(--accent)',
+                  borderRadius: 2,
+                  pointerEvents: 'none',
+                  zIndex: 5,
+                  animation: 'fadeIn 0.2s ease',
+                  boxShadow: '0 0 10px var(--accent)',
+                }}
+              />
             )}
 
             <SoundCard

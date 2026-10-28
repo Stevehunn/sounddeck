@@ -1,6 +1,24 @@
-// src/features/home/ImportModal/CompressionOptions.jsx
+/**
+ * @file Compression controls for the import modal.
+ *
+ * Renders the "compress on import" checkbox and (when enabled) a bitrate
+ * dropdown. The state is owned by the parent modal so all 3 tabs share it.
+ *
+ * @see ./index.jsx (ImportModal)
+ */
+
 import { useLanguage } from '@core/i18n/LanguageContext'
 
+/**
+ * Compression controls.
+ *
+ * @param {Object} props
+ * @param {boolean} props.compressOnImport
+ * @param {(v: boolean) => void} props.setCompressOnImport
+ * @param {number} props.compressionBitrate
+ * @param {(v: number) => void} props.setCompressionBitrate
+ * @returns {JSX.Element}
+ */
 export default function CompressionOptions({
   compressOnImport,
   setCompressOnImport,
@@ -10,18 +28,20 @@ export default function CompressionOptions({
   const { t } = useLanguage()
 
   return (
-    <div style={{
-      padding: '8px 12px',
-      background: 'var(--bg-tertiary)',
-      borderRadius: 'var(--radius-md)',
-      border: '1px solid var(--border)',
-      marginTop: 12,
-    }}>
+    <div
+      style={{
+        padding: '8px 12px',
+        background: 'var(--bg-tertiary)',
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--border)',
+        marginTop: 12,
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <input
           type="checkbox"
           checked={compressOnImport}
-          onChange={e => setCompressOnImport(e.target.checked)}
+          onChange={(e) => setCompressOnImport(e.target.checked)}
           style={{ width: 'auto', accentColor: 'var(--accent)' }}
         />
         <label style={{ fontSize: 12, cursor: 'pointer' }}>
@@ -31,13 +51,20 @@ export default function CompressionOptions({
       </div>
 
       {compressOnImport && (
-        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div
+          style={{
+            marginTop: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
           <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
             {t('compressionBitrate')}:
           </span>
           <select
             value={compressionBitrate}
-            onChange={e => setCompressionBitrate(Number(e.target.value))}
+            onChange={(e) => setCompressionBitrate(Number(e.target.value))}
             style={{ width: 120, fontSize: 12 }}
           >
             <option value="64">64 kbps</option>

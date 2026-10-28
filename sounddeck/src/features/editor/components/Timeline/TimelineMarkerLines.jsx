@@ -1,11 +1,36 @@
-// src/features/editor/components/Timeline/TimelineMarkerLines.jsx
+/**
+ * @file Renders timeline markers as vertical lines.
+ *
+ * Two variants:
+ * - `'ruler'` — triangle + truncated label + dotted line (richer, used in
+ *   the top ruler).
+ * - `'timeline'` — plain 2-px vertical line (used inside the clip area).
+ *
+ * Markers beyond `totalWidth` are skipped to avoid overflowing the
+ * container. `pointer-events: none` everywhere so markers never steal
+ * clicks from the clips or the seek handler.
+ *
+ * @see ../Timeline/index.jsx
+ */
+
 import { memo } from 'react'
 import { formatTime } from '@shared/utils/format'
 
+/** Default marker color when `marker.color` is absent. */
+const DEFAULT_MARKER_COLOR = '#3b82f6'
+
+/** Max characters shown in the ruler label before truncation. */
+const LABEL_MAX_CHARS = 8
+
 /**
- * Rend les marqueurs sur la timeline / le ruler.
+ * Timeline markers (see file header).
  *
- * @param {string} variant - 'ruler' (triangle + label) ou 'timeline' (simple ligne)
+ * @param {Object} props
+ * @param {Array<{id: string, name: string, time: number, color?: string}>} props.markers
+ * @param {number} props.pixelsPerSecond
+ * @param {number} props.totalWidth
+ * @param {'ruler'|'timeline'} [props.variant='timeline']
+ * @returns {JSX.Element|null}
  */
 const TimelineMarkerLines = memo(function TimelineMarkerLines({
   markers,
@@ -22,7 +47,7 @@ const TimelineMarkerLines = memo(function TimelineMarkerLines({
           const position = marker.time * pixelsPerSecond
           if (position > totalWidth) return null
 
-          const color = marker.color || '#3b82f6'
+          const color = marker.color || DEFAULT_MARKER_COLOR
 
           return (
             <div
@@ -72,8 +97,8 @@ const TimelineMarkerLines = memo(function TimelineMarkerLines({
                   textOverflow: 'ellipsis',
                 }}
               >
-                {marker.name.length > 8
-                  ? marker.name.slice(0, 8) + '…'
+                {marker.name.length > LABEL_MAX_CHARS
+                  ? marker.name.slice(0, LABEL_MAX_CHARS) + '…'
                   : marker.name}
               </div>
               <div
@@ -95,7 +120,7 @@ const TimelineMarkerLines = memo(function TimelineMarkerLines({
     )
   }
 
-  // variant === 'timeline' : simple ligne verticale
+  // variant === 'timeline' → simple vertical line
   return (
     <>
       {markers.map((marker) => {
@@ -111,7 +136,7 @@ const TimelineMarkerLines = memo(function TimelineMarkerLines({
               bottom: 0,
               left: position,
               width: 2,
-              background: marker.color || '#3b82f6',
+              background: marker.color || DEFAULT_MARKER_COLOR,
               opacity: 0.45,
               zIndex: 2,
               pointerEvents: 'none',

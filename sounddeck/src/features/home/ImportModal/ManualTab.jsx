@@ -1,4 +1,12 @@
-// src/features/home/ImportModal/ManualTab.jsx
+/**
+ * @file "Custom" tab of the import modal (name + file + image + emoji).
+ *
+ * @see ./index.jsx (ImportModal)
+ * @see ./CompressionOptions.jsx
+ * @see @shared/components/audio/AudioTrimmer
+ * @see @shared/components/ui/EmojiPicker
+ */
+
 import { useState } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { buildFileUrl } from '@shared/utils/fileUrl'
@@ -6,6 +14,18 @@ import AudioTrimmer from '@shared/components/audio/AudioTrimmer'
 import EmojiPicker from '@shared/components/ui/EmojiPicker'
 import CompressionOptions from './CompressionOptions'
 
+/**
+ * Manual tab.
+ *
+ * @param {Object} props
+ * @param {() => void} props.onClose
+ * @param {(name: string, path: string, imagePath: string|null, emoji: string) => void} props.onManualAdd
+ * @param {boolean} props.compressOnImport
+ * @param {(v: boolean) => void} props.setCompressOnImport
+ * @param {number} props.compressionBitrate
+ * @param {(v: number) => void} props.setCompressionBitrate
+ * @returns {JSX.Element}
+ */
 export default function ManualTab({
   onClose,
   onManualAdd,
@@ -42,7 +62,12 @@ export default function ManualTab({
   }
 
   const handleManualAdd = async (finalPath) => {
-    await onManualAdd(manualName, finalPath || manualFile.path, manualImage, manualEmoji)
+    await onManualAdd(
+      manualName,
+      finalPath || manualFile.path,
+      manualImage,
+      manualEmoji
+    )
   }
 
   if (showTrimmer && manualFile) {
@@ -63,18 +88,32 @@ export default function ManualTab({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div>
-        <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+        <label
+          style={{
+            fontSize: 12,
+            color: 'var(--text-secondary)',
+            display: 'block',
+            marginBottom: 4,
+          }}
+        >
           {t('soundName')}
         </label>
         <input
           value={manualName}
-          onChange={e => setManualName(e.target.value)}
-          placeholder="Ex: Airhorn"
+          onChange={(e) => setManualName(e.target.value)}
+          placeholder={t('soundNamePlaceholder')}
         />
       </div>
 
       <div>
-        <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+        <label
+          style={{
+            fontSize: 12,
+            color: 'var(--text-secondary)',
+            display: 'block',
+            marginBottom: 4,
+          }}
+        >
           {t('audioFile')}
         </label>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -101,14 +140,28 @@ export default function ManualTab({
       )}
 
       <div>
-        <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+        <label
+          style={{
+            fontSize: 12,
+            color: 'var(--text-secondary)',
+            display: 'block',
+            marginBottom: 4,
+          }}
+        >
           {t('image')}
         </label>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {manualImage && (
             <img
               src={buildFileUrl(manualImage)}
-              style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+              alt=""
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 8,
+                objectFit: 'cover',
+                flexShrink: 0,
+              }}
             />
           )}
           <input
@@ -121,7 +174,10 @@ export default function ManualTab({
             <i className="ti ti-photo" /> {t('image')}
           </button>
           {manualImage && (
-            <button className="btn-ghost btn-sm" onClick={() => setManualImage(null)}>
+            <button
+              className="btn-ghost btn-sm"
+              onClick={() => setManualImage(null)}
+            >
               <i className="ti ti-x" />
             </button>
           )}
@@ -130,7 +186,14 @@ export default function ManualTab({
 
       {!manualImage && (
         <div>
-          <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
+          <label
+            style={{
+              fontSize: 12,
+              color: 'var(--text-secondary)',
+              display: 'block',
+              marginBottom: 6,
+            }}
+          >
             {t('emojiLabel')}
           </label>
           <button

@@ -90,6 +90,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `0004_users_email_verified.sql` — Add `email_verified`, `verify_token`, `verify_token_expires` columns
 - `0005_password_resets.sql` — New `password_resets` table for password reset tokens
 
+#### 🧹 Editor refactor (Session 4)
+
+- **35 files refactored** in `src/features/editor/components/` — full `@file` headers, JSDoc on every exported function, comments in English, i18n policy applied (`t()` for components, `tr()` for props).
+  - `Clip/` (5), `Track/` (3), `Timeline/` (11), `Toolbar/` (3), `Modals/` (7), `Markers/` (2), `EffectsPanel/` (1), `MasterVolume/` (1), `ClipActionsMenu` (1), `ActionOverlay` (1).
+- **`Editor.jsx`** split into 8 focused hooks under `contexts/hooks/`:
+  `useEditorCore`, `useEditorTracks`, `useEditorClips`, `useEditorEffects`, `useEditorLoops`, `useEditorMarkers`, `useEditorOverlay`, `useEditorAudioPlayback`.
+
 ### Changed
 
 - **`server/src/index.js`** — Added 7 new routes (signup, verify, forgot, reset, admin)
@@ -103,12 +110,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`package.json`** — Added `electron-updater` dependency, `release` script, GitHub publish config
 - **`README.md`** — Rewritten with new features (auto-update, admin panel, quick setup)
 - **`CONTRIBUTING.md`** — Fixed encoding issues (emojis)
+- **ESLint** — 0 warnings on the entire `src/features/editor/components/` tree.
 
 ### Fixed
 
 - **`handleListCodes`** — D1 `.all()` returns `{ results, meta }`, not an array — fixed the codes table on the admin panel
 - **`AccountPanel`** — Free tier was incorrectly displayed as "Pro"
 - **`login.js`** — Unverified emails can no longer log in
+- **`errorHandler` debounce** — Guard now uses `!== null` instead of a truthy check, preventing duplicate `storeSet` calls when the timer id is `0`.
+- **`ImportFileModal`** — Unsupported-format message now goes through `tr()`.
+- **`MarkerItem`** — Avoids a crash when `editorSplitInstructions` is missing (`formatWithName` helper).
+- **`MasterVolume`** — Peak-meter overlay restored to `linear-gradient` to match the original visual and keep the test selector valid.
+- **i18n `editor.js`** — Added 11 missing keys (markers panel, effects panel, auto-preview tooltips, param labels) across EN/FR/ES.
+- **`i18nLocaleTestFactory`** — Collision threshold bumped from 60 → 100 (Session 4 additions; V2 cleanup planned).
+
+### Tests
+
+- **5621 / 5621** passing across **249 files**.
 
 ### Security
 

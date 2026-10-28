@@ -1,9 +1,42 @@
-// src/features/editor/components/Timeline/TimelineMarkersPanel.jsx
+/**
+ * @file Markers side panel + floating "add marker" button when closed.
+ *
+ * When `isOpen === false`, renders a floating pill button on the top-right
+ * of the timeline (badge = marker count) that calls `onOpen()`.
+ *
+ * When `isOpen === true`, renders a 280-px-wide column with a header
+ * (title + count + close button) and the `<MarkersPanel>` list.
+ *
+ * Returns `null` if `onAddMarker` is not provided — this lets the parent
+ * disable the whole markers feature without mounting an empty panel.
+ *
+ * @see ../Timeline/index.jsx
+ * @see ../Markers/MarkersPanel.jsx
+ */
+
 import { memo } from 'react'
 import MarkersPanel from '../Markers/MarkersPanel'
 
+/** Panel width (px). */
+const PANEL_WIDTH_PX = 280
+
 /**
- * Panneau latéral des marqueurs + bouton flottant quand fermé.
+ * Markers side panel (see file header).
+ *
+ * @param {Object} props
+ * @param {boolean} props.isOpen
+ * @param {Array} [props.markers]
+ * @param {number} props.currentTime
+ * @param {number} props.totalDuration
+ * @param {Function} [props.onAddMarker]
+ * @param {Function} [props.onRemoveMarker]
+ * @param {Function} [props.onUpdateMarker]
+ * @param {Function} [props.onNavigateToMarker]
+ * @param {Function} [props.onClose]
+ * @param {Function} [props.onOpen]
+ * @param {Function} [props.onAutoOpenChange]
+ * @param {(key: string, params?: Object) => string} props.tr
+ * @returns {JSX.Element|null}
  */
 const TimelineMarkersPanel = memo(function TimelineMarkersPanel({
   isOpen,
@@ -53,10 +86,10 @@ const TimelineMarkersPanel = memo(function TimelineMarkersPanel({
           e.currentTarget.style.borderColor = 'var(--border)'
           e.currentTarget.style.background = 'var(--bg-secondary)'
         }}
-        title={tr('editorMarkers') || 'Afficher les marqueurs'}
+        title={tr('editorMarkers') || 'Show markers'}
       >
         <i className="ti ti-flag" />
-        {tr('editorMarkers') || 'Marqueurs'}
+        {tr('editorMarkers') || 'Markers'}
         <span
           style={{
             fontSize: 9,
@@ -78,8 +111,8 @@ const TimelineMarkersPanel = memo(function TimelineMarkersPanel({
     <div
       data-testid="editor-markers-panel"
       style={{
-        width: 280,
-        minWidth: 280,
+        width: PANEL_WIDTH_PX,
+        minWidth: PANEL_WIDTH_PX,
         height: '100%',
         background: 'var(--bg-secondary)',
         borderLeft: '1px solid var(--border)',
@@ -111,7 +144,7 @@ const TimelineMarkersPanel = memo(function TimelineMarkersPanel({
           }}
         >
           <i className="ti ti-flag" style={{ color: 'var(--accent)' }} />
-          {tr('editorMarkers') || 'Marqueurs'}
+          {tr('editorMarkers') || 'Markers'}
           <span
             style={{
               fontSize: 9,
@@ -134,7 +167,7 @@ const TimelineMarkersPanel = memo(function TimelineMarkersPanel({
             minHeight: 20,
             borderRadius: 'var(--radius-sm)',
           }}
-          title={tr('close') || 'Fermer le panneau des marqueurs'}
+          title={tr('close') || 'Close markers panel'}
         >
           <i className="ti ti-x" />
         </button>

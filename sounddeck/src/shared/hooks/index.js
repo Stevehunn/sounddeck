@@ -1,4 +1,3 @@
-// src/shared/hooks/index.js
 export { useConfirm } from './useConfirm'
 export { useCurrentPlaying } from './useCurrentPlaying'
 export { useEmojis } from './useEmojis'

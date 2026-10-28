@@ -484,4 +484,8 @@ export default {
   pluginComponentNotFound: "Componente no encontrado",
   pluginLoadingError: "Error de carga",
   pluginAuthorUnknown: "Desconocido",
+
+  // ─── HOME ─────────────────────────────────────────────────────────
+  files: "archivo(s)",
+  soundNamePlaceholder: "Ej.: Airhorn",
 };

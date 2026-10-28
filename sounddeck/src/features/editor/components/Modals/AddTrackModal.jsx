@@ -1,20 +1,60 @@
-// src/features/editor/components/Modals/AddTrackModal.jsx
-import React, { useState } from 'react'
+/**
+ * @file Add-track modal.
+ *
+ * Minimal form: a name input (pre-filled with `defaultName`) and a color
+ * picker (default: `#3b82f6`). On submit, calls `onConfirm(name, color)`
+ * (or `onAddTrack` if `onConfirm` isn't provided — back-compat with older
+ * callers), then closes.
+ *
+ * The modal also accepts `onClose` or `onCancel` as close handlers (either
+ * works — `onClose` wins when both are present).
+ *
+ * ## Back-compat
+ *
+ * Some older callers pass `onAddTrack` instead of `onConfirm`, and
+ * `onCancel` instead of `onClose`. Both paths are preserved to avoid
+ * breaking existing code.
+ *
+ * @see ../Editor.jsx — the caller
+ */
 
-export default function AddTrackModal({ 
-  isOpen, 
+import { useState } from 'react'
+
+/** Default track color. */
+const DEFAULT_TRACK_COLOR = '#3b82f6'
+
+/**
+ * Add-track modal.
+ *
+ * @param {Object} props
+ * @param {boolean} props.isOpen
+ * @param {() => void} [props.onClose]
+ * @param {() => void} [props.onCancel] - Fallback for `onClose`.
+ * @param {(name: string|undefined, color: string) => void} [props.onConfirm]
+ * @param {(name: string|undefined, color: string) => void} [props.onAddTrack] - Fallback for `onConfirm`.
+ * @param {string} [props.defaultName='']
+ * @param {(key: string) => string} props.tr - i18n translator.
+ * @returns {JSX.Element|null}
+ */
+export default function AddTrackModal({
+  isOpen,
   onClose,
   onCancel,
   onConfirm,
   onAddTrack,
   defaultName,
-  tr 
+  tr,
 }) {
   const [name, setName] = useState(defaultName || '')
-  const [color, setColor] = useState('#3b82f6')
+  const [color, setColor] = useState(DEFAULT_TRACK_COLOR)
 
   if (!isOpen) return null
 
+  /**
+   * Submits the form, then closes the modal.
+   * @param {React.FormEvent} e
+   * @returns {void}
+   */
   const handleSubmit = (e) => {
     e.preventDefault()
     if (onConfirm) {
@@ -30,6 +70,10 @@ export default function AddTrackModal({
     }
   }
 
+  /**
+   * Closes the modal without submitting.
+   * @returns {void}
+   */
   const handleClose = () => {
     setName('')
     if (onClose) {
@@ -41,22 +85,36 @@ export default function AddTrackModal({
 
   return (
     <div className="modal-overlay" onClick={handleClose}>
-      <div className="modal" style={{ width: 400 }} onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal"
+        style={{ width: 400 }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-title">
           <i className="ti ti-playlist" style={{ color: 'var(--accent)' }} />
           {tr('editorAddTrack') || 'Ajouter une piste'}
         </div>
-        
+
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+            <label
+              style={{
+                fontSize: 12,
+                color: 'var(--text-secondary)',
+                display: 'block',
+                marginBottom: 4,
+              }}
+            >
               {tr('editorTrackName') || 'Nom de la piste'}
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={tr('editorTrackNamePlaceholder') || 'Ex: Batterie, Voix, Effets...'}
+              placeholder={
+                tr('editorTrackNamePlaceholder') ||
+                'Ex: Batterie, Voix, Effets...'
+              }
               autoFocus
               className="input-lg"
               style={{
@@ -67,27 +125,41 @@ export default function AddTrackModal({
                 background: 'var(--bg-tertiary)',
                 color: 'var(--text-primary)',
                 fontSize: 13,
-                outline: 'none'
+                outline: 'none',
               }}
             />
           </div>
 
           <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+            <label
+              style={{
+                fontSize: 12,
+                color: 'var(--text-secondary)',
+                display: 'block',
+                marginBottom: 4,
+              }}
+            >
               {tr('editorTrackColor') || 'Couleur de la piste'}
             </label>
             <input
               type="color"
               value={color}
               onChange={(e) => setColor(e.target.value)}
-              style={{ width: 50, height: 40, padding: 2, cursor: 'pointer', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}
+              style={{
+                width: 50,
+                height: 40,
+                padding: 2,
+                cursor: 'pointer',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+              }}
             />
           </div>
 
           <div className="modal-actions">
-            <button 
-              type="button" 
-              className="btn btn-secondary" 
+            <button
+              type="button"
+              className="btn btn-secondary"
               onClick={handleClose}
               style={{
                 fontSize: 13,
@@ -98,13 +170,13 @@ export default function AddTrackModal({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 6
+                gap: 6,
               }}
             >
               {tr('cancel') || 'Annuler'}
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="btn btn-primary"
               style={{
                 fontSize: 13,
@@ -115,7 +187,7 @@ export default function AddTrackModal({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 6
+                gap: 6,
               }}
             >
               <i className="ti ti-plus" /> {tr('add') || 'Ajouter'}

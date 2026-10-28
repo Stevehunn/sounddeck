@@ -1,6 +1,6 @@
 {
   "name": "sounddeck",
-  "version": "1.4.11",
+  "version": "1.4.12",
   "description": "Soundboard local for Discord or other applications with voice chat",
   "author": "Stevehunn <stevehun09@gmail.com>",
   "license": "MIT",
@@ -124,6 +124,7 @@
     "electron": "^42.3.3",
     "electron-builder": "^26.5.0",
     "eslint": "^10.13.0",
+    "eslint-formatter-unix": "^9.0.1",
     "eslint-plugin-jsdoc": "^63.3.3",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",

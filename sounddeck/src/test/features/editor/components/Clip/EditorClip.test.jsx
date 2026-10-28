@@ -542,7 +542,7 @@ describe('EditorClip', () => {
       expect(container.textContent).not.toContain('LOOP')
     })
 
-    it('devrait afficher LOOP si clip dans loopState', () => {
+    it('devrait afficher editorClipLoop si clip dans loopState', () => {
       const props = buildProps({
         loopState: {
           clips: {
@@ -557,7 +557,7 @@ describe('EditorClip', () => {
         },
       })
       const { container } = render(<EditorClip {...props} />)
-      expect(container.textContent).toContain('LOOP')
+      expect(container.textContent).toContain('editorClipLoop')
     })
 
     it('devrait afficher les cycles si loopMode=cycles', () => {

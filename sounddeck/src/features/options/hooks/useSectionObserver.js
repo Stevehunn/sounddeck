@@ -1,7 +1,42 @@
-// src/features/options/hooks/useSectionObserver.js
+/**
+ * @file Options page section observer.
+ *
+ * Keeps the active tab in sync with the viewport:
+ * - **`IntersectionObserver`** — watches every section node (by `SECTIONS`
+ *   order) and updates `activeSection` to the one with the highest
+ *   intersection ratio (threshold 0.2 to avoid jitter).
+ * - **`scrollToSection(id)`** — imperative scroll with a 800 ms "ignore
+ *   observer" window (otherwise the observer would immediately revert
+ *   the tab the user just clicked).
+ *
+ * The observer is set up ~200 ms after mount so React has time to commit
+ * the section refs (the effect runs before children commit their refs).
+ *
+ * @see ./constants.js (`SECTIONS`)
+ * @see ../Options.jsx
+ */
+
 import { useState, useRef, useEffect } from 'react'
 import { SECTIONS } from '../constants'
 
+/** Window (ms) during which the observer ignores events after a scroll. */
+const SCROLL_IGNORE_MS = 800
+
+/** Delay (ms) before the initial observer setup (wait for refs). */
+const OBSERVER_SETUP_DELAY_MS = 200
+
+/** Minimum intersection ratio to be considered "active". */
+const MIN_ACTIVE_RATIO = 0.2
+
+/**
+ * Options page section observer hook.
+ *
+ * @returns {{
+ *   activeSection: string,
+ *   sectionRefs: {current: Record<string, HTMLElement>},
+ *   scrollToSection: (sectionId: string) => void,
+ * }}
+ */
 export function useSectionObserver() {
   const [activeSection, setActiveSection] = useState('appearance')
   const sectionRefs = useRef({})
@@ -10,11 +45,12 @@ export function useSectionObserver() {
 
   useEffect(() => {
     const setupObserver = () => {
-      const sections = SECTIONS
-        .map((s) => sectionRefs.current[s.id])
-        .filter(Boolean)
+      const sections = SECTIONS.map((s) => sectionRefs.current[s.id]).filter(
+        Boolean
+      )
 
       if (sections.length === 0) {
+        // Refs aren't committed yet → retry shortly.
         setTimeout(setupObserver, 100)
         return
       }
@@ -38,7 +74,7 @@ export function useSectionObserver() {
             }
           })
 
-          if (maxId && maxRatio > 0.2) {
+          if (maxId && maxRatio > MIN_ACTIVE_RATIO) {
             setActiveSection(maxId)
           }
         },
@@ -59,7 +95,7 @@ export function useSectionObserver() {
       }
     }
 
-    const timer = setTimeout(setupObserver, 200)
+    const timer = setTimeout(setupObserver, OBSERVER_SETUP_DELAY_MS)
     return () => {
       clearTimeout(timer)
       if (observerRef.current) {
@@ -68,6 +104,12 @@ export function useSectionObserver() {
     }
   }, [])
 
+  /**
+   * Scrolls to the given section and updates `activeSection` immediately.
+   *
+   * @param {string} sectionId
+   * @returns {void}
+   */
   const scrollToSection = (sectionId) => {
     const ref = sectionRefs.current[sectionId]
     if (ref) {
@@ -77,7 +119,7 @@ export function useSectionObserver() {
 
       setTimeout(() => {
         isScrollingRef.current = false
-      }, 800)
+      }, SCROLL_IGNORE_MS)
     }
   }
 

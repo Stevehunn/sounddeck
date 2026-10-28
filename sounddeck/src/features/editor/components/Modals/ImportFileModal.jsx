@@ -1,6 +1,26 @@
-// src/features/editor/components/Modals/ImportFileModal.jsx
-import React, { useState, useEffect } from 'react'
+/**
+ * @file Import-file modal.
+ *
+ * Picks an audio file via the native dialog (or accepts a pre-selected
+ * file from the parent), asks for the target track and start time, then
+ * forwards everything to `onConfirm({filePath, fileName, trackId, startTime})`.
+ *
+ * The modal also validates the file extension against `SUPPORTED_FORMATS`
+ * before accepting it (shows a native `alert()` on mismatch).
+ *
+ * ## Two modes
+ *
+ * - **Standalone** — the user clicks the drop zone to open the file
+ *   picker (`handlePickFile`).
+ * - **Pre-filled** — the parent passes `initialFilePath` / `initialFileName`
+ *   (e.g. from a drag-and-drop or a native picker in `Editor.jsx`).
+ *
+ * @see ../Editor.jsx — the caller
+ */
 
+import { useState, useEffect } from 'react'
+
+/** File extensions accepted for import. */
 const SUPPORTED_FORMATS = [
   'mp3',
   'wav',
@@ -12,6 +32,38 @@ const SUPPORTED_FORMATS = [
   'webm',
 ]
 
+/**
+ * Returns the file extension, lowercased, or an empty string.
+ * @param {string} path
+ * @returns {string}
+ */
+function getExtension(path) {
+  return path.split('.').pop()?.toLowerCase() || ''
+}
+
+/**
+ * Returns the file base name (without extension) from a path.
+ * @param {string} path
+ * @returns {string}
+ */
+function getBaseName(path) {
+  return path.replace(/\.[^.]+$/, '').split(/[\\/]/).pop() || ''
+}
+
+/**
+ * Import-file modal.
+ *
+ * @param {Object} props
+ * @param {boolean} props.isOpen
+ * @param {() => void} props.onClose
+ * @param {(payload: {filePath: string, fileName: string, trackId: string, startTime: number}) => void} props.onConfirm
+ * @param {Array<{id: string, name: string, clips?: Array<Object>}>} props.tracks
+ * @param {(key: string) => string} props.tr
+ * @param {string} [props.defaultTrackId='']
+ * @param {string|null} [props.initialFilePath=null]
+ * @param {string} [props.initialFileName='']
+ * @returns {JSX.Element|null}
+ */
 export default function ImportFileModal({
   isOpen,
   onClose,
@@ -28,6 +80,8 @@ export default function ImportFileModal({
   const [startTime, setStartTime] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
 
+  // Reset the local state whenever the modal opens or the initial values
+  // change (the modal can be re-used across multiple imports).
   useEffect(() => {
     if (!isOpen) return
 
@@ -38,42 +92,66 @@ export default function ImportFileModal({
     if (initialFilePath) {
       setFilePath(initialFilePath)
       setFileName(
-        initialFileName || initialFilePath.split(/[\\/]/).pop() || 'Fichier audio'
+        initialFileName ||
+          initialFilePath.split(/[\\/]/).pop() ||
+          tr('editorAudioFileFallback') ||
+          'Audio file'
       )
     } else {
       setFilePath('')
       setFileName('')
     }
-  }, [isOpen, tracks, defaultTrackId, initialFilePath, initialFileName])
+  }, [
+    isOpen,
+    tracks,
+    defaultTrackId,
+    initialFilePath,
+    initialFileName,
+    tr,
+  ])
 
   if (!isOpen) return null
 
+  /**
+   * Opens the native file picker and validates the extension.
+   * @returns {Promise<void>}
+   */
   const handlePickFile = async () => {
     try {
       const result = await window.electronAPI.openFileDialog?.()
       if (!result || result.length === 0) return
 
       const picked = result[0]
-      const ext = picked.split('.').pop()?.toLowerCase()
+      const ext = getExtension(picked)
       if (!SUPPORTED_FORMATS.includes(ext)) {
+        // eslint-disable-next-line no-alert
         alert(
-          `Format non supporté. Formats acceptés: ${SUPPORTED_FORMATS.join(', ')}`
+          tr('editorUnsupportedFormat', {
+            formats: SUPPORTED_FORMATS.join(', '),
+          }) ||
+            `Unsupported format. Accepted formats: ${SUPPORTED_FORMATS.join(', ')}`
         )
         return
       }
 
       setFilePath(picked)
-      setFileName(picked.replace(/\.[^.]+$/, '').split(/[\\/]/).pop() || '')
+      setFileName(getBaseName(picked))
     } catch (e) {
-      console.error('Erreur sélection fichier:', e)
+      console.error('File picker error:', e)
     }
   }
 
+  /**
+   * Validates and forwards the import to the parent.
+   * @param {React.FormEvent} e
+   * @returns {void}
+   */
   const handleSubmit = (e) => {
     e.preventDefault()
 
     if (!filePath || !trackId) {
-      alert('Veuillez sélectionner un fichier et une piste')
+      // eslint-disable-next-line no-alert
+      alert('Please select a file and a track')
       return
     }
 
@@ -81,7 +159,7 @@ export default function ImportFileModal({
 
     onConfirm?.({
       filePath,
-      fileName: fileName || 'Fichier audio',
+      fileName: fileName || tr('editorAudioFileFallback') || 'Audio file',
       trackId,
       startTime: Math.max(0, startTime),
     })
@@ -105,10 +183,11 @@ export default function ImportFileModal({
             className="ti ti-file-import"
             style={{ color: 'var(--accent)' }}
           />
-          {tr('editorImportFile') || 'Importer un fichier'}
+          {tr('editorImportFile') || 'Import a file'}
         </div>
 
         <form onSubmit={handleSubmit}>
+          {/* Drop zone / file picker */}
           <div
             style={{
               border: `2px dashed ${
@@ -146,7 +225,7 @@ export default function ImportFileModal({
                     marginTop: 4,
                   }}
                 >
-                  {tr('orBrowse') || 'Cliquez pour changer'}
+                  {tr('orBrowse') || 'Click to change'}
                 </div>
               </div>
             ) : (
@@ -158,17 +237,18 @@ export default function ImportFileModal({
                 <div
                   style={{ marginTop: 8, color: 'var(--text-secondary)' }}
                 >
-                  {tr('dropFiles') || 'Choisissez un fichier audio'}
+                  {tr('dropFiles') || 'Choose an audio file'}
                 </div>
                 <div
                   style={{ fontSize: 11, color: 'var(--text-tertiary)' }}
                 >
-                  {tr('orBrowse') || 'ou cliquez pour parcourir'}
+                  {tr('orBrowse') || 'or click to browse'}
                 </div>
               </div>
             )}
           </div>
 
+          {/* Name */}
           <div style={{ marginBottom: 12 }}>
             <label
               style={{
@@ -178,18 +258,19 @@ export default function ImportFileModal({
                 marginBottom: 4,
               }}
             >
-              {tr('editorNameLabel') || 'Nom'}
+              {tr('editorNameLabel') || 'Name'}
             </label>
             <input
               type="text"
               value={fileName}
               onChange={(e) => setFileName(e.target.value)}
-              placeholder={tr('editorNamePlaceholder') || 'Nom du nouveau son'}
+              placeholder={tr('editorNamePlaceholder') || 'New sound name'}
               required
               className="input-lg"
             />
           </div>
 
+          {/* Track + Start time */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
             <div style={{ flex: 1 }}>
               <label
@@ -200,7 +281,7 @@ export default function ImportFileModal({
                   marginBottom: 4,
                 }}
               >
-                {tr('editorSelectTrack') || 'Piste'}
+                {tr('editorSelectTrack') || 'Track'}
               </label>
               <select
                 value={trackId}
@@ -211,7 +292,7 @@ export default function ImportFileModal({
               >
                 {tracks?.map((t, index) => (
                   <option key={t.id} value={t.id}>
-                    {t.name || `Piste ${index + 1}`} ({t.clips?.length || 0}{' '}
+                    {t.name || `Track ${index + 1}`} ({t.clips?.length || 0}{' '}
                     clips)
                   </option>
                 ))}
@@ -227,13 +308,15 @@ export default function ImportFileModal({
                   marginBottom: 4,
                 }}
               >
-                {tr('start') || 'Début'}
+                {tr('start') || 'Start'}
               </label>
               <input
                 type="number"
                 value={startTime}
                 onChange={(e) =>
-                  setStartTime(Math.max(0, parseFloat(e.target.value) || 0))
+                  setStartTime(
+                    Math.max(0, parseFloat(e.target.value) || 0)
+                  )
                 }
                 step={0.1}
                 min={0}
@@ -243,6 +326,7 @@ export default function ImportFileModal({
             </div>
           </div>
 
+          {/* Actions */}
           <div className="modal-actions">
             <button
               type="button"
@@ -260,7 +344,7 @@ export default function ImportFileModal({
                 gap: 6,
               }}
             >
-              {tr('cancel') || 'Annuler'}
+              {tr('cancel') || 'Cancel'}
             </button>
             <button
               type="submit"
@@ -289,7 +373,7 @@ export default function ImportFileModal({
               ) : (
                 <>
                   <i className="ti ti-upload" />{' '}
-                  {tr('editorImport') || 'Importer'}
+                  {tr('editorImport') || 'Import'}
                 </>
               )}
             </button>

@@ -1,10 +1,35 @@
-// src/features/editor/components/Timeline/TimelineLoopMarkers.jsx
+/**
+ * @file Per-clip loop end markers + intermediate cycle markers on the
+ * ruler and the timeline.
+ *
+ * For each clip with an active loop:
+ * - Draws a vertical `]` marker at the loop's end time (with the `END`
+ *   label and cycle count).
+ * - If `loopMode === 'cycles'` and `totalCycles > 1`, draws dashed
+ *   vertical lines at each intermediate cycle boundary.
+ *
+ * Only clips whose `enabled` flag is true appear; clips not present in
+ * `clipIndex` are skipped (avoids stale markers after deletion).
+ *
+ * @see ../Timeline/index.jsx
+ * @see ./TimelineLoop.jsx — the global loop strip (unrelated)
+ */
+
 import { memo } from 'react'
 
+/** Default loop color when `loopData.arrowColor` is absent. */
+const DEFAULT_LOOP_COLOR = '#22c55e'
+
 /**
- * Rend les marqueurs visuels des boucles de clips :
- *  - marqueur de fin de boucle (avec label FIN + count cycles)
- *  - marqueurs de cycles intermédiaires si mode "cycles"
+ * Per-clip loop end markers.
+ *
+ * @param {Object} props
+ * @param {Map<string, {start: number, duration: number}>} props.clipIndex
+ * @param {Object} props.loopState - `{ clips: { [clipId]: {...} } }`.
+ * @param {number} props.totalDuration
+ * @param {number} props.pixelsPerSecond
+ * @param {(key: string, params?: Object) => string} props.tr
+ * @returns {JSX.Element|null}
  */
 const TimelineLoopMarkers = memo(function TimelineLoopMarkers({
   clipIndex,
@@ -29,11 +54,11 @@ const TimelineLoopMarkers = memo(function TimelineLoopMarkers({
     const clipEnd = clipStart + clipDuration
     const loopEnd = loopData.end || totalDuration
     const loopEndPosition = Math.min(loopEnd, totalDuration) * pixelsPerSecond
-    const loopColor = loopData.arrowColor || '#22c55e'
+    const loopColor = loopData.arrowColor || DEFAULT_LOOP_COLOR
     const loopMode = loopData.loopMode || 'endOfTrack'
     const totalCycles = loopData.totalCycles || loopData.cycleCount || 1
 
-    // Marqueur de fin de boucle
+    // End marker (`]` + END label + cycle count)
     if (loopEndPosition > clipEnd * pixelsPerSecond) {
       markers.push(
         <div
@@ -102,7 +127,7 @@ const TimelineLoopMarkers = memo(function TimelineLoopMarkers({
             }}
           >
             <span>🔚</span>
-            <span>{tr('loopEndLabel') || 'FIN'}</span>
+            <span>{tr('editorClipLoopEnd') || 'END'}</span>
             {loopMode === 'cycles' && totalCycles > 1 && (
               <span style={{ opacity: 0.6 }}>({totalCycles}x)</span>
             )}
@@ -114,7 +139,7 @@ const TimelineLoopMarkers = memo(function TimelineLoopMarkers({
       )
     }
 
-    // Cycles intermédiaires
+    // Intermediate cycle markers
     if (loopMode === 'cycles' && totalCycles > 1) {
       let cycleEnd = clipEnd
       for (let i = 1; i < totalCycles; i++) {

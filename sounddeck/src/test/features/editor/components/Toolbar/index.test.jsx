@@ -40,7 +40,7 @@ describe('EditorToolbar', () => {
     ...o,
   })
 
-  // ✅ FIX : helper pour cibler le span du projet (pas le mock ProjectControls)
+  // helper to aim at the span of the projet (not the mock of ProjectControls)
   const getProjectNameEl = (container) =>
     container.querySelector('[title="editorClickToRename"]')
 
@@ -113,7 +113,6 @@ describe('EditorToolbar', () => {
       expect(getByTestId('editor-toolbar')).toBeInTheDocument()
     })
 
-    // ✅ FIX : cibler le span via title
     it('devrait afficher le nom du projet', () => {
       const { container } = render(<EditorToolbar {...defaultProps} />)
       const el = getProjectNameEl(container)
@@ -129,7 +128,7 @@ describe('EditorToolbar', () => {
         />
       )
       const el = getProjectNameEl(container)
-      expect(el?.textContent).toContain('Nouveau projet')
+      expect(el?.textContent).toContain('editorNewProject')
     })
 
     it('devrait afficher le temps (currentTime / totalDuration)', () => {
@@ -148,7 +147,6 @@ describe('EditorToolbar', () => {
   // ─── Renommage inline du projet ────────────────────────────────
 
   describe('renommage inline', () => {
-    // ✅ FIX : utiliser getProjectNameEl
     it('devrait activer le mode renommage au click sur le nom', () => {
       const { container } = render(<EditorToolbar {...defaultProps} />)
       fireEvent.click(getProjectNameEl(container))
@@ -313,7 +311,6 @@ describe('EditorToolbar', () => {
       expect(handlers.onToggleCrossfade).toHaveBeenCalled()
     })
 
-    // ✅ FIX : utiliser rerender au lieu de 2 render() consécutifs
     it('devrait afficher le statut ON/OFF du crossfade', () => {
       const { getByTestId, rerender } = render(
         <EditorToolbar {...defaultProps} autoCrossfade={true} />
@@ -517,7 +514,6 @@ describe('EditorToolbar', () => {
       expect(handlers.onAddClip).toHaveBeenCalled()
     })
 
-    // ✅ FIX : le bouton est `disabled` si pas de son → on teste ça directement
     it('devrait désactiver le bouton Ajouter si pas de son sélectionné', () => {
       const { getByTestId, container } = render(
         <EditorToolbar {...defaultProps} />

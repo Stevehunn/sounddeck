@@ -1,53 +1,68 @@
-// src/features/guide/Guide.jsx
+/**
+ * @file Discord + audio setup guide.
+ *
+ * Two modes:
+ * - **Simple** — VB-Cable only + SoundDeck's built-in mixer (recommended).
+ * - **Advanced** — VB-Cable + VoiceMeeter Banana for manual mixing.
+ *
+ * The two step lists live at module scope (they only hold i18n keys, so
+ * they don't depend on the current language). `activeStep` is reset to
+ * `'install'` via a deferred `setTimeout(0)` when the user changes mode
+ * or language (React 19 `set-state-in-effect` rule).
+ *
+ * Keyboard shortcuts:
+ * - `←` / `↑` — previous step
+ * - `→` / `↓` — next step
+ * - `M` — toggle simple / advanced mode
+ *
+ * @see @core/i18n/LanguageContext.jsx
+ */
+
 import { useState, useEffect, useCallback } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 
+/**
+ * "Simple" mode step list.
+ * @type {Array<{id: string, icon: string, titleKey: string, color: string}>}
+ */
+const SIMPLE_STEPS = [
+  { id: 'install', icon: '📦', titleKey: 'guideSimpleStep1Title', color: '#7C6FF7' },
+  { id: 'sounddeck', icon: '🎛️', titleKey: 'guideSimpleStep2Title', color: '#23c55e' },
+  { id: 'discord', icon: '💬', titleKey: 'guideSimpleStep3Title', color: '#5865F2' },
+  { id: 'tips', icon: '💡', titleKey: 'guideSimpleStep4Title', color: '#EF9F27' },
+]
+
+/**
+ * "Advanced" mode step list.
+ * @type {Array<{id: string, icon: string, titleKey: string, color: string}>}
+ */
+const ADVANCED_STEPS = [
+  { id: 'install', icon: '📦', titleKey: 'guideStep1Title', color: '#7C6FF7' },
+  { id: 'voicemeeter', icon: '🎚️', titleKey: 'guideStep2Title', color: '#2f81f7' },
+  { id: 'sounddeck', icon: '🎛️', titleKey: 'guideStep3Title', color: '#23c55e' },
+  { id: 'discord', icon: '💬', titleKey: 'guideStep4Title', color: '#5865F2' },
+  { id: 'tips', icon: '💡', titleKey: 'guideStep5Title', color: '#EF9F27' },
+]
+
+/**
+ * Guide page component.
+ * @returns {JSX.Element}
+ */
 export default function Guide() {
   const { t, currentLang } = useLanguage()
   const [mode, setMode] = useState('simple') // 'simple' | 'advanced'
   const [activeStep, setActiveStep] = useState('install')
   const [renderKey, setRenderKey] = useState(0)
 
-  // Reset active step quand on change de mode ou de langue
+  // Reset active step when mode or language changes.
+  // Deferred via setTimeout(0) (React 19 `set-state-in-effect` rule).
   useEffect(() => {
-    setRenderKey((prev) => prev + 1)
-    setActiveStep('install')
+    const timer = setTimeout(() => {
+      setRenderKey((prev) => prev + 1)
+      setActiveStep('install')
+    }, 0)
+    return () => clearTimeout(timer)
   }, [currentLang, mode])
-
-  const SIMPLE_STEPS = [
-    {
-      id: 'install',
-      icon: '📦',
-      titleKey: 'guideSimpleStep1Title',
-      color: '#7C6FF7',
-    },
-    {
-      id: 'sounddeck',
-      icon: '🎛️',
-      titleKey: 'guideSimpleStep2Title',
-      color: '#23c55e',
-    },
-    {
-      id: 'discord',
-      icon: '💬',
-      titleKey: 'guideSimpleStep3Title',
-      color: '#5865F2',
-    },
-    {
-      id: 'tips',
-      icon: '💡',
-      titleKey: 'guideSimpleStep4Title',
-      color: '#EF9F27',
-    },
-  ]
-
-  const ADVANCED_STEPS = [
-    { id: 'install', icon: '📦', titleKey: 'guideStep1Title', color: '#7C6FF7' },
-    { id: 'voicemeeter', icon: '🎚️', titleKey: 'guideStep2Title', color: '#2f81f7' },
-    { id: 'sounddeck', icon: '🎛️', titleKey: 'guideStep3Title', color: '#23c55e' },
-    { id: 'discord', icon: '💬', titleKey: 'guideStep4Title', color: '#5865F2' },
-    { id: 'tips', icon: '💡', titleKey: 'guideStep5Title', color: '#EF9F27' },
-  ]
 
   const steps = mode === 'simple' ? SIMPLE_STEPS : ADVANCED_STEPS
   const active = steps.find((s) => s.id === activeStep) || steps[0]
@@ -55,7 +70,7 @@ export default function Guide() {
   const isFirst = currentIdx <= 0
   const isLast = currentIdx >= steps.length - 1
 
-  // ─── NAVIGATION ────────────────────────────────────────────────────────
+  // ─── NAVIGATION ────────────────────────────────────────────────────
   const goPrev = useCallback(() => {
     if (isFirst) return
     setActiveStep(steps[currentIdx - 1].id)
@@ -70,10 +85,10 @@ export default function Guide() {
     setMode((prev) => (prev === 'simple' ? 'advanced' : 'simple'))
   }, [])
 
-  // navigation clavier : ← ↑ → ↓ + M (toggle mode)
+  // Keyboard navigation: arrows + M (toggle mode)
   useEffect(() => {
     const handler = (e) => {
-      // Ignore si l'utilisateur tape dans un champ
+      // Ignore if the user is typing in a field
       const tag = e.target?.tagName
       if (
         tag === 'INPUT' ||
@@ -100,11 +115,11 @@ export default function Guide() {
     return () => window.removeEventListener('keydown', handler)
   }, [goPrev, goNext, toggleMode])
 
-  // ─── CONTENU ─────────────────────────────────────────────────────────
+  // ─── CONTENT ───────────────────────────────────────────────────────
   const renderContent = () => {
-    // ═══════════════════════════════════════════════════════════════════
-    //  MODE SIMPLE
-    // ═══════════════════════════════════════════════════════════════════
+    // ═════════════════════════════════════════════════════════════════
+    //  SIMPLE MODE
+    // ═════════════════════════════════════════════════════════════════
     if (mode === 'simple') {
       switch (activeStep) {
         case 'install':
@@ -169,9 +184,9 @@ export default function Guide() {
       }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  MODE AVANCÉ
-    // ═══════════════════════════════════════════════════════════════════
+    // ═════════════════════════════════════════════════════════════════
+    //  ADVANCED MODE
+    // ═════════════════════════════════════════════════════════════════
     switch (activeStep) {
       case 'install':
         return (
@@ -291,7 +306,7 @@ export default function Guide() {
       data-testid="guide-container"
       style={{ display: 'flex', height: '100%', overflow: 'hidden' }}
     >
-      {/* ─── SIDEBAR GAUCHE ─────────────────────────────────────────── */}
+      {/* ─── LEFT SIDEBAR ─────────────────────────────────────────── */}
       <div
         style={{
           width: 240,
@@ -313,7 +328,7 @@ export default function Guide() {
           </div>
         </div>
 
-        {/* ─── TOGGLE MODE ──────────────────────────────────────────── */}
+        {/* ─── MODE TOGGLE ────────────────────────────────────────── */}
         <div style={{ padding: '10px 10px', borderBottom: '1px solid var(--border)' }}>
           <div
             style={{
@@ -388,7 +403,7 @@ export default function Guide() {
               : t('guideModeAdvancedDesc')}
           </div>
 
-          {/* Hint raccourci clavier M */}
+          {/* M keyboard shortcut hint */}
           <div
             style={{
               marginTop: 6,
@@ -418,7 +433,7 @@ export default function Guide() {
           </div>
         </div>
 
-        {/* ─── ÉTAPES ───────────────────────────────────────────────── */}
+        {/* ─── STEPS ─────────────────────────────────────────────── */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
           {steps.map((step) => (
             <button
@@ -481,7 +496,7 @@ export default function Guide() {
           ))}
         </div>
 
-        {/* ─── RÉCAP RAPIDE ────────────────────────────────────────── */}
+        {/* ─── QUICK RECAP ────────────────────────────────────────── */}
         <div
           style={{
             padding: '10px 14px',
@@ -506,7 +521,7 @@ export default function Guide() {
         </div>
       </div>
 
-      {/* ─── CONTENU PRINCIPAL ─────────────────────────────────────── */}
+      {/* ─── MAIN CONTENT ─────────────────────────────────────────── */}
       <div
         style={{
           flex: 1,
@@ -559,7 +574,7 @@ export default function Guide() {
             </div>
           </div>
 
-          {/* Boutons Précédent/Suivant */}
+          {/* Previous / Next buttons */}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
             <button
               data-testid="guide-prev"
@@ -592,7 +607,7 @@ export default function Guide() {
           </div>
         </div>
 
-        {/* Contenu */}
+        {/* Content */}
         <div
           style={{
             flex: 1,
@@ -607,7 +622,7 @@ export default function Guide() {
             {renderContent()}
           </div>
 
-          {/* Indice de navigation clavier en bas (inclut M) */}
+          {/* Keyboard shortcut hint at the bottom (includes M) */}
           <div
             style={{
               marginTop: 24,
@@ -643,8 +658,19 @@ export default function Guide() {
   )
 }
 
-// ─── SOUS-COMPOSANTS ──────────────────────────────────────────────────────────
+// ─── SUB-COMPONENTS ────────────────────────────────────────────────────
 
+/**
+ * Download card (icon + name + description + link + instructions).
+ *
+ * @param {Object} props
+ * @param {string} props.icon
+ * @param {string} props.name
+ * @param {string} props.desc
+ * @param {string} props.url
+ * @param {string} props.instructions
+ * @returns {JSX.Element}
+ */
 function DownloadCard({ icon, name, desc, url, instructions }) {
   const { t } = useLanguage()
   const handleOpen = () => {
@@ -691,6 +717,17 @@ function DownloadCard({ icon, name, desc, url, instructions }) {
   )
 }
 
+/**
+ * Numbered configuration step.
+ *
+ * @param {Object} props
+ * @param {string} props.number
+ * @param {string} props.title
+ * @param {string} props.desc
+ * @param {string} props.icon
+ * @param {boolean} [props.highlight]
+ * @returns {JSX.Element}
+ */
 function ConfigStep({ number, title, desc, icon, highlight }) {
   return (
     <div
@@ -749,6 +786,15 @@ function ConfigStep({ number, title, desc, icon, highlight }) {
   )
 }
 
+/**
+ * Tip card (icon + title + description).
+ *
+ * @param {Object} props
+ * @param {string} props.icon
+ * @param {string} props.title
+ * @param {string} props.desc
+ * @returns {JSX.Element}
+ */
 function TipCard({ icon, title, desc }) {
   return (
     <div className="option-row" style={{ padding: '10px 14px' }}>
@@ -765,6 +811,14 @@ function TipCard({ icon, title, desc }) {
   )
 }
 
+/**
+ * Info / warning / success banner.
+ *
+ * @param {Object} props
+ * @param {'info'|'warning'|'success'} props.type
+ * @param {string} props.text
+ * @returns {JSX.Element}
+ */
 function InfoBox({ type, text }) {
   const styles = {
     info: {

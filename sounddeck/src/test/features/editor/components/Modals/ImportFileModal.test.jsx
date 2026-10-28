@@ -126,7 +126,7 @@ describe('ImportFileModal', () => {
     })
 
     expect(alertSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Format non supporté')
+      expect.stringContaining('editorUnsupportedFormat')
     )
     alertSpy.mockRestore()
   })

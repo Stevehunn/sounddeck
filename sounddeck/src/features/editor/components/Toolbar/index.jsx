@@ -1,8 +1,101 @@
-// src/features/editor/components/Toolbar/index.jsx
-import React, { useState, useEffect, useRef } from 'react'
+/**
+ * @file Editor toolbar — project name, transport controls, snap/crossfade
+ * toggles, metronome, project I/O, effects panel, timeline loop, and the
+ * "add clip" dropdown.
+ *
+ * Layout (left → right):
+ * 1. **Project name** — inline rename (double-click → input).
+ * 2. **Transport** — play/pause, stop, undo, redo, snap, crossfade, time.
+ * 3. **Metronome** — delegates to `<EditorMetronome>`.
+ * 4. **Project I/O** — delegates to `<ProjectControls>`.
+ * 5. **Effects panel toggle** — shows/hides the effects sidebar.
+ * 6. **Timeline loop** — toggle + settings buttons.
+ * 7. **Add** — add track, add clip (dropdown), import file, export.
+ *
+ * The "add clip" dropdown lets the user pick a track and a sound, then
+ * appends the clip at `getNextStartPosition(trackId)` (0.5s after the last
+ * clip's end).
+ *
+ * @see ./EditorMetronome.jsx
+ * @see ./ProjectControls.jsx
+ */
+
+import { useState, useEffect, useRef } from 'react'
 import EditorMetronome from './EditorMetronome'
 import ProjectControls from './ProjectControls'
 
+/** Gap (seconds) between the last clip's end and a newly added clip. */
+const NEW_CLIP_GAP_SECONDS = 0.5
+
+/** Default clip duration fallback (seconds) when unknown. */
+const DEFAULT_CLIP_DURATION = 3
+
+/**
+ * Formats `seconds` as `M:SS`. Returns `'0:00'` for falsy/NaN values.
+ *
+ * @param {number} seconds
+ * @returns {string}
+ */
+function formatTime(seconds) {
+  if (!seconds || isNaN(seconds)) return '0:00'
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+/**
+ * Editor toolbar (see file header for responsibilities).
+ *
+ * @param {Object} props
+ * @param {Array} props.tracks - Timeline tracks (each with `id`, `clips[]`).
+ * @param {Array} props.sounds - Library sounds (each with `id`, `name`, `emoji`).
+ * @param {boolean} props.isPlaying
+ * @param {boolean} props.isPaused
+ * @param {number} props.currentTime
+ * @param {number} props.totalDuration
+ * @param {Function} [props.onAddTrack]
+ * @param {Function} [props.onAddClip]
+ * @param {Function} [props.onAddFile]
+ * @param {Function} [props.onPlay]
+ * @param {Function} [props.onStop]
+ * @param {Function} [props.onExport]
+ * @param {Function} [props.onUndo]
+ * @param {Function} [props.onRedo]
+ * @param {boolean} props.canUndo
+ * @param {boolean} props.canRedo
+ * @param {boolean} props.snapEnabled
+ * @param {Function} [props.onToggleSnap]
+ * @param {boolean} props.autoCrossfade
+ * @param {Function} [props.onToggleCrossfade]
+ * @param {string} props.projectName
+ * @param {Function} [props.onRenameProject]
+ * @param {(key: string) => string} props.tr - i18n translator.
+ * @param {Function} [props.addToast]
+ * @param {Object} [props.loopState]
+ * @param {Function} [props.onToggleTimelineLoop]
+ * @param {Function} [props.onOpenLoopPanel]
+ * @param {boolean} [props.metronomeEnabled]
+ * @param {Function} [props.onToggleMetronome]
+ * @param {number} [props.bpm]
+ * @param {Function} [props.onBpmChange]
+ * @param {Object} [props.project]
+ * @param {Array} [props.projectList]
+ * @param {Array} [props.recentProjects]
+ * @param {boolean} [props.isSaving]
+ * @param {boolean} [props.isLoading]
+ * @param {Function} [props.onSaveProject]
+ * @param {Function} [props.onLoadProject]
+ * @param {Function} [props.onCreateProject]
+ * @param {Function} [props.onDeleteProject]
+ * @param {Function} [props.onDuplicateProject]
+ * @param {Function} [props.onProjectRename]
+ * @param {Function} [props.onLoadProjectList]
+ * @param {Function} [props.onExportProject]
+ * @param {Function} [props.onImportProject]
+ * @param {boolean} [props.showEffectsPanel]
+ * @param {Function} [props.onToggleEffectsPanel]
+ * @returns {JSX.Element}
+ */
 export default function EditorToolbar({
   tracks,
   sounds,
@@ -52,21 +145,34 @@ export default function EditorToolbar({
   showEffectsPanel,
   onToggleEffectsPanel,
 }) {
+  const defaultProjectName = tr?.('editorNewProject') || 'New project'
+
   const [showAddClip, setShowAddClip] = useState(false)
   const [selectedTrackId, setSelectedTrackId] = useState('')
   const [selectedSoundId, setSelectedSoundId] = useState('')
   const [isRenaming, setIsRenaming] = useState(false)
   const [newProjectName, setNewProjectName] = useState(
-    projectName || 'Nouveau projet'
+    projectName || defaultProjectName
   )
   const dropdownRef = useRef(null)
 
   const timelineLoop = loopState?.timeline || { enabled: false }
 
+  // Re-sync the editable name when the parent changes `projectName`.
+  // Deferred to a macrotask so we don't emit a state update during the
+  // effect flush (satisfies `react-hooks/set-state-in-effect`).
   useEffect(() => {
-    setNewProjectName(projectName || 'Nouveau projet')
+    const timer = setTimeout(() => {
+      setNewProjectName(projectName || defaultProjectName)
+    }, 0)
+    return () => clearTimeout(timer)
+    // `defaultProjectName` is derived from `tr` (unstable ref) — intentionally
+    // not in deps to avoid a render loop. It only matters on first mount,
+    // when `useState` already covered it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectName])
 
+  // Close the "add clip" dropdown on outside click.
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -77,13 +183,13 @@ export default function EditorToolbar({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const formatTime = (seconds) => {
-    if (!seconds || isNaN(seconds)) return '0:00'
-    const m = Math.floor(seconds / 60)
-    const s = Math.floor(seconds % 60)
-    return `${m}:${s.toString().padStart(2, '0')}`
-  }
-
+  /**
+   * Returns the start position for a new clip on `trackId`:
+   * last clip's end + `NEW_CLIP_GAP_SECONDS`. Returns 0 for empty tracks.
+   *
+   * @param {string} trackId
+   * @returns {number}
+   */
   const getNextStartPosition = (trackId) => {
     const track = tracks.find((t) => t.id === trackId)
     if (!track) return 0
@@ -91,14 +197,18 @@ export default function EditorToolbar({
 
     const lastClip = track.clips.reduce(
       (max, clip) => {
-        const clipEnd = clip.start + (clip.duration || 3)
+        const clipEnd = clip.start + (clip.duration || DEFAULT_CLIP_DURATION)
         return clipEnd > max.end ? { start: clip.start, end: clipEnd } : max
       },
       { start: 0, end: 0 }
     )
-    return lastClip.end + 0.5
+    return lastClip.end + NEW_CLIP_GAP_SECONDS
   }
 
+  /**
+   * Validates the "add clip" form and forwards it to `onAddClip`.
+   * @returns {void}
+   */
   const handleAddClipAction = () => {
     let trackId = selectedTrackId
     if (!trackId && tracks.length > 0) {
@@ -122,6 +232,12 @@ export default function EditorToolbar({
     setSelectedSoundId('')
   }
 
+  /**
+   * Returns the play button's icon/label/color based on the current state
+   * (idle / playing / paused / seeking-from-start).
+   *
+   * @returns {{icon: string, label: string, color: string}}
+   */
   const getButtonState = () => {
     if (isPlaying)
       return {
@@ -149,6 +265,7 @@ export default function EditorToolbar({
   }
 
   const buttonState = getButtonState()
+  const projectDisplayName = projectName || defaultProjectName
 
   return (
     <div
@@ -180,7 +297,7 @@ export default function EditorToolbar({
               }
               if (e.key === 'Escape') {
                 setIsRenaming(false)
-                setNewProjectName(projectName || 'Nouveau projet')
+                setNewProjectName(projectDisplayName)
               }
             }}
             onBlur={() => {
@@ -221,7 +338,7 @@ export default function EditorToolbar({
                 opacity: 0.6,
               }}
             />
-            {projectName || 'Nouveau projet'}
+            {projectDisplayName}
           </span>
         )}
       </div>
@@ -332,7 +449,7 @@ export default function EditorToolbar({
             gap: 4,
             fontSize: 11,
           }}
-          title={tr('editorAutoCrossfade') || 'Crossfade automatique'}
+          title={tr('editorAutoCrossfade') || 'Auto crossfade'}
         >
           <i className="ti ti-transition-right" />
           <span>{tr('editorCrossfadeShort') || 'Crossfade'}</span>
@@ -443,12 +560,12 @@ export default function EditorToolbar({
           }}
           title={
             showEffectsPanel
-              ? tr('hideEffectsPanel') || 'Masquer le panneau des effets'
-              : tr('showEffectsPanel') || 'Afficher le panneau des effets'
+              ? tr('hideEffectsPanel') || 'Hide effects panel'
+              : tr('showEffectsPanel') || 'Show effects panel'
           }
         >
           <i className="ti ti-wand" />
-          <span>{tr('editorEffects') || 'Effets'}</span>
+          <span>{tr('editorEffects') || 'Effects'}</span>
           <span
             style={{
               fontSize: 8,
@@ -484,11 +601,11 @@ export default function EditorToolbar({
             fontSize: 11,
           }}
           title={
-            tr('toggleTimelineLoop') || 'Activer/désactiver la boucle générale'
+            tr('toggleTimelineLoop') || 'Toggle global timeline loop'
           }
         >
           <i className="ti ti-repeat" />
-          <span>{tr('loop') || 'Boucle'}</span>
+          <span>{tr('loop') || 'Loop'}</span>
           <span
             style={{
               fontSize: 8,
@@ -517,7 +634,7 @@ export default function EditorToolbar({
             justifyContent: 'center',
             fontSize: 12,
           }}
-          title={tr('loopSettings') || 'Paramètres de la boucle'}
+          title={tr('loopSettings') || 'Loop settings'}
         >
           <i className="ti ti-settings" />
         </button>
@@ -551,7 +668,7 @@ export default function EditorToolbar({
           style={{ fontSize: 12 }}
         >
           <i className="ti ti-file-import" />{' '}
-          {tr('editorAddFile') || 'Importer un fichier'}
+          {tr('editorAddFile') || 'Import file'}
         </button>
 
         <button
@@ -605,8 +722,10 @@ export default function EditorToolbar({
               <option value="">{tr('editorSelectTrack')}</option>
               {tracks.map((track, index) => (
                 <option key={track.id} value={track.id}>
-                  {track.name || `Piste ${index + 1}`} ({track.clips.length}{' '}
-                  clips)
+                  {track.name ||
+                    tr('editorTrackFallback', { n: index + 1 }) ||
+                    `Track ${index + 1}`}{' '}
+                  ({track.clips.length} clips)
                 </option>
               ))}
             </select>

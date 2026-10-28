@@ -1,9 +1,65 @@
-// src/features/options/hooks/useAudioDevices.js
+/**
+ * @file Audio device management hook.
+ *
+ * Handles:
+ * - **Initial enumeration** on mount (audio outputs + microphones).
+ * - **Manual detection** (`handleDetectDevices`) after driver install.
+ * - **Driver install** (`handleInstallDriver`) with a 3 s re-check.
+ * - **Microphone test** (`testMicrophone`) using `testMicrophoneOnce`,
+ *   auto-stopping the test stream after 3 s or on cleanup.
+ *
+ * The hook writes `virtualDriverInstalled` back to the store whenever the
+ * presence of a virtual device (CABLE / VoiceMeeter / Scream / VB-Audio)
+ * changes.
+ *
+ * @see @core/services/AudioMixerService.js (`testMicrophoneOnce`)
+ * @see @shared/hooks/useConfirm
+ */
+
 import { useState, useEffect, useRef } from 'react'
 import { useLanguage } from '@core/i18n/LanguageContext'
 import { testMicrophoneOnce } from '@core/services/AudioMixerService'
 import { logWarn } from '@shared/utils/logger'
 
+/**
+ * Matches the labels that identify a virtual audio device.
+ * @type {string[]}
+ */
+const VIRTUAL_DEVICE_KEYWORDS = [
+  'cable',
+  'virtual',
+  'scream',
+  'voicemeeter',
+  'vb-audio',
+]
+
+/**
+ * Returns `true` if the device label looks like a virtual device.
+ * @param {string} label
+ * @returns {boolean}
+ */
+function isVirtualDeviceLabel(label) {
+  const lower = (label || '').toLowerCase()
+  return VIRTUAL_DEVICE_KEYWORDS.some((kw) => lower.includes(kw))
+}
+
+/**
+ * Audio device management hook.
+ *
+ * @param {Object} options
+ * @param {Object} options.store - App store (needs `updateVirtualDriverInstalled`).
+ * @param {(msg: string, type?: string) => void} options.addToast
+ * @returns {{
+ *   audioDevices: MediaDeviceInfo[],
+ *   microphones: MediaDeviceInfo[],
+ *   isDetecting: boolean,
+ *   isInstallingDriver: boolean,
+ *   isMicrophoneTesting: boolean,
+ *   handleInstallDriver: () => Promise<void>,
+ *   handleDetectDevices: () => Promise<void>,
+ *   testMicrophone: () => Promise<void>,
+ * }}
+ */
 export function useAudioDevices({ store, addToast }) {
   const { t } = useLanguage()
   const [audioDevices, setAudioDevices] = useState([])
@@ -13,7 +69,7 @@ export function useAudioDevices({ store, addToast }) {
   const [isMicrophoneTesting, setIsMicrophoneTesting] = useState(false)
   const micTestRef = useRef(null)
 
-  // Détection initiale
+  // ─── INITIAL DETECTION ─────────────────────────────────────────────
   useEffect(() => {
     const detectDevices = async () => {
       try {
@@ -23,16 +79,9 @@ export function useAudioDevices({ store, addToast }) {
         setAudioDevices(outputs)
         setMicrophones(inputs)
 
-        const hasVirtualDevice = outputs.some((d) => {
-          const label = d.label.toLowerCase()
-          return (
-            label.includes('cable') ||
-            label.includes('virtual') ||
-            label.includes('scream') ||
-            label.includes('voicemeeter') ||
-            label.includes('vb-audio')
-          )
-        })
+        const hasVirtualDevice = outputs.some((d) =>
+          isVirtualDeviceLabel(d.label)
+        )
 
         if (hasVirtualDevice && !store.virtualDriverInstalled) {
           store.updateVirtualDriverInstalled?.(true)
@@ -41,15 +90,17 @@ export function useAudioDevices({ store, addToast }) {
           store.updateVirtualDriverInstalled?.(false)
         }
       } catch (e) {
-        logWarn('Options', 'Erreur détection périphériques', e)
+        logWarn('Options', 'Device detection error', e)
       }
     }
 
     detectDevices()
+    // The effect intentionally runs once on mount — subsequent updates are
+    // handled by `handleDetectDevices` and `handleInstallDriver`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Cleanup du test micro à l'unmount
+  // ─── CLEANUP MIC TEST ON UNMOUNT ───────────────────────────────────
   useEffect(() => {
     return () => {
       if (micTestRef.current) {
@@ -61,6 +112,11 @@ export function useAudioDevices({ store, addToast }) {
     }
   }, [])
 
+  /**
+   * Installs the VB-Cable driver (via the main process), then re-checks the
+   * device list after 3 s to detect the newly-installed virtual device.
+   * @returns {Promise<void>}
+   */
   const handleInstallDriver = async () => {
     setIsInstallingDriver(true)
     try {
@@ -76,16 +132,18 @@ export function useAudioDevices({ store, addToast }) {
           const devices = await navigator.mediaDevices.enumerateDevices()
           const outputs = devices.filter((d) => d.kind === 'audiooutput')
           setAudioDevices(outputs)
-          const hasVirtualDevice = outputs.some((d) => {
-            const label = d.label.toLowerCase()
-            return label.includes('cable') || label.includes('vb-audio')
-          })
+          const hasVirtualDevice = outputs.some((d) =>
+            isVirtualDeviceLabel(d.label)
+          )
           if (hasVirtualDevice) {
             store.updateVirtualDriverInstalled?.(true)
           }
         }, 3000)
       } else {
-        addToast(`${t('installError')}: ${result.error || t('unknown')}`, 'error')
+        addToast(
+          `${t('installError')}: ${result.error || t('unknown')}`,
+          'error'
+        )
       }
     } catch (e) {
       addToast(`${t('error')}: ${e.message}`, 'error')
@@ -93,6 +151,10 @@ export function useAudioDevices({ store, addToast }) {
     setIsInstallingDriver(false)
   }
 
+  /**
+   * Re-enumerates devices (user asked to "Detect" manually).
+   * @returns {Promise<void>}
+   */
   const handleDetectDevices = async () => {
     setIsDetecting(true)
     try {
@@ -100,16 +162,9 @@ export function useAudioDevices({ store, addToast }) {
       const outputs = devices.filter((d) => d.kind === 'audiooutput')
       setAudioDevices(outputs)
 
-      const hasVirtualDevice = outputs.some((d) => {
-        const label = d.label.toLowerCase()
-        return (
-          label.includes('cable') ||
-          label.includes('virtual') ||
-          label.includes('scream') ||
-          label.includes('voicemeeter') ||
-          label.includes('vb-audio')
-        )
-      })
+      const hasVirtualDevice = outputs.some((d) =>
+        isVirtualDeviceLabel(d.label)
+      )
 
       if (hasVirtualDevice) {
         store.updateVirtualDriverInstalled?.(true)
@@ -124,7 +179,16 @@ export function useAudioDevices({ store, addToast }) {
     setIsDetecting(false)
   }
 
-    const testMicrophone = async () => {
+  /**
+   * Starts/stops a 3-second microphone test.
+   *
+   * - If already testing → stops the stream.
+   * - Else → opens the mic, plays it briefly in the user's headphones, and
+   *   auto-stops after 3 s.
+   *
+   * @returns {Promise<void>}
+   */
+  const testMicrophone = async () => {
     if (micTestRef.current) {
       if (typeof micTestRef.current.stop === 'function') {
         micTestRef.current.stop()

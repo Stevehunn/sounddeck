@@ -124,11 +124,12 @@ describe('TimelineLoop', () => {
   // ─── État avec loop active ───────────────────────────────────────
 
   describe('état avec loop active', () => {
-    it('devrait afficher le label BOUCLE', () => {
+    it('devrait afficher le label editorClipLoop', () => {
       const { container } = render(
         <TimelineLoop {...defaultProps()} loopState={createLoopState()} />
       )
-      expect(container.textContent).toContain('BOUCLE')
+      // Component calls `tr('editorClipLoop')` → mock returns the raw key.
+      expect(container.textContent).toContain('editorClipLoop')
     })
 
     it('devrait afficher la position start → end', () => {
@@ -321,15 +322,14 @@ describe('TimelineLoop', () => {
   // ─── Indicateur FIN ─────────────────────────────────────────────
 
   describe('indicateur FIN', () => {
-    it('devrait afficher le label FIN si extendedWidthPx > 5', () => {
+    it('devrait afficher editorClipLoopEnd si extendedWidthPx > 5', () => {
       const { container } = render(
         <TimelineLoop {...defaultProps()} loopState={createLoopState()} />
       )
-      // 2 + 3*8 = 26s → extendedWidthPx = (26 - 10) * 80 > 5
-      expect(container.textContent).toContain('FIN')
+      expect(container.textContent).toContain('editorClipLoopEnd')
     })
 
-    it('ne devrait PAS afficher FIN si pas d\'extended', () => {
+    it('ne devrait PAS afficher editorClipLoopEnd si pas d\'extended', () => {
       const { container } = render(
         <TimelineLoop
           {...defaultProps()}
@@ -341,7 +341,7 @@ describe('TimelineLoop', () => {
           })}
         />
       )
-      expect(container.textContent).not.toContain('FIN')
+      expect(container.textContent).not.toContain('editorClipLoopEnd')
     })
   })
 

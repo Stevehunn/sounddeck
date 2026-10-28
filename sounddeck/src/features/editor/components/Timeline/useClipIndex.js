@@ -1,13 +1,32 @@
-// src/features/editor/components/Timeline/useClipIndex.js
+/**
+ * @file Memoized Map<clipId, {clip, track, start, duration}> builder.
+ *
+ * Replaces the O(n²) loop inside `renderLoopMarkers` (looping through every
+ * track to find every clip). With this index, loop-marker rendering is
+ * O(loops) instead of O(tracks × clips).
+ *
+ * The map is rebuilt only when `tracks` or `clipDurations` change
+ * (`useMemo`), so per-frame renders stay cheap.
+ *
+ * @see ../Timeline/index.jsx
+ * @see ./TimelineLoopMarkers.jsx
+ */
+
 import { useMemo } from 'react'
 
+/** Default clip duration (seconds) when no data is available. */
+const DEFAULT_CLIP_DURATION = 3
+
 /**
- * Construit un index Map<clipId, {clip, track, start, duration}> pour
- * des lookups O(1). Remplace les boucles imbriquées dans renderLoopMarkers.
+ * Builds an O(1) lookup map for every clip in the project.
  *
- * @param {Array} tracks
- * @param {Object} clipDurations - { [clipId]: number }
- * @returns {Map}
+ * Entry shape: `{ clip, track, start, duration }` where `duration` falls
+ * back to `clipDurations[clip.id]`, then `clip.duration`, then
+ * `DEFAULT_CLIP_DURATION`.
+ *
+ * @param {Array<{id: string, clips?: Array}>|null} tracks
+ * @param {Object<string, number>} [clipDurations]
+ * @returns {Map<string, {clip: Object, track: Object, start: number, duration: number}>}
  */
 export function useClipIndex(tracks, clipDurations) {
   return useMemo(() => {
@@ -21,7 +40,8 @@ export function useClipIndex(tracks, clipDurations) {
           clip,
           track,
           start: clip.start || 0,
-          duration: clipDurations?.[clip.id] || clip.duration || 3,
+          duration:
+            clipDurations?.[clip.id] || clip.duration || DEFAULT_CLIP_DURATION,
         })
       }
     }

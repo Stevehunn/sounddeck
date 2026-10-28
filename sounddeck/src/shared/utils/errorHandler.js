@@ -77,10 +77,17 @@ async function writeLogsToStore(logs) {
 
 /**
  * Schedules a debounced write of the current error buffer (300ms).
+ *
+ * The `!== null` check (instead of a plain truthiness check) is important:
+ * some timer implementations (fake timers in tests, jsdom in some envs)
+ * return `0` as the first timer id, which is falsy. With `if (pendingWrite)`,
+ * the guard would fail to short-circuit and a second timer would be
+ * scheduled — breaking the debounce semantics.
+ *
  * @returns {void}
  */
 function scheduleWrite() {
-  if (pendingWrite) return
+  if (pendingWrite !== null) return
   pendingWrite = setTimeout(async () => {
     pendingWrite = null
     await writeLogsToStore(errorLogs)

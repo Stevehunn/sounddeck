@@ -1,17 +1,49 @@
-// src/features/editor/components/EffectsPanel/index.jsx
+/**
+ * @file Effects panel — list, add, toggle, remove, and live-preview
+ * effects on the selected clip (volume / fadeIn / fadeOut / speed / echo /
+ * reverb).
+ *
+ * Preview pipeline:
+ * 1. Fetch the clip's file (via `buildFileUrl`).
+ * 2. Decode the audio into an `AudioBuffer`.
+ * 3. Apply the enabled effects via `applyEffectsToBuffer()`.
+ * 4. Play the processed buffer through the shared `AudioContext`, capped at
+ *    `PREVIEW_MAX_DURATION` seconds.
+ *
+ * The panel supports auto-preview (debounced, `AUTO_PREVIEW_DELAY`) and an
+ * explicit "Listen / Stop" button. FadeIn / FadeOut effects are edited via
+ * the special `onFadeUpdate` handler instead of `onEffectUpdate` so the
+ * fade handles on the clip stay in sync.
+ *
+ * @see ../ClipActionsMenu.jsx — mounts the "open effects" entry point
+ * @see @shared/utils/realTimeEffects.js
+ * @see @shared/utils/fileUrl.js
+ */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { buildFileUrl } from '@shared/utils/fileUrl'
 
+/** Effect type definitions (id + label key + icon + editable params). */
 const EFFECT_TYPES = [
   { id: 'volume', labelKey: 'editorEffectVolume', icon: 'ti-volume', params: ['value'] },
   { id: 'fadeIn', labelKey: 'editorEffectFadeIn', icon: 'ti-sunrise', params: ['duration'] },
   { id: 'fadeOut', labelKey: 'editorEffectFadeOut', icon: 'ti-sunset', params: ['duration'] },
   { id: 'speed', labelKey: 'editorEffectSpeed', icon: 'ti-gauge', params: ['value'] },
-  { id: 'echo', labelKey: 'editorEffectEcho', icon: 'ti-repeat', params: ['delay', 'decay', 'mix'] },
-  { id: 'reverb', labelKey: 'editorEffectReverb', icon: 'ti-wave-sine', params: ['roomSize', 'mix'] },
+  {
+    id: 'echo',
+    labelKey: 'editorEffectEcho',
+    icon: 'ti-repeat',
+    params: ['delay', 'decay', 'mix'],
+  },
+  {
+    id: 'reverb',
+    labelKey: 'editorEffectReverb',
+    icon: 'ti-wave-sine',
+    params: ['roomSize', 'mix'],
+  },
 ]
 
+/** Effect type → Tabler icon (used when the effect is listed by id only). */
 const EFFECT_ICON_MAP = {
   volume: 'ti-volume',
   fadeIn: 'ti-sunrise',
@@ -21,6 +53,7 @@ const EFFECT_ICON_MAP = {
   reverb: 'ti-wave-sine',
 }
 
+/** Param name → i18n label key. */
 const PARAM_LABEL_KEYS = {
   value: 'editorParamVolume',
   duration: 'editorParamDuration',
@@ -31,6 +64,7 @@ const PARAM_LABEL_KEYS = {
   roomSize: 'editorParamRoomSize',
 }
 
+/** Default param values (used when an effect is added). */
 const PARAM_DEFAULTS = {
   value: 1.0,
   duration: 0.5,
@@ -41,6 +75,7 @@ const PARAM_DEFAULTS = {
   roomSize: 0.5,
 }
 
+/** Min / max / step for each param. */
 const PARAM_RANGES = {
   value: { min: 0, max: 5, step: 0.05 },
   duration: { min: 0.05, max: 10, step: 0.05 },
@@ -51,19 +86,55 @@ const PARAM_RANGES = {
   roomSize: { min: 0, max: 1, step: 0.05 },
 }
 
+/** Max preview duration (seconds) — avoids long captures on big clips. */
 const PREVIEW_MAX_DURATION = 5
+
+/** Auto-preview debounce (ms). */
 const AUTO_PREVIEW_DELAY = 1000
 
-const formatParamValue = (effectType, param, value) => {
+/** Preview gain (0-1). */
+const PREVIEW_GAIN = 0.5
+
+/** Progress-update interval for the preview bar (ms). */
+const PREVIEW_PROGRESS_INTERVAL = 50
+
+/**
+ * Formats a param value for the slider label.
+ *
+ * @param {string} effectType
+ * @param {string} param
+ * @param {number} value
+ * @returns {string}
+ */
+function formatParamValue(effectType, param, value) {
   if (effectType === 'volume' && param === 'value') {
-    const percent = value * 100
-    return `${Math.round(percent)}%`
+    return `${Math.round(value * 100)}%`
   }
   if (param === 'duration') return `${value.toFixed(2)}s`
   if (effectType === 'volume') return `${value.toFixed(1)}x`
   return typeof value === 'number' ? value.toFixed(2) : value
 }
 
+/**
+ * Effects panel (see file header).
+ *
+ * @param {Object} props
+ * @param {Object|null} props.clip
+ * @param {string} props.trackId
+ * @param {(trackId: string, clipId: string, type: string, defaults: Object) => void} [props.onEffectAdd]
+ * @param {(trackId: string, clipId: string, effectId: string) => void} [props.onEffectRemove]
+ * @param {(trackId: string, clipId: string, effectId: string, param: string, value: number) => void} [props.onEffectUpdate]
+ * @param {(trackId: string, clipId: string, effectId: string, enabled: boolean) => void} [props.onEffectToggle]
+ * @param {Function} [props.onClipUpdate] - Unused; kept for API compat.
+ * @param {(trackId: string, clipId: string, edge: 'in'|'out', duration: number) => void} [props.onFadeUpdate]
+ * @param {(clip: Object, extra: Object|null) => void} [props.onPreview]
+ * @param {boolean} [props.isPreviewing] - Unused; kept for API compat.
+ * @param {(key: string, params?: Object) => string} props.tr
+ * @param {string} [props.lang] - Unused; kept for API compat.
+ * @param {boolean} [props.showAddMenu=false]
+ * @param {(show: boolean) => void} [props.onShowAddMenuChange]
+ * @returns {JSX.Element|null}
+ */
 export default function EditorEffectsPanel({
   clip,
   trackId,
@@ -71,12 +142,12 @@ export default function EditorEffectsPanel({
   onEffectRemove,
   onEffectUpdate,
   onEffectToggle,
-  onClipUpdate,
+  onClipUpdate: _onClipUpdate,
   onFadeUpdate,
   onPreview,
-  isPreviewing: isPreviewingProp,
+  isPreviewing: _isPreviewing,
   tr,
-  lang,
+  lang: _lang,
   showAddMenu: showAddMenuProp = false,
   onShowAddMenuChange,
 }) {
@@ -85,21 +156,32 @@ export default function EditorEffectsPanel({
   const [autoPreview, setAutoPreview] = useState(true)
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false)
   const [previewProgress, setPreviewProgress] = useState(0)
-  const [previewDuration, setPreviewDuration] = useState(0)
 
   const audioContextRef = useRef(null)
   const previewSourceRef = useRef(null)
   const previewProgressIntervalRef = useRef(null)
   const autoPreviewTimerRef = useRef(null)
 
+  /**
+   * Returns (and lazily creates) the shared `AudioContext`.
+   * @returns {AudioContext}
+   */
   const getAudioContext = useCallback(() => {
-    if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+    if (
+      !audioContextRef.current ||
+      audioContextRef.current.state === 'closed'
+    ) {
       audioContextRef.current = new (window.AudioContext ||
         window.webkitAudioContext)()
     }
     return audioContextRef.current
   }, [])
 
+  /**
+   * Stops any pending auto-preview timer, clears the progress interval,
+   * stops the current audio source, and resets the UI state.
+   * @returns {void}
+   */
   const stopPreview = useCallback(() => {
     if (autoPreviewTimerRef.current) {
       clearTimeout(autoPreviewTimerRef.current)
@@ -113,15 +195,21 @@ export default function EditorEffectsPanel({
       try {
         previewSourceRef.current.stop()
         previewSourceRef.current.disconnect()
-      } catch (e) {}
+      } catch {
+        // ignore — source may already be stopped
+      }
       previewSourceRef.current = null
     }
     setIsPreviewPlaying(false)
     setPreviewProgress(0)
-    setPreviewDuration(0)
     setIsProcessingPreview(false)
   }, [])
 
+  /**
+   * Fetches, decodes, processes, and plays the clip's audio buffer with
+   * its current effects applied.
+   * @returns {Promise<void>}
+   */
   const playPreview = useCallback(async () => {
     if (!clip || !clip.path) return
 
@@ -137,7 +225,6 @@ export default function EditorEffectsPanel({
 
     try {
       const fileUrl = buildFileUrl(clip.path)
-
       const response = await fetch(fileUrl)
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const arrayBuffer = await response.arrayBuffer()
@@ -162,14 +249,13 @@ export default function EditorEffectsPanel({
           processedBuffer.duration,
           PREVIEW_MAX_DURATION
         )
-        setPreviewDuration(actualDuration)
 
         const source = ctx.createBufferSource()
         source.buffer = processedBuffer
         previewSourceRef.current = source
 
         const gainNode = ctx.createGain()
-        gainNode.gain.value = 0.5
+        gainNode.gain.value = PREVIEW_GAIN
 
         source.connect(gainNode)
         gainNode.connect(ctx.destination)
@@ -189,7 +275,7 @@ export default function EditorEffectsPanel({
           const progress = Math.min(100, (elapsed / actualDuration) * 100)
           setPreviewProgress(progress)
           if (progress >= 100) stopPreview()
-        }, 50)
+        }, PREVIEW_PROGRESS_INTERVAL)
 
         source.onended = () => {
           stopPreview()
@@ -198,12 +284,16 @@ export default function EditorEffectsPanel({
         if (onPreview) onPreview(clip, null)
         stopPreview()
       }
-    } catch (e) {
+    } catch {
       if (onPreview) onPreview(clip, null)
       stopPreview()
     }
   }, [clip, onPreview, stopPreview, getAudioContext])
 
+  /**
+   * Debounced auto-preview trigger (1s).
+   * @returns {void}
+   */
   const schedulePreview = useCallback(() => {
     if (!autoPreview) return
     if (autoPreviewTimerRef.current) {
@@ -217,6 +307,7 @@ export default function EditorEffectsPanel({
     }, AUTO_PREVIEW_DELAY)
   }, [autoPreview, stopPreview, playPreview])
 
+  // Consume the external "show add menu" flag once.
   useEffect(() => {
     if (showAddMenuProp) {
       setShowAddEffect(true)
@@ -224,6 +315,7 @@ export default function EditorEffectsPanel({
     }
   }, [showAddMenuProp, onShowAddMenuChange])
 
+  // Cleanup on unmount.
   useEffect(() => {
     return () => {
       stopPreview()
@@ -335,7 +427,7 @@ export default function EditorEffectsPanel({
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <i className="ti ti-wand" style={{ color: 'var(--accent)' }} />
           <span style={{ fontSize: 13, fontWeight: 600 }}>
-            {tr('editorEffects') || 'Effets'} — {clip.name}
+            {tr('editorEffects') || 'Effects'} — {clip.name}
           </span>
           <span
             style={{
@@ -347,11 +439,18 @@ export default function EditorEffectsPanel({
             }}
           >
             {clip.effects?.filter((e) => e.enabled).length || 0}{' '}
-            {tr('editorEffectsActive') || 'actifs'}
+            {tr('editorEffectsActive') || 'active'}
           </span>
         </div>
 
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: 6,
+            alignItems: 'center',
+            flexWrap: 'wrap',
+          }}
+        >
           <button
             data-testid="editor-preview-effects-button"
             className={`btn-${isPreviewPlaying ? 'danger' : 'success'} btn-sm`}
@@ -381,10 +480,10 @@ export default function EditorEffectsPanel({
               }
             />
             {isPreviewPlaying
-              ? tr('editorStopPreview') || 'Arrêter'
+              ? tr('editorStopPreview') || 'Stop'
               : isProcessingPreview
-                ? tr('editorEffectPreviewing') || 'Génération...'
-                : tr('listen') || 'Écouter'}
+                ? tr('editorEffectPreviewing') || 'Processing…'
+                : tr('listen') || 'Listen'}
           </button>
 
           <div
@@ -394,15 +493,19 @@ export default function EditorEffectsPanel({
               gap: 4,
               padding: '2px 8px',
               borderRadius: 'var(--radius-sm)',
-              border: `1px solid ${autoPreview ? 'var(--accent)' : 'var(--border)'}`,
-              background: autoPreview ? 'var(--accent-light)' : 'var(--bg-tertiary)',
+              border: `1px solid ${
+                autoPreview ? 'var(--accent)' : 'var(--border)'
+              }`,
+              background: autoPreview
+                ? 'var(--accent-light)'
+                : 'var(--bg-tertiary)',
               cursor: 'pointer',
             }}
             onClick={toggleAutoPreview}
             title={
               autoPreview
-                ? tr('editorAutoPreviewTooltipOn') || 'Désactiver l\'auto-preview'
-                : tr('editorAutoPreviewTooltipOff') || 'Activer l\'auto-preview'
+                ? tr('editorAutoPreviewTooltipOn') || 'Disable auto-preview'
+                : tr('editorAutoPreviewTooltipOff') || 'Enable auto-preview'
             }
           >
             <span
@@ -411,7 +514,11 @@ export default function EditorEffectsPanel({
                 color: autoPreview ? 'var(--accent)' : 'var(--text-tertiary)',
               }}
             >
-              <i className={`ti ${autoPreview ? 'ti-player-play' : 'ti-player-pause'}`} />
+              <i
+                className={`ti ${
+                  autoPreview ? 'ti-player-play' : 'ti-player-pause'
+                }`}
+              />
             </span>
             <span
               style={{
@@ -426,7 +533,9 @@ export default function EditorEffectsPanel({
                 fontSize: 8,
                 padding: '1px 6px',
                 borderRadius: 10,
-                background: autoPreview ? 'var(--accent)' : 'var(--bg-tertiary)',
+                background: autoPreview
+                  ? 'var(--accent)'
+                  : 'var(--bg-tertiary)',
                 color: autoPreview ? 'white' : 'var(--text-tertiary)',
               }}
             >
@@ -442,8 +551,8 @@ export default function EditorEffectsPanel({
           >
             <i className={`ti ${showAddEffect ? 'ti-x' : 'ti-plus'}`} />
             {showAddEffect
-              ? tr('cancel') || 'Annuler'
-              : tr('editorAddEffect') || 'Ajouter un effet'}
+              ? tr('cancel') || 'Cancel'
+              : tr('editorAddEffect') || 'Add effect'}
           </button>
         </div>
       </div>
@@ -459,7 +568,7 @@ export default function EditorEffectsPanel({
               marginBottom: 2,
             }}
           >
-            <span>🔊 {tr('editorEffectPreview') || 'Prévisualisation'}</span>
+            <span>🔊 {tr('editorEffectPreview') || 'Preview'}</span>
             <span>{Math.round(previewProgress)}%</span>
           </div>
           <div
@@ -484,7 +593,14 @@ export default function EditorEffectsPanel({
         </div>
       )}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 8,
+          marginBottom: 8,
+        }}
+      >
         {clip.effects?.map((effect) => {
           const def = EFFECT_TYPES.find((e) => e.id === effect.type)
           if (!def) return null
@@ -497,8 +613,12 @@ export default function EditorEffectsPanel({
               key={effect.id}
               data-testid="editor-effect-item"
               style={{
-                background: effect.enabled ? 'var(--accent-light)' : 'var(--bg-tertiary)',
-                border: `1px solid ${effect.enabled ? 'var(--accent)' : 'var(--border)'}`,
+                background: effect.enabled
+                  ? 'var(--accent-light)'
+                  : 'var(--bg-tertiary)',
+                border: `1px solid ${
+                  effect.enabled ? 'var(--accent)' : 'var(--border)'
+                }`,
                 borderRadius: 'var(--radius-sm)',
                 padding: '6px 10px',
                 opacity: effect.enabled ? 1 : 0.5,
@@ -519,7 +639,9 @@ export default function EditorEffectsPanel({
                     className={`ti ${effectIcon}`}
                     style={{
                       fontSize: 14,
-                      color: effect.enabled ? 'var(--accent)' : 'var(--text-tertiary)',
+                      color: effect.enabled
+                        ? 'var(--accent)'
+                        : 'var(--text-tertiary)',
                       minWidth: 16,
                     }}
                   />
@@ -530,7 +652,9 @@ export default function EditorEffectsPanel({
                 <div style={{ display: 'flex', gap: 4 }}>
                   <button
                     className="btn-ghost btn-sm"
-                    onClick={() => handleEffectToggle(effect.id, !effect.enabled)}
+                    onClick={() =>
+                      handleEffectToggle(effect.id, !effect.enabled)
+                    }
                     style={{
                       padding: '1px 4px',
                       fontSize: 10,
@@ -549,7 +673,11 @@ export default function EditorEffectsPanel({
                     data-testid="editor-effect-delete"
                     className="btn-ghost btn-sm"
                     onClick={() => handleEffectRemove(effect.id)}
-                    style={{ padding: '1px 4px', fontSize: 10, color: 'var(--danger)' }}
+                    style={{
+                      padding: '1px 4px',
+                      fontSize: 10,
+                      color: 'var(--danger)',
+                    }}
                   >
                     <i className="ti ti-x" />
                   </button>
@@ -640,7 +768,7 @@ export default function EditorEffectsPanel({
               fontStyle: 'italic',
             }}
           >
-            {tr('editorNoEffects') || 'Aucun effet'}
+            {tr('editorNoEffects') || 'No effects'}
           </div>
         )}
       </div>

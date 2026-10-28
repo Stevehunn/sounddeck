@@ -1,13 +1,46 @@
-// src/features/editor/utils/timeUtils.js
-import { formatTime as sharedFormatTime } from '@shared/utils/format'
-
 /**
- * Formate un temps en secondes en format MM:SS ou MM:SS.ss
- * @param {number} seconds - Temps en secondes
- * @param {boolean} showMilliseconds - Afficher les millisecondes
- * @returns {string} Temps formaté
+ * @file Time formatting / parsing / snapping for the editor.
+ *
+ * Thin layer over `@shared/utils/format.js` with editor-specific extras:
+ * - `parseTime` — parses `M:SS` or raw seconds.
+ * - `snapTime` — rounds to the nearest grid step.
+ * - `getRulerStep` — the ruler tick interval for a given zoom.
+ * - `isInLoopRegion` — loop region membership test.
+ * - `getTotalDuration` — total project duration (min 10s).
+ * - `getPixelsPerSecond` — zoom → scale factor (min 10 px/s).
  */
 
+import { formatTime as sharedFormatTime } from '@shared/utils/format'
+
+/** Ruler tick (seconds) per zoom range. Ordered high→low zoom. */
+const RULER_STEPS = [
+  { maxZoom: 0.08, step: 60 },
+  { maxZoom: 0.15, step: 30 },
+  { maxZoom: 0.3, step: 10 },
+  { maxZoom: 0.6, step: 5 },
+  { maxZoom: 1.5, step: 1 },
+  { maxZoom: 3, step: 0.5 },
+]
+
+/** Default base scale (px per second at zoom = 1). */
+const BASE_PX_PER_SECOND = 80
+
+/** Minimum pixels-per-second floor (avoids collapsing the timeline). */
+const MIN_PX_PER_SECOND = 10
+
+/** Minimum project duration (seconds). */
+const MIN_PROJECT_DURATION = 10
+
+/** Extra padding added after the last clip (seconds). */
+const DURATION_PADDING = 2
+
+/**
+ * Formats a duration in seconds as `M:SS` (or `M:SS.ss` with ms).
+ *
+ * @param {number} seconds
+ * @param {boolean} [showMilliseconds=false]
+ * @returns {string}
+ */
 export function formatTime(seconds, showMilliseconds = false) {
   return sharedFormatTime(seconds, {
     decimals: showMilliseconds ? 2 : 0,
@@ -16,18 +49,18 @@ export function formatTime(seconds, showMilliseconds = false) {
 }
 
 /**
- * Parse une chaîne de temps en secondes
- * @param {string} timeString - Chaîne de temps (ex: "1:30", "90", "1:30.5")
- * @returns {number} Temps en secondes
+ * Parses a time string into seconds.
+ *
+ * Supports `M:SS` / `M:SS.ss` and raw decimal seconds (`"90"`, `"1.5"`).
+ *
+ * @param {string} timeString
+ * @returns {number} Seconds, or `0` on invalid input.
  */
 export function parseTime(timeString) {
   if (!timeString) return 0
 
-  // ✅ FIX P3 : on essaie d'abord le format MM:SS
-  // (sinon parseFloat('1:30') retourne 1 et on ne matche jamais le regex)
   const str = String(timeString).trim()
 
-  // Format MM:SS ou MM:SS.ss
   const match = str.match(/^(\d+):(\d+(?:\.\d+)?)$/)
   if (match) {
     const mins = parseInt(match[1], 10)
@@ -35,16 +68,16 @@ export function parseTime(timeString) {
     return mins * 60 + secs
   }
 
-  // Sinon, nombre simple (ex: "90" → 90, "1.5" → 1.5)
   const num = parseFloat(str)
   return Number.isFinite(num) ? num : 0
 }
 
 /**
- * Arrondit un temps à l'unité de snap la plus proche
- * @param {number} time - Temps en secondes
- * @param {number} snapValue - Valeur de snap en secondes
- * @returns {number} Temps arrondi
+ * Rounds a time to the nearest multiple of `snapValue`.
+ *
+ * @param {number} time
+ * @param {number} [snapValue=0.1] - Grid step (seconds). `<= 0` disables.
+ * @returns {number}
  */
 export function snapTime(time, snapValue = 0.1) {
   if (snapValue <= 0) return time
@@ -52,25 +85,24 @@ export function snapTime(time, snapValue = 0.1) {
 }
 
 /**
- * Calcule le pas de la règle en fonction du zoom
- * @param {number} zoomLevel - Niveau de zoom
- * @returns {number} Pas en secondes
+ * Returns the ruler tick interval (seconds) for the given zoom level.
+ *
+ * @param {number} zoomLevel
+ * @returns {number}
  */
 export function getRulerStep(zoomLevel) {
-  if (zoomLevel < 0.08) return 60
-  if (zoomLevel < 0.15) return 30
-  if (zoomLevel < 0.3) return 10
-  if (zoomLevel < 0.6) return 5
-  if (zoomLevel < 1.5) return 1
-  if (zoomLevel < 3) return 0.5
+  for (const { maxZoom, step } of RULER_STEPS) {
+    if (zoomLevel < maxZoom) return step
+  }
   return 0.1
 }
 
 /**
- * Vérifie si un temps est à l'intérieur d'une zone de boucle
- * @param {number} time - Temps en secondes
- * @param {Object} loopRegion - Zone de boucle { start, end, enabled }
- * @returns {boolean} Vrai si le temps est dans la zone de boucle
+ * Returns `true` if `time` is inside the loop region.
+ *
+ * @param {number} time
+ * @param {{enabled: boolean, start: number, end: number}|null|undefined} loopRegion
+ * @returns {boolean}
  */
 export function isInLoopRegion(time, loopRegion) {
   if (!loopRegion?.enabled) return false
@@ -79,14 +111,18 @@ export function isInLoopRegion(time, loopRegion) {
 }
 
 /**
- * Obtient la durée totale d'un projet
- * @param {Object} project - Projet avec des pistes et clips
- * @param {Object} clipDurations - Durées des clips
- * @returns {number} Durée totale en secondes
+ * Computes the total duration of a project from its clips.
+ *
+ * Returns `max(end) + DURATION_PADDING`, floored at `MIN_PROJECT_DURATION`.
+ *
+ * @param {Object} project
+ * @param {Record<string, number>} [clipDurations={}]
+ * @returns {number} Seconds.
  */
 export function getTotalDuration(project, clipDurations = {}) {
-  // ✅ FIX P3 : cohérence — tous les cas vides retournent 10
-  if (!project?.tracks || project.tracks.length === 0) return 10
+  if (!project?.tracks || project.tracks.length === 0) {
+    return MIN_PROJECT_DURATION
+  }
 
   let maxDuration = 0
   for (const track of project.tracks) {
@@ -96,15 +132,19 @@ export function getTotalDuration(project, clipDurations = {}) {
       if (end > maxDuration) maxDuration = end
     }
   }
-  return Math.max(maxDuration + 2, 10)
+  return Math.max(maxDuration + DURATION_PADDING, MIN_PROJECT_DURATION)
 }
 
 /**
- * Calcule le nombre de pixels par seconde
- * @param {number} zoomLevel - Niveau de zoom
- * @param {number} basePixelsPerSecond - Pixels de base par seconde (défaut: 80)
- * @returns {number} Pixels par seconde
+ * Returns the pixels-per-second factor for the given zoom level.
+ *
+ * @param {number} zoomLevel
+ * @param {number} [basePixelsPerSecond=BASE_PX_PER_SECOND]
+ * @returns {number} Clamped to `>= MIN_PX_PER_SECOND`.
  */
-export function getPixelsPerSecond(zoomLevel, basePixelsPerSecond = 80) {
-  return Math.max(10, basePixelsPerSecond * zoomLevel)
+export function getPixelsPerSecond(
+  zoomLevel,
+  basePixelsPerSecond = BASE_PX_PER_SECOND
+) {
+  return Math.max(MIN_PX_PER_SECOND, basePixelsPerSecond * zoomLevel)
 }

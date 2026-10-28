@@ -1,8 +1,43 @@
-// src/features/editor/components/Clip/ClipActions.jsx
+/**
+ * @file Floating action buttons (duplicate, delete) on a selected clip.
+ *
+ * Shows two buttons when a clip is both selected AND hovered:
+ * - **Duplicate** — calls `onDuplicate(clipId, trackId)`.
+ * - **Delete** — `DeleteButton` (handles its own confirm dialog) which
+ *   calls `onRemove(trackId, clipId)`.
+ *
+ * The delete button briefly stays visible after a delete confirm
+ * (`isDeleting` flag) so the user doesn't lose the affordance mid-flow.
+ *
+ * ## Confirm flow
+ *
+ * `DeleteButton` fires two callbacks:
+ * - `onConfirmStart` → enter "deleting" mode (delete button stays visible).
+ * - `onConfirmEnd` → after `DELETE_RESET_DELAY_MS` ms, exit "deleting" mode.
+ *
+ * @see ../Clip/index.jsx — the parent that mounts it
+ * @see @shared/components/ui/DeleteButton
+ */
 
-import React, { memo, useState, useRef, useEffect } from 'react'
+import { memo, useState, useRef, useEffect } from 'react'
 import { DeleteButton } from '@shared/components/ui'
 
+/** Delay before exiting the "deleting" state (ms). */
+const DELETE_RESET_DELAY_MS = 300
+
+/**
+ * Floating action buttons (duplicate / delete) for a clip.
+ *
+ * @param {Object} props
+ * @param {boolean} props.isSelected
+ * @param {boolean} props.isHovering
+ * @param {string} props.clipId
+ * @param {string} props.trackId
+ * @param {(clipId: string, trackId: string) => void} [props.onDuplicate]
+ * @param {(trackId: string, clipId: string) => void} [props.onRemove]
+ * @param {(key: string) => string} [props.tr] - i18n translator.
+ * @returns {JSX.Element}
+ */
 const ClipActions = memo(
   ({
     isSelected,
@@ -17,6 +52,7 @@ const ClipActions = memo(
     const [showDeleteButton, setShowDeleteButton] = useState(false)
     const deleteTimeoutRef = useRef(null)
 
+    // Cleanup the pending timer on unmount.
     useEffect(() => {
       return () => {
         if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current)
@@ -27,25 +63,45 @@ const ClipActions = memo(
     const shouldShowDeleteButton =
       isSelected && (isHovering || isDeleting || showDeleteButton)
 
+    /**
+     * Enters the "deleting" state (keeps the delete button visible during
+     * the confirm dialog).
+     * @returns {void}
+     */
     const handleDeleteStart = () => {
       setShowDeleteButton(true)
       setIsDeleting(true)
     }
 
+    /**
+     * Schedules the exit from the "deleting" state once the confirm
+     * dialog closes.
+     * @returns {void}
+     */
     const handleDeleteEnd = () => {
       if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current)
       deleteTimeoutRef.current = setTimeout(() => {
         setIsDeleting(false)
         setShowDeleteButton(false)
-      }, 300)
+      }, DELETE_RESET_DELAY_MS)
     }
 
+    /**
+     * Forwards the delete confirmation to the parent.
+     * @returns {void}
+     */
     const handleDeleteConfirm = () => {
       if (onRemove && clipId && trackId) {
         onRemove(trackId, clipId)
       }
     }
 
+    /**
+     * Forwards the duplicate intent to the parent.
+     *
+     * @param {React.MouseEvent} e
+     * @returns {void}
+     */
     const handleDuplicateClick = (e) => {
       e?.stopPropagation?.()
       e?.preventDefault?.()

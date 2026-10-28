@@ -1,11 +1,27 @@
-// src/features/emoji/tutorialSteps.js
+/**
+ * @file Tutorial steps for the "My emojis" page.
+ *
+ * Each step resolves to a DOM element via a `data-testid` selector or a
+ * fallback CSS selector. `TUTORIAL_STEPS(t)` is a factory so titles react
+ * to language changes.
+ *
+ * @see @shared/components/ui/Tutorial
+ */
 
+/**
+ * Finds the first custom emoji tile (if any).
+ * @returns {HTMLElement|null}
+ */
 function findFirstCustomEmoji() {
   const el = document.querySelector('[data-testid^="emoji-page-item-"]')
   if (el && el.offsetParent !== null) return el
   return null
 }
 
+/**
+ * Finds the custom-emojis section (or its empty state).
+ * @returns {HTMLElement|null}
+ */
 function findCustomSection() {
   return (
     document.querySelector('[data-testid="emoji-page-custom-section"]') ||
@@ -13,17 +29,19 @@ function findCustomSection() {
   )
 }
 
+/**
+ * Builds the "My emojis" page tutorial steps.
+ *
+ * @param {(key: string) => string} t - i18n translator.
+ * @returns {Array<Object>} Step descriptors.
+ */
 export const TUTORIAL_STEPS = (t) => [
   {
     id: 'emoji-page-1',
     icon: '😀',
-    title: t('tutorialEmojiPageStep1Title') || 'Votre bibliothèque d\'emojis',
-    description:
-      t('tutorialEmojiPageStep1Desc') ||
-      'Cette page regroupe tous vos emojis : ceux par défaut, ceux que vous avez ajoutés manuellement, et ceux téléchargés depuis la page Découvrir.',
-    hint:
-      t('tutorialEmojiPageStep1Hint') ||
-      '💡 Astuce : Les emojis par défaut sont toujours disponibles dans le picker.',
+    title: t('tutorialEmojiPageStep1Title'),
+    description: t('tutorialEmojiPageStep1Desc'),
+    hint: t('tutorialEmojiPageStep1Hint'),
     target: '[data-testid="emoji-page-container"]',
     fallbackTarget: '.main-content',
     position: 'bottom',
@@ -31,13 +49,9 @@ export const TUTORIAL_STEPS = (t) => [
   {
     id: 'emoji-page-2',
     icon: '⭐',
-    title: t('tutorialEmojiPageStep2Title') || 'Vos emojis ajoutés',
-    description:
-      t('tutorialEmojiPageStep2Desc') ||
-      'Cette section affiche uniquement les emojis que vous avez ajoutés. Ils sont groupés par catégorie d\'origine.',
-    hint:
-      t('tutorialEmojiPageStep2Hint') ||
-      '💡 Astuce : Les emojis sans catégorie apparaissent dans "Sans catégorie".',
+    title: t('tutorialEmojiPageStep2Title'),
+    description: t('tutorialEmojiPageStep2Desc'),
+    hint: t('tutorialEmojiPageStep2Hint'),
     target: findCustomSection,
     fallbackTarget: '[data-testid="emoji-page-custom-section"]',
     position: 'bottom',
@@ -45,13 +59,9 @@ export const TUTORIAL_STEPS = (t) => [
   {
     id: 'emoji-page-3',
     icon: '🗑️',
-    title: t('tutorialEmojiPageStep3Title') || 'Retirer un emoji',
-    description:
-      t('tutorialEmojiPageStep3Desc') ||
-      'Survolez un emoji ajouté pour voir le bouton ×. Cliquez dessus pour le retirer de votre collection. Les emojis par défaut ne peuvent pas être retirés.',
-    hint:
-      t('tutorialEmojiPageStep3Hint') ||
-      '💡 Astuce : Utilisez le bouton "Retirer la catégorie" pour en supprimer plusieurs d\'un coup.',
+    title: t('tutorialEmojiPageStep3Title'),
+    description: t('tutorialEmojiPageStep3Desc'),
+    hint: t('tutorialEmojiPageStep3Hint'),
     target: findFirstCustomEmoji,
     fallbackTarget: '[data-testid="emoji-page-custom-section"]',
     position: 'bottom',
@@ -59,13 +69,9 @@ export const TUTORIAL_STEPS = (t) => [
   {
     id: 'emoji-page-4',
     icon: '🔍',
-    title: t('tutorialEmojiPageStep4Title') || 'Rechercher',
-    description:
-      t('tutorialEmojiPageStep4Desc') ||
-      'Utilisez la barre de recherche pour filtrer vos emojis ajoutés.',
-    hint:
-      t('tutorialEmojiPageStep4Hint') ||
-      '💡 Astuce : La recherche porte sur le caractère emoji lui-même.',
+    title: t('tutorialEmojiPageStep4Title'),
+    description: t('tutorialEmojiPageStep4Desc'),
+    hint: t('tutorialEmojiPageStep4Hint'),
     target: '[data-testid="emoji-page-search"]',
     fallbackTarget: 'input[type="text"]',
     position: 'bottom',
@@ -73,13 +79,9 @@ export const TUTORIAL_STEPS = (t) => [
   {
     id: 'emoji-page-5',
     icon: '🧭',
-    title: t('tutorialEmojiPageStep5Title') || 'Découvrir plus d\'emojis',
-    description:
-      t('tutorialEmojiPageStep5Desc') ||
-      'Cliquez sur "Ajouter plus d\'emojis" pour ouvrir la page Découvrir et enrichir votre collection par catégorie entière.',
-    hint:
-      t('tutorialEmojiPageStep5Hint') ||
-      '💡 Astuce : Vous pouvez ajouter 30 emojis d\'un seul clic depuis la page Découvrir.',
+    title: t('tutorialEmojiPageStep5Title'),
+    description: t('tutorialEmojiPageStep5Desc'),
+    hint: t('tutorialEmojiPageStep5Hint'),
     target: '[data-testid="emoji-page-open-discover-button"]',
     fallbackTarget: '.btn-primary',
     position: 'bottom',
