@@ -96,7 +96,7 @@ export default function ExportModal({
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!name.trim()) {
-      // eslint-disable-next-line no-alert
+       
       alert(tr('editorNameRequired') || 'Please enter a name')
       return
     }

@@ -13,13 +13,16 @@
  *   same reason: an unverified account that provides the correct password
  *   gets `403 email_not_verified`, which is actionable; without the
  *   correct password, it stays a generic 401.
+ * - If the user's trial has expired, the account is downgraded to `free`
+ *   **before** issuing the token (idempotent).
  *
  * @see ../lib/crypto.js — `verifyPassword` (PBKDF2-SHA256, constant-time compare)
  * @see ../lib/license.js — `generateLicenseToken`
+ * @see ../lib/db.js — `downgradeIfExpired`
  */
 
 import { verifyPassword } from "../lib/crypto.js";
-import { getUserByEmail, logAudit } from "../lib/db.js";
+import { getUserByEmail, logAudit, downgradeIfExpired } from "../lib/db.js";
 import { generateLicenseToken } from "../lib/license.js";
 
 /**
@@ -29,7 +32,7 @@ import { generateLicenseToken } from "../lib/license.js";
  * @param {Object} env - Worker environment bindings.
  * @param {string} env.DB - D1 database binding.
  * @param {string} env.PRIVATE_KEY_HEX - Ed25519 private key (32 bytes hex).
- * @returns {Promise<Response>} JSON with `{token, email, tier, donorId, donorName}`.
+ * @returns {Promise<Response>} JSON with `{token, email, tier, expiresAt, donorId, donorName}`.
  */
 export async function handleLogin(request, env) {
   let body;
@@ -93,11 +96,16 @@ export async function handleLogin(request, env) {
     return jsonResponse({ error: "email_not_verified" }, 403);
   }
 
+  // ✅ Trial expired? → downgrade to 'free' (idempotent)
+  const { tier: effectiveTier, expiresAt: tierExpiresAt } =
+    await downgradeIfExpired(env.DB, user);
+
   // Issue a fresh token on every login (private key is never exposed)
   const token = await generateLicenseToken({
     donorId: user.donor_id,
     donorName: user.donor_name,
-    tier: user.tier,
+    tier: effectiveTier,
+    expiresAt: tierExpiresAt,
     privateKeyHex: env.PRIVATE_KEY_HEX,
   });
 
@@ -112,7 +120,8 @@ export async function handleLogin(request, env) {
   return jsonResponse({
     token,
     email: user.email,
-    tier: user.tier,
+    tier: effectiveTier,
+    expiresAt: tierExpiresAt,
     donorId: user.donor_id,
     donorName: user.donor_name,
   });

@@ -7,30 +7,35 @@
  *
  * The payload is plain JSON (readable, non-secret):
  *
- *   `{ v, tier, donorId, donorName, issuedAt, neverExpires }`
+ *   `{ v, tier, donorId, donorName, issuedAt, neverExpires, expiresAt }`
  *
  * The Ed25519 signature guarantees authenticity. No network call, no
  * machine binding — the token is 100% portable.
+ *
+ * Since 1.4.13, the payload also carries `expiresAt` (Unix seconds) and
+ * `neverExpires` (boolean). When `neverExpires === false` and the
+ * expiration date is in the past, the token is rejected with
+ * `error: 'EXPIRED'`.
  *
  * @see ./licenseKeys.js — the public key + tier definitions
  * @see ./revokedDonors.js — revoked donor list
  * @see @core/services/LicenseService.js — storage + activation
  */
 
-import * as ed from '@noble/ed25519'
-import { sha512 } from '@noble/hashes/sha512'
-import { logWarn } from '@shared/utils/logger'
+import * as ed from "@noble/ed25519";
+import { sha512 } from "@noble/hashes/sha512";
+import { logWarn } from "@shared/utils/logger";
 import {
   PUBLIC_KEY_HEX,
   TOKEN_VERSION,
   TOKEN_PREFIX,
   LICENSE_TIERS,
   isValidPublicKeyConfigured,
-} from './licenseKeys'
-import { isDonorRevoked } from './revokedDonors'
+} from "./licenseKeys";
+import { isDonorRevoked } from "./revokedDonors";
 
 // @noble/ed25519 v2 requires an injected hash function
-ed.etc.sha512Sync = (...m) => sha512(ed.etc.concatBytes(...m))
+ed.etc.sha512Sync = (...m) => sha512(ed.etc.concatBytes(...m));
 
 // ─── base64url helpers ────────────────────────────────────────────────
 
@@ -40,16 +45,16 @@ ed.etc.sha512Sync = (...m) => sha512(ed.etc.concatBytes(...m))
  * @returns {Uint8Array|null} `null` on invalid input.
  */
 function b64urlDecode(str) {
-  if (typeof str !== 'string') return null
+  if (typeof str !== "string") return null;
   try {
-    let s = str.replace(/-/g, '+').replace(/_/g, '/')
-    while (s.length % 4) s += '='
-    const bin = atob(s)
-    const bytes = new Uint8Array(bin.length)
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-    return bytes
+    let s = str.replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    const bin = atob(s);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
   } catch {
-    return null
+    return null;
   }
 }
 
@@ -59,15 +64,15 @@ function b64urlDecode(str) {
  * @returns {Uint8Array|null} `null` on invalid input.
  */
 function hexToBytes(hex) {
-  if (typeof hex !== 'string' || hex.length % 2 !== 0) return null
+  if (typeof hex !== "string" || hex.length % 2 !== 0) return null;
   try {
-    const bytes = new Uint8Array(hex.length / 2)
+    const bytes = new Uint8Array(hex.length / 2);
     for (let i = 0; i < hex.length; i += 2) {
-      bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16)
+      bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
     }
-    return bytes
+    return bytes;
   } catch {
-    return null
+    return null;
   }
 }
 
@@ -78,9 +83,9 @@ function hexToBytes(hex) {
  */
 function safeJsonParse(str) {
   try {
-    return JSON.parse(str)
+    return JSON.parse(str);
   } catch {
-    return null
+    return null;
   }
 }
 
@@ -95,6 +100,9 @@ function safeJsonParse(str) {
  * @property {string}  [donorId]
  * @property {string}  [donorName]
  * @property {number}  [issuedAt]
+ * @property {number|null} [expiresAt]     Unix seconds, null = never
+ * @property {boolean} [neverExpires]
+ * @property {number}  [expiredAt]  Unix seconds, only when error === 'EXPIRED'
  * @property {string}  [error]      Error code if invalid
  * @property {Object}  [payload]    Raw payload (debug)
  */
@@ -110,74 +118,93 @@ export async function verifyLicense(token) {
   if (!isValidPublicKeyConfigured()) {
     return {
       valid: false,
-      tier: 'free',
-      error: 'PUBLIC_KEY_NOT_CONFIGURED',
-    }
+      tier: "free",
+      error: "PUBLIC_KEY_NOT_CONFIGURED",
+    };
   }
 
   // 2. Format check
-  if (!token || typeof token !== 'string') {
-    return { valid: false, tier: 'free', error: 'MISSING_TOKEN' }
+  if (!token || typeof token !== "string") {
+    return { valid: false, tier: "free", error: "MISSING_TOKEN" };
   }
 
-  const parts = token.split('.')
+  const parts = token.split(".");
   if (parts.length !== 3) {
-    return { valid: false, tier: 'free', error: 'MALFORMED_TOKEN' }
+    return { valid: false, tier: "free", error: "MALFORMED_TOKEN" };
   }
 
-  const [prefix, payloadB64, signatureB64] = parts
+  const [prefix, payloadB64, signatureB64] = parts;
   if (prefix !== TOKEN_PREFIX) {
-    return { valid: false, tier: 'free', error: 'WRONG_PREFIX' }
+    return { valid: false, tier: "free", error: "WRONG_PREFIX" };
   }
 
   // 3. Decode
-  const payloadBytes = b64urlDecode(payloadB64)
-  const signature = b64urlDecode(signatureB64)
-  const publicKey = hexToBytes(PUBLIC_KEY_HEX)
+  const payloadBytes = b64urlDecode(payloadB64);
+  const signature = b64urlDecode(signatureB64);
+  const publicKey = hexToBytes(PUBLIC_KEY_HEX);
 
   if (!payloadBytes || !signature || !publicKey) {
-    return { valid: false, tier: 'free', error: 'DECODE_ERROR' }
+    return { valid: false, tier: "free", error: "DECODE_ERROR" };
   }
 
   // 4. Cryptographic verification
-  let cryptoValid
+  let cryptoValid;
   try {
-    cryptoValid = await ed.verifyAsync(signature, payloadBytes, publicKey)
+    cryptoValid = await ed.verifyAsync(signature, payloadBytes, publicKey);
   } catch (e) {
-    logWarn('licenseManager', 'Ed25519 verification error', e)
-    return { valid: false, tier: 'free', error: 'VERIFY_THREW' }
+    logWarn("licenseManager", "Ed25519 verification error", e);
+    return { valid: false, tier: "free", error: "VERIFY_THREW" };
   }
 
   if (!cryptoValid) {
-    return { valid: false, tier: 'free', error: 'INVALID_SIGNATURE' }
+    return { valid: false, tier: "free", error: "INVALID_SIGNATURE" };
   }
 
   // 5. Payload parsing
-  const payloadJson = new TextDecoder().decode(payloadBytes)
-  const payload = safeJsonParse(payloadJson)
+  const payloadJson = new TextDecoder().decode(payloadBytes);
+  const payload = safeJsonParse(payloadJson);
 
-  if (!payload || typeof payload !== 'object') {
-    return { valid: false, tier: 'free', error: 'BAD_PAYLOAD' }
+  if (!payload || typeof payload !== "object") {
+    return { valid: false, tier: "free", error: "BAD_PAYLOAD" };
   }
 
   if (payload.v !== TOKEN_VERSION) {
-    return { valid: false, tier: 'free', error: 'UNSUPPORTED_VERSION' }
+    return { valid: false, tier: "free", error: "UNSUPPORTED_VERSION" };
   }
 
   // 6. Revocation
   if (payload.donorId && isDonorRevoked(payload.donorId)) {
     return {
       valid: false,
-      tier: 'free',
-      error: 'REVOKED',
+      tier: "free",
+      error: "REVOKED",
       donorId: payload.donorId,
-    }
+    };
+  }
+
+  // 6.5. Trial expired?
+  // We compare `expiresAt` (payload) to the local clock. If the user
+  // tampered with their system clock, that's their problem — the trade-off
+  // is intentional (no network round-trip for offline verification).
+  if (
+    payload.neverExpires === false &&
+    typeof payload.expiresAt === "number" &&
+    payload.expiresAt < Math.floor(Date.now() / 1000)
+  ) {
+    return {
+      valid: false,
+      tier: "free",
+      error: "EXPIRED",
+      expiredAt: payload.expiresAt,
+      donorId: payload.donorId,
+      payload,
+    };
   }
 
   // 7. Unknown tier?
-  const tierInfo = LICENSE_TIERS[payload.tier]
+  const tierInfo = LICENSE_TIERS[payload.tier];
   if (!tierInfo) {
-    return { valid: false, tier: 'free', error: 'UNKNOWN_TIER' }
+    return { valid: false, tier: "free", error: "UNKNOWN_TIER" };
   }
 
   return {
@@ -187,8 +214,10 @@ export async function verifyLicense(token) {
     donorId: payload.donorId,
     donorName: payload.donorName || null,
     issuedAt: payload.issuedAt,
+    expiresAt: payload.expiresAt ?? null,
+    neverExpires: payload.neverExpires !== false,
     payload,
-  }
+  };
 }
 
 /**
@@ -199,9 +228,9 @@ export async function verifyLicense(token) {
  * @returns {boolean}
  */
 export function meetsTier(userTier, requiredTier) {
-  const u = LICENSE_TIERS[userTier]?.rank ?? 0
-  const r = LICENSE_TIERS[requiredTier]?.rank ?? 0
-  return u >= r
+  const u = LICENSE_TIERS[userTier]?.rank ?? 0;
+  const r = LICENSE_TIERS[requiredTier]?.rank ?? 0;
+  return u >= r;
 }
 
 /**
@@ -209,11 +238,11 @@ export function meetsTier(userTier, requiredTier) {
  * @returns {'free'}
  */
 export function getDefaultTier() {
-  return 'free'
+  return "free";
 }
 
 export default {
   verifyLicense,
   meetsTier,
   getDefaultTier,
-}
+};

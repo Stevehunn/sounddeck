@@ -492,4 +492,19 @@ export default {
   // ─── HOME ─────────────────────────────────────────────────────────
   files: "fichier(s)",
   soundNamePlaceholder: "Ex : Airhorn",
+
+  // ─── TRIAL NOTIFICATIONS ─────────────────────────────────────────
+  trialBadge: "Trial",
+  trialExpiresOn: "Pro jusqu'au {date}",
+  trialUpgradeCta: "Passer à Pro à vie",
+  trialActivated:
+    "🎉 Ton essai Pro est activé ! Tu as {days} jours pour profiter de tous les plugins Pro.",
+  trialMonthLeft:
+    "⏳ Il te reste moins d'1 mois de Pro. Pense à passer à Pro à vie pour continuer !",
+  trialWeekLeft: "⏳ Plus qu'1 semaine de Pro. Ton essai se termine bientôt !",
+  trialDayLeft:
+    "⏳ Dernier jour de Pro ! Profite-en, ou passe à Pro à vie pour ne pas perdre tes plugins.",
+  trialExpired:
+    "🔒 Ton essai Pro est terminé. Ton compte repasse en version gratuite. Pour récupérer tes plugins Pro, passe à Pro à vie depuis Options → Soutenir SoundDeck.",
+  trialUpgradedLifetime: "💖 Merci ! Ton accès Pro à vie est activé.",
 };

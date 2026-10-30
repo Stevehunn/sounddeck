@@ -1,4 +1,3 @@
-// src/App.jsx
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useStore } from '@core/store'
 import { useLanguage } from '@core/i18n/LanguageContext'
@@ -21,6 +20,8 @@ import { getItem, setItem } from '@shared/utils/appStorage'
 import { uuid } from '@shared/utils/uuid'
 import { logWarn } from '@shared/utils/logger'
 import { useLatestRefs } from '@shared/hooks/useLatestRefs'
+import { useLicense } from '@core/store/hooks/useLicense'
+import { useTrialNotifications } from '@shared/hooks/useTrialNotifications'
 
 import { playSound, stopAllSounds, setStoreRef } from '@core/services/AudioService'
 import { warmupAudioContext } from '@core/services/AudioMixerService'
@@ -41,7 +42,7 @@ function PageWrapper({ children, pageId, onHelpClick }) {
   )
 }
 
-// ─── COMPOSANT PRINCIPAL AVEC PLUGINS ────────────────────────────────────────
+// ─── MAIN COMPONENT WITH PLUGINS ─────────────────────────────────────────────
 function AppContent({ store }) {
   const { t, currentLang } = useLanguage()
   const [currentPage, setCurrentPage] = useState('home')
@@ -62,14 +63,25 @@ function AppContent({ store }) {
     error: pluginError,
   } = usePluginPage(isPluginPage(currentPage) ? currentPage : null)
 
-  // ─── addToast (défini tôt pour être inclus dans useLatestRefs) ──────────
+  // ─── addToast (defined early so it can be included in useLatestRefs) ────
   const addToast = useCallback((message, type = 'info') => {
     const id = uuid()
     setToasts((prev) => [...prev, { id, message, type }])
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000)
   }, [])
 
-  // ─── Refs "latest" centralisées ────────────────────────────────────────
+  // ─── Trial Pro notifications (toasts at key milestones) ────────────────
+  // Displays toast popups when the 3-month Pro trial:
+  //   - is activated (first time)
+  //   - reaches the 1-month / 1-week / 1-day remaining thresholds
+  //   - expires (auto-downgrade to Free)
+  //   - is upgraded to lifetime Pro (via GitHub Sponsors)
+  // No-op if `licenseStatus` is null or `addToast` is missing.
+  // @see @shared/hooks/useTrialNotifications.js
+  const { status: licenseStatus } = useLicense()
+  useTrialNotifications(licenseStatus, addToast)
+
+  // ─── Centralized "latest" refs ─────────────────────────────────────────
   const refs = useLatestRefs({
     sounds: store.sounds,
     switchToNextProfile: store.switchToNextProfile,
@@ -82,7 +94,7 @@ function AppContent({ store }) {
     addToast,
   })
 
-  // ─── Refs mutables (ne suivent PAS une valeur) ──────────────────────────
+  // ─── Mutable refs (do NOT track a value) ───────────────────────────────
   const isQuittingRef = useRef(false)
   const isPopupBlockedRef = useRef(false)
   const blockTimerRef = useRef(null)
@@ -100,7 +112,7 @@ function AppContent({ store }) {
     return () => clearTimeout(timer)
   }, [store.loading])
 
-  // ─── Tutoriel global ────────────────────────────────────────────────────
+  // ─── Global tutorial ────────────────────────────────────────────────────
   const openTutorial = useCallback((pageId) => {
     setTutorialPageId(pageId)
     setShowTutorial(true)
@@ -113,7 +125,7 @@ function AppContent({ store }) {
     }
   }, [openTutorial])
 
-  // ─── Navigation programmatique (pour les pages/plugins) ─────────────────
+  // ─── Programmatic navigation (for pages/plugins) ────────────────────────
   useEffect(() => {
     window.__navigateTo = setCurrentPage
     return () => {
@@ -136,14 +148,14 @@ function AppContent({ store }) {
           setTimeout(() => setShowTutorial(true), 500)
         }
       } catch (e) {
-        logWarn('App', 'Erreur vérification premier lancement', e)
+        logWarn('App', 'First-launch check error', e)
         setIsFirstLaunch(false)
       }
     }
     checkFirstLaunch()
   }, [])
 
-  // ─── Redirection pages plugin si plugins pas chargés ────────────────────
+  // ─── Redirect plugin pages if plugins aren't loaded ─────────────────────
   useEffect(() => {
     if (store.loading) return
     if (isFirstLaunch === true) return
@@ -156,7 +168,7 @@ function AppContent({ store }) {
     }
   }, [currentPage, isPluginPage, pluginsLoaded, store.loading, isFirstLaunch])
 
-  // ─── Molette pour changer de profil ─────────────────────────────────────
+  // ─── Ctrl+wheel to switch profile ───────────────────────────────────────
   useEffect(() => {
     const handleWheel = (e) => {
       const target = e.target
@@ -183,7 +195,7 @@ function AppContent({ store }) {
     return () => window.removeEventListener('wheel', handleWheel)
   }, [store.currentProfileId, store.profiles])
 
-  // ─── Popup de fermeture ─────────────────────────────────────────────────
+  // ─── Quit-confirm popup ─────────────────────────────────────────────────
   useEffect(() => {
     const blockPopup = () => {
       isPopupBlockedRef.current = true
@@ -225,11 +237,11 @@ function AppContent({ store }) {
     if (!store.theme) return
 
     window.electronAPI.storeSet('theme', store.theme).catch((e) => {
-      logWarn('App', 'Erreur persist theme', e)
+      logWarn('App', 'Persist theme error', e)
     })
   }, [store.theme, store.loading])
 
-  // ─── Appliquer thème ────────────────────────────────────────────────────
+  // ─── Apply theme ────────────────────────────────────────────────────────
   useEffect(() => {
     if (store.loading) return
 
@@ -315,7 +327,7 @@ function AppContent({ store }) {
         await new Promise((resolve) => setTimeout(resolve, 500))
         const success = await store.initMixerOnStartup()
         setMixerInitialized(true)
-        if (!success) logWarn('App', 'Échec init mixeur')
+        if (!success) logWarn('App', 'Mixer init failed')
       } else {
         setMixerInitialized(true)
       }
@@ -328,7 +340,7 @@ function AppContent({ store }) {
     mixerInitialized,
   ])
 
-  // ─── Vérif mixer quand langue change ────────────────────────────────────
+  // ─── Re-check mixer when language changes ───────────────────────────────
   useEffect(() => {
     if (!store.loading && store.mixerEnabled && mixerInitialized) {
       const checkMixer = async () => {
@@ -338,14 +350,14 @@ function AppContent({ store }) {
           )
           if (!isMixerOperational()) repairMixer()
         } catch (e) {
-          logWarn('App', 'Erreur vérification mixeur', e)
+          logWarn('App', 'Mixer check error', e)
         }
       }
       checkMixer()
     }
   }, [currentLang, store.loading, store.mixerEnabled, mixerInitialized])
 
-  // ─── Vérif micro ────────────────────────────────────────────────────────
+  // ─── Check microphone ───────────────────────────────────────────────────
   useEffect(() => {
     if (store.loading) return
 
@@ -359,7 +371,7 @@ function AppContent({ store }) {
           )
           if (!deviceExists) await store.updateMicrophoneDeviceId('default')
         } catch (e) {
-          logWarn('App', 'Erreur vérif micro', e)
+          logWarn('App', 'Mic device check error', e)
         }
       }
     }
@@ -489,7 +501,7 @@ function AppContent({ store }) {
       )
     }
 
-    // Route "emoji" (page "Mes emojis")
+    // Route "emoji" (page "My emojis")
     if (currentPage === 'emoji') {
       return (
         <PageWrapper pageId="emoji" onHelpClick={openTutorial}>
@@ -722,7 +734,7 @@ function AppContent({ store }) {
   )
 }
 
-// ─── WRAPPER AVEC PLUGIN PROVIDER ────────────────────────────────────────────
+// ─── WRAPPER WITH PLUGIN PROVIDER ────────────────────────────────────────────
 
 export default function App() {
   const store = useStore()

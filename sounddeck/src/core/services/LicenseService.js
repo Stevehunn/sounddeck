@@ -12,36 +12,46 @@
  * - **Caching** — `getStatus()` caches the result; `getStatus(true)` or
  *   `invalidateCache()` bypasses it.
  *
+ * Since 1.4.13, the returned status also carries:
+ * - `expiresAt` (Unix seconds, or `null` for lifetime Pro)
+ * - `neverExpires` (boolean)
+ * - `expiredAt` (Unix seconds, only set when the token expired)
+ *
  * @see @core/plugins/PluginManager/licenseManager.js (verification)
  * @see @core/plugins/PluginManager/licenseKeys.js (tier definitions)
  * @see @core/store/hooks/useLicense.js (React wrapper)
  */
 
-import { logWarn, logError, logInfo } from '@shared/utils/logger'
-import { verifyLicense } from '@core/plugins/PluginManager/licenseManager'
+import { logWarn, logError, logInfo } from "@shared/utils/logger";
+import { verifyLicense } from "@core/plugins/PluginManager/licenseManager";
 
-const STORE_KEY_TOKEN = 'licenseToken'
-const STORE_KEY_EMAIL = 'licenseEmail'
+const STORE_KEY_TOKEN = "licenseToken";
+const STORE_KEY_EMAIL = "licenseEmail";
 
-let cachedStatus = null
+let cachedStatus = null;
 
 /**
  * Builds a "free tier" status object.
  *
  * @param {string|null} [error=null] - Verification error code, if any.
+ * @param {number|null} [expiredAt=null] - Unix seconds, only when
+ *   `error === 'EXPIRED'`.
  * @returns {Object}
  */
-function buildFreeStatus(error = null) {
+function buildFreeStatus(error = null, expiredAt = null) {
   return {
     valid: false,
-    tier: 'free',
+    tier: "free",
     rank: 0,
     donorId: null,
     donorName: null,
     email: null,
     issuedAt: null,
+    expiresAt: null,
+    neverExpires: true,
+    expiredAt,
     error,
-  }
+  };
 }
 
 /**
@@ -56,26 +66,32 @@ function buildFreeStatus(error = null) {
  *   donorName: string|null,
  *   email: string|null,
  *   issuedAt: number|null,
+ *   expiresAt: number|null,
+ *   neverExpires: boolean,
+ *   expiredAt: number|null,
  *   error: string|null,
  * }>}
  */
 export async function getStatus(force = false) {
-  if (cachedStatus && !force) return cachedStatus
+  if (cachedStatus && !force) return cachedStatus;
 
   try {
-    const token = await window.electronAPI?.storeGet?.(STORE_KEY_TOKEN)
-    const email = await window.electronAPI?.storeGet?.(STORE_KEY_EMAIL)
+    const token = await window.electronAPI?.storeGet?.(STORE_KEY_TOKEN);
+    const email = await window.electronAPI?.storeGet?.(STORE_KEY_EMAIL);
 
     if (!token) {
-      cachedStatus = buildFreeStatus(null)
-      return cachedStatus
+      cachedStatus = buildFreeStatus(null);
+      return cachedStatus;
     }
 
-    const result = await verifyLicense(token)
+    const result = await verifyLicense(token);
 
     if (!result.valid) {
-      cachedStatus = { ...buildFreeStatus(result.error), email: email || null }
-      return cachedStatus
+      cachedStatus = {
+        ...buildFreeStatus(result.error, result.expiredAt ?? null),
+        email: email || null,
+      };
+      return cachedStatus;
     }
 
     cachedStatus = {
@@ -86,13 +102,16 @@ export async function getStatus(force = false) {
       donorName: result.donorName || null,
       email: email || null,
       issuedAt: result.issuedAt || null,
+      expiresAt: result.expiresAt || null,
+      neverExpires: result.neverExpires !== false,
+      expiredAt: null,
       error: null,
-    }
-    return cachedStatus
+    };
+    return cachedStatus;
   } catch (e) {
-    logError('LicenseService', 'getStatus error', e)
-    cachedStatus = buildFreeStatus('INTERNAL_ERROR')
-    return cachedStatus
+    logError("LicenseService", "getStatus error", e);
+    cachedStatus = buildFreeStatus("INTERNAL_ERROR");
+    return cachedStatus;
   }
 }
 
@@ -104,31 +123,31 @@ export async function getStatus(force = false) {
  * @returns {Promise<{success: boolean, error?: string, status?: Object}>}
  */
 export async function activate(token, email = null) {
-  if (!token || typeof token !== 'string') {
-    return { success: false, error: 'MISSING_TOKEN' }
+  if (!token || typeof token !== "string") {
+    return { success: false, error: "MISSING_TOKEN" };
   }
 
-  const cleanToken = token.trim().replace(/\s+/g, '')
+  const cleanToken = token.trim().replace(/\s+/g, "");
 
-  const result = await verifyLicense(cleanToken)
+  const result = await verifyLicense(cleanToken);
   if (!result.valid) {
-    return { success: false, error: result.error }
+    return { success: false, error: result.error };
   }
 
   try {
-    await window.electronAPI?.storeSet?.(STORE_KEY_TOKEN, cleanToken)
+    await window.electronAPI?.storeSet?.(STORE_KEY_TOKEN, cleanToken);
     if (email) {
-      await window.electronAPI?.storeSet?.(STORE_KEY_EMAIL, email)
+      await window.electronAPI?.storeSet?.(STORE_KEY_EMAIL, email);
     }
-    logInfo('LicenseService', `License activated: tier=${result.tier}`)
+    logInfo("LicenseService", `License activated: tier=${result.tier}`);
   } catch (e) {
-    logError('LicenseService', 'License persistence error', e)
-    return { success: false, error: 'STORE_ERROR' }
+    logError("LicenseService", "License persistence error", e);
+    return { success: false, error: "STORE_ERROR" };
   }
 
-  cachedStatus = null
-  const status = await getStatus(true)
-  return { success: true, status }
+  cachedStatus = null;
+  const status = await getStatus(true);
+  return { success: true, status };
 }
 
 /**
@@ -138,13 +157,13 @@ export async function activate(token, email = null) {
  */
 export async function logout() {
   try {
-    await window.electronAPI?.storeSet?.(STORE_KEY_EMAIL, null)
-    logInfo('LicenseService', 'Logout: email cleared (token kept)')
+    await window.electronAPI?.storeSet?.(STORE_KEY_EMAIL, null);
+    logInfo("LicenseService", "Logout: email cleared (token kept)");
   } catch (e) {
-    logWarn('LicenseService', 'Logout error', e)
+    logWarn("LicenseService", "Logout error", e);
   }
-  cachedStatus = null
-  return getStatus(true)
+  cachedStatus = null;
+  return getStatus(true);
 }
 
 /**
@@ -154,14 +173,14 @@ export async function logout() {
  */
 export async function revokeLocal() {
   try {
-    await window.electronAPI?.storeSet?.(STORE_KEY_TOKEN, null)
-    await window.electronAPI?.storeSet?.(STORE_KEY_EMAIL, null)
-    logWarn('LicenseService', 'License revoked locally')
+    await window.electronAPI?.storeSet?.(STORE_KEY_TOKEN, null);
+    await window.electronAPI?.storeSet?.(STORE_KEY_EMAIL, null);
+    logWarn("LicenseService", "License revoked locally");
   } catch (e) {
-    logWarn('LicenseService', 'revokeLocal error', e)
+    logWarn("LicenseService", "revokeLocal error", e);
   }
-  cachedStatus = null
-  return getStatus(true)
+  cachedStatus = null;
+  return getStatus(true);
 }
 
 /**
@@ -171,11 +190,11 @@ export async function revokeLocal() {
  * @returns {Promise<boolean>}
  */
 export async function meetsTier(requiredTier) {
-  const status = await getStatus()
+  const status = await getStatus();
   const { meetsTier: check } = await import(
-    '@core/plugins/PluginManager/licenseManager'
-  )
-  return check(status.tier, requiredTier)
+    "@core/plugins/PluginManager/licenseManager"
+  );
+  return check(status.tier, requiredTier);
 }
 
 /**
@@ -183,7 +202,7 @@ export async function meetsTier(requiredTier) {
  * @returns {void}
  */
 export function invalidateCache() {
-  cachedStatus = null
+  cachedStatus = null;
 }
 
 export default {
@@ -193,4 +212,4 @@ export default {
   revokeLocal,
   meetsTier,
   invalidateCache,
-}
+};

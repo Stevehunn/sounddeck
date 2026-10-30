@@ -16,8 +16,8 @@
  * reveals whether the email exists (we always return 200 OK).
  *
  * The verification flow (`GET /verify-email?token=X`) marks the user as
- * verified and renders a self-contained HTML success page (dark theme,
- * inline CSS, no JS, no external assets).
+ * verified, **activates the 3-month Pro trial**, and renders a
+ * self-contained HTML success page.
  *
  * Verification tokens:
  * - 256 bits of entropy (2× UUIDv4 concatenated, hyphens stripped)
@@ -117,16 +117,8 @@ function generateVerifyToken() {
  * - **Email is new** → creates the user (tier `free`, `email_verified=0`),
  *   issues a token, sends the email (see "Case 3" below)
  *
- * Error codes (400):
- * - `invalid_json`         — body isn't valid JSON
- * - `missing_fields`       — `email` or `password` is empty
- * - `invalid_email`        — email fails the sanity check
- * - `password_too_short`   — password length < 6
- * - `password_too_long`    — password length > 100
- *
- * The email-send step is **best-effort**: if it fails, the user record
- * still exists and the client gets 200 OK. The failure is logged to
- * `audit_log` with `detail: "email_failed"` so support can investigate.
+ * The trial Pro (3 months) is **NOT** activated here — it's activated
+ * when the user clicks the verification link (`markEmailVerified`).
  *
  * @param {Request} request
  * @param {Object} env - Worker env bindings.
@@ -180,7 +172,6 @@ export async function handleSignup(request, env) {
 
   if (existing) {
     // ─── Case 2: existing but unverified → reset password + token ──
-    // (the user may have forgotten what they chose on their first try)
     await updateUserPassword(env.DB, existing.id, hash, salt);
     await setUserVerifyToken(
       env.DB,
@@ -237,16 +228,13 @@ export async function handleSignup(request, env) {
 /**
  * Handles `GET /verify-email?token=X`.
  *
- * Marks the user as verified and renders an HTML success page.
+ * Marks the user as verified, activates the 3-month Pro trial (via
+ * `markEmailVerified`), and renders an HTML success page.
  *
  * Three error cases, each returns a dedicated HTML page with 400:
  * - No `token` query param → "Invalid link" / "No token was provided."
  * - Token unknown or already used → "Invalid or already-used link"
  * - Token exists but `verify_token_expires < now` → "Link expired"
- *
- * On success, `markEmailVerified` is called (which clears
- * `verify_token` + `verify_token_expires` so the token becomes single-use),
- * and an audit log entry `email_verified` is recorded.
  *
  * @param {Request} request
  * @param {Object} env
@@ -287,7 +275,7 @@ export async function handleVerifyEmail(request, env) {
     );
   }
 
-  await markEmailVerified(env.DB, user.id);
+  const result = await markEmailVerified(env.DB, user.id);
 
   await logAudit(env.DB, {
     event: "email_verified",
@@ -295,9 +283,12 @@ export async function handleVerifyEmail(request, env) {
     donorId: user.donor_id,
     ip: request.headers.get("CF-Connecting-IP"),
     userAgent: request.headers.get("User-Agent"),
+    detail: `tier=${result.tier} expiresAt=${result.expiresAt ?? "null"}`,
   });
 
-  return htmlResponse(buildSuccessPage(user.email));
+  return htmlResponse(
+    buildSuccessPage(user.email, result.tier, result.expiresAt),
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -308,17 +299,46 @@ export async function handleVerifyEmail(request, env) {
  * Builds the HTML success page shown after email verification.
  *
  * Self-contained: inline CSS, no JS, no external assets. The dark theme
- * matches the app's `index.css` colors. Includes a small "next steps"
- * checklist guiding the user to log in from the app.
+ * matches the app's `index.css` colors. Adapts the banner + footer based
+ * on whether the user has a trial or a lifetime Pro.
  *
  * User-facing strings are currently in **French** to match the app's
- * locale. When we add i18n to the worker responses, these should be
- * looked up via `Accept-Language`.
+ * default locale (like the rest of the worker HTML templates).
  *
  * @param {string} email - The verified email (displayed for confirmation).
+ * @param {string} tier - Effective tier ('pro', 'dev', or 'free').
+ * @param {number|null} expiresAt - Trial expiration (Unix seconds) or null.
  * @returns {string} HTML document as a string.
  */
-function buildSuccessPage(email) {
+function buildSuccessPage(email, tier, expiresAt) {
+  const isTrial =
+    tier === "pro" && expiresAt !== null && expiresAt !== undefined;
+
+  const trialEndStr = isTrial
+    ? new Date(expiresAt * 1000).toLocaleDateString("fr-FR", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      })
+    : null;
+
+  const bannerHtml = isTrial
+    ? `<div class="banner-trial">
+         🎉 <strong>Bonus : 3 mois de Pro offerts !</strong><br>
+         Ton compte est activé en version <strong>Pro</strong> jusqu'au
+         <strong>${trialEndStr}</strong>.
+       </div>`
+    : `<div class="banner-trial">
+         💖 <strong>Merci !</strong> Ton compte Pro est activé à vie.
+       </div>`;
+
+  const footerHtml = isTrial
+    ? `À la fin du trial, ton compte repassera automatiquement en version
+       <strong>gratuite</strong>. Tu peux passer à Pro à vie à tout moment
+       avec un don GitHub Sponsors.`
+    : `Ton accès Pro est valable à vie sur un nombre illimité de PC.`;
+
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -332,9 +352,9 @@ function buildSuccessPage(email) {
     h1 { font-size: 22px; margin: 0 0 12px; }
     p { color: #a0a0b0; line-height: 1.6; margin: 0 0 16px; }
     .email { font-family: monospace; color: #7c6ff7; }
+    .banner-trial { background: linear-gradient(135deg, #7c6ff7 0%, #5b4fd4 100%); color: white; border-radius: 10px; padding: 16px 20px; margin: 20px 0; font-size: 14px; line-height: 1.6; text-align: left; }
     .steps { text-align: left; background: #222228; border-radius: 10px; padding: 16px 20px; margin: 24px 0; font-size: 14px; color: #a0a0b0; line-height: 1.8; }
     .steps strong { color: #f0f0f2; }
-    .btn { display: inline-block; background: #7c6ff7; color: white; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; margin-top: 12px; }
   </style>
 </head>
 <body>
@@ -342,6 +362,7 @@ function buildSuccessPage(email) {
     <div class="icon">✅</div>
     <h1>Email vérifié !</h1>
     <p>Bienvenue sur SoundDeck, <span class="email">${email}</span></p>
+    ${bannerHtml}
     <div class="steps">
       <strong>Prochaines étapes :</strong><br>
       1. Ouvre SoundDeck<br>
@@ -349,9 +370,7 @@ function buildSuccessPage(email) {
       3. Clique sur <strong>Se connecter</strong><br>
       4. Entre ton email et ton mot de passe
     </div>
-    <p style="font-size: 13px; color: #606070;">
-      Ton compte est en version <strong>gratuite</strong>. Passe à Pro à tout moment avec un don GitHub Sponsors.
-    </p>
+    <p style="font-size: 13px; color: #606070;">${footerHtml}</p>
   </div>
 </body>
 </html>`;

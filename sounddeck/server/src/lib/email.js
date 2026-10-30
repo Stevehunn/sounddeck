@@ -1,8 +1,10 @@
 /**
  * @file Transactional email module (Resend).
  *
- * Provides four email types:
- * - Welcome email (sponsor after donation) — includes credentials + license token
+ * Provides five email types:
+ * - Welcome email (new sponsor) — includes credentials + license token
+ * - **Pro upgrade email** (existing trial user → lifetime Pro) — no
+ *   credentials, existing password is preserved
  * - Redeem code email (sponsor) — includes the 14-char code
  * - Verification email (signup) — includes the verify-email link
  * - Password reset email (forgot password) — includes the reset link
@@ -38,7 +40,7 @@ function isPlaceholderApiKey(key) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 1. Welcome email (sponsor → account created)
+// 1. Welcome email (new sponsor → account created)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -161,7 +163,126 @@ function buildWelcomeHtml({ email, password, token, donorName }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 2. Redeem code email (sponsor without email on GitHub)
+// 2. Pro upgrade email (trial user → lifetime Pro via GitHub Sponsors)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Sends a "Pro upgrade" email to an existing trial user who just became
+ * a lifetime Pro donor (via a GitHub Sponsorship with a public email).
+ *
+ * Unlike `sendWelcomeEmail`, this email does **NOT** contain a password
+ * — the user keeps their existing password. They only need to sign out
+ * and sign back in to refresh their license token.
+ *
+ * @param {string} resendApiKey
+ * @param {Object} params
+ * @param {string} params.email
+ * @param {string} params.token - New lifetime-Pro Ed25519 token.
+ * @param {string} [params.donorName]
+ * @returns {Promise<Object>}
+ * @throws {Error} If Resend returns a non-OK status.
+ */
+export async function sendProUpgradeEmail(
+  resendApiKey,
+  { email, token, donorName },
+) {
+  const displayName = donorName || "donateur";
+
+  if (isPlaceholderApiKey(resendApiKey)) {
+    console.log("");
+    console.log(
+      "╔══════════════════════════════════════════════════════════════╗",
+    );
+    console.log(
+      "║  📧 [DEV] Pro upgrade email simulated                        ║",
+    );
+    console.log("║  To   :", email.padEnd(52), "║");
+    console.log(
+      "╚══════════════════════════════════════════════════════════════╝",
+    );
+    return { dev: true, skipped: true };
+  }
+
+  const html = buildProUpgradeHtml({ token, donorName: displayName });
+
+  const res = await fetch(RESEND_API, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: FROM_EMAIL,
+      to: [email],
+      subject: "💖 Your SoundDeck Pro access is now permanent",
+      html,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Resend error (${res.status}): ${err}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Builds the HTML body for the Pro upgrade email.
+ *
+ * @param {Object} params
+ * @param {string} params.token
+ * @param {string} params.donorName
+ * @returns {string}
+ */
+function buildProUpgradeHtml({ token, donorName }) {
+  return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: system-ui, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #111; background: #f8f8fa;">
+  <div style="background: white; border-radius: 12px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.05);">
+    <div style="font-size: 32px; margin-bottom: 16px;">💖</div>
+    <h1 style="font-size: 22px; margin: 0 0 8px;">Thanks ${donorName}!</h1>
+    <p style="font-size: 14px; line-height: 1.6; color: #444; margin-bottom: 24px;">
+      Thank you for your sponsorship! Your SoundDeck account has been upgraded from
+      <strong>trial Pro</strong> to <strong>lifetime Pro</strong>. This is valid forever,
+      on as many PCs as you want.
+    </p>
+
+    <h2 style="font-size: 16px; margin: 0 0 12px;">What changes?</h2>
+    <ul style="font-size: 13px; line-height: 1.8; color: #444; padding-left: 20px; margin-bottom: 24px;">
+      <li>No more expiration date — your Pro access is permanent</li>
+      <li>Your existing password is unchanged — no new credentials needed</li>
+      <li>Just sign out and sign back in to refresh your license token</li>
+    </ul>
+
+    <h2 style="font-size: 16px; margin: 0 0 12px;">How to refresh your token</h2>
+    <ol style="font-size: 13px; line-height: 1.8; color: #444; padding-left: 20px; margin-bottom: 24px;">
+      <li>Open SoundDeck</li>
+      <li>Go to <strong>Options → Support SoundDeck</strong></li>
+      <li>Click <strong>Disconnect</strong></li>
+      <li>Click <strong>Sign in</strong> and enter your email + password</li>
+      <li>Done — your access is now permanent!</li>
+    </ol>
+
+    <h2 style="font-size: 16px; margin: 0 0 12px;">Your new license key (backup)</h2>
+    <div style="background: #1a1a1e; color: #e0e0e0; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 11px; word-break: break-all; line-height: 1.4;">
+      ${token}
+    </div>
+
+    <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 24px 0;">
+    <p style="font-size: 12px; color: #888; line-height: 1.6;">
+      Any question? Just reply to this email.
+    </p>
+  </div>
+</body>
+</html>
+  `.trim();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 3. Redeem code email (sponsor without email on GitHub)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -277,7 +398,7 @@ function buildRedeemCodeHtml({ code, expiresStr, donorName }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 3. Email verification (signup)
+// 4. Email verification (signup)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -353,8 +474,12 @@ function buildVerifyEmailHtml({ verifyUrl }) {
   <div style="background: white; border-radius: 12px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.05);">
     <div style="font-size: 32px; margin-bottom: 16px;">🎧</div>
     <h1 style="font-size: 22px; margin: 0 0 8px;">Welcome to SoundDeck!</h1>
-    <p style="font-size: 14px; line-height: 1.6; color: #444; margin-bottom: 24px;">
+    <p style="font-size: 14px; line-height: 1.6; color: #444; margin-bottom: 16px;">
       Thanks for signing up. Click the button below to verify your email address and activate your account.
+    </p>
+    <p style="font-size: 14px; line-height: 1.6; color: #444; margin-bottom: 24px;">
+      🎁 <strong>Bonus:</strong> verifying your email also activates a
+      <strong>3-month Pro trial</strong> — all Pro plugins unlocked, free of charge.
     </p>
 
     <div style="text-align: center; margin: 32px 0;">
@@ -379,7 +504,7 @@ function buildVerifyEmailHtml({ verifyUrl }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 4. Password reset
+// 5. Password reset
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**

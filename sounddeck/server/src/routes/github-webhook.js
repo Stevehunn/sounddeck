@@ -8,9 +8,13 @@
  * accepted (200 OK) so GitHub doesn't retry.
  *
  * Two cases:
- * - **CASE A — public email**: the sponsor's GitHub email is exposed by
- *   the webhook. We auto-create a `pro` user, generate a temp password,
- *   sign an Ed25519 license token, and email everything to the sponsor.
+ * - **CASE A — public email**:
+ *   - **New email** → create a lifetime-Pro user, generate a temp
+ *     password, sign a token, send a welcome email.
+ *   - **Existing trial user** → upgrade to lifetime Pro (clear
+ *     `tier_expires_at`, keep the existing password), send a
+ *     "pro upgrade" email.
+ *   - **Existing lifetime Pro** → no-op.
  * - **CASE B — private email**: the sponsor's email is hidden. We store
  *   a `pending_sponsorships` row so the sponsor can later claim it via
  *   `/claim-sponsorship`.
@@ -20,10 +24,15 @@
  *
  * @see ./claim.js — the "claim" route for CASE B
  * @see ../lib/crypto.js — `verifyGitHubSignature`
- * @see ../lib/email.js — `sendWelcomeEmail`
+ * @see ../lib/email.js — `sendWelcomeEmail`, `sendProUpgradeEmail`
  */
 
-import { verifyGitHubSignature, hashPassword, generateTempPassword, uuid } from "../lib/crypto.js";
+import {
+  verifyGitHubSignature,
+  hashPassword,
+  generateTempPassword,
+  uuid,
+} from "../lib/crypto.js";
 import {
   insertPendingSponsorship,
   getPendingSponsorshipByNodeId,
@@ -32,7 +41,7 @@ import {
   logAudit,
 } from "../lib/db.js";
 import { generateLicenseToken } from "../lib/license.js";
-import { sendWelcomeEmail } from "../lib/email.js";
+import { sendWelcomeEmail, sendProUpgradeEmail } from "../lib/email.js";
 
 /** Only `sponsorship.created` events are processed; all other actions are a no-op. */
 const SUPPORTED_ACTIONS = new Set(["created"]);
@@ -123,20 +132,85 @@ export async function handleGitHubSponsorWebhook(request, env) {
 
   try {
     // ══════════════════════════════════════════════════════════════
-    // CASE A — Public email: auto-create the account + send welcome
+    // CASE A — Public email
     // ══════════════════════════════════════════════════════════════
     if (sponsorEmail) {
       const existingUser = await getUserByEmail(env.DB, sponsorEmail);
-      if (existingUser) {
-        // User already has an account — log and return (no re-creation)
+
+      // Sub-case A1: existing lifetime Pro → no-op
+      if (
+        existingUser &&
+        existingUser.tier === "pro" &&
+        existingUser.tier_expires_at === null
+      ) {
         await logAudit(env.DB, {
-          event: "github_sponsor_email_exists",
+          event: "github_sponsor_already_pro",
           email: sponsorEmail,
+          donorId: existingUser.donor_id,
           detail: `login=${githubLogin} nodeId=${nodeId}`,
         });
-        return new Response("User already exists", { status: 200 });
+        return new Response("Already lifetime Pro", { status: 200 });
       }
 
+      // Sub-case A2: existing trial user (or free) → upgrade to lifetime Pro
+      if (existingUser) {
+        const now = Math.floor(Date.now() / 1000);
+        const previousTier = existingUser.tier;
+        const previousExpiresAt = existingUser.tier_expires_at;
+
+        await env.DB
+          .prepare(
+            `UPDATE users
+             SET tier = 'pro',
+                 tier_expires_at = NULL,
+                 donor_name = COALESCE(donor_name, ?),
+                 updated_at = ?
+             WHERE id = ?`,
+          )
+          .bind(githubLogin, now, existingUser.id)
+          .run();
+
+        // Trace the sponsorship (claimed immediately, already has a user)
+        await insertPendingSponsorship(env.DB, {
+          id: uuid(),
+          sponsorshipNodeId: nodeId,
+          githubLogin,
+          githubUserId,
+          amountCents,
+          currency: "USD",
+          tier: "pro",
+          isOneTime,
+          privacyLevel,
+        });
+
+        const token = await generateLicenseToken({
+          donorId: existingUser.donor_id,
+          donorName: githubLogin,
+          tier: "pro",
+          expiresAt: null, // lifetime
+          privateKeyHex: env.PRIVATE_KEY_HEX,
+        });
+
+        await sendProUpgradeEmail(env.RESEND_API_KEY, {
+          email: sponsorEmail,
+          token,
+          donorName: githubLogin,
+        });
+
+        await logAudit(env.DB, {
+          event: "github_sponsor_upgraded",
+          email: sponsorEmail,
+          donorId: existingUser.donor_id,
+          detail: `login=${githubLogin} previousTier=${previousTier} previousExpiresAt=${previousExpiresAt ?? "null"}`,
+        });
+
+        console.log(
+          `💖 Sponsor upgraded to lifetime Pro: @${githubLogin} <${sponsorEmail}>`,
+        );
+        return new Response("Upgraded to lifetime Pro", { status: 200 });
+      }
+
+      // Sub-case A3: new email → create user + welcome email
       const userId = uuid();
       const donorId = uuid();
       const tempPassword = generateTempPassword();
@@ -150,9 +224,9 @@ export async function handleGitHubSponsorWebhook(request, env) {
         donorId,
         donorName: githubLogin,
         tier: "pro",
+        tierExpiresAt: null, // lifetime
       });
 
-      // Trace in pending_sponsorships (with claimed = immediate)
       await insertPendingSponsorship(env.DB, {
         id: uuid(),
         sponsorshipNodeId: nodeId,
@@ -169,6 +243,7 @@ export async function handleGitHubSponsorWebhook(request, env) {
         donorId,
         donorName: githubLogin,
         tier: "pro",
+        expiresAt: null, // lifetime
         privateKeyHex: env.PRIVATE_KEY_HEX,
       });
 

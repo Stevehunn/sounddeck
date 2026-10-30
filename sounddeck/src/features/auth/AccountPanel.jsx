@@ -3,6 +3,8 @@
  *
  * Displays:
  * - The current tier (free / pro / dev) with a color-coded badge
+ * - Trial users see a small "Trial" sub-badge + the expiry date +
+ *   an "Upgrade to lifetime Pro" CTA
  * - The user's email and issue date (if connected)
  * - Actions: reveal/copy license token, change account, logout
  *
@@ -11,6 +13,8 @@
  *   to be saved by the user in case they change PC)
  * - **Free**: no token controls (there's no meaningful license to save);
  *   an "Upgrade to Pro" CTA is shown by the parent (`SupportSection`)
+ * - **Trial Pro** (`tier === 'pro'` + `expiresAt` set): same as Pro, plus
+ *   a "Pro until <date>" banner and a "Upgrade to lifetime Pro" CTA
  */
 
 import { useState } from "react";
@@ -22,7 +26,25 @@ import { useLanguage } from "@core/i18n/LanguageContext";
  * @property {string|null} email - User email, null if not connected
  * @property {LicenseTier} [tier] - 'free' | 'pro' | 'dev'
  * @property {number} [issuedAt] - Unix timestamp (seconds)
+ * @property {number|null} [expiresAt] - Trial expiration (Unix seconds),
+ *   `null` for lifetime Pro.
+ * @property {boolean} [neverExpires] - `true` for lifetime Pro.
  */
+
+/**
+ * Formats a Unix timestamp (seconds) into a short locale date.
+ *
+ * @param {number} unixSec
+ * @returns {string}
+ */
+function formatExpiry(unixSec) {
+  return new Date(unixSec * 1000).toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
 
 /**
  * Account panel with tier badge, user info, and actions.
@@ -50,6 +72,11 @@ export default function AccountPanel({
   const isPro = tier === "pro" || tier === "dev";
   const isDev = tier === "dev";
   const isFree = tier === "free";
+  const isTrial =
+    isPro &&
+    !isDev &&
+    status.expiresAt != null &&
+    status.neverExpires === false;
 
   // ─── Load / copy token ──────────────────────────────────────────────
   const loadToken = async () => {
@@ -76,6 +103,21 @@ export default function AccountPanel({
       return;
     }
     onLogout?.();
+  };
+
+  // ─── Upgrade to lifetime Pro (opens GitHub Sponsors) ────────────────
+  const handleUpgradeClick = () => {
+    const url = "https://github.com/sponsors/Stevehunn";
+    // Prefer the shell bridge; fall back to the update one if not present
+    if (window.electronAPI?.openExternal) {
+      window.electronAPI.openExternal(url);
+    } else if (window.electronAPI?.updateOpenGithub) {
+      // Last resort: opens the GitHub releases page in a browser
+      window.electronAPI.updateOpenGithub();
+    } else {
+      // Web dev fallback
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
   };
 
   // ─── Tier-specific display config ───────────────────────────────────
@@ -157,19 +199,36 @@ export default function AccountPanel({
             {tierConfig.header}
           </span>
         </div>
-        <span
-          style={{
-            fontSize: 10,
-            padding: "2px 8px",
-            borderRadius: 10,
-            background: tierConfig.color,
-            color: "white",
-            fontWeight: 600,
-            flexShrink: 0,
-          }}
-        >
-          {tierConfig.label}
-        </span>
+        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+          {isTrial && (
+            <span
+              data-testid="account-trial-badge"
+              style={{
+                fontSize: 9,
+                padding: "1px 6px",
+                borderRadius: 8,
+                background: "rgba(239,159,39,0.15)",
+                color: "var(--warning)",
+                border: "1px solid var(--warning)",
+                fontWeight: 600,
+              }}
+            >
+              {t("trialBadge")}
+            </span>
+          )}
+          <span
+            style={{
+              fontSize: 10,
+              padding: "2px 8px",
+              borderRadius: 10,
+              background: tierConfig.color,
+              color: "white",
+              fontWeight: 600,
+            }}
+          >
+            {tierConfig.label}
+          </span>
+        </div>
       </div>
 
       {/* ─── Description ─────────────────────────────────────────── */}
@@ -182,6 +241,24 @@ export default function AccountPanel({
       >
         {tierConfig.desc}
       </div>
+
+      {/* ─── Trial expiry banner ─────────────────────────────────── */}
+      {isTrial && (
+        <div
+          data-testid="account-trial-expiry"
+          style={{
+            fontSize: 11,
+            color: "var(--warning)",
+            lineHeight: 1.5,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
+          <i className="ti ti-calendar-time" style={{ fontSize: 12 }} />
+          {t("trialExpiresOn", { date: formatExpiry(status.expiresAt) })}
+        </div>
+      )}
 
       {/* ─── "Not connected" badge ───────────────────────────────── */}
       {!isConnected && (
@@ -323,6 +400,19 @@ export default function AccountPanel({
         )}
 
         <div style={{ flex: 1 }} />
+
+        {/* Upgrade CTA — Trial users only */}
+        {isTrial && (
+          <button
+            type="button"
+            className="btn-primary btn-sm"
+            onClick={handleUpgradeClick}
+            style={{ fontSize: 11 }}
+            data-testid="account-upgrade-lifetime-button"
+          >
+            <i className="ti ti-heart" /> {t("trialUpgradeCta")}
+          </button>
+        )}
 
         {/* Connected actions */}
         {isConnected && (

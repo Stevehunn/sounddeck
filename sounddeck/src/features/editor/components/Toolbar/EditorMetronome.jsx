@@ -186,7 +186,7 @@ export default function EditorMetronome({
    * @param {boolean} [isAccent=false]
    * @returns {boolean}
    */
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
+   
   const generateClickSound = useCallback(
     (isAccent = false) =>
       playClickSound(

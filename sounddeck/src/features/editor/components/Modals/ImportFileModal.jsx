@@ -124,7 +124,7 @@ export default function ImportFileModal({
       const picked = result[0]
       const ext = getExtension(picked)
       if (!SUPPORTED_FORMATS.includes(ext)) {
-        // eslint-disable-next-line no-alert
+         
         alert(
           tr('editorUnsupportedFormat', {
             formats: SUPPORTED_FORMATS.join(', '),
@@ -150,7 +150,7 @@ export default function ImportFileModal({
     e.preventDefault()
 
     if (!filePath || !trackId) {
-      // eslint-disable-next-line no-alert
+       
       alert('Please select a file and a track')
       return
     }

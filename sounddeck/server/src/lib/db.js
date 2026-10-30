@@ -6,8 +6,8 @@
  * consistent across all tables.
  *
  * Grouped by domain:
- * - Users (CRUD, list, password updates)
- * - Email verification (tokens, mark-as-verified)
+ * - Users (CRUD, list, password updates, trial expiry)
+ * - Email verification (tokens, mark-as-verified + trial activation)
  * - Password resets (tokens, single-use, expiry)
  * - Payments (Stripe history)
  * - Audit log (all sensitive events)
@@ -47,10 +47,43 @@ export function getUserByDonorId(db, donorId) {
 }
 
 /**
+ * Computes the trial expiration timestamp.
+ *
+ * Business rule: the verification month + the 3 following months.
+ * - Verified in January 2026  → Pro until 2026-04-30 23:59:59 UTC
+ * - Verified in October 2026  → Pro until 2027-01-31 23:59:59 UTC
+ *
+ * Implementation: `new Date(y, m + 4, 0)` with `day = 0` yields the last
+ * day of month `m + 3` (i.e. the 3rd following month), at 00:00 UTC.
+ * We then push it to 23:59:59.999 to include the whole day.
+ *
+ * @param {Date} [now=new Date()]
+ * @returns {number} Unix timestamp (seconds), 23:59:59.999 UTC.
+ */
+export function computeTrialExpiresAt(now = new Date()) {
+  const end = new Date(
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth() + 4,
+      0, // day 0 = last day of the previous month
+      23,
+      59,
+      59,
+      999,
+    ),
+  );
+  return Math.floor(end.getTime() / 1000);
+}
+
+/**
  * Inserts a user with a verified email (`email_verified = 1`).
  *
- * Used by the admin CLI (`admin.mjs create-user`) and by the sponsor webhook
- * when the GitHub email is public.
+ * Used by the admin CLI (`admin.mjs create-user`), the redeem-code route,
+ * the claim-sponsorship route, and the GitHub sponsor webhook.
+ *
+ * `tierExpiresAt` is `null` by default — meaning "lifetime Pro" for
+ * donors, redeem codes, and admin-created accounts. Only the signup +
+ * email-verification flow sets a non-null value (via `markEmailVerified`).
  *
  * @param {D1Database} db
  * @param {Object} params
@@ -61,17 +94,30 @@ export function getUserByDonorId(db, donorId) {
  * @param {string} params.donorId - Unique donor ID.
  * @param {string|null} params.donorName - Display name.
  * @param {'pro'|'free'|'dev'} [params.tier='pro']
- * @returns {Promise<{id: string, email: string, donorId: string, donorName: string|null, tier: string}>}
+ * @param {number|null} [params.tierExpiresAt=null]
+ *   Unix seconds when the trial ends. `null` = lifetime Pro.
+ * @returns {Promise<{id: string, email: string, donorId: string, donorName: string|null, tier: string, tierExpiresAt: number|null}>}
  */
 export async function createUser(
   db,
-  { id, email, passwordHash, passwordSalt, donorId, donorName, tier = "pro" },
+  {
+    id,
+    email,
+    passwordHash,
+    passwordSalt,
+    donorId,
+    donorName,
+    tier = "pro",
+    tierExpiresAt = null,
+  },
 ) {
   const now = Math.floor(Date.now() / 1000);
   await db
     .prepare(
-      `INSERT INTO users (id, email, password_hash, password_salt, donor_id, donor_name, tier, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users
+         (id, email, password_hash, password_salt, donor_id, donor_name,
+          tier, tier_expires_at, email_verified, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     )
     .bind(
       id,
@@ -81,11 +127,12 @@ export async function createUser(
       donorId,
       donorName,
       tier,
+      tierExpiresAt,
       now,
       now,
     )
     .run();
-  return { id, email, donorId, donorName, tier };
+  return { id, email, donorId, donorName, tier, tierExpiresAt };
 }
 
 /**
@@ -123,13 +170,47 @@ export async function updateUserPassword(
 export function listUsers(db, { limit = 100 } = {}) {
   return db
     .prepare(
-      `SELECT id, email, tier, donor_id, donor_name, email_verified, created_at, updated_at
+      `SELECT id, email, tier, tier_expires_at, trial_activated_at,
+              donor_id, donor_name, email_verified, created_at, updated_at
        FROM users
        ORDER BY created_at DESC
        LIMIT ?`,
     )
     .bind(limit)
     .all();
+}
+
+/**
+ * Downgrades an expired trial user to `free` (idempotent).
+ *
+ * Lifetime Pro accounts (`tier_expires_at === null`) are never touched.
+ *
+ * @param {D1Database} db
+ * @param {Object} user - A `users` row (must contain `id`, `tier`,
+ *   `tier_expires_at`).
+ * @returns {Promise<{tier: string, expiresAt: number|null}>}
+ *   The effective tier + expiration after the downgrade check.
+ */
+export async function downgradeIfExpired(db, user) {
+  const now = Math.floor(Date.now() / 1000);
+
+  if (
+    user.tier_expires_at !== null &&
+    user.tier_expires_at !== undefined &&
+    user.tier_expires_at < now
+  ) {
+    await db
+      .prepare(
+        `UPDATE users
+         SET tier = 'free', tier_expires_at = NULL, updated_at = ?
+         WHERE id = ?`,
+      )
+      .bind(now, user.id)
+      .run();
+    return { tier: "free", expiresAt: null };
+  }
+
+  return { tier: user.tier, expiresAt: user.tier_expires_at ?? null };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -172,27 +253,63 @@ export async function setUserVerifyToken(db, userId, token, expiresAt) {
 }
 
 /**
- * Marks a user's email as verified and clears the verification token.
+ * Marks a user's email as verified AND activates the 3-month Pro trial
+ * (unless the user is already lifetime Pro or Dev).
+ *
+ * Tier logic:
+ * - New `free` user          → `pro` + `tier_expires_at = <trial end>`
+ * - Lifetime `pro` (NULL)    → unchanged (donor / redeem / admin)
+ * - `dev`                    → unchanged
+ *
+ * Idempotent: calling twice won't overwrite an existing trial activation
+ * (`trial_activated_at` is set via `COALESCE`).
  *
  * @param {D1Database} db
  * @param {string} userId
- * @returns {Promise<void>}
+ * @returns {Promise<{tier: string, expiresAt: number|null}>}
+ *   The effective tier + trial end date after the update.
  */
 export async function markEmailVerified(db, userId) {
   const now = Math.floor(Date.now() / 1000);
+
+  const user = await db
+    .prepare("SELECT tier, tier_expires_at FROM users WHERE id = ?")
+    .bind(userId)
+    .first();
+
+  const isLifetimePro =
+    user?.tier === "pro" && user?.tier_expires_at === null;
+  const isDev = user?.tier === "dev";
+  const keepLifetime = isLifetimePro || isDev;
+
+  const newTier = keepLifetime ? user.tier : "pro";
+  const newExpiresAt = keepLifetime ? null : computeTrialExpiresAt();
+  const trialActivatedAt = keepLifetime ? null : now;
+
   await db
     .prepare(
       `UPDATE users
-       SET email_verified = 1, verify_token = NULL, verify_token_expires = NULL, updated_at = ?
+       SET email_verified = 1,
+           verify_token = NULL,
+           verify_token_expires = NULL,
+           tier = ?,
+           tier_expires_at = ?,
+           trial_activated_at = COALESCE(trial_activated_at, ?),
+           updated_at = ?
        WHERE id = ?`,
     )
-    .bind(now, userId)
+    .bind(newTier, newExpiresAt, trialActivatedAt, now, userId)
     .run();
+
+  return { tier: newTier, expiresAt: newExpiresAt };
 }
 
 /**
  * Inserts a new user with `email_verified = 0` and a pending verification
  * token. Called from the public signup route.
+ *
+ * Note: this does NOT set a trial — the trial is activated when the user
+ * clicks the verification link (`markEmailVerified`).
  *
  * @param {D1Database} db
  * @param {Object} params
