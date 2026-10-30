@@ -16,7 +16,7 @@ database_id = "843190a9-ae07-4eef-a17d-7e7c05ec7f94"
 
 # ─── Variables publiques (visibles dans le code) ──────────────────────
 [vars]
-APP_VERSION = "1.4.1"
+APP_VERSION = "1.4.13"
 DONATION_MIN_EUR = "5"
 
 # ─── Secrets (à définir via `wrangler secret put`) ────────────────────
