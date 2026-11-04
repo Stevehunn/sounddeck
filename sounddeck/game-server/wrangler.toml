@@ -1,0 +1,23 @@
+name = "valogamble-game"
+main = "src/index.js"
+compatibility_date = "2025-03-01"
+workers_dev = true
+
+[observability]
+enabled = true
+
+[[durable_objects.bindings]]
+name = "GAME_ROOMS"
+class_name = "GameRoom"
+
+[[durable_objects.bindings]]
+name = "GAME_REGISTRY"
+class_name = "RoomRegistry"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GameRoom"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["RoomRegistry"]
