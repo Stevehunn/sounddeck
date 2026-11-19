@@ -147,7 +147,7 @@ export function useSettings(initialState = {}, save) {
     await save('shortcutsEnabled', enabled)
   }, [save])
 
-    const updateToggleShortcutsAccelerator = useCallback(async (accelerator) => {
+  const updateToggleShortcutsAccelerator = useCallback(async (accelerator) => {
     setToggleShortcutsAccelerator(accelerator)
     await save('toggleShortcutsAccelerator', accelerator)
     await window.electronAPI?.updateToggleShortcutsAccelerator?.(accelerator)
@@ -182,9 +182,26 @@ export function useSettings(initialState = {}, save) {
     await save('startMinimized', val)
   }, [save])
 
-  const updateLaunchAtStartup = useCallback(async (val) => {
+  /**
+   * Updates the "launch at startup" preference.
+   *
+   * @param {boolean} val
+   * @param {Object} [options]
+   * @param {boolean} [options.skipIpc=false] - If true, only updates the
+   *   React state and the store — does not call the main-process IPC that
+   *   registers/unregisters the Windows login item. Used during initial
+   *   hydration, where `main.js` already syncs the registry from the store
+   *   in `app.whenReady()`. Avoids a redundant `setLoginItemSettings` call
+   *   at every boot, and the edge case where a failed `getLaunchAtStartup`
+   *   would otherwise disable auto-start by accident.
+   * @returns {Promise<void>}
+   */
+  const updateLaunchAtStartup = useCallback(async (val, options = {}) => {
     setLaunchAtStartup(val)
     await save('launchAtStartup', val)
+    if (!options.skipIpc) {
+      await window.electronAPI?.setLaunchAtStartup?.(val)
+    }
   }, [save])
 
   return {

@@ -217,7 +217,14 @@ export function useStore() {
           data.normalizationTarget ?? 0.2
         )
         settingsHook.setStartMinimized(data.startMinimized ?? false)
-        settingsHook.setLaunchAtStartup(data.launchAtStartup ?? false)
+        // Hydration only: set the React state without triggering the
+        // `set-launch-at-startup` IPC. `main.js` syncs the Windows
+        // registry from the store in `app.whenReady()`, so an extra
+        // `setLoginItemSettings` call here would be redundant (and could
+        // wrongly disable auto-start if `getLaunchAtStartup` ever fails).
+        settingsHook.setLaunchAtStartup(data.launchAtStartup ?? false, {
+          skipIpc: true,
+        })
         settingsHook.updateVirtualDriverInstalled(
           data.virtualDriverInstalled || false
         )

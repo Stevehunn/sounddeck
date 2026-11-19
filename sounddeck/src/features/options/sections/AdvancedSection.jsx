@@ -26,6 +26,47 @@ export default function AdvancedSection({
         title={t('advancedOptions')}
         icon="ti-gauge"
       >
+        {/* Windows startup */}
+        <OptionRow
+          label={t('optionsStartMinimized')}
+          sub={t('optionsStartMinimizedDesc')}
+        >
+          <Toggle
+            value={store.startMinimized || false}
+            onChange={async (val) => {
+              await store.setStartMinimized(val)
+              addToast(
+                val
+                  ? t('toastStartMinimizedEnabled')
+                  : t('toastStartMinimizedDisabled'),
+                'info'
+              )
+            }}
+          />
+        </OptionRow>
+
+        <OptionRow
+          label={t('optionsLaunchAtStartup')}
+          sub={t('optionsLaunchAtStartupDesc')}
+        >
+          <Toggle
+            value={store.launchAtStartup || false}
+            onChange={async (val) => {
+              await store.setLaunchAtStartup(val)
+              addToast(
+                val
+                  ? t('toastLaunchAtStartupEnabled')
+                  : t('toastLaunchAtStartupDisabled'),
+                'info'
+              )
+            }}
+          />
+        </OptionRow>
+
+        <div
+          style={{ height: 1, background: 'var(--border)', margin: '6px 0' }}
+        />
+
         <OptionRow label={t('compressOnImport')} sub={t('compressOnImportDesc')}>
           <Toggle
             value={store.compressOnImport || false}

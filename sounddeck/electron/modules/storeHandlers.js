@@ -85,7 +85,22 @@ function registerStoreHandlers() {
   });
 
   ipcMain.handle("set-launch-at-startup", (event, value) => {
-    store.set("launchAtStartup", !!value);
+    const enabled = !!value;
+    store.set("launchAtStartup", enabled);
+
+    if (app.isPackaged) {
+      try {
+        app.setLoginItemSettings({
+          openAtLogin: enabled,
+          args: enabled ? ["--hidden"] : [],
+        });
+      } catch (e) {
+        console.warn("⚠️ setLoginItemSettings failed:", e.message);
+      }
+    } else {
+      console.log("[dev] Would set login item:", { openAtLogin: enabled });
+    }
+
     return true;
   });
 

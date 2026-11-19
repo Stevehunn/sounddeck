@@ -151,7 +151,69 @@ app.on("second-instance", () => {
 const soundsDir = path.join(app.getPath("userData"), "sounds");
 if (!fs.existsSync(soundsDir)) fs.mkdirSync(soundsDir, { recursive: true });
 
-const shouldStartMinimized = store.get("startMinimized", false);
+// Auto-start Windows : l'installeur / setLoginItemSettings enregistre le
+// binaire avec l'argument `--hidden`. Dans ce cas, on démarre TOUJOURS en
+// arrière-plan (tray), indépendamment de la préférence "startMinimized".
+const wasAutoStarted = process.argv.includes("--hidden");
+const shouldStartMinimized =
+  wasAutoStarted || store.get("startMinimized", false);
+
+// ─── Diagnostic de démarrage (permet de comprendre le boot) ─────────────
+console.log("🔎 [boot] SoundDeck startup diagnostic:", {
+  argv: process.argv,
+  wasAutoStarted,
+  shouldStartMinimized,
+  storedLaunchAtStartup: store.get("launchAtStartup", false),
+  isPackaged: app.isPackaged,
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LOGIN ITEM (auto-start Windows)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Persists the "launch at startup" preference and synchronises it with the
+ * Windows registry via `app.setLoginItemSettings`.
+ *
+ * When enabled, the app is registered with the `--hidden` argument so that
+ * Windows auto-started instances always boot in the background (tray-only),
+ * regardless of the "Démarrer en arrière-plan" (`startMinimized`) preference.
+ *
+ * Important: `setLoginItemSettings` is idempotent on Windows. Calling it
+ * again with the same `openAtLogin: true` but new `args` is a no-op — the
+ * registry keeps the old `args` (often empty). To force a rewrite, we
+ * explicitly unregister first when the desired state is "enabled with args".
+ *
+ * No-op in dev: registering the dev `electron.exe` binary would create a
+ * stale entry pointing to `node_modules/electron/dist/electron.exe`.
+ *
+ * @param {boolean} enabled
+ * @returns {void}
+ */
+function applyLaunchAtStartup(enabled) {
+  const value = !!enabled;
+  store.set("launchAtStartup", value);
+
+  if (!app.isPackaged) {
+    console.log("[dev] Would set login item:", { openAtLogin: value });
+    return;
+  }
+
+  try {
+    // Force a clean re-register: unregister first so the new `args` are
+    // actually written to HKCU\...\Run (avoids the idempotence no-op).
+    app.setLoginItemSettings({ openAtLogin: false });
+    if (value) {
+      app.setLoginItemSettings({
+        openAtLogin: true,
+        args: ["--hidden"],
+      });
+    }
+    console.log("🔐 [login-item] updated:", app.getLoginItemSettings());
+  } catch (e) {
+    console.warn("⚠️ setLoginItemSettings failed:", e.message);
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // IPC HANDLERS REGISTRATION
@@ -257,9 +319,7 @@ function createMainWindow() {
         shortcutManager.toggleGlobalShortcuts(mainWindow);
         updateTrayMenu();
       },
-      onLaunchAtStartup: (checked) => {
-        store.set("launchAtStartup", checked);
-      },
+      onLaunchAtStartup: applyLaunchAtStartup,
       onStartMinimized: (checked) => {
         store.set("startMinimized", checked);
       },
@@ -282,6 +342,11 @@ function createMainWindow() {
     shortcutManager.registerToggleWindowShortcut(
       mainWindow,
       savedToggleWindowShortcut,
+    );
+
+    console.log(
+      "🪟 [window] ready-to-show →",
+      shouldStartMinimized ? "HIDDEN (tray)" : "VISIBLE",
     );
 
     if (!shouldStartMinimized) {
@@ -337,9 +402,7 @@ function updateTrayMenu() {
       shortcutManager.toggleGlobalShortcuts(mainWindow);
       setTimeout(() => updateTrayMenu(), 100);
     },
-    onLaunchAtStartup: (checked) => {
-      store.set("launchAtStartup", checked);
-    },
+    onLaunchAtStartup: applyLaunchAtStartup,
     onStartMinimized: (checked) => {
       store.set("startMinimized", checked);
     },
@@ -359,6 +422,40 @@ function updateTrayMenu() {
 
 app.whenReady().then(async () => {
   protocolHandler.registerLocalFileProtocol();
+
+  // ── Sync login item with the stored preference ────────────────────
+  // Fixes stale registry entries from earlier versions that only saved
+  // the preference without calling setLoginItemSettings, and re-applies
+  // the `--hidden` argument to existing users.
+  //
+  // Force a clean cycle (false → true) because `setLoginItemSettings`
+  // is idempotent on Windows: writing `{openAtLogin: true, args:['--hidden']}`
+  // over an existing `{openAtLogin: true}` entry is a no-op that leaves the
+  // old (empty) args in place.
+  if (app.isPackaged) {
+    try {
+      const launch = store.get("launchAtStartup", false);
+      console.log(
+        "🔐 [boot] login item sync: stored launchAtStartup =",
+        launch,
+      );
+
+      app.setLoginItemSettings({ openAtLogin: false });
+      if (launch) {
+        app.setLoginItemSettings({
+          openAtLogin: true,
+          args: ["--hidden"],
+        });
+      }
+
+      console.log(
+        "🔐 [boot] login item after sync:",
+        app.getLoginItemSettings(),
+      );
+    } catch (e) {
+      console.warn("⚠️ login item sync failed:", e.message);
+    }
+  }
 
   // Store the current app version in electron-store so the renderer and
   // the auto-updater hook can compare it against the latest GitHub release.

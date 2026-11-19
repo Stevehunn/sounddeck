@@ -5,6 +5,94 @@ All notable changes to **SoundDeck** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.14] — 2026-11-18
+
+### Fixed
+
+#### 🖥️ Windows auto-start
+
+- **"Lancer au démarrage" now actually registers SoundDeck with Windows** — previous versions only persisted `launchAtStartup` to the store, but never called `app.setLoginItemSettings`, so the `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry was never created. The checkbox was a silent no-op. SoundDeck now registers and unregisters itself correctly.
+- **"Démarrer en arrière-plan" now works at auto-start** — the startup entry is written with the `--hidden` argument. At boot, `process.argv.includes('--hidden')` forces the main window to stay hidden in the tray, regardless of the `startMinimized` preference state. Manual launches (double-click, Start menu) are unaffected and continue to respect the `startMinimized` toggle.
+- **Electron idempotence bug workaround** — `app.setLoginItemSettings` is a no-op on Windows when called with the same `openAtLogin: true` but different `args`; the registry keeps the old (empty) `args`. The fix forces a `false → true` cycle to guarantee `--hidden` is written on existing installations.
+- **Boot-time registry sync** — on every launch, the registry entry is reconciled with the stored `launchAtStartup` preference. Fixes stale entries created by older versions that only saved the preference.
+- **Startup diagnostic logs** — added `🔎 [boot]`, `🔐 [boot]` and `🪟 [window]` console logs to trace auto-start behavior in production builds (`argv`, `wasAutoStarted`, `shouldStartMinimized`, `app.getLoginItemSettings()`).
+
+### Added
+
+#### 🎛️ Options → Advanced
+
+- **"Démarrer en arrière-plan" toggle** — previously only available from the system tray menu, now also exposed in the standard Options page (`Options → Avancé`).
+- **"Lancer au démarrage" toggle** — same, now accessible outside the tray.
+- **FR / EN / ES translations** for the new labels (`optionsStartMinimizedDesc`) and toast messages (`toastStartMinimizedEnabled/Disabled`, `toastLaunchAtStartupEnabled/Disabled`).
+
+### Changed
+
+- **`electron/main.js`** — new `applyLaunchAtStartup()` helper, used by both the tray menu and the boot-time sync. Unregisters then re-registers the login item to force the `--hidden` argument. Two new diagnostic `console.log` blocks.
+- **`electron/modules/storeHandlers.js`** — `set-launch-at-startup` IPC handler now calls `app.setLoginItemSettings` (gated by `app.isPackaged`), and returns `true` for consistency with the other handlers.
+- **`src/core/store/hooks/useSettings.js`** — `updateLaunchAtStartup` now triggers the `set-launch-at-startup` IPC in addition to persisting the preference. Accepts an optional `{ skipIpc: true }` flag used during hydration.
+- **`src/core/store/index.js`** — hydrates `launchAtStartup` with `{ skipIpc: true }` to avoid a redundant registry call at boot (the sync already happens in `main.js`).
+- **`src/features/options/sections/AdvancedSection.jsx`** — renders the two new toggles at the top of the section, before the compression settings.
+
+### Known issues
+
+- **Legacy `shell:startup` shortcut** — if an older manual shortcut to `SoundDeck.exe --hidden` still exists in `shell:startup`, it will launch SoundDeck hidden at every boot regardless of the in-app toggles. This shortcut must be deleted manually; the app now uses the registry (`setLoginItemSettings`) exclusively.
+
+---
+
+## [1.4.13] — 2026-11-10
+
+### Added
+
+#### 💎 Pro trial (3 months)
+
+- **Automatic 3-month Pro trial** — when a new user signs up and verifies their email, a 3-month Pro subscription is automatically granted.
+- **Trial expiry rule** — Pro is valid for the **verification month + the 3 following months**, ending at `23:59:59 UTC` on the last day of the 3rd following month. Example: verified on 2026-10-29 → Pro until 2027-01-31 23:59:59 UTC.
+- **Trial tracking** — the user record now stores `tier_expires_at`; expired trials silently fall back to `free` on the next login check (`downgradeIfExpired`).
+- **Lifetime Pro for donors, redeem codes, admins** — `tier_expires_at = NULL` for these paths, preserving the current "Pro forever" behavior.
+- **Trial notification popups** — activation notice, reminders at 1 month / 1 week / 1 day before expiry, and an end-of-trial notice. Driven by the new `TrialNotificationService` + `useTrialNotifications` hook (mounted in `App.jsx`).
+- **Trial countdown banner** in Options → Support (AccountPanel shows remaining days for active trials).
+
+#### 👤 Account creation flow
+
+- **Signup form** — inline validation, password strength indicator, terms acceptance.
+- **Email verification** — verification link valid for 24 hours, `handleVerifyEmail` + `buildSuccessPage` in `server/src/routes/signup.js`.
+- **Welcome email + verification reminder** — sent on signup; reminder after 48 hours if unverified.
+- **Pro upgrade email** — `sendProUpgradeEmail` (`server/src/lib/email.js`) sent automatically once the email is verified, to confirm the trial start.
+
+#### 🗄️ Database
+
+- **Migration `0006_user_trial.sql`** — adds `tier_expires_at` column with an index for fast expiry checks.
+
+### Changed
+
+- **`server/src/lib/db.js`** — `markEmailVerified`, `createUser`, `listUsers` updated to handle `tier_expires_at`; two new helper functions for trial computation and expiry checks.
+- **`server/src/lib/license.js`** — `buildLicensePayload` and `generateLicenseToken` now include `expiresAt` (`null` for lifetime Pro, ISO date for trials).
+- **`server/src/routes/login.js`** — calls `downgradeIfExpired` before issuing the token; token now carries `expiresAt`.
+- **`server/src/routes/signup.js`** — verification now triggers the Pro trial grant + `sendProUpgradeEmail`.
+- **`server/src/routes/github-webhook.js`** — fix for the "existing user upgrade" path (no longer resets `tier_expires_at` to `NULL` for an already-Pro user who was on trial).
+- **`src/core/plugins/PluginManager/licenseManager.js`** — checks token expiry and returns an enriched license object (`tier`, `expiresAt`, `expired`, `neverExpires`).
+- **`src/core/services/LicenseService.js`** — exposes `expiresAt`, `expiredAt` and `neverExpires`; plugins with `licenseRequired: true` now respect the trial expiry.
+- **`src/features/auth/AccountPanel.jsx`** — distinguishes Free / Trial Pro / Lifetime Pro / Dev tiers; shows trial countdown and an upgrade CTA.
+- **`src/App.jsx`** — mounts the `useTrialNotifications` hook.
+- **i18n** — 9 new keys × 3 languages (`trialStarted`, `trialEndsIn`, `trialExpired`, `trialUpgradeCta`, etc.).
+
+### Fixed
+
+- **`server/src/routes/github-webhook.js`** — upgrading an existing Free user to Pro via GitHub Sponsors no longer touches `tier_expires_at` when they were not on trial.
+
+### Tests
+
+- **5621 / 5621** passing.
+- `computeTrialExpiresAt` — 7 unit tests including January 2026, October 2026, leap year edge cases.
+- `npm run audit:i18n` — **2106** keys × 3 languages, fully synced.
+- Migration `0006_user_trial.sql` — verified locally.
+
+### Security
+
+- **Trial grants are server-side only** — the client cannot extend `tier_expires_at`.
+- **Signed license tokens carry `expiresAt`** — the client validates expiry on every plugin load; a modified token would break the Ed25519 signature.
+- **Donors / redeem codes / admins** — `tier_expires_at = NULL`, lifetime Pro preserved.
+
 ---
 
 ## [1.4.12] — 2026-10-16
@@ -239,6 +327,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[1.4.14]: https://github.com/Stevehunn/sounddeck/releases/tag/v1.4.14
+[1.4.13]: https://github.com/Stevehunn/sounddeck/releases/tag/v1.4.13
 [1.4.12]: https://github.com/Stevehunn/sounddeck/releases/tag/v1.4.12
 [1.4.0]: https://github.com/Stevehunn/sounddeck/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Stevehunn/sounddeck/releases/tag/v1.3.0

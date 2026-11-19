@@ -11,3 +11,5 @@ server/scripts/.tmp-*.sql
 /game-server/.dev.vars
 *.log
 .DS_Store
+*.local.md
+*.local.txt

@@ -509,4 +509,14 @@ export default {
   supportUpgradeTitle: "Pasa a Pro de por vida",
   supportUpgradeDesc:
     "Desbloquea todos los plugins Pro con una donación única de 5 € o más en GitHub Sponsors. Acceso de por vida, válido en un número ilimitado de PCs.",
+
+  // ─── Opción bandeja ─────────────────────────────────────────────
+  optionsStartMinimized: "Iniciar en segundo plano",
+  optionsStartMinimizedDesc: "Abrir SoundDeck minimizado en la bandeja del sistema en lugar de la ventana principal",
+  optionsLaunchAtStartup: "Iniciar al arrancar",
+  optionsLaunchAtStartupDesc: "Iniciar SoundDeck automáticamente con Windows",
+  toastStartMinimizedEnabled: "SoundDeck se iniciará en segundo plano",
+  toastStartMinimizedDisabled: "SoundDeck se iniciará con la ventana visible",
+  toastLaunchAtStartupEnabled: "SoundDeck se iniciará al arrancar Windows",
+  toastLaunchAtStartupDisabled: "SoundDeck ya no se iniciará al arrancar",
 };

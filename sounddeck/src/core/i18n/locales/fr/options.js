@@ -508,4 +508,14 @@ export default {
   supportUpgradeTitle: "Passe à Pro à vie",
   supportUpgradeDesc:
     "Débloque tous les plugins Pro avec un don unique de 5 € ou plus sur GitHub Sponsors. Accès à vie, valable sur un nombre illimité de PC.",
+
+  // ─── Option tray ─────────────────────────────────────────────────
+  optionsStartMinimized: "Démarrer en arrière-plan",
+  optionsStartMinimizedDesc: "Ouvrir SoundDeck minimisé dans la barre système au lieu de la fenêtre principale",
+  optionsLaunchAtStartup: "Lancer au démarrage",
+  optionsLaunchAtStartupDesc: "Démarrer SoundDeck automatiquement avec Windows",
+  toastStartMinimizedEnabled: "SoundDeck démarrera en arrière-plan",
+  toastStartMinimizedDisabled: "SoundDeck démarrera avec la fenêtre visible",
+  toastLaunchAtStartupEnabled: "SoundDeck se lancera au démarrage de Windows",
+  toastLaunchAtStartupDisabled: "SoundDeck ne se lancera plus au démarrage",
 };
